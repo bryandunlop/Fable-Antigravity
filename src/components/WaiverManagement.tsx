@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import WaiverRequestForm from './safety/WaiverRequestForm';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -9,13 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { 
-  FileCheck, 
-  Plus, 
-  Search, 
-  Filter, 
-  User, 
-  Calendar, 
+import {
+  FileCheck,
+  Plus,
+  Search,
+  Filter,
+  User,
+  Calendar,
   Clock,
   CheckCircle,
   XCircle,
@@ -26,11 +27,28 @@ import {
 import { toast } from 'sonner';
 
 export default function WaiverManagement() {
+  interface Waiver {
+    id: string;
+    title: string;
+    type: string;
+    priority: string;
+    status: string;
+    submittedBy: string;
+    submittedDate: string;
+    expirationDate: string;
+    description: string;
+    justification: string;
+    riskAssessment: string;
+    assignedTo: string;
+    approvers: string[];
+    duties: { id: number; task: string; assignedTo: string; status: string; }[];
+  }
+
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewWaiverDialog, setShowNewWaiverDialog] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
-  const [selectedWaiver, setSelectedWaiver] = useState(null);
+  const [selectedWaiver, setSelectedWaiver] = useState<Waiver | null>(null);
 
   // Mock data - in real app this would come from backend
   const waivers = [
@@ -113,8 +131,8 @@ export default function WaiverManagement() {
   const filteredWaivers = waivers.filter(waiver => {
     const matchesFilter = filter === 'all' || waiver.status.toLowerCase().replace(' ', '') === filter;
     const matchesSearch = waiver.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         waiver.submittedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         waiver.id.toLowerCase().includes(searchTerm.toLowerCase());
+      waiver.submittedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      waiver.id.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -142,7 +160,7 @@ export default function WaiverManagement() {
           </h1>
           <p className="text-muted-foreground">Review and approve operational waiver requests</p>
         </div>
-        
+
         <Dialog open={showNewWaiverDialog} onOpenChange={setShowNewWaiverDialog}>
           <DialogTrigger asChild>
             <Button>
@@ -150,81 +168,14 @@ export default function WaiverManagement() {
               New Waiver Request
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Submit New Waiver Request</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Waiver Title</Label>
-                  <Input placeholder="Brief description of waiver request" />
-                </div>
-                <div>
-                  <Label>Type</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select waiver type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="operational">Operational</SelectItem>
-                      <SelectItem value="weather">Weather</SelectItem>
-                      <SelectItem value="crew-rest">Crew Rest</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Priority</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="critical">Critical</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Expiration Date</Label>
-                  <Input type="date" />
-                </div>
-              </div>
-              
-              <div>
-                <Label>Description</Label>
-                <Textarea placeholder="Detailed description of the waiver request" rows={3} />
-              </div>
-              
-              <div>
-                <Label>Justification</Label>
-                <Textarea placeholder="Business justification for this waiver" rows={3} />
-              </div>
-              
-              <div>
-                <Label>Risk Assessment</Label>
-                <Textarea placeholder="Risk assessment and mitigation measures" rows={3} />
-              </div>
-              
-              <div className="flex gap-2 pt-4">
-                <Button onClick={() => {
-                  toast.success('Waiver request submitted successfully');
-                  setShowNewWaiverDialog(false);
-                }}>
-                  Submit Request
-                </Button>
-                <Button variant="outline" onClick={() => setShowNewWaiverDialog(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
+            <WaiverRequestForm
+              onSuccess={() => setShowNewWaiverDialog(false)}
+              onCancel={() => setShowNewWaiverDialog(false)}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -303,7 +254,7 @@ export default function WaiverManagement() {
                 />
               </div>
             </div>
-            
+
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger className="w-48">
                 <Filter className="w-4 h-4 mr-2" />
@@ -404,7 +355,7 @@ export default function WaiverManagement() {
                                 <TabsTrigger value="duties">Duties</TabsTrigger>
                                 <TabsTrigger value="approvals">Approvals</TabsTrigger>
                               </TabsList>
-                              
+
                               <TabsContent value="details" className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
@@ -428,22 +379,22 @@ export default function WaiverManagement() {
                                     </Badge>
                                   </div>
                                 </div>
-                                
+
                                 <div>
                                   <Label>Description</Label>
                                   <p>{waiver.description}</p>
                                 </div>
-                                
+
                                 <div>
                                   <Label>Justification</Label>
                                   <p>{waiver.justification}</p>
                                 </div>
-                                
+
                                 <div>
                                   <Label>Risk Assessment</Label>
                                   <p>{waiver.riskAssessment}</p>
                                 </div>
-                                
+
                                 <div className="flex gap-2 pt-4">
                                   <Button onClick={() => handleApproveWaiver(waiver.id)} className="bg-green-600 hover:bg-green-700">
                                     <CheckCircle className="w-4 h-4 mr-2" />
@@ -456,7 +407,7 @@ export default function WaiverManagement() {
                                   <Button variant="outline">Request More Info</Button>
                                 </div>
                               </TabsContent>
-                              
+
                               <TabsContent value="duties" className="space-y-4">
                                 <div className="flex justify-between items-center">
                                   <h3>Assigned Duties</h3>
@@ -465,7 +416,7 @@ export default function WaiverManagement() {
                                     Add Duty
                                   </Button>
                                 </div>
-                                
+
                                 {waiver.duties.length > 0 ? (
                                   <div className="space-y-3">
                                     {waiver.duties.map((duty) => (
@@ -495,7 +446,7 @@ export default function WaiverManagement() {
                                   </div>
                                 )}
                               </TabsContent>
-                              
+
                               <TabsContent value="approvals" className="space-y-4">
                                 <div>
                                   <h3>Required Approvers</h3>

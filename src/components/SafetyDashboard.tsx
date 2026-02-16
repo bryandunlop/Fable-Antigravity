@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import SafetyMyActivity from './SafetyMyActivity';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -55,6 +56,7 @@ interface SafetyDashboardProps {
 }
 
 export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardProps) {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHazard, setSelectedHazard] = useState<any>(null);
@@ -63,6 +65,20 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
   const [selectedWaiverDetail, setSelectedWaiverDetail] = useState<any>(null);
   const [waiverComment, setWaiverComment] = useState('');
   const [forwardToRole, setForwardToRole] = useState('');
+
+  useEffect(() => {
+    // Check if we need to switch tabs or open dialogs based on query params
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+
+    // Pass action params to My Activity if relevant
+    const actionParam = searchParams.get('action');
+    if (actionParam && (actionParam === 'new-waiver' || actionParam === 'new-cws')) {
+      setActiveTab('my-activity');
+    }
+  }, [searchParams]);
 
   // Mock data - in real app this would come from backend
   const safetyStats = {
@@ -467,6 +483,10 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
             {isAdmin && safetyStats.pendingWaivers > 0 && (
               <Badge className="ml-1 h-5 px-1.5 text-xs">{safetyStats.pendingWaivers}</Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="my-activity" className="gap-2">
+            <ClipboardList className="w-4 h-4" />
+            <span className="hidden sm:inline">My Activity</span>
           </TabsTrigger>
           <TabsTrigger value="audits" className="gap-2">
             <Target className="w-4 h-4" />
@@ -1069,7 +1089,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                 <CardDescription>Submit a Caught Working Safely recognition</CardDescription>
               </CardHeader>
               <CardContent>
-                <Link to="/user-safety">
+                <Link to="/user-safety?action=new-cws">
                   <Button className="w-full bg-green-600 hover:bg-green-700">
                     <Star className="w-4 h-4 mr-2" />
                     Submit CWS Recognition
@@ -1121,7 +1141,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
               <h2 className="text-lg">Waiver Management</h2>
               <p className="text-sm text-muted-foreground">Review and manage waiver requests</p>
             </div>
-            <Link to="/user-safety">
+            <Link to="/user-safety?action=new-waiver">
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
                 Request Waiver

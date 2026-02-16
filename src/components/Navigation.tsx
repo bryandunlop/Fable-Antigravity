@@ -241,7 +241,8 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
       label: "Safety",
       items: [
         { name: 'Safety Center', href: '/safety', icon: Shield, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
-        { name: 'Report Hazard', href: '/safety/hazards?action=new', icon: AlertTriangle, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
+        { name: 'My Safety Activity', href: '/safety?tab=my-activity', icon: UserCheck, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
+        { name: 'Report Hazard', href: '/safety?tab=hazards&action=new', icon: AlertTriangle, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
       ]
     },
     {

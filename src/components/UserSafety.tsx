@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import WaiverRequestForm from './safety/WaiverRequestForm';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -11,17 +13,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
-import { 
+import {
   Shield,
-  FileCheck, 
+  FileCheck,
   AlertTriangle,
   Target,
   UserCheck,
-  Plus, 
-  Search, 
-  Filter, 
-  User, 
-  Calendar, 
+  Plus,
+  Search,
+  Filter,
+  User,
+  Calendar,
   Clock,
   CheckCircle,
   XCircle,
@@ -41,10 +43,20 @@ interface UserSafetyProps {
 }
 
 export default function UserSafety({ userRole }: UserSafetyProps) {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('overview');
   const [showWaiverDialog, setShowWaiverDialog] = useState(false);
   const [showHazardDialog, setShowHazardDialog] = useState(false);
   const [showCWSDialog, setShowCWSDialog] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'new-waiver') {
+      setShowWaiverDialog(true);
+    }
+    if (searchParams.get('action') === 'new-cws') {
+      setShowCWSDialog(true);
+    }
+  }, [searchParams]);
 
   // Mock data for user's safety items
   const myWaivers = [
@@ -151,10 +163,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
     }
   };
 
-  const handleSubmitWaiver = () => {
-    toast.success('Waiver request submitted successfully');
-    setShowWaiverDialog(false);
-  };
+
 
   const handleSubmitHazard = () => {
     toast.success('Hazard report submitted successfully');
@@ -190,7 +199,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
           </h1>
           <p className="text-muted-foreground">Submit reports, respond to audits, and stay compliant</p>
         </div>
-        
+
         <div className="flex gap-2 mt-4 lg:mt-0 flex-wrap">
           <Dialog open={showCWSDialog} onOpenChange={setShowCWSDialog}>
             <DialogTrigger asChild>
@@ -233,7 +242,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                     </Select>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Date Observed *</Label>
@@ -244,7 +253,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                     <Input placeholder="e.g., Hangar 3, Ramp Area, Office" />
                   </div>
                 </div>
-                
+
                 <div>
                   <Label>Category of Safe Practice *</Label>
                   <Select>
@@ -265,10 +274,10 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Label>Description of Safe Behavior *</Label>
-                  <Textarea 
+                  <Textarea
                     placeholder="Describe what you observed. What specifically did this person do that demonstrated safe work practices? Be detailed and specific."
                     rows={4}
                   />
@@ -276,10 +285,10 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                     Example: "Observed wearing proper eye protection and gloves while performing maintenance tasks. Also took extra time to properly secure tools before climbing ladder."
                   </p>
                 </div>
-                
+
                 <div>
                   <Label>Why This Matters (Optional)</Label>
-                  <Textarea 
+                  <Textarea
                     placeholder="Explain the impact or importance of this safe behavior"
                     rows={2}
                   />
@@ -309,7 +318,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2 pt-4">
                   <Button onClick={handleSubmitCWS} className="bg-green-600 hover:bg-green-700">
                     <Send className="w-4 h-4 mr-2" />
@@ -330,73 +339,14 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                 Request Waiver
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Submit Waiver Request</DialogTitle>
+                <DialogTitle>Submit New Waiver Request</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Waiver Title</Label>
-                    <Input placeholder="Brief description of waiver request" />
-                  </div>
-                  <div>
-                    <Label>Type</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select waiver type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="operational">Operational</SelectItem>
-                        <SelectItem value="weather">Weather</SelectItem>
-                        <SelectItem value="crew-rest">Crew Rest</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Priority</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="critical">Critical</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Requested Date</Label>
-                    <Input type="date" />
-                  </div>
-                </div>
-                
-                <div>
-                  <Label>Description</Label>
-                  <Textarea placeholder="Detailed description of the waiver request" rows={3} />
-                </div>
-                
-                <div>
-                  <Label>Justification</Label>
-                  <Textarea placeholder="Why is this waiver necessary?" rows={3} />
-                </div>
-                
-                <div className="flex gap-2 pt-4">
-                  <Button onClick={handleSubmitWaiver}>
-                    Submit Request
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowWaiverDialog(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
+              <WaiverRequestForm
+                onSuccess={() => setShowWaiverDialog(false)}
+                onCancel={() => setShowWaiverDialog(false)}
+              />
             </DialogContent>
           </Dialog>
 
@@ -435,7 +385,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                     </Select>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Severity</Label>
@@ -456,17 +406,17 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                     <Input placeholder="Specific location of hazard" />
                   </div>
                 </div>
-                
+
                 <div>
                   <Label>Description</Label>
                   <Textarea placeholder="Detailed description of the hazard" rows={3} />
                 </div>
-                
+
                 <div>
                   <Label>Immediate Actions Taken</Label>
                   <Textarea placeholder="What immediate actions were taken?" rows={2} />
                 </div>
-                
+
                 <div className="flex gap-2 pt-4">
                   <Button onClick={handleSubmitHazard}>
                     Submit Report
@@ -591,7 +541,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                       Pending Review
                     </Badge>
                   </div>
-                  
+
                   <div className="flex items-start gap-3 p-3 border rounded-lg">
                     <AlertTriangle className="w-4 h-4 mt-1 text-red-600" />
                     <div className="flex-1">
@@ -603,7 +553,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                       Under Investigation
                     </Badge>
                   </div>
-                  
+
                   <div className="flex items-start gap-3 p-3 border rounded-lg">
                     <Target className="w-4 h-4 mt-1 text-purple-600" />
                     <div className="flex-1">
@@ -651,7 +601,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="p-4 border rounded-lg bg-blue-50">
                     <div className="flex items-center gap-3">
                       <Target className="w-5 h-5 text-blue-600" />
@@ -664,7 +614,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="p-4 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <AlertTriangle className="w-5 h-5 text-orange-600" />
@@ -757,8 +707,8 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                     <div>
                       <p className="font-medium text-blue-900">Why Caught Working Safely Matters</p>
                       <p className="text-sm text-blue-800 mt-1">
-                        The Caught Working Safely program strengthens our safety culture by recognizing and celebrating safe behaviors. 
-                        When you submit a recognition, it goes directly to the Safety Manager and may be shared in safety communications 
+                        The Caught Working Safely program strengthens our safety culture by recognizing and celebrating safe behaviors.
+                        When you submit a recognition, it goes directly to the Safety Manager and may be shared in safety communications
                         to inspire others. Your observations help identify and reinforce best practices across our operations.
                       </p>
                     </div>
@@ -843,11 +793,11 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                         <Progress value={audit.completionRate} className="w-32 mt-1" />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-3">
                       {audit.checklist.map((item) => (
                         <div key={item.id} className="flex items-center gap-3 p-3 border rounded">
-                          <Checkbox 
+                          <Checkbox
                             checked={item.completed}
                             onCheckedChange={() => handleUpdateAuditItem(audit.id, item.id)}
                           />
@@ -896,7 +846,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         {doc.status === 'Pending' ? (
                           <div className="flex items-center gap-2">
@@ -905,14 +855,14 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
                               <Input
                                 placeholder="Enter completion code"
                                 className="w-40"
-                                onKeyPress={(e) => {
+                                onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => {
                                   if (e.key === 'Enter') {
                                     handleCompleteDocument(doc.id, (e.target as HTMLInputElement).value);
                                   }
                                 }}
                               />
                             </div>
-                            <Button 
+                            <Button
                               size="sm"
                               onClick={(e) => {
                                 const input = e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement;
