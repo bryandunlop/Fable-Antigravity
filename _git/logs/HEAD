@@ -1,0 +1,19 @@
+0000000000000000000000000000000000000000 ae0131b304c88978e28d145e3a03cedfa5504461 AI Agent <agent@example.com> 1765153505 -0500	commit (initial): Initial commit from migration
+ae0131b304c88978e28d145e3a03cedfa5504461 ae0131b304c88978e28d145e3a03cedfa5504461 AI Agent <agent@example.com> 1765158250 -0500	checkout: moving from master to backup-api-work
+ae0131b304c88978e28d145e3a03cedfa5504461 02ca2e28d74af8b77225c27f0422a5a732cb3669 AI Agent <agent@example.com> 1765158302 -0500	commit: Backup: API integrations and bug fixes before restoring Figma design
+02ca2e28d74af8b77225c27f0422a5a732cb3669 ae0131b304c88978e28d145e3a03cedfa5504461 AI Agent <agent@example.com> 1765158317 -0500	checkout: moving from backup-api-work to master
+ae0131b304c88978e28d145e3a03cedfa5504461 9a4411a5be491f216ceb6515ccf87cee83ee2612 AI Agent <agent@example.com> 1765158525 -0500	reset: moving to origin/main
+9a4411a5be491f216ceb6515ccf87cee83ee2612 ca6cb0a9fd470249932e087349ab727e7059624f AI Agent <agent@example.com> 1765160176 -0500	commit: Add Vercel configuration for deployment
+ca6cb0a9fd470249932e087349ab727e7059624f fa011ff010d116c99ff17cd3e2fa7f7ae4c34636 AI Agent <agent@example.com> 1765161587 -0500	commit: Fix deployment: Add vercel.json, .gitignore and fix sonner imports
+fa011ff010d116c99ff17cd3e2fa7f7ae4c34636 28251a0dc80f964d173972181c30cae2627d795f AI Agent <agent@example.com> 1765245856 -0500	commit: Deployment: Update application code base
+28251a0dc80f964d173972181c30cae2627d795f 434829c15b869b48d261880f1e9f40aa9a7bb73b AI Agent <agent@example.com> 1765246567 -0500	commit: Add technical architecture diagram and hazard workflow fixes
+434829c15b869b48d261880f1e9f40aa9a7bb73b 0aa5234d46c9731ec3e6360e3b45384adeadf8a8 AI Agent <agent@example.com> 1765306878 -0500	commit: Syncing latest changes
+0aa5234d46c9731ec3e6360e3b45384adeadf8a8 84037a63f7ecd43b5c1b307ae865c4c97329a09c AI Agent <agent@example.com> 1765487940 -0500	commit: feat: Add Tax Compliance, Maintenance Settings, and Preflight Workflow updates
+84037a63f7ecd43b5c1b307ae865c4c97329a09c 405c4989360a53acb4090d772fc57b3e5f9756c9 AI Agent <agent@example.com> 1765488312 -0500	commit: fix(vercel): add rewrite rule for SPA routing
+405c4989360a53acb4090d772fc57b3e5f9756c9 99e65e33159f45962f1c5f6499796fbf9727f94e AI Agent <agent@example.com> 1765918779 -0500	commit: Fix preflight workflow mock data and persistence logic
+99e65e33159f45962f1c5f6499796fbf9727f94e 573e927a1406091c2ccc3e14a4e5b1610a662e48 AI Agent <agent@example.com> 1765938591 -0500	commit: Update Hazard Reporting and Workflow components
+573e927a1406091c2ccc3e14a4e5b1610a662e48 5ed0a3ec07843b7f3b822db7c15ae8c6a153864f AI Agent <agent@example.com> 1766551592 -0500	commit: Add maintenance features, dashboard widgets, and update contexts
+5ed0a3ec07843b7f3b822db7c15ae8c6a153864f 10db70b27cb8a2f2b69a5d975687d2ffa6e56677 AI Agent <agent@example.com> 1767836092 -0500	commit: chore: track package-lock.json to ensure consistent dependencies
+10db70b27cb8a2f2b69a5d975687d2ffa6e56677 11412bb50a12bc4dcd7d78e9dd35e05b20ae7522 AI Agent <agent@example.com> 1767845808 -0500	commit: Update Hazard Reporting, Preflight, and Catering components
+11412bb50a12bc4dcd7d78e9dd35e05b20ae7522 885df7370b8b84eebbc246a6d5d04655299ba577 AI Agent <agent@example.com> 1767845986 -0500	commit: Trigger Vercel Deploy
+885df7370b8b84eebbc246a6d5d04655299ba577 885df7370b8b84eebbc246a6d5d04655299ba577 AI Agent <agent@example.com> 1767846136 -0500	checkout: moving from master to main

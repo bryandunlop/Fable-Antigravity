@@ -1,0 +1,289 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 14px;
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #0037B1;
+  --primary-foreground: #ffffff;
+  --secondary: #44BEEE;
+  --secondary-foreground: #0037B1;
+  --muted: #f0f6ff;
+  --muted-foreground: #717182;
+  --accent: #00A1DF;
+  --accent-foreground: #ffffff;
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 161, 223, 0.15);
+  --input: transparent;
+  --input-background: #f8fbff;
+  --switch-background: #cbced4;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #00A1DF;
+  --chart-1: #0037B1;
+  --chart-2: #00A1DF;
+  --chart-3: #44BEEE;
+  --chart-4: #7dd3f0;
+  --chart-5: #b3e5f7;
+  --radius: 0.625rem;
+  --sidebar: #fafbff;
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #0037B1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f6ff;
+  --sidebar-accent-foreground: #0037B1;
+  --sidebar-border: rgba(0, 55, 177, 0.1);
+  --sidebar-ring: #00A1DF;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: #44BEEE;
+  --primary-foreground: #0037B1;
+  --secondary: #0037B1;
+  --secondary-foreground: #44BEEE;
+  --muted: #1a2332;
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: #00A1DF;
+  --accent-foreground: #ffffff;
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: rgba(68, 190, 238, 0.2);
+  --input: #1a2332;
+  --ring: #44BEEE;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: #44BEEE;
+  --chart-2: #00A1DF;
+  --chart-3: #7dd3f0;
+  --chart-4: #0037B1;
+  --chart-5: #b3e5f7;
+  --sidebar: #0f1419;
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: #44BEEE;
+  --sidebar-primary-foreground: #0037B1;
+  --sidebar-accent: #1a2332;
+  --sidebar-accent-foreground: #44BEEE;
+  --sidebar-border: rgba(68, 190, 238, 0.15);
+  --sidebar-ring: #00A1DF;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* Aviation Blue Theme Enhancements */
+@layer components {
+  /* Enhanced blue gradients for special elements */
+  .aviation-gradient {
+    background: linear-gradient(135deg, #0037B1 0%, #00A1DF 50%, #44BEEE 100%);
+  }
+  
+  .aviation-gradient-subtle {
+    background: linear-gradient(135deg, rgba(0, 55, 177, 0.1) 0%, rgba(0, 161, 223, 0.1) 50%, rgba(68, 190, 238, 0.1) 100%);
+  }
+  
+  /* Blue-themed shadows */
+  .aviation-shadow {
+    box-shadow: 0 4px 20px rgba(0, 161, 223, 0.15);
+  }
+  
+  .aviation-shadow-lg {
+    box-shadow: 0 10px 40px rgba(0, 161, 223, 0.2);
+  }
+  
+  /* Enhanced focus states with blue */
+  .aviation-focus {
+    @apply focus:ring-2 focus:ring-accent/50 focus:border-accent;
+  }
+  
+  /* Special blue variants for important elements */
+  .btn-aviation-primary {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground;
+    box-shadow: 0 2px 8px rgba(0, 55, 177, 0.2);
+  }
+  
+  .btn-aviation-secondary {
+    @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground;
+    box-shadow: 0 2px 8px rgba(68, 190, 238, 0.2);
+  }
+  
+  .btn-aviation-accent {
+    @apply bg-accent hover:bg-accent/90 text-accent-foreground;
+    box-shadow: 0 2px 8px rgba(0, 161, 223, 0.2);
+  }
+  
+  /* Enhanced card styling with blue accents */
+  .aviation-card {
+    @apply bg-card border border-border/50 rounded-lg;
+    box-shadow: 0 1px 3px rgba(0, 161, 223, 0.05);
+  }
+  
+  .aviation-card-featured {
+    @apply bg-card border-2 border-accent/20 rounded-lg;
+    box-shadow: 0 4px 12px rgba(0, 161, 223, 0.1);
+  }
+  
+  /* Enhanced shadow variants */
+  .aviation-shadow-xl {
+    box-shadow: 0 25px 50px rgba(0, 161, 223, 0.25);
+  }
+  
+  /* Border width utilities */
+  .border-3 {
+    border-width: 3px;
+  }
+  
+  /* Enhanced button glow effects */
+  .request-button-glow {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .request-button-glow::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+  }
+  
+  .request-button-glow:hover::before {
+    left: 100%;
+  }
+  
+  /* Pulse animation for emphasis */
+  @keyframes aviation-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 0.8;
+    }
+  }
+  
+  .aviation-pulse {
+    animation: aviation-pulse 2s infinite;
+  }
+}

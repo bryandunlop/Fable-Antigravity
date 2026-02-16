@@ -1,0 +1,35 @@
+{
+    "leg_id": 101,
+    "trip_id": 5001,
+    "aircraft_tail": "N1PG",
+    "dep_airport": "KTEB",
+    "arr_airport": "MYNN",
+    "block_time_hours": 2.5,
+    "distance_miles": 945.00,
+    "leg_type": "Live",
+    "date": "2023-10-15T08:00:00Z",
+    "passengers": [
+        {
+            "pax_id": 10,
+            "name": "John Doe",
+            "relationship": "Executive",
+            "tax_status": "Personal-Ent",
+            "sifl_income": 450.25
+        },
+        {
+            "pax_id": 11,
+            "name": "Jane Doe",
+            "relationship": "Spouse",
+            "tax_status": "Personal-Non-Ent",
+            "sifl_income": 450.25
+        }
+    ],
+    "cost_center": {
+        "fuel_cost": 2500.00,
+        "catering_cost": 300.00,
+        "landing_fees": 150.00,
+        "crew_travel": 0.00,
+        "total_variable_cost": 2950.00
+    },
+    "compliance_alerts": []
+}

@@ -1,0 +1,92 @@
+import React from 'react';
+import { Button } from "./ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Badge } from "./ui/badge";
+import { Printer } from 'lucide-react';
+
+interface ExecutiveSummaryProps {
+    trips: any[];
+    onClose: () => void;
+}
+
+export default function ExecutiveSummaryReport({ trips, onClose }: ExecutiveSummaryProps) {
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const totalTaxableValue = trips.reduce((acc, trip) =>
+        acc + trip.legs.reduce((lAcc: number, leg: any) =>
+            lAcc + (leg.passengers.reduce((pAcc: number, p: any) => pAcc + p.siflAmount, 0)), 0
+        ), 0
+    );
+
+    return (
+        <div className="fixed inset-0 bg-background z-50 overflow-auto p-8 print:p-0">
+            {/* Print Controls - Hidden when printing */}
+            <div className="max-w-4xl mx-auto flex justify-between items-center mb-8 print:hidden">
+                <Button variant="outline" onClick={onClose}>Close</Button>
+                <Button onClick={handlePrint}><Printer className="w-4 h-4 mr-2" /> Print Executive Summary</Button>
+            </div>
+
+            {/* Report Content */}
+            <div className="max-w-4xl mx-auto border p-8 print:border-none print:p-0">
+                <div className="flex justify-between items-end border-b pb-4 mb-6">
+                    <div>
+                        <h1 className="text-2xl font-bold uppercase tracking-widest text-slate-800">Flight Tax Summary</h1>
+                        <p className="text-sm text-slate-500">Q4 2024 Audit Report</p>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-xs text-slate-400 uppercase">Total Imputed Income</div>
+                        <div className="text-3xl font-mono font-bold text-slate-900">${totalTaxableValue.toLocaleString()}</div>
+                    </div>
+                </div>
+
+                {trips.map((trip) => (
+                    <div key={trip.id} className="mb-8 break-inside-avoid">
+                        <div className="flex justify-between items-center mb-2 bg-slate-50 p-2 rounded print:bg-transparent print:p-0">
+                            <h3 className="font-bold text-lg">{trip.name}</h3>
+                            <span className="text-sm text-slate-500">{trip.startDate} - {trip.endDate}</span>
+                        </div>
+
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="border-b-2 border-slate-800">
+                                    <TableHead className="w-[100px] text-slate-900 font-bold">Date</TableHead>
+                                    <TableHead className="text-slate-900 font-bold">Route</TableHead>
+                                    <TableHead className="text-slate-900 font-bold">Passenger</TableHead>
+                                    <TableHead className="text-slate-900 font-bold">Classification</TableHead>
+                                    <TableHead className="text-right text-slate-900 font-bold">SIFL Amount</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {trip.legs.map((leg: any) => (
+                                    <React.Fragment key={leg.id}>
+                                        {leg.passengers.map((p: any) => (
+                                            <TableRow key={p.id} className="border-b border-slate-100">
+                                                <TableCell className="font-medium text-slate-700">{leg.date}</TableCell>
+                                                <TableCell className="font-mono text-xs">{leg.origin} &rarr; {leg.destination}</TableCell>
+                                                <TableCell>{p.name}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className="border-slate-300 text-slate-600 font-normal">
+                                                        {p.classification}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    ${p.siflAmount.toFixed(2)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </React.Fragment>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                ))}
+
+                <div className="mt-12 pt-8 border-t text-xs text-slate-400 text-center">
+                    <p>Generated by Aviation Management System • Report ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+                </div>
+            </div>
+        </div>
+    );
+}
