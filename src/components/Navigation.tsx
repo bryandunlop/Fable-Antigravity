@@ -55,8 +55,10 @@ import {
   RotateCcw,
   Calculator,
   HardHat,
-  ArrowRightLeft
+  ArrowRightLeft,
+  HardDrive
 } from 'lucide-react';
+
 
 interface NavigationProps {
   userRole: string;
@@ -273,6 +275,8 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
         { name: 'Document Center', href: '/documents', icon: Archive, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
         { name: 'Document Management', href: '/document-management', icon: FileText, roles: ['document-manager'] },
         { name: 'Document Request', href: '/document-management', icon: Send, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+        { name: 'Offline Documents', href: '/dms/offline', icon: HardDrive, roles: ['dms-manager', 'admin'] },
+        { name: 'Document Library', href: '/documents', icon: Archive, roles: ['dms-manager'] },
       ]
     },
     {
