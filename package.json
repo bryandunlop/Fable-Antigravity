@@ -48,15 +48,18 @@
             "react-dnd-touch-backend": "^16.0.1",
             "react-dom": "^18.3.1",
             "react-hook-form": "^7.55.0",
+            "react-pdf": "^10.3.0",
             "react-resizable-panels": "^2.1.7",
             "react-router-dom": "*",
             "recharts": "^2.15.2",
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
-            "vaul": "^1.1.2"
+            "vaul": "^1.1.2",
+            "yjs": "^13.6.29"
       },
       "devDependencies": {
             "@tailwindcss/vite": "^4.1.17",
+            "@types/diff": "^7.0.2",
             "@types/node": "^20.10.0",
             "@types/react": "^19.2.7",
             "@types/react-dom": "^19.2.3",
