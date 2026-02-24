@@ -340,8 +340,8 @@ export const DEFAULT_INVENTORY: InventoryItem[] = [
     item('USB-A Lightning Charger', 'Equipment', 'credenza', 'Sideledge', null, 1, 'high', ['iphone charger', 'lightning cable']),
     item('USB-A USB-C Charger', 'Equipment', 'credenza', 'Sideledge', null, 1, 'high', ['usbc charger', 'android charger']),
     item('Bose Headphones', 'Equipment', 'credenza', 'Sideledge', null, 1, 'high', ['headphones', 'bose', 'noise cancelling']),
-    item('Motion Sickness Bags', 'Safety', 'credenza', 'Each Armrest', 1, null, 'critical', ['sick bag', 'airsick bag']),
-    item('Safety Briefing Cards', 'Safety', 'credenza', 'Each Armrest / Aft Lav', 1, null, 'critical', ['safety card', 'briefing card']),
+    item('Motion Sickness Bags', 'Safety', 'credenza', 'Each Armrest', 12, 10, 'critical', ['sick bag', 'airsick bag'], '1 per seat — 12 seats G650, 10 seats G500'),
+    item('Safety Briefing Cards', 'Safety', 'credenza', 'Each Armrest / Aft Lav', 12, 10, 'critical', ['safety card', 'briefing card'], '1 per seat — 12 seats G650, 10 seats G500'),
 
     // ─── CHILLER / BAGGAGE ─────────────────────────────────────────────────────
     item('Waters (Chiller)', 'Beverages', 'chiller', 'Chiller', 9, null, 'critical', ['water bottles', 'bottled water']),

@@ -82,6 +82,12 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                       Document Manager
                     </div>
                   </SelectItem>
+                  <SelectItem value="dms-manager">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
+                      DMS Manager
+                    </div>
+                  </SelectItem>
                   <SelectItem value="admin-assistant">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-pink-500 rounded-full"></div>

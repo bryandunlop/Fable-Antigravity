@@ -25,6 +25,7 @@ import ScheduleCalendar from './components/ScheduleCalendar';
 import DocumentCenter from './components/DocumentCenter';
 import DocumentManagement from './components/DocumentManagement';
 import DocumentRequest from './components/DocumentRequest';
+import OfflineDocuments from './components/OfflineDocuments';
 import DocumentReviewQueue from './components/DocumentReviewQueue';
 import DocumentCollaborations from './components/DocumentCollaborations';
 import LeadDashboard from './components/LeadDashboard';
@@ -217,13 +218,22 @@ export default function App() {
                               <Route path="/schedule" element={<ScheduleCalendar />} />
                               <Route path="/documents" element={<DocumentCenter userRole={userRole} />} />
 
-                              {/* Document Management - Document Manager role only, others get Document Request */}
+                              {/* Document Management - Document Manager & DMS Manager role only, others get Document Request */}
                               <Route
                                 path="/document-management"
                                 element={
-                                  userRole === 'document-manager' ?
+                                  ['document-manager', 'dms-manager'].includes(userRole) ?
                                     <DocumentManagement userRole={userRole} /> :
                                     <DocumentRequest userRole={userRole} />
+                                }
+                              />
+
+                              <Route
+                                path="/dms/offline"
+                                element={
+                                  <ProtectedRoute userRole={userRole} allowedRoles={['dms-manager', 'admin']}>
+                                    <OfflineDocuments />
+                                  </ProtectedRoute>
                                 }
                               />
 
