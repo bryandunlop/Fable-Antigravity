@@ -18,7 +18,6 @@ import {
   Clock,
   Phone,
   Mail,
-  AlertTriangle,
   CheckCircle,
   Calendar,
   Building2,
@@ -27,7 +26,9 @@ import {
   Wrench,
   Users,
   Home,
-  Shield
+  Shield,
+  ArrowRight,
+  AlertTriangle
 } from 'lucide-react';
 
 interface ServiceCategory {
@@ -102,10 +103,42 @@ interface Airport {
 
 export default function AirportServicesDatabase() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [flightSearchTerm, setFlightSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [selectedAirport, setSelectedAirport] = useState<Airport | null>(null);
   const [isAddingAirport, setIsAddingAirport] = useState(false);
+  const [activeTab, setActiveTab] = useState('flights');
+
+  // Helper to dynamically calculate review status and next review due
+  const calculateReviewInfo = (lastReviewDateStr: string) => {
+    const lastReviewDate = new Date(lastReviewDateStr);
+    const now = new Date();
+
+    // Calculate months difference
+    const diffMonths = (now.getFullYear() - lastReviewDate.getFullYear()) * 12 + (now.getMonth() - lastReviewDate.getMonth());
+
+    // Calculate exact difference in milliseconds to handle partial months more accurately
+    const diffTime = now.getTime() - lastReviewDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    let reviewStatus: 'Current' | 'Due Soon' | 'Overdue' = 'Current';
+
+    if (diffDays >= 180) { // Approx 6 months
+      reviewStatus = 'Overdue';
+    } else if (diffDays >= 150) { // Approx 5 months
+      reviewStatus = 'Due Soon';
+    }
+
+    // Next review is exactly 6 months from last review
+    const nextReview = new Date(lastReviewDate);
+    nextReview.setMonth(nextReview.getMonth() + 6);
+
+    return {
+      reviewStatus,
+      nextReviewDue: nextReview.toISOString().split('T')[0]
+    };
+  };
 
   const airports: Airport[] = [
     {
@@ -270,7 +303,34 @@ export default function AirportServicesDatabase() {
     }
   ];
 
-  const filteredAirports = airports.filter(airport => {
+  // Map over airports to apply dynamic calculations and filter flights relative to today
+  const dynamicAirports = airports.map(airport => {
+    const dynamicReviewInfo = calculateReviewInfo(airport.reviewInfo.lastReviewDate);
+
+    // Adjust mock flight dates so they fall relative to today for demonstration
+    // If the mock says 2025-02-05 and today is 2026-02-24, we bring it to within the next 14 days.
+    // To make the demo rich, we map them directly to today + some days
+    const adjustedFlights = airport.upcomingFlights.map((flight, index) => {
+      const flightDate = new Date();
+      flightDate.setDate(flightDate.getDate() + (index + 2)); // 2 days from now, 3 days from now, etc.
+      return {
+        ...flight,
+        date: flightDate.toISOString().split('T')[0]
+      };
+    });
+
+    return {
+      ...airport,
+      reviewInfo: {
+        ...airport.reviewInfo,
+        reviewStatus: dynamicReviewInfo.reviewStatus,
+        nextReviewDue: dynamicReviewInfo.nextReviewDue
+      },
+      upcomingFlights: adjustedFlights
+    };
+  });
+
+  const filteredAirports = dynamicAirports.filter(airport => {
     const matchesSearch =
       airport.icaoCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       airport.iataCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -325,13 +385,21 @@ export default function AirportServicesDatabase() {
   };
 
   const hasUpcomingFlights = (airport: Airport) => {
-    return airport.upcomingFlights.some(flight =>
-      new Date(flight.date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    );
+    // 14 days rolling window
+    return airport.upcomingFlights.some(flight => {
+      const flightDate = new Date(flight.date);
+      const today = new Date();
+      // Reset hours to compare purely by date
+      today.setHours(0, 0, 0, 0);
+      const future14 = new Date(today);
+      future14.setDate(future14.getDate() + 14);
+
+      return flightDate >= today && flightDate <= future14;
+    });
   };
 
   const needsUrgentReview = (airport: Airport) => {
-    return airport.reviewInfo.reviewStatus === 'Overdue' && hasUpcomingFlights(airport);
+    return (airport.reviewInfo.reviewStatus === 'Overdue' || airport.reviewInfo.reviewStatus === 'Due Soon') && hasUpcomingFlights(airport);
   };
 
   const getServiceIcon = (service: string) => {
@@ -673,6 +741,20 @@ export default function AirportServicesDatabase() {
     );
   };
 
+  // Helper to get all upcoming valid flights
+  const allUpcomingFlights = dynamicAirports.flatMap(a =>
+    a.upcomingFlights
+      .filter(flight => {
+        const flightDate = new Date(flight.date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const future14 = new Date(today);
+        future14.setDate(future14.getDate() + 14);
+        return flightDate >= today && flightDate <= future14;
+      })
+      .map(f => ({ ...f, airport: a }))
+  ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
@@ -700,6 +782,31 @@ export default function AirportServicesDatabase() {
         </Dialog>
       </div>
 
+      {/* Actionable Alerts Banner */}
+      {dynamicAirports.some(needsUrgentReview) && (
+        <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5" />
+            <div>
+              <h3 className="text-orange-900 font-medium">Expiring Airports with Upcoming Flights (Next 14 Days)</h3>
+              <p className="text-orange-700 text-sm mb-3">
+                Action required: The following airports have upcoming flights and their evaluations are expiring soon or already overdue.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {dynamicAirports.filter(needsUrgentReview).map(airport => (
+                  <div key={airport.id} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-md border border-orange-100 shadow-sm">
+                    <span className="font-medium text-sm">{airport.iataCode}</span>
+                    <Badge variant="outline" className={`text-xs ${airport.reviewInfo.reviewStatus === 'Overdue' ? 'text-red-600 border-red-200 bg-red-50' : 'text-yellow-600 border-yellow-200 bg-yellow-50'}`}>
+                      {airport.reviewInfo.reviewStatus}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
         <Card>
@@ -708,7 +815,7 @@ export default function AirportServicesDatabase() {
               <Plane className="w-4 h-4 text-blue-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Total Airports</p>
-                <p className="text-2xl font-bold">{airports.length}</p>
+                <p className="text-2xl font-bold">{dynamicAirports.length}</p>
               </div>
             </div>
           </CardContent>
@@ -721,7 +828,7 @@ export default function AirportServicesDatabase() {
               <div>
                 <p className="text-sm text-yellow-700 font-medium">5-Star Airports</p>
                 <p className="text-2xl font-bold text-yellow-700">
-                  {airports.filter(a => a.overallRating === 5).length}
+                  {dynamicAirports.filter(a => a.overallRating === 5).length}
                 </p>
               </div>
             </div>
@@ -735,7 +842,7 @@ export default function AirportServicesDatabase() {
               <div>
                 <p className="text-sm text-green-700 font-medium">Current Reviews</p>
                 <p className="text-2xl font-bold text-green-700">
-                  {airports.filter(a => a.reviewInfo.reviewStatus === 'Current').length}
+                  {dynamicAirports.filter(a => a.reviewInfo.reviewStatus === 'Current').length}
                 </p>
               </div>
             </div>
@@ -749,7 +856,7 @@ export default function AirportServicesDatabase() {
               <div>
                 <p className="text-sm text-yellow-700 font-medium">Due Soon</p>
                 <p className="text-2xl font-bold text-yellow-700">
-                  {airports.filter(a => a.reviewInfo.reviewStatus === 'Due Soon').length}
+                  {dynamicAirports.filter(a => a.reviewInfo.reviewStatus === 'Due Soon').length}
                 </p>
               </div>
             </div>
@@ -763,205 +870,358 @@ export default function AirportServicesDatabase() {
               <div>
                 <p className="text-sm text-red-700 font-medium">Overdue</p>
                 <p className="text-2xl font-bold text-red-700">
-                  {airports.filter(a => a.reviewInfo.reviewStatus === 'Overdue').length}
+                  {dynamicAirports.filter(a => a.reviewInfo.reviewStatus === 'Overdue').length}
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Upcoming Flights</p>
-                <p className="text-2xl font-bold">
-                  {airports.reduce((sum, a) => sum + a.upcomingFlights.length, 0)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:bg-blue-50 transition-colors border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Upcoming Flights</p>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {allUpcomingFlights.length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Plane className="w-5 h-5 text-blue-600" />
+                All Upcoming Flights (Next 14 Days)
+              </DialogTitle>
+              <DialogDescription>
+                A consolidated view of all flights assigned to tracked airports over the next 14 days.
+              </DialogDescription>
+            </DialogHeader>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by ICAO, IATA, name, or city..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <Select value={regionFilter} onValueChange={setRegionFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by region" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Regions</SelectItem>
-                <SelectItem value="na">North America</SelectItem>
-                <SelectItem value="eu">Europe</SelectItem>
-                <SelectItem value="asia">Asia Pacific</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={ratingFilter} onValueChange={setRatingFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by rating" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Ratings</SelectItem>
-                <SelectItem value="5">5 Stars</SelectItem>
-                <SelectItem value="4">4 Stars</SelectItem>
-                <SelectItem value="3">3 Stars</SelectItem>
-                <SelectItem value="2">≤2 Stars</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Airports Grid/List */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Airport Profiles</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredAirports.map((airport) => (
-                  <Card
-                    key={airport.id}
-                    className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${needsUrgentReview(airport)
-                      ? 'border-red-500 border-2 bg-red-50'
-                      : airport.reviewInfo.reviewStatus === 'Overdue'
-                        ? 'border-red-300 border-2 bg-red-50'
-                        : airport.reviewInfo.reviewStatus === 'Due Soon'
-                          ? 'border-yellow-300 border-2 bg-yellow-50'
-                          : ''
-                      }`}
-                    onClick={() => setSelectedAirport(airport)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        {/* Header Section */}
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <div className="flex items-center gap-3">
-                              <h4 className="font-medium">{airport.icaoCode} ({airport.iataCode})</h4>
-                              <div className="flex items-center gap-1">
-                                {renderStarRating(airport.overallRating)}
-                                <span className="text-sm text-muted-foreground ml-1">({airport.overallRating}/5)</span>
-                              </div>
-                            </div>
-                            <p className="text-sm text-muted-foreground">{airport.name}</p>
-                            <p className="text-sm text-muted-foreground">{airport.city}, {airport.country}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Badge className={getReviewStatusColor(airport.reviewInfo.reviewStatus)}>
-                              {airport.reviewInfo.reviewStatus}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        {/* Suggested Support */}
-                        <div className="mb-3 p-2 rounded-lg bg-blue-50 border border-blue-200">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Shield className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-semibold text-blue-700">TECH SUPPORT RECOMMENDATION</span>
-                          </div>
-                          <p className="text-sm text-blue-700">{airport.suggestedSupport}</p>
-                        </div>
-
-                        {/* Upcoming Flights Alert */}
-                        {hasUpcomingFlights(airport) && (
-                          <div className="mb-3 p-2 rounded-lg bg-orange-50 border border-orange-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Calendar className="w-4 h-4 text-orange-600" />
-                              <span className="text-sm font-semibold text-orange-700">UPCOMING FLIGHTS</span>
-                            </div>
-                            <div className="space-y-1">
-                              {airport.upcomingFlights.slice(0, 2).map((flight, i) => (
-                                <div key={i} className="text-xs text-orange-700">
-                                  {flight.flightId} - {new Date(flight.date).toLocaleDateString()} at {flight.departureTime}
-                                  <span className="ml-2 italic">({flight.serviceRequirements.join(', ')})</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Service Ratings Summary */}
-                        <div className="mb-3 p-2 rounded-lg bg-green-50 border border-green-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Star className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-semibold text-green-700">SERVICE RATINGS</span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            {Object.entries(airport.serviceCategories).map(([key, service]) => (
-                              <div key={key} className="flex items-center justify-between">
-                                <span>{service.name}:</span>
-                                <div className="flex items-center gap-1">
-                                  {renderStarRating(service.rating)}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Review Information */}
-                        <div className="p-2 rounded-lg bg-gray-50 border border-gray-200">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Eye className="w-4 h-4 text-gray-600" />
-                            <span className="text-sm font-semibold text-gray-700">LAST REVIEW</span>
-                          </div>
-                          <div className="text-xs text-gray-700">
-                            <div>{new Date(airport.reviewInfo.lastReviewDate).toLocaleDateString()} by {airport.reviewInfo.reviewedBy}</div>
-                            <div>Next Due: {new Date(airport.reviewInfo.nextReviewDue).toLocaleDateString()}</div>
-                          </div>
-                        </div>
+            <div className="space-y-4 mt-4">
+              {allUpcomingFlights.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No upcoming flights scheduled in the next 14 days.
+                </div>
+              ) : (
+                allUpcomingFlights.map((flight, i) => (
+                  <div key={i} className="flex flex-col md:flex-row items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-100 text-blue-700 rounded-full">
+                        <Plane className="w-5 h-5" />
                       </div>
-
-                      <div className="flex gap-2 ml-4">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-5xl">
-                            <DialogHeader>
-                              <DialogTitle>Edit Airport - {airport.icaoCode} {airport.name}</DialogTitle>
-                              <DialogDescription>
-                                Update airport services, star ratings, and operational information.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <AirportForm airport={airport} onClose={() => { }} />
-                          </DialogContent>
-                        </Dialog>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-lg">{flight.flightId}</h4>
+                          <Badge variant="secondary">{flight.aircraftId}</Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(flight.date).toLocaleDateString()}
+                          <Clock className="w-3 h-3 ml-2" />
+                          {flight.departureTime}
+                        </div>
                       </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
 
-              {filteredAirports.length === 0 && (
-                <div className="text-center py-8">
-                  <Plane className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No airports match the current filters.</p>
-                </div>
+                    <div className="flex flex-col items-end mt-4 md:mt-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-semibold">{flight.airport.iataCode}</span>
+                        <span className="text-muted-foreground">({flight.airport.icaoCode})</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Needs: {flight.serviceRequirements.join(', ')}
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+      {/* Main Layout Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="flights" className="flex items-center justify-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Upcoming Flights (14 Days)
+              </TabsTrigger>
+              <TabsTrigger value="airports" className="flex items-center justify-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Airport Database
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="flights" className="mt-0 space-y-6">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search flights by ID, aircraft, or destination..."
+                      value={flightSearchTerm}
+                      onChange={(e) => setFlightSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Flights Overview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {allUpcomingFlights.filter(f =>
+                      f.flightId.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+                      f.aircraftId.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+                      f.airport.icaoCode.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+                      f.airport.iataCode.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+                      f.airport.city.toLowerCase().includes(flightSearchTerm.toLowerCase())
+                    ).length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No flights match your search criteria.
+                      </div>
+                    ) : (
+                      allUpcomingFlights.filter(f =>
+                        f.flightId.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+                        f.aircraftId.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+                        f.airport.icaoCode.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+                        f.airport.iataCode.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+                        f.airport.city.toLowerCase().includes(flightSearchTerm.toLowerCase())
+                      ).map((flight, i) => (
+                        <Card
+                          key={i}
+                          className={`cursor-pointer transition-colors hover:bg-muted/50 ${selectedAirport?.id === flight.airport.id ? 'border-blue-400 bg-blue-50/50' : ''}`}
+                          onClick={() => setSelectedAirport(flight.airport)}
+                        >
+                          <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-full ${needsUrgentReview(flight.airport) ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                <Plane className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-bold text-lg">{flight.flightId}</h4>
+                                  <Badge variant="secondary">{flight.aircraftId}</Badge>
+                                  {needsUrgentReview(flight.airport) && (
+                                    <Badge variant="destructive" className="ml-2">Expiring Destination</Badge>
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {new Date(flight.date).toLocaleDateString()}
+                                  <Clock className="w-3 h-3 ml-2" />
+                                  {flight.departureTime}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col items-end mt-4 md:mt-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-semibold">{flight.airport.iataCode}</span>
+                                <span className="text-muted-foreground">({flight.airport.icaoCode}) - {flight.airport.city}</span>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Needs: {flight.serviceRequirements.join(', ')}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="airports" className="mt-0 space-y-6">
+              {/* Filters */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by ICAO, IATA, name, or city..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    <Select value={regionFilter} onValueChange={setRegionFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filter by region" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Regions</SelectItem>
+                        <SelectItem value="na">North America</SelectItem>
+                        <SelectItem value="eu">Europe</SelectItem>
+                        <SelectItem value="asia">Asia Pacific</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={ratingFilter} onValueChange={setRatingFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filter by rating" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Ratings</SelectItem>
+                        <SelectItem value="5">5 Stars</SelectItem>
+                        <SelectItem value="4">4 Stars</SelectItem>
+                        <SelectItem value="3">3 Stars</SelectItem>
+                        <SelectItem value="2">≤2 Stars</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Airport Profiles</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {filteredAirports.map((airport) => (
+                      <Card
+                        key={airport.id}
+                        className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${needsUrgentReview(airport)
+                          ? 'border-red-500 border-2 bg-red-50'
+                          : airport.reviewInfo.reviewStatus === 'Overdue'
+                            ? 'border-red-300 border-2 bg-red-50'
+                            : airport.reviewInfo.reviewStatus === 'Due Soon'
+                              ? 'border-yellow-300 border-2 bg-yellow-50'
+                              : ''
+                          }`}
+                        onClick={() => setSelectedAirport(airport)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            {/* Header Section */}
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <div className="flex items-center gap-3">
+                                  <h4 className="font-medium">{airport.icaoCode} ({airport.iataCode})</h4>
+                                  <div className="flex items-center gap-1">
+                                    {renderStarRating(airport.overallRating)}
+                                    <span className="text-sm text-muted-foreground ml-1">({airport.overallRating}/5)</span>
+                                  </div>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{airport.name}</p>
+                                <p className="text-sm text-muted-foreground">{airport.city}, {airport.country}</p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Badge className={getReviewStatusColor(airport.reviewInfo.reviewStatus)}>
+                                  {airport.reviewInfo.reviewStatus}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Suggested Support */}
+                            <div className="mb-3 p-2 rounded-lg bg-blue-50 border border-blue-200">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Shield className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm font-semibold text-blue-700">TECH SUPPORT RECOMMENDATION</span>
+                              </div>
+                              <p className="text-sm text-blue-700">{airport.suggestedSupport}</p>
+                            </div>
+
+                            {/* Upcoming Flights Alert */}
+                            {hasUpcomingFlights(airport) && (
+                              <div className="mb-3 p-2 rounded-lg bg-orange-50 border border-orange-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Calendar className="w-4 h-4 text-orange-600" />
+                                  <span className="text-sm font-semibold text-orange-700">UPCOMING FLIGHTS</span>
+                                </div>
+                                <div className="space-y-1">
+                                  {airport.upcomingFlights.slice(0, 2).map((flight, i) => (
+                                    <div key={i} className="text-xs text-orange-700">
+                                      {flight.flightId} - {new Date(flight.date).toLocaleDateString()} at {flight.departureTime}
+                                      <span className="ml-2 italic">({flight.serviceRequirements.join(', ')})</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Service Ratings Summary */}
+                            <div className="mb-3 p-2 rounded-lg bg-green-50 border border-green-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Star className="w-4 h-4 text-green-600" />
+                                <span className="text-sm font-semibold text-green-700">SERVICE RATINGS</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                {Object.entries(airport.serviceCategories).map(([key, service]) => (
+                                  <div key={key} className="flex items-center justify-between">
+                                    <span>{service.name}:</span>
+                                    <div className="flex items-center gap-1">
+                                      {renderStarRating(service.rating)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Review Information */}
+                            <div className="p-2 rounded-lg bg-gray-50 border border-gray-200">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Eye className="w-4 h-4 text-gray-600" />
+                                <span className="text-sm font-semibold text-gray-700">LAST REVIEW</span>
+                              </div>
+                              <div className="text-xs text-gray-700">
+                                <div>{new Date(airport.reviewInfo.lastReviewDate).toLocaleDateString()} by {airport.reviewInfo.reviewedBy}</div>
+                                <div>Next Due: {new Date(airport.reviewInfo.nextReviewDue).toLocaleDateString()}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 ml-4">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-5xl">
+                                <DialogHeader>
+                                  <DialogTitle>Edit Airport - {airport.icaoCode} {airport.name}</DialogTitle>
+                                  <DialogDescription>
+                                    Update airport services, star ratings, and operational information.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <AirportForm airport={airport} onClose={() => { }} />
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {filteredAirports.length === 0 && (
+                    <div className="text-center py-8">
+                      <Plane className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No airports match the current filters.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Selected Airport Details */}

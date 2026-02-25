@@ -10,10 +10,10 @@ import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { 
-  Plane, 
-  Users, 
-  Search, 
+import {
+  Plane,
+  Users,
+  Search,
   Eye,
   Calendar,
   Clock,
@@ -116,7 +116,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
   if (userRole === 'inflight') {
     return <InflightCalendarView userRole={userRole} />;
   }
-  
+
   // Original list view for other roles
   const [searchTerm, setSearchTerm] = useState('');
   const [airportFilter, setAirportFilter] = useState('all');
@@ -125,13 +125,20 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
   const [expandedFlight, setExpandedFlight] = useState<string | null>(null);
   const [selectedPassenger, setSelectedPassenger] = useState<Passenger | null>(null);
 
+  // Helper function to create dates relative to today
+  const getRelativeDate = (daysOffset: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysOffset);
+    return date.toISOString().split('T')[0];
+  };
+
   // Mock upcoming flight legs data
   const upcomingFlightLegs: FlightLeg[] = [
     {
       id: 'LEG001',
       flightNumber: 'FO001',
       legNumber: 1,
-      date: '2025-02-05',
+      date: getRelativeDate(2),
       departureTime: '08:00',
       arrivalTime: '13:30',
       departureAirport: 'LAX',
@@ -149,7 +156,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
       id: 'LEG002',
       flightNumber: 'FO001',
       legNumber: 2,
-      date: '2025-02-05',
+      date: getRelativeDate(2),
       departureTime: '15:00',
       arrivalTime: '18:30',
       departureAirport: 'JFK',
@@ -167,7 +174,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
       id: 'LEG003',
       flightNumber: 'FO002',
       legNumber: 1,
-      date: '2025-02-06',
+      date: getRelativeDate(3),
       departureTime: '10:30',
       arrivalTime: '16:15',
       departureAirport: 'MIA',
@@ -185,7 +192,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
       id: 'LEG004',
       flightNumber: 'FO003',
       legNumber: 1,
-      date: '2025-02-07',
+      date: getRelativeDate(4),
       departureTime: '16:45',
       arrivalTime: '19:15',
       departureAirport: 'EWR',
@@ -216,17 +223,17 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
       beveragePreferences: ['Dom Pérignon', 'Macallan 18', 'Perrier'],
       seatPreferences: ['Forward-facing', 'Window seat', 'Extra legroom'],
       allergies: [
-        { 
-          allergen: 'Shellfish', 
-          severity: 'Critical', 
-          reaction: 'Anaphylaxis', 
-          medication: 'EpiPen - seat pocket' 
+        {
+          allergen: 'Shellfish',
+          severity: 'Critical',
+          reaction: 'Anaphylaxis',
+          medication: 'EpiPen - seat pocket'
         },
-        { 
-          allergen: 'Tree nuts', 
-          severity: 'Moderate', 
-          reaction: 'Hives, swelling', 
-          medication: 'Benadryl' 
+        {
+          allergen: 'Tree nuts',
+          severity: 'Moderate',
+          reaction: 'Hives, swelling',
+          medication: 'Benadryl'
         }
       ],
       foodPreferences: {
@@ -319,11 +326,11 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
       beveragePreferences: ['Coffee (black)', 'Whiskey neat'],
       seatPreferences: ['Window seat'],
       allergies: [
-        { 
-          allergen: 'Peanuts', 
-          severity: 'Critical', 
-          reaction: 'Severe breathing difficulty', 
-          medication: 'EpiPen required immediately' 
+        {
+          allergen: 'Peanuts',
+          severity: 'Critical',
+          reaction: 'Severe breathing difficulty',
+          medication: 'EpiPen required immediately'
         }
       ],
       foodPreferences: {
@@ -366,17 +373,17 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
       beveragePreferences: ['Oat milk latte', 'Sparkling water'],
       seatPreferences: ['Aisle seat'],
       allergies: [
-        { 
-          allergen: 'Bee stings', 
-          severity: 'Moderate', 
-          reaction: 'Localized swelling', 
-          medication: 'Antihistamine' 
+        {
+          allergen: 'Bee stings',
+          severity: 'Moderate',
+          reaction: 'Localized swelling',
+          medication: 'Antihistamine'
         },
-        { 
-          allergen: 'Latex', 
-          severity: 'Mild', 
-          reaction: 'Skin irritation', 
-          medication: 'Avoid latex gloves' 
+        {
+          allergen: 'Latex',
+          severity: 'Mild',
+          reaction: 'Skin irritation',
+          medication: 'Avoid latex gloves'
         }
       ],
       foodPreferences: {
@@ -414,20 +421,28 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
     }
   ];
 
-  // Filter flights based on search and filters
+  // Filter flights based on search, filters, and 14 day window
   const filteredFlightLegs = upcomingFlightLegs.filter(leg => {
-    const matchesSearch = 
+    const flightDate = new Date(leg.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const future14 = new Date(today);
+    future14.setDate(future14.getDate() + 14);
+
+    const within14Days = flightDate >= today && flightDate <= future14;
+
+    const matchesSearch =
       leg.flightNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       leg.departureAirport.toLowerCase().includes(searchTerm.toLowerCase()) ||
       leg.arrivalAirport.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesAirport = airportFilter === 'all' || 
-      leg.departureAirport === airportFilter || 
+
+    const matchesAirport = airportFilter === 'all' ||
+      leg.departureAirport === airportFilter ||
       leg.arrivalAirport === airportFilter;
-    
+
     const matchesStatus = statusFilter === 'all' || leg.status === statusFilter;
-    
-    return matchesSearch && matchesAirport && matchesStatus;
+
+    return within14Days && matchesSearch && matchesAirport && matchesStatus;
   });
 
   // Get unique airports for filter
@@ -444,17 +459,17 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
   // Function to check if birthday occurs during flight period
   const isBirthdayDuringTrip = (birthDate: string, flightDate: string) => {
     if (!birthDate) return false;
-    
+
     const birth = new Date(birthDate);
     const flight = new Date(flightDate);
-    
+
     // Check if birthday occurs on flight date or within 7 days of flight
     const flightStart = new Date(flight);
     const flightEnd = new Date(flight.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days after
-    
+
     // Create birthday this year
     const birthdayThisYear = new Date(flight.getFullYear(), birth.getMonth(), birth.getDate());
-    
+
     return birthdayThisYear >= flightStart && birthdayThisYear <= flightEnd;
   };
 
@@ -509,7 +524,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
   };
 
   const hasAllergies = (passenger: Passenger) => passenger.allergies.length > 0;
-  const hasCriticalAllergies = (passenger: Passenger) => 
+  const hasCriticalAllergies = (passenger: Passenger) =>
     passenger.allergies.some(allergy => allergy.severity === 'Critical');
 
   return (
@@ -521,7 +536,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
             Upcoming Flights
           </h1>
           <p className="text-muted-foreground">
-            Your flight assignments with passenger manifests and safety information
+            Your flight assignments with passenger manifests and safety information (Next 14 Days)
           </p>
         </div>
       </div>
@@ -541,7 +556,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                 />
               </div>
             </div>
-            
+
             <Select value={airportFilter} onValueChange={setAirportFilter}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filter by airport" />
@@ -625,7 +640,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                 <p className="text-2xl font-bold text-purple-700">
                   {filteredFlightLegs.reduce((count, leg) => {
                     const legPassengers = getFlightPassengers(leg);
-                    return count + legPassengers.filter(p => 
+                    return count + legPassengers.filter(p =>
                       p.birthDate && isBirthdayDuringTrip(p.birthDate, leg.date)
                     ).length;
                   }, 0)}
@@ -641,11 +656,11 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
         {filteredFlightLegs.map((leg) => {
           const legPassengers = getFlightPassengers(leg);
           const isExpanded = expandedFlight === leg.id;
-          
+
           return (
             <Card key={leg.id} className="overflow-hidden">
-              <Collapsible 
-                open={isExpanded} 
+              <Collapsible
+                open={isExpanded}
                 onOpenChange={() => setExpandedFlight(isExpanded ? null : leg.id)}
               >
                 <CollapsibleTrigger asChild>
@@ -715,7 +730,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                 <CollapsibleContent>
                   <CardContent className="pt-0">
                     <Separator className="mb-6" />
-                    
+
                     {/* Crew Information */}
                     {leg.crewAssignment && (
                       <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -739,19 +754,18 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                       <h4 className="font-medium">Passenger Manifest</h4>
                       {legPassengers.map((passenger) => {
                         const hasBirthday = passenger.birthDate && isBirthdayDuringTrip(passenger.birthDate, leg.date);
-                        
+
                         return (
-                          <Card 
+                          <Card
                             key={passenger.id}
-                            className={`p-4 ${
-                              hasBirthday 
-                                ? 'border-purple-300 bg-purple-50' 
-                                : hasCriticalAllergies(passenger) 
-                                  ? 'border-red-500 border-2 bg-red-50' 
-                                  : hasAllergies(passenger) 
-                                    ? 'border-orange-300 border-2 bg-orange-50' 
+                            className={`p-4 ${hasBirthday
+                                ? 'border-purple-300 bg-purple-50'
+                                : hasCriticalAllergies(passenger)
+                                  ? 'border-red-500 border-2 bg-red-50'
+                                  : hasAllergies(passenger)
+                                    ? 'border-orange-300 border-2 bg-orange-50'
                                     : ''
-                            }`}
+                              }`}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
@@ -804,8 +818,8 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                                     </div>
                                     <div className="flex flex-wrap gap-1 mb-2">
                                       {passenger.allergies.map((allergy, i) => (
-                                        <Badge 
-                                          key={i} 
+                                        <Badge
+                                          key={i}
                                           className={`${getAllergySeverityColor(allergy.severity)} text-xs font-semibold`}
                                         >
                                           <span className="flex items-center gap-1">
@@ -843,7 +857,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                                       <span className="font-medium">Style:</span> {passenger.foodPreferences.cateringStyle}
                                     </div>
                                     <div>
-                                      <span className="font-medium">Spice:</span> 
+                                      <span className="font-medium">Spice:</span>
                                       <Badge className={`ml-1 ${getSpiceLevelColor(passenger.foodPreferences.spiceLevel)} text-xs`}>
                                         {passenger.foodPreferences.spiceLevel}
                                       </Badge>
@@ -873,8 +887,8 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                               <div className="flex gap-2">
                                 <Dialog>
                                   <DialogTrigger asChild>
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => setSelectedPassenger(passenger)}
                                     >
@@ -894,14 +908,14 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                                         Complete passenger profile for in-flight service
                                       </DialogDescription>
                                     </DialogHeader>
-                                    
+
                                     {/* Detailed passenger information would go here */}
                                     <Tabs defaultValue="service" className="w-full">
                                       <TabsList className="grid w-full grid-cols-2">
                                         <TabsTrigger value="service">Service Info</TabsTrigger>
                                         <TabsTrigger value="safety">Safety & Contact</TabsTrigger>
                                       </TabsList>
-                                      
+
                                       <TabsContent value="service" className="space-y-4">
                                         {/* Critical Allergy Warning */}
                                         {hasCriticalAllergies(passenger) && (
@@ -932,7 +946,7 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                                               ))}
                                             </div>
                                           </div>
-                                          
+
                                           <div>
                                             <Label className="text-xs">Beverages</Label>
                                             <div className="flex flex-wrap gap-1 mt-1">
@@ -987,15 +1001,14 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
                                             <Label className="text-xs text-red-600 font-semibold">⚠️ ALLERGIES - SAFETY CRITICAL</Label>
                                             <div className="space-y-2 mt-2">
                                               {passenger.allergies.map((allergy, i) => (
-                                                <div 
-                                                  key={i} 
-                                                  className={`p-3 rounded border ${
-                                                    allergy.severity === 'Critical' 
-                                                      ? 'bg-red-100 border-red-300' 
+                                                <div
+                                                  key={i}
+                                                  className={`p-3 rounded border ${allergy.severity === 'Critical'
+                                                      ? 'bg-red-100 border-red-300'
                                                       : allergy.severity === 'Moderate'
                                                         ? 'bg-orange-100 border-orange-300'
                                                         : 'bg-yellow-100 border-yellow-300'
-                                                  }`}
+                                                    }`}
                                                 >
                                                   <div className="flex items-center gap-2 mb-2">
                                                     <Badge className={getAllergySeverityColor(allergy.severity)}>
