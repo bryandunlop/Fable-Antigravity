@@ -11,11 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
-import { 
+import {
   ClipboardCheck,
-  Plus, 
-  Search, 
-  Filter, 
+  Plus,
+  Search,
+  Filter,
   Plane,
   User,
   Calendar,
@@ -169,14 +169,14 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
   };
 
   const currentChecklist = selectedFlight ? checklistItems[selectedFlight] || [] : [];
-  
+
   const filteredChecklist = currentChecklist.filter(item => {
     const matchesSearch = item.task.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'completed' && item.completed) ||
-                         (statusFilter === 'pending' && !item.completed) ||
-                         (statusFilter === 'my-role' && (item.assignedTo === userRole || item.assignedTo === 'both'));
+      item.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'completed' && item.completed) ||
+      (statusFilter === 'pending' && !item.completed) ||
+      (statusFilter === 'my-role' && (item.assignedTo === userRole || item.assignedTo === 'both'));
     return matchesSearch && matchesStatus;
   });
 
@@ -246,7 +246,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
           </h1>
           <p className="text-muted-foreground">Shared checklist system for flight reset procedures</p>
         </div>
-        
+
         <Dialog open={showAddItemDialog} onOpenChange={setShowAddItemDialog}>
           <DialogTrigger asChild>
             <Button>
@@ -296,12 +296,12 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                   </Select>
                 </div>
               </div>
-              
+
               <div>
                 <Label>Task Description</Label>
                 <Textarea placeholder="Detailed description of the task..." rows={3} />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Assigned To</Label>
@@ -310,7 +310,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                       <SelectValue placeholder="Select assignment" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="inflight">Inflight Crew</SelectItem>
+                      <SelectItem value="inflight">Flight Attendant</SelectItem>
                       <SelectItem value="maintenance">Maintenance</SelectItem>
                       <SelectItem value="both">Both Teams</SelectItem>
                     </SelectContent>
@@ -331,7 +331,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                   </Select>
                 </div>
               </div>
-              
+
               <div className="flex gap-2 pt-4">
                 <Button onClick={handleAddChecklistItem}>Add Item</Button>
                 <Button variant="outline" onClick={() => setShowAddItemDialog(false)}>
@@ -362,7 +362,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex-1">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
@@ -374,7 +374,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                 />
               </div>
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-48">
                 <Filter className="w-4 h-4 mr-2" />
@@ -436,8 +436,8 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => setSelectedFlight(flight.id)}
                       >
@@ -464,7 +464,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                       Flight {selectedFlight} - {flights.find(f => f.id === selectedFlight)?.aircraft}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      {flights.find(f => f.id === selectedFlight)?.route} - 
+                      {flights.find(f => f.id === selectedFlight)?.route} -
                       {new Date(flights.find(f => f.id === selectedFlight)?.date || '').toLocaleDateString()}
                     </p>
                   </div>
@@ -564,7 +564,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                             </span>
                             <Badge variant="outline" className="text-xs">{item.category}</Badge>
                           </div>
-                          
+
                           <div className="flex items-center gap-2 mb-2">
                             <Badge className={getPriorityColor(item.priority)}>
                               {item.priority}
@@ -576,7 +576,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                               </span>
                             </Badge>
                           </div>
-                          
+
                           {item.completed && (
                             <div className="text-sm text-muted-foreground">
                               <div className="flex items-center gap-2">
@@ -590,7 +590,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                           )}
                         </div>
                       </div>
-                      
+
                       {!item.completed && canCompleteTask(item) && (
                         <Dialog>
                           <DialogTrigger asChild>
@@ -610,7 +610,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                               </div>
                               <div>
                                 <Label>Notes (Optional)</Label>
-                                <Textarea 
+                                <Textarea
                                   placeholder="Add any notes about completing this task..."
                                   rows={3}
                                 />

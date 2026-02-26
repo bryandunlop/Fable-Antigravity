@@ -1,7 +1,7 @@
 // Aircraft Inventory Data — G650 (N1PG, N2PG) & G500 (N5PG, N6PG)
 // Generated from official Word inventory documents
 
-export type AreaType = 'forward-lav' | 'galley' | 'aft-lav' | 'credenza' | 'chiller';
+export type AreaType = 'forward-lav' | 'galley' | 'aft-lav' | 'credenza' | 'chiller' | 'baggage';
 export type PriorityType = 'low' | 'medium' | 'high' | 'critical';
 
 export interface InventoryItem {
@@ -350,8 +350,8 @@ export const DEFAULT_INVENTORY: InventoryItem[] = [
     item('Sauvignon Blanc', 'Wine', 'chiller', 'Chiller / Wine Rack', 2, null, 'high', ['white wine', 'sauv blanc']),
     item('Pinot Noir', 'Wine', 'chiller', 'Chiller / Wine Rack', 2, null, 'high', ['red wine', 'pinot']),
     item('Cabernet Sauvignon', 'Wine', 'chiller', 'Chiller / Wine Rack', 2, null, 'high', ['red wine', 'cab sauv', 'cabernet']),
-    item('Case Small Waters (Baggage)', 'Beverages', 'chiller', 'Baggage Compartment', null, 1, 'critical', ['water case', 'water supply']),
-    item('Case Perrier (Baggage)', 'Beverages', 'chiller', 'Baggage Compartment', null, 1, 'high', ['perrier case', 'sparkling water']),
-    item('Vacuum Base', 'Equipment', 'chiller', 'Baggage Compartment', null, 1, 'medium', ['vacuum base', 'vacuum body']),
-    item('8 Liter Water Bottles', 'Beverages', 'chiller', 'Galley Closet / Storage', null, 1, 'high', ['liter water', 'large water']),
+    item('Case Small Waters (Baggage)', 'Beverages', 'baggage', 'Baggage Compartment', null, 1, 'critical', ['water case', 'water supply']),
+    item('Case Perrier (Baggage)', 'Beverages', 'baggage', 'Baggage Compartment', null, 1, 'high', ['perrier case', 'sparkling water']),
+    item('Vacuum Base', 'Equipment', 'baggage', 'Baggage Compartment', null, 1, 'medium', ['vacuum base', 'vacuum body']),
+    item('8 Liter Water Bottles', 'Beverages', 'baggage', 'Galley Closet / Storage', null, 1, 'high', ['liter water', 'large water']),
 ];

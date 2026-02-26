@@ -699,7 +699,7 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
                   Flight Attendant Private Notes
                 </Label>
                 <p className="text-sm text-muted-foreground mb-2">
-                  These notes are ONLY visible to Inflight Crew members. Use this for sensitive service preferences or behavioral notes.
+                  These notes are ONLY visible to Flight Attendant members. Use this for sensitive service preferences or behavioral notes.
                 </p>
                 <Textarea
                   id="faNotes"

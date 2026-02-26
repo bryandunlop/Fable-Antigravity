@@ -279,7 +279,7 @@ export default function SafetyMyActivity({ userRole }: SafetyMyActivityProps) {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="pilot">Pilot</SelectItem>
-                                            <SelectItem value="inflight">Inflight Crew</SelectItem>
+                                            <SelectItem value="inflight">Flight Attendant</SelectItem>
                                             <SelectItem value="maintenance">Maintenance</SelectItem>
                                             <SelectItem value="safety">Safety</SelectItem>
                                             <SelectItem value="scheduling">Scheduling</SelectItem>

@@ -49,7 +49,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   <SelectItem value="inflight">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      Inflight Crew
+                      Flight Attendant
                     </div>
                   </SelectItem>
                   <SelectItem value="maintenance">

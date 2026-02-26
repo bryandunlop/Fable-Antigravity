@@ -13,7 +13,7 @@ import {
   FileText, Download, Clock, Trash2, RotateCcw, Check, X, Zap,
   ShoppingCart, Calendar, ChevronRight, ChevronLeft, History, Eye,
   Coffee, Droplets, Armchair, Settings, Filter, Edit, AlertCircle,
-  BarChart2, ClipboardList, Scan, Star, Pencil
+  BarChart2, ClipboardList, Scan, Star, Pencil, CheckSquare, PackagePlus, ListChecks, ArrowRight, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DEFAULT_INVENTORY, FLEET, InventoryItem, AreaType, FleetAircraft } from './inventoryData';
@@ -32,7 +32,8 @@ interface InventorySession {
   aircraftType: 'G650' | 'G500';
   date: string;
   reportedBy: string;
-  flightNumber: string;
+  departure: string;
+  arrival: string;
   checkedItems: CheckedItem[];
   customItems: CustomItem[];
   additionalNotes: string;
@@ -47,6 +48,7 @@ interface CustomItem {
   area: AreaType;
   needsReplenishment: boolean;
   notes?: string;
+  category?: string;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -56,10 +58,11 @@ const AREA_META: Record<AreaType, { label: string; icon: React.ElementType; colo
   'galley': { label: 'Galley', icon: Coffee, color: 'text-amber-400' },
   'aft-lav': { label: 'Aft Lav', icon: Star, color: 'text-purple-400' },
   'credenza': { label: 'Credenza', icon: Package, color: 'text-emerald-400' },
-  'chiller': { label: 'Chiller / Baggage', icon: Zap, color: 'text-blue-400' },
+  'chiller': { label: 'Chiller', icon: Zap, color: 'text-blue-400' },
+  'baggage': { label: 'Baggage', icon: Package, color: 'text-indigo-400' },
 };
 
-const AREAS: AreaType[] = ['forward-lav', 'galley', 'aft-lav', 'credenza', 'chiller'];
+const AREAS: AreaType[] = ['forward-lav', 'galley', 'aft-lav', 'credenza', 'chiller', 'baggage'];
 
 const PRIORITY_COLORS: Record<string, string> = {
   critical: 'bg-red-500/15 text-red-400 border border-red-500/30',
@@ -114,28 +117,7 @@ function stockBarColor(pct: number): string {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ReadinessRing({ score }: { score: number }) {
-  const r = 36;
-  const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - score / 100);
-  const color = score >= 90 ? '#22c55e' : score >= 70 ? '#eab308' : '#ef4444';
-  return (
-    <div className="relative w-24 h-24 flex items-center justify-center">
-      <svg className="absolute inset-0 -rotate-90" viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
-        <circle
-          cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="6"
-          strokeDasharray={circ} strokeDashoffset={offset}
-          strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-        />
-      </svg>
-      <div className="flex flex-col items-center">
-        <span className="text-xl font-bold text-foreground">{score}%</span>
-        <span className="text-[10px] text-muted-foreground tracking-wide uppercase">Ready</span>
-      </div>
-    </div>
-  );
-}
+// Readiness ring removed per user feedback
 
 function StockBar({ current, required }: { current: number; required: number }) {
   const pct = required > 0 ? Math.min(100, Math.round((current / required) * 100)) : 100;
@@ -180,115 +162,189 @@ function AreaSummaryChip({ area, items }: { area: AreaType; items: InventoryItem
 
 function ItemCard({
   item,
-  onToggle,
   onAdjust,
   editMode = false,
   onHide,
   onChangeRequired,
+  onChangeLocation,
   defaultRequired,
 }: {
   item: InventoryItem;
-  onToggle: (id: string) => void;
   onAdjust: (id: string, delta: number) => void;
   editMode?: boolean;
   onHide?: (id: string) => void;
   onChangeRequired?: (id: string, qty: number) => void;
+  onChangeLocation?: (id: string, loc: string) => void;
   defaultRequired?: number;
 }) {
-  const pct = item.requiredQuantity > 0
-    ? Math.min(100, Math.round((item.currentQuantity / item.requiredQuantity) * 100))
-    : 100;
-  const isLow = item.currentQuantity < item.requiredQuantity;
+  const [isEditingQty, setIsEditingQty] = useState(false);
+  const [tempQty, setTempQty] = useState('');
+
+  const isEmpty = item.requiredQuantity > 0 && item.currentQuantity <= 0;
+  const isHealthy = item.requiredQuantity > 0 && item.currentQuantity >= item.requiredQuantity;
+  const isLow = item.requiredQuantity > 0 && item.currentQuantity > 0 && item.currentQuantity < item.requiredQuantity;
+
+  const handleQtySubmit = () => {
+    const val = parseInt(tempQty);
+    if (!isNaN(val) && val >= 0) {
+      const delta = val - item.currentQuantity;
+      if (delta !== 0) {
+        onAdjust(item.id, delta);
+      }
+    }
+    setIsEditingQty(false);
+  };
 
   return (
     <div className={`rounded-xl border transition-all ${editMode
       ? 'border-primary/30 bg-primary/5'
       : item.needsReplenishment
         ? 'border-orange-500/40 bg-orange-500/10'
-        : isLow
-          ? 'border-yellow-500/20 bg-yellow-500/5'
-          : 'border-border/60 bg-muted/30'
-      } p-3`}>
-      <div className="flex items-start justify-between gap-2">
+        : isEmpty
+          ? 'border-red-500/30 bg-red-500/5'
+          : isLow
+            ? 'border-yellow-500/30 bg-yellow-500/5'
+            : isHealthy
+              ? 'border-emerald-500/30 bg-emerald-500/5'
+              : 'border-border/40 bg-muted/20 opacity-80'
+      } p-4`}>
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-foreground truncate">{item.itemName}</span>
-            <Badge className={`text-[10px] px-1.5 py-0 shrink-0 ${PRIORITY_COLORS[item.priority]}`}>
-              {item.priority}
-            </Badge>
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="text-base font-semibold text-foreground truncate">{item.itemName}</span>
           </div>
-          <p className="text-[11px] text-muted-foreground/70 mt-0.5">{item.location}</p>
-          {item.notes && <p className="text-[10px] text-muted-foreground/50 mt-0.5 italic">{item.notes}</p>}
-          <StockBar current={item.currentQuantity} required={item.requiredQuantity} />
+          {editMode ? (
+            <input
+              type="text"
+              value={item.location || ''}
+              onChange={e => onChangeLocation?.(item.id, e.target.value)}
+              placeholder="Storage location..."
+              className="text-xs w-full mt-1 bg-background border border-primary/40 rounded px-2 py-1 text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          ) : (
+            item.location && <p className="text-xs text-muted-foreground/80 mt-0.5"><span className="font-medium">Loc:</span> {item.location}</p>
+          )}
+          {item.notes && <p className="text-[11px] text-muted-foreground/60 mt-0.5 italic">{item.notes}</p>}
+          <div className="mt-2">
+            <StockBar current={item.currentQuantity} required={item.requiredQuantity} />
+          </div>
         </div>
+
         {editMode ? (
           <button
             onClick={() => onHide?.(item.id)}
-            className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors"
+            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors"
             title="Hide this item"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         ) : (
-          <button
-            onClick={() => onToggle(item.id)}
-            className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${item.needsReplenishment
-              ? 'bg-orange-500/15 border-orange-500/40 text-orange-400 hover:bg-orange-500/25'
-              : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
-          >
-            <ShoppingCart className="w-3.5 h-3.5" />
-            {item.needsReplenishment ? 'Remove' : 'Add to list'}
-          </button>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground/70 tracking-wider pr-1">
+              {item.requiredQuantity > 0 ? `Target: ${item.requiredQuantity}` : 'No Target'}
+            </span>
+            <div className={`flex items-center gap-1 bg-background/50 border rounded-lg p-1 transition-colors ${isEmpty
+              ? 'border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]'
+              : isLow
+                ? 'border-yellow-500/30 shadow-[0_0_10px_rgba(234,179,8,0.1)]'
+                : isHealthy
+                  ? 'border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]'
+                  : 'border-border/60 opacity-50'
+              }`}>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-10 w-10 border-border text-foreground hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/30 transition-colors"
+                onClick={() => onAdjust(item.id, -1)}
+                disabled={item.currentQuantity <= 0}
+              >
+                <Minus className="w-5 h-5" />
+              </Button>
+              <div
+                className={`w-14 h-10 flex items-center justify-center font-bold text-xl rounded border cursor-pointer transition-colors ${isEmpty
+                  ? 'text-red-500 bg-red-500/10 border-red-500/20 hover:bg-red-500/20'
+                  : isLow
+                    ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20'
+                    : isHealthy
+                      ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20'
+                      : 'text-foreground bg-accent/30 border-border/40 hover:bg-accent/50'
+                  }`}
+                onClick={() => {
+                  setTempQty(item.currentQuantity.toString());
+                  setIsEditingQty(true);
+                }}
+                title="Click to enter exact quantity"
+              >
+                {isEditingQty ? (
+                  <input
+                    type="number"
+                    autoFocus
+                    min={0}
+                    value={tempQty}
+                    onChange={(e) => setTempQty(e.target.value)}
+                    onBlur={handleQtySubmit}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleQtySubmit();
+                      if (e.key === 'Escape') setIsEditingQty(false);
+                    }}
+                    className="w-full h-full bg-transparent text-center outline-none rounded appearance-none"
+                    style={{ MozAppearance: 'textfield' }}
+                  />
+                ) : (
+                  item.currentQuantity
+                )}
+              </div>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-10 w-10 border-border text-foreground hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/30 transition-colors"
+                onClick={() => onAdjust(item.id, 1)}
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
-      <div className="flex items-center gap-1.5 mt-2">
-        <Button size="sm" variant="outline"
-          className="h-7 w-7 p-0 bg-muted/50 border-border hover:bg-accent"
-          onClick={() => onAdjust(item.id, -1)}
-          disabled={item.currentQuantity <= 0}
-        >
-          <Minus className="w-3 h-3" />
-        </Button>
-        <span className={`text-sm font-semibold w-8 text-center ${pct < 60 ? 'text-red-400' : pct < 90 ? 'text-yellow-400' : 'text-emerald-400'}`}>
-          {item.currentQuantity}
-        </span>
-        <Button size="sm" variant="outline"
-          className="h-7 w-7 p-0 bg-muted/50 border-border hover:bg-accent"
-          onClick={() => onAdjust(item.id, 1)}
-        >
-          <Plus className="w-3 h-3" />
-        </Button>
-        <span className="text-[11px] text-muted-foreground/70">/</span>
+
+      <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-border/40">
         {editMode ? (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2 w-full justify-end">
+            <Label className="text-xs text-muted-foreground">Default Stock:</Label>
             <input
-              type="number"
-              min={1}
-              value={item.requiredQuantity}
-              onChange={e => onChangeRequired?.(item.id, Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-14 h-7 text-sm text-center font-semibold bg-background border border-primary/40 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              type="text"
+              inputMode="numeric"
+              value={item.requiredQuantity.toString()}
+              onChange={e => {
+                // Replace completely, don't just concatenate strings if they type over
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                if (val) {
+                  onChangeRequired?.(item.id, Math.max(1, parseInt(val)));
+                }
+              }}
+              onFocus={(e) => e.target.select()}
+              className="w-16 h-8 text-sm text-center font-semibold bg-background border border-primary/40 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             />
             {defaultRequired !== undefined && defaultRequired !== item.requiredQuantity && (
               <button
                 onClick={() => onChangeRequired?.(item.id, defaultRequired)}
                 title={`Reset to default (${defaultRequired})`}
-                className="p-1 text-muted-foreground/50 hover:text-primary rounded transition-colors"
+                className="p-1 px-2 text-xs text-muted-foreground/70 bg-muted/50 hover:bg-accent hover:text-foreground rounded transition-colors"
               >
-                <RotateCcw className="w-3 h-3" />
+                Reset ({defaultRequired})
               </button>
             )}
+            <span className="ml-2 text-[10px] text-primary/60 italic">editing</span>
           </div>
         ) : (
-          <span className="text-[11px] text-muted-foreground/70">{item.requiredQuantity} req.</span>
-        )}
-        {!editMode && item.currentQuantity < item.requiredQuantity && (
-          <Badge className="ml-auto text-[10px] bg-orange-500/15 text-orange-400 border-orange-500/30">
-            Need {item.requiredQuantity - item.currentQuantity}
-          </Badge>
-        )}
-        {editMode && (
-          <span className="ml-auto text-[10px] text-primary/60 italic">editing</span>
+          <>
+            <span className="text-xs text-muted-foreground/80 font-medium">Target: {item.requiredQuantity}</span>
+            {item.currentQuantity < item.requiredQuantity && (
+              <Badge className="ml-2 text-[10px] bg-orange-500/15 text-orange-400 border-orange-500/30">
+                Need {item.requiredQuantity - item.currentQuantity}
+              </Badge>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -408,7 +464,7 @@ function ShoppingListView({
   selectedTail: string;
   reporterName: string;
   additionalNotes: string;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   const [manualItems, setManualItems] = useState<ManualItem[]>([]);
   const [manualInput, setManualInput] = useState('');
@@ -452,10 +508,12 @@ function ShoppingListView({
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="w-4 h-4 mr-1" /> Back
-        </Button>
-        <h1 className="text-xl font-bold text-foreground flex-1">Shopping List</h1>
+        {onBack && (
+          <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground hover:text-foreground">
+            <ChevronLeft className="w-4 h-4 mr-1" /> Back
+          </Button>
+        )}
+        <h2 className="text-xl font-bold text-foreground flex-1">Grocery List</h2>
         <Button size="sm" variant="outline" onClick={() => window.print()} className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1">
           <FileText className="w-4 h-4" /> Print
         </Button>
@@ -606,7 +664,7 @@ function HistoryView({
                       {new Date(s.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </p>
                     <p className="text-xs text-muted-foreground/70">
-                      {s.reportedBy}{s.flightNumber ? ` · ${s.flightNumber}` : ''}
+                      {s.reportedBy}{s.departure && s.arrival ? ` · ${s.departure} ✈️ ${s.arrival}` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -664,19 +722,24 @@ export default function AircraftInventory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [reporterName, setReporterName] = useState('');
-  const [flightNumber, setFlightNumber] = useState('');
+  const [departure, setDeparture] = useState('');
+  const [arrival, setArrival] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [showScanMode, setShowScanMode] = useState(false);
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customQty, setCustomQty] = useState(1);
   const [customArea, setCustomArea] = useState<AreaType>('galley');
+  const [customCategory, setCustomCategory] = useState('');
   const [customNotes, setCustomNotes] = useState('');
   const [sessions, setSessions] = useState<InventorySession[]>([]);
   const [currentView, setCurrentView] = useState<'check' | 'shopping' | 'history'>('check');
+  const [mainTab, setMainTab] = useState('inventory');
+  const [workflowMode, setWorkflowMode] = useState<'inflight' | 'audit'>('inflight');
   const [editMode, setEditMode] = useState(false);
   const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set());
   const [requiredOverrides, setRequiredOverrides] = useState<Record<string, number>>({});
+  const [locationOverrides, setLocationOverrides] = useState<Record<string, string>>({});
 
   const aircraft = useMemo(() => FLEET.find(f => f.tailNumber === selectedTail), [selectedTail]);
 
@@ -691,8 +754,10 @@ export default function AircraftInventory() {
   // Load overrides per tail
   useEffect(() => {
     if (!selectedTail) return;
-    const saved = localStorage.getItem(`inventory-overrides-${selectedTail}`);
-    setRequiredOverrides(saved ? JSON.parse(saved) : {});
+    const reqSaved = localStorage.getItem(`inventory-overrides-${aircraft?.type}`);
+    setRequiredOverrides(reqSaved ? JSON.parse(reqSaved) : {});
+    const locSaved = localStorage.getItem(`inventory-loc-overrides-${aircraft?.type}`);
+    setLocationOverrides(locSaved ? JSON.parse(locSaved) : {});
   }, [selectedTail]);
 
   // Persist reporter name
@@ -707,16 +772,28 @@ export default function AircraftInventory() {
     const saved = localStorage.getItem(sessionKey);
     if (saved) {
       const parsed = JSON.parse(saved);
-      const overrides: Record<string, number> = JSON.parse(localStorage.getItem(`inventory-overrides-${selectedTail}`) || '{}');
-      setItems((parsed.items || []).map((i: InventoryItem) => overrides[i.id] !== undefined ? { ...i, requiredQuantity: overrides[i.id] } : i));
+      const reqOver: Record<string, number> = JSON.parse(localStorage.getItem(`inventory-overrides-${aircraft?.type}`) || '{}');
+      const locOver: Record<string, string> = JSON.parse(localStorage.getItem(`inventory-loc-overrides-${aircraft?.type}`) || '{}');
+      setItems((parsed.items || []).map((i: InventoryItem) => ({
+        ...i,
+        requiredQuantity: reqOver[i.id] !== undefined ? reqOver[i.id] : i.requiredQuantity,
+        location: locOver[i.id] !== undefined ? locOver[i.id] : i.location,
+      })));
       setCustomItems(parsed.customItems || []);
-      setFlightNumber(parsed.flightNumber || '');
+      setDeparture(parsed.departure || '');
+      setArrival(parsed.arrival || '');
       setAdditionalNotes(parsed.additionalNotes || '');
     } else {
-      const overrides: Record<string, number> = JSON.parse(localStorage.getItem(`inventory-overrides-${selectedTail}`) || '{}');
-      setItems(initItemsForAircraft(aircraft.type).map(i => overrides[i.id] !== undefined ? { ...i, requiredQuantity: overrides[i.id] } : i));
+      const reqOver: Record<string, number> = JSON.parse(localStorage.getItem(`inventory-overrides-${aircraft?.type}`) || '{}');
+      const locOver: Record<string, string> = JSON.parse(localStorage.getItem(`inventory-loc-overrides-${aircraft?.type}`) || '{}');
+      setItems(initItemsForAircraft(aircraft.type).map((i: InventoryItem) => ({
+        ...i,
+        requiredQuantity: reqOver[i.id] !== undefined ? reqOver[i.id] : i.requiredQuantity,
+        location: locOver[i.id] !== undefined ? locOver[i.id] : i.location,
+      })));
       setCustomItems([]);
-      setFlightNumber('');
+      setDeparture('');
+      setArrival('');
       setAdditionalNotes('');
     }
   }, [aircraft, selectedTail]);
@@ -725,8 +802,8 @@ export default function AircraftInventory() {
   useEffect(() => {
     if (!selectedTail || !items.length) return;
     const sessionKey = `inventory-session-${selectedTail}`;
-    localStorage.setItem(sessionKey, JSON.stringify({ items, customItems, flightNumber, additionalNotes }));
-  }, [items, customItems, selectedTail, flightNumber, additionalNotes]);
+    localStorage.setItem(sessionKey, JSON.stringify({ items, customItems, departure, arrival, additionalNotes }));
+  }, [items, customItems, selectedTail, departure, arrival, additionalNotes]);
 
   const readinessScore = useMemo(() => calcReadiness(items, customItems), [items, customItems]);
 
@@ -740,21 +817,29 @@ export default function AircraftInventory() {
     [items]
   );
 
+  const rawFilteredItems = useMemo(() => {
+    return items.filter(item => {
+      // Basic search filtering
+      if (searchTerm && !item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) && !item.alternateNames.some(n => n.toLowerCase().includes(searchTerm.toLowerCase()))) return false;
+
+      // Hidden items filtering
+      if (hiddenItems.has(item.id) && !editMode) return false;
+
+      // Priority filtering
+      if (filterPriority !== 'all' && item.priority !== filterPriority) return false;
+
+      // Aircraft applicability filtering
+      if (aircraft && !item.defaultQuantities[aircraft.type]) return false;
+
+      return true;
+    });
+  }, [items, searchTerm, hiddenItems, editMode, filterPriority, aircraft]);
+
   const filteredItems = useMemo(() => {
-    let result = items.filter(i => i.area === activeTab && !hiddenItems.has(i.id));
-    if (searchTerm) {
-      const t = searchTerm.toLowerCase();
-      result = result.filter(i =>
-        i.itemName.toLowerCase().includes(t) ||
-        i.category.toLowerCase().includes(t) ||
-        i.alternateNames.some(a => a.toLowerCase().includes(t))
-      );
-    }
-    if (filterPriority !== 'all') {
-      result = result.filter(i => i.priority === filterPriority);
-    }
-    return result;
-  }, [items, activeTab, searchTerm, filterPriority, hiddenItems]);
+    // If searchResults is active, this filteredItems will be ignored in favor of searchResults
+    // Otherwise, filter by activeTab
+    return rawFilteredItems.filter(item => item.area === activeTab);
+  }, [rawFilteredItems, activeTab]);
 
   // Cross-tab search: when searchTerm is set, search ALL areas
   const searchResults = useMemo(() => {
@@ -809,7 +894,16 @@ export default function AircraftInventory() {
     setItems(prev => prev.map(i => i.id === id ? { ...i, requiredQuantity: qty } : i));
     setRequiredOverrides(prev => {
       const next = { ...prev, [id]: qty };
-      localStorage.setItem(`inventory-overrides-${selectedTail}`, JSON.stringify(next));
+      localStorage.setItem(`inventory-overrides-${aircraft?.type}`, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function changeLocation(id: string, loc: string) {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, location: loc } : i));
+    setLocationOverrides(prev => {
+      const next = { ...prev, [id]: loc };
+      localStorage.setItem(`inventory-loc-overrides-${aircraft?.type}`, JSON.stringify(next));
       return next;
     });
   }
@@ -834,11 +928,12 @@ export default function AircraftInventory() {
       name: customName.trim(),
       quantity: customQty,
       area: customArea,
+      category: customCategory.trim() || 'Custom',
       needsReplenishment: false,
       notes: customNotes,
     };
     setCustomItems(prev => [...prev, newItem]);
-    setCustomName(''); setCustomQty(1); setCustomNotes('');
+    setCustomName(''); setCustomQty(1); setCustomCategory(''); setCustomNotes('');
     setShowAddCustom(false);
     toast.success(`Added ${newItem.name}`);
   }
@@ -852,7 +947,8 @@ export default function AircraftInventory() {
       aircraftType: aircraft!.type,
       date: new Date().toISOString(),
       reportedBy: reporterName,
-      flightNumber,
+      departure,
+      arrival,
       checkedItems: items.map(i => ({ itemId: i.id, currentQuantity: i.currentQuantity, needsReplenishment: i.needsReplenishment })),
       customItems,
       additionalNotes,
@@ -872,7 +968,7 @@ export default function AircraftInventory() {
     if (!flagged.length && !customItems.filter(c => c.needsReplenishment).length) {
       toast.info('No items flagged for restock'); return;
     }
-    setCurrentView('shopping');
+    setMainTab('grocery');
   }
 
   // ── No aircraft selected ──────────────────────────────────────────────────
@@ -897,9 +993,25 @@ export default function AircraftInventory() {
                 className="group relative rounded-2xl border border-border bg-muted/40 p-5 text-left hover:border-primary/40 hover:bg-primary/5 transition-all"
               >
                 {hasDraft && (
-                  <Badge className="absolute top-2 right-2 text-[10px] bg-amber-500/20 text-amber-400 border-amber-500/30">
-                    Draft
-                  </Badge>
+                  <div className="absolute top-2 right-2 flex items-center gap-1 z-10" onClick={e => e.stopPropagation()}>
+                    <Badge className="text-[10px] bg-amber-500/20 text-amber-400 border-amber-500/30">
+                      Draft
+                    </Badge>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Clear draft for ${ac.tailNumber}?`)) {
+                          localStorage.removeItem(sessionKey);
+                          setSessions([...sessions]);
+                          toast.success('Draft cleared');
+                        }
+                      }}
+                      className="p-1 hover:bg-amber-500/20 bg-background/50 backdrop-blur rounded-full text-amber-500/70 hover:text-amber-500 transition-colors border border-amber-500/20"
+                      title="Clear draft"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 )}
                 <Plane className="w-8 h-8 text-primary mb-3" />
                 <p className="text-xl font-bold text-foreground">{ac.tailNumber}</p>
@@ -918,7 +1030,7 @@ export default function AircraftInventory() {
                   <Plane className="w-4 h-4 text-muted-foreground" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-foreground">{s.tailNumber} — {s.aircraftType}</p>
-                    <p className="text-xs text-muted-foreground/70">{new Date(s.date).toLocaleDateString()} · {s.reportedBy}{s.flightNumber ? ` · ${s.flightNumber}` : ''}</p>
+                    <p className="text-xs text-muted-foreground/70">{new Date(s.date).toLocaleDateString()} · {s.reportedBy}{s.departure && s.arrival ? ` · ${s.departure} ✈️ ${s.arrival}` : ''}</p>
                   </div>
                   <span className={`text-sm font-bold ${readinessColor(s.readinessScore)}`}>{s.readinessScore}%</span>
                 </div>
@@ -930,19 +1042,7 @@ export default function AircraftInventory() {
     );
   }
 
-  // ── Shopping List View ────────────────────────────────────────────────────
-  if (currentView === 'shopping') {
-    return (
-      <ShoppingListView
-        items={items}
-        customItems={customItems}
-        selectedTail={selectedTail}
-        reporterName={reporterName}
-        additionalNotes={additionalNotes}
-        onBack={() => setCurrentView('check')}
-      />
-    );
-  }
+  // ── Main View Logic ───────────────────────────────────────────────────────
 
   // ── History View ──────────────────────────────────────────────────────────
   if (currentView === 'history') {
@@ -979,294 +1079,352 @@ export default function AircraftInventory() {
             <p className="text-xs text-muted-foreground/70 mt-0.5">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
           </div>
         </div>
-        <ReadinessRing score={readinessScore} />
       </div>
 
-      {/* Reporter + Flight number */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <div>
-          <Label className="text-xs text-muted-foreground mb-1 block">Your Name</Label>
-          <Input
-            placeholder="Flight Attendant Name"
-            value={reporterName}
-            onChange={e => setReporterName(e.target.value)}
-            className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 h-9"
-          />
-        </div>
-        <div>
-          <Label className="text-xs text-muted-foreground mb-1 block">Flight Number</Label>
-          <Input
-            placeholder="e.g. PGF-001"
-            value={flightNumber}
-            onChange={e => setFlightNumber(e.target.value)}
-            className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 h-9"
-          />
-        </div>
-      </div>
+      <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
+        <div className="flex items-center justify-between mb-5">
+          <TabsList className="h-14 bg-muted/50 p-1 rounded-xl">
+            <TabsTrigger value="inventory" className="flex gap-2 text-base px-6 py-2.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all h-full">
+              <ClipboardList className="w-5 h-5" /> Inventory Check
+            </TabsTrigger>
+            <TabsTrigger value="grocery" className="flex gap-2 text-base px-6 py-2.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all h-full">
+              <ShoppingCart className="w-5 h-5" /> Grocery List
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Critical alert banner */}
-      {criticalLow.length > 0 && (
-        <div className="mb-5 bg-destructive/10 border border-red-500/30 rounded-xl p-3 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-red-300 mb-0.5">⚠ Critical items below threshold</p>
-            <p className="text-xs text-red-400/80">{criticalLow.map(i => i.itemName).join(' · ')}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Area summary chips */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-5">
-        {AREAS.map(area => (
-          <button key={area} onClick={() => setActiveTab(area)} className="text-left">
-            <AreaSummaryChip area={area} items={items} />
-          </button>
-        ))}
-      </div>
-
-      {/* Action bar */}
-      <div className="flex gap-2 mb-5 flex-wrap">
-        <div className="relative flex-1 min-w-[160px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/70" />
-          <Input
-            placeholder="Search items..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="pl-8 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 h-9 text-sm"
-          />
-        </div>
-        <Select value={filterPriority} onValueChange={setFilterPriority}>
-          <SelectTrigger className="w-32 bg-muted/50 border-border text-foreground h-9 text-sm">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button size="sm" variant="outline"
-          className="bg-muted/50 border-border text-foreground hover:bg-accent gap-1.5 h-9"
-          onClick={() => setShowScanMode(true)}>
-          <Scan className="w-3.5 h-3.5" /> Quick Scan
-        </Button>
-        <Button size="sm" variant="outline"
-          className="bg-muted/50 border-border text-muted-foreground hover:bg-accent gap-1 h-9"
-          onClick={resetArea}>
-          <RotateCcw className="w-3.5 h-3.5" /> Reset
-        </Button>
-        <Button size="sm" variant="outline"
-          onClick={() => setEditMode(e => !e)}
-          className={`gap-1.5 h-9 transition-all ${editMode
-            ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/20'
-            : 'bg-muted/50 border-border text-muted-foreground hover:bg-accent'
-            }`}>
-          <Pencil className="w-3.5 h-3.5" />
-          {editMode ? 'Done' : 'Edit'}
-        </Button>
-      </div>
-      {editMode && (
-        <div className="mb-3 flex items-center gap-2 text-xs text-primary/80 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
-          <Pencil className="w-3.5 h-3.5 shrink-0" />
-          <span>Edit mode — change required quantities or hide items. Changes save automatically.</span>
-          {hiddenInArea > 0 && (
-            <button onClick={restoreHidden} className="ml-auto text-xs underline text-primary hover:text-primary/80 shrink-0">
-              Restore {hiddenInArea} hidden
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as AreaType)}>
-        {/* Custom tab bar — bigger, theme-safe */}
-        <div className="flex gap-2 overflow-x-auto pb-1 mb-5">
-          {AREAS.map(area => {
-            const { pct } = getAreaReadiness(items, area);
-            const { label, icon: Icon, color } = AREA_META[area];
-            const isActive = activeTab === area;
-            return (
-              <button
-                key={area}
-                onClick={() => setActiveTab(area)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all border shrink-0 ${isActive
-                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                  : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
-                  }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-primary-foreground' : color}`} />
-                {label}
-                {pct < 100 && (
-                  <span className={`text-xs font-bold ml-0.5 ${isActive ? 'text-primary-foreground/80' : readinessColor(pct)}`}>
-                    {pct}%
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Cross-tab search results — shown instead of tab panels when searching */}
-        {searchResults ? (
-          <div className="space-y-5 mt-0">
-            {Object.keys(searchResults).length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground/50">
-                <Search className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No items match "{searchTerm}"</p>
-              </div>
-            ) : (
-              Object.entries(searchResults).map(([area, areaItems]) => (
-                <div key={area}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {React.createElement(AREA_META[area as AreaType].icon, { className: `w-4 h-4 ${AREA_META[area as AreaType].color}` })}
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{AREA_META[area as AreaType].label}</span>
-                    <span className="text-xs text-muted-foreground/50">({areaItems.length})</span>
-                  </div>
-                  <div className="space-y-2">
-                    {areaItems.map(item => (
-                      <ItemCard
-                        key={item.id}
-                        item={item}
-                        onToggle={toggleReplenishment}
-                        onAdjust={adjustQuantity}
-                        editMode={editMode}
-                        onHide={hideItem}
-                        onChangeRequired={changeRequired}
-                        defaultRequired={item.defaultQuantities[aircraft?.type ?? 'G650']}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        ) : (
-          <>{AREAS.map(area => (
-            <TabsContent key={area} value={area} className="mt-0">
-              <div className="space-y-2">
-                {filteredItems.length === 0 ? (
-                  <div className="text-center py-10 text-muted-foreground/50">
-                    <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">No items match your filters</p>
-                  </div>
-                ) : (
-                  filteredItems.map(item => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      onToggle={toggleReplenishment}
-                      onAdjust={adjustQuantity}
-                      editMode={editMode}
-                      onHide={hideItem}
-                      onChangeRequired={changeRequired}
-                      defaultRequired={item.defaultQuantities[aircraft?.type ?? 'G650']}
-                    />
-                  ))
-                )}
-
-                {/* Custom items for this area */}
-                {customItems.filter(c => c.area === area).map(c => (
-                  <div key={c.id} className={`rounded-xl border p-3 ${c.needsReplenishment ? 'border-orange-500/30 bg-orange-500/5' : 'border-border/60 bg-muted/30'}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge className="text-[10px] bg-blue-500/15 text-blue-400 border-blue-500/30">Custom</Badge>
-                        <span className="text-sm text-foreground">{c.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Qty: {c.quantity}</span>
-                        <Switch
-                          checked={c.needsReplenishment}
-                          onCheckedChange={() => setCustomItems(prev => prev.map(ci =>
-                            ci.id === c.id ? { ...ci, needsReplenishment: !ci.needsReplenishment } : ci
-                          ))}
-                        />
-                        <button onClick={() => setCustomItems(prev => prev.filter(ci => ci.id !== c.id))}>
-                          <Trash2 className="w-4 h-4 text-red-500/50 hover:text-red-500" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <button
-                  onClick={() => { setCustomArea(area); setShowAddCustom(true); }}
-                  className="w-full border border-dashed border-border rounded-xl p-3 text-sm text-muted-foreground/70 hover:border-border hover:text-muted-foreground transition-colors flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" /> Add custom item
-                </button>
-              </div>
-            </TabsContent>
-          ))}</>)}
-      </Tabs>
-
-      {/* Add custom item modal */}
-      {showAddCustom && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-end md:items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl p-5 w-full max-w-sm">
-            <h3 className="text-base font-semibold text-foreground mb-4">Add Custom Item</h3>
-            <div className="space-y-3">
-              <Input placeholder="Item name" value={customName} onChange={e => setCustomName(e.target.value)}
-                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50" />
-              <div className="flex gap-2">
-                <Input type="number" min={1} value={customQty} onChange={e => setCustomQty(parseInt(e.target.value) || 1)}
-                  className="bg-muted/50 border-border text-foreground w-24" />
-                <Select value={customArea} onValueChange={(v: string) => setCustomArea(v as AreaType)}>
-                  <SelectTrigger className="flex-1 bg-muted/50 border-border text-foreground">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {AREAS.map(a => <SelectItem key={a} value={a}>{AREA_META[a].label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Input placeholder="Notes (optional)" value={customNotes} onChange={e => setCustomNotes(e.target.value)}
-                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50" />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <Button variant="outline" className="flex-1 border-border bg-muted/50 text-foreground" onClick={() => setShowAddCustom(false)}>Cancel</Button>
-              <Button className="flex-1 bg-primary hover:bg-primary/90" onClick={addCustomItem}>Add</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom action bar */}
-      <div className="mt-6 pt-4 border-t border-border/60 flex flex-wrap gap-3 items-center justify-between">
-        <div className="flex gap-2">
           <Button variant="outline" size="sm"
             className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1.5"
             onClick={() => setCurrentView('history')}>
             <History className="w-4 h-4" /> History
           </Button>
-          <Button variant="outline" size="sm"
-            className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1.5"
-            onClick={generateShoppingList}>
-            <ShoppingCart className="w-4 h-4" /> Shopping List
-            {itemsNeedingRestock.length > 0 && (
-              <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-[10px] ml-0.5">
-                {itemsNeedingRestock.length}
+        </div>
+
+        <TabsContent value="inventory" className="mt-0">
+          {/* Reporter + Departure/Arrival */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Your Name</Label>
+              <Input
+                placeholder="Flight Attendant Name"
+                value={reporterName}
+                onChange={e => setReporterName(e.target.value)}
+                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 h-9"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Departure</Label>
+              <Input
+                placeholder="e.g. TEB"
+                value={departure}
+                onChange={e => setDeparture(e.target.value)}
+                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 h-9 uppercase"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Arrival</Label>
+              <Input
+                placeholder="e.g. VNY"
+                value={arrival}
+                onChange={e => setArrival(e.target.value)}
+                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 h-9 uppercase"
+              />
+            </div>
+          </div>
+
+          {/* Critical alert banner */}
+          {criticalLow.length > 0 && (
+            <div className="mb-5 bg-destructive/10 border border-red-500/30 rounded-xl p-3 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-300 mb-0.5">⚠ Critical items below threshold</p>
+                <p className="text-xs text-red-400/80">{criticalLow.map(i => i.itemName).join(' · ')}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Area summary chips */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-5">
+            {AREAS.map(area => (
+              <button key={area} onClick={() => setActiveTab(area)} className="text-left">
+                <AreaSummaryChip area={area} items={items} />
+              </button>
+            ))}
+          </div>
+
+          {/* Filters Grid */}
+          <div className="flex gap-2 mb-5 flex-wrap">
+            <div className="relative flex-1 min-w-[160px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/70" />
+              <Input
+                placeholder="Search items..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-8 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 h-9 text-sm"
+              />
+            </div>
+            <Select value={filterPriority} onValueChange={setFilterPriority}>
+              <SelectTrigger className="w-32 bg-muted/50 border-border text-foreground h-9 text-sm">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline"
+              className="bg-muted/50 border-border text-foreground hover:bg-accent gap-1.5 h-9"
+              onClick={() => setShowScanMode(true)}>
+              <Scan className="w-3.5 h-3.5" /> Quick Scan
+            </Button>
+            <Button size="sm" variant="outline"
+              className="bg-muted/50 border-border text-muted-foreground hover:bg-accent gap-1 h-9"
+              onClick={resetArea}>
+              <RotateCcw className="w-3.5 h-3.5" /> Reset
+            </Button>
+            <Button size="sm" variant="outline"
+              onClick={() => setEditMode(e => !e)}
+              className={`gap-1.5 h-9 transition-all ${editMode
+                ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/20'
+                : 'bg-muted/50 border-border text-muted-foreground hover:bg-accent'
+                }`}>
+              <Pencil className="w-3.5 h-3.5" />
+              <Badge variant="outline" className="text-xs border-primary/30 text-primary bg-primary/5">
+                Editing Defaults
               </Badge>
-            )}
-          </Button>
-        </div>
-        <div className="flex gap-2">
-          <Textarea
-            placeholder="Additional notes..."
-            value={additionalNotes}
-            onChange={e => setAdditionalNotes(e.target.value)}
-            className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 h-9 py-2 text-sm resize-none w-48"
+            </Button>
+          </div>
+          {editMode && (
+            <div className="mb-3 flex items-center gap-2 text-xs text-primary/80 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+              <Pencil className="w-3.5 h-3.5 shrink-0" />
+              <span>Edit mode — change required quantities or hide items. Changes save automatically.</span>
+              {hiddenInArea > 0 && (
+                <button onClick={restoreHidden} className="ml-auto text-xs underline text-primary hover:text-primary/80 shrink-0">
+                  Restore {hiddenInArea} hidden
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as AreaType)}>
+            {/* Custom tab bar — bigger, theme-safe */}
+            <div className="flex gap-2 overflow-x-auto pb-1 mb-5">
+              {AREAS.map(area => {
+                const { pct } = getAreaReadiness(items, area);
+                const { label, icon: Icon, color } = AREA_META[area];
+                const isActive = activeTab === area;
+                return (
+                  <button
+                    key={area}
+                    onClick={() => setActiveTab(area)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all border shrink-0 ${isActive
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+                      }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-primary-foreground' : color}`} />
+                    {label}
+                    {pct < 100 && (
+                      <span className={`text-xs font-bold ml-0.5 ${isActive ? 'text-primary-foreground/80' : readinessColor(pct)}`}>
+                        {pct}%
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Cross-tab search results — shown instead of tab panels when searching */}
+            {searchResults ? (
+              <div className="space-y-5 mt-0">
+                {Object.keys(searchResults).length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground/50">
+                    <Search className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No items match "{searchTerm}"</p>
+                  </div>
+                ) : (
+                  Object.entries(searchResults).map(([area, areaItems]) => (
+                    <div key={area}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {React.createElement(AREA_META[area as AreaType].icon, { className: `w-4 h-4 ${AREA_META[area as AreaType].color}` })}
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{AREA_META[area as AreaType].label}</span>
+                        <span className="text-xs text-muted-foreground/50">({areaItems.length})</span>
+                      </div>
+                      <div className="space-y-6">
+                        {Object.entries(
+                          areaItems.reduce((acc, item) => {
+                            acc[item.category] = acc[item.category] || [];
+                            acc[item.category].push(item);
+                            return acc;
+                          }, {} as Record<string, InventoryItem[]>)
+                        ).map(([category, catItems]) => (
+                          <div key={category}>
+                            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/40">
+                              {category}
+                            </h4>
+                            <div className="space-y-2">
+                              {catItems.map(item => (
+                                <ItemCard
+                                  key={item.id}
+                                  item={item}
+                                  onAdjust={adjustQuantity}
+                                  editMode={editMode}
+                                  onHide={hideItem}
+                                  onChangeRequired={changeRequired}
+                                  onChangeLocation={changeLocation}
+                                  defaultRequired={item.defaultQuantities[aircraft?.type ?? 'G650']}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : (
+              <>{AREAS.map(area => (
+                <TabsContent key={area} value={area} className="mt-0">
+                  <div className="space-y-2">
+                    {filteredItems.length === 0 ? (
+                      <div className="text-center py-10 text-muted-foreground/50">
+                        <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">No items match your filters</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {Object.entries(
+                          // Group normal Items and Custom Items into the same dictionary
+                          (() => {
+                            const grouped = filteredItems.reduce((acc, item) => {
+                              acc[item.category] = acc[item.category] || { normal: [], custom: [] };
+                              acc[item.category].normal.push(item);
+                              return acc;
+                            }, {} as Record<string, { normal: InventoryItem[], custom: CustomItem[] }>);
+
+                            customItems.filter(c => c.area === area).forEach(c => {
+                              const cat = c.category || 'Custom';
+                              if (!grouped[cat]) grouped[cat] = { normal: [], custom: [] };
+                              grouped[cat].custom.push(c);
+                            });
+
+                            return grouped;
+                          })()
+                        ).map(([category, { normal, custom }]) => (
+                          <div key={category}>
+                            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/40">
+                              {category}
+                            </h4>
+                            <div className="space-y-2">
+                              {normal.map(item => (
+                                <ItemCard
+                                  key={item.id}
+                                  item={item}
+                                  onAdjust={adjustQuantity}
+                                  editMode={editMode}
+                                  onHide={hideItem}
+                                  onChangeRequired={changeRequired}
+                                  onChangeLocation={changeLocation}
+                                  defaultRequired={item.defaultQuantities[aircraft?.type ?? 'G650']}
+                                />
+                              ))}
+                              {custom.map(c => (
+                                <div key={c.id} className={`rounded-xl border p-3 ${c.needsReplenishment ? 'border-orange-500/30 bg-orange-500/5' : 'border-border/60 bg-muted/30'}`}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Badge className="text-[10px] bg-blue-500/15 text-blue-400 border-blue-500/30">Custom</Badge>
+                                      <span className="text-sm text-foreground">{c.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm text-muted-foreground">Qty: {c.quantity}</span>
+                                      <Switch
+                                        checked={c.needsReplenishment}
+                                        onCheckedChange={() => setCustomItems(prev => prev.map(ci =>
+                                          ci.id === c.id ? { ...ci, needsReplenishment: !ci.needsReplenishment } : ci
+                                        ))}
+                                      />
+                                      <button onClick={() => setCustomItems(prev => prev.filter(ci => ci.id !== c.id))}>
+                                        <Trash2 className="w-4 h-4 text-red-500/50 hover:text-red-500" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => { setCustomArea(area); setShowAddCustom(true); }}
+                      className="w-full border border-dashed border-border rounded-xl p-3 text-sm text-muted-foreground/70 hover:border-border hover:text-muted-foreground transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" /> Add custom item
+                    </button>
+                  </div>
+                </TabsContent>
+              ))}</>)}
+          </Tabs>
+
+          {/* Add custom item modal */}
+          {showAddCustom && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-end md:items-center justify-center p-4">
+              <div className="bg-card border border-border rounded-2xl p-5 w-full max-w-sm">
+                <h3 className="text-base font-semibold text-foreground mb-4">Add Custom Item</h3>
+                <div className="space-y-3">
+                  <Input placeholder="Item name" value={customName} onChange={e => setCustomName(e.target.value)}
+                    className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50" />
+                  <div className="flex gap-2">
+                    <Input type="number" min={1} value={customQty} onChange={e => setCustomQty(parseInt(e.target.value) || 1)}
+                      className="bg-muted/50 border-border text-foreground w-24" />
+                    <Select value={customArea} onValueChange={(v: string) => setCustomArea(v as AreaType)}>
+                      <SelectTrigger className="flex-1 bg-muted/50 border-border text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AREAS.map(a => <SelectItem key={a} value={a}>{AREA_META[a].label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Input placeholder="Category (e.g. Snacks)" list="category-suggestions" value={customCategory} onChange={e => setCustomCategory(e.target.value)}
+                    className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50" />
+                  <datalist id="category-suggestions">
+                    {Array.from(new Set(DEFAULT_INVENTORY.map(i => i.category))).map(cat => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
+                  <Input placeholder="Notes (optional)" value={customNotes} onChange={e => setCustomNotes(e.target.value)}
+                    className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50" />
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" className="flex-1 border-border bg-muted/50 text-foreground" onClick={() => setShowAddCustom(false)}>Cancel</Button>
+                  <Button className="flex-1 bg-primary hover:bg-primary/90" onClick={addCustomItem}>Add</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom action bar now purely a 'Needed mode tools' wrapper for resetting or exporting */}
+          <div className="mt-6 pt-4 border-t border-border/60">
+            {/* Bottom bar reserved for future main actions */}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="grocery" className="mt-0">
+          <ShoppingListView
+            items={items}
+            customItems={customItems}
+            selectedTail={selectedTail}
+            reporterName={reporterName}
+            additionalNotes={additionalNotes}
           />
-          <Button
-            onClick={submitInventory}
-            className="bg-primary hover:bg-primary/90 text-white gap-1.5"
-            disabled={!reporterName.trim()}
-          >
-            <FileText className="w-4 h-4" /> Submit
-          </Button>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -85,7 +85,7 @@ export default function ProceduralBulletins({ userRole, userName = 'Current User
   // Role options
   const roleOptions = [
     { value: 'pilot', label: 'Pilots' },
-    { value: 'inflight', label: 'Inflight Crew' },
+    { value: 'inflight', label: 'Flight Attendant' },
     { value: 'maintenance', label: 'Maintenance' },
     { value: 'safety', label: 'Safety' },
     { value: 'scheduling', label: 'Scheduling' },
@@ -443,7 +443,7 @@ Ensure all crew members receive adequate rest to maintain safety and operational
 - Minimum 24 consecutive hours rest in any 7 days
 - Rest period begins when crew is released from duty
 
-## Inflight Crew Duty Limitations
+## Flight Attendant Duty Limitations
 
 ### Daily Duty Period
 - Maximum 14 hours duty time
@@ -720,14 +720,14 @@ Contact Safety or Maintenance for questions.`,
   };
 
   const handleTogglePin = (bulletinId: string) => {
-    setBulletins(bulletins.map(b => 
+    setBulletins(bulletins.map(b =>
       b.id === bulletinId ? { ...b, isPinned: !b.isPinned } : b
     ));
     toast.success('Bulletin updated');
   };
 
   const handleArchive = (bulletinId: string) => {
-    setBulletins(bulletins.map(b => 
+    setBulletins(bulletins.map(b =>
       b.id === bulletinId ? { ...b, isArchived: !b.isArchived } : b
     ));
     toast.success('Bulletin archived');
@@ -836,11 +836,10 @@ Contact Safety or Maintenance for questions.`,
           </Card>
         ) : (
           sortedBulletins.map(bulletin => (
-            <Card 
-              key={bulletin.id} 
-              className={`hover:shadow-md transition-shadow ${
-                bulletin.isPinned ? 'border-blue-500 border-2' : ''
-              } ${bulletin.isArchived ? 'opacity-60' : ''}`}
+            <Card
+              key={bulletin.id}
+              className={`hover:shadow-md transition-shadow ${bulletin.isPinned ? 'border-blue-500 border-2' : ''
+                } ${bulletin.isArchived ? 'opacity-60' : ''}`}
             >
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
@@ -960,8 +959,8 @@ Contact Safety or Maintenance for questions.`,
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="category">Category *</Label>
-                <Select 
-                  value={newBulletin.category} 
+                <Select
+                  value={newBulletin.category}
                   onValueChange={(value) => setNewBulletin({ ...newBulletin, category: value })}
                 >
                   <SelectTrigger>
@@ -1028,9 +1027,9 @@ Contact Safety or Maintenance for questions.`,
               <Input
                 id="tags"
                 value={newBulletin.tags?.join(', ')}
-                onChange={(e) => setNewBulletin({ 
-                  ...newBulletin, 
-                  tags: e.target.value.split(',').map(t => t.trim()).filter(t => t) 
+                onChange={(e) => setNewBulletin({
+                  ...newBulletin,
+                  tags: e.target.value.split(',').map(t => t.trim()).filter(t => t)
                 })}
                 placeholder="winter, safety, maintenance..."
               />
