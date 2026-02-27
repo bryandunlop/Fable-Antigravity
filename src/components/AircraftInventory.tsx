@@ -452,6 +452,189 @@ function QuickScanMode({
   );
 }
 
+// ─── Grocery List View ────────────────────────────────────────────────────────
+
+function GroceryListView({
+  customItems, selectedTail, reporterName, additionalNotes, onBack, setCustomItems
+}: {
+  customItems: CustomItem[];
+  selectedTail: string;
+  reporterName: string;
+  additionalNotes: string;
+  onBack?: () => void;
+  setCustomItems?: React.Dispatch<React.SetStateAction<CustomItem[]>>;
+}) {
+  const [manualItems, setManualItems] = useState<ManualItem[]>([]);
+  const [manualInput, setManualInput] = useState('');
+  const [manualQty, setManualQty] = useState(1);
+  const [grabbedItems, setGrabbedItems] = useState<Set<string>>(new Set());
+
+  function toggleGrabbed(id: string) {
+    setGrabbedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function addManual() {
+    if (!manualInput.trim()) return;
+    setManualItems(prev => [...prev, { id: `m-${Date.now()}`, name: manualInput.trim(), qty: manualQty }]);
+    setManualInput('');
+    setManualQty(1);
+  }
+
+  function copyToClipboard() {
+    const lines: string[] = [`Grocery List — ${selectedTail} — ${new Date().toLocaleDateString()}`, ''];
+    const flaggedCustom = customItems.filter(c => c.needsReplenishment);
+    if (flaggedCustom.length) {
+      lines.push('Custom Items:');
+      flaggedCustom.forEach(c => lines.push(`  • ${c.name} (${c.quantity} needed)`));
+      lines.push('');
+    }
+    if (manualItems.length) {
+      lines.push('Additional:');
+      manualItems.forEach(m => lines.push(`  • ${m.name} ×${m.qty}`));
+    }
+    if (additionalNotes) lines.push(`\nNotes: ${additionalNotes}`);
+    navigator.clipboard.writeText(lines.join('\n')).then(() => toast.success('Copied to clipboard!'));
+  }
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        {onBack && (
+          <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground hover:text-foreground">
+            <ChevronLeft className="w-4 h-4 mr-1" /> Back
+          </Button>
+        )}
+        <h2 className="text-xl font-bold text-foreground flex-1">Grocery List</h2>
+        <Button size="sm" variant="outline" onClick={() => window.print()} className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1">
+          <FileText className="w-4 h-4" /> Print
+        </Button>
+        <Button size="sm" variant="outline" onClick={copyToClipboard} className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1">
+          <Download className="w-4 h-4" /> Copy
+        </Button>
+      </div>
+
+      <div className="bg-muted/40 border border-border/60 rounded-xl p-4 mb-4">
+        <p className="text-sm text-muted-foreground">
+          <span className="text-foreground font-medium">{selectedTail}</span> · {new Date().toLocaleDateString()} · {reporterName || '—'}
+        </p>
+      </div>
+
+      {/* Flagged custom items */}
+      {customItems.length > 0 && (
+        <div className="mb-5">
+          <h3 className="text-sm font-semibold text-foreground mb-2">Trip Groceries</h3>
+          {customItems.map(c => {
+            const grabbed = grabbedItems.has(c.id);
+            return (
+              <div
+                key={c.id}
+                onClick={() => toggleGrabbed(c.id)}
+                className={`flex items-center gap-3 border rounded-lg px-3 py-2 mb-1.5 cursor-pointer transition-all ${grabbed
+                  ? 'bg-muted/20 border-border/40 opacity-50'
+                  : 'bg-muted/40 border-border/60 hover:border-primary/40 hover:bg-primary/5'
+                  }`}
+              >
+                <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${grabbed ? 'bg-emerald-500/20 border-emerald-500/50' : 'border-border'
+                  }`}>
+                  {grabbed && <Check className="w-3 h-3 text-emerald-500" />}
+                </div>
+                <span className={`text-sm flex-1 ${grabbed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                  {c.name}
+                </span>
+                <span className={`text-sm ${grabbed ? 'text-muted-foreground' : 'text-orange-400'}`}>
+                  {c.quantity} needed
+                </span>
+                {setCustomItems && (
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    setCustomItems(prev => prev.filter(ci => ci.id !== c.id));
+                  }}>
+                    <Trash2 className="w-4 h-4 text-red-400/50 hover:text-red-400" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Manually added items */}
+      {manualItems.length > 0 && (
+        <div className="mb-5">
+          <h3 className="text-sm font-semibold text-foreground mb-2">Manual Additions</h3>
+          <div className="space-y-1.5">
+            {manualItems.map(m => {
+              const grabbed = grabbedItems.has(m.id);
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => toggleGrabbed(m.id)}
+                  className={`flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer transition-all ${grabbed
+                    ? 'bg-muted/20 border-border/40 opacity-50'
+                    : 'bg-muted/40 border-border/60 hover:border-primary/40 hover:bg-primary/5'
+                    }`}
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${grabbed ? 'bg-emerald-500/20 border-emerald-500/50' : 'border-border'
+                    }`}>
+                    {grabbed && <Check className="w-3 h-3 text-emerald-500" />}
+                  </div>
+                  <Badge className="text-[10px] bg-blue-500/15 text-blue-400 border-blue-500/30">manual</Badge>
+                  <span className={`text-sm flex-1 ${grabbed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                    {m.name}
+                  </span>
+                  <span className={`text-sm font-semibold ${grabbed ? 'text-muted-foreground' : 'text-orange-400'}`}>
+                    ×{m.qty}
+                  </span>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    setManualItems(prev => prev.filter(x => x.id !== m.id));
+                  }}>
+                    <Trash2 className="w-4 h-4 text-red-400/50 hover:text-red-400" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add manual item */}
+      <div className="bg-muted/30 border border-dashed border-border rounded-xl p-4 mt-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Add to list</p>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Item name..."
+            value={manualInput}
+            onChange={e => setManualInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addManual()}
+            className="bg-background border-border text-foreground placeholder:text-muted-foreground/50 flex-1"
+          />
+          <Input
+            type="number" min={1} value={manualQty}
+            onChange={e => setManualQty(parseInt(e.target.value) || 1)}
+            className="bg-background border-border text-foreground w-20"
+          />
+          <Button onClick={addManual} className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1 shrink-0">
+            <Plus className="w-4 h-4" /> Add
+          </Button>
+        </div>
+      </div>
+
+      {additionalNotes && (
+        <div className="bg-muted/40 border border-border/60 rounded-xl p-4 mt-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
+          <p className="text-sm text-foreground">{additionalNotes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Shopping List View ───────────────────────────────────────────────────────
 
 interface ManualItem { id: string; name: string; qty: number; }
@@ -469,6 +652,16 @@ function ShoppingListView({
   const [manualItems, setManualItems] = useState<ManualItem[]>([]);
   const [manualInput, setManualInput] = useState('');
   const [manualQty, setManualQty] = useState(1);
+  const [grabbedItems, setGrabbedItems] = useState<Set<string>>(new Set());
+
+  function toggleGrabbed(id: string) {
+    setGrabbedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const needItems = items.filter(i => i.needsReplenishment || i.currentQuantity < i.requiredQuantity);
   const byArea = AREAS.reduce((acc, area) => {
@@ -513,7 +706,7 @@ function ShoppingListView({
             <ChevronLeft className="w-4 h-4 mr-1" /> Back
           </Button>
         )}
-        <h2 className="text-xl font-bold text-foreground flex-1">Grocery List</h2>
+        <h2 className="text-xl font-bold text-foreground flex-1">Restock List</h2>
         <Button size="sm" variant="outline" onClick={() => window.print()} className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1">
           <FileText className="w-4 h-4" /> Print
         </Button>
@@ -536,15 +729,30 @@ function ShoppingListView({
             <h3 className="text-sm font-semibold text-foreground">{AREA_META[area as AreaType].label}</h3>
           </div>
           <div className="space-y-1.5">
-            {areaItems.map(i => (
-              <div key={i.id} className="flex items-center gap-3 bg-muted/40 border border-border/60 rounded-lg px-3 py-2">
-                <Badge className={`text-[10px] ${PRIORITY_COLORS[i.priority]}`}>{i.priority}</Badge>
-                <span className="text-sm text-foreground flex-1">{i.itemName}</span>
-                <span className="text-sm text-orange-400 font-semibold">
-                  +{Math.max(0, i.requiredQuantity - i.currentQuantity)} needed
-                </span>
-              </div>
-            ))}
+            {areaItems.map(i => {
+              const grabbed = grabbedItems.has(i.id);
+              return (
+                <div
+                  key={i.id}
+                  onClick={() => toggleGrabbed(i.id)}
+                  className={`flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer transition-all ${grabbed
+                    ? 'bg-muted/20 border-border/40 opacity-50'
+                    : 'bg-muted/40 border-border/60 hover:border-primary/40 hover:bg-primary/5'
+                    }`}
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${grabbed ? 'bg-emerald-500/20 border-emerald-500/50' : 'border-border'
+                    }`}>
+                    {grabbed && <Check className="w-3 h-3 text-emerald-500" />}
+                  </div>
+                  <span className={`text-sm flex-1 ${grabbed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                    {i.itemName}
+                  </span>
+                  <span className={`text-sm font-semibold ${grabbed ? 'text-muted-foreground' : 'text-orange-400'}`}>
+                    +{Math.max(0, i.requiredQuantity - i.currentQuantity)} needed
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -553,12 +761,30 @@ function ShoppingListView({
       {customItems.filter(c => c.needsReplenishment).length > 0 && (
         <div className="mb-5">
           <h3 className="text-sm font-semibold text-foreground mb-2">Custom Items</h3>
-          {customItems.filter(c => c.needsReplenishment).map(c => (
-            <div key={c.id} className="flex items-center gap-3 bg-muted/40 border border-border/60 rounded-lg px-3 py-2 mb-1.5">
-              <span className="text-sm text-foreground flex-1">{c.name}</span>
-              <span className="text-sm text-orange-400">{c.quantity} needed</span>
-            </div>
-          ))}
+          {customItems.filter(c => c.needsReplenishment).map(c => {
+            const grabbed = grabbedItems.has(c.id);
+            return (
+              <div
+                key={c.id}
+                onClick={() => toggleGrabbed(c.id)}
+                className={`flex items-center gap-3 border rounded-lg px-3 py-2 mb-1.5 cursor-pointer transition-all ${grabbed
+                  ? 'bg-muted/20 border-border/40 opacity-50'
+                  : 'bg-muted/40 border-border/60 hover:border-primary/40 hover:bg-primary/5'
+                  }`}
+              >
+                <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${grabbed ? 'bg-emerald-500/20 border-emerald-500/50' : 'border-border'
+                  }`}>
+                  {grabbed && <Check className="w-3 h-3 text-emerald-500" />}
+                </div>
+                <span className={`text-sm flex-1 ${grabbed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                  {c.name}
+                </span>
+                <span className={`text-sm ${grabbed ? 'text-muted-foreground' : 'text-orange-400'}`}>
+                  {c.quantity} needed
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -567,16 +793,37 @@ function ShoppingListView({
         <div className="mb-5">
           <h3 className="text-sm font-semibold text-foreground mb-2">Manual Additions</h3>
           <div className="space-y-1.5">
-            {manualItems.map(m => (
-              <div key={m.id} className="flex items-center gap-3 bg-muted/40 border border-border/60 rounded-lg px-3 py-2">
-                <Badge className="text-[10px] bg-blue-500/15 text-blue-400 border-blue-500/30">manual</Badge>
-                <span className="text-sm text-foreground flex-1">{m.name}</span>
-                <span className="text-sm text-orange-400 font-semibold">×{m.qty}</span>
-                <button onClick={() => setManualItems(prev => prev.filter(x => x.id !== m.id))}>
-                  <Trash2 className="w-4 h-4 text-red-400/50 hover:text-red-400" />
-                </button>
-              </div>
-            ))}
+            {manualItems.map(m => {
+              const grabbed = grabbedItems.has(m.id);
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => toggleGrabbed(m.id)}
+                  className={`flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer transition-all ${grabbed
+                    ? 'bg-muted/20 border-border/40 opacity-50'
+                    : 'bg-muted/40 border-border/60 hover:border-primary/40 hover:bg-primary/5'
+                    }`}
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${grabbed ? 'bg-emerald-500/20 border-emerald-500/50' : 'border-border'
+                    }`}>
+                    {grabbed && <Check className="w-3 h-3 text-emerald-500" />}
+                  </div>
+                  <Badge className="text-[10px] bg-blue-500/15 text-blue-400 border-blue-500/30">manual</Badge>
+                  <span className={`text-sm flex-1 ${grabbed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                    {m.name}
+                  </span>
+                  <span className={`text-sm font-semibold ${grabbed ? 'text-muted-foreground' : 'text-orange-400'}`}>
+                    ×{m.qty}
+                  </span>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    setManualItems(prev => prev.filter(x => x.id !== m.id));
+                  }}>
+                    <Trash2 className="w-4 h-4 text-red-400/50 hover:text-red-400" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -878,7 +1125,8 @@ export default function AircraftInventory() {
     setItems(prev => prev.map(i => {
       if (i.id !== id) return i;
       const newQty = Math.max(0, i.currentQuantity + delta);
-      return { ...i, currentQuantity: newQty };
+      const needsReplenishment = newQty >= i.requiredQuantity ? false : i.needsReplenishment;
+      return { ...i, currentQuantity: newQty, needsReplenishment };
     }));
   }
 
@@ -1086,6 +1334,9 @@ export default function AircraftInventory() {
           <TabsList className="h-14 bg-muted/50 p-1 rounded-xl">
             <TabsTrigger value="inventory" className="flex gap-2 text-base px-6 py-2.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all h-full">
               <ClipboardList className="w-5 h-5" /> Inventory Check
+            </TabsTrigger>
+            <TabsTrigger value="restock" className="flex gap-2 text-base px-6 py-2.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all h-full">
+              <PackagePlus className="w-5 h-5" /> Restock List
             </TabsTrigger>
             <TabsTrigger value="grocery" className="flex gap-2 text-base px-6 py-2.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all h-full">
               <ShoppingCart className="w-5 h-5" /> Grocery List
@@ -1415,13 +1666,23 @@ export default function AircraftInventory() {
           </div>
         </TabsContent>
 
-        <TabsContent value="grocery" className="mt-0">
+        <TabsContent value="restock" className="mt-0">
           <ShoppingListView
             items={items}
             customItems={customItems}
             selectedTail={selectedTail}
             reporterName={reporterName}
             additionalNotes={additionalNotes}
+          />
+        </TabsContent>
+
+        <TabsContent value="grocery" className="mt-0">
+          <GroceryListView
+            customItems={customItems}
+            selectedTail={selectedTail}
+            reporterName={reporterName}
+            additionalNotes={additionalNotes}
+            setCustomItems={setCustomItems}
           />
         </TabsContent>
       </Tabs>
