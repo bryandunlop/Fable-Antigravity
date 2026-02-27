@@ -65,7 +65,7 @@ const SEED_NOTIFICATIONS: Notification[] = [
         title: 'Trip Checklist Item Due Today',
         message: 'TRP-2025-001: File international flight plans due today',
         type: 'trip',
-        priority: 'critical',
+        priority: 'high',
         timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
         isRead: false,
         actionUrl: '/trip-coordination',
@@ -80,7 +80,7 @@ const SEED_NOTIFICATIONS: Notification[] = [
         title: 'Task Due Tomorrow',
         message: 'Complete 100-hour inspection on N123AB is due tomorrow',
         type: 'task',
-        priority: 'high',
+        priority: 'medium',
         timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         isRead: false,
         actionUrl: '/assigned-tasks',
@@ -89,6 +89,58 @@ const SEED_NOTIFICATIONS: Notification[] = [
         relatedId: 'TASK001',
         daysUntilDue: 1,
         assignedBy: 'Chief Maintenance Officer'
+    },
+    {
+        id: 'INV001',
+        title: 'Critical Inventory Shortage',
+        message: 'Diet Coke has fallen below acceptable thresholds on N500GA. Restock needed prior to next flight.',
+        type: 'passenger',
+        priority: 'high',
+        timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+        isRead: false,
+        actionUrl: '/inventory',
+        actionText: 'View Inventory',
+        module: 'Inventory Operations',
+        relatedId: 'INV-DC'
+    },
+    {
+        id: 'SQUAWK001',
+        title: 'New AOG Squawk Reported',
+        message: 'N650PR reported Right Engine Bleed Air fault resulting in AOG status.',
+        type: 'maintenance',
+        priority: 'critical',
+        timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        isRead: false,
+        actionUrl: '/tech-log',
+        actionText: 'View Tech Log',
+        module: 'Maintenance',
+        relatedId: 'SQ-9921'
+    },
+    {
+        id: 'SAFE001',
+        title: 'New ASAP Report Submitted',
+        message: 'A new ASAP report requires initial review by the Safety Committee.',
+        type: 'safety',
+        priority: 'high',
+        timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        isRead: false,
+        actionUrl: '/safety-dashboard',
+        actionText: 'Review Report',
+        module: 'Safety Systems',
+        relatedId: 'ASAP-928'
+    },
+    {
+        id: 'DOC001',
+        title: 'Document Revision Released',
+        message: 'GOM Revision 14.2 has been released. Please acknowledge receipt.',
+        type: 'document',
+        priority: 'medium',
+        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        isRead: false,
+        actionUrl: '/document-center',
+        actionText: 'Acknowledge',
+        module: 'Document Control',
+        relatedId: 'DOC-GOM142'
     }
 ];
 
@@ -102,7 +154,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         try {
             const saved = localStorage.getItem('ams_notifications');
             if (saved) {
-                setNotifications(JSON.parse(saved));
+                const parsed = JSON.parse(saved);
+                if (parsed.length > 0) {
+                    setNotifications(parsed);
+                } else {
+                    setNotifications(SEED_NOTIFICATIONS);
+                    localStorage.setItem('ams_notifications', JSON.stringify(SEED_NOTIFICATIONS));
+                }
             } else {
                 // Seed initial data if empty
                 setNotifications(SEED_NOTIFICATIONS);

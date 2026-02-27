@@ -242,7 +242,14 @@
     color: var(--color-foreground);
     background-image: var(--gradient-body);
     background-attachment: fixed;
+    -webkit-tap-highlight-color: transparent;
     @apply antialiased transition-colors duration-500 ease-in-out;
+  }
+
+  /* Prevent text selection on UI elements typically tapped */
+  button, a, .select-none {
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .dark body {

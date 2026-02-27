@@ -269,6 +269,61 @@ const searchableItems: SearchResult[] = [
     category: 'Scheduling',
     icon: BarChart3,
     keywords: ['crew', 'workload', 'planning', 'balance', 'scheduling', 'forward looking', 'trip days', 'ron', 'standby', 'utilization', 'crew scheduling', 'balance workload', 'historical', 'trends', 'monthly planning']
+  },
+  // --- Dynamic Mock Data Insertions ---
+  {
+    id: 'flight-fo004',
+    title: 'Flight FO004 (ORD → LGA)',
+    description: 'Scheduled Departure: 14:30 Z',
+    href: '/upcoming-flights', // In a real app, this would route to /flight/FO004
+    category: 'Flights',
+    icon: Plane,
+    keywords: ['fo004', 'ord', 'lga', 'chicago', 'new york', 'flight']
+  },
+  {
+    id: 'flight-fo089',
+    title: 'Flight FO089 (JFK → LHR)',
+    description: 'Scheduled Departure: 22:15 Z',
+    href: '/upcoming-flights',
+    category: 'Flights',
+    icon: Plane,
+    keywords: ['fo089', 'jfk', 'lhr', 'london', 'new york', 'flight']
+  },
+  {
+    id: 'pax-smith',
+    title: 'John Smith - VIP Passenger',
+    description: 'Preferences: Window Seat, Diet Coke',
+    href: '/passenger-database',
+    category: 'Passengers',
+    icon: Users,
+    keywords: ['john smith', 'vip', 'passenger', 'diet coke']
+  },
+  {
+    id: 'doc-gom',
+    title: 'General Operations Manual (GOM)',
+    description: 'Revision 14.2 - Effective Oct 2025',
+    href: '/documents',
+    category: 'Documents',
+    icon: FileText,
+    keywords: ['gom', 'manual', 'operations', 'revision']
+  },
+  {
+    id: 'ac-n650pr',
+    title: 'N650PR (G650)',
+    description: 'Status: AOG - Right Engine Bleed',
+    href: '/aircraft',
+    category: 'Aircraft',
+    icon: Plane,
+    keywords: ['n650pr', 'g650', 'gulfstream', 'aog', 'maintenance']
+  },
+  {
+    id: 'ac-n500ga',
+    title: 'N500GA (G500)',
+    description: 'Status: Airworthy - Next Inspection in 45hrs',
+    href: '/aircraft',
+    category: 'Aircraft',
+    icon: Plane,
+    keywords: ['n500ga', 'g500', 'gulfstream', 'airworthy']
   }
 ];
 
@@ -295,22 +350,18 @@ export default function CommandPalette({ isOpen, onClose, userRole }: CommandPal
     setQuery('');
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % filteredResults.length);
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + filteredResults.length) % filteredResults.length);
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (filteredResults[selectedIndex]) {
-          handleSelect(filteredResults[selectedIndex].href);
-        }
-        break;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % filteredResults.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + filteredResults.length) % filteredResults.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredResults.length > 0 && filteredResults[selectedIndex]) {
+        handleSelect(filteredResults[selectedIndex].href);
+      }
     }
   };
 
