@@ -128,10 +128,12 @@ const DraggableNavigationGroup = ({
 
               return (
                 <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={isActive} className={`hover:bg-accent hover:text-accent-foreground ${isActive ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-muted-foreground'}`}>
-                    <Link to={item.href} className="flex items-center gap-3">
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
-                      <span>{item.name}</span>
+                  <SidebarMenuButton asChild isActive={isActive} className={`relative overflow-hidden group transition-all duration-300 ${isActive ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-muted-foreground bg-transparent'}`}>
+                    <Link to={item.href} className="flex items-center gap-3 w-full relative">
+                      {/* Hover Slide Background replaced with left edge bar per user request */}
+                      {!isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-muted-foreground/50 rounded-r-full transition-all duration-200 group-hover:h-3/4" />}
+                      <Icon className={`w-4 h-4 z-10 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                      <span className={`z-10 transition-colors duration-300 relative ${isActive ? '' : 'group-hover:text-foreground'}`}>{item.name}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -248,6 +250,7 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
     {
       label: "Inflight Services",
       items: [
+        { name: 'Upcoming Trips', href: '/upcoming-flights', icon: Calendar, roles: ['inflight', 'admin'] },
         { name: 'Flight Calendar', href: '/upcoming-flights', icon: Calendar, roles: ['pilot', 'admin'] },
         { name: 'Passenger Database', href: '/passenger-database', icon: Users, roles: ['inflight', 'admin'] },
         { name: 'Catering Tracker', href: '/catering-tracker', icon: Utensils, roles: ['inflight', 'admin'] },

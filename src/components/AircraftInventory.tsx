@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { FlightPathButton } from './ui/FlightPathButton';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -16,6 +17,7 @@ import {
   BarChart2, ClipboardList, Scan, Star, Pencil, CheckSquare, PackagePlus, ListChecks, ArrowRight, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
+import JSConfetti from 'js-confetti';
 import { DEFAULT_INVENTORY, FLEET, InventoryItem, AreaType, FleetAircraft } from './inventoryData';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -115,10 +117,6 @@ function stockBarColor(pct: number): string {
   return 'bg-red-500';
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-// Readiness ring removed per user feedback
-
 function StockBar({ current, required }: { current: number; required: number }) {
   const pct = required > 0 ? Math.min(100, Math.round((current / required) * 100)) : 100;
   return (
@@ -160,22 +158,15 @@ function AreaSummaryChip({ area, items }: { area: AreaType; items: InventoryItem
 
 // ─── Inventory Item Card ─────────────────────────────────────────────────────
 
-function ItemCard({
-  item,
-  onAdjust,
-  editMode = false,
-  onHide,
-  onChangeRequired,
-  onChangeLocation,
-  defaultRequired,
-}: {
+function ItemCard({ item, onAdjust, editMode, onHide, onChangeRequired, onChangeLocation, defaultRequired, index = 0 }: {
   item: InventoryItem;
   onAdjust: (id: string, delta: number) => void;
-  editMode?: boolean;
+  editMode: boolean;
   onHide?: (id: string) => void;
   onChangeRequired?: (id: string, qty: number) => void;
   onChangeLocation?: (id: string, loc: string) => void;
   defaultRequired?: number;
+  index?: number;
 }) {
   const [isEditingQty, setIsEditingQty] = useState(false);
   const [tempQty, setTempQty] = useState('');
@@ -196,18 +187,10 @@ function ItemCard({
   };
 
   return (
-    <div className={`rounded-xl border transition-all ${editMode
-      ? 'border-primary/30 bg-primary/5'
-      : item.needsReplenishment
-        ? 'border-orange-500/40 bg-orange-500/10'
-        : isEmpty
-          ? 'border-red-500/30 bg-red-500/5'
-          : isLow
-            ? 'border-yellow-500/30 bg-yellow-500/5'
-            : isHealthy
-              ? 'border-emerald-500/30 bg-emerald-500/5'
-              : 'border-border/40 bg-muted/20 opacity-80'
-      } p-4`}>
+    <div
+      className={`bg-card flex flex-col p-4 rounded-xl border transition-colors ${isEmpty ? 'border-red-500/30' : isLow ? 'border-yellow-500/30' : 'border-border'} ${item.isHidden ? 'opacity-50 grayscale' : ''} animate-list-stagger opacity-0`}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -352,110 +335,10 @@ function ItemCard({
 }
 
 
-// ─── Quick Scan Mode ──────────────────────────────────────────────────────────
-
-function QuickScanMode({
-  items,
-  onToggle,
-  onClose,
-}: {
-  items: InventoryItem[];
-  onToggle: (id: string) => void;
-  onClose: () => void;
-}) {
-  const [idx, setIdx] = useState(0);
-  const item = items[idx];
-  const progress = Math.round(((idx) / items.length) * 100);
-
-  if (!item) {
-    return (
-      <div className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center gap-6 p-6">
-        <CheckCircle className="w-20 h-20 text-emerald-400" />
-        <h2 className="text-2xl font-bold text-foreground">Scan Complete!</h2>
-        <p className="text-muted-foreground">All {items.length} items reviewed.</p>
-        <Button onClick={onClose} className="bg-emerald-600 hover:bg-emerald-500 text-foreground px-8">
-          Done
-        </Button>
-      </div>
-    );
-  }
-
-  const pct = item.requiredQuantity > 0
-    ? Math.min(100, Math.round((item.currentQuantity / item.requiredQuantity) * 100))
-    : 100;
-
-  return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      {/* Progress bar */}
-      <div className="h-1 bg-accent">
-        <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-        <Button variant="ghost" size="sm" onClick={onClose} className="text-muted-foreground hover:text-foreground gap-1">
-          <X className="w-4 h-4" /> Exit Scan
-        </Button>
-        <span className="text-sm text-muted-foreground">{idx + 1} / {items.length}</span>
-        <span className={`text-xs px-2 py-1 rounded-full ${PRIORITY_COLORS[item.priority]}`}>{item.priority}</span>
-      </div>
-
-      {/* Item */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6">
-        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${AREA_META[item.area].color.replace('text-', 'bg-').replace('-400', '-500/20')}`}>
-          {React.createElement(AREA_META[item.area].icon, { className: `w-8 h-8 ${AREA_META[item.area].color}` })}
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-muted-foreground/70 uppercase tracking-widest mb-1">{AREA_META[item.area].label}</p>
-          <h2 className="text-2xl font-bold text-foreground mb-1">{item.itemName}</h2>
-          <p className="text-sm text-muted-foreground">{item.location}</p>
-        </div>
-
-        <div className="bg-muted/50 border border-border rounded-2xl p-6 w-full max-w-sm text-center">
-          <p className="text-sm text-muted-foreground mb-1">Required</p>
-          <p className="text-4xl font-bold text-foreground mb-4">{item.requiredQuantity}</p>
-          <div className="h-2 bg-accent rounded-full overflow-hidden mb-4">
-            <div className={`h-full rounded-full ${stockBarColor(pct)}`} style={{ width: `${pct}%` }} />
-          </div>
-          <div className="flex items-center justify-center gap-3">
-            <Button variant="outline" size="sm" className="bg-muted/50 border-border h-9 w-9 p-0"
-              onClick={() => { onToggle(item.id); }}>
-              {item.needsReplenishment
-                ? <Check className="w-4 h-4 text-emerald-400" />
-                : <AlertTriangle className="w-4 h-4 text-orange-400" />}
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              {item.needsReplenishment ? 'Flagged for restock' : 'Mark needs restock'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Nav */}
-      <div className="grid grid-cols-2 gap-3 p-4 border-t border-border/60">
-        <Button
-          variant="outline"
-          className="bg-muted/50 border-border text-foreground gap-2 h-14 text-base hover:bg-accent"
-          onClick={() => setIdx(Math.max(0, idx - 1))}
-          disabled={idx === 0}
-        >
-          <ChevronLeft className="w-5 h-5" /> Back
-        </Button>
-        <Button
-          className="bg-primary hover:bg-primary/90 text-foreground gap-2 h-14 text-base"
-          onClick={() => setIdx(idx + 1)}
-        >
-          Next <ChevronRight className="w-5 h-5" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Grocery List View ────────────────────────────────────────────────────────
 
 function GroceryListView({
-  customItems, selectedTail, reporterName, additionalNotes, onBack, setCustomItems
+  customItems, selectedTail, reporterName, additionalNotes, onBack, setCustomItems, onToggleItem
 }: {
   customItems: CustomItem[];
   selectedTail: string;
@@ -463,6 +346,7 @@ function GroceryListView({
   additionalNotes: string;
   onBack?: () => void;
   setCustomItems?: React.Dispatch<React.SetStateAction<CustomItem[]>>;
+  onToggleItem?: (id: string, isCustom: boolean) => void;
 }) {
   const [manualItems, setManualItems] = useState<ManualItem[]>([]);
   const [manualInput, setManualInput] = useState('');
@@ -513,9 +397,9 @@ function GroceryListView({
         <Button size="sm" variant="outline" onClick={() => window.print()} className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1">
           <FileText className="w-4 h-4" /> Print
         </Button>
-        <Button size="sm" variant="outline" onClick={copyToClipboard} className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1">
+        <FlightPathButton size="sm" variant="outline" onClick={copyToClipboard} className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1">
           <Download className="w-4 h-4" /> Copy
-        </Button>
+        </FlightPathButton>
       </div>
 
       <div className="bg-muted/40 border border-border/60 rounded-xl p-4 mb-4">
@@ -533,7 +417,7 @@ function GroceryListView({
             return (
               <div
                 key={c.id}
-                onClick={() => toggleGrabbed(c.id)}
+                onClick={() => { toggleGrabbed(c.id); onToggleItem?.(c.id, true); }}
                 className={`flex items-center gap-3 border rounded-lg px-3 py-2 mb-1.5 cursor-pointer transition-all ${grabbed
                   ? 'bg-muted/20 border-border/40 opacity-50'
                   : 'bg-muted/40 border-border/60 hover:border-primary/40 hover:bg-primary/5'
@@ -640,7 +524,7 @@ function GroceryListView({
 interface ManualItem { id: string; name: string; qty: number; }
 
 function ShoppingListView({
-  items, customItems, selectedTail, reporterName, additionalNotes, onBack,
+  items, customItems, selectedTail, reporterName, additionalNotes, onBack, onRestock, onToggleItem
 }: {
   items: InventoryItem[];
   customItems: CustomItem[];
@@ -648,6 +532,8 @@ function ShoppingListView({
   reporterName: string;
   additionalNotes: string;
   onBack?: () => void;
+  onRestock?: () => void;
+  onToggleItem?: (id: string, isCustom: boolean) => void;
 }) {
   const [manualItems, setManualItems] = useState<ManualItem[]>([]);
   const [manualInput, setManualInput] = useState('');
@@ -707,6 +593,11 @@ function ShoppingListView({
           </Button>
         )}
         <h2 className="text-xl font-bold text-foreground flex-1">Restock List</h2>
+        {onRestock && (
+          <Button size="sm" onClick={onRestock} className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-md hover:shadow-lg transition-all border border-emerald-500/20">
+            <CheckCircle className="w-4 h-4" /> Plane Restocked
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={() => window.print()} className="border-border bg-muted/50 text-foreground hover:bg-accent gap-1">
           <FileText className="w-4 h-4" /> Print
         </Button>
@@ -734,7 +625,7 @@ function ShoppingListView({
               return (
                 <div
                   key={i.id}
-                  onClick={() => toggleGrabbed(i.id)}
+                  onClick={() => { toggleGrabbed(i.id); onToggleItem?.(i.id, false); }}
                   className={`flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer transition-all ${grabbed
                     ? 'bg-muted/20 border-border/40 opacity-50'
                     : 'bg-muted/40 border-border/60 hover:border-primary/40 hover:bg-primary/5'
@@ -766,7 +657,7 @@ function ShoppingListView({
             return (
               <div
                 key={c.id}
-                onClick={() => toggleGrabbed(c.id)}
+                onClick={() => { toggleGrabbed(c.id); onToggleItem?.(c.id, true); }}
                 className={`flex items-center gap-3 border rounded-lg px-3 py-2 mb-1.5 cursor-pointer transition-all ${grabbed
                   ? 'bg-muted/20 border-border/40 opacity-50'
                   : 'bg-muted/40 border-border/60 hover:border-primary/40 hover:bg-primary/5'
@@ -966,19 +857,44 @@ export default function AircraftInventory() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [customItems, setCustomItems] = useState<CustomItem[]>([]);
   const [activeTab, setActiveTab] = useState<AreaType>('forward-lav');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterPriority, setFilterPriority] = useState<string>('all');
   const [reporterName, setReporterName] = useState('');
   const [departure, setDeparture] = useState('');
   const [arrival, setArrival] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
-  const [showScanMode, setShowScanMode] = useState(false);
+
+  // Custom item modal state
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customQty, setCustomQty] = useState(1);
   const [customArea, setCustomArea] = useState<AreaType>('galley');
   const [customCategory, setCustomCategory] = useState('');
   const [customNotes, setCustomNotes] = useState('');
+
+  // Category editing state
+  const [editingCategory, setEditingCategory] = useState<{ area: AreaType; oldName: string } | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+
+  // Handle opening modal for a specific category
+  function openAddPageModal(area: AreaType, categoryName: string) {
+    setCustomArea(area);
+    setCustomCategory(categoryName);
+    setCustomName('');
+    setCustomQty(1);
+    setCustomNotes('');
+    setShowAddCustom(true);
+  }
+
+  // Handle opening modal for a new chapter
+  function openAddChapterModal(area: AreaType) {
+    setCustomArea(area);
+    setCustomCategory(''); // User types new chapter name
+    setCustomName('');
+    setCustomQty(1);
+    setCustomNotes('');
+    setShowAddCustom(true);
+  }
   const [sessions, setSessions] = useState<InventorySession[]>([]);
   const [currentView, setCurrentView] = useState<'check' | 'shopping' | 'history'>('check');
   const [mainTab, setMainTab] = useState('inventory');
@@ -1072,43 +988,48 @@ export default function AircraftInventory() {
       // Hidden items filtering
       if (hiddenItems.has(item.id) && !editMode) return false;
 
-      // Priority filtering
-      if (filterPriority !== 'all' && item.priority !== filterPriority) return false;
-
       // Aircraft applicability filtering
       if (aircraft && !item.defaultQuantities[aircraft.type]) return false;
 
       return true;
     });
-  }, [items, searchTerm, hiddenItems, editMode, filterPriority, aircraft]);
+  }, [items, searchTerm, hiddenItems, editMode, aircraft]);
 
   const filteredItems = useMemo(() => {
-    // If searchResults is active, this filteredItems will be ignored in favor of searchResults
-    // Otherwise, filter by activeTab
-    return rawFilteredItems.filter(item => item.area === activeTab);
-  }, [rawFilteredItems, activeTab]);
+    let filtered = items;
+    // hide items toggled off in edit mode unless we are searching
+    if (!searchTerm) {
+      filtered = filtered.filter(i => !hiddenItems.has(i.id));
+    }
+
+    if (searchTerm) {
+      filtered = filtered.filter(i =>
+        i.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        i.category.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    } else {
+      filtered = filtered.filter(i => i.area === activeTab);
+    }
+
+    return filtered;
+  }, [items, activeTab, searchTerm, hiddenItems]);
 
   // Cross-tab search: when searchTerm is set, search ALL areas
   const searchResults = useMemo(() => {
     if (!searchTerm) return null;
-    const t = searchTerm.toLowerCase();
-    const matched = items.filter(i =>
-      !hiddenItems.has(i.id) &&
-      (filterPriority === 'all' || i.priority === filterPriority) &&
-      (i.itemName.toLowerCase().includes(t) ||
-        i.category.toLowerCase().includes(t) ||
-        i.alternateNames.some(a => a.toLowerCase().includes(t)))
+    let filtered = items;
+
+    filtered = filtered.filter(i =>
+      i.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      i.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    // Group by area
-    return AREAS.reduce((acc, area) => {
-      const areaItems = matched.filter(i => i.area === area);
-      if (areaItems.length) acc[area] = areaItems;
+
+    return filtered.reduce((acc, item) => {
+      acc[item.area] = acc[item.area] || [];
+      acc[item.area].push(item);
       return acc;
     }, {} as Record<AreaType, InventoryItem[]>);
-  }, [items, searchTerm, filterPriority, hiddenItems]);
-
-  // All items for scan (current area or all)
-  const scanItems = useMemo(() => items.filter(i => i.area === activeTab), [items, activeTab]);
+  }, [items, searchTerm, hiddenItems]);
 
   const hiddenInArea = useMemo(() =>
     items.filter(i => i.area === activeTab && hiddenItems.has(i.id)).length,
@@ -1128,6 +1049,42 @@ export default function AircraftInventory() {
       const needsReplenishment = newQty >= i.requiredQuantity ? false : i.needsReplenishment;
       return { ...i, currentQuantity: newQty, needsReplenishment };
     }));
+  }
+
+  function renameCategory(area: AreaType, oldName: string, newName: string) {
+    if (!newName.trim() || oldName === newName) {
+      setEditingCategory(null);
+      return;
+    }
+
+    // Update standard items
+    setItems(prev => prev.map(i => {
+      if (i.area === area && i.category === oldName) {
+        return { ...i, category: newName.trim() };
+      }
+      return i;
+    }));
+
+    // Update custom items
+    setCustomItems(prev => prev.map(c => {
+      if (c.area === area && c.category === oldName) {
+        return { ...c, category: newName.trim() };
+      }
+      return c;
+    }));
+
+    setEditingCategory(null);
+  }
+
+  function deleteCategory(area: AreaType, categoryName: string) {
+    if (confirm(`Are you sure you want to delete the entire '${categoryName}' category and all its items?`)) {
+      // Hide all standard items in this category
+      const itemsToHide = items.filter(i => i.area === area && i.category === categoryName);
+      itemsToHide.forEach(i => hideItem(i.id));
+
+      // Remove all custom items in this category
+      setCustomItems(prev => prev.filter(c => !(c.area === area && c.category === categoryName)));
+    }
   }
 
   function hideItem(id: string) {
@@ -1166,6 +1123,7 @@ export default function AircraftInventory() {
         needsReplenishment: false,
       };
     }));
+    localStorage.removeItem(`inventory-session-${selectedTail}`);
     toast.success(`${AREA_META[activeTab].label} reset to full stock`);
   }
 
@@ -1207,8 +1165,72 @@ export default function AircraftInventory() {
     setSessions(updated);
     localStorage.setItem('inventory-sessions-v2', JSON.stringify(updated));
     localStorage.removeItem(`inventory-session-${selectedTail}`);
-    toast.success('Inventory submitted!');
-    setCurrentView('history');
+
+    const jsConfetti = new JSConfetti();
+    jsConfetti.addConfetti({
+      emojis: ['📦', '✈️', '✅', '📋'],
+      emojiSize: 30,
+      confettiNumber: 40,
+    });
+
+    setShowSuccessModal(true);
+    setTimeout(() => {
+      setShowSuccessModal(false);
+      toast.success('Inventory submitted!');
+      setCurrentView('history');
+    }, 2500);
+  }
+
+  function handleToggleItem(id: string, isCustom: boolean) {
+    if (!aircraft) return;
+    if (isCustom) {
+      setCustomItems(prev => prev.map(c => c.id === id ? { ...c, needsReplenishment: false } : c));
+    } else {
+      setItems(prev => prev.map(i => i.id === id ? { ...i, currentQuantity: i.defaultQuantities[aircraft.type] ?? i.requiredQuantity, needsReplenishment: false } : i));
+    }
+  }
+
+  function handlePlaneRestocked() {
+    if (!aircraft) return;
+
+    // Check if there are things to restock
+    const needItems = items.filter(i => i.needsReplenishment || i.currentQuantity < i.requiredQuantity);
+    const flaggedCustom = customItems.filter(c => c.needsReplenishment);
+
+    if (needItems.length === 0 && flaggedCustom.length === 0) {
+      toast.info("Plane is already fully stocked.");
+      return;
+    }
+
+    if (confirm(`Are you sure you want to mark ${selectedTail} as fully restocked? This will reset all item quantities to their targets and clear the restock list.`)) {
+      // Reset normal items
+      setItems(prev => prev.map(i => ({
+        ...i,
+        currentQuantity: i.defaultQuantities[aircraft.type] ?? i.requiredQuantity,
+        needsReplenishment: false,
+      })));
+
+      // Clear custom items' replenishment flag
+      setCustomItems(prev => prev.map(c => ({
+        ...c,
+        needsReplenishment: false,
+      })));
+
+      // Trigger success animation
+      const jsConfetti = new JSConfetti();
+      jsConfetti.addConfetti({
+        emojis: ['✨', '✈️', '✅', '📦'],
+        emojiSize: 30,
+        confettiNumber: 40,
+      });
+
+      localStorage.removeItem(`inventory-session-${selectedTail}`);
+
+      toast.success(`${selectedTail} has been restocked successfully!`);
+
+      // Bring them back to the inventory tab
+      setMainTab('inventory');
+    }
   }
 
   function generateShoppingList() {
@@ -1308,10 +1330,6 @@ export default function AircraftInventory() {
   // ── Main Check View ───────────────────────────────────────────────────────
   return (
     <div className="p-4 max-w-5xl mx-auto">
-      {showScanMode && (
-        <QuickScanMode items={scanItems} onToggle={toggleReplenishment} onClose={() => setShowScanMode(false)} />
-      )}
-
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
         <div className="flex items-center gap-3">
@@ -1413,23 +1431,6 @@ export default function AircraftInventory() {
                 className="pl-8 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 h-9 text-sm"
               />
             </div>
-            <Select value={filterPriority} onValueChange={setFilterPriority}>
-              <SelectTrigger className="w-32 bg-muted/50 border-border text-foreground h-9 text-sm">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button size="sm" variant="outline"
-              className="bg-muted/50 border-border text-foreground hover:bg-accent gap-1.5 h-9"
-              onClick={() => setShowScanMode(true)}>
-              <Scan className="w-3.5 h-3.5" /> Quick Scan
-            </Button>
             <Button size="sm" variant="outline"
               className="bg-muted/50 border-border text-muted-foreground hover:bg-accent gap-1 h-9"
               onClick={resetArea}>
@@ -1513,14 +1514,55 @@ export default function AircraftInventory() {
                           }, {} as Record<string, InventoryItem[]>)
                         ).map(([category, catItems]) => (
                           <div key={category}>
-                            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/40">
-                              {category}
-                            </h4>
+                            {editingCategory?.area === area && editingCategory?.oldName === category ? (
+                              <div className="flex items-center gap-2 mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/40">
+                                <Input
+                                  autoFocus
+                                  value={editingCategoryName}
+                                  onChange={e => setEditingCategoryName(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') renameCategory(area as AreaType, category, editingCategoryName);
+                                    if (e.key === 'Escape') setEditingCategory(null);
+                                  }}
+                                  onBlur={() => renameCategory(area as AreaType, category, editingCategoryName)}
+                                  className="h-7 text-xs font-bold uppercase tracking-widest bg-background border-primary/40 focus-visible:ring-1 focus-visible:ring-primary w-full max-w-[200px]"
+                                />
+                                <span className="text-[10px] text-primary/60 italic ml-2">Press Enter to save</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/40 group">
+                                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                  {category}
+                                </h4>
+                                {editMode && (
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => {
+                                        setEditingCategory({ area: area as AreaType, oldName: category });
+                                        setEditingCategoryName(category);
+                                      }}
+                                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                      title="Rename Chapter"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteCategory(area as AreaType, category)}
+                                      className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                                      title="Delete Chapter"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div className="space-y-2">
-                              {catItems.map(item => (
+                              {catItems.map((item, index) => (
                                 <ItemCard
                                   key={item.id}
                                   item={item}
+                                  index={index}
                                   onAdjust={adjustQuantity}
                                   editMode={editMode}
                                   onHide={hideItem}
@@ -1567,14 +1609,55 @@ export default function AircraftInventory() {
                           })()
                         ).map(([category, { normal, custom }]) => (
                           <div key={category}>
-                            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/40">
-                              {category}
-                            </h4>
+                            {editingCategory?.area === area && editingCategory?.oldName === category ? (
+                              <div className="flex items-center gap-2 mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/40">
+                                <Input
+                                  autoFocus
+                                  value={editingCategoryName}
+                                  onChange={e => setEditingCategoryName(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') renameCategory(area, category, editingCategoryName);
+                                    if (e.key === 'Escape') setEditingCategory(null);
+                                  }}
+                                  onBlur={() => renameCategory(area, category, editingCategoryName)}
+                                  className="h-7 text-xs font-bold uppercase tracking-widest bg-background border-primary/40 focus-visible:ring-1 focus-visible:ring-primary w-full max-w-[200px]"
+                                />
+                                <span className="text-[10px] text-primary/60 italic ml-2">Press Enter to save</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/40 group">
+                                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                  {category}
+                                </h4>
+                                {editMode && (
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => {
+                                        setEditingCategory({ area, oldName: category });
+                                        setEditingCategoryName(category);
+                                      }}
+                                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                      title="Rename Chapter"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteCategory(area, category)}
+                                      className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                                      title="Delete Chapter"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div className="space-y-2">
-                              {normal.map(item => (
+                              {normal.map((item, index) => (
                                 <ItemCard
                                   key={item.id}
                                   item={item}
+                                  index={index}
                                   onAdjust={adjustQuantity}
                                   editMode={editMode}
                                   onHide={hideItem}
@@ -1605,18 +1688,39 @@ export default function AircraftInventory() {
                                   </div>
                                 </div>
                               ))}
+                              {editMode && (
+                                <button
+                                  onClick={() => openAddPageModal(area, category)}
+                                  className="w-full border border-dashed border-primary/30 rounded-xl p-3 text-sm text-primary/70 hover:border-primary/60 hover:text-primary transition-colors flex items-center justify-center gap-2 bg-primary/5 mt-2"
+                                >
+                                  <Plus className="w-4 h-4" /> Add Page (Item) to {category}
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
+
+                        {editMode && (
+                          <div className="pt-4 border-t border-border/40">
+                            <button
+                              onClick={() => openAddChapterModal(area)}
+                              className="w-full border border-dashed border-primary/50 rounded-xl p-4 text-sm font-medium text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+                            >
+                              <Plus className="w-5 h-5" /> Add New Chapter (Category)
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    <button
-                      onClick={() => { setCustomArea(area); setShowAddCustom(true); }}
-                      className="w-full border border-dashed border-border rounded-xl p-3 text-sm text-muted-foreground/70 hover:border-border hover:text-muted-foreground transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" /> Add custom item
-                    </button>
+                    {!editMode && (
+                      <button
+                        onClick={() => { setCustomArea(area); setShowAddCustom(true); }}
+                        className="w-full border border-dashed border-border rounded-xl p-3 text-sm text-muted-foreground/70 hover:border-border hover:text-muted-foreground transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Add custom item
+                      </button>
+                    )}
                   </div>
                 </TabsContent>
               ))}</>)}
@@ -1626,7 +1730,9 @@ export default function AircraftInventory() {
           {showAddCustom && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-end md:items-center justify-center p-4">
               <div className="bg-card border border-border rounded-2xl p-5 w-full max-w-sm">
-                <h3 className="text-base font-semibold text-foreground mb-4">Add Custom Item</h3>
+                <h3 className="text-base font-semibold text-foreground mb-4">
+                  {customCategory && customName === '' ? `Add Page to ${customCategory}` : !customCategory ? 'Add New Chapter & Page' : 'Add Custom Item'}
+                </h3>
                 <div className="space-y-3">
                   <Input placeholder="Item name" value={customName} onChange={e => setCustomName(e.target.value)}
                     className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50" />
@@ -1673,6 +1779,8 @@ export default function AircraftInventory() {
             selectedTail={selectedTail}
             reporterName={reporterName}
             additionalNotes={additionalNotes}
+            onRestock={handlePlaneRestocked}
+            onToggleItem={handleToggleItem}
           />
         </TabsContent>
 
@@ -1683,6 +1791,7 @@ export default function AircraftInventory() {
             reporterName={reporterName}
             additionalNotes={additionalNotes}
             setCustomItems={setCustomItems}
+            onToggleItem={handleToggleItem}
           />
         </TabsContent>
       </Tabs>

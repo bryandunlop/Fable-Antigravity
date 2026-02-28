@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Users, Phone, MapPin, ChevronRight, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AltimeterSpinner } from './ui/LoadingSpinners';
 
 interface ShiftMember {
     id: string;
@@ -26,8 +27,17 @@ export default function DutyRosterWidget() {
         { id: '5', name: 'Elena Fisher', role: 'Safety Officer', status: 'standby', location: 'Remote', avatar: 'EF' },
     ];
 
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 1200);
+        return () => clearTimeout(timer);
+    }, []);
+
     return (
-        <Card className="h-full border-none shadow-none bg-transparent">
+        <Card className="h-full border-none shadow-none bg-transparent flex flex-col">
             <CardHeader className="px-0 pt-0 pb-4">
                 <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -44,72 +54,81 @@ export default function DutyRosterWidget() {
                     Current shift assignments and on-call personnel
                 </CardDescription>
             </CardHeader>
-            <CardContent className="px-0 pb-0 space-y-6">
+            <CardContent className="px-0 pb-0 space-y-6 flex-1 flex flex-col justify-center">
 
-                {/* On Shift */}
-                <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Active Shift
-                    </h4>
-                    <div className="space-y-3">
-                        {onShift.map((member) => (
-                            <div key={member.id} className="flex items-center justify-between group">
-                                <div className="flex items-center gap-3">
-                                    <Avatar className="h-8 w-8 border border-border">
-                                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${member.avatar}`} />
-                                        <AvatarFallback>{member.avatar}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <div className="text-sm font-medium leading-none group-hover:text-blue-500 transition-colors">
-                                            {member.name}
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground animate-fade-in space-y-4">
+                        <AltimeterSpinner size={40} />
+                        <span className="text-sm font-medium">Loading Roster...</span>
+                    </div>
+                ) : (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* On Shift */}
+                        <div>
+                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Active Shift
+                            </h4>
+                            <div className="space-y-3">
+                                {onShift.map((member) => (
+                                    <div key={member.id} className="flex items-center justify-between group">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-8 w-8 border border-border">
+                                                <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${member.avatar}`} />
+                                                <AvatarFallback>{member.avatar}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <div className="text-sm font-medium leading-none group-hover:text-blue-500 transition-colors">
+                                                    {member.name}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground mt-1">
+                                                    {member.role}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-muted-foreground mt-1">
-                                            {member.role}
+                                        <div className="text-right">
+                                            <Badge variant="secondary" className="text-[10px] font-normal bg-secondary/50">
+                                                {member.location}
+                                            </Badge>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="text-right">
-                                    <Badge variant="secondary" className="text-[10px] font-normal bg-secondary/50">
-                                        {member.location}
-                                    </Badge>
-                                </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                </div>
+                        </div>
 
-                {/* On Call */}
-                <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        On Call
-                    </h4>
-                    <div className="space-y-3">
-                        {onCall.map((member) => (
-                            <div key={member.id} className="flex items-center justify-between group opacity-80 hover:opacity-100 transition-opacity">
-                                <div className="flex items-center gap-3">
-                                    <Avatar className="h-8 w-8 border border-border">
-                                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${member.avatar}`} />
-                                        <AvatarFallback>{member.avatar}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <div className="text-sm font-medium leading-none">
-                                            {member.name}
+                        {/* On Call */}
+                        <div>
+                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                On Call
+                            </h4>
+                            <div className="space-y-3">
+                                {onCall.map((member) => (
+                                    <div key={member.id} className="flex items-center justify-between group opacity-80 hover:opacity-100 transition-opacity">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-8 w-8 border border-border">
+                                                <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${member.avatar}`} />
+                                                <AvatarFallback>{member.avatar}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <div className="text-sm font-medium leading-none">
+                                                    {member.name}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                                    <Phone className="w-3 h-3" />
+                                                    {member.role}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                            <Phone className="w-3 h-3" />
-                                            {member.role}
-                                        </div>
+                                        <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-500/5">
+                                            Standby
+                                        </Badge>
                                     </div>
-                                </div>
-                                <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-500/5">
-                                    Standby
-                                </Badge>
+                                ))}
                             </div>
-                        ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
             </CardContent>
         </Card>

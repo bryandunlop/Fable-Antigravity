@@ -11,6 +11,7 @@ import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
 import { toast } from 'sonner';
+import JSConfetti from 'js-confetti';
 import {
   Shield,
   AlertTriangle,
@@ -209,6 +210,9 @@ export default function EnhancedFRATForm({ userRole = 'pilot', initialData, onCl
     return section.items.reduce((acc, item) => item.selected ? acc + item.score : acc, 0);
   };
 
+  // Success Animation State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   // Handle form submission
   const handleSubmit = (newStatus: string) => {
     setStatus(newStatus);
@@ -226,307 +230,339 @@ export default function EnhancedFRATForm({ userRole = 'pilot', initialData, onCl
       status: newStatus
     };
 
+    if (newStatus === 'submitted') {
+      const jsConfetti = new JSConfetti();
+      jsConfetti.addConfetti({
+        emojis: ['✈️', '✅', '☁️', '🛫'],
+        emojiSize: 30,
+        confettiNumber: 40,
+      });
+      setShowSuccessModal(true);
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        if (onSave) onSave(data);
+        if (onClose) onClose();
+      }, 2500);
+      return;
+    }
+
     if (onSave) {
       onSave(data);
     } else {
       if (process.env.NODE_ENV === 'development') {
         console.log('[DEV] Form saved:', data);
       }
-      toast.success(newStatus === 'draft' ? 'Draft saved successfully' : 'FRAT submitted successfully');
-      if (newStatus === 'submitted' && onClose) {
-        onClose();
-      }
+      toast.success('Draft saved successfully');
     }
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6 pb-20">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-600 rounded-lg">
-            <Shield className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Enhanced FRAT Form</h1>
-            <p className="text-sm text-muted-foreground">
-              Flight Risk Assessment Tool - Gulfstream G650
-            </p>
+    <>
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-card border shadow-2xl rounded-3xl p-8 flex flex-col items-center max-w-sm text-center animate-in zoom-in-95 duration-500 delay-150">
+            <div className="relative w-24 h-24 mb-6">
+              <svg viewBox="0 0 100 100" className="w-full h-full text-green-500 overflow-visible">
+                {/* Circle growing */}
+                <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" className="animate-[dash_0.8s_ease-out_forwards]" strokeDasharray="283" strokeDashoffset="283" />
+                {/* Airplane flying in to form the checkmark */}
+                <path d="M 30,50 L 45,65 L 75,35" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="animate-[dash_0.6s_ease-out_0.6s_forwards]" strokeDasharray="100" strokeDashoffset="100" />
+                <Plane className="absolute text-accent-foreground w-8 h-8 animate-[takeoff-arc_1s_ease-out_1.2s_forwards] opacity-0" style={{ transformOrigin: 'center' }} />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold tracking-tight text-foreground mb-2">FRAT Submitted</h3>
+            <p className="text-muted-foreground">Clear skies ahead.</p>
           </div>
         </div>
-        <Button variant="outline" onClick={() => onClose ? onClose() : navigate('/frat')}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
-      </div>
-
-      {/* Risk Score Card */}
-      < Card className={`border-2 ${riskLevel.level === 'low' ? 'border-green-500 bg-green-50 dark:bg-green-950' :
-        riskLevel.level === 'medium' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950' :
-          'border-red-500 bg-red-50 dark:bg-red-950'
-        }`
-      }>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      )}
+      <div className="p-6 max-w-4xl mx-auto space-y-6 pb-20">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              <Shield className="w-8 h-8 text-white" />
+            </div>
             <div>
-              <CardTitle className="flex items-center gap-2">
-                {riskLevel.level === 'low' && <CheckCircle className="w-6 h-6 text-green-600" />}
-                {riskLevel.level === 'medium' && <AlertTriangle className="w-6 h-6 text-yellow-600" />}
-                {riskLevel.level === 'high' && <AlertTriangle className="w-6 h-6 text-red-600" />}
-                Current Risk Score: {totalScore}
-              </CardTitle>
-              <CardDescription>
-                Risk Level: <span className={`font-semibold ${riskLevel.level === 'low' ? 'text-green-700 dark:text-green-400' :
-                  riskLevel.level === 'medium' ? 'text-yellow-700 dark:text-yellow-400' :
-                    'text-red-700 dark:text-red-400'
-                  }`}>{riskLevel.label}</span>
-              </CardDescription>
+              <h1 className="text-2xl font-bold tracking-tight">Enhanced FRAT Form</h1>
+              <p className="text-sm text-muted-foreground">
+                Flight Risk Assessment Tool - Gulfstream G650
+              </p>
             </div>
-            <div className="text-right">
-              <div className={`text-4xl font-bold ${riskLevel.level === 'low' ? 'text-green-600' :
-                riskLevel.level === 'medium' ? 'text-yellow-600' :
-                  'text-red-600'
-                }`}>
-                {totalScore}
+          </div>
+          <Button variant="outline" onClick={() => onClose ? onClose() : navigate('/frat')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        </div>
+
+        {/* Risk Score Card */}
+        < Card className={`border-2 ${riskLevel.level === 'low' ? 'border-green-500 bg-green-50 dark:bg-green-950' :
+          riskLevel.level === 'medium' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950' :
+            'border-red-500 bg-red-50 dark:bg-red-950'
+          }`
+        }>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  {riskLevel.level === 'low' && <CheckCircle className="w-6 h-6 text-green-600" />}
+                  {riskLevel.level === 'medium' && <AlertTriangle className="w-6 h-6 text-yellow-600" />}
+                  {riskLevel.level === 'high' && <AlertTriangle className="w-6 h-6 text-red-600" />}
+                  Current Risk Score: {totalScore}
+                </CardTitle>
+                <CardDescription>
+                  Risk Level: <span className={`font-semibold ${riskLevel.level === 'low' ? 'text-green-700 dark:text-green-400' :
+                    riskLevel.level === 'medium' ? 'text-yellow-700 dark:text-yellow-400' :
+                      'text-red-700 dark:text-red-400'
+                    }`}>{riskLevel.label}</span>
+                </CardDescription>
               </div>
-              <div className="text-sm text-muted-foreground">Total Points</div>
+              <div className="text-right">
+                <div className={`text-4xl font-bold ${riskLevel.level === 'low' ? 'text-green-600' :
+                  riskLevel.level === 'medium' ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`}>
+                  {totalScore}
+                </div>
+                <div className="text-sm text-muted-foreground">Total Points</div>
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Progress
-            value={Math.min((totalScore / 30) * 100, 100)}
-            className="h-3"
-          />
-          <div className="mt-4 flex justify-between text-xs text-muted-foreground">
-            <span>0-10: Low Risk</span>
-            <span>11-20: Medium Risk</span>
-            <span>21+: High Risk</span>
-          </div>
-          {mitigationRequired && (
-            <Alert className="mt-4">
-              <AlertTriangle className="w-4 h-4" />
+          </CardHeader>
+          <CardContent>
+            <Progress
+              value={Math.min((totalScore / 30) * 100, 100)}
+              className="h-3"
+            />
+            <div className="mt-4 flex justify-between text-xs text-muted-foreground">
+              <span>0-10: Low Risk</span>
+              <span>11-20: Medium Risk</span>
+              <span>21+: High Risk</span>
+            </div>
+            {mitigationRequired && (
+              <Alert className="mt-4">
+                <AlertTriangle className="w-4 h-4" />
+                <AlertDescription>
+                  <strong>Mitigation Required:</strong> This flight exceeds low risk threshold. Please document mitigation strategies below before submitting.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card >
+
+        {/* Flight Information */}
+        < Card >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plane className="w-5 h-5" />
+              Flight Information
+            </CardTitle>
+            <CardDescription>
+              Flight details will be automatically populated from MyAirOps API
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <Info className="w-4 h-4" />
               <AlertDescription>
-                <strong>Mitigation Required:</strong> This flight exceeds low risk threshold. Please document mitigation strategies below before submitting.
+                <strong>Auto-Population:</strong> Flight information below will be automatically populated from the MyAirOps API when you select a flight from the flight list. You can manually edit any field if needed.
               </AlertDescription>
             </Alert>
-          )}
-        </CardContent>
-      </Card >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="flightNumber">Flight Number *</Label>
+                <Input
+                  id="flightNumber"
+                  value={flightNumber}
+                  onChange={(e) => setFlightNumber(e.target.value)}
+                  placeholder="G650-001"
+                />
+              </div>
+              <div>
+                <Label htmlFor="aircraft">Aircraft *</Label>
+                <Input
+                  id="aircraft"
+                  value={aircraft}
+                  onChange={(e) => setAircraft(e.target.value)}
+                  placeholder="N123GS"
+                />
+              </div>
+              <div>
+                <Label htmlFor="flightDate">Flight Date *</Label>
+                <Input
+                  id="flightDate"
+                  type="date"
+                  value={flightDate}
+                  onChange={(e) => setFlightDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="departure">Departure *</Label>
+                <Input
+                  id="departure"
+                  value={departure}
+                  onChange={(e) => setDeparture(e.target.value.toUpperCase())}
+                  placeholder="KTEB"
+                  maxLength={4}
+                />
+              </div>
+              <div>
+                <Label htmlFor="destination">Destination *</Label>
+                <Input
+                  id="destination"
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value.toUpperCase())}
+                  placeholder="KMIA"
+                  maxLength={4}
+                />
+              </div>
+              <div>
+                <Label htmlFor="departureTime">Departure Time (UTC) *</Label>
+                <Input
+                  id="departureTime"
+                  type="time"
+                  value={departureTime}
+                  onChange={(e) => setDepartureTime(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="picName">PIC Name *</Label>
+                <Input
+                  id="picName"
+                  value={picName}
+                  onChange={(e) => setPicName(e.target.value)}
+                  placeholder="Captain John Smith"
+                />
+              </div>
+              <div>
+                <Label htmlFor="sicName">SIC Name</Label>
+                <Input
+                  id="sicName"
+                  value={sicName}
+                  onChange={(e) => setSicName(e.target.value)}
+                  placeholder="First Officer Jane Doe"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card >
 
-      {/* Flight Information */}
-      < Card >
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plane className="w-5 h-5" />
-            Flight Information
-          </CardTitle>
-          <CardDescription>
-            Flight details will be automatically populated from MyAirOps API
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert>
-            <Info className="w-4 h-4" />
-            <AlertDescription>
-              <strong>Auto-Population:</strong> Flight information below will be automatically populated from the MyAirOps API when you select a flight from the flight list. You can manually edit any field if needed.
-            </AlertDescription>
-          </Alert>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="flightNumber">Flight Number *</Label>
-              <Input
-                id="flightNumber"
-                value={flightNumber}
-                onChange={(e) => setFlightNumber(e.target.value)}
-                placeholder="G650-001"
-              />
-            </div>
-            <div>
-              <Label htmlFor="aircraft">Aircraft *</Label>
-              <Input
-                id="aircraft"
-                value={aircraft}
-                onChange={(e) => setAircraft(e.target.value)}
-                placeholder="N123GS"
-              />
-            </div>
-            <div>
-              <Label htmlFor="flightDate">Flight Date *</Label>
-              <Input
-                id="flightDate"
-                type="date"
-                value={flightDate}
-                onChange={(e) => setFlightDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="departure">Departure *</Label>
-              <Input
-                id="departure"
-                value={departure}
-                onChange={(e) => setDeparture(e.target.value.toUpperCase())}
-                placeholder="KTEB"
-                maxLength={4}
-              />
-            </div>
-            <div>
-              <Label htmlFor="destination">Destination *</Label>
-              <Input
-                id="destination"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value.toUpperCase())}
-                placeholder="KMIA"
-                maxLength={4}
-              />
-            </div>
-            <div>
-              <Label htmlFor="departureTime">Departure Time (UTC) *</Label>
-              <Input
-                id="departureTime"
-                type="time"
-                value={departureTime}
-                onChange={(e) => setDepartureTime(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="picName">PIC Name *</Label>
-              <Input
-                id="picName"
-                value={picName}
-                onChange={(e) => setPicName(e.target.value)}
-                placeholder="Captain John Smith"
-              />
-            </div>
-            <div>
-              <Label htmlFor="sicName">SIC Name</Label>
-              <Input
-                id="sicName"
-                value={sicName}
-                onChange={(e) => setSicName(e.target.value)}
-                placeholder="First Officer Jane Doe"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card >
+        {/* FRAT Sections */}
+        {
+          fratSections.map((section, sectionIndex) => {
+            const Icon = section.icon;
+            const sectionScore = getSectionScore(section);
+            const hasSelectedItems = section.items.some(item => item.selected);
 
-      {/* FRAT Sections */}
-      {
-        fratSections.map((section, sectionIndex) => {
-          const Icon = section.icon;
-          const sectionScore = getSectionScore(section);
-          const hasSelectedItems = section.items.some(item => item.selected);
+            return (
+              <Card key={sectionIndex} className={hasSelectedItems ? 'border-blue-500' : ''}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Icon className="w-5 h-5" />
+                      {section.title}
+                    </CardTitle>
+                    {sectionScore > 0 && (
+                      <Badge variant="secondary" className="text-lg px-3 py-1">
+                        +{sectionScore} points
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {section.items.map((item, itemIndex) => (
+                      <div
+                        key={item.id}
+                        className={`flex items-start space-x-3 p-3 rounded-lg transition-colors ${item.selected ? 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800' : 'hover:bg-muted/50'
+                          }`}
+                      >
+                        <Checkbox
+                          id={item.id}
+                          checked={item.selected}
+                          onCheckedChange={() => handleItemToggle(sectionIndex, itemIndex)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 flex items-center justify-between gap-4 py-1">
+                          <Label
+                            htmlFor={item.id}
+                            className="cursor-pointer flex-1"
+                          >
+                            {item.label}
+                          </Label>
+                          <Badge
+                            variant={item.selected ? "default" : "outline"}
+                            className={item.score === 0 ? 'bg-gray-500' : ''}
+                          >
+                            {item.score === 0 ? '0' : `+${item.score}`}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        }
 
-          return (
-            <Card key={sectionIndex} className={hasSelectedItems ? 'border-blue-500' : ''}>
+        {/* Mitigation Notes */}
+        {
+          mitigationRequired && (
+            <Card className="border-yellow-500">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon className="w-5 h-5" />
-                    {section.title}
-                  </CardTitle>
-                  {sectionScore > 0 && (
-                    <Badge variant="secondary" className="text-lg px-3 py-1">
-                      +{sectionScore} points
-                    </Badge>
-                  )}
-                </div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                  Mitigation Strategies
+                </CardTitle>
+                <CardDescription>
+                  Document how identified risks will be mitigated for this flight (optional but recommended)
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {section.items.map((item, itemIndex) => (
-                    <div
-                      key={item.id}
-                      className={`flex items-start space-x-3 p-3 rounded-lg transition-colors ${item.selected ? 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800' : 'hover:bg-muted/50'
-                        }`}
-                    >
-                      <Checkbox
-                        id={item.id}
-                        checked={item.selected}
-                        onCheckedChange={() => handleItemToggle(sectionIndex, itemIndex)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1 flex items-center justify-between gap-4 py-1">
-                        <Label
-                          htmlFor={item.id}
-                          className="cursor-pointer flex-1"
-                        >
-                          {item.label}
-                        </Label>
-                        <Badge
-                          variant={item.selected ? "default" : "outline"}
-                          className={item.score === 0 ? 'bg-gray-500' : ''}
-                        >
-                          {item.score === 0 ? '0' : `+${item.score}`}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <Textarea
+                  value={mitigationNotes}
+                  onChange={(e) => setMitigationNotes(e.target.value)}
+                  placeholder="Describe specific mitigation strategies for the risks identified above. Include any additional crew briefings, alternate airports, fuel reserves, or other safety measures..."
+                  rows={6}
+                />
               </CardContent>
             </Card>
-          );
-        })
-      }
+          )
+        }
 
-      {/* Mitigation Notes */}
-      {
-        mitigationRequired && (
-          <Card className="border-yellow-500">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                Mitigation Strategies
-              </CardTitle>
-              <CardDescription>
-                Document how identified risks will be mitigated for this flight (optional but recommended)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                value={mitigationNotes}
-                onChange={(e) => setMitigationNotes(e.target.value)}
-                placeholder="Describe specific mitigation strategies for the risks identified above. Include any additional crew briefings, alternate airports, fuel reserves, or other safety measures..."
-                rows={6}
-              />
-            </CardContent>
-          </Card>
-        )
-      }
+        {/* Additional Notes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="w-5 h-5" />
+              Additional Notes
+            </CardTitle>
+            <CardDescription>
+              Add any additional information or comments here
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={additionalNotes}
+              onChange={(e) => setAdditionalNotes(e.target.value)}
+              placeholder="Enter any additional notes or comments for this flight..."
+              rows={4}
+            />
+          </CardContent>
+        </Card>
 
-      {/* Additional Notes */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Info className="w-5 h-5" />
-            Additional Notes
-          </CardTitle>
-          <CardDescription>
-            Add any additional information or comments here
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            value={additionalNotes}
-            onChange={(e) => setAdditionalNotes(e.target.value)}
-            placeholder="Enter any additional notes or comments for this flight..."
-            rows={4}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Action Buttons */}
-      <div className="flex gap-4 justify-end pb-8">
-        <Button variant="outline" onClick={() => handleSubmit('draft')}>
-          <Save className="w-4 h-4 mr-2" />
-          Save Draft
-        </Button>
-        <Button onClick={() => handleSubmit('submitted')} className="bg-green-600 hover:bg-green-700">
-          <Send className="w-4 h-4 mr-2" />
-          Submit FRAT
-        </Button>
-      </div>
-    </div >
+        {/* Action Buttons */}
+        <div className="flex gap-4 justify-end pb-8">
+          <Button variant="outline" onClick={() => handleSubmit('draft')}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Draft
+          </Button>
+          <Button onClick={() => handleSubmit('submitted')} className="bg-green-600 hover:bg-green-700">
+            <Send className="w-4 h-4 mr-2" />
+            Submit FRAT
+          </Button>
+        </div>
+      </div >
+    </>
   );
 }

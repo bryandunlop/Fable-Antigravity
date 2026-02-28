@@ -29,7 +29,11 @@ import {
   ChevronDown,
   ChevronRight,
   User,
-  Utensils
+  Utensils,
+  ArrowRight,
+  UtensilsCrossed,
+  Coffee,
+  Sparkles
 } from 'lucide-react';
 
 interface FoodPreferences {
@@ -112,12 +116,6 @@ interface UpcomingFlightsProps {
 }
 
 export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFlightsProps) {
-  // If user is inflight crew, show calendar view
-  if (userRole === 'inflight') {
-    return <InflightCalendarView userRole={userRole} />;
-  }
-
-  // Original list view for other roles
   const [searchTerm, setSearchTerm] = useState('');
   const [airportFilter, setAirportFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -359,6 +357,11 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
         music: 'Jazz',
         newspaper: ['Entrepreneur Magazine'],
         specialRequests: 'Tour of cockpit if possible'
+      },
+      emergencyContact: {
+        name: 'David Chen',
+        relationship: 'Brother',
+        phone: '+1 (555) 987-6544'
       }
     },
     {
@@ -658,391 +661,317 @@ export default function UpcomingFlights({ userRole = 'inflight' }: UpcomingFligh
           const isExpanded = expandedFlight === leg.id;
 
           return (
-            <Card key={leg.id} className="overflow-hidden">
-              <Collapsible
-                open={isExpanded}
-                onOpenChange={() => setExpandedFlight(isExpanded ? null : leg.id)}
+            <Card key={leg.id} className="overflow-hidden border-2 transition-all duration-200">
+              <div
+                className="cursor-pointer bg-card hover:bg-muted/30 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6"
+                onClick={() => setExpandedFlight(isExpanded ? null : leg.id)}
               >
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                          <Plane className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-3 mb-1">
-                            <CardTitle className="text-lg">
-                              {leg.flightNumber} - Leg {leg.legNumber}
-                            </CardTitle>
-                            <Badge className={getFlightStatusColor(leg.status)}>
-                              {leg.status}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {leg.departureAirport} → {leg.arrivalAirport}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(leg.date).toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {leg.departureTime} - {leg.arrivalTime}
-                            </span>
-                            <span>{leg.aircraft}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Users className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-medium">{legPassengers.length} passengers</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            {legPassengers.some(p => hasCriticalAllergies(p)) && (
-                              <div className="flex items-center gap-1 text-red-600">
-                                <ShieldAlert className="w-4 h-4" />
-                                <span>Critical Allergies</span>
-                              </div>
-                            )}
-                            {legPassengers.some(p => p.birthDate && isBirthdayDuringTrip(p.birthDate, leg.date)) && (
-                              <div className="flex items-center gap-1 text-purple-600">
-                                <Cake className="w-4 h-4" />
-                                <span>Birthday</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {isExpanded ? (
-                          <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                <div className="flex items-start md:items-center gap-6">
+                  <div className="p-4 bg-primary/10 rounded-2xl shrink-0">
+                    <Plane className="w-8 h-8 text-primary" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3 mb-2">
+                      <h3 className="text-2xl font-bold tracking-tight">
+                        {leg.flightNumber} <span className="text-muted-foreground font-normal">| Leg {leg.legNumber}</span>
+                      </h3>
+                      <Badge className={`${getFlightStatusColor(leg.status)} px-3 py-1 text-sm font-semibold`}>
+                        {leg.status}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground font-medium">
+                      <span className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg text-foreground">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        {new Date(leg.date).toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' })}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        <span className="font-semibold text-foreground">{leg.departureAirport}</span>
+                        <ArrowRight className="w-3 h-3 mx-1" />
+                        <span className="font-semibold text-foreground">{leg.arrivalAirport}</span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        {leg.departureTime} - {leg.arrivalTime}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Plane className="w-4 h-4" />
+                        Tail: {leg.aircraft}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between md:justify-end gap-6 md:pl-6 md:border-l border-border/50">
+                  <div className="text-right flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-muted-foreground" />
+                      <span className="text-lg font-bold">{legPassengers.length} <span className="text-sm font-medium text-muted-foreground">PAX</span></span>
+                    </div>
+                    {(legPassengers.some(p => hasAllergies(p)) || legPassengers.some(p => p.birthDate && isBirthdayDuringTrip(p.birthDate, leg.date))) && (
+                      <div className="flex items-center gap-2">
+                        {legPassengers.some(p => hasAllergies(p)) && (
+                          <Badge variant="destructive" className="animate-pulse shadow-sm">
+                            <ShieldAlert className="w-3 h-3 mr-1" />
+                            Medical Alert
+                          </Badge>
+                        )}
+                        {legPassengers.some(p => p.birthDate && isBirthdayDuringTrip(p.birthDate, leg.date)) && (
+                          <Badge className="bg-fuchsia-600 shadow-sm border-fuchsia-400 text-white">
+                            <Cake className="w-3 h-3 mr-1" />
+                            Birthday
+                          </Badge>
                         )}
                       </div>
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="icon" className="shrink-0 group-hover:bg-background">
+                    {isExpanded ? (
+                      <ChevronDown className="w-6 h-6 text-primary" />
+                    ) : (
+                      <ChevronRight className="w-6 h-6 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
 
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    <Separator className="mb-6" />
+              {isExpanded && (
+                <div className="bg-muted/10 p-6 md:p-8 border-t border-border/50">
 
-                    {/* Crew Information */}
-                    {leg.crewAssignment && (
-                      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h4 className="font-medium mb-3 text-blue-700">Crew Assignment</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <span className="font-medium">Captain:</span> {leg.crewAssignment.captain}
-                          </div>
-                          <div>
-                            <span className="font-medium">First Officer:</span> {leg.crewAssignment.firstOfficer}
-                          </div>
-                          <div>
-                            <span className="font-medium">Flight Attendants:</span> {leg.crewAssignment.flightAttendants.join(', ')}
-                          </div>
+                  {/* Crew Information Box */}
+                  {leg.crewAssignment && (
+                    <div className="mb-8 p-5 bg-background rounded-xl border-l-4 border-l-blue-500 shadow-sm flex flex-col md:flex-row gap-6">
+                      <div className="shrink-0 flex items-center gap-2 text-blue-600 font-bold">
+                        <Users className="w-5 h-5" />
+                        Crew
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 text-sm">
+                        <div>
+                          <span className="text-muted-foreground block text-xs uppercase tracking-widest mb-1">Captain</span>
+                          <span className="font-semibold">{leg.crewAssignment.captain}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-xs uppercase tracking-widest mb-1">First Officer</span>
+                          <span className="font-semibold">{leg.crewAssignment.firstOfficer}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-xs uppercase tracking-widest mb-1">Flight Attendants</span>
+                          <span className="font-semibold">{leg.crewAssignment.flightAttendants.join(', ')}</span>
                         </div>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Passenger Manifest */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Passenger Manifest</h4>
-                      {legPassengers.map((passenger) => {
-                        const hasBirthday = passenger.birthDate && isBirthdayDuringTrip(passenger.birthDate, leg.date);
+                  {/* OVERALL TRIP ALERTS (The Flag) */}
+                  {(() => {
+                    const allAllergies = legPassengers.flatMap(p => p.allergies.map(a => ({ ...a, passengerName: `${p.firstName} ${p.lastName}` })));
+                    const birthdays = legPassengers.filter(p => p.birthDate && isBirthdayDuringTrip(p.birthDate, leg.date));
 
-                        return (
-                          <Card
-                            key={passenger.id}
-                            className={`p-4 ${hasBirthday
-                                ? 'border-purple-300 bg-purple-50'
-                                : hasCriticalAllergies(passenger)
-                                  ? 'border-red-500 border-2 bg-red-50'
-                                  : hasAllergies(passenger)
-                                    ? 'border-orange-300 border-2 bg-orange-50'
-                                    : ''
-                              }`}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="font-medium">{passenger.firstName} {passenger.lastName}</h4>
-                                      {hasBirthday && (
-                                        <div className="flex items-center gap-1 text-purple-600">
-                                          <Cake className="w-4 h-4" />
-                                          <span className="text-xs font-bold">BIRTHDAY!</span>
-                                        </div>
-                                      )}
-                                      {hasCriticalAllergies(passenger) && (
-                                        <div className="flex items-center gap-1 text-red-600">
-                                          <ShieldAlert className="w-4 h-4" />
-                                          <span className="text-xs font-bold">CRITICAL ALLERGY</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                      <span>{passenger.email}</span>
-                                      <span>{passenger.phone}</span>
-                                    </div>
-                                  </div>
-                                  <Badge className={getVipColor(passenger.vipLevel)}>
-                                    {passenger.vipLevel}
-                                  </Badge>
-                                </div>
+                    if (allAllergies.length === 0 && birthdays.length === 0) return null;
 
-                                {/* Birthday Alert */}
-                                {hasBirthday && (
-                                  <div className="mb-3 p-2 rounded-lg bg-purple-100 border border-purple-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <Gift className="w-4 h-4 text-purple-600" />
-                                      <span className="text-sm font-semibold text-purple-700">🎉 BIRTHDAY CELEBRATION</span>
-                                    </div>
-                                    <p className="text-xs text-purple-700">
-                                      Birthday on {new Date(passenger.birthDate!).toLocaleDateString()} - Consider special arrangements!
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Critical Safety Alerts */}
-                                {hasAllergies(passenger) && (
-                                  <div className="mb-3 p-3 rounded-lg bg-white border-2 border-red-200">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <AlertTriangle className="w-4 h-4 text-red-600" />
-                                      <span className="text-sm font-semibold text-red-700">⚠️ ALLERGY ALERT - SAFETY CRITICAL</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1 mb-2">
-                                      {passenger.allergies.map((allergy, i) => (
-                                        <Badge
-                                          key={i}
-                                          className={`${getAllergySeverityColor(allergy.severity)} text-xs font-semibold`}
-                                        >
-                                          <span className="flex items-center gap-1">
-                                            {getAllergySeverityIcon(allergy.severity)}
-                                            {allergy.allergen} - {allergy.severity}
-                                          </span>
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                    {hasCriticalAllergies(passenger) && (
-                                      <div className="p-2 bg-red-100 rounded border border-red-300">
-                                        <div className="text-xs text-red-700 font-bold">
-                                          🚨 EMERGENCY PROTOCOL: {passenger.allergies.find(a => a.severity === 'Critical')?.medication}
-                                        </div>
-                                        <div className="text-xs text-red-700 mt-1">
-                                          Reaction: {passenger.allergies.find(a => a.severity === 'Critical')?.reaction}
-                                        </div>
+                    return (
+                      <div className="space-y-4 mb-8">
+                        {allAllergies.length > 0 && (
+                          <Card className="border-red-500 bg-red-50/50 shadow-sm">
+                            <CardContent className="p-4 flex flex-col md:flex-row items-start gap-4">
+                              <div className="p-3 bg-red-100 rounded-lg shrink-0">
+                                <ShieldAlert className="w-6 h-6 text-red-600" />
+                              </div>
+                              <div className="flex-1 w-full">
+                                <h3 className="font-bold text-red-700 text-lg mb-2">MEDICAL ALERTS FOR THIS LEG</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {allAllergies.map((a, i) => (
+                                    <div key={i} className="flex flex-col bg-white/60 p-3 rounded-md border border-red-200">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <Badge className={getAllergySeverityColor(a.severity)}>{a.severity.toUpperCase()}</Badge>
+                                        <span className="font-semibold text-red-900">{a.passengerName}</span>
                                       </div>
-                                    )}
-                                  </div>
-                                )}
+                                      <span className="text-sm font-medium text-red-800">{a.allergen}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                        {birthdays.length > 0 && (
+                          <Card className="border-fuchsia-400 bg-fuchsia-50/50 shadow-sm">
+                            <CardContent className="p-4 flex items-start gap-4">
+                              <div className="p-3 bg-fuchsia-100 rounded-lg shrink-0">
+                                <Cake className="w-6 h-6 text-fuchsia-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-bold text-fuchsia-700 text-lg mb-2">BIRTHDAY TRIPS</h3>
+                                <div className="flex flex-wrap gap-2">
+                                  {birthdays.map((p, i) => (
+                                    <Badge key={i} className="bg-fuchsia-600 text-white border-fuchsia-400 px-3 py-1 shadow-sm">
+                                      {p.firstName} {p.lastName}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    );
+                  })()}
 
-                                {/* Food Preferences Summary */}
-                                <div className="mb-3 p-2 rounded-lg bg-green-50 border border-green-200">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <ChefHat className="w-4 h-4 text-green-600" />
-                                    <span className="text-sm font-semibold text-green-700">CULINARY PREFERENCES</span>
+                  {/* Passenger Manifest Layout (matching the popup design) */}
+                  <div className="space-y-6">
+                    <h4 className="flex items-center gap-2 font-bold text-xl mb-4">
+                      <Users className="w-5 h-5 text-primary" />
+                      Passenger Manifest & Service Details
+                    </h4>
+                    <div className="flex flex-col gap-6">
+                      {legPassengers.map((passenger) => (
+                        <Card key={passenger.id} className={`w-full bg-background shadow-sm hover:shadow-md transition-shadow overflow-hidden ${hasCriticalAllergies(passenger) ? 'border-red-500 border-2' : ''}`}>
+                          <CardContent className="p-0 flex flex-col md:flex-row bg-gradient-to-r from-background to-muted/10">
+
+                            {/* Left Column: Core Info & Actions */}
+                            <div className="p-6 md:w-1/3 border-b md:border-b-0 md:border-r border-border/50 flex flex-col justify-between bg-muted/20">
+                              <div>
+                                <div className="flex items-start gap-4 mb-5">
+                                  <div className="p-3 bg-accent/10 rounded-xl shrink-0">
+                                    <User className="w-6 h-6 text-accent" />
                                   </div>
-                                  <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                      <span className="font-medium">Cuisines:</span> {passenger.foodPreferences.favoriteCuisines.slice(0, 2).join(', ')}
-                                      {passenger.foodPreferences.favoriteCuisines.length > 2 && '...'}
-                                    </div>
-                                    <div>
-                                      <span className="font-medium">Style:</span> {passenger.foodPreferences.cateringStyle}
-                                    </div>
-                                    <div>
-                                      <span className="font-medium">Spice:</span>
-                                      <Badge className={`ml-1 ${getSpiceLevelColor(passenger.foodPreferences.spiceLevel)} text-xs`}>
-                                        {passenger.foodPreferences.spiceLevel}
+                                  <div className="space-y-1.5 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h3 className="font-semibold text-xl">{passenger.firstName} {passenger.lastName}</h3>
+                                      <Badge className={getVipColor(passenger.vipLevel)}>
+                                        {passenger.vipLevel}
                                       </Badge>
                                     </div>
-                                    <div>
-                                      <span className="font-medium">Dietary:</span> {passenger.dietaryRestrictions.join(', ') || 'None'}
-                                    </div>
+                                    {passenger.birthDate && isBirthdayDuringTrip(passenger.birthDate, leg.date) && (
+                                      <Badge className="bg-fuchsia-600 text-white animate-pulse shadow-md border-fuchsia-400 mt-1">
+                                        <Cake className="w-4 h-4 mr-1.5" />
+                                        BIRTHDAY TRIP!
+                                      </Badge>
+                                    )}
                                   </div>
-                                  {passenger.foodPreferences.chefNotes && (
-                                    <div className="mt-2 text-xs italic text-green-700">
-                                      Chef Notes: {passenger.foodPreferences.chefNotes}
-                                    </div>
-                                  )}
                                 </div>
 
-                                {/* Service Preferences */}
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                  <div>
-                                    <span className="font-medium">Temperature:</span> {passenger.preferences.temperature}
+                                <div className="space-y-3 mb-6">
+                                  <div className="bg-background/80 p-3 rounded-lg border border-border/50">
+                                    <span className="text-muted-foreground block text-[10px] font-bold uppercase tracking-widest mb-1">Contact</span>
+                                    <span className="font-medium text-sm">{passenger.phone}</span>
                                   </div>
-                                  <div>
-                                    <span className="font-medium">Music:</span> {passenger.preferences.music || 'No preference'}
+                                  <div className="bg-background/80 p-3 rounded-lg border border-border/50">
+                                    <span className="text-muted-foreground block text-[10px] font-bold uppercase tracking-widest mb-1">Cabin Temp</span>
+                                    <span className="font-medium text-sm">{passenger.preferences.temperature}</span>
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="flex gap-2">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setSelectedPassenger(passenger)}
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                                    <DialogHeader>
-                                      <DialogTitle className="flex items-center gap-2">
-                                        <User className="w-5 h-5" />
-                                        {passenger.firstName} {passenger.lastName}
-                                        {hasCriticalAllergies(passenger) && (
-                                          <ShieldAlert className="w-5 h-5 text-red-600" />
-                                        )}
-                                      </DialogTitle>
-                                      <DialogDescription>
-                                        Complete passenger profile for in-flight service
-                                      </DialogDescription>
-                                    </DialogHeader>
+                              <Button
+                                className="w-full bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 shadow-none font-medium mt-auto"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedPassenger(passenger);
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Full VIP Profile
+                              </Button>
+                            </div>
 
-                                    {/* Detailed passenger information would go here */}
-                                    <Tabs defaultValue="service" className="w-full">
-                                      <TabsList className="grid w-full grid-cols-2">
-                                        <TabsTrigger value="service">Service Info</TabsTrigger>
-                                        <TabsTrigger value="safety">Safety & Contact</TabsTrigger>
-                                      </TabsList>
+                            {/* Right Column: Service Details */}
+                            <div className="p-6 md:w-2/3 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-                                      <TabsContent value="service" className="space-y-4">
-                                        {/* Critical Allergy Warning */}
-                                        {hasCriticalAllergies(passenger) && (
-                                          <div className="p-3 bg-red-100 border border-red-300 rounded-lg">
-                                            <div className="flex items-center gap-2 mb-2">
-                                              <ShieldAlert className="w-5 h-5 text-red-600" />
-                                              <span className="font-bold text-red-700">🚨 CRITICAL ALLERGY ALERT</span>
-                                            </div>
-                                            {passenger.allergies
-                                              .filter(a => a.severity === 'Critical')
-                                              .map((allergy, i) => (
-                                                <div key={i} className="text-sm text-red-700">
-                                                  <div className="font-semibold">{allergy.allergen}</div>
-                                                  <div>Reaction: {allergy.reaction}</div>
-                                                  <div className="font-semibold">Emergency: {allergy.medication}</div>
-                                                </div>
-                                              ))}
+                              {/* Service Column 1 */}
+                              <div className="space-y-6">
+
+                                {/* Allergies - Critical Section */}
+                                {passenger.allergies.length > 0 && (
+                                  <div className="space-y-3">
+                                    <h4 className="font-bold text-red-600 flex items-center gap-2 bg-red-100 p-2 rounded-t-md animate-pulse text-sm">
+                                      <ShieldAlert className="w-4 h-4" />
+                                      MEDICAL ALERT
+                                    </h4>
+                                    <div className="space-y-3 mt-0 p-2 border-x-2 border-b-2 border-red-200 rounded-b-md">
+                                      {passenger.allergies.map((allergy, index) => (
+                                        <div key={index} className={`p-3 rounded-md border-2 shadow-sm ${allergy.severity === 'Critical' ? 'bg-red-50 border-red-500' :
+                                          allergy.severity === 'Moderate' ? 'bg-orange-50 border-orange-400' :
+                                            'bg-yellow-50 border-yellow-400'
+                                          }`}>
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <Badge className={getAllergySeverityColor(allergy.severity)}>
+                                              {getAllergySeverityIcon(allergy.severity)}
+                                              {allergy.severity.toUpperCase()}
+                                            </Badge>
+                                            <span className="font-medium text-sm">{allergy.allergen}</span>
                                           </div>
-                                        )}
-
-                                        {/* Food preferences detailed view */}
-                                        <div className="space-y-3">
-                                          <div>
-                                            <Label className="text-xs">Favorite Dishes</Label>
-                                            <div className="text-sm space-y-1">
-                                              {passenger.foodPreferences.favoriteDishes.slice(0, 5).map((dish, i) => (
-                                                <div key={i}>• {dish}</div>
-                                              ))}
-                                            </div>
-                                          </div>
-
-                                          <div>
-                                            <Label className="text-xs">Beverages</Label>
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                              {passenger.beveragePreferences.map((bev, i) => (
-                                                <Badge key={i} variant="outline" className="text-xs">{bev}</Badge>
-                                              ))}
-                                            </div>
-                                          </div>
-
-                                          {passenger.preferences.specialRequests && (
-                                            <div>
-                                              <Label className="text-xs">Special Requests</Label>
-                                              <p className="text-sm bg-muted p-2 rounded mt-1">
-                                                {passenger.preferences.specialRequests}
-                                              </p>
-                                            </div>
+                                          {allergy.reaction && (
+                                            <p className="text-sm text-red-700 font-medium mb-1">
+                                              Reaction: {allergy.reaction}
+                                            </p>
+                                          )}
+                                          {allergy.medication && (
+                                            <p className="text-sm text-red-700 font-medium bg-red-100/50 p-1.5 rounded">
+                                              Emergency Action: {allergy.medication}
+                                            </p>
                                           )}
                                         </div>
-                                      </TabsContent>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
 
-                                      <TabsContent value="safety" className="space-y-4">
-                                        {/* Contact info and emergency contacts */}
-                                        <div>
-                                          <Label className="text-xs">Contact Information</Label>
-                                          <div className="text-sm space-y-2 mt-2">
-                                            <div className="flex items-center gap-2">
-                                              <Mail className="w-3 h-3" />
-                                              {passenger.email}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                              <Phone className="w-3 h-3" />
-                                              {passenger.phone}
-                                            </div>
-                                            {passenger.emergencyContact && (
-                                              <div className="mt-3 p-2 bg-muted rounded">
-                                                <Label className="text-xs">Emergency Contact</Label>
-                                                <div className="text-sm">
-                                                  <div>{passenger.emergencyContact.name} ({passenger.emergencyContact.relationship})</div>
-                                                  <div className="flex items-center gap-2">
-                                                    <Phone className="w-3 h-3" />
-                                                    {passenger.emergencyContact.phone}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
+                                {/* Food Preferences */}
+                                <div className="space-y-3">
+                                  <h4 className="font-bold text-lg flex items-center gap-2">
+                                    <UtensilsCrossed className="w-5 h-5 text-muted-foreground" />
+                                    Food Preferences
+                                  </h4>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="bg-background/80 p-3 rounded-lg border border-border/50">
+                                      <span className="text-muted-foreground block text-[10px] font-bold uppercase tracking-widest mb-1">Favorite Dishes</span>
+                                      <span className="font-medium text-sm">{passenger.foodPreferences.favoriteDishes.join(', ')}</span>
+                                    </div>
+                                    <div className="bg-background/80 p-3 rounded-lg border border-border/50">
+                                      <span className="text-muted-foreground block text-[10px] font-bold uppercase tracking-widest mb-1">Disliked Foods</span>
+                                      <span className="font-medium text-sm">{passenger.foodPreferences.avoidedFoods.join(', ')}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
 
-                                        {/* All allergies detail */}
-                                        {hasAllergies(passenger) && (
-                                          <div>
-                                            <Label className="text-xs text-red-600 font-semibold">⚠️ ALLERGIES - SAFETY CRITICAL</Label>
-                                            <div className="space-y-2 mt-2">
-                                              {passenger.allergies.map((allergy, i) => (
-                                                <div
-                                                  key={i}
-                                                  className={`p-3 rounded border ${allergy.severity === 'Critical'
-                                                      ? 'bg-red-100 border-red-300'
-                                                      : allergy.severity === 'Moderate'
-                                                        ? 'bg-orange-100 border-orange-300'
-                                                        : 'bg-yellow-100 border-yellow-300'
-                                                    }`}
-                                                >
-                                                  <div className="flex items-center gap-2 mb-2">
-                                                    <Badge className={getAllergySeverityColor(allergy.severity)}>
-                                                      <span className="flex items-center gap-1">
-                                                        {getAllergySeverityIcon(allergy.severity)}
-                                                        {allergy.severity}
-                                                      </span>
-                                                    </Badge>
-                                                    <span className="font-semibold">{allergy.allergen}</span>
-                                                  </div>
-                                                  {allergy.reaction && (
-                                                    <div className="text-sm mb-1">Reaction: {allergy.reaction}</div>
-                                                  )}
-                                                  {allergy.medication && (
-                                                    <div className="text-sm font-semibold">Treatment: {allergy.medication}</div>
-                                                  )}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </TabsContent>
-                                    </Tabs>
-                                  </DialogContent>
-                                </Dialog>
+                              {/* Service Column 2 */}
+                              <div className="space-y-6">
+                                {/* Beverage Preferences */}
+                                <div className="space-y-3">
+                                  <h4 className="font-bold text-lg flex items-center gap-2">
+                                    <Coffee className="w-5 h-5 text-muted-foreground" />
+                                    Beverage Preferences
+                                  </h4>
+                                  <div className="bg-background/80 p-3 rounded-lg border border-border/50">
+                                    <span className="text-muted-foreground block text-[10px] font-bold uppercase tracking-widest mb-1">Preferred Beverages</span>
+                                    <span className="font-medium text-sm">{passenger.beveragePreferences.join(', ')}</span>
+                                  </div>
+                                </div>
+
+                                {/* Special Requests */}
+                                {passenger.preferences.specialRequests && (
+                                  <div className="space-y-3">
+                                    <h4 className="font-bold text-lg flex items-center gap-2">
+                                      <Sparkles className="w-5 h-5 text-muted-foreground" />
+                                      Special Requests
+                                    </h4>
+                                    <div className="bg-background/80 p-3 rounded-lg border border-border/50">
+                                      <span className="font-medium text-sm">{passenger.preferences.specialRequests}</span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </Card>
-                        );
-                      })}
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
+                  </div>
+                </div>
+              )}
             </Card>
           );
         })}

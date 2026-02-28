@@ -9,11 +9,11 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useNotifications } from './hooks/useNotifications';
-import { 
-  Bell, 
-  AlertTriangle, 
-  Clock, 
-  CheckCircle, 
+import {
+  Bell,
+  AlertTriangle,
+  Clock,
+  CheckCircle,
   AlertCircle,
   Plane,
   Wrench,
@@ -44,6 +44,7 @@ import {
   Navigation,
   MapPin
 } from 'lucide-react';
+import { ClearSkiesSVG } from './ui/EmptyStateSVGs';
 
 interface NotificationCenterProps {
   userRole: string;
@@ -53,23 +54,23 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread' | 'high'>('all');
-  
-  const { 
-    notifications, 
-    loading, 
-    error, 
-    markAsRead, 
+
+  const {
+    notifications,
+    loading,
+    error,
+    markAsRead,
     markAsUnread,
-    markAllAsRead, 
-    deleteNotification, 
+    markAllAsRead,
+    deleteNotification,
     refetch,
-    counts 
+    counts
   } = useNotifications({ userRole });
 
   const getNotificationIcon = (type: string, priority: string) => {
-    const iconClass = priority === 'critical' ? 'text-red-500' : 
-                     priority === 'high' ? 'text-orange-500' : 
-                     priority === 'medium' ? 'text-yellow-500' : 'text-blue-500';
+    const iconClass = priority === 'critical' ? 'text-red-500' :
+      priority === 'high' ? 'text-orange-500' :
+        priority === 'medium' ? 'text-yellow-500' : 'text-blue-500';
 
     switch (type) {
       case 'task':
@@ -113,13 +114,13 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
     const now = new Date();
     const time = new Date(timestamp);
     const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours}h ago`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays}d ago`;
   };
@@ -136,13 +137,13 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
   }).sort((a, b) => {
     // Sort by: unread first, then by priority, then by timestamp
     if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
-    
+
     const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
     const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder];
     const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder];
-    
+
     if (aPriority !== bPriority) return bPriority - aPriority;
-    
+
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
@@ -150,7 +151,7 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
     if (!notification.isRead) {
       markAsRead(notification.id);
     }
-    
+
     // Navigate to the URL if it exists
     if (notification.actionUrl) {
       navigate(notification.actionUrl);
@@ -184,17 +185,16 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           className="relative p-2 hover:bg-accent"
         >
           <Bell className="w-5 h-5" />
           {counts.unread > 0 && (
-            <Badge 
-              className={`absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs ${
-                counts.critical > 0 ? 'bg-red-500 animate-pulse' : 'bg-primary'
-              }`}
+            <Badge
+              className={`absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs ${counts.critical > 0 ? 'bg-red-500 animate-pulse' : 'bg-primary'
+                }`}
             >
               {counts.unread > 99 ? '99+' : counts.unread}
             </Badge>
@@ -211,9 +211,9 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={refetch}
                   disabled={loading}
                   className="text-xs"
@@ -222,9 +222,9 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                   <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
                 {counts.unread > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={markAllAsRead}
                     className="text-xs"
                     title="Mark all as read"
@@ -232,9 +232,9 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                     Mark all read
                   </Button>
                 )}
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setIsOpen(false)}
                   title="Close notifications"
                 >
@@ -242,7 +242,7 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                 </Button>
               </div>
             </div>
-            
+
             {/* Quick stats */}
             {counts.critical > 0 && (
               <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
@@ -254,7 +254,7 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                 </div>
               </div>
             )}
-            
+
             {/* Filter tabs */}
             <Tabs value={filter} onValueChange={(value) => setFilter(value as any)} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
@@ -270,7 +270,7 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
               </TabsList>
             </Tabs>
           </CardHeader>
-          
+
           <CardContent className="p-0">
             {error && (
               <div className="p-4 bg-red-50 border-b">
@@ -283,7 +283,7 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                 </div>
               </div>
             )}
-            
+
             <ScrollArea className="h-96">
               {loading && notifications.length === 0 ? (
                 <div className="p-6 text-center">
@@ -291,33 +291,35 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                   <p className="text-sm text-muted-foreground">Loading notifications...</p>
                 </div>
               ) : filteredNotifications.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground">
-                  <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No notifications to display</p>
+                <div className="p-10 text-center text-muted-foreground flex flex-col items-center justify-center h-full animate-fade-in">
+                  <ClearSkiesSVG size={80} className="mb-4 opacity-70" />
+                  <p className="font-medium text-foreground">No notifications to display</p>
                   <p className="text-xs mt-1">
-                    {filter === 'unread' ? 'All caught up!' : 
-                     filter === 'high' ? 'No high priority items' : 
-                     'Check back later for updates'}
+                    {filter === 'unread' ? 'All caught up!' :
+                      filter === 'high' ? 'No high priority items' :
+                        'Check back later for updates'}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-0">
                   {filteredNotifications.map((notification, index) => (
-                    <div key={notification.id} className="group">
-                      <div 
-                        className={`p-4 hover:bg-accent/50 cursor-pointer transition-colors ${
-                          !notification.isRead ? 'bg-blue-50/50' : ''
-                        } ${notification.priority === 'critical' ? 'border-l-4 border-l-red-500' : 
-                          notification.priority === 'high' ? 'border-l-4 border-l-orange-500' : ''} ${
-                          notification.type === 'nas_impact' ? 'border-l-4 border-l-blue-500' : ''
-                        }`}
+                    <div
+                      key={notification.id}
+                      className="group animate-list-stagger opacity-0"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      <div
+                        className={`p-4 hover:bg-accent/50 cursor-pointer transition-colors ${!notification.isRead ? 'bg-blue-50/50' : ''
+                          } ${notification.priority === 'critical' ? 'border-l-4 border-l-red-500' :
+                            notification.priority === 'high' ? 'border-l-4 border-l-orange-500' : ''} ${notification.type === 'nas_impact' ? 'border-l-4 border-l-blue-500' : ''
+                          }`}
                         onClick={() => handleNotificationClick(notification)}
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-shrink-0 mt-0.5">
                             {getNotificationIcon(notification.type, notification.priority)}
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1">
@@ -332,9 +334,9 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                                 <p className="text-sm text-muted-foreground mb-2">
                                   {notification.message}
                                 </p>
-                                
+
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge 
+                                  <Badge
                                     className={`text-xs ${getPriorityColor(notification.priority)}`}
                                   >
                                     {notification.priority}
@@ -349,18 +351,17 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                                     </Badge>
                                   )}
                                   {notification.daysUntilDue !== undefined && (
-                                    <Badge 
-                                      className={`text-xs ${
-                                        notification.daysUntilDue < 0 ? 'bg-red-100 text-red-800' :
+                                    <Badge
+                                      className={`text-xs ${notification.daysUntilDue < 0 ? 'bg-red-100 text-red-800' :
                                         notification.daysUntilDue <= 1 ? 'bg-orange-100 text-orange-800' :
-                                        'bg-yellow-100 text-yellow-800'
-                                      }`}
+                                          'bg-yellow-100 text-yellow-800'
+                                        }`}
                                     >
-                                      {notification.daysUntilDue < 0 
+                                      {notification.daysUntilDue < 0
                                         ? `${Math.abs(notification.daysUntilDue)}d overdue`
-                                        : notification.daysUntilDue === 0 
-                                        ? 'Due today'
-                                        : `${notification.daysUntilDue}d left`
+                                        : notification.daysUntilDue === 0
+                                          ? 'Due today'
+                                          : `${notification.daysUntilDue}d left`
                                       }
                                     </Badge>
                                   )}
@@ -375,7 +376,7 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                                   </p>
                                 )}
                               </div>
-                              
+
                               {/* Actions dropdown */}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -426,11 +427,11 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
-                            
+
                             {notification.actionUrl && notification.actionText && (
                               <div className="mt-3 flex gap-2">
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   className="text-xs h-7"
                                   onClick={(e) => handleActionClick(notification, e)}
                                 >

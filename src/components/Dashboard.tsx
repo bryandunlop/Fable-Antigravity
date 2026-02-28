@@ -170,12 +170,12 @@ export default function Dashboard({ userRole }: DashboardProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-200px)] min-h-[600px]">
 
         {/* Top Left: Aircraft Status */}
-        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-blue transition-all duration-500">
+        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-blue transition-all duration-500 opacity-0 animate-slide-up [animation-delay:100ms]">
           <FleetStatusWidget compact={true} showDetailsLink={true} transparent={true} className="flex-1" />
         </div>
 
         {/* Top Right: NAS Impact */}
-        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-orange transition-all duration-500">
+        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-orange transition-all duration-500 opacity-0 animate-slide-up [animation-delay:200ms]">
           {/* Padding adjustment to match others since NAS widget has internal titles */}
           <div className="h-full">
             <NASImpactWidget compact={true} transparent={true} />
@@ -183,12 +183,12 @@ export default function Dashboard({ userRole }: DashboardProps) {
         </div>
 
         {/* Bottom Left: Flights Today */}
-        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-green transition-all duration-500">
+        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-green transition-all duration-500 opacity-0 animate-slide-up [animation-delay:300ms]">
           <DailyFlightsWidget />
         </div>
 
         {/* Bottom Right: Duty Roster */}
-        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-purple transition-all duration-500">
+        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-purple transition-all duration-500 opacity-0 animate-slide-up [animation-delay:400ms]">
           <DutyRosterWidget />
         </div>
 

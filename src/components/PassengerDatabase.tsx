@@ -731,320 +731,325 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-2">
         <div>
           <h1 className="flex items-center gap-2">
             <Users className="w-6 h-6 text-blue-500" />
-            Passenger Database
+            Passenger Management
           </h1>
           <p className="text-muted-foreground">
-            Search and manage passenger information and preferences
+            Manage passengers and view upcoming inflight trips.
           </p>
         </div>
-        <Dialog open={isAddingPassenger} onOpenChange={setIsAddingPassenger}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Add Passenger
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Passenger</DialogTitle>
-              <DialogDescription>
-                Enter passenger details and preferences for personalized service
-              </DialogDescription>
-            </DialogHeader>
-            <PassengerForm onClose={() => setIsAddingPassenger(false)} />
-          </DialogContent>
-        </Dialog>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Passengers</p>
-                <p className="text-2xl font-bold">{passengers.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-red-600" />
-              <div>
-                <p className="text-sm text-red-700 font-medium">Executives</p>
-                <p className="text-2xl font-bold text-red-700">
-                  {passengers.filter(p => ['CEO', 'CFO', 'President', 'Sector CEO'].includes(p.role || '')).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200 bg-purple-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-purple-600" />
-              <div>
-                <p className="text-sm text-purple-700 font-medium">Custom Roles</p>
-                <p className="text-2xl font-bold text-purple-700">
-                  {passengers.filter(p => !['CEO', 'CFO', 'President', 'Sector CEO', 'Standard'].includes(p.role || '')).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-orange-600" />
-              <div>
-                <p className="text-sm text-orange-700 font-medium">Has Allergies</p>
-                <p className="text-2xl font-bold text-orange-700">
-                  {passengers.filter(p => hasAllergies(p)).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200 bg-purple-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Cake className="w-4 h-4 text-purple-600" />
-              <div>
-                <p className="text-sm text-purple-700 font-medium">This Month Birthdays</p>
-                <p className="text-2xl font-bold text-purple-700">
-                  {passengers.filter(p => {
-                    if (!p.birthday) return false;
-                    const birthMonth = new Date(p.birthday).getMonth();
-                    const currentMonth = new Date().getMonth();
-                    return birthMonth === currentMonth;
-                  }).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search passengers by name, email, food, or beverage preferences..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex gap-2">
-
-
-          <Select value={allergyFilter} onValueChange={setAllergyFilter}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Allergies" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="any">Has Allergies</SelectItem>
-              <SelectItem value="none">No Allergies</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Passengers List */}
-      <div className="space-y-4">
-        {filteredPassengers.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="font-medium mb-2">No passengers found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm ? 'Try adjusting your search criteria.' : 'Start by adding your first passenger.'}
-              </p>
-              <Button onClick={() => setIsAddingPassenger(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add First Passenger
+      <div className="space-y-6 mt-0">
+        <div className="flex justify-end">
+          <Dialog open={isAddingPassenger} onOpenChange={setIsAddingPassenger}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                Add Passenger
               </Button>
+            </DialogTrigger>
+            <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Passenger</DialogTitle>
+                <DialogDescription>
+                  Enter passenger details and preferences for personalized service
+                </DialogDescription>
+              </DialogHeader>
+              <PassengerForm onClose={() => setIsAddingPassenger(false)} />
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-600" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Passengers</p>
+                  <p className="text-2xl font-bold">{passengers.length}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        ) : (
-          filteredPassengers.map((passenger) => (
-            <Card
-              key={passenger.id}
-              className={`${hasAllergies(passenger)
-                ? 'border-orange-300 border-2 bg-orange-50'
-                : ''
-                }`}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-medium text-lg">{passenger.name}</h3>
 
-                      <Badge className={getRoleColor(passenger.role)}>
-                        {passenger.role}
-                      </Badge>
-                      {hasAllergies(passenger) && (
-                        <Badge className="bg-orange-100 text-orange-800 border-orange-200 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          ALLERGY
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                      {/* Contact Info */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Mail className="w-3 h-3" />
-                          <span>{passenger.info.email || 'No email'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="w-3 h-3" />
-                          <span>{passenger.info.phone || 'No phone'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <span className="font-medium">Role:</span>
-                          <span>{passenger.role}</span>
-                        </div>
-                      </div>
-
-                      {/* Birthday */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Cake className="w-3 h-3 text-purple-600" />
-                          <span className="font-medium text-purple-700">Birthday</span>
-                        </div>
-                        {passenger.birthday ? (
-                          <div className="text-xs text-purple-600">
-                            {new Date(passenger.birthday).toLocaleDateString()}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Not provided</span>
-                        )}
-                      </div>
-
-                      {/* Allergies */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <AlertTriangle className="w-3 h-3 text-orange-600" />
-                          <span className="font-medium text-orange-700">Allergies</span>
-                        </div>
-                        {passenger.allergies.length > 0 ? (
-                          <div className="space-y-1">
-                            {passenger.allergies.slice(0, 2).map((allergy, index) => (
-                              <div key={index} className="flex items-center gap-1">
-                                {getAllergySeverityIcon(allergy.severity)}
-                                <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
-                                  {allergy.allergen} - {allergy.severity}
-                                </Badge>
-                              </div>
-                            ))}
-                            {passenger.allergies.length > 2 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{passenger.allergies.length - 2} more
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-green-600">No known allergies</span>
-                        )}
-                      </div>
-
-                      {/* Beverages */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Wine className="w-3 h-3 text-blue-600" />
-                          <span className="font-medium">Beverages</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {passenger.beverage.slice(0, 3).join(', ')}
-                          {passenger.beverage.length > 3 && `... +${passenger.beverage.length - 3} more`}
-                        </div>
-                      </div>
-
-                      {/* Food */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Utensils className="w-3 h-3 text-green-600" />
-                          <span className="font-medium">Food</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {passenger.food.slice(0, 3).join(', ')}
-                          {passenger.food.length > 3 && `... +${passenger.food.length - 3} more`}
-                        </div>
-                      </div>
-
-                      {/* Comfort */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Heart className="w-3 h-3 text-purple-600" />
-                          <span className="font-medium">Comfort</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {passenger.passengerComfort.temperature}, {passenger.passengerComfort.seating}
-                        </div>
-                      </div>
-
-                      {/* Notes */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <User className="w-3 h-3 text-gray-600" />
-                          <span className="font-medium">Notes</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {passenger.additionalNotes ?
-                            (passenger.additionalNotes.length > 50 ?
-                              passenger.additionalNotes.substring(0, 50) + '...' :
-                              passenger.additionalNotes
-                            ) :
-                            'No additional notes'
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedPassenger(passenger);
-                        setIsPassengerDetailOpen(true);
-                      }}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedPassenger(passenger);
-                        setIsEditingPassenger(true);
-                      }}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  </div>
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-red-600" />
+                <div>
+                  <p className="text-sm text-red-700 font-medium">Executives</p>
+                  <p className="text-2xl font-bold text-red-700">
+                    {passengers.filter(p => ['CEO', 'CFO', 'President', 'Sector CEO'].includes(p.role || '')).length}
+                  </p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-purple-200 bg-purple-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-purple-600" />
+                <div>
+                  <p className="text-sm text-purple-700 font-medium">Custom Roles</p>
+                  <p className="text-2xl font-bold text-purple-700">
+                    {passengers.filter(p => !['CEO', 'CFO', 'President', 'Sector CEO', 'Standard'].includes(p.role || '')).length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-600" />
+                <div>
+                  <p className="text-sm text-orange-700 font-medium">Has Allergies</p>
+                  <p className="text-2xl font-bold text-orange-700">
+                    {passengers.filter(p => hasAllergies(p)).length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-purple-200 bg-purple-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Cake className="w-4 h-4 text-purple-600" />
+                <div>
+                  <p className="text-sm text-purple-700 font-medium">This Month Birthdays</p>
+                  <p className="text-2xl font-bold text-purple-700">
+                    {passengers.filter(p => {
+                      if (!p.birthday) return false;
+                      const birthMonth = new Date(p.birthday).getMonth();
+                      const currentMonth = new Date().getMonth();
+                      return birthMonth === currentMonth;
+                    }).length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search passengers by name, email, food, or beverage preferences..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-2">
+
+
+            <Select value={allergyFilter} onValueChange={setAllergyFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Allergies" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="any">Has Allergies</SelectItem>
+                <SelectItem value="none">No Allergies</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Passengers List */}
+        <div className="space-y-4">
+          {filteredPassengers.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="font-medium mb-2">No passengers found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchTerm ? 'Try adjusting your search criteria.' : 'Start by adding your first passenger.'}
+                </p>
+                <Button onClick={() => setIsAddingPassenger(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add First Passenger
+                </Button>
               </CardContent>
             </Card>
-          ))
-        )}
+          ) : (
+            filteredPassengers.map((passenger) => (
+              <Card
+                key={passenger.id}
+                className={`${hasAllergies(passenger)
+                  ? 'border-orange-300 border-2 bg-orange-50'
+                  : ''
+                  }`}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-medium text-lg">{passenger.name}</h3>
+
+                        <Badge className={getRoleColor(passenger.role)}>
+                          {passenger.role}
+                        </Badge>
+                        {hasAllergies(passenger) && (
+                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            ALLERGY
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                        {/* Contact Info */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Mail className="w-3 h-3" />
+                            <span>{passenger.info.email || 'No email'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Phone className="w-3 h-3" />
+                            <span>{passenger.info.phone || 'No phone'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <span className="font-medium">Role:</span>
+                            <span>{passenger.role}</span>
+                          </div>
+                        </div>
+
+                        {/* Birthday */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Cake className="w-3 h-3 text-purple-600" />
+                            <span className="font-medium text-purple-700">Birthday</span>
+                          </div>
+                          {passenger.birthday ? (
+                            <div className="text-xs text-purple-600">
+                              {new Date(passenger.birthday).toLocaleDateString()}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Not provided</span>
+                          )}
+                        </div>
+
+                        {/* Allergies */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <AlertTriangle className="w-3 h-3 text-orange-600" />
+                            <span className="font-medium text-orange-700">Allergies</span>
+                          </div>
+                          {passenger.allergies.length > 0 ? (
+                            <div className="space-y-1">
+                              {passenger.allergies.slice(0, 2).map((allergy, index) => (
+                                <div key={index} className="flex items-center gap-1">
+                                  {getAllergySeverityIcon(allergy.severity)}
+                                  <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
+                                    {allergy.allergen} - {allergy.severity}
+                                  </Badge>
+                                </div>
+                              ))}
+                              {passenger.allergies.length > 2 && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{passenger.allergies.length - 2} more
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-green-600">No known allergies</span>
+                          )}
+                        </div>
+
+                        {/* Beverages */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Wine className="w-3 h-3 text-blue-600" />
+                            <span className="font-medium">Beverages</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {passenger.beverage.slice(0, 3).join(', ')}
+                            {passenger.beverage.length > 3 && `... +${passenger.beverage.length - 3} more`}
+                          </div>
+                        </div>
+
+                        {/* Food */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Utensils className="w-3 h-3 text-green-600" />
+                            <span className="font-medium">Food</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {passenger.food.slice(0, 3).join(', ')}
+                            {passenger.food.length > 3 && `... +${passenger.food.length - 3} more`}
+                          </div>
+                        </div>
+
+                        {/* Comfort */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Heart className="w-3 h-3 text-purple-600" />
+                            <span className="font-medium">Comfort</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {passenger.passengerComfort.temperature}, {passenger.passengerComfort.seating}
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <User className="w-3 h-3 text-gray-600" />
+                            <span className="font-medium">Notes</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {passenger.additionalNotes ?
+                              (passenger.additionalNotes.length > 50 ?
+                                passenger.additionalNotes.substring(0, 50) + '...' :
+                                passenger.additionalNotes
+                              ) :
+                              'No additional notes'
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPassenger(passenger);
+                          setIsPassengerDetailOpen(true);
+                        }}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPassenger(passenger);
+                          setIsEditingPassenger(true);
+                        }}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
       </div>
 
       {/* View Details Dialog */}
