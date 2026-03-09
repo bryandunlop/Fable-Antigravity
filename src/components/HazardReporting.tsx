@@ -645,7 +645,11 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
                         <div className="text-sm">
                           <div className="flex items-center gap-1">
                             <User className="w-3 h-3 text-muted-foreground" />
-                            {hazard.reportedBy}
+                            {hazard.isAnonymous ? (
+                              <span className="italic text-muted-foreground">Anonymous</span>
+                            ) : (
+                              hazard.reportedBy
+                            )}
                           </div>
                           <div className="text-muted-foreground">
                             {new Date(hazard.reportedDate).toLocaleDateString()}
@@ -703,7 +707,9 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
                   {selectedHazard.id}: {selectedHazard.title}
                 </DialogTitle>
                 <DialogDescription>
-                  Reported by {selectedHazard.reportedBy} on {new Date(selectedHazard.reportedDate).toLocaleDateString()}
+                  {selectedHazard.isAnonymous
+                    ? `Anonymous submission on ${new Date(selectedHazard.reportedDate).toLocaleDateString()}`
+                    : `Reported by ${selectedHazard.reportedBy} on ${new Date(selectedHazard.reportedDate).toLocaleDateString()}`}
                 </DialogDescription>
               </DialogHeader>
 

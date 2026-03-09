@@ -30,6 +30,7 @@ import OfflineDocuments from './components/OfflineDocuments';
 import DocumentReviewQueue from './components/DocumentReviewQueue';
 import DocumentCollaborations from './components/DocumentCollaborations';
 import LeadDashboard from './components/LeadDashboard';
+import ManagerInsights from './components/ManagerInsights';
 import AirportServicesDatabase from './components/AirportServicesDatabase';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
@@ -245,6 +246,7 @@ export default function App() {
                                 <Route path="/document-management/collaborations" element={<DocumentCollaborations userRole={userRole} />} />
 
                                 <Route path="/lead-dashboard" element={<LeadDashboard />} />
+                                <Route path="/manager-insights" element={<ManagerInsights />} />
                                 <Route
                                   path="/live-metrics"
                                   element={

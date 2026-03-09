@@ -49,6 +49,7 @@ const routeLabels: Record<string, string> = {
   '/fuel-load-request': 'Fuel Load Request',
   '/airport-evaluations': 'Airport Evaluations',
   '/lead-dashboard': 'Lead Dashboard',
+  '/manager-insights': 'Manager Insights',
   '/admin': 'User Management',
   '/user-safety': 'Safety Participation'
 };
@@ -82,7 +83,7 @@ const routeCategories: Record<string, string> = {
 export default function BreadcrumbNav() {
   const location = useLocation();
   const pathSegments = location.pathname.split('/').filter(Boolean);
-  
+
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Home', href: '/' }
   ];
@@ -94,7 +95,7 @@ export default function BreadcrumbNav() {
     const label = routeLabels[currentPath] || segment.charAt(0).toUpperCase() + segment.slice(1);
     const icon = routeIcons[currentPath];
     const category = routeCategories[currentPath];
-    
+
     breadcrumbItems.push({
       label,
       href: index === pathSegments.length - 1 ? undefined : currentPath,
@@ -116,8 +117,8 @@ export default function BreadcrumbNav() {
         <React.Fragment key={index}>
           {index > 0 && <ChevronRight className="w-4 h-4 flex-shrink-0" />}
           {item.href ? (
-            <Link 
-              to={item.href} 
+            <Link
+              to={item.href}
               className="hover:text-foreground transition-colors flex items-center gap-1.5"
             >
               {index === 0 && <Home className="w-4 h-4" />}

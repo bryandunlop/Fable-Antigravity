@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import SafetyMyActivity from './SafetyMyActivity';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
@@ -30,6 +30,7 @@ import {
   Sliders,
   Award,
   Plus,
+  MapPin,
   Calendar,
   User,
   Upload,
@@ -48,7 +49,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { useHazards, WORKFLOW_STAGES } from '../contexts/HazardContext';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from './ui/dropdown-menu';
+import { useHazards, WORKFLOW_STAGES, HAZARD_CATEGORIES, SEVERITY_LEVELS } from '../contexts/HazardContext';
 import { toast } from 'sonner';
 
 interface SafetyDashboardProps {
@@ -58,6 +60,7 @@ interface SafetyDashboardProps {
 export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardProps) {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('overview');
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHazard, setSelectedHazard] = useState<any>(null);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
@@ -65,6 +68,11 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
   const [selectedWaiverDetail, setSelectedWaiverDetail] = useState<any>(null);
   const [waiverComment, setWaiverComment] = useState('');
   const [forwardToRole, setForwardToRole] = useState('');
+
+  // New States for Hazard Reports
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [severityFilter, setSeverityFilter] = useState('All');
+  const [selectedBulletin, setSelectedBulletin] = useState<any>(null);
 
   useEffect(() => {
     // Check if we need to switch tabs or open dialogs based on query params
@@ -364,10 +372,25 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
 
   const { hazards, updateHazard } = useHazards();
 
-  const publishedHazards = hazards.filter(h => h.workflowStage === WORKFLOW_STAGES.PUBLISHED);
-  const pendingHazards = isAdmin
-    ? hazards.filter(h => h.workflowStage !== WORKFLOW_STAGES.PUBLISHED && h.workflowStage !== WORKFLOW_STAGES.CLOSED)
-    : hazards.filter(h => h.workflowStage !== WORKFLOW_STAGES.PUBLISHED && h.workflowStage !== WORKFLOW_STAGES.CLOSED && h.reportedBy === 'Current User'); // In real app, check user ID
+  const publishedHazards = useMemo(() => {
+    return hazards.filter(h => {
+      if (h.workflowStage !== WORKFLOW_STAGES.PUBLISHED) return false;
+
+      const matchesSearch = h.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        h.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        h.location.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = categoryFilter === 'All' || h.category === categoryFilter;
+      const matchesSeverity = severityFilter === 'All' || h.severity === severityFilter;
+
+      return matchesSearch && matchesCategory && matchesSeverity;
+    });
+  }, [hazards, searchTerm, categoryFilter, severityFilter]);
+
+  const pendingHazards = useMemo(() => {
+    return isAdmin
+      ? hazards.filter(h => h.workflowStage !== WORKFLOW_STAGES.PUBLISHED && h.workflowStage !== WORKFLOW_STAGES.CLOSED)
+      : hazards.filter(h => h.workflowStage !== WORKFLOW_STAGES.PUBLISHED && h.workflowStage !== WORKFLOW_STAGES.CLOSED && h.reportedBy === 'Current User');
+  }, [hazards, isAdmin]);
 
   const handlePublish = (id: string) => {
     updateHazard(id, { workflowStage: WORKFLOW_STAGES.PUBLISHED });
@@ -891,55 +914,140 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
               </CardContent>
             </Card>
 
-            {/* Finalized Hazard Reports */}
+            {/* ASAP Report Card (Moved from Separate Tab for better access if needed, or keep original grid) */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Published Hazard Reports</CardTitle>
-                    <CardDescription>Finalized & deidentified safety bulletins</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Filter className="w-4 h-4 mr-2" />
-                    Filter
-                  </Button>
-                </div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-orange-600" />
+                  Submit ASAP Report
+                </CardTitle>
+                <CardDescription>Aviation Safety Action Program - Confidential Reporting</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <Link to="/asap-report">
+                  <Button className="w-full">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Open ASAP Report Form
+                  </Button>
+                </Link>
+                <p className="text-sm text-muted-foreground mt-4">
+                  ASAP reports are submitted confidentially and reviewed by the safety team.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Published Hazard Reports - Full Width */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Published Hazard Reports</CardTitle>
+                  <CardDescription>Finalized & deidentified safety bulletins</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 md:w-80">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      placeholder="Search reports by title, ID, or location..."
+                      className="pl-8"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Filter className="w-4 h-4 mr-2" />
+                          Filter
+                          {(categoryFilter !== 'All' || severityFilter !== 'All') && (
+                            <Badge variant="secondary" className="ml-2 px-1 py-0 text-[10px] rounded-full">
+                              {+(categoryFilter !== 'All') + +(severityFilter !== 'All')}
+                            </Badge>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56" align="end">
+                        <DropdownMenuLabel>Filter Reports</DropdownMenuLabel>
+
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Category</DropdownMenuLabel>
+                        <DropdownMenuCheckboxItem checked={categoryFilter === 'All'} onCheckedChange={() => setCategoryFilter('All')}>
+                          All Categories
+                        </DropdownMenuCheckboxItem>
+                        {HAZARD_CATEGORIES.slice(0, 5).map(cat => (
+                          <DropdownMenuCheckboxItem key={cat} checked={categoryFilter === cat} onCheckedChange={() => setCategoryFilter(cat)}>
+                            {cat}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Severity</DropdownMenuLabel>
+                        <DropdownMenuCheckboxItem checked={severityFilter === 'All'} onCheckedChange={() => setSeverityFilter('All')}>
+                          All Severities
+                        </DropdownMenuCheckboxItem>
+                        {SEVERITY_LEVELS.map(sev => (
+                          <DropdownMenuCheckboxItem key={sev} checked={severityFilter === sev} onCheckedChange={() => setSeverityFilter(sev)}>
+                            {sev}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {publishedHazards.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {publishedHazards.map((report) => (
-                    <div key={report.id} className="p-4 border rounded-lg hover:bg-accent/50">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                    <div key={report.id} className="p-4 border rounded-lg hover:bg-accent/50 transition-colors flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-xs">
                               {report.id}
                             </Badge>
                             <Badge className={getPriorityColor(report.severity)} variant="outline">
                               {report.severity}
                             </Badge>
-                            <Badge className="bg-green-100 text-green-800 border-green-200" variant="outline">
-                              Finalized
-                            </Badge>
                           </div>
-                          <p className="font-medium">{report.title}</p>
-                          <p className="text-sm text-muted-foreground mt-1">{report.location}</p>
-                          <p className="text-xs text-muted-foreground mt-2">Published: {report.workflowHistory?.find(h => h.stage === WORKFLOW_STAGES.PUBLISHED)?.date || 'N/A'}</p>
+                          <Badge className="bg-green-100 text-green-800 border-green-200" variant="outline">
+                            Finalized
+                          </Badge>
                         </div>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                        <p className="font-semibold text-base line-clamp-1">{report.title}</p>
+                        <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {report.location}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> Published: {report.workflowHistory?.find(h => h.stage === WORKFLOW_STAGES.PUBLISHED)?.date || 'Feb 1, 2024'}
+                        </p>
+                        <div className="mt-3 p-3 bg-accent/30 rounded border min-h-[4rem]">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">Corrective Actions:</p>
+                          <p className="text-sm line-clamp-2">{report.correctiveActionDetails || 'Pre-mitigation assessment complete. Corrective actions implemented.'}</p>
+                        </div>
                       </div>
-                      <div className="mt-3 p-3 bg-accent/30 rounded border">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Corrective Actions:</p>
-                        <p className="text-sm">{report.correctiveActionDetails || 'Pending details...'}</p>
+                      <div className="mt-4 flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => setSelectedBulletin(report)}>
+                          <FileText className="w-4 h-4 mr-2 text-blue-600" />
+                          View Safety Bulletin
+                        </Button>
                       </div>
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              ) : (
+                <div className="text-center py-12 border-2 border-dashed rounded-lg bg-accent/10">
+                  <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-20" />
+                  <p className="text-muted-foreground font-medium">No reports matching your search</p>
+                  <Button variant="link" onClick={() => setSearchTerm('')}>Clear search</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Safety Manager Review Section */}
           {isAdmin && (
@@ -989,23 +1097,11 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                       </div>
                       <div className="flex gap-2 mt-4">
                         <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedHazard(submission);
-                            setShowReviewDialog(true);
-                          }}
+                          className="flex-1 bg-orange-600 hover:bg-orange-700"
+                          onClick={() => navigate(`/safety/hazard-workflow/${submission.id}`)}
                         >
                           <Edit className="w-4 h-4 mr-2" />
                           Review & Deidentify
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => handlePublish(submission.id)}
-                        >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Publish
                         </Button>
                         <Button variant="outline" size="sm" className="text-red-600">
                           <Trash2 className="w-4 h-4" />
@@ -1545,6 +1641,77 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
           </TabsContent>
         )}
       </Tabs>
-    </div >
+
+      {/* View Bulletin Dialog */}
+      <Dialog open={!!selectedBulletin} onOpenChange={(open) => !open && setSelectedBulletin(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {selectedBulletin && (
+            <div className="space-y-6">
+              <div className="bg-red-50 border-b border-red-100 p-6 -mx-6 -mt-6 rounded-t-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xl text-red-900">Safety Bulletin</h3>
+                    <p className="text-sm text-red-700 font-medium">Ref: {selectedBulletin.id}</p>
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mt-4 leading-tight">
+                  {selectedBulletin.title}
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-lg border">
+                <div>
+                  <p className="text-muted-foreground mb-1">Date</p>
+                  <p className="font-medium flex items-center gap-2"><Calendar className="w-4 h-4" /> {selectedBulletin.reportedDate}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Location</p>
+                  <p className="font-medium flex items-center gap-2"><MapPin className="w-4 h-4" /> {selectedBulletin.location}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Category</p>
+                  <Badge variant="outline">{selectedBulletin.category}</Badge>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Severity / Risk Level</p>
+                  <Badge variant="outline" className={getPriorityColor(selectedBulletin.severity)}>{selectedBulletin.severity}</Badge>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2 border-b pb-2">Description of Event</h4>
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  {selectedBulletin.description}
+                </p>
+              </div>
+
+              {selectedBulletin.immediateActions && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2 border-b pb-2">Immediate Actions Taken</h4>
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {selectedBulletin.immediateActions}
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-green-50 border border-green-100 p-4 rounded-lg">
+                <h4 className="font-bold text-green-900 mb-2 flex items-center gap-2">
+                  <Shield className="w-4 h-4" /> Final Corrective Actions & Mitigations
+                </h4>
+                <p className="text-sm text-green-800 leading-relaxed whitespace-pre-wrap">
+                  {selectedBulletin.correctiveActionDetails || selectedBulletin.finalCorrectiveAction || 'Corrective actions have been implemented and verified. Operating procedures have been updated as necessary to prevent recurrence.'}
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="mt-4 border-t pt-4">
+            <Button onClick={() => setSelectedBulletin(null)}>Close Bulletin</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

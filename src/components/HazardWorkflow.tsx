@@ -88,6 +88,7 @@ export default function HazardWorkflow() {
   const [investigationNotes, setInvestigationNotes] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]); // New state for uploads
   const [consolidatedPlan, setConsolidatedPlan] = useState('');
+  const [sharedReportSummary, setSharedReportSummary] = useState(''); // De-identified summary for PACE team
 
 
 
@@ -406,135 +407,310 @@ The mitigation has been implemented and verified for effectiveness over the moni
 
   const BulletinDialog = () => {
     const [subject, setSubject] = useState(hazard?.title || '');
-    const [content, setContent] = useState(''); // Unified content state
     const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
-    const [activeTab, setActiveTab] = useState('write');
+    const [activeTab, setActiveTab] = useState('form');
+    const [isUrgent, setIsUrgent] = useState(false);
 
-    // Helper to append details
-    const insertDetail = (label: string, value: string) => {
-      setContent(prev => `${prev}${prev ? '\n\n' : ''}**${label}:** ${value}`);
-    };
+    // Structured form fields
+    const [bulletinSummary, setBulletinSummary] = useState('');
+    const [whatHappened, setWhatHappened] = useState('');
+    const [riskLevel, setRiskLevel] = useState('Medium');
+    const [correctiveActions, setCorrectiveActions] = useState('');
+    const [recommendations, setRecommendations] = useState('');
+    const [additionalNotes, setAdditionalNotes] = useState('');
+
+    // Auto-populate from hazard data
+    useEffect(() => {
+      if (showBulletinDialog && hazard) {
+        setSubject(hazard.title || '');
+        setBulletinSummary(`A hazard event was identified at ${hazard.location || 'an operational area'} on ${hazard.reportedDate || 'a recent date'}.`);
+        setWhatHappened(hazard.description || '');
+        setRiskLevel(hazard.severity || 'Medium');
+        setCorrectiveActions(hazard.immediateActions || '');
+      }
+    }, [showBulletinDialog]);
 
     const handlePublish = () => {
       toast.promise(new Promise(resolve => setTimeout(resolve, 1000)), {
-        loading: 'Publishing Bulletin...',
-        success: 'Bulletin published successfully!',
+        loading: isUrgent ? 'Sending Urgent Bulletin...' : 'Publishing Bulletin...',
+        success: isUrgent ? 'Urgent bulletin sent successfully!' : 'Bulletin published successfully!',
         error: 'Failed to publish'
       });
       setShowBulletinDialog(false);
     };
+
+    const getRiskBadgeColor = (level: string) => {
+      switch (level.toLowerCase()) {
+        case 'critical': return 'bg-red-600 text-white';
+        case 'high': return 'bg-red-100 text-red-800 border-red-300';
+        case 'medium': return 'bg-orange-100 text-orange-800 border-orange-300';
+        case 'low': return 'bg-green-100 text-green-800 border-green-300';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    };
+
+    const isFormComplete = subject && bulletinSummary && whatHappened && correctiveActions && selectedGroups.length > 0;
 
     return (
       <Dialog open={showBulletinDialog} onOpenChange={setShowBulletinDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-red-600" />
-              Publish Safety Bulletin
+              {isUrgent ? (
+                <><AlertTriangle className="w-5 h-5 text-orange-600" /> Send Urgent Safety Bulletin</>
+              ) : (
+                <><Target className="w-5 h-5 text-red-600" /> Publish Safety Bulletin</>
+              )}
             </DialogTitle>
             <DialogDescription>
-              Compose and review the final bulletin before broadcasting.
+              Complete the sections below. All fields marked with * are required. The preview tab shows exactly what recipients will see.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-4 py-4">
-            {/* Configuration Top Bar */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
-              <div className="space-y-2">
-                <Label>Subject Line</Label>
-                <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Urgent Safety Notice..." />
+          {/* Urgent Toggle */}
+          <div className="flex items-center gap-3 py-2">
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full cursor-pointer border transition-all text-sm font-medium ${isUrgent
+                  ? 'bg-orange-100 border-orange-300 text-orange-800'
+                  : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                }`}
+              onClick={() => setIsUrgent(!isUrgent)}
+            >
+              <AlertTriangle className={`w-3.5 h-3.5 ${isUrgent ? 'text-orange-600' : 'text-gray-400'}`} />
+              {isUrgent ? 'Urgent — Immediate attention' : 'Mark as Urgent'}
+            </div>
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="form">Fill Out Bulletin</TabsTrigger>
+              <TabsTrigger value="preview">Preview Final Bulletin</TabsTrigger>
+            </TabsList>
+
+            {/* FORM TAB */}
+            <TabsContent value="form" className="space-y-5 mt-4">
+
+              {/* Subject & Recipients Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="font-semibold">Subject Line *</Label>
+                  <Input
+                    value={isUrgent ? (subject.startsWith('URGENT:') ? subject : `URGENT: ${subject}`) : subject}
+                    onChange={e => setSubject(e.target.value)}
+                    placeholder="Brief title for the bulletin"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="font-semibold">Recipients *</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['R&I Team', 'Document Compliance', 'All Pilots', 'Maintenance Team', 'Ground Ops', 'Flight Attendants'].map(group => (
+                      <Badge
+                        key={group}
+                        variant={selectedGroups.includes(group) ? 'default' : 'outline'}
+                        className="cursor-pointer select-none hover:bg-gray-200 text-xs"
+                        onClick={() => setSelectedGroups(prev =>
+                          prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]
+                        )}
+                      >
+                        {group}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Recipients</Label>
-                <div className="flex flex-wrap gap-2">
-                  {['R&I Team', 'Document Compliance', 'All Pilots', 'Maintenance Team', 'Ground Ops'].map(group => (
+
+              {/* 1. Hazard Summary */}
+              <div className="space-y-1.5 p-4 bg-slate-50 rounded-lg border">
+                <Label className="font-semibold text-slate-900">1. Hazard Summary *</Label>
+                <p className="text-xs text-muted-foreground">Provide a brief, de-identified overview of the hazard event.</p>
+                <Textarea
+                  value={bulletinSummary}
+                  onChange={e => setBulletinSummary(e.target.value)}
+                  placeholder="A brief summary of what occurred, when, and where..."
+                  className="min-h-[60px] bg-white"
+                />
+              </div>
+
+              {/* 2. What Happened */}
+              <div className="space-y-1.5 p-4 bg-slate-50 rounded-lg border">
+                <Label className="font-semibold text-slate-900">2. Description of Event *</Label>
+                <p className="text-xs text-muted-foreground">Describe the event in detail. Remove any identifying information about personnel.</p>
+                <Textarea
+                  value={whatHappened}
+                  onChange={e => setWhatHappened(e.target.value)}
+                  placeholder="Detail what happened, the sequence of events, and contributing factors..."
+                  className="min-h-[100px] bg-white"
+                />
+              </div>
+
+              {/* 3. Risk / Severity */}
+              <div className="space-y-1.5 p-4 bg-slate-50 rounded-lg border">
+                <Label className="font-semibold text-slate-900">3. Risk / Severity Level</Label>
+                <div className="flex gap-2 mt-1">
+                  {['Low', 'Medium', 'High', 'Critical'].map(level => (
                     <Badge
-                      key={group}
-                      variant={selectedGroups.includes(group) ? 'default' : 'outline'}
-                      className="cursor-pointer select-none hover:bg-gray-200"
-                      onClick={() => setSelectedGroups(prev =>
-                        prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]
-                      )}
+                      key={level}
+                      variant="outline"
+                      className={`cursor-pointer px-3 py-1 text-sm ${riskLevel === level ? getRiskBadgeColor(level) + ' ring-2 ring-offset-1 ring-gray-400' : 'hover:bg-gray-100'}`}
+                      onClick={() => setRiskLevel(level)}
                     >
-                      {group}
+                      {level}
                     </Badge>
                   ))}
                 </div>
               </div>
-            </div>
 
-            {/* Tabs for Editor vs Preview */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="write">Write & Edit</TabsTrigger>
-                <TabsTrigger value="preview">Preview Final Bulletin</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="write" className="space-y-4 mt-4">
-                {/* Insert Helpers */}
-                <div className="flex flex-wrap items-center gap-2 bg-gray-50 p-2 rounded border">
-                  <span className="text-xs font-semibold text-gray-500 mr-2">Insert Details:</span>
-                  <Button size="sm" variant="ghost" onClick={() => insertDetail('Date', hazard?.reportedDate || '')} className="h-7 text-xs border bg-white">+ Date</Button>
-                  <Button size="sm" variant="ghost" onClick={() => insertDetail('Location', hazard?.location || '')} className="h-7 text-xs border bg-white">+ Location</Button>
-                  <Button size="sm" variant="ghost" onClick={() => insertDetail('Description', hazard?.description || '')} className="h-7 text-xs border bg-white">+ Description</Button>
-                  <Button size="sm" variant="ghost" onClick={() => insertDetail('Actions', hazard?.immediateActions || '')} className="h-7 text-xs border bg-white">+ Actions</Button>
-                  <Button size="sm" variant="ghost" onClick={() => insertDetail('Risk Score', `${riskSeverity + riskLikelihood}`)} className="h-7 text-xs border bg-white">+ Risk Score</Button>
-                </div>
-
+              {/* 4. Corrective Actions */}
+              <div className="space-y-1.5 p-4 bg-green-50 rounded-lg border border-green-200">
+                <Label className="font-semibold text-green-900">4. Corrective Actions & Mitigations *</Label>
+                <p className="text-xs text-green-700">What has been done or will be done to resolve this hazard?</p>
                 <Textarea
-                  className="min-h-[400px] font-mono text-sm leading-relaxed"
-                  placeholder="Type your bulletin message here. Use the buttons above to insert report details as needed..."
-                  value={content}
-                  onChange={e => setContent(e.target.value)}
+                  value={correctiveActions}
+                  onChange={e => setCorrectiveActions(e.target.value)}
+                  placeholder="List corrective actions taken and planned mitigations..."
+                  className="min-h-[80px] bg-white border-green-200"
                 />
-              </TabsContent>
+              </div>
 
-              <TabsContent value="preview" className="mt-4">
-                <div className="border rounded-lg shadow-sm overflow-hidden">
-                  {/* Email/Bulletin Header Simulation */}
-                  <div className="bg-red-50 border-b p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                        <AlertTriangle className="w-6 h-6 text-red-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-lg text-red-900">Safety Bulletin</h3>
-                        <p className="text-xs text-red-700">Sent by Safety Management System • {new Date().toLocaleDateString()}</p>
-                      </div>
+              {/* 5. Recommendations */}
+              <div className="space-y-1.5 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <Label className="font-semibold text-blue-900">5. Recommendations & Precautions</Label>
+                <p className="text-xs text-blue-700">What should personnel be aware of or do differently?</p>
+                <Textarea
+                  value={recommendations}
+                  onChange={e => setRecommendations(e.target.value)}
+                  placeholder="Precautions to take, procedures to review, awareness reminders..."
+                  className="min-h-[60px] bg-white border-blue-200"
+                />
+              </div>
+
+              {/* 6. Additional Notes */}
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-gray-700">6. Additional Notes (Optional)</Label>
+                <Textarea
+                  value={additionalNotes}
+                  onChange={e => setAdditionalNotes(e.target.value)}
+                  placeholder="Any other relevant information, references, or follow-up instructions..."
+                  className="min-h-[50px]"
+                />
+              </div>
+            </TabsContent>
+
+            {/* PREVIEW TAB */}
+            <TabsContent value="preview" className="mt-4">
+              <div className="border rounded-lg shadow-sm overflow-hidden">
+                {/* Header */}
+                <div className={`${isUrgent ? 'bg-orange-50 border-b border-orange-200' : 'bg-red-50 border-b border-red-200'} p-5`}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className={`w-10 h-10 ${isUrgent ? 'bg-orange-100' : 'bg-red-100'} rounded-full flex items-center justify-center`}>
+                      <AlertTriangle className={`w-6 h-6 ${isUrgent ? 'text-orange-600' : 'text-red-600'}`} />
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">{subject}</h2>
-                    <div className="flex gap-1 mt-2">
-                      {selectedGroups.map(g => <Badge key={g} variant="secondary" className="text-[10px]">{g}</Badge>)}
+                    <div>
+                      <h3 className={`font-bold text-lg ${isUrgent ? 'text-orange-900' : 'text-red-900'}`}>
+                        {isUrgent ? '⚠ URGENT Safety Bulletin' : 'Safety Bulletin'}
+                      </h3>
+                      <p className={`text-xs ${isUrgent ? 'text-orange-700' : 'text-red-700'}`}>
+                        Safety Management System • {new Date().toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
-
-                  {/* Content Body */}
-                  <div className="p-6 bg-white min-h-[300px] prose prose-sm max-w-none whitespace-pre-wrap">
-                    {content || <span className="text-gray-400 italic">No content...</span>}
-                  </div>
-
-                  {/* Footer */}
-                  <div className="bg-gray-50 p-4 border-t text-center text-xs text-gray-500">
-                    Confidential Safety Reporting System • Do not distribute outside authorized channels.
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {isUrgent && !subject.startsWith('URGENT:') ? `URGENT: ${subject}` : subject || 'Untitled Bulletin'}
+                  </h2>
+                  <div className="flex gap-1 mt-2">
+                    {selectedGroups.map(g => <Badge key={g} variant="secondary" className="text-[10px]">{g}</Badge>)}
+                    {selectedGroups.length === 0 && <span className="text-xs text-gray-400 italic">No recipients selected</span>}
                   </div>
                 </div>
-              </TabsContent>
-            </Tabs>
-          </div>
+
+                {/* Body */}
+                <div className="p-6 bg-white space-y-5">
+                  {/* Summary */}
+                  {bulletinSummary && (
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-1">Summary</h4>
+                      <p className="text-sm text-gray-700 leading-relaxed">{bulletinSummary}</p>
+                    </div>
+                  )}
+
+                  {/* What Happened */}
+                  {whatHappened && (
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-1">Description of Event</h4>
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{whatHappened}</p>
+                    </div>
+                  )}
+
+                  {/* Risk Level */}
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-1">Risk Assessment</h4>
+                    <Badge variant="outline" className={`${getRiskBadgeColor(riskLevel)} text-sm px-3 py-1`}>
+                      {riskLevel} Risk
+                    </Badge>
+                    {(riskSeverity + riskLikelihood) > 0 && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        (Score: {riskSeverity + riskLikelihood})
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Corrective Actions */}
+                  {correctiveActions && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <h4 className="text-sm font-bold text-green-900 uppercase tracking-wide mb-1">
+                        Corrective Actions & Mitigations
+                      </h4>
+                      <p className="text-sm text-green-800 leading-relaxed whitespace-pre-wrap">{correctiveActions}</p>
+                    </div>
+                  )}
+
+                  {/* Recommendations */}
+                  {recommendations && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wide mb-1">
+                        Recommendations & Precautions
+                      </h4>
+                      <p className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap">{recommendations}</p>
+                    </div>
+                  )}
+
+                  {/* Additional Notes */}
+                  {additionalNotes && (
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-1">Additional Information</h4>
+                      <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{additionalNotes}</p>
+                    </div>
+                  )}
+
+                  {!bulletinSummary && !whatHappened && !correctiveActions && (
+                    <div className="text-center py-12 text-gray-400 italic">
+                      Fill out the form to see the preview...
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="bg-gray-50 p-4 border-t text-center text-xs text-gray-500">
+                  Ref: {hazard?.id || 'N/A'} • Confidential Safety Reporting System • Do not distribute outside authorized channels.
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
 
           <DialogFooter className="flex justify-between items-center sm:justify-between w-full">
             <div className="text-xs text-gray-500">
               {selectedGroups.length === 0 ? '⚠ Select at least one recipient group' : `${selectedGroups.length} group(s) selected`}
+              {!isFormComplete && <span className="ml-2 text-orange-500">• Fill required fields (*)</span>}
             </div>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setShowBulletinDialog(false)}>Cancel</Button>
               <Button
-                className="bg-red-600 hover:bg-red-700"
+                className={isUrgent ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'}
                 onClick={handlePublish}
-                disabled={!content || !subject || selectedGroups.length === 0}
+                disabled={!isFormComplete}
               >
                 <Send className="w-4 h-4 mr-2" />
-                Publish Bulletin
+                {isUrgent ? 'Send Urgent Bulletin' : 'Publish Bulletin'}
               </Button>
             </div>
           </DialogFooter>
@@ -697,6 +873,26 @@ The mitigation has been implemented and verified for effectiveness over the moni
         </DialogHeader>
 
         <div className="px-6 py-4 max-h-[60vh] overflow-y-auto space-y-6">
+
+          {/* De-identification Banner & Shared Summary */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">De-identification Required</p>
+                <p className="text-xs text-amber-700">Only the summary below will be shared with the assignee. Reporter identity and raw report details remain confidential to the Safety Manager.</p>
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-amber-900">Shared Report Summary (visible to assignee)</Label>
+              <Textarea
+                value={sharedReportSummary}
+                onChange={(e) => setSharedReportSummary(e.target.value)}
+                placeholder="Write a de-identified summary of the hazard for the assignee. Remove any names, identifying details, or sensitive information..."
+                className="mt-1.5 min-h-[80px] bg-white border-amber-200 focus:border-amber-400"
+              />
+            </div>
+          </div>
 
           {/* List Existing assignments */}
           <div className="space-y-3">
@@ -953,7 +1149,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
       investigationNotes,
       paceAssignments: paceAssignments as any,
       finalCorrectiveAction: consolidatedPlan,
-      attachments: formattedAttachments.length > 0 ? formattedAttachments : undefined
+      attachments: formattedAttachments.length > 0 ? formattedAttachments : hazard?.attachments
     });
     // Only show toast if not part of a transition (optional, but keeps it less noisy)
     // toast.success('Progress saved'); 
@@ -974,9 +1170,9 @@ The mitigation has been implemented and verified for effectiveness over the moni
           toast.error("Please complete the Risk Assessment first.");
           return;
         }
-        if (whyAnalysis[0].length < 5) {
-          toast.error("Please complete the 5 Whys Analysis first.");
-          return;
+        // 5 Whys is optional — SM can skip if not needed
+        if (whyAnalysis[0].length > 0 && whyAnalysis[0].length < 5) {
+          toast.warning("5 Whys analysis looks incomplete. You can still proceed.");
         }
         nextStage = WORKFLOW_STAGES.ASSIGN_MITIGATION;
         toast.success("Investigation complete. Proceed to PACE assignment.");
@@ -1081,6 +1277,10 @@ The mitigation has been implemented and verified for effectiveness over the moni
           <Button variant="ghost" size="icon" onClick={onClose}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
+          <Button variant="link" onClick={() => navigate('/safety?tab=hazards')} className="text-blue-600 font-semibold p-0">
+            Back to Safety Center
+          </Button>
+          <div className="h-6 w-px bg-gray-200 mx-2" />
           <div>
             <h1 className="text-xl font-bold flex items-center gap-3">
               {hazard?.id || 'HZ-2024-001'}
@@ -1099,6 +1299,13 @@ The mitigation has been implemented and verified for effectiveness over the moni
             <Target className="w-4 h-4 mr-2" />
             Publish Bulletin
           </Button>
+          <Button variant="outline" className="text-orange-700 bg-orange-50 hover:bg-orange-100 hover:text-orange-800 border-orange-200" onClick={() => {
+            setShowBulletinDialog(true);
+            // The urgent flag will be handled inside BulletinDialog next render
+          }}>
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            Send Urgent Bulletin
+          </Button>
           <Button variant="outline" onClick={() => saveChanges()}><Save className="w-4 h-4 mr-2" /> Save Progress</Button>
         </div>
       </div>
@@ -1107,7 +1314,15 @@ The mitigation has been implemented and verified for effectiveness over the moni
       <div className="flex flex-1 overflow-hidden">
         {/* Left Column: Form & Data (Scrollable) */}
         <div className="w-2/3 overflow-y-auto p-6 space-y-8">
-          <ProgressTracker currentStage={currentStage} />
+          <ProgressTracker
+            currentStage={currentStage}
+            onStageClick={(stage) => {
+              setCurrentStage(stage);
+              saveChanges(stage);
+              toast.info(`Switched to ${stage}`);
+            }}
+            allowNavigation={true}
+          />
 
           {/* 1. Report Details (Always Visible) */}
           <Card>
@@ -1123,7 +1338,11 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   <Label className="text-xs text-gray-500">Reported By</Label>
                   <div className="font-medium text-sm flex items-center gap-2">
                     <User className="w-3 h-3" />
-                    {hazard.reportedBy}
+                    {hazard.isAnonymous ? (
+                      <span className="italic text-muted-foreground">Anonymous Submission</span>
+                    ) : (
+                      hazard.reportedBy
+                    )}
                   </div>
                 </div>
                 <div>
@@ -1223,8 +1442,11 @@ The mitigation has been implemented and verified for effectiveness over the moni
                       </div>
                       {whyAnalysis[0].length > 5 && <CheckCircle className="w-6 h-6 text-green-500" />}
                     </div>
-                    <h3 className="font-bold text-lg mb-1">Root Cause Analysis</h3>
-                    <p className="text-sm text-gray-500 mb-3">Conduct 5 Whys Analysis</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-lg">Root Cause Analysis</h3>
+                      <Badge variant="outline" className="text-xs text-gray-500 border-gray-300">Optional</Badge>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-3">Conduct 5 Whys Analysis (can be skipped)</p>
 
                     {whyAnalysis[0].length > 5 ? (
                       <div className="mt-2 text-sm italic text-gray-700 bg-white/50 p-2 rounded truncate">

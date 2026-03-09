@@ -18,8 +18,25 @@ export const WORKFLOW_STAGES = {
     IMPLEMENTATION: 'Implementation', // Send Info & R&I
     // Effectiveness Phase
     EFFECTIVENESS_REVIEW: 'Review for Effectiveness', // 6 months later
+    PUBLISHED: 'Published',
     CLOSED: 'Closed'
 };
+
+export const HAZARD_CATEGORIES = [
+    'Flight Operations',
+    'Ground Operations',
+    'Maintenance',
+    'Cabin/Inflight',
+    'Security',
+    'Airport Infrastructure',
+    'Wildlife',
+    'Equipment',
+    'Fuel System',
+    'Cargo Handling',
+    'Other'
+];
+
+export const SEVERITY_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
 
 export interface Hazard {
     id: string;
@@ -150,6 +167,7 @@ export interface Hazard {
     // Implementation tracking
     implementationNotes?: string;
     publicationContent?: string; // Content sent to group
+    correctiveActionDetails?: string; // Manual details for bulletin
     documentComplianceId?: string; // Link to R&I
     effectivenessReviewNotes?: string;
 
@@ -300,6 +318,54 @@ const INITIAL_HAZARDS: Hazard[] = [
         riskFactors: ['Complacency'],
         isPublished: true,
         submitterId: 'legacy_user'
+    },
+    {
+        id: 'HZ-007',
+        title: 'Hydraulic Fluid Spill - Gate B12',
+        category: 'Ground Operations',
+        severity: 'Medium',
+        workflowStage: WORKFLOW_STAGES.PUBLISHED,
+        location: 'DFW - Gate B12',
+        reportedBy: 'Kevin Adams',
+        reportedDate: '2024-01-20',
+        description: 'Significant hydraulic fluid leak from regional jet during engine start.',
+        immediateActions: 'Spill kit deployed, fire department stood by.',
+        potentialConsequences: 'Environmental hazard, slip risk, equipment damage.',
+        isPublished: true,
+        correctiveActionDetails: 'All ground crews retrained on spill response. Maintenance procedures updated for hydraulic line inspections.',
+        submitterId: 'legacy_user'
+    },
+    {
+        id: 'HZ-008',
+        title: 'Unauthorized Drone Activity - VNY',
+        category: 'Security',
+        severity: 'High',
+        workflowStage: WORKFLOW_STAGES.PUBLISHED,
+        location: 'VNY - North Perimeter',
+        reportedBy: 'Jennifer Wu',
+        reportedDate: '2024-01-25',
+        description: 'Small commercial drone observed hovering near the approach end of Runway 16R.',
+        immediateActions: 'Tower notified, local law enforcement dispatched.',
+        potentialConsequences: 'Mid-air collision, security breach.',
+        isPublished: true,
+        correctiveActionDetails: 'Enhanced perimeter monitoring implemented. Local "No Drone Zone" signage increased.',
+        submitterId: 'legacy_user'
+    },
+    {
+        id: 'HZ-009',
+        title: 'FOD Found on Taxiway Romeo',
+        category: 'Airport Infrastructure',
+        severity: 'Low',
+        workflowStage: WORKFLOW_STAGES.PUBLISHED,
+        location: 'ASE - Taxiway Romeo',
+        reportedBy: 'Robert Taylor',
+        reportedDate: '2024-02-01',
+        description: 'Large metal bolt found on center line of Taxiway Romeo.',
+        immediateActions: 'FOD removed, taxiway swept by operations.',
+        potentialConsequences: 'Tire damage, engine ingestion.',
+        isPublished: true,
+        correctiveActionDetails: 'Daily FOD walks increased. Local construction crews reminded of tool accountability.',
+        submitterId: 'legacy_user'
     }
 ];
 
@@ -311,7 +377,19 @@ export const HazardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     useEffect(() => {
         const storedHazards = localStorage.getItem('aviation_hazards');
         if (storedHazards) {
-            setHazards(JSON.parse(storedHazards));
+            const parsedStored = JSON.parse(storedHazards);
+            // Merge any missing INITIAL_HAZARDS (helpful during development/demo)
+            const missingInitialHazards = INITIAL_HAZARDS.filter(
+                initial => !parsedStored.some((stored: Hazard) => stored.id === initial.id)
+            );
+
+            if (missingInitialHazards.length > 0) {
+                const combined = [...missingInitialHazards, ...parsedStored];
+                setHazards(combined);
+                localStorage.setItem('aviation_hazards', JSON.stringify(combined));
+            } else {
+                setHazards(parsedStored);
+            }
         } else {
             setHazards(INITIAL_HAZARDS);
             localStorage.setItem('aviation_hazards', JSON.stringify(INITIAL_HAZARDS));
@@ -347,7 +425,7 @@ export const HazardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             daysInStage: 0,
             priority: newHazardData.severity, // Simple default mapping
             isAnonymous: newHazardData.isAnonymous || false,
-            submitterId: currentUserId,
+            submitterId: newHazardData.isAnonymous ? undefined : currentUserId,
             isPublished: false // Hidden by default until published by Safety
         };
 

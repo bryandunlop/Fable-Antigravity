@@ -56,7 +56,8 @@ import {
   Calculator,
   HardHat,
   ArrowRightLeft,
-  HardDrive
+  HardDrive,
+  Layers
 } from 'lucide-react';
 
 
@@ -305,6 +306,7 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
       label: "Management",
       items: [
         { name: 'Lead Dashboard', href: '/lead-dashboard', icon: BarChart3, roles: ['lead', 'admin'] },
+        { name: 'Manager Insights', href: '/manager-insights', icon: Layers, roles: ['lead', 'admin'] },
         { name: 'Live Metrics', href: '/live-metrics', icon: Activity, roles: ['lead', 'admin'], description: 'Real-time operations KPIs' },
         { name: 'Critical Functions', href: '/critical-functions', icon: Shield, roles: ['lead', 'admin'] },
         { name: 'Admin Panel', href: '/admin', icon: Settings, roles: ['admin'] },
