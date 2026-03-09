@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -24,10 +24,22 @@ import {
     MapPin,
     UserCheck
 } from 'lucide-react';
+import { AuditLogger } from '../services/AuditLogger';
 
 export default function ManagerInsights() {
     const navigate = useNavigate();
     const [opsTimeframe, setOpsTimeframe] = useState<'7d' | '30d' | '90d'>('30d');
+    const [activeTab, setActiveTab] = useState('operations');
+
+    // Initial load audit log
+    useEffect(() => {
+        AuditLogger.log('ACCESS_PAGE', 'ManagerInsights', { defaultTab: 'operations' });
+    }, []);
+
+    const handleTabChange = (value: string) => {
+        setActiveTab(value);
+        AuditLogger.log('VIEW_TAB', `ManagerInsights_${value}`, { tab: value });
+    };
 
     // ─── OPERATIONS ANALYTICS DATA ─────────────────────────────
 
@@ -162,7 +174,7 @@ export default function ManagerInsights() {
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="operations" className="space-y-6">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="operations" className="flex items-center gap-2">
                         <BarChart3 className="w-4 h-4" /> Operations Analytics

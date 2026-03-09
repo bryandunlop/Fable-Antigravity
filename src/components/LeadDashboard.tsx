@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -27,10 +27,10 @@ import {
   Navigation,
   Bookmark,
   BookmarkCheck,
-  ChevronDown,
   ChevronUp,
   Layers
 } from 'lucide-react';
+import { AuditLogger } from '../services/AuditLogger';
 
 export default function LeadDashboard() {
   const navigate = useNavigate();
@@ -38,6 +38,16 @@ export default function LeadDashboard() {
   const [expandedFlight, setExpandedFlight] = useState<string | null>(null);
   const [selectedPassengerForDetails, setSelectedPassengerForDetails] = useState<any>(null);
   const [showPassengerDetailsDialog, setShowPassengerDetailsDialog] = useState(false);
+
+  // Monitor passenger details view for auditing
+  useEffect(() => {
+    if (showPassengerDetailsDialog && selectedPassengerForDetails) {
+      AuditLogger.log('VIEW_VIP_DETAILS', 'LeadDashboard', {
+        passengerId: selectedPassengerForDetails.id,
+        name: selectedPassengerForDetails.name
+      });
+    }
+  }, [showPassengerDetailsDialog, selectedPassengerForDetails]);
 
   // ─── DATA ─────────────────────────────────────────────────────
 
@@ -128,15 +138,24 @@ export default function LeadDashboard() {
   // ─── HELPERS ──────────────────────────────────────────────────
 
   const toggleHighlightPassenger = (passengerId: string) => {
+    const isAdding = !highlightedPassengers.includes(passengerId);
+
     setHighlightedPassengers(prev =>
-      prev.includes(passengerId)
-        ? prev.filter(id => id !== passengerId)
-        : [...prev, passengerId]
+      isAdding
+        ? [...prev, passengerId]
+        : prev.filter(id => id !== passengerId)
     );
+
+    AuditLogger.log(
+      isAdding ? 'TRACK_VIP_PASSENGER' : 'UNTRACK_VIP_PASSENGER',
+      'LeadDashboard',
+      { passengerId }
+    );
+
     toast.success(
-      highlightedPassengers.includes(passengerId)
-        ? 'Passenger removed from tracking'
-        : 'Passenger added to tracking'
+      isAdding
+        ? 'Passenger added to tracking'
+        : 'Passenger removed from tracking'
     );
   };
 
