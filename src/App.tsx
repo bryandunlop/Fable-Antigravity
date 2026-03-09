@@ -245,8 +245,22 @@ export default function App() {
 
                                 <Route path="/document-management/collaborations" element={<DocumentCollaborations userRole={userRole} />} />
 
-                                <Route path="/lead-dashboard" element={<LeadDashboard />} />
-                                <Route path="/manager-insights" element={<ManagerInsights />} />
+                                <Route
+                                  path="/lead-dashboard"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} allowedRoles={['lead', 'admin']}>
+                                      <LeadDashboard />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/manager-insights"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} allowedRoles={['lead', 'admin']}>
+                                      <ManagerInsights />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route
                                   path="/live-metrics"
                                   element={
