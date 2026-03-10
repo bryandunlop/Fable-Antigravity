@@ -27,10 +27,13 @@ import {
   Navigation,
   Bookmark,
   BookmarkCheck,
+  ChevronDown,
   ChevronUp,
-  Layers
+  Layers,
+  BellRing
 } from 'lucide-react';
 import { AuditLogger } from '../services/AuditLogger';
+import { AlertStream, OperationalAlert } from '../services/RealTimeAlertService';
 
 export default function LeadDashboard() {
   const navigate = useNavigate();
@@ -38,6 +41,42 @@ export default function LeadDashboard() {
   const [expandedFlight, setExpandedFlight] = useState<string | null>(null);
   const [selectedPassengerForDetails, setSelectedPassengerForDetails] = useState<any>(null);
   const [showPassengerDetailsDialog, setShowPassengerDetailsDialog] = useState(false);
+
+  // Live Alerts State
+  const [liveAlerts, setLiveAlerts] = useState<OperationalAlert[]>([
+    { id: 'DLY001', airport: 'KJFK', type: 'GDP', severity: 'medium', delay: '45 min', impact: 'FLT002 departure was delayed', affectedFlight: 'FLT002', timestamp: new Date().toISOString() },
+    { id: 'DLY002', airport: 'KMIA', type: 'Weather', severity: 'low', delay: '15 min', impact: 'Thunderstorms clearing — FLT003 may be affected', affectedFlight: 'FLT003', timestamp: new Date().toISOString() },
+    { id: 'DLY003', airport: 'EGLL', type: 'Capacity', severity: 'medium', delay: '30 min', impact: 'Heavy traffic — expect arrival delay for FLT002', affectedFlight: 'FLT002', timestamp: new Date().toISOString() },
+  ]);
+
+  // Connect to mock Real-Time WebSocket
+  useEffect(() => {
+    AlertStream.connect();
+
+    const unsubscribe = AlertStream.subscribe((newAlert) => {
+      setLiveAlerts(prev => [newAlert, ...prev].slice(0, 10)); // Keep last 10
+
+      // Trigger a prominent toast for managers
+      if (newAlert.severity === 'critical' || newAlert.severity === 'high') {
+        toast.error(`CRITICAL ALERT: ${newAlert.affectedFlight}`, {
+          description: newAlert.impact,
+          duration: 10000,
+          icon: <AlertTriangle className="text-red-500" />
+        });
+      } else {
+        toast.warning(`Update: ${newAlert.affectedFlight}`, {
+          description: newAlert.impact,
+          duration: 6000,
+          icon: <BellRing className="text-orange-500" />
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      AlertStream.disconnect();
+    };
+  }, []);
 
   // Monitor passenger details view for auditing
   useEffect(() => {
@@ -100,12 +139,7 @@ export default function LeadDashboard() {
     }
   ];
 
-  // Delay Alerts
-  const delayAlerts = [
-    { id: 'DLY001', airport: 'KJFK', type: 'GDP', severity: 'medium', delay: '45 min', impact: 'FLT002 departure was delayed', affectedFlight: 'FLT002' },
-    { id: 'DLY002', airport: 'KMIA', type: 'Weather', severity: 'low', delay: '15 min', impact: 'Thunderstorms clearing — FLT003 may be affected', affectedFlight: 'FLT003' },
-    { id: 'DLY003', airport: 'EGLL', type: 'Capacity', severity: 'medium', delay: '30 min', impact: 'Heavy traffic — expect arrival delay for FLT002', affectedFlight: 'FLT002' },
-  ];
+  // Initial mock alerts moved to state `liveAlerts` above
 
   // Maintenance Activity
   const maintenanceActivity = [
@@ -205,7 +239,7 @@ export default function LeadDashboard() {
   // Quick stats
   const activeFlightsCount = flights.filter(f => f.status === 'In Air').length;
   const availableAircraftCount = aircraft.filter(a => a.status === 'available').length;
-  const alertsCount = delayAlerts.length + maintenanceActivity.filter(m => m.priority === 'critical').length;
+  const alertsCount = liveAlerts.length + maintenanceActivity.filter(m => m.priority === 'critical').length;
 
   // ─── RENDER ───────────────────────────────────────────────────
 
@@ -281,11 +315,11 @@ export default function LeadDashboard() {
         <CardContent className="space-y-4">
 
           {/* Delay Alerts */}
-          {delayAlerts.length > 0 && (
+          {liveAlerts.length > 0 && (
             <div className="space-y-2 mb-4">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Delay Alerts</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {delayAlerts.map(alert => (
+                {liveAlerts.slice(0, 3).map(alert => (
                   <div key={alert.id} className={`border-l-4 rounded-r-lg p-3 ${getDelaySeverityColor(alert.severity)}`}>
                     <div className="flex items-start justify-between">
                       <div>
@@ -310,7 +344,7 @@ export default function LeadDashboard() {
             {flights.map(flight => {
               const isExpanded = expandedFlight === flight.id;
               const isLive = flight.status === 'In Air';
-              const hasDelay = delayAlerts.some(d => d.affectedFlight === flight.id);
+              const hasDelay = liveAlerts.some(d => d.affectedFlight === flight.id);
               const trackedPax = flight.passengers.filter(p => highlightedPassengers.includes(p));
               const trackedPaxNames = trackedPax.map(p => vipPassengers.find(v => v.id === p)?.name).filter(Boolean);
 
