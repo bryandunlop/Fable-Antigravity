@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, AlertTriangle, CheckCircle, XCircle, MessageSquare, Bell, Plane, Plus, Edit2 } from 'lucide-react';
 
-type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical';
+type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical' | 'PBST Accrual';
 type RequestStatus = 'pending_scheduling' | 'denied_by_scheduling' | 'tentative_scheduling' | 'pending_manager' | 'denied_by_manager' | 'tentative_manager' | 'approved_awaiting_confirmation' | 'confirmed';
 
 interface Comment {
@@ -200,7 +200,8 @@ export function VacationRequestSystem() {
       denied_by_manager: { label: 'Denied by Manager', variant: 'destructive' as const, color: 'bg-red-500' },
       tentative_manager: { label: 'Tentative - Manager', variant: 'secondary' as const, color: 'bg-orange-500' },
       approved_awaiting_confirmation: { label: 'Approved - Awaiting Confirmation', variant: 'outline' as const, color: 'bg-green-400' },
-      confirmed: { label: 'Confirmed', variant: 'default' as const, color: 'bg-green-500' }
+      confirmed: { label: 'Confirmed', variant: 'default' as const, color: 'bg-green-500' },
+      pending_accrual: { label: 'Pending Accrual', variant: 'secondary' as const, color: 'bg-orange-400' }
     };
 
     return <Badge variant={statusConfig[status].variant}>{statusConfig[status].label}</Badge>;
@@ -313,7 +314,7 @@ export function VacationRequestSystem() {
                     id="startDate"
                     type="date" 
                     value={newRequest.startDate}
-                    onChange={(e) => setNewRequest({...newRequest, startDate: e.target.value})}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRequest({...newRequest, startDate: e.target.value})}
                   />
                 </div>
 
@@ -323,7 +324,7 @@ export function VacationRequestSystem() {
                     id="endDate"
                     type="date" 
                     value={newRequest.endDate}
-                    onChange={(e) => setNewRequest({...newRequest, endDate: e.target.value})}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRequest({...newRequest, endDate: e.target.value})}
                   />
                 </div>
               </div>
@@ -334,7 +335,7 @@ export function VacationRequestSystem() {
                   id="comments"
                   placeholder="Provide any additional details or reason for this request..."
                   value={newRequest.comments}
-                  onChange={(e) => setNewRequest({...newRequest, comments: e.target.value})}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewRequest({...newRequest, comments: e.target.value})}
                   rows={4}
                 />
               </div>
@@ -378,6 +379,11 @@ export function VacationRequestSystem() {
                     <div>
                       <CardTitle className="flex items-center gap-3">
                         {request.requestType}
+                        {request.requestType === 'PBST Accrual' && (
+                          <Badge variant="outline" className="border-orange-500 text-orange-600 bg-orange-50">
+                            System Generated
+                          </Badge>
+                        )}
                         {getStatusBadge(request.status)}
                       </CardTitle>
                       <CardDescription>

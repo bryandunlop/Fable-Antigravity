@@ -71,10 +71,12 @@ import PartsInventory from './components/PartsInventory';
 import TripCoordination from './components/TripCoordination';
 import CrewSchedulingWorkload from './components/CrewSchedulingWorkload';
 import FlightOperationsCenter from './components/FlightOperationsCenter';
-import EnhancedFRATForm from './components/EnhancedFRATForm';
-import EnhancedGRATForm from './components/EnhancedGRATForm';
+import StandaloneFRATForm from './components/StandaloneFRATForm';
+import StandaloneGRATForm from './components/StandaloneGRATForm';
+import GRATReview from './components/GRATReview';
 import FormFieldManager from './components/FormFieldManager';
 import FRATFormBuilder from './components/FRATFormBuilder';
+import GRATFormBuilder from './components/GRATFormBuilder';
 import ProceduralBulletins from './components/ProceduralBulletins';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 
@@ -115,15 +117,18 @@ import MWPredictiveAnalytics from './components/maintenance-workflow/PredictiveA
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string>('pilot');
+  const [additionalRoles, setAdditionalRoles] = useState<string[]>([]);
 
-  const handleLogin = (role: string) => {
+  const handleLogin = (role: string, extraRoles: string[]) => {
     setIsAuthenticated(true);
     setUserRole(role);
+    setAdditionalRoles(extraRoles);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setUserRole('pilot');
+    setAdditionalRoles([]);
   };
 
   return (
@@ -153,7 +158,7 @@ export default function App() {
                         <Navigate to="/login" replace />
                       ) : (
                         <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
-                          <Navigation userRole={userRole} onLogout={handleLogout}>
+                          <Navigation userRole={userRole} additionalRoles={additionalRoles} onLogout={handleLogout}>
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out h-full">
                               <Routes>
                                 <Route path="/" element={userRole === 'maintenance-workflow' ? <Navigate to="/maintenance-workflow" replace /> : <Dashboard userRole={userRole} />} />
@@ -164,12 +169,12 @@ export default function App() {
                                     <PreflightWorkflow />
                                   </FuelRequestProvider>
                                 } />
-                                <Route path="/frat/enhanced" element={<EnhancedFRATForm userRole={userRole} />} />
+                                <Route path="/frat/standalone" element={<StandaloneFRATForm userRole={userRole} />} />
                                 <Route path="/frat/my-submissions" element={<MyFRATSubmissions userRole={userRole} />} />
                                 <Route
                                   path="/frat/review"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
                                       <FRATReview />
                                     </ProtectedRoute>
                                   }
@@ -192,19 +197,27 @@ export default function App() {
                                 } />
                                 <Route path="/maintenance/technician" element={<TechnicianDashboard />} />
                                 <Route path="/pilot/elb" element={<ElectronicLogbook />} />
-                                <Route path="/grat/enhanced" element={<EnhancedGRATForm userRole={userRole} />} />
+                                <Route path="/grat/standalone" element={<StandaloneGRATForm userRole={userRole} />} />
+                                <Route
+                                  path="/grat/review"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
+                                      <GRATReview />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route
                                   path="/grat/form-builder"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
-                                      <FRATFormBuilder />
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
+                                      <GRATFormBuilder />
                                     </ProtectedRoute>
                                   }
                                 />
                                 <Route
                                   path="/grat/form-fields"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
                                       <FormFieldManager userRole={userRole} />
                                     </ProtectedRoute>
                                   }
@@ -217,7 +230,14 @@ export default function App() {
                                 <Route path="/passenger-database" element={<PassengerDatabase userRole={userRole} />} />
 
                                 <Route path="/admin" element={<AdminUserManagement />} />
-                                <Route path="/admin/airport-evaluation-officer" element={<AirportEvaluationOfficer />} />
+                                <Route
+                                  path="/admin/airport-evaluation-officer"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin', 'airport-evaluator']}>
+                                      <AirportEvaluationOfficer />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route path="/schedule" element={<ScheduleCalendar />} />
                                 <Route path="/documents" element={<DocumentCenter userRole={userRole} />} />
 
@@ -234,7 +254,7 @@ export default function App() {
                                 <Route
                                   path="/dms/offline"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['dms-manager', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['dms-manager', 'admin']}>
                                       <OfflineDocuments />
                                     </ProtectedRoute>
                                   }
@@ -248,7 +268,7 @@ export default function App() {
                                 <Route
                                   path="/lead-dashboard"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['lead', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['lead', 'admin']}>
                                       <LeadDashboard />
                                     </ProtectedRoute>
                                   }
@@ -256,7 +276,7 @@ export default function App() {
                                 <Route
                                   path="/manager-insights"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['lead', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['lead', 'admin']}>
                                       <ManagerInsights />
                                     </ProtectedRoute>
                                   }
@@ -264,7 +284,7 @@ export default function App() {
                                 <Route
                                   path="/live-metrics"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['lead', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['lead', 'admin']}>
                                       <LiveMetricsDashboard />
                                     </ProtectedRoute>
                                   }
@@ -283,7 +303,7 @@ export default function App() {
                                 <Route
                                   path="/safety/form-fields"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
                                       <FormFieldManager userRole={userRole} />
                                     </ProtectedRoute>
                                   }
@@ -291,15 +311,23 @@ export default function App() {
                                 <Route
                                   path="/safety/frat-builder"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
                                       <FRATFormBuilder />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/safety/grat-builder"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
+                                      <GRATFormBuilder />
                                     </ProtectedRoute>
                                   }
                                 />
                                 <Route
                                   path="/safety/risk-profile"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
                                       <SafetyRiskProfile />
                                     </ProtectedRoute>
                                   }
@@ -307,7 +335,7 @@ export default function App() {
                                 <Route
                                   path="/safety/manager-dashboard"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
                                       <SafetyManagerDashboard />
                                     </ProtectedRoute>
                                   }
@@ -315,7 +343,7 @@ export default function App() {
                                 <Route
                                   path="/safety/hazard-workflow/:id"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
                                       <HazardWorkflow />
                                     </ProtectedRoute>
                                   }
@@ -323,7 +351,7 @@ export default function App() {
                                 <Route
                                   path="/safety/preflight-workflow/:id"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['safety', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['safety', 'admin']}>
                                       <FuelRequestProvider>
                                         <PreflightWorkflow />
                                       </FuelRequestProvider>
@@ -342,7 +370,7 @@ export default function App() {
                                 <Route
                                   path="/crew-scheduling-workload"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['scheduling', 'admin', 'lead']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin', 'lead']}>
                                       <CrewSchedulingWorkload />
                                     </ProtectedRoute>
                                   }
@@ -359,7 +387,7 @@ export default function App() {
                                 <Route
                                   path="/flight-operations-center"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling']}>
                                       <FlightOperationsCenter />
                                     </ProtectedRoute>
                                   }
@@ -367,7 +395,7 @@ export default function App() {
                                 <Route
                                   path="/tax-compliance"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['tax', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['tax', 'admin']}>
                                       <TaxProvider>
                                         <TaxComplianceDashboard />
                                       </TaxProvider>
@@ -377,7 +405,7 @@ export default function App() {
                                 {/* <Route
                                   path="/flight-family"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'admin-assistant']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'admin-assistant']}>
                                       <FlightFamily userRole={userRole} />
                                     </ProtectedRoute>
                                   }
@@ -385,7 +413,7 @@ export default function App() {
                                 <Route
                                   path="/booking-profile"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['admin-assistant', 'admin', 'lead']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'admin', 'lead']}>
                                       <BookingProfile />
                                     </ProtectedRoute>
                                   }
@@ -393,7 +421,7 @@ export default function App() {
                                 <Route
                                   path="/trip-builder/:tripId?"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['admin-assistant', 'admin', 'lead']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'admin', 'lead']}>
                                       <TripBuilder
                                         onSave={() => { }}
                                         onCancel={() => window.history.back()}
@@ -404,7 +432,7 @@ export default function App() {
                                 <Route
                                   path="/itinerary-builder"
                                   element={
-                                    <ProtectedRoute userRole={userRole} allowedRoles={['admin-assistant', 'admin', 'lead']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'admin', 'lead']}>
                                       <ItineraryBuilderV2 />
                                     </ProtectedRoute>
                                   }

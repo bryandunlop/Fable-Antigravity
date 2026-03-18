@@ -99,6 +99,7 @@ interface Airport {
   };
   restrictions: string[];
   randomNotes: string;
+  operationNotes?: string;
 }
 
 export default function AirportServicesDatabase() {
@@ -443,7 +444,8 @@ export default function AirportServicesDatabase() {
         fuel: ''
       },
       restrictions: [],
-      randomNotes: ''
+      randomNotes: '',
+      operationNotes: ''
     });
 
     const updateServiceRating = (category: string, rating: number) => {
@@ -618,11 +620,11 @@ export default function AirportServicesDatabase() {
           </TabsContent>
 
           <TabsContent value="operations" className="space-y-4">
-            <div>
-              <Label>Operating Hours</Label>
+            <div className="space-y-4">
+              <Label className="text-base font-semibold">Operational Hours</Label>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label className="text-sm">Standard Hours</Label>
+                  <Label className="text-sm">Operating Hours</Label>
                   <Input
                     placeholder="24/7 or 06:00-22:00"
                     value={formData.operatingHours?.standard || ''}
@@ -657,65 +659,13 @@ export default function AirportServicesDatabase() {
               </div>
             </div>
 
-            <div>
-              <Label>Fees Structure</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm">Landing Fee</Label>
-                  <Input
-                    placeholder="$8.50/1000 lbs"
-                    value={formData.fees?.landing || ''}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      fees: { parking: '', handling: '', fuel: '', ...(formData.fees || {}), landing: e.target.value }
-                    })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm">Parking Fee</Label>
-                  <Input
-                    placeholder="$15/day"
-                    value={formData.fees?.parking || ''}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      fees: { landing: '', handling: '', fuel: '', ...(formData.fees || {}), parking: e.target.value }
-                    })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm">Handling Fee</Label>
-                  <Input
-                    placeholder="$125 flat"
-                    value={formData.fees?.handling || ''}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      fees: { landing: '', parking: '', fuel: '', ...(formData.fees || {}), handling: e.target.value }
-                    })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm">Fuel Pricing</Label>
-                  <Input
-                    placeholder="Market + $0.25"
-                    value={formData.fees?.fuel || ''}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      fees: { landing: '', parking: '', handling: '', ...(formData.fees || {}), fuel: e.target.value }
-                    })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <Label>Restrictions & Limitations</Label>
-              <Input
-                placeholder="Slot controlled, Noise restrictions, etc. (comma separated)"
-                value={formData.restrictions?.join(', ') || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  restrictions: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                })}
+            <div className="pt-4 border-t">
+              <Label className="text-base font-semibold">Operations Notes</Label>
+              <Textarea
+                rows={6}
+                placeholder="Additional operational details, fees, restrictions, or special considerations..."
+                value={formData.operationNotes || ''}
+                onChange={(e) => setFormData({ ...formData, operationNotes: e.target.value })}
               />
             </div>
           </TabsContent>

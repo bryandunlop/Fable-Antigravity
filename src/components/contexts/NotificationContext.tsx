@@ -33,6 +33,8 @@ interface NotificationContextType {
         highPriority: number;
         critical: number;
     };
+    permission: NotificationPermission;
+    requestPermission: () => Promise<NotificationPermission>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -149,6 +151,25 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [permission, setPermission] = useState<NotificationPermission>(
+        typeof window !== 'undefined' ? Notification.permission : 'default'
+    );
+
+    // Register service worker
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch(registrationError => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    }, []);
+
     // Load from local storage on mount
     useEffect(() => {
         try {
@@ -183,6 +204,37 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     }, [notifications, loading]);
 
+    const requestPermission = useCallback(async () => {
+        if (!('Notification' in window)) {
+            console.log('This browser does not support notifications.');
+            return 'default';
+        }
+
+        const res = await Notification.requestPermission();
+        setPermission(res);
+        return res;
+    }, []);
+
+    const showBrowserNotification = useCallback((title: string, message: string, actionUrl?: string) => {
+        if (permission === 'granted' && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, {
+                    body: message,
+                    icon: '/vite.svg',
+                    badge: '/vite.svg',
+                    data: {
+                        url: actionUrl || '/'
+                    }
+                });
+            });
+        } else if (permission === 'granted') {
+            new Notification(title, {
+                body: message,
+                icon: '/vite.svg'
+            });
+        }
+    }, [permission]);
+
     const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => {
         const newNotification: Notification = {
             ...notification,
@@ -191,7 +243,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             isRead: false
         };
         setNotifications(prev => [newNotification, ...prev]);
-    }, []);
+
+        // Trigger browser notification
+        showBrowserNotification(newNotification.title, newNotification.message, newNotification.actionUrl);
+    }, [showBrowserNotification]);
 
     const markAsRead = useCallback((id: string) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
@@ -256,7 +311,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             deleteNotification,
             clearAll,
             refetch,
-            counts: getCounts()
+            counts: getCounts(),
+            permission,
+            requestPermission
         }}>
             {children}
         </NotificationContext.Provider>

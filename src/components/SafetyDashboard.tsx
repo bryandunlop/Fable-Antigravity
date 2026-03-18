@@ -73,6 +73,8 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [severityFilter, setSeverityFilter] = useState('All');
   const [selectedBulletin, setSelectedBulletin] = useState<any>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [hazardToDelete, setHazardToDelete] = useState<any>(null);
 
   useEffect(() => {
     // Check if we need to switch tabs or open dialogs based on query params
@@ -81,10 +83,10 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
       setActiveTab(tabParam);
     }
 
-    // Pass action params to My Activity if relevant
+    // Pass action params to Overview or Hazards if relevant (My Activity was removed)
     const actionParam = searchParams.get('action');
     if (actionParam && (actionParam === 'new-waiver' || actionParam === 'new-cws')) {
-      setActiveTab('my-activity');
+      setActiveTab('overview');
     }
   }, [searchParams]);
 
@@ -94,6 +96,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
     openHazards: 7,
     pendingAudits: 2,
     fratReviewsNeeded: 4,
+    gratReviewsNeeded: 2,
     complianceRate: 94.2,
     myHazardReports: 2,
     myAsapReports: 1,
@@ -370,7 +373,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
     }
   ];
 
-  const { hazards, updateHazard } = useHazards();
+  const { hazards, updateHazard, deleteHazard } = useHazards();
 
   const publishedHazards = useMemo(() => {
     return hazards.filter(h => {
@@ -457,12 +460,20 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
         <div className="flex gap-2 mt-4 lg:mt-0">
           {isAdmin && (
             <>
-              <Link to="/safety/frat-builder">
-                <Button variant="outline">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Form Builder
-                </Button>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Link to="/safety/frat-builder">
+                  <Button variant="outline">
+                    <Settings className="w-4 h-4 mr-2" />
+                    FRAT Builder
+                  </Button>
+                </Link>
+                <Link to="/safety/grat-builder">
+                  <Button variant="outline">
+                    <Settings className="w-4 h-4 mr-2" />
+                    GRAT Builder
+                  </Button>
+                </Link>
+              </div>
               <Link to="/safety/form-fields">
                 <Button variant="outline">
                   <Sliders className="w-4 h-4 mr-2" />
@@ -492,14 +503,19 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
               <Badge className="ml-1 h-5 px-1.5 text-xs">{safetyStats.openHazards}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="asap" className="gap-2">
-            <FileText className="w-4 h-4" />
-            <span className="hidden sm:inline">ASAP</span>
-          </TabsTrigger>
-          <TabsTrigger value="cws" className="gap-2">
-            <Award className="w-4 h-4" />
-            <span className="hidden sm:inline">CWS</span>
-          </TabsTrigger>
+          {/* Hidden ASAP and CWS tabs as requested */}
+          {false && (
+            <>
+              <TabsTrigger value="asap" className="gap-2">
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">ASAP</span>
+              </TabsTrigger>
+              <TabsTrigger value="cws" className="gap-2">
+                <Award className="w-4 h-4" />
+                <span className="hidden sm:inline">CWS</span>
+              </TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="waivers" className="gap-2">
             <FileCheck className="w-4 h-4" />
             <span className="hidden sm:inline">Waivers</span>
@@ -507,10 +523,13 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
               <Badge className="ml-1 h-5 px-1.5 text-xs">{safetyStats.pendingWaivers}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="my-activity" className="gap-2">
-            <ClipboardList className="w-4 h-4" />
-            <span className="hidden sm:inline">My Activity</span>
-          </TabsTrigger>
+          {/* Hidden My Activity as requested */}
+          {false && (
+            <TabsTrigger value="my-activity" className="gap-2">
+              <ClipboardList className="w-4 h-4" />
+              <span className="hidden sm:inline">My Activity</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="audits" className="gap-2">
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">Audits</span>
@@ -520,13 +539,22 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
             <span className="hidden sm:inline">Compliance</span>
           </TabsTrigger>
           {isAdmin && (
-            <TabsTrigger value="frat-review" className="gap-2">
-              <ClipboardList className="w-4 h-4" />
-              <span className="hidden sm:inline">FRAT</span>
-              {safetyStats.fratReviewsNeeded > 0 && (
-                <Badge className="ml-1 h-5 px-1.5 text-xs">{safetyStats.fratReviewsNeeded}</Badge>
-              )}
-            </TabsTrigger>
+            <>
+              <TabsTrigger value="frat-submissions" className="gap-2">
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden sm:inline">Submitted FRATs</span>
+                {safetyStats.fratReviewsNeeded > 0 && (
+                  <Badge className="ml-1 h-5 px-1.5 text-xs">{safetyStats.fratReviewsNeeded}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="grat-submissions" className="gap-2">
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden sm:inline">Submitted GRATs</span>
+                {safetyStats.gratReviewsNeeded > 0 && (
+                  <Badge className="ml-1 h-5 px-1.5 text-xs">{safetyStats.gratReviewsNeeded}</Badge>
+                )}
+              </TabsTrigger>
+            </>
           )}
         </TabsList>
 
@@ -914,27 +942,29 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
               </CardContent>
             </Card>
 
-            {/* ASAP Report Card (Moved from Separate Tab for better access if needed, or keep original grid) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-orange-600" />
-                  Submit ASAP Report
-                </CardTitle>
-                <CardDescription>Aviation Safety Action Program - Confidential Reporting</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link to="/asap-report">
-                  <Button className="w-full">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Open ASAP Report Form
-                  </Button>
-                </Link>
-                <p className="text-sm text-muted-foreground mt-4">
-                  ASAP reports are submitted confidentially and reviewed by the safety team.
-                </p>
-              </CardContent>
-            </Card>
+            {/* ASAP Report Card Hidden as requested */}
+            {false && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-orange-600" />
+                    Submit ASAP Report
+                  </CardTitle>
+                  <CardDescription>Aviation Safety Action Program - Confidential Reporting</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link to="/asap-report">
+                    <Button className="w-full">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Open ASAP Report Form
+                    </Button>
+                  </Link>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    ASAP reports are submitted confidentially and reviewed by the safety team.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Published Hazard Reports - Full Width */}
@@ -1103,7 +1133,15 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                           <Edit className="w-4 h-4 mr-2" />
                           Review & Deidentify
                         </Button>
-                        <Button variant="outline" size="sm" className="text-red-600">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                          onClick={() => {
+                            setHazardToDelete(submission);
+                            setShowDeleteConfirm(true);
+                          }}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -1113,122 +1151,168 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
               </CardContent>
             </Card>
           )}
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-600">
+                  <AlertTriangle className="w-5 h-5" />
+                  Confirm Deletion
+                </DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete this hazard report? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              
+              {hazardToDelete && (
+                <div className="p-4 bg-muted rounded-lg border mb-4">
+                  <p className="text-sm font-bold">{hazardToDelete.id}: {hazardToDelete.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Submitted by {hazardToDelete.reportedBy} on {hazardToDelete.reportedDate}</p>
+                </div>
+              )}
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    if (hazardToDelete) {
+                      deleteHazard(hazardToDelete.id);
+                      toast.success(`Hazard ${hazardToDelete.id} has been deleted.`);
+                      setShowDeleteConfirm(false);
+                      setHazardToDelete(null);
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Confirm Delete
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
-        {/* ASAP Report Tab */}
-        <TabsContent value="asap" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* ASAP Form */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-orange-600" />
-                  Submit ASAP Report
-                </CardTitle>
-                <CardDescription>Aviation Safety Action Program - Confidential Reporting</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link to="/asap-report">
-                  <Button className="w-full">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Open ASAP Report Form
-                  </Button>
-                </Link>
-                <p className="text-sm text-muted-foreground mt-4">
-                  ASAP reports are submitted confidentially and reviewed by the safety team.
-                </p>
-              </CardContent>
-            </Card>
+        {/* ASAP Report Tab - Hidden as requested */}
+        {false && (
+          <TabsContent value="asap" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* ASAP Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-orange-600" />
+                    Submit ASAP Report
+                  </CardTitle>
+                  <CardDescription>Aviation Safety Action Program - Confidential Reporting</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link to="/asap-report">
+                    <Button className="w-full">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Open ASAP Report Form
+                    </Button>
+                  </Link>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    ASAP reports are submitted confidentially and reviewed by the safety team.
+                  </p>
+                </CardContent>
+              </Card>
 
-            {/* ASAP Reports List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>My ASAP Reports</CardTitle>
-                <CardDescription>Your submitted reports</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {asapReports.map((report) => (
-                    <div key={report.id} className="p-3 border rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-medium">Report #{report.reportNumber}</p>
-                          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                            <Calendar className="w-3 h-3" />
-                            <span>{report.date}</span>
-                            <span>•</span>
-                            <span>{report.flightPhase}</span>
+              {/* ASAP Reports List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>My ASAP Reports</CardTitle>
+                  <CardDescription>Your submitted reports</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {asapReports.map((report) => (
+                      <div key={report.id} className="p-3 border rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium">Report #{report.reportNumber}</p>
+                            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                              <Calendar className="w-3 h-3" />
+                              <span>{report.date}</span>
+                              <span>•</span>
+                              <span>{report.flightPhase}</span>
+                            </div>
+                            <Badge className={`${getStatusColor(report.status)} mt-2`} variant="outline">
+                              {report.status}
+                            </Badge>
                           </div>
-                          <Badge className={`${getStatusColor(report.status)} mt-2`} variant="outline">
-                            {report.status}
-                          </Badge>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        )}
 
-        {/* CWS Tab */}
-        <TabsContent value="cws" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* CWS Submission Form */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="w-5 h-5 text-green-600" />
-                  Recognize Safe Behavior
-                </CardTitle>
-                <CardDescription>Submit a Caught Working Safely recognition</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link to="/user-safety?action=new-cws">
-                  <Button className="w-full bg-green-600 hover:bg-green-700">
-                    <Star className="w-4 h-4 mr-2" />
-                    Submit CWS Recognition
-                  </Button>
-                </Link>
-                <p className="text-sm text-muted-foreground mt-4">
-                  Recognize colleagues who demonstrate safe work practices and adherence to procedures.
-                </p>
-              </CardContent>
-            </Card>
+        {/* CWS Tab - Hidden as requested */}
+        {false && (
+          <TabsContent value="cws" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* CWS Submission Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="w-5 h-5 text-green-600" />
+                    Recognize Safe Behavior
+                  </CardTitle>
+                  <CardDescription>Submit a Caught Working Safely recognition</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link to="/user-safety?action=new-cws">
+                    <Button className="w-full bg-green-600 hover:bg-green-700">
+                      <Star className="w-4 h-4 mr-2" />
+                      Submit CWS Recognition
+                    </Button>
+                  </Link>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    Recognize colleagues who demonstrate safe work practices and adherence to procedures.
+                  </p>
+                </CardContent>
+              </Card>
 
-            {/* Recent CWS */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent CWS Recognitions</CardTitle>
-                <CardDescription>{safetyStats.cwsRecognitions} recognitions this month</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {cwsRecognitions.map((cws) => (
-                    <div key={cws.id} className="p-3 border rounded-lg bg-green-50/50">
-                      <div className="flex items-start gap-3">
-                        <Award className="w-5 h-5 text-green-600 mt-1" />
-                        <div className="flex-1">
-                          <p className="font-medium">{cws.recognizedPerson}</p>
-                          <p className="text-sm text-muted-foreground mt-1">{cws.behavior}</p>
-                          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                            <span>Submitted by {cws.submittedBy}</span>
-                            <span>•</span>
-                            <span>{cws.date}</span>
+              {/* Recent CWS */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent CWS Recognitions</CardTitle>
+                  <CardDescription>{safetyStats.cwsRecognitions} recognitions this month</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {cwsRecognitions.map((cws) => (
+                      <div key={cws.id} className="p-3 border rounded-lg bg-green-50/50">
+                        <div className="flex items-start gap-3">
+                          <Award className="w-5 h-5 text-green-600 mt-1" />
+                          <div className="flex-1">
+                            <p className="font-medium">{cws.recognizedPerson}</p>
+                            <p className="text-sm text-muted-foreground mt-1">{cws.behavior}</p>
+                            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                              <span>Submitted by {cws.submittedBy}</span>
+                              <span>•</span>
+                              <span>{cws.date}</span>
+                            </div>
+                            <Badge className={`${getStatusColor(cws.status)} mt-2`} variant="outline">
+                              {cws.status}
+                            </Badge>
                           </div>
-                          <Badge className={`${getStatusColor(cws.status)} mt-2`} variant="outline">
-                            {cws.status}
-                          </Badge>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        )}
 
         {/* Waivers Tab */}
         <TabsContent value="waivers" className="space-y-6">
@@ -1607,9 +1691,9 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
           </Card>
         </TabsContent>
 
-        {/* FRAT Review Tab (Admin Only) */}
+        {/* Submitted FRATs Tab (Admin Only) */}
         {isAdmin && (
-          <TabsContent value="frat-review" className="space-y-6">
+          <TabsContent value="frat-submissions" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1633,6 +1717,40 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                     </div>
                     <div className="text-3xl font-semibold text-blue-900">
                       {safetyStats.fratReviewsNeeded}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* Submitted GRATs Tab (Admin Only) */}
+        {isAdmin && (
+          <TabsContent value="grat-submissions" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5" />
+                  GRAT Outcomes Review
+                </CardTitle>
+                <CardDescription>Review ground risk assessment submissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link to="/grat/review">
+                  <Button className="w-full">
+                    <Eye className="w-4 h-4 mr-2" />
+                    Open GRAT Review Dashboard
+                  </Button>
+                </Link>
+                <div className="mt-6">
+                  <div className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div>
+                      <p className="font-medium text-orange-900">Pending Reviews</p>
+                      <p className="text-sm text-orange-700">GRAT submissions awaiting approval</p>
+                    </div>
+                    <div className="text-3xl font-semibold text-orange-900">
+                      {safetyStats.gratReviewsNeeded}
                     </div>
                   </div>
                 </div>

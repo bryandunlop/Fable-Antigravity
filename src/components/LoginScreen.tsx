@@ -5,8 +5,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Plane } from 'lucide-react';
 
+
+import { SYSTEM_USERS } from '../lib/mockUsers';
+
 interface LoginScreenProps {
-  onLogin: (role: string) => void;
+  onLogin: (role: string, additionalRoles: string[]) => void;
 }
 
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
@@ -14,9 +17,13 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (role) {
-      onLogin(role);
+      const user = SYSTEM_USERS.find(u => u.roles.includes(role));
+      const additionalRoles = user ? user.roles.filter(r => r !== role) : [];
+      onLogin(role, additionalRoles);
     }
   };
+
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
@@ -51,6 +58,12 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                       <span className="font-medium">Flight Attendant</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="safety" className="py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
+                      <span className="font-medium">Safety</span>
+                    </div>
+                  </SelectItem>
                   <SelectItem value="maintenance" className="py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-2.5 h-2.5 bg-orange-500 rounded-full shadow-[0_0_8px_rgba(249,115,22,0.6)]"></div>
@@ -63,28 +76,22 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                       <span className="font-medium">Maintenance Workflow (AviaSync)</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="lead" className="py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>
+                      <span className="font-medium">Lead Team</span>
+                    </div>
+                  </SelectItem>
                   <SelectItem value="scheduling" className="py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.6)]"></div>
                       <span className="font-medium">Scheduling</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="safety" className="py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
-                      <span className="font-medium">Safety</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="document-manager" className="py-3">
+                  <SelectItem value="hr" className="py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-2.5 h-2.5 bg-yellow-500 rounded-full shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div>
-                      <span className="font-medium">Document Manager</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="dms-manager" className="py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 bg-amber-600 rounded-full shadow-[0_0_8px_rgba(217,119,6,0.6)]"></div>
-                      <span className="font-medium">DMS Manager</span>
+                      <span className="font-medium">HR</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="admin-assistant" className="py-3">
@@ -93,10 +100,16 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                       <span className="font-medium">Administrative Assistant</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="lead" className="py-3">
+                  <SelectItem value="document-manager" className="py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>
-                      <span className="font-medium">Lead Team</span>
+                      <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full shadow-[0_0_8px_rgba(250,204,21,0.6)]"></div>
+                      <span className="font-medium">Document Manager</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="dms-manager" className="py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 bg-amber-600 rounded-full shadow-[0_0_8px_rgba(217,119,6,0.6)]"></div>
+                      <span className="font-medium">DMS Manager</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="admin" className="py-3">
@@ -126,6 +139,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 </SelectContent>
               </Select>
             </div>
+
+
+
             <Button type="submit" className="w-full h-14 text-lg font-bold rounded-xl shadow-lg transition-all" size="lg">
               Access Dashboard
             </Button>

@@ -37,7 +37,8 @@ import {
   CheckSquare,
   Download,
   Upload,
-  Sliders
+  Sliders,
+  Wrench
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -102,7 +103,7 @@ interface FormSection {
 interface FormTemplate {
   id: string;
   name: string;
-  type: 'FRAT';
+  type: 'GRAT';
   description: string;
   sections: FormSection[];
   scoring: {
@@ -116,7 +117,7 @@ interface FormTemplate {
   isActive: boolean;
 }
 
-export default function FRATFormBuilder() {
+export default function GRATFormBuilder() {
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [currentTemplate, setCurrentTemplate] = useState<FormTemplate | null>(null);
   const [editingSection, setEditingSection] = useState<FormSection | null>(null);
@@ -132,7 +133,7 @@ export default function FRATFormBuilder() {
   }, []);
 
   const loadTemplates = () => {
-    const savedTemplates = localStorage.getItem('frat_templates_v2');
+    const savedTemplates = localStorage.getItem('grat_templates_v2');
     if (savedTemplates) {
       const parsed = JSON.parse(savedTemplates);
       setTemplates(parsed);
@@ -148,188 +149,73 @@ export default function FRATFormBuilder() {
   };
 
   const saveTemplates = (templatesToSave: FormTemplate[]) => {
-    localStorage.setItem('frat_templates_v2', JSON.stringify(templatesToSave));
-    toast.success('FRAT Templates saved successfully');
+    localStorage.setItem('grat_templates_v2', JSON.stringify(templatesToSave));
+    toast.success('GRAT Templates saved successfully');
   };
 
   const createDefaultTemplate = (): FormTemplate => ({
-    id: 'default-frat',
-    name: 'Standard FRAT Form',
-    type: 'FRAT',
-    description: 'Default Flight Risk Assessment Tool',
+    id: 'default-grat',
+    name: 'Standard GRAT Form',
+    type: 'GRAT',
+    description: 'Default Ground Risk Assessment Tool',
     sections: [
       {
-        id: 'flight-info',
-        name: 'flight-information',
-        title: 'Flight Information',
-        description: 'Basic flight details',
+        id: 'mx-info',
+        name: 'maintenance-information',
+        title: 'Maintenance Information',
+        description: 'Basic task details',
         collapsed: false,
         order: 1,
         fields: [
           {
-            id: 'flight-number',
-            name: 'flightNumber',
-            label: 'Flight Number',
+            id: 'technician',
+            name: 'technicianName',
+            label: 'Technician Name',
             type: 'text',
             required: true,
-            placeholder: 'e.g., G650-001',
             scoring: { enabled: false, weight: 0 }
           },
           {
-            id: 'aircraft',
-            name: 'aircraft',
-            label: 'Aircraft Registration',
-            type: 'select',
-            required: true,
-            scoring: { enabled: false, weight: 0 },
-            options: [
-              { label: 'N123GS', value: 'N123GS' },
-              { label: 'N456GS', value: 'N456GS' },
-              { label: 'N789GS', value: 'N789GS' }
-            ]
-          },
-          {
-            id: 'departure',
-            name: 'departure',
-            label: 'Departure Airport',
-            type: 'text',
-            required: true,
-            placeholder: 'ICAO code (e.g., KTEB)',
-            scoring: { enabled: false, weight: 0 }
-          },
-          {
-            id: 'destination',
-            name: 'destination',
-            label: 'Destination Airport',
-            type: 'text',
-            required: true,
-            placeholder: 'ICAO code (e.g., KMIA)',
-            scoring: { enabled: false, weight: 0 }
-          },
-          {
-            id: 'departure-time',
-            name: 'departureTime',
-            label: 'Departure Time',
-            type: 'datetime',
+            id: 'task-date',
+            name: 'taskDate',
+            label: 'Task Date',
+            type: 'date',
             required: true,
             scoring: { enabled: false, weight: 0 }
           }
         ]
       },
       {
-        id: 'crew-exp',
-        name: 'crew-experience',
-        title: 'Crew Experience',
-        description: 'Crew qualifications and experience levels',
+        id: 'human-factors',
+        name: 'human-factors',
+        title: 'Human Factors',
+        description: 'Personnel and psychological factors',
         collapsed: false,
         order: 2,
         fields: [
           {
-            id: 'captain-exp',
-            name: 'captainExperience',
-            label: 'Captain Total Hours',
-            type: 'select',
-            required: true,
-            scoring: { enabled: true, weight: 15 },
-            options: [
-              { label: 'More than 5000 hours', value: '5000+', score: 0 },
-              { label: '3000-5000 hours', value: '3000-5000', score: 3 },
-              { label: '1500-3000 hours', value: '1500-3000', score: 6 },
-              { label: 'Less than 1500 hours', value: '<1500', score: 10 }
-            ]
-          },
-          {
-            id: 'fo-exp',
-            name: 'foExperience',
-            label: 'First Officer Total Hours',
+            id: 'duty-time',
+            name: 'dutyTime',
+            label: 'Duty Time',
             type: 'select',
             required: true,
             scoring: { enabled: true, weight: 10 },
             options: [
-              { label: 'More than 3000 hours', value: '3000+', score: 0 },
-              { label: '1500-3000 hours', value: '1500-3000', score: 2 },
-              { label: '500-1500 hours', value: '500-1500', score: 5 },
-              { label: 'Less than 500 hours', value: '<500', score: 8 }
+              { label: '8 hours or less', value: '8-less', score: 1 },
+              { label: '8 to 12 hours', value: '8-12', score: 2 },
+              { label: 'Over 12 hours', value: '12+', score: 5 }
             ]
           },
           {
-            id: 'crew-fatigue',
-            name: 'crewFatigue',
-            label: 'Crew Fatigue Level',
-            type: 'select',
-            required: true,
-            scoring: { enabled: true, weight: 20 },
-            options: [
-              { label: 'Well rested', value: 'well-rested', score: 0 },
-              { label: 'Slightly tired', value: 'slightly-tired', score: 5 },
-              { label: 'Moderately tired', value: 'moderately-tired', score: 10 },
-              { label: 'Very tired', value: 'very-tired', score: 15 }
-            ]
-          }
-        ]
-      },
-      {
-        id: 'weather',
-        name: 'weather-conditions',
-        title: 'Weather Conditions',
-        description: 'Environmental and weather factors',
-        collapsed: false,
-        order: 3,
-        fields: [
-          {
-            id: 'visibility',
-            name: 'visibility',
-            label: 'Visibility',
-            type: 'select',
-            required: true,
-            scoring: { enabled: true, weight: 15 },
-            options: [
-              { label: 'Greater than 10 miles', value: '10+', score: 0 },
-              { label: '5-10 miles', value: '5-10', score: 3 },
-              { label: '1-5 miles', value: '1-5', score: 8 },
-              { label: 'Less than 1 mile', value: '<1', score: 12 }
-            ]
-          },
-          {
-            id: 'wind-speed',
-            name: 'windSpeed',
-            label: 'Wind Speed',
-            type: 'select',
+            id: 'working-alone',
+            name: 'workingAlone',
+            label: 'Working Alone',
+            type: 'boolean',
             required: true,
             scoring: { enabled: true, weight: 10 },
             options: [
-              { label: 'Less than 10 knots', value: '<10', score: 0 },
-              { label: '10-20 knots', value: '10-20', score: 2 },
-              { label: '20-30 knots', value: '20-30', score: 5 },
-              { label: 'Greater than 30 knots', value: '30+', score: 10 }
-            ]
-          },
-          {
-            id: 'weather-conditions',
-            name: 'weatherConditions',
-            label: 'General Weather',
-            type: 'select',
-            required: true,
-            scoring: { enabled: true, weight: 15 },
-            options: [
-              { label: 'Clear/Few clouds', value: 'clear', score: 0 },
-              { label: 'Scattered clouds', value: 'scattered', score: 3 },
-              { label: 'Broken clouds', value: 'broken', score: 6 },
-              { label: 'Overcast/Storms', value: 'overcast', score: 12 }
-            ]
-          },
-          {
-            id: 'turbulence',
-            name: 'turbulence',
-            label: 'Expected Turbulence',
-            type: 'select',
-            required: true,
-            scoring: { enabled: true, weight: 10 },
-            options: [
-              { label: 'None expected', value: 'none', score: 0 },
-              { label: 'Light', value: 'light', score: 2 },
-              { label: 'Moderate', value: 'moderate', score: 6 },
-              { label: 'Severe', value: 'severe', score: 12 }
+              { label: 'Yes', value: 'true', score: 5 },
+              { label: 'No', value: 'false', score: 0 }
             ]
           }
         ]
@@ -403,9 +289,6 @@ export default function FRATFormBuilder() {
   };
 
   const handleAddField = (sectionId: string) => {
-    const section = currentTemplate?.sections.find(s => s.id === sectionId);
-    if (!section) return;
-
     setEditingField({
       id: `field-${Date.now()}`,
       name: '',
@@ -544,11 +427,11 @@ export default function FRATFormBuilder() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-3xl font-bold flex items-center space-x-2">
-            <Settings className="h-8 w-8 text-primary" />
-            <span>FRAT Form Builder</span>
+            <Wrench className="h-8 w-8 text-primary" />
+            <span>GRAT Form Builder</span>
           </h1>
           <p className="text-muted-foreground mt-2">
-            Configure form sections, fields, and risk scoring for Flight Risk Assessment Tools
+            Configure form sections, fields, and risk scoring for Ground Risk Assessment Tools
           </p>
         </div>
 
@@ -948,7 +831,7 @@ export default function FRATFormBuilder() {
               <div className="space-y-2">
                 <Label>Form Type</Label>
                 <div className="p-2 border rounded-md bg-muted text-muted-foreground">
-                  FRAT (Flight Risk Assessment Tool)
+                  GRAT (Ground Risk Assessment Tool)
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Type is fixed for this builder.
@@ -1000,7 +883,7 @@ export default function FRATFormBuilder() {
                   onChange={(e) =>
                     setEditingSection({ ...editingSection, title: e.target.value })
                   }
-                  placeholder="e.g., Flight Information"
+                  placeholder="e.g., Maintenance Tasks"
                 />
               </div>
 
@@ -1011,7 +894,7 @@ export default function FRATFormBuilder() {
                   onChange={(e) =>
                     setEditingSection({ ...editingSection, name: e.target.value })
                   }
-                  placeholder="e.g., flight-information"
+                  placeholder="e.g., maintenance-tasks"
                 />
                 <p className="text-xs text-muted-foreground">
                   Used for internal identification (lowercase, no spaces)
@@ -1135,7 +1018,7 @@ function FieldEditorDialog({ open, field, onClose, onSave, onFieldChange }: Fiel
                 <Input
                   value={field.label}
                   onChange={(e) => onFieldChange({ ...field, label: e.target.value })}
-                  placeholder="e.g., Captain Experience"
+                  placeholder="e.g., Tech Experience"
                 />
               </div>
 
@@ -1144,7 +1027,7 @@ function FieldEditorDialog({ open, field, onClose, onSave, onFieldChange }: Fiel
                 <Input
                   value={field.name}
                   onChange={(e) => onFieldChange({ ...field, name: e.target.value })}
-                  placeholder="e.g., captainExperience"
+                  placeholder="e.g., techExperience"
                 />
               </div>
             </div>

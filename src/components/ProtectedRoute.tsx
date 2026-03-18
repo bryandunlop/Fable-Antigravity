@@ -6,6 +6,7 @@ import { Shield, AlertTriangle } from 'lucide-react';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   userRole: string;
+  additionalRoles?: string[];
   allowedRoles: string[];
   fallbackPath?: string;
 }
@@ -13,10 +14,11 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ 
   children, 
   userRole, 
+  additionalRoles = [],
   allowedRoles, 
   fallbackPath = '/' 
 }: ProtectedRouteProps) {
-  const hasAccess = allowedRoles.includes(userRole);
+  const hasAccess = allowedRoles.includes(userRole) || additionalRoles.some(role => allowedRoles.includes(role));
 
   if (!hasAccess) {
     return (

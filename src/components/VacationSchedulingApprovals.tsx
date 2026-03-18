@@ -17,7 +17,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 
-export type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical';
+export type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical' | 'PBST Accrual';
 export type RequestStatus = 'pending_scheduling' | 'denied_by_scheduling' | 'tentative_scheduling' | 'pending_manager' | 'denied_by_manager' | 'tentative_manager' | 'approved_awaiting_confirmation' | 'confirmed';
 
 export interface Comment {
@@ -64,6 +64,53 @@ export function VacationSchedulingApprovals({ requests, onUpdateRequests }: Vaca
     { id: 'n3', message: 'Manager approved Sarah Williams medical leave', time: '1 day ago', unread: false }
   ]);
 
+  const [flightActivities] = useState([
+    { id: 'fa1', crewMemberId: 'user2', crewMemberName: 'Mike Johnson', type: 'Flight', date: '2025-01-10', detail: 'GS001 KATL-KJFK' },
+    { id: 'fa2', crewMemberId: 'user1', crewMemberName: 'John Smith', type: 'Training', date: '2025-01-20', detail: 'Recurrent Sim' },
+  ]);
+
+  const [pbstAccrualsDetected, setPbstAccrualsDetected] = useState<string[]>([]);
+
+  // Auto-detect PBST conflicts (Activity on a confirmed PBST day)
+  React.useEffect(() => {
+    const confirmedPBSTs = requests.filter(r => r.requestType === 'Payback Stop' && r.status === 'confirmed');
+    
+    confirmedPBSTs.forEach(pbst => {
+      const conflict = flightActivities.find(fa => 
+        fa.crewMemberId === pbst.submitterId && 
+        fa.date >= pbst.startDate && 
+        fa.date <= pbst.endDate
+      );
+
+      if (conflict && !pbstAccrualsDetected.includes(`${conflict.id}-${pbst.id}`)) {
+        // Create an automated accrual request
+        const accrualRequest: VacationRequest = {
+          id: `accrual-${Date.now()}-${pbst.id}`,
+          submitterId: pbst.submitterId,
+          submitterName: pbst.submitterName,
+          submitterPosition: pbst.submitterPosition,
+          requestType: 'PBST Accrual',
+          startDate: conflict.date,
+          endDate: conflict.date,
+          daysRequested: 1,
+          status: 'pending_scheduling',
+          comments: [{
+            id: `c-auto-${Date.now()}`,
+            author: 'System',
+            role: 'scheduling',
+            comment: `AUTOMATED: Activity (${conflict.type}: ${conflict.detail}) detected on scheduled PBST day. Requesting balance accrual.`,
+            timestamp: new Date()
+          }],
+          submittedDate: new Date(),
+          lastModified: new Date()
+        };
+
+        onUpdateRequests([...requests, accrualRequest]);
+        setPbstAccrualsDetected(prev => [...prev, `${conflict.id}-${pbst.id}`]);
+      }
+    });
+  }, [requests, flightActivities, pbstAccrualsDetected, onUpdateRequests]);
+
   const handleSchedulingAction = (request: VacationRequest, action: 'approved' | 'tentative' | 'denied') => {
     setSelectedRequest(request);
     setActionType(action);
@@ -93,7 +140,7 @@ export function VacationSchedulingApprovals({ requests, onUpdateRequests }: Vaca
       lastModified: new Date()
     };
 
-    setRequests(requests.map(r => r.id === selectedRequest.id ? updatedRequest : r));
+    onUpdateRequests(requests.map(r => r.id === selectedRequest.id ? updatedRequest : r));
     setActionDialogOpen(false);
     setSchedulingComment('');
     setActionType(null);
@@ -122,10 +169,14 @@ export function VacationSchedulingApprovals({ requests, onUpdateRequests }: Vaca
       lastModified: new Date()
     };
 
-    setRequests(requests.map(r => r.id === selectedRequest.id ? updatedRequest : r));
+    onUpdateRequests(requests.map(r => r.id === selectedRequest.id ? updatedRequest : r));
     setConfirmDialogOpen(false);
 
     alert(`Request confirmed and added to Vacation Master Calendar. ${selectedRequest.submitterName} has been notified.`);
+    
+    if (selectedRequest.requestType === 'PBST Accrual') {
+      alert(`PBST balance for ${selectedRequest.submitterName} has been increased by 1.`);
+    }
   };
 
   const getStatusBadge = (status: RequestStatus) => {
@@ -280,6 +331,12 @@ export function VacationSchedulingApprovals({ requests, onUpdateRequests }: Vaca
                         {getStatusBadge(request.status)}
                       </CardTitle>
                       <CardDescription className="mt-2">
+                        {request.requestType === 'PBST Accrual' && (
+                          <div className="flex items-center gap-1 text-orange-600 mb-2 font-medium">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span>System Detected Activity Conflict</span>
+                          </div>
+                        )}
                         <strong>{request.requestType}</strong> | {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()} ({request.daysRequested} days)
                       </CardDescription>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -555,7 +612,7 @@ export function VacationSchedulingApprovals({ requests, onUpdateRequests }: Vaca
                       'Add any additional comments...'
                 }
                 value={schedulingComment}
-                onChange={(e) => setSchedulingComment(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSchedulingComment(e.target.value)}
                 rows={4}
               />
             </div>
@@ -605,6 +662,9 @@ export function VacationSchedulingApprovals({ requests, onUpdateRequests }: Vaca
                   <li>Send a confirmation notification to the crew member</li>
                   {selectedRequest?.requestType === 'Payback Stop' && (
                     <li>Deduct 1 day from the crew member&apos;s PBST balance</li>
+                  )}
+                  {selectedRequest?.requestType === 'PBST Accrual' && (
+                    <li>Add 1 day to the crew member&apos;s PBST balance</li>
                   )}
                 </ul>
               </AlertDescription>

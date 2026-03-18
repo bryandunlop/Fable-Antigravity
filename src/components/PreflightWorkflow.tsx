@@ -24,7 +24,7 @@ import {
   X
 } from 'lucide-react';
 import { format, differenceInDays, parseISO, addDays, addHours, startOfDay } from 'date-fns';
-import EnhancedFRATForm from './EnhancedFRATForm';
+import StandaloneFRATForm from './StandaloneFRATForm';
 import { useFuelRequests } from './contexts/FuelRequestContext';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -972,7 +972,7 @@ export default function PreflightWorkflow() {
 
     return (
       <div className="space-y-6">
-        <EnhancedFRATForm
+        <StandaloneFRATForm
           initialData={{
             flightNumber: trip?.tripNumber,
             aircraft: trip?.tailNumber,

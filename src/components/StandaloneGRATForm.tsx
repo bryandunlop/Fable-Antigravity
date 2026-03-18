@@ -10,6 +10,7 @@ import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Progress } from './ui/progress';
 import { toast } from 'sonner';
+import { useNotificationContext } from './contexts/NotificationContext';
 import {
   Shield,
   AlertTriangle,
@@ -30,25 +31,44 @@ import {
   Sliders
 } from 'lucide-react';
 
-interface GRATItem {
+export interface GRATItem {
   id: string;
   label: string;
   score: number;
   selected: boolean;
 }
 
-interface GRATSection {
+export interface GRATSection {
   title: string;
   icon: React.ElementType;
   items: GRATItem[];
 }
 
-interface EnhancedGRATFormProps {
+export interface GRATSubmission {
+  id: string;
+  technicianName: string;
+  taskDate: string;
+  startTime: string;
+  status: 'Draft' | 'Pending' | 'Approved' | 'Rejected' | 'Requires Review';
+  totalScore: number;
+  maxScore: number;
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
+  submittedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewComments?: string;
+  mitigationNotes?: string;
+  additionalNotes?: string;
+  flaggedItems: string[];
+}
+
+
+interface StandaloneGRATFormProps {
   userRole: string;
   userName?: string;
 }
 
-export default function EnhancedGRATForm({ userRole, userName = 'Current User' }: EnhancedGRATFormProps) {
+export default function StandaloneGRATForm({ userRole, userName = 'Current User' }: StandaloneGRATFormProps) {
   const navigate = useNavigate();
 
   // Basic maintenance information - auto-populated
@@ -166,13 +186,14 @@ export default function EnhancedGRATForm({ userRole, userName = 'Current User' }
 
   // Determine risk level based on score
   const getRiskLevel = (score: number) => {
-    if (score <= 10) return { level: 'low', color: 'green', label: 'Low Risk' };
-    if (score <= 20) return { level: 'medium', color: 'yellow', label: 'Medium Risk' };
-    return { level: 'high', color: 'red', label: 'High Risk' };
+    if (score >= 25) return { level: 'no-go', color: 'black', label: 'No-Go' };
+    if (score >= 20) return { level: 'high', color: 'red', label: 'High Risk' };
+    if (score >= 11) return { level: 'medium', color: 'yellow', label: 'Medium Risk' };
+    return { level: 'low', color: 'green', label: 'Low Risk' };
   };
 
   const riskLevel = getRiskLevel(totalScore);
-  const mitigationRequired = totalScore > 10;
+  const mitigationRequired = totalScore >= 20;
 
   // Toggle item selection
   const handleItemToggle = (sectionIndex: number, itemIndex: number) => {
@@ -183,6 +204,8 @@ export default function EnhancedGRATForm({ userRole, userName = 'Current User' }
     });
   };
 
+  const { addNotification } = useNotificationContext();
+
   // Handle form submission
   const handleSubmit = (status: 'draft' | 'submitted') => {
     if (!taskDate || !startTime || !technicianName) {
@@ -190,7 +213,67 @@ export default function EnhancedGRATForm({ userRole, userName = 'Current User' }
       return;
     }
 
-    // Here you would save to database
+    const flaggedItems = gratSections.flatMap(section => 
+      section.items.filter(item => item.selected).map(item => item.label)
+    );
+
+    let finalStatus: GRATSubmission['status'] = status === 'draft' ? 'Draft' : 'Pending';
+    
+    if (status === 'submitted') {
+      if (totalScore >= 25) {
+        toast.error('NO GO: Ground risk score is 25 or above. Task rejected automatically.');
+        finalStatus = 'Rejected';
+      } else if (totalScore >= 20) {
+        if (!mitigationNotes.trim()) {
+          toast.error('Required: Please provide Mitigation Strategies for scores 20-24.');
+          return;
+        }
+        finalStatus = 'Requires Review';
+        
+        // Dispatched Notification
+        addNotification({
+          title: 'Submitted GRAT Needs Approval',
+          message: `Task by ${technicianName} has a GRAT score of ${totalScore}. Approval required from Scheduling Manager and Director of Maintenance or Chief Inspector.`,
+          type: 'safety',
+          priority: 'high',
+          module: 'Safety Systems',
+          relatedId: `GRAT_${Date.now()}`,
+          actionUrl: '/grat/review',
+          actionText: 'Review GRAT'
+        });
+      } else if (totalScore >= 11) {
+        finalStatus = 'Requires Review';
+      } else {
+        finalStatus = 'Approved';
+      }
+    }
+
+    const submission: GRATSubmission = {
+      id: `GRAT_${Date.now()}`,
+      technicianName,
+      taskDate,
+      startTime,
+      status: finalStatus,
+      totalScore,
+      maxScore: 60, // Arbitrary max based on summing all if needed, but not critical
+      riskLevel: riskLevel.level === 'low' ? 'Low' : riskLevel.level === 'medium' ? 'Medium' : 'High',
+      submittedAt: new Date().toISOString(),
+      mitigationNotes,
+      additionalNotes,
+      flaggedItems
+    };
+
+    const savedSubmissions = localStorage.getItem('grat_submissions');
+    const existingSubmissions: GRATSubmission[] = savedSubmissions ? JSON.parse(savedSubmissions) : [];
+    existingSubmissions.push(submission);
+    localStorage.setItem('grat_submissions', JSON.stringify(existingSubmissions));
+
+    if (finalStatus === 'Rejected') {
+      toast.error('Task rejected and saved.');
+      navigate('/maintenance-hub');
+      return;
+    }
+
     toast.success(`GRAT ${status === 'draft' ? 'saved as draft' : 'submitted successfully'}`);
 
     if (status === 'submitted') {
@@ -210,7 +293,7 @@ export default function EnhancedGRATForm({ userRole, userName = 'Current User' }
         <div>
           <h1 className="flex items-center gap-2 text-muted-foreground mb-2">
             <Wrench className="w-8 h-8" />
-            Submit GRAT
+            Standalone GRAT
           </h1>
           <p className="text-sm text-muted-foreground">
             Ground Risk Assessment Tool - Gulfstream G650

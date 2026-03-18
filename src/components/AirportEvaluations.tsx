@@ -32,6 +32,7 @@ interface RunwayData {
   width: number;
   slope: number;
   pcn: string;
+  pcr: string;
 }
 
 interface InstrumentApproach {
@@ -67,6 +68,9 @@ interface Airport {
   lastReviewed: string;
   reviewedBy: string;
   aircraft: string;
+  unauthorized?: boolean;
+  unauthorizedReason?: string;
+  weightLimits?: string;
 }
 
 interface ChangeRequest {
@@ -115,7 +119,8 @@ export default function AirportEvaluations() {
           lda: 5998,
           width: 150,
           slope: 0,
-          pcn: '25/F/C/X/T DW80'
+          pcn: '25/F/C/X/T DW80',
+          pcr: 'TBD'
         },
         {
           runway: 'RWY23',
@@ -124,7 +129,8 @@ export default function AirportEvaluations() {
           lda: 5998,
           width: 150,
           slope: 0,
-          pcn: '25/F/C/X/T DW80'
+          pcn: '25/F/C/X/T DW80',
+          pcr: 'TBD'
         }
       ],
       approaches: [
@@ -149,7 +155,8 @@ export default function AirportEvaluations() {
       status: 'active',
       lastReviewed: '2024-10-08',
       reviewedBy: 'CL350',
-      aircraft: 'CL350'
+      aircraft: 'CL350',
+      weightLimits: 'DW80'
     },
     {
       id: 'apt-002',
@@ -166,7 +173,8 @@ export default function AirportEvaluations() {
           lda: 7000,
           width: 150,
           slope: 0.1,
-          pcn: '40/F/C/X/T DW110'
+          pcn: '40/F/C/X/T DW110',
+          pcr: 'TBD'
         },
         {
           runway: 'RWY24',
@@ -175,7 +183,8 @@ export default function AirportEvaluations() {
           lda: 7000,
           width: 150,
           slope: 0.1,
-          pcn: '40/F/C/X/T DW110'
+          pcn: '40/F/C/X/T DW110',
+          pcr: 'TBD'
         },
         {
           runway: 'RWY19',
@@ -184,7 +193,8 @@ export default function AirportEvaluations() {
           lda: 6013,
           width: 150,
           slope: 0,
-          pcn: '40/F/C/X/T DW110'
+          pcn: '40/F/C/X/T DW110',
+          pcr: 'TBD'
         },
         {
           runway: 'RWY01',
@@ -193,7 +203,8 @@ export default function AirportEvaluations() {
           lda: 6013,
           width: 150,
           slope: 0,
-          pcn: '40/F/C/X/T DW110'
+          pcn: '40/F/C/X/T DW110',
+          pcr: 'TBD'
         }
       ],
       approaches: [
@@ -236,7 +247,8 @@ export default function AirportEvaluations() {
           lda: 7006,
           width: 100,
           slope: 0.7,
-          pcn: '50/R/B/W/T'
+          pcn: '50/R/B/W/T',
+          pcr: 'TBD'
         },
         {
           runway: 'RWY33',
@@ -245,7 +257,8 @@ export default function AirportEvaluations() {
           lda: 8006,
           width: 100,
           slope: 0.7,
-          pcn: '50/R/B/W/T'
+          pcn: '50/R/B/W/T',
+          pcr: 'TBD'
         }
       ],
       approaches: [
@@ -286,7 +299,8 @@ export default function AirportEvaluations() {
           lda: 8001,
           width: 150,
           slope: 0,
-          pcn: '75/F/A/W/T'
+          pcn: '75/F/A/W/T',
+          pcr: 'TBD'
         },
         {
           runway: 'RWY34R',
@@ -295,7 +309,8 @@ export default function AirportEvaluations() {
           lda: 8001,
           width: 150,
           slope: 0,
-          pcn: '75/F/A/W/T'
+          pcn: '75/F/A/W/T',
+          pcr: 'TBD'
         },
         {
           runway: 'RWY16R',
@@ -304,7 +319,8 @@ export default function AirportEvaluations() {
           lda: 4013,
           width: 75,
           slope: 0.1,
-          pcn: '30/F/C/X/T'
+          pcn: '30/F/C/X/T',
+          pcr: 'TBD'
         }
       ],
       approaches: [
@@ -329,7 +345,52 @@ export default function AirportEvaluations() {
       status: 'active',
       lastReviewed: '2024-11-28',
       reviewedBy: 'G650',
-      aircraft: 'G650'
+      aircraft: 'G650',
+      weightLimits: '75,000 lbs MTOW'
+    },
+    {
+      id: 'apt-005',
+      icao: 'KSMO',
+      name: 'Santa Monica',
+      tower: true,
+      attendedHours: '0700-2100L',
+      elevation: 177,
+      runways: [
+        {
+          runway: 'RWY03',
+          tora: 3500,
+          toda: 3500,
+          lda: 3500,
+          width: 60,
+          slope: 0.5,
+          pcn: '15/F/C/X/T',
+          pcr: 'Low'
+        }
+      ],
+      approaches: [
+        { runway: 'RWY21', type: 'RNAV(GPS)', glidepath: 3 }
+      ],
+      runwayLighting: 'MIRL',
+      mountainous: false,
+      obstructions: 'Residential area surrounds airport',
+      firefighting: 'On-field station',
+      fboName: 'Atlantic Aviation',
+      fboPhone: '310.396.6023',
+      fboHours: '0700-2100L',
+      fboLocation: 'Main ramp',
+      restArea: true,
+      jetAAvailable: true,
+      deicingCapability: 'N',
+      hangarSpace: 'Very limited',
+      opsNotes: 'Strict noise enforcement.',
+      limitations: 'Weight limit 95,000 lbs. Pattern restrictions.',
+      status: 'active',
+      lastReviewed: '2024-11-15',
+      reviewedBy: 'Admin',
+      aircraft: 'All',
+      unauthorized: true,
+      unauthorizedReason: 'Company policy: Runway length insufficient for safe margins with current fleet operations under various conditions.',
+      weightLimits: '95,000 lbs'
     }
   ];
 
@@ -699,6 +760,12 @@ export default function AirportEvaluations() {
                         Mountainous
                       </span>
                     )}
+                    {airport.unauthorized && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
+                        <XCircle className="w-3 h-3" />
+                        UNAUTHORIZED
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid md:grid-cols-4 gap-4 text-sm">
@@ -731,6 +798,18 @@ export default function AirportEvaluations() {
                         <div>
                           <p className="text-sm font-semibold text-orange-900">Limitations</p>
                           <p className="text-sm text-orange-800">{airport.limitations}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {airport.unauthorized && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <XCircle className="w-4 h-4 text-red-600 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-red-900">Unauthorized Reason</p>
+                          <p className="text-sm text-red-800">{airport.unauthorizedReason}</p>
                         </div>
                       </div>
                     </div>

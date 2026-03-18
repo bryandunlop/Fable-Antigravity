@@ -1,23 +1,57 @@
-const CACHE_NAME = 'aviation-ms-v1';
-const ASSETS_TO_CACHE = [
-    '/',
-    '/index.html',
-    '/manifest.json',
-    '/vite.svg'
-];
+// Service Worker for Aviation Management System
+// Handles background push notifications and notification clicks
 
-self.addEventListener('install', (event) => {
+self.addEventListener('push', (event) => {
+    if (event.data) {
+        const data = event.data.json();
+        const options = {
+            body: data.message,
+            icon: '/icons/icon-192x192.png', // Fallback icon
+            badge: '/icons/badge-72x72.png',
+            vibrate: [100, 50, 100],
+            data: {
+                url: data.actionUrl || '/'
+            },
+            actions: data.actionText ? [
+                {
+                    action: 'view',
+                    title: data.actionText
+                }
+            ] : []
+        };
+
+        event.waitUntil(
+            self.registration.showNotification(data.title, options)
+        );
+    }
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const urlToOpen = event.notification.data.url;
+
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(ASSETS_TO_CACHE);
+        clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        }).then((windowClients) => {
+            // If a window is already open, focus it and navigate
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url === urlToOpen && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // If no window is open, open a new one
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
         })
     );
 });
 
-self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        caches.match(event.request).then((response) => {
-            return response || fetch(event.request);
-        })
-    );
+// Self-destruct old service workers if necessary
+self.addEventListener('activate', (event) => {
+    event.waitUntil(clients.claim());
 });

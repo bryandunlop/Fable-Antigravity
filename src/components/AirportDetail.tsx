@@ -9,6 +9,7 @@ import {
   Clock,
   AlertCircle,
   CheckCircle,
+  XCircle,
   Edit,
   Download,
   Fuel,
@@ -26,6 +27,7 @@ interface RunwayData {
   width: number;
   slope: number;
   pcn: string;
+  pcr: string;
 }
 
 interface InstrumentApproach {
@@ -66,6 +68,9 @@ interface Airport {
   lastReviewed: string;
   reviewedBy: string;
   aircraft: string;
+  unauthorized?: boolean;
+  unauthorizedReason?: string;
+  weightLimits?: string;
 }
 
 interface AirportDetailProps {
@@ -103,6 +108,12 @@ export default function AirportDetail({ airport, onBack, onSubmitCorrection }: A
                   Mountainous
                 </span>
               )}
+              {airport.unauthorized && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-red-100 text-red-700 font-bold uppercase tracking-wider">
+                  <XCircle className="w-4 h-4" />
+                  Unauthorized
+                </span>
+              )}
             </div>
             <p className="text-xl text-muted-foreground">{airport.name}</p>
             <p className="text-sm text-muted-foreground mt-1">
@@ -120,6 +131,16 @@ export default function AirportDetail({ airport, onBack, onSubmitCorrection }: A
             </Button>
           </div>
         </div>
+        
+        {airport.unauthorized && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-lg font-semibold text-red-900 mb-1">UNAUTHORIZED STATUS</h3>
+              <p className="text-red-800">{airport.unauthorizedReason}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Basic Airport Data */}
@@ -164,9 +185,13 @@ export default function AirportDetail({ airport, onBack, onSubmitCorrection }: A
               )}
             </div>
           </div>
-          <div className="md:col-span-2">
+          <div className="md:col-span-1">
             <p className="text-sm text-muted-foreground mb-1">Aircraft Type</p>
             <p className="font-medium">{airport.aircraft}</p>
+          </div>
+          <div className="md:col-span-1">
+            <p className="text-sm text-muted-foreground mb-1">Weight Limits</p>
+            <p className="font-medium">{airport.weightLimits || 'Not specified'}</p>
           </div>
         </div>
       </Card>
@@ -186,8 +211,9 @@ export default function AirportDetail({ airport, onBack, onSubmitCorrection }: A
                 <th className="text-right py-2 px-3">TODA</th>
                 <th className="text-right py-2 px-3">LDA</th>
                 <th className="text-right py-2 px-3">Width</th>
-                <th className="text-right py-2 px-3">Rwy Slope</th>
-                <th className="text-left py-2 px-3">PCN/Wt Bearing</th>
+                 <th className="text-right py-2 px-3">Rwy Slope</th>
+                <th className="text-left py-2 px-3">PCN</th>
+                <th className="text-left py-2 px-3">PCR</th>
               </tr>
             </thead>
             <tbody>
@@ -198,8 +224,9 @@ export default function AirportDetail({ airport, onBack, onSubmitCorrection }: A
                   <td className="py-3 px-3 text-right">{runway.toda}</td>
                   <td className="py-3 px-3 text-right">{runway.lda}</td>
                   <td className="py-3 px-3 text-right">{runway.width}</td>
-                  <td className="py-3 px-3 text-right">{runway.slope}%</td>
+                   <td className="py-3 px-3 text-right">{runway.slope}%</td>
                   <td className="py-3 px-3">{runway.pcn}</td>
+                  <td className="py-3 px-3 italic text-muted-foreground">{runway.pcr || 'TBD'}</td>
                 </tr>
               ))}
             </tbody>

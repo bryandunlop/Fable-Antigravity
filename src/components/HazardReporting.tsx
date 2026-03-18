@@ -568,7 +568,6 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
                   <TableHead>Current Reviewer</TableHead>
                   <TableHead>Effectiveness Review</TableHead>
                   <TableHead>Reported</TableHead>
-                  <TableHead>Visible To</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -655,13 +654,6 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
                             {new Date(hazard.reportedDate).toLocaleDateString()}
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {hazard.isPublished ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Public</Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">Private</Badge>
-                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">

@@ -53,17 +53,9 @@ import { toast } from 'sonner';
 import { useHazards, WORKFLOW_STAGES } from '../contexts/HazardContext';
 import { useNotificationContext } from './contexts/NotificationContext';
 import ProgressTracker, { PHASES } from './HazardWorkflow/ProgressTracker';
-import { ForeFlightLogo } from './ui/ForeFlightLogo';
+import { SYSTEM_USERS } from '../lib/mockUsers';
 
-const MOCK_USERS = [
-  { id: 'u1', name: 'Captain Smith', email: 'csmith@example.com', role: 'Chief Pilot' },
-  { id: 'u2', name: 'Jane Doe', email: 'jdoe@example.com', role: 'Safety Manager' },
-  { id: 'u3', name: 'Mike Ross', email: 'mross@example.com', role: 'Director of Maintenance' },
-  { id: 'u4', name: 'Dr. House', email: 'house@example.com', role: 'Medical' },
-  { id: 'u5', name: 'Officer John', email: 'john@example.com', role: 'Security' },
-  { id: 'u6', name: 'Sarah Connor', email: 'sarah@example.com', role: 'VP' },
-  { id: 'u7', name: 'Tom Cruise', email: 'tom@example.com', role: 'Flight Attendant Manager' },
-];
+
 
 export default function HazardWorkflow() {
   const { id } = useParams();
@@ -80,6 +72,12 @@ export default function HazardWorkflow() {
   const [showRCAWizard, setShowRCAWizard] = useState(false);
   const [activeAssignmentType, setActiveAssignmentType] = useState<'processOwner' | 'approver' | null>(null);
   const [showBulletinDialog, setShowBulletinDialog] = useState(false); // Bulletin Feature
+  
+  // Data Sharing Toggles for Assignment
+  const [includeDescription, setIncludeDescription] = useState(true);
+  const [includeRisk, setIncludeRisk] = useState(false);
+  const [includeRCA, setIncludeRCA] = useState(false);
+  const [includeNotes, setIncludeNotes] = useState(false);
 
   // Data States (Risk, RCA, PACE)
   const [riskSeverity, setRiskSeverity] = useState(3);
@@ -757,7 +755,6 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 {/* Formal Header */}
                 <div className="border-b p-6 flex justify-between items-start bg-slate-50">
                   <div>
-                    <ForeFlightLogo className="h-8 w-auto mb-4 text-slate-800" />
                     <h1 className="text-2xl font-serif font-bold text-slate-900">Safety Investigation Report</h1>
                     <p className="text-sm text-slate-500 uppercase tracking-widest mt-1">Confidential & Proprietary</p>
                   </div>
@@ -847,58 +844,105 @@ The mitigation has been implemented and verified for effectiveness over the moni
     </Dialog>
   );
 
-  const AssignmentModal = () => (
-    <Dialog open={activeAssignmentType !== null} onOpenChange={(open) => !open && setActiveAssignmentType(null)}>
-      <DialogContent className="max-w-2xl bg-white shadow-2xl border-0 overflow-hidden">
-        <div className={`absolute top-0 left-0 w-full h-2 ${activeAssignmentType === 'processOwner' ? 'bg-purple-500' : 'bg-blue-500'}`} />
-        <DialogHeader className="pt-6 px-6">
-          <DialogTitle className="flex items-center gap-2 text-2xl">
-            {activeAssignmentType === 'processOwner' ? (
-              <>
-                <div className="bg-purple-100 p-2 rounded-full"><UserCog className="w-6 h-6 text-purple-600" /></div>
-                Manage Process Owners
-              </>
-            ) : (
-              <>
-                <div className="bg-blue-100 p-2 rounded-full"><ShieldCheck className="w-6 h-6 text-blue-600" /></div>
-                Manage Approvers
-              </>
-            )}
-          </DialogTitle>
-          <DialogDescription className="text-gray-500 text-base">
-            {activeAssignmentType === 'processOwner'
-              ? "Assign responsibilities for developing corrective actions. You can assign multiple owners."
-              : "Designate specific roles required to approve the mitigation plan."}
-          </DialogDescription>
-        </DialogHeader>
+  const AssignmentModal = () => {
+    
+    // Regenerate the shared summary when toggles or hazard data changes
+    useEffect(() => {
+      if (activeAssignmentType !== null && hazard) {
+        let draft = '';
+        
+        if (includeDescription) {
+          draft += `**Hazard Description:**\n${hazard.description || 'N/A'}\n\n`;
+        }
+        
+        if (includeRisk) {
+          draft += `**Risk Assessment:**\nScore: ${riskSeverity + riskLikelihood} (Severity: ${riskSeverity}, Likelihood: ${riskLikelihood})\n\n`;
+        }
+        
+        if (includeRCA) {
+          draft += `**Root Cause (5 Whys):**\n${whyAnalysis[4] || whyAnalysis[3] || whyAnalysis[0] || 'N/A'}\n\n`;
+        }
+        
+        if (includeNotes) {
+          draft += `**Investigation Notes:**\n${investigationNotes || 'N/A'}\n\n`;
+        }
+        
+        setSharedReportSummary(draft.trim());
+      }
+    }, [activeAssignmentType, hazard, includeDescription, includeRisk, includeRCA, includeNotes, riskSeverity, riskLikelihood, whyAnalysis, investigationNotes]);
 
-        <div className="px-6 py-4 max-h-[60vh] overflow-y-auto space-y-6">
+    return (
+      <Dialog open={activeAssignmentType !== null} onOpenChange={(open) => !open && setActiveAssignmentType(null)}>
+        <DialogContent className="max-w-2xl bg-white shadow-2xl border-0 overflow-hidden">
+          <div className={`absolute top-0 left-0 w-full h-2 ${activeAssignmentType === 'processOwner' ? 'bg-purple-500' : 'bg-blue-500'}`} />
+          <DialogHeader className="pt-6 px-6">
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              {activeAssignmentType === 'processOwner' ? (
+                <>
+                  <div className="bg-purple-100 p-2 rounded-full"><UserCog className="w-6 h-6 text-purple-600" /></div>
+                  Manage Process Owners
+                </>
+              ) : (
+                <>
+                  <div className="bg-blue-100 p-2 rounded-full"><ShieldCheck className="w-6 h-6 text-blue-600" /></div>
+                  Manage Approvers
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-gray-500 text-base">
+              {activeAssignmentType === 'processOwner'
+                ? "Assign responsibilities for developing corrective actions. You can assign multiple owners."
+                : "Designate specific roles required to approve the mitigation plan."}
+            </DialogDescription>
+          </DialogHeader>
 
-          {/* De-identification Banner & Shared Summary */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="px-6 py-4 max-h-[60vh] overflow-y-auto space-y-6">
+
+            {/* De-identification Banner & Shared Summary */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">De-identification & Information Sharing</p>
+                  <p className="text-xs text-amber-700">Select which investigation details to include for the assignee. Reporter identity will be automatically omitted to preserve confidentiality.</p>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap gap-4 pt-2 border-t border-amber-200/50">
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="inc-desc" checked={includeDescription} onCheckedChange={(c: boolean) => setIncludeDescription(!!c)} />
+                  <label htmlFor="inc-desc" className="text-sm font-medium text-amber-900 cursor-pointer">Description</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="inc-risk" checked={includeRisk} onCheckedChange={(c: boolean) => setIncludeRisk(!!c)} />
+                  <label htmlFor="inc-risk" className="text-sm font-medium text-amber-900 cursor-pointer">Risk Score</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="inc-rca" checked={includeRCA} onCheckedChange={(c: boolean) => setIncludeRCA(!!c)} />
+                  <label htmlFor="inc-rca" className="text-sm font-medium text-amber-900 cursor-pointer">Root Cause</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="inc-notes" checked={includeNotes} onCheckedChange={(c: boolean) => setIncludeNotes(!!c)} />
+                  <label htmlFor="inc-notes" className="text-sm font-medium text-amber-900 cursor-pointer">Invest. Notes</label>
+                </div>
+              </div>
+
               <div>
-                <p className="text-sm font-semibold text-amber-900">De-identification Required</p>
-                <p className="text-xs text-amber-700">Only the summary below will be shared with the assignee. Reporter identity and raw report details remain confidential to the Safety Manager.</p>
+                <Label className="text-sm font-medium text-amber-900">Preview/Edit Generated Summary text</Label>
+                <Textarea
+                  value={sharedReportSummary}
+                  onChange={(e) => setSharedReportSummary(e.target.value)}
+                  placeholder="Summary text for the assignee..."
+                  className="mt-1.5 min-h-[120px] bg-white border-amber-200 focus:border-amber-400"
+                />
               </div>
             </div>
-            <div>
-              <Label className="text-sm font-medium text-amber-900">Shared Report Summary (visible to assignee)</Label>
-              <Textarea
-                value={sharedReportSummary}
-                onChange={(e) => setSharedReportSummary(e.target.value)}
-                placeholder="Write a de-identified summary of the hazard for the assignee. Remove any names, identifying details, or sensitive information..."
-                className="mt-1.5 min-h-[80px] bg-white border-amber-200 focus:border-amber-400"
-              />
-            </div>
-          </div>
 
-          {/* List Existing assignments */}
-          <div className="space-y-3">
-            <Label className="uppercase text-xs font-bold text-gray-500 tracking-wider">
-              Current {activeAssignmentType === 'processOwner' ? 'Owners' : 'Approvers'}
-            </Label>
+            {/* List Existing assignments */}
+            <div className="space-y-3">
+              <Label className="uppercase text-xs font-bold text-gray-500 tracking-wider">
+                Current {activeAssignmentType === 'processOwner' ? 'Owners' : 'Approvers'}
+              </Label>
 
             {activeAssignmentType === 'processOwner' && paceAssignments.processOwner.length === 0 && (
               <div className="p-8 text-center border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
@@ -976,7 +1020,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   <div className="space-y-2">
                     <Label>Select User (Optional)</Label>
                     <Select onValueChange={(val: string) => {
-                      const user = MOCK_USERS.find(u => u.id === val);
+                      const user = SYSTEM_USERS.find(u => u.id === val);
                       if (user) {
                         (document.getElementById('new-po-name') as HTMLInputElement).value = user.name;
                         (document.getElementById('new-po-email') as HTMLInputElement).value = user.email;
@@ -984,8 +1028,8 @@ The mitigation has been implemented and verified for effectiveness over the moni
                     }}>
                       <SelectTrigger><SelectValue placeholder="Select from list..." /></SelectTrigger>
                       <SelectContent>
-                        {MOCK_USERS.map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.name} ({u.role})</SelectItem>
+                        {SYSTEM_USERS.map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.name} ({u.department})</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1042,25 +1086,23 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   <div className="space-y-2 col-span-2">
                     <Label>Select User (Optional)</Label>
                     <Select onValueChange={(val: string) => {
-                      const user = MOCK_USERS.find(u => u.id === val);
+                      const user = SYSTEM_USERS.find(u => u.id === val);
                       if (user) {
-                        // For approvers, we might want to auto-select role too if it matches valid roles
-                        // But user asked for user list. Let's populate email and maybe name if we can map it.
-                        // Main issue is Role is required.
-                        // Let's just populate email for now, or match role if possible.
                         const emailEl = document.getElementById('new-ap-email') as HTMLInputElement;
                         if (emailEl) emailEl.value = user.email;
-
-                        // Try to match role text
-                        // This is tricky with uncontrolled select.
-                        // Simplify: Just auto-fill email, user must pick role.
-                        toast.info(`Selected ${user.name}. Please confirm Role.`);
+                        
+                        // Auto-select the first role mapped to the user as a suggested role
+                        if (user.roles.length > 0) {
+                            const hidden = document.getElementById('new-ap-role') as HTMLInputElement;
+                            if (hidden) hidden.value = user.roles[0];
+                        }
+                        toast.info(`Selected ${user.name}. Please confirm or select their Role.`);
                       }
                     }}>
                       <SelectTrigger><SelectValue placeholder="Select from list..." /></SelectTrigger>
                       <SelectContent>
-                        {MOCK_USERS.map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.name} ({u.role})</SelectItem>
+                        {SYSTEM_USERS.map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.name} ({u.department})</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1125,7 +1167,8 @@ The mitigation has been implemented and verified for effectiveness over the moni
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+    );
+  };
 
 
   const saveChanges = (stageOverride?: string) => {
@@ -1183,12 +1226,8 @@ The mitigation has been implemented and verified for effectiveness over the moni
           toast.error("Please assign at least one Process Owner.");
           return;
         }
-        if (paceAssignments.approver.length === 0) {
-          toast.error("Please assign at least one Approver.");
-          return;
-        }
         nextStage = WORKFLOW_STAGES.MITIGATION_DEVELOPMENT;
-        toast.success("PACE Team assigned. Waiting for Process Owner input.");
+        toast.success("Process Owners assigned. Waiting for Process Owner input.");
         break;
 
       case WORKFLOW_STAGES.MITIGATION_DEVELOPMENT:
@@ -1206,6 +1245,10 @@ The mitigation has been implemented and verified for effectiveness over the moni
       case WORKFLOW_STAGES.SM_REVIEW:
         if (!consolidatedPlan) {
           toast.error("Please finalize the Corrective Action Plan.");
+          return;
+        }
+        if (paceAssignments.approver.length === 0) {
+          toast.error("Please assign at least one Approver before sending for approval.");
           return;
         }
         nextStage = WORKFLOW_STAGES.LINE_MANAGER_APPROVAL;
@@ -1321,7 +1364,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
               saveChanges(stage);
               toast.info(`Switched to ${stage}`);
             }}
-            allowNavigation={true}
+            allowNavigation={false}
           />
 
           {/* 1. Report Details (Always Visible) */}
@@ -1520,13 +1563,13 @@ The mitigation has been implemented and verified for effectiveness over the moni
             </Card>
           )}
 
-          {/* 3. Mitigation & PACE Phase */}
+          {/* 3. Mitigation Assignment Phase */}
           {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.ASSIGN_MITIGATION)) && (
-            <Card className="border-l-4 border-l-indigo-500">
+            <Card className="border-l-4 border-l-blue-500 mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-indigo-600" />
-                  Mitigation & PACE Team
+                  <UserCog className="w-5 h-5 text-blue-600" />
+                  Mitigation Assignment
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1557,6 +1600,26 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   ))}
                 </div>
 
+                {/* Input for assigning if in assignment stage */}
+                {currentStage === WORKFLOW_STAGES.ASSIGN_MITIGATION && (
+                  <div className="mt-4 pt-4 border-t border-dashed text-center">
+                    <p className="text-xs text-gray-500 italic">Click on the Process Owners card above to add team members.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 4. PACE Team Approvals */}
+          {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.SM_REVIEW)) && (
+            <Card className="border-l-4 border-l-orange-500 mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-orange-600" />
+                  PACE Approvals
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div
                   className="flex flex-col gap-2 p-3 bg-orange-50 rounded-lg border border-orange-100 cursor-pointer hover:bg-orange-100 transition-colors hover:shadow-md hover:border-orange-300 group"
                   onClick={() => setActiveAssignmentType('approver')}
@@ -1579,9 +1642,9 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 </div>
 
                 {/* Input for assigning if in assignment stage */}
-                {currentStage === WORKFLOW_STAGES.ASSIGN_MITIGATION && (
+                {currentStage === WORKFLOW_STAGES.SM_REVIEW && (
                   <div className="mt-4 pt-4 border-t border-dashed text-center">
-                    <p className="text-xs text-gray-500 italic">Click on the Process Owners or Approvers cards above to add team members.</p>
+                    <p className="text-xs text-gray-500 italic">Click on the Approvers card above to add team members.</p>
                   </div>
                 )}
               </CardContent>

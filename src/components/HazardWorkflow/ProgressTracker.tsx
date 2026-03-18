@@ -62,12 +62,11 @@ export default function ProgressTracker({ currentStage, onStageClick, allowNavig
                 {PHASES.map((phase, index) => {
                     const isCompleted = index < currentPhaseIndex;
                     const isCurrent = index === currentPhaseIndex;
-                    const isClickable = isCompleted || isCurrent || allowNavigation;
+                    const isClickable = allowNavigation;
 
                     return (
                         <div key={phase.id} className="flex flex-col items-center flex-1">
                             <button
-                                // For now, clicking a phase could jump to the first stage of that phase if navigation allowed
                                 onClick={() => isClickable && onStageClick?.(phase.stages[0])}
                                 disabled={!isClickable}
                                 className={`
@@ -75,7 +74,7 @@ export default function ProgressTracker({ currentStage, onStageClick, allowNavig
                                     ${isCompleted ? 'border-green-500 text-green-500' : ''}
                                     ${isCurrent ? 'border-blue-600 text-blue-600 ring-4 ring-blue-50' : ''}
                                     ${!isCompleted && !isCurrent ? 'border-gray-200 text-gray-300' : ''}
-                                    ${isClickable ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed'}
+                                    ${isClickable ? 'cursor-pointer hover:scale-110' : 'cursor-default'}
                                 `}
                             >
                                 {isCompleted ? (

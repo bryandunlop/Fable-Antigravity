@@ -39,6 +39,9 @@ interface AirportSubmission {
     towerFrequency?: string;
     runways?: any[];
     approaches?: any[];
+    unauthorized?: boolean;
+    unauthorizedReason?: string;
+    weightLimits?: string;
   };
   changes?: Record<string, string>;
 }
@@ -50,7 +53,7 @@ export default function AirportEvaluationOfficer() {
   const [enhancedData, setEnhancedData] = useState<any>({});
   const [runways, setRunways] = useState<any[]>([]);
   const [approaches, setApproaches] = useState<any[]>([]);
-  const [newRunway, setNewRunway] = useState({ designation: '', length: '', width: '', surface: '', lighting: '', ils: false });
+  const [newRunway, setNewRunway] = useState({ designation: '', length: '', width: '', surface: '', lighting: '', ils: false, pcn: '', pcr: '' });
   const [newApproach, setNewApproach] = useState({ runway: '', type: '', minimums: '' });
 
   // Mock submissions
@@ -181,7 +184,7 @@ export default function AirportEvaluationOfficer() {
         length: parseInt(newRunway.length),
         width: parseInt(newRunway.width) || 0
       }]);
-      setNewRunway({ designation: '', length: '', width: '', surface: '', lighting: '', ils: false });
+      setNewRunway({ designation: '', length: '', width: '', surface: '', lighting: '', ils: false, pcn: '', pcr: '' });
     }
   };
 
@@ -398,6 +401,12 @@ export default function AirportEvaluationOfficer() {
                                   <p className="font-medium">{runway.pcn}</p>
                                 </div>
                               )}
+                              {runway.pcr && (
+                                <div>
+                                  <p className="text-xs text-muted-foreground">PCR</p>
+                                  <p className="font-medium">{runway.pcr}</p>
+                                </div>
+                              )}
                               <div>
                                 <p className="text-xs text-muted-foreground">ILS</p>
                                 <p className="font-medium">{runway.ils ? '✓ Yes' : 'No'}</p>
@@ -530,6 +539,16 @@ export default function AirportEvaluationOfficer() {
                             <div>
                               <span className="font-medium">ILS:</span> {runway.ils ? 'Yes' : 'No'}
                             </div>
+                            {runway.pcn && (
+                              <div>
+                                <span className="font-medium">PCN:</span> {runway.pcn}
+                              </div>
+                            )}
+                            {runway.pcr && (
+                              <div>
+                                <span className="font-medium">PCR:</span> {runway.pcr}
+                              </div>
+                            )}
                           </div>
                           <Button
                             variant="ghost"
@@ -600,6 +619,20 @@ export default function AirportEvaluationOfficer() {
                       />
                       <label htmlFor="ils" className="text-sm">ILS Available</label>
                     </div>
+                    <input
+                      type="text"
+                      placeholder="PCN"
+                      value={newRunway.pcn}
+                      onChange={(e) => setNewRunway({ ...newRunway, pcn: e.target.value })}
+                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    />
+                    <input
+                      type="text"
+                      placeholder="PCR"
+                      value={newRunway.pcr}
+                      onChange={(e) => setNewRunway({ ...newRunway, pcr: e.target.value })}
+                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    />
                   </div>
                   <Button onClick={handleAddRunway} variant="outline" className="mt-3 w-full" size="sm">
                     <Plus className="w-4 h-4 mr-2" />
@@ -681,6 +714,69 @@ export default function AirportEvaluationOfficer() {
                 <CardTitle>FBO & Services</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Core Data */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Elevation (ft)</label>
+                    <input
+                      type="number"
+                      value={enhancedData.elevation || ''}
+                      onChange={(e) => setEnhancedData({ ...enhancedData, elevation: parseInt(e.target.value) })}
+                      className="w-full p-2 border rounded-md"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Attended Hours</label>
+                    <input
+                      type="text"
+                      value={enhancedData.attendedHours || ''}
+                      onChange={(e) => setEnhancedData({ ...enhancedData, attendedHours: e.target.value })}
+                      className="w-full p-2 border rounded-md"
+                    />
+                  </div>
+                </div>
+
+                {/* Safety & Status */}
+                <div className="space-y-4 p-4 bg-red-50 border border-red-100 rounded-lg">
+                  <h3 className="text-sm font-semibold text-red-900 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Safety & Operational Status
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="unauthorized"
+                      checked={enhancedData.unauthorized || false}
+                      onChange={(e) => setEnhancedData({ ...enhancedData, unauthorized: e.target.checked })}
+                      className="w-4 h-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+                    />
+                    <label htmlFor="unauthorized" className="text-sm font-medium text-red-900">
+                      Mark as UNAUTHORIZED
+                    </label>
+                  </div>
+                  {enhancedData.unauthorized && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-red-900">Unauthorized Reason</label>
+                      <textarea
+                        value={enhancedData.unauthorizedReason || ''}
+                        onChange={(e) => setEnhancedData({ ...enhancedData, unauthorizedReason: e.target.value })}
+                        className="w-full p-2 border border-red-200 rounded-md bg-white min-h-[80px]"
+                        placeholder="Specify why this airport is unauthorized for operations..."
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Weight Limits / Restrictons</label>
+                  <input
+                    type="text"
+                    value={enhancedData.weightLimits || ''}
+                    onChange={(e) => setEnhancedData({ ...enhancedData, weightLimits: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="e.g. 75,000 lbs MTOW"
+                  />
+                </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">FBO Name</label>

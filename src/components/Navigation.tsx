@@ -63,6 +63,7 @@ import {
 
 interface NavigationProps {
   userRole: string;
+  additionalRoles?: string[];
   onLogout: () => void;
   children: React.ReactNode;
 }
@@ -147,7 +148,7 @@ const DraggableNavigationGroup = ({
   );
 };
 
-function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
+function NavigationContent({ userRole, additionalRoles = [], onLogout, children }: NavigationProps) {
   const location = useLocation();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -189,7 +190,7 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
       label: "Flight Operations",
       items: [
         { name: 'Preflight Workflow', href: '/frat', icon: ClipboardList, roles: ['pilot', 'admin'] },
-        { name: 'Enhanced FRAT', href: '/frat/enhanced', icon: Shield, roles: ['pilot', 'admin'] },
+        { name: 'Standalone FRAT', href: '/frat/standalone', icon: Shield, roles: ['pilot', 'admin'] },
         { name: 'My FRAT Submissions', href: '/frat/my-submissions', icon: FileText, roles: ['pilot', 'admin'] },
         { name: 'Airport Evaluations', href: '/airport-evaluations', icon: MapPin, roles: ['pilot', 'admin'] },
         { name: 'Pilot Currency', href: '/pilot-currency', icon: UserCheck, roles: ['pilot', 'admin', 'lead'] },
@@ -237,7 +238,7 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
         { name: 'Airport Services', href: '/airport-services', icon: Building2, roles: ['maintenance', 'admin'] },
         { name: 'Fuel Farm Tracker', href: '/fuel-farm', icon: Fuel, roles: ['maintenance'] },
         { name: 'Maintenance Board', href: '/maintenance', icon: Wrench, roles: ['maintenance', 'admin', 'lead'] },
-        { name: 'Submit GRAT', href: '/grat/enhanced', icon: Shield, roles: ['maintenance', 'admin', 'lead'] },
+        { name: 'Standalone GRAT', href: '/grat/standalone', icon: Shield, roles: ['maintenance', 'admin', 'lead'] },
       ]
     },
     {
@@ -309,6 +310,7 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
         { name: 'Manager Insights', href: '/manager-insights', icon: Layers, roles: ['lead', 'admin'] },
         { name: 'Live Metrics', href: '/live-metrics', icon: Activity, roles: ['lead', 'admin'], description: 'Real-time operations KPIs' },
         { name: 'Critical Functions', href: '/critical-functions', icon: Shield, roles: ['lead', 'admin'] },
+        { name: 'Airport Evaluation Officer', href: '/admin/airport-evaluation-officer', icon: MapPin, roles: ['airport-evaluator', 'admin'] },
         { name: 'Admin Panel', href: '/admin', icon: Settings, roles: ['admin'] },
       ]
     }
@@ -331,10 +333,12 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
   const [navigationGroups, setNavigationGroups] = useState<NavigationGroup[]>(() => {
     const customOrder = loadCustomOrder();
 
-    // Filter groups and items based on user role
+    // Filter groups and items based on user role and additional roles
     const filtered = defaultNavigationGroups.map(group => ({
       ...group,
-      items: group.items.filter(item => item.roles.includes(userRole))
+      items: group.items.filter(item => 
+        item.roles.includes(userRole) || additionalRoles.some(role => item.roles.includes(role))
+      )
     })).filter(group => group.items.length > 0);
 
     if (customOrder) {
@@ -385,7 +389,9 @@ function NavigationContent({ userRole, onLogout, children }: NavigationProps) {
   const resetToDefault = () => {
     const filtered = defaultNavigationGroups.map(group => ({
       ...group,
-      items: group.items.filter(item => item.roles.includes(userRole))
+      items: group.items.filter(item => 
+        item.roles.includes(userRole) || additionalRoles.some(role => item.roles.includes(role))
+      )
     })).filter(group => group.items.length > 0);
 
     setNavigationGroups(filtered);

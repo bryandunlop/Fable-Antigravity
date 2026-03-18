@@ -12,6 +12,7 @@ import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
 import { toast } from 'sonner';
 import JSConfetti from 'js-confetti';
+import { useNotificationContext } from './contexts/NotificationContext';
 import {
   Shield,
   AlertTriangle,
@@ -43,14 +44,14 @@ interface FRATSection {
   items: FRATItem[];
 }
 
-interface EnhancedFRATFormProps {
+interface StandaloneFRATFormProps {
   userRole?: string;
   initialData?: any;
   onClose?: () => void;
   onSave?: (data: any) => void;
 }
 
-export default function EnhancedFRATForm({ userRole = 'pilot', initialData, onClose, onSave }: EnhancedFRATFormProps) {
+export default function StandaloneFRATForm({ userRole = 'pilot', initialData, onClose, onSave }: StandaloneFRATFormProps) {
   const navigate = useNavigate();
   // Use initialData or fall back to defaults
   const flightData = initialData;
@@ -186,13 +187,14 @@ export default function EnhancedFRATForm({ userRole = 'pilot', initialData, onCl
 
   // Determine risk level based on score
   const getRiskLevel = (score: number) => {
-    if (score <= 10) return { level: 'low', color: 'green', label: 'Low Risk' };
-    if (score <= 20) return { level: 'medium', color: 'yellow', label: 'Medium Risk' };
-    return { level: 'high', color: 'red', label: 'High Risk' };
+    if (score >= 25) return { level: 'no-go', color: 'black', label: 'No-Go' };
+    if (score >= 20) return { level: 'high', color: 'red', label: 'High Risk' };
+    if (score >= 11) return { level: 'medium', color: 'yellow', label: 'Medium Risk' };
+    return { level: 'low', color: 'green', label: 'Low Risk' };
   };
 
   const riskLevel = getRiskLevel(totalScore);
-  const mitigationRequired = totalScore > 10;
+  const mitigationRequired = totalScore >= 20;
 
   // Toggle item selection
   const handleItemToggle = (sectionIndex: number, itemIndex: number) => {
@@ -212,9 +214,35 @@ export default function EnhancedFRATForm({ userRole = 'pilot', initialData, onCl
 
   // Success Animation State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const { addNotification } = useNotificationContext();
 
   // Handle form submission
   const handleSubmit = (newStatus: string) => {
+    if (newStatus === 'submitted') {
+      if (totalScore >= 25) {
+        toast.error('NO GO: Flight risk score is 25 or above. Flight rejected automatically.');
+        newStatus = 'Rejected';
+      } else if (totalScore >= 20 && totalScore < 25) {
+        if (!mitigationNotes.trim()) {
+          toast.error('Required: Please provide Mitigation Strategies for scores 20-24.');
+          return;
+        }
+        newStatus = 'Requires Review';
+        
+        // Dispatched Notification
+        addNotification({
+          title: 'Submitted FRAT Needs Approval',
+          message: `Flight ${flightNumber} has a FRAT score of ${totalScore}. Approval required from Scheduling Manager and Chief Pilot or Assistant Chief Pilot.`,
+          type: 'safety',
+          priority: 'high',
+          module: 'Safety Systems',
+          relatedId: flightNumber,
+          actionUrl: '/frat/review',
+          actionText: 'Review FRAT'
+        });
+      }
+    }
+
     setStatus(newStatus);
     const data = {
       flightNumber,
@@ -227,7 +255,8 @@ export default function EnhancedFRATForm({ userRole = 'pilot', initialData, onCl
       sic: sicName,
       items: fratSections,
       totalScore,
-      status: newStatus
+      status: newStatus,
+      mitigationNotes
     };
 
     if (newStatus === 'submitted') {
@@ -243,6 +272,12 @@ export default function EnhancedFRATForm({ userRole = 'pilot', initialData, onCl
         if (onSave) onSave(data);
         if (onClose) onClose();
       }, 2500);
+      return;
+    }
+
+    if (newStatus === 'Rejected') {
+      if (onSave) onSave(data);
+      if (onClose) setTimeout(onClose, 2000);
       return;
     }
 
@@ -283,7 +318,7 @@ export default function EnhancedFRATForm({ userRole = 'pilot', initialData, onCl
               <Shield className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Enhanced FRAT Form</h1>
+              <h1 className="text-2xl font-bold tracking-tight">Standalone FRAT Form</h1>
               <p className="text-sm text-muted-foreground">
                 Flight Risk Assessment Tool - Gulfstream G650
               </p>

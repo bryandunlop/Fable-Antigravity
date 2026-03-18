@@ -81,13 +81,13 @@ const searchableItems: SearchResult[] = [
     keywords: ['frat', 'risk', 'assessment', 'safety', 'flight']
   },
   {
-    id: 'enhanced-frat',
-    title: 'Enhanced FRAT',
-    description: 'Auto-populated Flight Risk Assessment with system integration',
-    href: '/frat/enhanced',
+    id: 'standalone-frat',
+    title: 'Standalone FRAT',
+    description: 'Manual Flight Risk Assessment for one-off flights',
+    href: '/frat/standalone',
     category: 'Safety',
     icon: Shield,
-    keywords: ['enhanced frat', 'auto-populated', 'risk assessment', 'integrated', 'smart frat']
+    keywords: ['standalone frat', 'manual', 'risk assessment', 'one-off', 'independent']
   },
   {
     id: 'frat-review',
