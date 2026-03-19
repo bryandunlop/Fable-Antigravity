@@ -23,7 +23,8 @@ import {
   MapPin,
   Monitor,
   Sliders,
-  Settings
+  Settings,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,12 +36,14 @@ interface SearchResult {
   category: string;
   icon: any;
   keywords: string[];
+  roles?: string[];
 }
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   userRole: string;
+  additionalRoles?: string[];
 }
 
 const searchableItems: SearchResult[] = [
@@ -114,7 +117,8 @@ const searchableItems: SearchResult[] = [
     href: '/maintenance',
     category: 'Maintenance',
     icon: Wrench,
-    keywords: ['maintenance', 'mx', 'repair', 'service', 'scheduled']
+    keywords: ['maintenance', 'mx', 'repair', 'service', 'scheduled'],
+    roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom']
   },
   {
     id: 'schedule',
@@ -206,6 +210,16 @@ const searchableItems: SearchResult[] = [
     icon: AlertTriangle,
     keywords: ['aog', 'emergency', 'aircraft on ground', 'critical', 'maintenance']
   },
+  {
+    id: 'maintenance-turnover',
+    title: 'Maintenance Turnover',
+    description: 'Structured shift handover protocol to establish clear chain of custody',
+    href: '/maintenance-turnover',
+    category: 'Maintenance',
+    icon: ArrowRightLeft,
+    keywords: ['turnover', 'handover', 'shift', 'maintenance', '5/40', 'protocol', 'technician'],
+    roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom']
+  },
 
   {
     id: 'document-management',
@@ -241,16 +255,8 @@ const searchableItems: SearchResult[] = [
     href: '/trip-coordination',
     category: 'Scheduling',
     icon: MapPin,
-    keywords: ['trip', 'coordination', 'collaborative', 'workspace', 'schedulers', 'planning', 'requirements', 'catering', 'hotels', 'ground transport', 'fuel', 'permits', 'team work', 'checklist', 'tiles', 'notifications', 'deadlines']
-  },
-  {
-    id: 'crew-management',
-    title: 'Crew Management',
-    description: 'Comprehensive crew resource management, duty times, and currency tracking',
-    href: '/crew-management',
-    category: 'Scheduling',
-    icon: Clock,
-    keywords: ['crew', 'management', 'duty', 'time', 'fatigue', 'compliance', 'far', 'scheduling', 'currency', 'pilot', 'qualification', 'training', 'medical', 'crew scheduling']
+    keywords: ['trip', 'coordination', 'collaborative', 'workspace', 'schedulers', 'planning', 'requirements', 'catering', 'hotels', 'ground transport', 'fuel', 'permits', 'team work', 'checklist', 'tiles', 'notifications', 'deadlines'],
+    roles: ['scheduling', 'admin']
   },
   {
     id: 'parts-inventory',
@@ -259,7 +265,8 @@ const searchableItems: SearchResult[] = [
     href: '/parts-inventory',
     category: 'Maintenance',
     icon: Boxes,
-    keywords: ['parts', 'inventory', 'stock', 'procurement', 'mycmp', 'camp', 'vendor', 'purchase', 'order', 'supplies', 'maintenance parts']
+    keywords: ['parts', 'inventory', 'stock', 'procurement', 'mycmp', 'camp', 'vendor', 'purchase', 'order', 'supplies', 'maintenance parts'],
+    roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom']
   },
   {
     id: 'crew-scheduling-workload',
@@ -327,12 +334,18 @@ const searchableItems: SearchResult[] = [
   }
 ];
 
-export default function CommandPalette({ isOpen, onClose, userRole }: CommandPaletteProps) {
+export default function CommandPalette({ isOpen, onClose, userRole, additionalRoles = [] }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const navigate = useNavigate();
 
   const filteredResults = searchableItems.filter(item => {
+    // Role based filtering
+    if (item.roles) {
+      const hasAccess = item.roles.includes(userRole) || additionalRoles.some(role => item.roles?.includes(role));
+      if (!hasAccess) return false;
+    }
+
     if (!query) return true;
 
     const searchTerm = query.toLowerCase();

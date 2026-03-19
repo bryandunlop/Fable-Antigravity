@@ -6,9 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Download, Filter, Plane, User } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical';
+type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical' | 'STOP Assignment';
+type RequestStatus = 'confirmed' | 'pending';
 
-interface ConfirmedVacation {
+interface CalendarEvent {
   id: string;
   crewMemberId: string;
   crewMemberName: string;
@@ -17,16 +18,21 @@ interface ConfirmedVacation {
   startDate: string;
   endDate: string;
   daysRequested: number;
-  confirmedDate: Date;
+  confirmedDate?: Date;
+  status: RequestStatus;
 }
 
-export function VacationMasterCalendar() {
+interface VacationMasterCalendarProps {
+  embedded?: boolean;
+}
+
+export function VacationMasterCalendar({ embedded = false }: VacationMasterCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date(2025, 0, 1)); // January 2025
   const [viewMode, setViewMode] = useState<'month' | 'quarter'>('month');
   const [positionFilter, setPositionFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  const [confirmedVacations] = useState<ConfirmedVacation[]>([
+  const [calendarEvents] = useState<CalendarEvent[]>([
     {
       id: 'vac1',
       crewMemberId: 'user1',
@@ -36,7 +42,8 @@ export function VacationMasterCalendar() {
       startDate: '2025-01-15',
       endDate: '2025-01-22',
       daysRequested: 7,
-      confirmedDate: new Date('2024-12-03T15:00:00')
+      confirmedDate: new Date('2024-12-03T15:00:00'),
+      status: 'confirmed'
     },
     {
       id: 'vac2',
@@ -47,7 +54,8 @@ export function VacationMasterCalendar() {
       startDate: '2025-01-10',
       endDate: '2025-01-11',
       daysRequested: 1,
-      confirmedDate: new Date('2024-12-04T10:00:00')
+      confirmedDate: new Date('2024-12-04T10:00:00'),
+      status: 'confirmed'
     },
     {
       id: 'vac3',
@@ -58,7 +66,8 @@ export function VacationMasterCalendar() {
       startDate: '2025-01-05',
       endDate: '2025-01-12',
       daysRequested: 7,
-      confirmedDate: new Date('2024-12-01T11:00:00')
+      confirmedDate: new Date('2024-12-01T11:00:00'),
+      status: 'confirmed'
     },
     {
       id: 'vac4',
@@ -69,7 +78,8 @@ export function VacationMasterCalendar() {
       startDate: '2025-02-10',
       endDate: '2025-02-17',
       daysRequested: 7,
-      confirmedDate: new Date('2024-11-28T14:00:00')
+      confirmedDate: new Date('2024-11-28T14:00:00'),
+      status: 'confirmed'
     },
     {
       id: 'vac5',
@@ -80,7 +90,30 @@ export function VacationMasterCalendar() {
       startDate: '2025-01-20',
       endDate: '2025-01-21',
       daysRequested: 2,
-      confirmedDate: new Date('2024-12-05T09:00:00')
+      confirmedDate: new Date('2024-12-05T09:00:00'),
+      status: 'confirmed'
+    },
+    {
+      id: 'vac6-pending',
+      crewMemberId: 'user4',
+      crewMemberName: 'David Lee',
+      position: 'First Officer',
+      requestType: 'Vacation',
+      startDate: '2025-01-25',
+      endDate: '2025-01-28',
+      daysRequested: 4,
+      status: 'pending'
+    },
+    {
+      id: 'stop1',
+      crewMemberId: 'user1',
+      crewMemberName: 'John Smith',
+      position: 'Captain',
+      requestType: 'STOP Assignment',
+      startDate: '2025-01-24',
+      endDate: '2025-01-25',
+      daysRequested: 2,
+      status: 'confirmed'
     }
   ]);
 
@@ -100,25 +133,32 @@ export function VacationMasterCalendar() {
 
   const getVacationsForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    return confirmedVacations.filter(vac => {
-      const start = new Date(vac.startDate);
-      const end = new Date(vac.endDate);
+    return calendarEvents.filter(ev => {
+      const start = new Date(ev.startDate);
+      const end = new Date(ev.endDate);
       const check = new Date(dateStr);
       return check >= start && check <= end;
-    }).filter(vac => {
-      if (positionFilter !== 'all' && vac.position !== positionFilter) return false;
-      if (typeFilter !== 'all' && vac.requestType !== typeFilter) return false;
+    }).filter(ev => {
+      if (positionFilter !== 'all' && ev.position !== positionFilter) return false;
+      if (typeFilter !== 'all' && ev.requestType !== typeFilter) return false;
       return true;
     });
   };
 
-  const getTypeColor = (type: RequestType) => {
+  const getTypeColor = (type: RequestType, status: RequestStatus) => {
+    let baseColor = 'bg-gray-500 text-white';
     switch(type) {
-      case 'Vacation': return 'bg-blue-500';
-      case 'Payback Stop': return 'bg-orange-500';
-      case 'Off': return 'bg-green-500';
-      case 'Medical': return 'bg-red-500';
+      case 'Vacation': baseColor = 'bg-blue-500 text-white'; break;
+      case 'Payback Stop': baseColor = 'bg-orange-500 text-white'; break;
+      case 'Off': baseColor = 'bg-green-500 text-white'; break;
+      case 'Medical': baseColor = 'bg-red-500 text-white'; break;
+      case 'STOP Assignment': baseColor = 'bg-slate-700 text-white'; break;
     }
+    
+    if (status === 'pending') {
+      return baseColor.replace('bg-', 'border-2 border-dashed border-') + ' text-black font-medium opacity-70 bg-transparent';
+    }
+    return baseColor;
   };
 
   const renderCalendar = () => {
@@ -147,17 +187,17 @@ export function VacationMasterCalendar() {
             {day}
           </div>
           <div className="space-y-1">
-            {vacations.slice(0, 3).map((vac) => (
+            {vacations.slice(0, 4).map((vac) => (
               <div 
                 key={vac.id}
-                className={`text-xs p-1 rounded text-white truncate ${getTypeColor(vac.requestType)}`}
-                title={`${vac.crewMemberName} - ${vac.requestType}`}
+                className={`text-[10px] p-1 rounded-sm truncate ${getTypeColor(vac.requestType, vac.status)}`}
+                title={`${vac.crewMemberName} - ${vac.requestType} (${vac.status})`}
               >
-                {vac.crewMemberName}
+                {vac.crewMemberName} {vac.status === 'pending' && '(P)'}
               </div>
             ))}
-            {vacations.length > 3 && (
-              <div className="text-xs text-muted-foreground">+{vacations.length - 3} more</div>
+            {vacations.length > 4 && (
+              <div className="text-xs text-muted-foreground">+{vacations.length - 4} more</div>
             )}
           </div>
         </div>
@@ -182,9 +222,9 @@ export function VacationMasterCalendar() {
     );
   };
 
-  const filteredVacations = confirmedVacations.filter(vac => {
-    if (positionFilter !== 'all' && vac.position !== positionFilter) return false;
-    if (typeFilter !== 'all' && vac.requestType !== typeFilter) return false;
+  const filteredVacations = calendarEvents.filter(ev => {
+    if (positionFilter !== 'all' && ev.position !== positionFilter) return false;
+    if (typeFilter !== 'all' && ev.requestType !== typeFilter) return false;
     return true;
   });
 
@@ -192,44 +232,46 @@ export function VacationMasterCalendar() {
     const positions = ['Captain', 'First Officer'];
     return positions.map(pos => ({
       position: pos,
-      count: confirmedVacations.filter(v => v.position === pos).length,
-      totalDays: confirmedVacations.filter(v => v.position === pos).reduce((sum, v) => sum + v.daysRequested, 0)
+      count: calendarEvents.filter(v => v.position === pos && v.status === 'confirmed').length,
+      totalDays: calendarEvents.filter(v => v.position === pos && v.status === 'confirmed').reduce((sum, v) => sum + v.daysRequested, 0)
     }));
   };
 
   const getStatsByType = () => {
-    const types: RequestType[] = ['Vacation', 'Payback Stop', 'Off', 'Medical'];
+    const types: RequestType[] = ['Vacation', 'Payback Stop', 'Off', 'Medical', 'STOP Assignment'];
     return types.map(type => ({
       type,
-      count: confirmedVacations.filter(v => v.requestType === type).length,
-      totalDays: confirmedVacations.filter(v => v.requestType === type).reduce((sum, v) => sum + v.daysRequested, 0)
+      count: calendarEvents.filter(v => v.requestType === type && v.status === 'confirmed').length,
+      totalDays: calendarEvents.filter(v => v.requestType === type && v.status === 'confirmed').reduce((sum, v) => sum + v.daysRequested, 0)
     }));
   };
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="flex items-center space-x-2 mb-2">
-          <CalendarIcon className="h-8 w-8 text-primary" />
-          <span>Vacation Master Calendar</span>
-        </h1>
-        <p className="text-muted-foreground">
-          View all confirmed time off requests for Gulfstream G650 operations crew
-        </p>
-      </div>
+    <div className={embedded ? "space-y-6" : "space-y-6 p-6"}>
+      {!embedded && (
+        <div>
+          <h1 className="flex items-center space-x-2 mb-2">
+            <CalendarIcon className="h-8 w-8 text-primary" />
+            <span>Vacation Master Calendar</span>
+          </h1>
+          <p className="text-muted-foreground">
+            View all confirmed time off requests for Gulfstream G650 operations crew
+          </p>
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-4 gap-4">
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="pt-6">
-            <div className="text-3xl font-bold text-blue-700">{confirmedVacations.length}</div>
+            <div className="text-3xl font-bold text-blue-700">{calendarEvents.filter(e => e.status === 'confirmed').length}</div>
             <p className="text-sm text-blue-600">Total Confirmed</p>
           </CardContent>
         </Card>
         <Card className="bg-green-50 border-green-200">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-green-700">
-              {confirmedVacations.filter(v => v.requestType === 'Vacation').length}
+              {calendarEvents.filter(v => v.requestType === 'Vacation' && v.status === 'confirmed').length}
             </div>
             <p className="text-sm text-green-600">Vacation Days</p>
           </CardContent>
@@ -237,7 +279,7 @@ export function VacationMasterCalendar() {
         <Card className="bg-orange-50 border-orange-200">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-orange-700">
-              {confirmedVacations.filter(v => v.requestType === 'Payback Stop').length}
+              {calendarEvents.filter(v => v.requestType === 'Payback Stop' && v.status === 'confirmed').length}
             </div>
             <p className="text-sm text-orange-600">PBST Days</p>
           </CardContent>
@@ -245,7 +287,7 @@ export function VacationMasterCalendar() {
         <Card className="bg-purple-50 border-purple-200">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-purple-700">
-              {confirmedVacations.reduce((sum, v) => sum + v.daysRequested, 0)}
+              {calendarEvents.filter(v => v.status === 'confirmed').reduce((sum, v) => sum + v.daysRequested, 0)}
             </div>
             <p className="text-sm text-purple-600">Total Days Off</p>
           </CardContent>
@@ -297,6 +339,7 @@ export function VacationMasterCalendar() {
                       <SelectItem value="Payback Stop">Payback Stop</SelectItem>
                       <SelectItem value="Off">Off</SelectItem>
                       <SelectItem value="Medical">Medical</SelectItem>
+                      <SelectItem value="STOP Assignment">STOP Assignment</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -307,26 +350,33 @@ export function VacationMasterCalendar() {
                 </div>
               </div>
 
-              {/* Legend */}
-              <div className="flex items-center gap-4 mt-4 pt-4 border-t">
-                <span className="text-sm font-medium">Legend:</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-blue-500 rounded"></div>
-                  <span className="text-sm">Vacation</span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-4 border-t">
+                  <span className="text-sm font-medium">Legend:</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                    <span className="text-sm">Vacation</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                    <span className="text-sm">Payback Stop</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-green-500 rounded"></div>
+                    <span className="text-sm">Off</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-red-500 rounded"></div>
+                    <span className="text-sm">Medical</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-slate-700 rounded"></div>
+                    <span className="text-sm">STOP Assignment</span>
+                  </div>
+                  <div className="flex items-center gap-2 ml-2 pl-2 border-l">
+                    <div className="w-4 h-4 border-2 border-dashed border-gray-400 rounded bg-transparent"></div>
+                    <span className="text-sm text-muted-foreground">Pending Request</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                  <span className="text-sm">Payback Stop</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-green-500 rounded"></div>
-                  <span className="text-sm">Off</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-red-500 rounded"></div>
-                  <span className="text-sm">Medical</span>
-                </div>
-              </div>
             </CardHeader>
             <CardContent>
               {renderCalendar()}
@@ -345,23 +395,26 @@ export function VacationMasterCalendar() {
                 {filteredVacations.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).map((vac) => (
                   <div key={vac.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30">
                     <div className="flex items-center gap-4 flex-1">
-                      <div className={`w-1 h-16 rounded ${getTypeColor(vac.requestType)}`}></div>
+                      <div className={`w-1 h-16 rounded ${getTypeColor(vac.requestType, vac.status).split(' ')[0]}`}></div>
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-1">
                           <h4 className="font-medium">{vac.crewMemberName}</h4>
                           <Badge variant="outline">{vac.position}</Badge>
-                          <Badge className={getTypeColor(vac.requestType).replace('bg-', 'bg-') + ' text-white'}>
+                          <Badge className={getTypeColor(vac.requestType, vac.status).replace('border-dashed', '')}>
                             {vac.requestType}
                           </Badge>
+                          {vac.status === 'pending' && <Badge variant="secondary">Pending</Badge>}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {new Date(vac.startDate).toLocaleDateString()} - {new Date(vac.endDate).toLocaleDateString()} 
                           <span className="mx-2">•</span>
                           {vac.daysRequested} days
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Confirmed: {vac.confirmedDate.toLocaleString()}
-                        </p>
+                        {vac.confirmedDate && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Confirmed: {vac.confirmedDate.toLocaleString()}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -391,7 +444,7 @@ export function VacationMasterCalendar() {
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-blue-500 h-2 rounded-full"
-                          style={{ width: `${(stat.totalDays / confirmedVacations.reduce((sum, v) => sum + v.daysRequested, 0)) * 100}%` }}
+                          style={{ width: `${(stat.totalDays / Math.max(1, calendarEvents.filter(e => e.status === 'confirmed').reduce((sum, v) => sum + v.daysRequested, 0))) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -411,7 +464,7 @@ export function VacationMasterCalendar() {
                     <div key={stat.type} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded ${getTypeColor(stat.type)}`}></div>
+                          <div className={`w-3 h-3 rounded ${getTypeColor(stat.type, 'confirmed').split(' ')[0]}`}></div>
                           <span className="font-medium">{stat.type}</span>
                         </div>
                         <span className="text-sm text-muted-foreground">
@@ -420,8 +473,8 @@ export function VacationMasterCalendar() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
-                          className={`h-2 rounded-full ${getTypeColor(stat.type)}`}
-                          style={{ width: `${(stat.totalDays / confirmedVacations.reduce((sum, v) => sum + v.daysRequested, 0)) * 100}%` }}
+                          className={`h-2 rounded-full ${getTypeColor(stat.type, 'confirmed').split(' ')[0]}`}
+                          style={{ width: `${(stat.totalDays / Math.max(1, calendarEvents.filter(e => e.status === 'confirmed').reduce((sum, v) => sum + v.daysRequested, 0))) * 100}%` }}
                         />
                       </div>
                     </div>

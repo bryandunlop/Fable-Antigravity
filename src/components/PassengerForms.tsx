@@ -10,6 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from './ui/dialog';
+import {
   FileText,
   AlertTriangle,
   Clock,
@@ -214,6 +221,23 @@ export default function PassengerForms() {
             </h1>
             <p className="text-muted-foreground">Manage passenger form submissions and templates</p>
           </div>
+          
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button size="lg" className="shadow-sm">
+                <Settings className="w-4 h-4 mr-2" />
+                Manage Templates
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-full p-0">
+              <div className="p-6">
+                <DialogHeader className="mb-4">
+                  <DialogTitle className="text-2xl font-bold">Form Templates</DialogTitle>
+                </DialogHeader>
+                <FormTemplateEditor />
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -323,10 +347,6 @@ export default function PassengerForms() {
               <Badge className="ml-2 bg-red-500">{outdatedDataCount}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="templates">
-            <Settings className="w-4 h-4 mr-2" />
-            Templates
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-6">
@@ -397,10 +417,6 @@ export default function PassengerForms() {
               {renderSubmissionsTable(getOutdatedData())}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="templates" className="mt-6">
-          <FormTemplateEditor />
         </TabsContent>
       </Tabs>
 

@@ -69,7 +69,7 @@ export default function FloatingActionButton({ userRole }: FloatingActionButtonP
         return [
           { label: 'Flight Ops Center', icon: Monitor, href: '/flight-operations-center', color: 'bg-primary hover:bg-primary/90' },
           { label: 'Add Flight', icon: Calendar, href: '/scheduling-dashboard', color: 'bg-blue-500 hover:bg-blue-600' },
-          { label: 'Crew Assignment', icon: Users, href: '/crew-management', color: 'bg-green-500 hover:bg-green-600' },
+          { label: 'Crew Assignment', icon: Users, href: '/crew-scheduling-workload', color: 'bg-green-500 hover:bg-green-600' },
           { label: 'Send Forms', icon: FileText, href: '/passenger-forms', color: 'bg-purple-500 hover:bg-purple-600' }
         ];
       

@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { Settings, Save, ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { useMaintenanceContext, AircraftConfig, FacilityCheckConfig, AircraftStatusConfig, AdditionalNoteConfig } from './contexts/MaintenanceContext';
+import { useMaintenance, AircraftConfig, FacilityCheckConfig, AircraftStatusConfig, AdditionalNoteConfig } from './contexts/MaintenanceContext';
 import { toast } from 'sonner';
 
 interface MaintenanceSettingsProps {
@@ -112,7 +112,7 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
                             <div key={item.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
                                 <Checkbox
                                     checked={item.isActive}
-                                    onCheckedChange={(checked) => updateItem(setLocalAircraft, item.id, 'isActive', checked)}
+                                    onCheckedChange={(checked: boolean) => updateItem(setLocalAircraft, item.id, 'isActive', checked)}
                                 />
                                 <Input
                                     value={item.tailNumber}
@@ -141,7 +141,7 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
                             <div key={item.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
                                 <Checkbox
                                     checked={item.isActive}
-                                    onCheckedChange={(checked) => updateItem(setLocalFacility, item.id, 'isActive', checked)}
+                                    onCheckedChange={(checked: boolean) => updateItem(setLocalFacility, item.id, 'isActive', checked)}
                                 />
                                 <Input
                                     value={item.label}
@@ -170,7 +170,7 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
                             <div key={item.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
                                 <Checkbox
                                     checked={item.isActive}
-                                    onCheckedChange={(checked) => updateItem(setLocalStatus, item.id, 'isActive', checked)}
+                                    onCheckedChange={(checked: boolean) => updateItem(setLocalStatus, item.id, 'isActive', checked)}
                                 />
                                 <Input
                                     value={item.value}
@@ -199,7 +199,7 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
                             <div key={item.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
                                 <Checkbox
                                     checked={item.isActive}
-                                    onCheckedChange={(checked) => updateItem(setLocalNotes, item.id, 'isActive', checked)}
+                                    onCheckedChange={(checked: boolean) => updateItem(setLocalNotes, item.id, 'isActive', checked)}
                                 />
                                 <Input
                                     value={item.label}

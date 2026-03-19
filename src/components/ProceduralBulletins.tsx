@@ -29,8 +29,14 @@ import {
   Image as ImageIcon,
   Video,
   Link as LinkIcon,
-  X
+  X,
+  ShieldCheck,
+  FileCheck,
+  Info,
+  Printer
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ProceduralBulletin {
   id: string;
@@ -65,8 +71,8 @@ export default function ProceduralBulletins({ userRole, userName = 'Current User
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
-  // Can create/edit/delete bulletins - now includes document-manager
-  const canManage = ['admin', 'safety', 'lead', 'document-manager'].includes(userRole);
+  // Can create/edit/delete bulletins - now includes document-manager and procedural-specialist
+  const canManage = ['admin', 'safety', 'lead', 'document-manager', 'procedural-specialist'].includes(userRole);
 
   // Categories
   const categories = [
@@ -90,6 +96,7 @@ export default function ProceduralBulletins({ userRole, userName = 'Current User
     { value: 'safety', label: 'Safety' },
     { value: 'scheduling', label: 'Scheduling' },
     { value: 'document-manager', label: 'Document Manager' },
+    { value: 'procedural-specialist', label: 'Procedural Specialist' },
     { value: 'admin-assistant', label: 'Admin Assistant' },
     { value: 'lead', label: 'Leadership' },
     { value: 'admin', label: 'Admin' },
@@ -613,6 +620,7 @@ Contact Safety or Maintenance for questions.`,
     category: '',
     roles: [],
     effectiveDate: new Date().toISOString().split('T')[0],
+    expirationDate: '',
     author: userName,
     version: '1.0',
     isPinned: false,
@@ -651,12 +659,25 @@ Contact Safety or Maintenance for questions.`,
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return (
+      if (!(
         bulletin.title.toLowerCase().includes(query) ||
         bulletin.content.toLowerCase().includes(query) ||
         bulletin.tags.some(tag => tag.toLowerCase().includes(query)) ||
         bulletin.category.toLowerCase().includes(query)
-      );
+      )) {
+        return false;
+      }
+    }
+
+    // Automatic Removal Date filter
+    if (bulletin.expirationDate) {
+      const expirationDate = new Date(bulletin.expirationDate);
+      const today = new Date();
+      // Set hours to 0 to compare dates only
+      today.setHours(0, 0, 0, 0);
+      if (expirationDate < today) {
+        return false;
+      }
     }
 
     return true;
@@ -696,12 +717,45 @@ Contact Safety or Maintenance for questions.`,
 
     setBulletins([bulletin, ...bulletins]);
     setIsCreateDialogOpen(false);
+    resetNewBulletin();
+    toast.success('Procedural bulletin created successfully');
+  };
+
+  const handleEditBulletin = () => {
+    if (!newBulletin.id || !newBulletin.title || !newBulletin.content || !newBulletin.category || !newBulletin.roles?.length) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setBulletins(bulletins.map(b =>
+      b.id === newBulletin.id ? {
+        ...b,
+        title: newBulletin.title!,
+        content: newBulletin.content!,
+        category: newBulletin.category!,
+        roles: newBulletin.roles!,
+        effectiveDate: newBulletin.effectiveDate || b.effectiveDate,
+        expirationDate: newBulletin.expirationDate,
+        version: newBulletin.version || b.version,
+        isPinned: newBulletin.isPinned || false,
+        tags: newBulletin.tags || [],
+        lastUpdated: new Date().toISOString().split('T')[0]
+      } : b
+    ));
+
+    setIsCreateDialogOpen(false);
+    resetNewBulletin();
+    toast.success('Procedural bulletin updated successfully');
+  };
+
+  const resetNewBulletin = () => {
     setNewBulletin({
       title: '',
       content: '',
       category: '',
       roles: [],
       effectiveDate: new Date().toISOString().split('T')[0],
+      expirationDate: '',
       author: userName,
       version: '1.0',
       isPinned: false,
@@ -711,7 +765,11 @@ Contact Safety or Maintenance for questions.`,
       videos: [],
       links: []
     });
-    toast.success('Procedural bulletin created successfully');
+  };
+
+  const handleEditClick = (bulletin: ProceduralBulletin) => {
+    setNewBulletin(bulletin);
+    setIsCreateDialogOpen(true);
   };
 
   const handleViewBulletin = (bulletin: ProceduralBulletin) => {
@@ -745,6 +803,7 @@ Contact Safety or Maintenance for questions.`,
       maintenance: 'bg-orange-100 text-orange-800',
       safety: 'bg-red-100 text-red-800',
       scheduling: 'bg-green-100 text-green-800',
+      'procedural-specialist': 'bg-indigo-100 text-indigo-800',
       admin: 'bg-gray-100 text-gray-800',
       all: 'bg-slate-100 text-slate-800'
     };
@@ -838,7 +897,7 @@ Contact Safety or Maintenance for questions.`,
           sortedBulletins.map(bulletin => (
             <Card
               key={bulletin.id}
-              className={`hover:shadow-md transition-shadow ${bulletin.isPinned ? 'border-blue-500 border-2' : ''
+              className={`premium-card glass-premium group ${bulletin.isPinned ? 'border-pg-accent ring-1 ring-pg-accent/10' : ''
                 } ${bulletin.isArchived ? 'opacity-60' : ''}`}
             >
               <CardHeader>
@@ -917,6 +976,13 @@ Contact Safety or Maintenance for questions.`,
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleEditClick(bulletin)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleDelete(bulletin.id)}
                           className="text-red-600 hover:text-red-700"
                         >
@@ -928,9 +994,9 @@ Contact Safety or Maintenance for questions.`,
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-2">
+                <div className="text-sm text-muted-foreground line-clamp-2 prose-sm dark:prose-invert">
                   {bulletin.content.substring(0, 200)}...
-                </p>
+                </div>
               </CardContent>
             </Card>
           ))
@@ -1057,11 +1123,11 @@ Contact Safety or Maintenance for questions.`,
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetNewBulletin(); }}>
               Cancel
             </Button>
-            <Button onClick={handleCreateBulletin}>
-              Create Bulletin
+            <Button onClick={newBulletin.id ? handleEditBulletin : handleCreateBulletin}>
+              {newBulletin.id ? 'Update Bulletin' : 'Create Bulletin'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1069,73 +1135,100 @@ Contact Safety or Maintenance for questions.`,
 
       {/* View Bulletin Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-900 shadow-2xl">
           {selectedBulletin && (
-            <>
-              <DialogHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <DialogTitle className="text-2xl mb-2">
-                      {selectedBulletin.isPinned && <Pin className="w-5 h-5 text-blue-600 inline mr-2" />}
-                      {selectedBulletin.title}
-                    </DialogTitle>
-                    <DialogDescription>
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">{selectedBulletin.category}</Badge>
-                          <Badge variant="secondary">v{selectedBulletin.version}</Badge>
-                          {selectedBulletin.roles.map(role => (
-                            <Badge key={role} className={getRoleBadgeColor(role)}>
-                              {roleOptions.find(r => r.value === role)?.label || role}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="flex flex-wrap gap-4 text-xs">
-                          <span className="flex items-center gap-1">
-                            <User className="w-3 h-3" />
-                            {selectedBulletin.author}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            Effective: {new Date(selectedBulletin.effectiveDate).toLocaleDateString()}
-                          </span>
-                          {selectedBulletin.expirationDate && (
-                            <span className="flex items-center gap-1 text-orange-600">
-                              <Clock className="w-3 h-3" />
-                              Expires: {new Date(selectedBulletin.expirationDate).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                        {selectedBulletin.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {selectedBulletin.tags.map(tag => (
-                              <Badge key={tag} variant="outline" className="text-xs">
-                                <Tag className="w-3 h-3 mr-1" />
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </DialogDescription>
+            <div className="flex flex-col h-full">
+              {/* Official Document Header */}
+              <div className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 p-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-pg-blue dark:bg-pg-accent rounded-lg flex items-center justify-center text-white shadow-lg shadow-pg-blue/20">
+                      <ShieldCheck className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold tracking-tight text-pg-blue dark:text-white uppercase">
+                        Antigravity Aviation
+                      </h2>
+                      <p className="text-xs font-semibold text-pg-accent uppercase tracking-[0.2em]">
+                        Procedural Bulletin
+                      </p>
+                    </div>
                   </div>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Print
-                  </Button>
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      PUBLISHED
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      REF: {selectedBulletin.id} | VER: {selectedBulletin.version}
+                    </p>
+                  </div>
                 </div>
-              </DialogHeader>
-              <div className="mt-6 prose prose-sm max-w-none dark:prose-invert">
-                <div className="whitespace-pre-wrap font-sans">
-                  {selectedBulletin.content}
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Department</span>
+                    <p className="text-sm font-semibold">{selectedBulletin.category}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Effective Date</span>
+                    <p className="text-sm font-semibold">{new Date(selectedBulletin.effectiveDate).toLocaleDateString(undefined, { dateStyle: 'long' })}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Author</span>
+                    <p className="text-sm font-semibold">{selectedBulletin.author}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1 font-semibold">Target Roles</p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedBulletin.roles.map(role => (
+                        <span key={role} className="text-[10px] px-2 py-0.5 bg-pg-blue/10 text-pg-blue dark:text-pg-accent rounded-md border border-pg-blue/20">
+                          {roleOptions.find(r => r.value === role)?.label || role}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {selectedBulletin.expirationDate && (
+                    <div className="p-3 bg-orange-50 dark:bg-orange-900/10 rounded-lg border border-orange-100 dark:border-orange-800">
+                      <p className="text-[10px] uppercase tracking-wider text-orange-500 mb-1 font-semibold">Removal Date</p>
+                      <p className="text-sm font-bold text-orange-700 dark:text-orange-400">
+                        {new Date(selectedBulletin.expirationDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
-              {selectedBulletin.lastUpdated && (
-                <div className="mt-6 pt-6 border-t text-xs text-muted-foreground">
-                  Last updated: {new Date(selectedBulletin.lastUpdated).toLocaleDateString()}
+
+              {/* Document Content - Paper Style */}
+              <div className="flex-1 bg-slate-50 dark:bg-slate-900 p-4 md:p-8">
+                <div className="max-w-3xl mx-auto bg-white dark:bg-slate-950 p-8 md:p-12 shadow-xl border border-slate-200 dark:border-slate-800 rounded-sm relative overflow-hidden">
+                  {/* Subtle Paper Background Texture Indicator */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50/50 dark:bg-slate-900/10 pointer-events-none rotate-45 transform translate-x-16 -translate-y-16"></div>
+                  
+                  <div className="prose-bulletin mb-12">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {selectedBulletin.content}
+                    </ReactMarkdown>
+                  </div>
                 </div>
-              )}
-            </>
+              </div>
+
+                {/* Footer / Last Updated */}
+              <div className="px-12 py-6 flex justify-between items-center border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
+                <p className="text-xs text-slate-400">
+                  Last updated: {selectedBulletin.lastUpdated || selectedBulletin.createdDate}
+                </p>
+                <div className="flex gap-3">
+                  <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
+                    <Printer className="w-4 h-4" />
+                    Print Document
+                  </Button>
+                  <Button variant="default" size="sm" onClick={() => setIsViewDialogOpen(false)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

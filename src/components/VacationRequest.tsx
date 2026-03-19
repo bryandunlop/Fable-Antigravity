@@ -19,9 +19,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 interface VacationRequestProps {
   userRole: string;
+  additionalRoles?: string[];
 }
 
-export default function VacationRequest({ userRole }: VacationRequestProps) {
+export default function VacationRequest({ userRole, additionalRoles = [] }: VacationRequestProps) {
   // Lifted State for Vacation Requests
   const [vacationRequests, setVacationRequests] = React.useState<ApprovalRequest[]>([
     {
@@ -143,18 +144,51 @@ export default function VacationRequest({ userRole }: VacationRequestProps) {
   };
 
 
-  // For pilots and inflight crew - show the request system
-  if (userRole === 'pilot' || userRole === 'inflight') {
-    return <VacationRequestSystem />;
+  const isMaintenanceTech = userRole === 'maintenance' || userRole === 'technician' || userRole === 'mechanic' || additionalRoles?.some(r => ['maintenance', 'technician', 'mechanic'].includes(r));
+  const isCoordinator = userRole === 'maintenance-coordinator' || additionalRoles?.includes('maintenance-coordinator');
+  const isDOM = userRole === 'dom' || additionalRoles?.includes('dom');
+
+  // If they have both tech and lead/manager roles, show tabs
+  if (isMaintenanceTech && (isCoordinator || isDOM)) {
+    return (
+      <div className="p-6">
+        <Tabs defaultValue={isDOM || isCoordinator ? "approvals" : "request"}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="request">My Requests</TabsTrigger>
+            {(isCoordinator || isDOM) && (
+              <TabsTrigger value="approvals">
+                {isDOM ? 'Manager Approvals' : 'Lead Approvals'}
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="calendar">Master Calendar</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="request">
+            <MaintenanceVacationRequestForm />
+          </TabsContent>
+
+          <TabsContent value="approvals">
+            <MaintenanceVacationApproval userRole={isDOM ? "manager" : "lead"} />
+          </TabsContent>
+
+          <TabsContent value="calendar">
+            <VacationMasterCalendar />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
   }
 
-  // For maintenance personnel - show request form
-  if (userRole === 'maintenance' || userRole === 'technician' || userRole === 'mechanic') {
-    return <MaintenanceVacationRequestForm />;
+  // Fallback for single roles
+  if (isDOM) {
+    return (
+      <div className="p-6">
+        <MaintenanceVacationApproval userRole="manager" />
+      </div>
+    );
   }
 
-  // For maintenance lead/manager - show approval dashboard
-  if (userRole === 'maintenance-lead') {
+  if (isCoordinator) {
     return (
       <div className="p-6">
         <MaintenanceVacationApproval userRole="lead" />
@@ -162,12 +196,14 @@ export default function VacationRequest({ userRole }: VacationRequestProps) {
     );
   }
 
-  if (userRole === 'maintenance-manager') {
-    return (
-      <div className="p-6">
-        <MaintenanceVacationApproval userRole="manager" />
-      </div>
-    );
+  // For pilots and inflight crew - show the request system
+  if (userRole === 'pilot' || userRole === 'inflight') {
+    return <VacationRequestSystem />;
+  }
+
+  // For maintenance personnel - show request form
+  if (isMaintenanceTech) {
+    return <MaintenanceVacationRequestForm />;
   }
 
   // For scheduling role - show all tabs

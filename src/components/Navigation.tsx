@@ -208,37 +208,38 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     {
       label: "Maintenance",
       items: [
-        { name: 'Maintenance Hub', href: '/maintenance-hub', icon: Monitor, roles: ['maintenance', 'admin', 'lead'], description: 'Overview dashboard' },
-        { name: 'Tech Log', href: '/tech-log', icon: FileText, roles: ['pilot', 'maintenance', 'admin'], description: 'Report squawks' },
-        { name: 'Work Orders', href: '/work-orders', icon: ClipboardCheck, roles: ['maintenance', 'admin', 'lead'], description: 'Manage work orders' },
-        { name: 'My Maintenance', href: '/maintenance-dashboard', icon: Clipboard, roles: ['maintenance'], description: 'Personal dashboard' },
-        { name: 'Aircraft Cleaning', href: '/aircraft-cleaning', icon: Sparkles, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead'], description: 'Track cleaning status' },
+        { name: 'Maintenance Hub', href: '/maintenance-hub', icon: Monitor, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'], description: 'Overview dashboard' },
+        { name: 'Tech Log', href: '/tech-log', icon: FileText, roles: ['pilot', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Report squawks' },
+        { name: 'Work Orders', href: '/work-orders', icon: ClipboardCheck, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Manage work orders' },
+        { name: 'My Maintenance', href: '/maintenance-dashboard', icon: Clipboard, roles: ['maintenance', 'maintenance-coordinator'], description: 'Personal dashboard' },
+        { name: 'Aircraft Cleaning', href: '/aircraft-cleaning', icon: Sparkles, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Track cleaning status' },
       ]
     },
     {
       label: "Maintenance Analytics",
       items: [
-        { name: 'Work Analytics', href: '/tech-work-analytics', icon: BarChart3, roles: ['maintenance', 'admin', 'lead'] },
-        { name: 'MTTR Dashboard', href: '/mttr-dashboard', icon: Activity, roles: ['maintenance', 'admin', 'lead'] },
+        { name: 'Work Analytics', href: '/tech-work-analytics', icon: BarChart3, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+        { name: 'MTTR Dashboard', href: '/mttr-dashboard', icon: Activity, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
       ]
     },
     {
       label: "Maintenance Compliance",
       items: [
-        { name: 'MEL/CDL Management', href: '/mel-cdl', icon: AlertTriangle, roles: ['maintenance', 'admin', 'lead'] },
-        { name: 'Turndown Reports', href: '/turndown-reports', icon: FileText, roles: ['maintenance', 'admin', 'lead'] },
-        { name: 'Turndown Form', href: '/turndown-form', icon: ClipboardList, roles: ['maintenance'] },
+        { name: 'MEL/CDL Management', href: '/mel-cdl', icon: AlertTriangle, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+        { name: 'Maintenance Turnover', href: '/maintenance-turnover', icon: ArrowRightLeft, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Shift handover protocol' },
+        { name: 'Turndown Reports', href: '/turndown-reports', icon: FileText, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
+        { name: 'Turndown Form', href: '/turndown-form', icon: ClipboardList, roles: ['maintenance', 'maintenance-coordinator'] },
       ]
     },
     {
       label: "Maintenance Resources",
       items: [
-        { name: 'Parts Inventory', href: '/parts-inventory', icon: Boxes, roles: ['maintenance', 'admin', 'lead'] },
-        { name: 'Car Tracking', href: '/car-tracking', icon: Package, roles: ['maintenance', 'admin', 'lead'] },
-        { name: 'Airport Services', href: '/airport-services', icon: Building2, roles: ['maintenance', 'admin'] },
-        { name: 'Fuel Farm Tracker', href: '/fuel-farm', icon: Fuel, roles: ['maintenance'] },
-        { name: 'Maintenance Board', href: '/maintenance', icon: Wrench, roles: ['maintenance', 'admin', 'lead'] },
-        { name: 'Standalone GRAT', href: '/grat/standalone', icon: Shield, roles: ['maintenance', 'admin', 'lead'] },
+        { name: 'Parts Inventory', href: '/parts-inventory', icon: Boxes, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+        { name: 'Car Tracking', href: '/car-tracking', icon: Package, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+        { name: 'Airport Services', href: '/airport-services', icon: Building2, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+        { name: 'Fuel Farm Tracker', href: '/fuel-farm', icon: Fuel, roles: ['maintenance', 'maintenance-coordinator', 'dom'] },
+        { name: 'Maintenance Board', href: '/maintenance', icon: Wrench, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
+        { name: 'Standalone GRAT', href: '/grat/standalone', icon: Shield, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
       ]
     },
     {
@@ -246,7 +247,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
       items: [
         { name: 'Safety Center', href: '/safety', icon: Shield, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
         { name: 'My Safety Activity', href: '/safety?tab=my-activity', icon: UserCheck, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
-        { name: 'Report Hazard', href: '/safety?tab=hazards&action=new', icon: AlertTriangle, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
       ]
     },
     {
@@ -267,12 +267,11 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Schedule Calendar', href: '/schedule', icon: Calendar, roles: ['pilot', 'admin'] },
         { name: 'Scheduling Dashboard', href: '/scheduling-dashboard', icon: Calendar, roles: ['scheduling', 'admin'] },
         { name: 'Trip Coordination', href: '/trip-coordination', icon: MapPin, roles: ['scheduling', 'admin'] },
-        { name: 'Crew Management', href: '/crew-management', icon: Clock, roles: ['scheduling', 'admin', 'lead'] },
         { name: 'Crew Workload & Travel', href: '/crew-scheduling-workload', icon: BarChart3, roles: ['scheduling', 'admin', 'lead'] },
-        { name: 'Trip Management', href: '/booking-profile', icon: BookOpen, roles: ['admin-assistant', 'admin', 'lead'] },
-        { name: 'Itinerary Builder', href: '/itinerary-builder', icon: FileText, roles: ['admin-assistant', 'admin', 'lead'] },
+        { name: 'Trip Management', href: '/booking-profile', icon: BookOpen, roles: ['admin-assistant', 'admin'] },
+        { name: 'Itinerary Builder', href: '/itinerary-builder', icon: FileText, roles: ['admin-assistant', 'admin'] },
         { name: 'Passenger Forms', href: '/passenger-forms', icon: FileText, roles: ['scheduling', 'admin'] },
-        { name: 'Vacation Request', href: '/vacation-request', icon: CalendarCheck, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling'] },
+        { name: 'Vacation Request', href: '/vacation-request', icon: CalendarCheck, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },
       ]
     },
     {
@@ -330,9 +329,9 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   };
 
   // Initialize navigation groups with custom order if available
-  const [navigationGroups, setNavigationGroups] = useState<NavigationGroup[]>(() => {
-    const customOrder = loadCustomOrder();
+  const [customOrderKeys, setCustomOrderKeys] = useState<string[] | null>(loadCustomOrder);
 
+  const navigationGroups = React.useMemo(() => {
     // Filter groups and items based on user role and additional roles
     const filtered = defaultNavigationGroups.map(group => ({
       ...group,
@@ -341,10 +340,10 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
       )
     })).filter(group => group.items.length > 0);
 
-    if (customOrder) {
+    if (customOrderKeys) {
       // Reorder based on saved order
       const orderedGroups: NavigationGroup[] = [];
-      customOrder.forEach((label: string) => {
+      customOrderKeys.forEach((label: string) => {
         const group = filtered.find(g => g.label === label);
         if (group) {
           orderedGroups.push(group);
@@ -362,7 +361,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     }
 
     return filtered;
-  });
+  }, [userRole, additionalRoles, customOrderKeys]);
 
   // Save custom order to localStorage
   const saveCustomOrder = (groups: NavigationGroup[]) => {
@@ -375,7 +374,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     const newGroups = [...navigationGroups];
     const [draggedGroup] = newGroups.splice(dragIndex, 1);
     newGroups.splice(hoverIndex, 0, draggedGroup);
-    setNavigationGroups(newGroups);
+    setCustomOrderKeys(newGroups.map(g => g.label));
   };
 
   // Save order when customization mode is turned off
@@ -387,14 +386,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
   // Reset to default order
   const resetToDefault = () => {
-    const filtered = defaultNavigationGroups.map(group => ({
-      ...group,
-      items: group.items.filter(item => 
-        item.roles.includes(userRole) || additionalRoles.some(role => item.roles.includes(role))
-      )
-    })).filter(group => group.items.length > 0);
-
-    setNavigationGroups(filtered);
+    setCustomOrderKeys(null);
     localStorage.removeItem(`nav-order-${userRole}`);
   };
 
@@ -556,6 +548,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
           isOpen={isCommandPaletteOpen}
           onClose={() => setIsCommandPaletteOpen(false)}
           userRole={userRole}
+          additionalRoles={additionalRoles}
         />
       </div>
     </SidebarProvider>

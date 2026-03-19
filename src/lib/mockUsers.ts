@@ -81,6 +81,16 @@ export const SYSTEM_USERS = [
     lastLogin: '2025-02-02 07:30',
     department: 'Maintenance',
     hireDate: '2022-02-14'
+  },
+  {
+    id: 'USR009',
+    name: 'Kevin Miller',
+    email: 'k.miller@flightops.com',
+    roles: ['maintenance', 'maintenance-coordinator'],
+    status: 'Active',
+    lastLogin: '2025-02-02 10:00',
+    department: 'Maintenance',
+    hireDate: '2021-03-20'
   }
 ];
 
@@ -102,6 +112,7 @@ export const ROLE_CATEGORIES = {
     { value: 'lead', label: 'Lead Team', description: 'Management and leadership' },
     { value: 'scheduling', label: 'Scheduling', description: 'Flight scheduling and dispatch' },
     { value: 'document-manager', label: 'Document Manager', description: 'Document and manual management' },
+    { value: 'procedural-specialist', label: 'Procedural Specialist', description: 'Procedural bulletin management' },
     { value: 'hr', label: 'HR', description: 'Human resources' },
     { value: 'admin', label: 'Administrator', description: 'System administration' },
   ]
@@ -115,7 +126,7 @@ export const ADDITIONAL_ROLES = [
   { id: 'assistant-chief-pilot', label: 'Assistant Chief Pilot' },
   { id: 'dom', label: 'Director of Maintenance' },
   { id: 'chief-inspector', label: 'Chief Inspector' },
-  { id: 'maintenance-shift-lead', label: 'Maintenance Shift Lead' },
+  { id: 'maintenance-coordinator', label: 'Maintenance Coordinator' },
   { id: 'scheduling-manager', label: 'Scheduling Manager' },
   { id: 'lead-scheduler', label: 'Lead Scheduler' },
   { id: 'fa-manager', label: 'Flight Attendant Manager' },

@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, AlertTriangle, CheckCircle, XCircle, MessageSquare, Bell, Plane, Plus, Edit2 } from 'lucide-react';
+import { VacationMasterCalendar } from './VacationMasterCalendar';
 
 type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical' | 'PBST Accrual';
 type RequestStatus = 'pending_scheduling' | 'denied_by_scheduling' | 'tentative_scheduling' | 'pending_manager' | 'denied_by_manager' | 'tentative_manager' | 'approved_awaiting_confirmation' | 'confirmed';
@@ -143,7 +144,8 @@ export function VacationRequestSystem() {
     requestType: '' as RequestType | '',
     startDate: '',
     endDate: '',
-    comments: ''
+    comments: '',
+    selectedPbstDays: [] as string[]
   });
 
   const calculateDays = (start: string, end: string) => {
@@ -162,6 +164,11 @@ export function VacationRequestSystem() {
     }
 
     const daysRequested = calculateDays(newRequest.startDate, newRequest.endDate);
+
+    if (newRequest.selectedPbstDays.length > daysRequested) {
+      alert('You selected more PBST days than the total number of vacation days requested.');
+      return;
+    }
 
     const request: VacationRequest = {
       id: `req${Date.now()}`,
@@ -185,7 +192,7 @@ export function VacationRequestSystem() {
     };
 
     setRequests([...requests, request]);
-    setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '' });
+    setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '', selectedPbstDays: [] });
     
     // Would trigger notification to scheduling here
     alert('Request submitted! Scheduling has been notified.');
@@ -216,6 +223,21 @@ export function VacationRequestSystem() {
     return null;
   };
 
+  const handlePbstCardClick = (pbst: PaybackStopDay) => {
+    if (pbst.used || pbst.daysRemaining <= 0) return;
+    
+    setNewRequest(prev => {
+      const selected = prev.selectedPbstDays || [];
+      const newSelected = selected.includes(pbst.id) ? selected : [...selected, pbst.id];
+      return {
+        ...prev,
+        requestType: prev.requestType || 'Payback Stop',
+        selectedPbstDays: newSelected
+      };
+    });
+    setActiveTab('submit');
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div>
@@ -232,8 +254,17 @@ export function VacationRequestSystem() {
         <TabsList>
           <TabsTrigger value="submit">Submit Request</TabsTrigger>
           <TabsTrigger value="my-requests">My Requests</TabsTrigger>
+          <TabsTrigger value="calendar">Master Calendar</TabsTrigger>
           <TabsTrigger value="pbst-balance">PBST Balance</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="calendar">
+          <Card>
+            <CardContent className="p-0">
+              <VacationMasterCalendar embedded={true} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="submit" className="space-y-6">
           {/* Payback Stop Balance Summary */}
@@ -340,18 +371,40 @@ export function VacationRequestSystem() {
                 />
               </div>
 
-              {newRequest.requestType === 'Payback Stop' && (
+              <div className="space-y-2">
+                <Label>Apply Available PBST Days (Optional)</Label>
+                <div className="flex flex-wrap gap-2">
+                  {currentUser.paybackStopDays.filter(p => !p.used).map(pbst => (
+                    <Badge 
+                      key={pbst.id}
+                      variant={newRequest.selectedPbstDays.includes(pbst.id) ? "default" : "outline"}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        setNewRequest(prev => ({
+                          ...prev,
+                          selectedPbstDays: prev.selectedPbstDays.includes(pbst.id) 
+                            ? prev.selectedPbstDays.filter(id => id !== pbst.id)
+                            : [...prev.selectedPbstDays, pbst.id]
+                        }))
+                      }}
+                    >
+                      {pbst.reason} (Expires: {pbst.expirationDate.toLocaleDateString()})
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {newRequest.selectedPbstDays.length > 0 && (
                 <Alert className="border-orange-200 bg-orange-50">
                   <AlertTriangle className="h-4 w-4 text-orange-600" />
                   <AlertDescription className="text-orange-800">
-                    <strong>Note:</strong> This will deduct 1 day from your Payback Stop balance ({currentUser.paybackStopBalance} available). 
-                    Make sure to submit within 91 days of being awarded the PBST day.
+                    <strong>Note:</strong> This request will use {newRequest.selectedPbstDays.length} day(s) from your Payback Stop balance.
                   </AlertDescription>
                 </Alert>
               )}
 
               <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '' })}>
+                <Button variant="outline" onClick={() => setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '', selectedPbstDays: [] })}>
                   Clear
                 </Button>
                 <Button onClick={handleSubmitRequest}>
@@ -497,7 +550,7 @@ export function VacationRequestSystem() {
                 {currentUser.paybackStopDays.map((pbst) => {
                   const alert = getExpirationAlert(pbst.daysRemaining);
                   return (
-                    <Card key={pbst.id} className={pbst.used ? 'opacity-50' : ''}>
+                    <Card key={pbst.id} className={pbst.used ? 'opacity-50' : 'cursor-pointer hover:border-primary transition-colors'} onClick={() => handlePbstCardClick(pbst)}>
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex-1">

@@ -51,6 +51,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from './ui/dropdown-menu';
 import { useHazards, WORKFLOW_STAGES, HAZARD_CATEGORIES, SEVERITY_LEVELS } from '../contexts/HazardContext';
+import { useAudits } from '../contexts/AuditContext';
 import { toast } from 'sonner';
 
 interface SafetyDashboardProps {
@@ -342,36 +343,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
     return waiver.approvalChain.find((s: any) => s.status === 'pending');
   };
 
-  // Audit Schedule
-  const audits = [
-    {
-      id: 1,
-      title: 'Monthly Safety Audit - February',
-      auditor: 'Safety Team',
-      scheduledDate: '2024-02-15',
-      area: 'Flight Operations',
-      status: 'Scheduled',
-      findings: 0
-    },
-    {
-      id: 2,
-      title: 'Maintenance Records Audit',
-      auditor: 'John Smith',
-      scheduledDate: '2024-02-10',
-      area: 'Maintenance',
-      status: 'In Progress',
-      findings: 2
-    },
-    {
-      id: 3,
-      title: 'Document Compliance Review',
-      auditor: 'Sarah Wilson',
-      scheduledDate: '2024-01-28',
-      area: 'All Departments',
-      status: 'Completed',
-      findings: 3
-    }
-  ];
+  const { audits } = useAudits();
 
   const { hazards, updateHazard, deleteHazard } = useHazards();
 
@@ -1614,10 +1586,12 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
               <p className="text-sm text-muted-foreground">Schedule and manage safety audits</p>
             </div>
             {isAdmin && (
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Schedule Audit
-              </Button>
+              <Link to="/safety/audits">
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Schedule Audit
+                </Button>
+              </Link>
             )}
           </div>
 
@@ -1635,7 +1609,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                         <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
                           <div>
                             <span className="text-muted-foreground">Auditor:</span>
-                            <span className="ml-2">{audit.auditor}</span>
+                            <span className="ml-2">{audit.assignedTo}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Date:</span>
@@ -1643,11 +1617,11 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                           </div>
                           <div>
                             <span className="text-muted-foreground">Area:</span>
-                            <span className="ml-2">{audit.area}</span>
+                            <span className="ml-2">{audit.category}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Findings:</span>
-                            <span className="ml-2">{audit.findings}</span>
+                            <span className="ml-2">{audit.findings.length}</span>
                           </div>
                         </div>
                         <Badge className={`${getStatusColor(audit.status)} mt-3`} variant="outline">

@@ -101,7 +101,7 @@ export default function DutyRosterWidget() {
                         <Users className="w-5 h-5 text-emerald-500" />
                         Duty Roster
                     </CardTitle>
-                    <Link to="/crew-management">
+                    <Link to="/crew-scheduling-workload">
                         <Badge variant="outline" className="hover:bg-accent cursor-pointer transition-colors">
                             View All
                         </Badge>

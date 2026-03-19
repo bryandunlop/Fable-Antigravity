@@ -66,7 +66,6 @@ import BookingProfile from './components/BookingProfile';
 import TripBuilder from './components/TripBuilder';
 import FlightFamily from './components/FlightFamily';
 import ASAPReport from './components/ASAPReport';
-import CrewManagement from './components/CrewManagement';
 import PartsInventory from './components/PartsInventory';
 import TripCoordination from './components/TripCoordination';
 import CrewSchedulingWorkload from './components/CrewSchedulingWorkload';
@@ -112,7 +111,8 @@ import MWWorkOrderBoard from './components/maintenance-workflow/WorkOrderBoard';
 import MWTechnicianView from './components/maintenance-workflow/TechnicianView';
 import MWShiftHandover from './components/maintenance-workflow/ShiftHandover';
 import MWPredictiveAnalytics from './components/maintenance-workflow/PredictiveAnalytics';
-
+import MaintenanceTurnoverForm from './components/MaintenanceTurnoverForm';
+import { AuditProvider } from './contexts/AuditContext';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -136,8 +136,9 @@ export default function App() {
       <NotificationProvider>
         <MaintenanceProvider>
           <HazardProvider>
-            <PassengerFormProvider>
-              <ForeFlightSyncProvider>
+            <AuditProvider>
+              <PassengerFormProvider>
+                <ForeFlightSyncProvider>
                 <Router>
                   <Routes>
                     {/* Public Routes - No Authentication Required */}
@@ -225,6 +226,7 @@ export default function App() {
                                 <Route path="/work-orders" element={<WorkOrders />} />
                                 <Route path="/tech-work-analytics" element={<TechWorkAnalytics />} />
                                 <Route path="/mttr-dashboard" element={<MTTRDashboard />} />
+                                <Route path="/maintenance-turnover" element={<MaintenanceTurnoverForm />} />
                                 <Route path="/mel-cdl" element={<MELCDLManagement />} />
                                 <Route path="/car-tracking" element={<CarTracking />} />
                                 <Route path="/passenger-database" element={<PassengerDatabase userRole={userRole} />} />
@@ -291,7 +293,7 @@ export default function App() {
                                 />
                                 <Route path="/airport-services" element={<AirportServicesDatabase />} />
                                 <Route path="/maintenance-dashboard" element={<MaintenanceDashboard />} />
-                                <Route path="/vacation-request" element={<VacationRequest userRole={userRole} />} />
+                                <Route path="/vacation-request" element={<VacationRequest userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/fuel-farm" element={<FuelFarmTracker />} />
                                 <Route path="/user-safety" element={<UserSafety userRole={userRole} />} />
                                 <Route path="/safety" element={<SafetyDashboard userRole={userRole} />} />
@@ -376,7 +378,6 @@ export default function App() {
                                   }
                                 />
                                 <Route path="/critical-functions" element={<CriticalFunctionsPlan />} />
-                                <Route path="/crew-management" element={<CrewManagement />} />
                                 <Route path="/parts-inventory" element={<PartsInventory />} />
                                 <Route path="/passenger-forms" element={<PassengerForms />} />
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
@@ -488,6 +489,7 @@ export default function App() {
                 </Router>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
+            </AuditProvider>
           </HazardProvider>
         </MaintenanceProvider>
       </NotificationProvider>
