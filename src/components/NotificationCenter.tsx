@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useNotifications } from './hooks/useNotifications';
+import { useNotificationContext } from './contexts/NotificationContext';
 import {
   Bell,
   AlertTriangle,
@@ -66,6 +67,17 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
     refetch,
     counts
   } = useNotifications({ userRole });
+
+  const { permission, requestPermission } = useNotificationContext();
+
+  const handleEnableNotifications = async () => {
+    const result = await requestPermission();
+    if (result === 'granted') {
+      // Show a confirmation via sonner or just rely on native notification
+      const { toast } = await import('sonner');
+      toast.success('Push notifications enabled! You will now receive alerts for audits, safety events, and more.');
+    }
+  };
 
   const getNotificationIcon = (type: string, priority: string) => {
     const iconClass = priority === 'critical' ? 'text-red-500' :
@@ -251,6 +263,21 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
                   <span className="text-sm font-medium">
                     {counts.critical} critical notification{counts.critical !== 1 ? 's' : ''} requiring immediate attention
                   </span>
+                </div>
+              </div>
+            )}
+
+          {/* Push notification permission banner */}
+            {permission === 'default' && (
+              <div className="px-4 pb-2">
+                <div className="flex items-center justify-between gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-blue-800">
+                    <Bell className="w-3.5 h-3.5 shrink-0" />
+                    <span className="text-[11px] font-medium">Enable push notifications for audit alerts &amp; safety reminders</span>
+                  </div>
+                  <Button size="sm" className="h-6 text-[10px] px-2 bg-blue-600 hover:bg-blue-700 shrink-0" onClick={handleEnableNotifications}>
+                    Enable
+                  </Button>
                 </div>
               </div>
             )}

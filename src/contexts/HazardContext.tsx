@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useNotificationContext } from '../components/contexts/NotificationContext';
 
 // Define types based on existing components
 export const WORKFLOW_STAGES = {
@@ -402,6 +403,50 @@ export const HazardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             localStorage.setItem('aviation_hazards', JSON.stringify(hazards));
         }
     }, [hazards]);
+
+    const { addNotification } = useNotificationContext();
+
+    // Check for 6-month effectiveness review reminders (throttled to once per day)
+    const checkEffectivenessReviews = useCallback((hazardList: Hazard[]) => {
+        const today = new Date();
+        const todayKey = today.toISOString().split('T')[0];
+        const lastChecked = localStorage.getItem('hazard_effectiveness_checked');
+        if (lastChecked === todayKey) return;
+        localStorage.setItem('hazard_effectiveness_checked', todayKey);
+
+        hazardList.forEach(hazard => {
+            if (!hazard.effectivenessReviewDate) return;
+            const reviewDate = new Date(hazard.effectivenessReviewDate);
+            const daysUntil = Math.ceil((reviewDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+
+            // Fire if within 7 days or overdue
+            if (daysUntil <= 7) {
+                addNotification({
+                    title: daysUntil < 0
+                        ? `Effectiveness Review Overdue: ${hazard.title}`
+                        : `Effectiveness Review Due: ${hazard.title}`,
+                    message: daysUntil < 0
+                        ? `6-month effectiveness review is ${Math.abs(daysUntil)} day(s) overdue.`
+                        : daysUntil === 0
+                            ? '6-month effectiveness review is due today.'
+                            : `6-month effectiveness review is due in ${daysUntil} day(s).`,
+                    type: 'safety',
+                    priority: daysUntil < 0 ? 'high' : 'medium',
+                    actionUrl: `/safety/hazard-workflow/${hazard.id}`,
+                    actionText: 'Review Hazard',
+                    module: 'Safety Systems',
+                    relatedId: hazard.id,
+                    daysUntilDue: daysUntil
+                });
+            }
+        });
+    }, [addNotification]);
+
+    useEffect(() => {
+        if (hazards.length > 0) {
+            checkEffectivenessReviews(hazards);
+        }
+    }, [hazards, checkEffectivenessReviews]);
 
     const getHazardById = (id: string) => {
         return hazards.find(h => h.id === id);
