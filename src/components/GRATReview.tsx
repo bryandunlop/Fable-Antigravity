@@ -43,9 +43,96 @@ export default function GRATReview() {
   const getSubmissions = (): GRATSubmission[] => {
     const savedSubmissions = localStorage.getItem('grat_submissions');
     let submissions: GRATSubmission[] = savedSubmissions ? JSON.parse(savedSubmissions) : [];
-    
+
+    // Seed sample data if none exist
+    if (submissions.length === 0) {
+      const today = new Date();
+      const d = (daysAgo: number) => new Date(today.getTime() - daysAgo * 86400000).toISOString();
+      submissions = [
+        {
+          id: 'GRAT_SAMPLE_001',
+          technicianName: 'Marcus Rivera',
+          taskDate: d(1).split('T')[0],
+          startTime: '08:30',
+          status: 'Requires Review',
+          totalScore: 22,
+          maxScore: 60,
+          riskLevel: 'High',
+          submittedAt: d(1),
+          mitigationNotes: 'Working with a second technician. Safety briefing completed. Fall protection in-use.',
+          additionalNotes: 'Engine APU maintenance at night shift.',
+          flaggedItems: ['Working Temperatures Below 32F', 'Unscheduled Maintenance', 'Engine/APU Maintenance', 'Work during WOCL (0200-0600 Local)', 'Working Alone']
+        },
+        {
+          id: 'GRAT_SAMPLE_002',
+          technicianName: 'Jordan Lee',
+          taskDate: d(3).split('T')[0],
+          startTime: '10:00',
+          status: 'Approved',
+          totalScore: 8,
+          maxScore: 60,
+          riskLevel: 'Low',
+          submittedAt: d(3),
+          reviewedBy: 'Safety Manager',
+          reviewedAt: d(2),
+          reviewComments: 'Low risk, routine inspection. Approved for operations.',
+          mitigationNotes: '',
+          additionalNotes: 'Pre-flight inspection only.',
+          flaggedItems: ['Inspection: Pre and Post Flight']
+        },
+        {
+          id: 'GRAT_SAMPLE_003',
+          technicianName: 'Sarah Thompson',
+          taskDate: d(5).split('T')[0],
+          startTime: '07:00',
+          status: 'Pending',
+          totalScore: 13,
+          maxScore: 60,
+          riskLevel: 'Medium',
+          submittedAt: d(5),
+          mitigationNotes: 'Two-person team assigned. Supervisor oversight required.',
+          additionalNotes: 'Hydraulic system maintenance during scheduled window.',
+          flaggedItems: ['Hydraulic Maintenance', 'Ladder or Maintenance Platform Use', 'Duty Time 8 to 12 hours']
+        },
+        {
+          id: 'GRAT_SAMPLE_004',
+          technicianName: 'David Kim',
+          taskDate: d(10).split('T')[0],
+          startTime: '14:00',
+          status: 'Closed',
+          totalScore: 6,
+          maxScore: 60,
+          riskLevel: 'Low',
+          submittedAt: d(10),
+          reviewedBy: 'Safety Manager',
+          reviewedAt: d(9),
+          reviewComments: 'Routine fuel servicing. All checks complete.',
+          closedBy: 'Safety Manager',
+          closedAt: d(8),
+          mitigationNotes: '',
+          additionalNotes: 'Standard fuel servicing, no anomalies.',
+          flaggedItems: ['Servicing: Fuel']
+        },
+        {
+          id: 'GRAT_SAMPLE_005',
+          technicianName: 'Aisha Patel',
+          taskDate: d(2).split('T')[0],
+          startTime: '09:15',
+          status: 'Requires Review',
+          totalScore: 21,
+          maxScore: 60,
+          riskLevel: 'High',
+          submittedAt: d(2),
+          mitigationNotes: 'Peer review required. Second tech on standby. Local thunderstorm window passed.',
+          additionalNotes: 'Aircraft jacking for landing gear inspection.',
+          flaggedItems: ['Local Thunderstorms', 'Aircraft Jacking', 'Electrical System Maintenance', 'Hydraulic Maintenance', 'Contract Aircraft Mx Personnel']
+        }
+      ];
+      localStorage.setItem('grat_submissions', JSON.stringify(submissions));
+    }
+
     // Filter out drafts
-    return submissions.filter(submission => 
+    return submissions.filter(submission =>
       submission.status !== 'Draft'
     );
   };
@@ -70,6 +157,7 @@ export default function GRATReview() {
       case 'Rejected': return 'bg-red-100 text-red-800';
       case 'Pending': return 'bg-yellow-100 text-yellow-800';
       case 'Requires Review': return 'bg-orange-100 text-orange-800';
+      case 'Closed': return 'bg-gray-200 text-gray-700';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -145,6 +233,25 @@ export default function GRATReview() {
 
     return filtered;
   }, [submissions, searchTerm, statusFilter, dateRange, sortBy, sortOrder]);
+
+  const handleMarkAsClosed = (submissionId: string) => {
+    const closedAt = new Date().toISOString();
+    const closedBy = 'Safety Manager'; // In production, get from auth context
+
+    const updated = submissions.map(sub =>
+      sub.id === submissionId
+        ? { ...sub, status: 'Closed' as const, closedBy, closedAt }
+        : sub
+    );
+    setSubmissions(updated);
+
+    const allSubmissions = JSON.parse(localStorage.getItem('grat_submissions') || '[]');
+    const updatedAll = allSubmissions.map((sub: any) =>
+      sub.id === submissionId ? { ...sub, status: 'Closed', closedBy, closedAt } : sub
+    );
+    localStorage.setItem('grat_submissions', JSON.stringify(updatedAll));
+    toast.success('GRAT submission closed. Audit trail recorded.');
+  };
 
   const handleReviewSubmission = async (decision: 'approve' | 'reject') => {
     if (!selectedSubmission) return;
@@ -329,6 +436,7 @@ export default function GRATReview() {
                 <SelectItem value="Requires Review">Requires Review</SelectItem>
                 <SelectItem value="Approved">Approved</SelectItem>
                 <SelectItem value="Rejected">Rejected</SelectItem>
+                <SelectItem value="Closed">Closed</SelectItem>
               </SelectContent>
             </Select>
 
@@ -448,6 +556,27 @@ export default function GRATReview() {
                             Review
                           </Button>
                         </DialogTrigger>
+                        {/* Mark as Closed button — only for reviewed/approved submissions not already closed */}
+                        {(submission.status === 'Approved' || submission.status === 'Requires Review' || submission.status === 'Pending') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-gray-400 text-gray-700 hover:bg-gray-100"
+                            onClick={() => {
+                              if (window.confirm(`Mark GRAT for ${submission.technicianName} as Closed? This will be recorded in the audit trail.`)) {
+                                handleMarkAsClosed(submission.id);
+                              }
+                            }}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Mark Closed
+                          </Button>
+                        )}
+                        {submission.status === 'Closed' && submission.closedAt && (
+                          <span className="text-xs text-muted-foreground">
+                            Closed {new Date(submission.closedAt).toLocaleDateString()}
+                          </span>
+                        )}
                         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle className="flex items-center gap-2">

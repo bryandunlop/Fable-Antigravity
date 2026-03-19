@@ -49,7 +49,7 @@ export interface GRATSubmission {
   technicianName: string;
   taskDate: string;
   startTime: string;
-  status: 'Draft' | 'Pending' | 'Approved' | 'Rejected' | 'Requires Review';
+  status: 'Draft' | 'Pending' | 'Approved' | 'Rejected' | 'Requires Review' | 'Closed';
   totalScore: number;
   maxScore: number;
   riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
@@ -60,6 +60,8 @@ export interface GRATSubmission {
   mitigationNotes?: string;
   additionalNotes?: string;
   flaggedItems: string[];
+  closedBy?: string;
+  closedAt?: string;
 }
 
 

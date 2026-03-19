@@ -51,7 +51,7 @@ interface FRATSubmission {
   route: string;
   departureTime: string;
   estimatedFlightTime: string;
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Requires Review';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Requires Review' | 'Closed';
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
   totalScore: number;
   maxScore: number;
@@ -69,6 +69,8 @@ interface FRATSubmission {
   };
   flaggedItems: string[];
   attachments?: string[];
+  closedBy?: string;
+  closedAt?: string;
 }
 
 export default function FRATReview() {
@@ -291,9 +293,7 @@ export default function FRATReview() {
       localStorage.setItem('frat_submissions', JSON.stringify(submissions));
     }
     
-    return submissions.filter(submission => 
-      submission.status !== 'Draft' // Only show submitted forms to Safety
-    );
+    return submissions;
   };
 
   const [submissions, setSubmissions] = useState<FRATSubmission[]>([]);
@@ -319,6 +319,7 @@ export default function FRATReview() {
       case 'Rejected': return 'bg-red-100 text-red-800';
       case 'Pending': return 'bg-yellow-100 text-yellow-800';
       case 'Requires Review': return 'bg-orange-100 text-orange-800';
+      case 'Closed': return 'bg-gray-200 text-gray-700';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -412,6 +413,25 @@ export default function FRATReview() {
 
     return filtered;
   }, [submissions, searchTerm, statusFilter, priorityFilter, dateRange, sortBy, sortOrder]);
+
+  const handleMarkAsClosed = (submissionId: string) => {
+    const closedAt = new Date().toISOString();
+    const closedBy = 'Safety Manager';
+
+    const updatedSubmissions = submissions.map(sub =>
+      sub.id === submissionId
+        ? { ...sub, status: 'Closed' as const, closedBy, closedAt }
+        : sub
+    );
+    setSubmissions(updatedSubmissions);
+
+    const allSubmissions = JSON.parse(localStorage.getItem('frat_submissions') || '[]');
+    const updatedAll = allSubmissions.map((sub: any) =>
+      sub.id === submissionId ? { ...sub, status: 'Closed', closedBy, closedAt } : sub
+    );
+    localStorage.setItem('frat_submissions', JSON.stringify(updatedAll));
+    toast.success('FRAT submission closed. Audit trail recorded.');
+  };
 
   const handleReviewSubmission = async (decision: 'approve' | 'reject') => {
     if (!selectedSubmission) return;
@@ -606,6 +626,7 @@ export default function FRATReview() {
                 <SelectItem value="Requires Review">Requires Review</SelectItem>
                 <SelectItem value="Approved">Approved</SelectItem>
                 <SelectItem value="Rejected">Rejected</SelectItem>
+                <SelectItem value="Closed">Closed</SelectItem>
               </SelectContent>
             </Select>
 
@@ -742,6 +763,27 @@ export default function FRATReview() {
                             Review
                           </Button>
                         </DialogTrigger>
+                        {/* Mark as Closed — SM only, for any non-closed submission */}
+                        {submission.status !== 'Closed' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-gray-400 text-gray-700 hover:bg-gray-100"
+                            onClick={() => {
+                              if (window.confirm(`Mark FRAT ${submission.flightNumber} as Closed? This will be recorded in the audit trail.`)) {
+                                handleMarkAsClosed(submission.id);
+                              }
+                            }}
+                          >
+                            <Archive className="w-4 h-4 mr-1" />
+                            Mark Closed
+                          </Button>
+                        )}
+                        {submission.status === 'Closed' && submission.closedAt && (
+                          <span className="text-xs text-muted-foreground">
+                            Closed {new Date(submission.closedAt).toLocaleDateString()}
+                          </span>
+                        )}
                         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle className="flex items-center gap-2">
