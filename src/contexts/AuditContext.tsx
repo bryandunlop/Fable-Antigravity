@@ -3,7 +3,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 export interface AuditChecklistItem {
     id: number;
     item: string;
-    completed: boolean;
+    completed: boolean; // legacy - kept for compatibility
+    status: 'Acceptable' | 'Unacceptable' | 'Pending';
 }
 
 export interface AuditFinding {
@@ -22,6 +23,8 @@ export interface Audit {
     priority: string;
     scheduledDate: string;
     dueDate: string;
+    expirationDate?: string;
+    protocolLink?: string;
     assignedTo: string;
     assignedRole: string;
     assignmentType: string;
@@ -57,11 +60,11 @@ const INITIAL_AUDITS: Audit[] = [
         assignmentType: 'Manual',
         description: 'Comprehensive monthly safety audit covering all operational areas',
         checklist: [
-            { id: 1, item: 'Review incident reports from previous month', completed: true },
-            { id: 2, item: 'Inspect emergency equipment', completed: true },
-            { id: 3, item: 'Verify crew training records', completed: false },
-            { id: 4, item: 'Check fuel handling procedures', completed: false },
-            { id: 5, item: 'Review maintenance compliance', completed: false }
+            { id: 1, item: 'Review incident reports from previous month', completed: true, status: 'Acceptable' as const },
+            { id: 2, item: 'Inspect emergency equipment', completed: true, status: 'Acceptable' as const },
+            { id: 3, item: 'Verify crew training records', completed: false, status: 'Unacceptable' as const },
+            { id: 4, item: 'Check fuel handling procedures', completed: false, status: 'Pending' as const },
+            { id: 5, item: 'Review maintenance compliance', completed: false, status: 'Pending' as const }
         ],
         findings: [],
         completionRate: 40
@@ -79,11 +82,13 @@ const INITIAL_AUDITS: Audit[] = [
         assignedRole: 'Pilot',
         assignmentType: 'Random (Pilot)',
         description: 'Audit of ground handling procedures and equipment maintenance',
+        protocolLink: 'ISBAO Stage III Section 4.1',
+        expirationDate: '2025-08-20',
         checklist: [
-            { id: 6, item: 'Inspect ground support equipment', completed: false },
-            { id: 7, item: 'Review baggage handling procedures', completed: false },
-            { id: 8, item: 'Check aircraft positioning protocols', completed: false },
-            { id: 9, item: 'Verify safety zone compliance', completed: false }
+            { id: 6, item: 'Inspect ground support equipment', completed: false, status: 'Pending' as const },
+            { id: 7, item: 'Review baggage handling procedures', completed: false, status: 'Pending' as const },
+            { id: 8, item: 'Check aircraft positioning protocols', completed: false, status: 'Pending' as const },
+            { id: 9, item: 'Verify safety zone compliance', completed: false, status: 'Acceptable' as const }
         ],
         findings: [],
         completionRate: 0
@@ -101,11 +106,13 @@ const INITIAL_AUDITS: Audit[] = [
         assignedRole: 'Document Manager',
         assignmentType: 'Random (Any)',
         description: 'Audit of document management and version control processes',
+        protocolLink: 'ISBAO Stage III Section 8.3',
+        expirationDate: '2024-08-05',
         checklist: [
-            { id: 10, item: 'Verify document version control', completed: true },
-            { id: 11, item: 'Check distribution records', completed: true },
-            { id: 12, item: 'Review archive procedures', completed: true },
-            { id: 13, item: 'Validate electronic signatures', completed: true }
+            { id: 10, item: 'Verify document version control', completed: true, status: 'Acceptable' as const },
+            { id: 11, item: 'Check distribution records', completed: true, status: 'Acceptable' as const },
+            { id: 12, item: 'Review archive procedures', completed: true, status: 'Acceptable' as const },
+            { id: 13, item: 'Validate electronic signatures', completed: true, status: 'Acceptable' as const }
         ],
         findings: [
             { id: 1, description: 'Minor discrepancy in version numbering', severity: 'Low', status: 'Resolved' },
@@ -126,12 +133,14 @@ const INITIAL_AUDITS: Audit[] = [
         assignedRole: 'Maintenance',
         assignmentType: 'Random (Maintenance)',
         description: 'Review maintenance procedures and quality assurance processes',
+        protocolLink: 'ISBAO Stage III Section 5.2',
+        expirationDate: '2025-12-31',
         checklist: [
-            { id: 14, item: 'Review maintenance logs and records', completed: false },
-            { id: 15, item: 'Inspect tool calibration records', completed: false },
-            { id: 16, item: 'Check parts inventory management', completed: false },
-            { id: 17, item: 'Verify mechanic certifications', completed: false },
-            { id: 18, item: 'Review work order completion', completed: false }
+            { id: 14, item: 'Review maintenance logs and records', completed: false, status: 'Pending' as const },
+            { id: 15, item: 'Inspect tool calibration records', completed: false, status: 'Pending' as const },
+            { id: 16, item: 'Check parts inventory management', completed: false, status: 'Unacceptable' as const },
+            { id: 17, item: 'Verify mechanic certifications', completed: false, status: 'Pending' as const },
+            { id: 18, item: 'Review work order completion', completed: false, status: 'Pending' as const }
         ],
         findings: [],
         completionRate: 0
@@ -185,12 +194,15 @@ export const AuditProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [audits, setAudits] = useState<Audit[]>([]);
 
     useEffect(() => {
+        const AUDIT_VERSION = 'v2'; // bump to clear stale localStorage
+        const storedVersion = localStorage.getItem('antigravity_audits_version');
         const storedAudits = localStorage.getItem('antigravity_audits');
-        if (storedAudits) {
+        if (storedAudits && storedVersion === AUDIT_VERSION) {
             setAudits(JSON.parse(storedAudits));
         } else {
             setAudits(INITIAL_AUDITS);
             localStorage.setItem('antigravity_audits', JSON.stringify(INITIAL_AUDITS));
+            localStorage.setItem('antigravity_audits_version', AUDIT_VERSION);
         }
     }, []);
 

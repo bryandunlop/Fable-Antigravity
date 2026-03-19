@@ -42,6 +42,10 @@ export default function InternalAuditManagement() {
   const [selectedRole, setSelectedRole] = useState('All Roles');
   const [assignmentSearchTerm, setAssignmentSearchTerm] = useState('');
 
+  const [showNewFindingForm, setShowNewFindingForm] = useState(false);
+  const [newFindingForm, setNewFindingForm] = useState({ description: '', severity: 'Medium', status: 'Open' });
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+
   const [newAuditForm, setNewAuditForm] = useState({
     title: '',
     type: 'Scheduled',
@@ -49,6 +53,8 @@ export default function InternalAuditManagement() {
     priority: 'Medium',
     scheduledDate: '',
     dueDate: '',
+    expirationDate: '',
+    protocolLink: '',
     description: '',
     useTemplate: true,
     initialAssignment: 'None'
@@ -176,6 +182,52 @@ export default function InternalAuditManagement() {
     }
   };
 
+  // Helper: expiration status
+  const getExpirationStatus = (expDate?: string) => {
+    if (!expDate) return null;
+    const exp = new Date(expDate);
+    const now = new Date();
+    const daysUntil = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 3600 * 24));
+    if (daysUntil < 0) return { label: 'Expired', color: 'bg-red-100 text-red-800 border-red-200', dot: '🔴' };
+    if (daysUntil <= 30) return { label: `${daysUntil}d left`, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', dot: '🟡' };
+    return { label: `${daysUntil}d left`, color: 'bg-green-100 text-green-800 border-green-200', dot: '🟢' };
+  };
+
+  // Annual schedule generator: distribute 30 audits across 12 months randomly
+  const generateAnnualSchedule = () => {
+    const categories = Object.keys(AUDIT_TEMPLATES);
+    const year = new Date().getFullYear() + 1;
+    const created: string[] = [];
+    for (let i = 0; i < 30; i++) {
+      const month = Math.floor(i / 2.5); // spread ~2-3/month
+      const day = Math.floor(Math.random() * 20) + 1;
+      const scheduledDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const category = categories[i % categories.length];
+      const templateItems = (AUDIT_TEMPLATES[category as keyof typeof AUDIT_TEMPLATES] || []);
+      addAudit({
+        title: `${year} ${category} Audit #${i + 1}`,
+        type: 'Scheduled',
+        category,
+        status: 'Scheduled',
+        priority: i % 5 === 0 ? 'High' : 'Medium',
+        scheduledDate,
+        dueDate: scheduledDate,
+        expirationDate: `${year}-${String(month + 1).padStart(2, '0')}-${String(Math.min(day + 30, 28)).padStart(2, '0')}`,
+        protocolLink: 'ISBAO Stage III',
+        assignedTo: 'Unassigned',
+        assignedRole: '',
+        assignmentType: 'None',
+        description: `Annual scheduled ${category.toLowerCase()} audit`,
+        checklist: templateItems.map((item, idx) => ({ id: Date.now() + idx + i * 100, item, completed: false, status: 'Pending' as const })),
+        findings: [],
+        completionRate: 0
+      });
+      created.push(scheduledDate);
+    }
+    toast.success(`30 audits scheduled across ${year}. Sent for assignment.`);
+    setShowScheduleDialog(false);
+  };
+
   const generateAuditReport = (auditId: string) => {
     toast.success(`Generating PDF report for audit ${auditId}`);
   };
@@ -192,15 +244,43 @@ export default function InternalAuditManagement() {
         </div>
         
         <div className="flex gap-2 mt-4 lg:mt-0">
+          <Button variant="outline" onClick={() => setShowScheduleDialog(true)}>
+            <Shuffle className="w-4 h-4 mr-2" />
+            Annual Schedule
+          </Button>
           <Button onClick={() => setShowNewAuditDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Schedule New Audit
           </Button>
-          
-          <Dialog open={showAssignDialog} onOpenChange={(open) => {
-            if (!open) setSelectedAudit(null);
-            setShowAssignDialog(open);
-          }}>
+        </div>
+      </div>
+
+      {/* Annual Schedule Dialog */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shuffle className="w-5 h-5 text-blue-600" />
+              Generate Annual Audit Schedule
+            </DialogTitle>
+            <DialogDescription>
+              This will auto-create 30 ISBAO Stage III audits spread across {new Date().getFullYear() + 1}, distributed randomly across all categories (5–6 per month). You can then assign auditors.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 pt-4">
+            <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={generateAnnualSchedule}>
+              <Shuffle className="w-4 h-4 mr-2" />
+              Yes, Send &amp; Assign
+            </Button>
+            <Button variant="outline" onClick={() => setShowScheduleDialog(false)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAssignDialog} onOpenChange={(open) => {
+        if (!open) setSelectedAudit(null);
+        setShowAssignDialog(open);
+      }}>
             <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
@@ -358,10 +438,10 @@ export default function InternalAuditManagement() {
                 </TabsContent>
               </Tabs>
             </DialogContent>
-          </Dialog>
+      </Dialog>
 
-          <Dialog open={showNewAuditDialog} onOpenChange={setShowNewAuditDialog}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={showNewAuditDialog} onOpenChange={setShowNewAuditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Schedule New Audit</DialogTitle>
                 <DialogDescription>
@@ -445,6 +525,14 @@ export default function InternalAuditManagement() {
                     <Label>Due Date</Label>
                     <Input type="date" value={newAuditForm.dueDate} onChange={e => setNewAuditForm({ ...newAuditForm, dueDate: e.target.value })} />
                   </div>
+                  <div>
+                    <Label>Expiration Date</Label>
+                    <Input type="date" value={newAuditForm.expirationDate} onChange={e => setNewAuditForm({ ...newAuditForm, expirationDate: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Protocol Link (e.g. ISBAO Stage III §4.1)</Label>
+                    <Input placeholder="ISBAO Stage III Section..." value={newAuditForm.protocolLink} onChange={e => setNewAuditForm({ ...newAuditForm, protocolLink: e.target.value })} />
+                  </div>
                 </div>
                 
                 <div>
@@ -466,11 +554,13 @@ export default function InternalAuditManagement() {
                       priority: newAuditForm.priority,
                       scheduledDate: newAuditForm.scheduledDate || new Date().toISOString().split('T')[0],
                       dueDate: newAuditForm.dueDate || new Date().toISOString().split('T')[0],
+                      expirationDate: newAuditForm.expirationDate || undefined,
+                      protocolLink: newAuditForm.protocolLink || undefined,
                       assignedTo: 'Unassigned',
                       assignedRole: '',
                       assignmentType: 'None',
                       description: newAuditForm.description,
-                      checklist: templateItems.map((item, idx) => ({ id: Date.now() + idx, item, completed: false })),
+                      checklist: templateItems.map((item, idx) => ({ id: Date.now() + idx, item, completed: false, status: 'Pending' as const })),
                       findings: [],
                       completionRate: 0
                     });
@@ -478,7 +568,8 @@ export default function InternalAuditManagement() {
                     setShowNewAuditDialog(false);
                     setNewAuditForm({ 
                       title: '', type: 'Scheduled', category: 'Safety Management', 
-                      priority: 'Medium', scheduledDate: '', dueDate: '', 
+                      priority: 'Medium', scheduledDate: '', dueDate: '',
+                      expirationDate: '', protocolLink: '',
                       description: '', useTemplate: true, initialAssignment: 'None' 
                     });
                   }}>
@@ -491,8 +582,6 @@ export default function InternalAuditManagement() {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -677,17 +766,26 @@ export default function InternalAuditManagement() {
 
               <div className="flex-1 overflow-hidden p-6">
                 <Tabs defaultValue="checklist" className="h-full flex flex-col">
-                  <TabsList className="grid w-80 grid-cols-3 shrink-0">
+                <TabsList className="grid w-full grid-cols-4 shrink-0">
                     <TabsTrigger value="checklist">Checklist</TabsTrigger>
                     <TabsTrigger value="findings">Findings</TabsTrigger>
                     <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="expiration">Expiry Matrix</TabsTrigger>
                   </TabsList>
 
                   <div className="flex-1 mt-4 overflow-y-auto pr-2">
                     <TabsContent value="checklist" className="m-0 space-y-4">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="font-semibold">Audit Checklist Items</h3>
-                        <Button size="sm" variant="ghost" className="h-8 text-xs">
+                      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => {
+                          const newItemText = prompt('Enter new checklist item:');
+                          if (newItemText?.trim()) {
+                            const updated = [...currentAudit.checklist, { id: Date.now(), item: newItemText.trim(), completed: false, status: 'Pending' as const }];
+                            const acceptableCount = updated.filter(c => c.status === 'Acceptable').length;
+                            const rate = Math.round((acceptableCount / updated.length) * 100);
+                            updateAudit(currentAudit.id, { checklist: updated, completionRate: rate });
+                          }
+                        }}>
                           <Plus className="w-3 h-3 mr-1" /> Add Requirement
                         </Button>
                       </div>
@@ -695,28 +793,63 @@ export default function InternalAuditManagement() {
                       {currentAudit.checklist.length > 0 ? (
                         <div className="grid gap-2">
                           {currentAudit.checklist.map((item) => (
-                            <div key={item.id} className="group flex items-start gap-4 p-4 border rounded-xl hover:border-blue-200 hover:bg-blue-50/20 transition-all">
-                              <Checkbox 
-                                checked={item.completed} 
-                                onCheckedChange={(checked: boolean) => {
-                                  const updatedChecklist = currentAudit.checklist.map(c => 
-                                    c.id === item.id ? { ...c, completed: !!checked } : c
-                                  );
-                                  const completedCount = updatedChecklist.filter(c => c.completed).length;
-                                  const rate = Math.round((completedCount / updatedChecklist.length) * 100);
-                                  updateAudit(currentAudit.id, { 
-                                    checklist: updatedChecklist,
-                                    completionRate: rate,
-                                    status: rate === 100 ? 'Complete' : rate > 0 ? 'In Progress' : 'Scheduled'
-                                  });
-                                }}
-                              />
-                              <div className="flex-1 pt-0.5">
-                                <p className={`text-sm ${item.completed ? 'line-through text-muted-foreground' : 'font-medium'}`}>
+                            <div key={item.id} className="flex items-start gap-3 p-4 border rounded-xl hover:border-blue-200 transition-all">
+                              {/* Binary ✅/❌ toggle buttons */}
+                              <div className="flex gap-1 shrink-0 mt-0.5">
+                                <button
+                                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors ${
+                                    item.status === 'Acceptable'
+                                      ? 'bg-green-100 text-green-700 ring-2 ring-green-400'
+                                      : 'bg-muted text-muted-foreground hover:bg-green-50 hover:text-green-600'
+                                  }`}
+                                  title="Mark Acceptable"
+                                  onClick={() => {
+                                    const newStatus = item.status === 'Acceptable' ? 'Pending' : 'Acceptable';
+                                    const updated = currentAudit.checklist.map(c =>
+                                      c.id === item.id ? { ...c, status: newStatus as 'Acceptable' | 'Unacceptable' | 'Pending', completed: newStatus === 'Acceptable' } : c
+                                    );
+                                    const acceptableCount = updated.filter(c => c.status === 'Acceptable').length;
+                                    const rate = Math.round((acceptableCount / updated.length) * 100);
+                                    updateAudit(currentAudit.id, {
+                                      checklist: updated,
+                                      completionRate: rate,
+                                      status: updated.every(c => c.status !== 'Pending') ? 'Complete' : rate > 0 ? 'In Progress' : 'Scheduled'
+                                    });
+                                  }}
+                                >✅</button>
+                                <button
+                                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors ${
+                                    item.status === 'Unacceptable'
+                                      ? 'bg-red-100 text-red-700 ring-2 ring-red-400'
+                                      : 'bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-600'
+                                  }`}
+                                  title="Mark Unacceptable"
+                                  onClick={() => {
+                                    const newStatus = item.status === 'Unacceptable' ? 'Pending' : 'Unacceptable';
+                                    const updated = currentAudit.checklist.map(c =>
+                                      c.id === item.id ? { ...c, status: newStatus as 'Acceptable' | 'Unacceptable' | 'Pending', completed: false } : c
+                                    );
+                                    const acceptableCount = updated.filter(c => c.status === 'Acceptable').length;
+                                    const rate = Math.round((acceptableCount / updated.length) * 100);
+                                    updateAudit(currentAudit.id, {
+                                      checklist: updated,
+                                      completionRate: rate,
+                                      status: updated.every(c => c.status !== 'Pending') ? 'Complete' : rate > 0 ? 'In Progress' : 'Scheduled'
+                                    });
+                                  }}
+                                >❌</button>
+                              </div>
+                              <div className="flex-1">
+                                <p className={`text-sm ${
+                                  item.status === 'Unacceptable' ? 'text-red-700 font-medium' :
+                                  item.status === 'Acceptable' ? 'text-muted-foreground line-through' : 'font-medium'
+                                }`}>
                                   {item.item}
                                 </p>
+                                <span className={`text-[10px] ${item.status === 'Pending' ? 'text-muted-foreground' : item.status === 'Acceptable' ? 'text-green-600' : 'text-red-600'}`}>
+                                  {item.status}
+                                </span>
                               </div>
-                              {item.completed && <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />}
                             </div>
                           ))}
                         </div>
@@ -732,10 +865,62 @@ export default function InternalAuditManagement() {
                     <TabsContent value="findings" className="m-0 space-y-4">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="font-semibold">Observed Findings</h3>
-                        <Button size="sm" className="bg-red-50 text-red-600 hover:bg-red-100 border-red-100 border">
+                        <Button size="sm" className="bg-red-50 text-red-600 hover:bg-red-100 border-red-100 border" onClick={() => setShowNewFindingForm(v => !v)}>
                           <Plus className="w-3 h-3 mr-1" /> New Finding
                         </Button>
                       </div>
+
+                      {/* Inline new finding form */}
+                      {showNewFindingForm && (
+                        <div className="border border-red-200 bg-red-50/30 rounded-xl p-4 space-y-3">
+                          <h4 className="text-sm font-semibold text-red-700">Record New Finding</h4>
+                          <Textarea
+                            placeholder="Describe the finding..."
+                            rows={3}
+                            value={newFindingForm.description}
+                            onChange={e => setNewFindingForm({ ...newFindingForm, description: e.target.value })}
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <Select value={newFindingForm.severity} onValueChange={v => setNewFindingForm({ ...newFindingForm, severity: v })}>
+                              <SelectTrigger><SelectValue placeholder="Severity" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Low">Low</SelectItem>
+                                <SelectItem value="Medium">Medium</SelectItem>
+                                <SelectItem value="High">High</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={newFindingForm.status} onValueChange={v => setNewFindingForm({ ...newFindingForm, status: v })}>
+                              <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Open">Open</SelectItem>
+                                <SelectItem value="In Progress">In Progress</SelectItem>
+                                <SelectItem value="Resolved">Resolved</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => {
+                              if (!newFindingForm.description.trim()) {
+                                toast.error('Please enter a finding description');
+                                return;
+                              }
+                              const newFinding = {
+                                id: Date.now(),
+                                description: newFindingForm.description.trim(),
+                                severity: newFindingForm.severity,
+                                status: newFindingForm.status
+                              };
+                              updateAudit(currentAudit.id, { findings: [...currentAudit.findings, newFinding] });
+                              setNewFindingForm({ description: '', severity: 'Medium', status: 'Open' });
+                              setShowNewFindingForm(false);
+                              toast.success('Finding recorded');
+                            }}>
+                              Save Finding
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setShowNewFindingForm(false)}>Cancel</Button>
+                          </div>
+                        </div>
+                      )}
 
                       {currentAudit.findings.length > 0 ? (
                         <div className="space-y-3">
