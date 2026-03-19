@@ -612,7 +612,7 @@ export default function AirportEvaluations() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl">Airport Evaluations</h1>
+        <h1 className="text-2xl">Airport Information</h1>
         <p className="text-muted-foreground">
           Review airport evaluations and submit corrections
         </p>

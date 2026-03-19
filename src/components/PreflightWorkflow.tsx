@@ -1167,7 +1167,7 @@ export default function PreflightWorkflow() {
               <ChevronRight className="w-4 h-4 rotate-180 mr-2" />
               Back to Trips
             </Button>
-            <h1 className="text-2xl">Airport Evaluations - Leg {leg?.legNumber}</h1>
+            <h1 className="text-2xl">Airport Information - Leg {leg?.legNumber}</h1>
             <p className="text-muted-foreground">
               {leg?.departure} ({leg?.departureICAO}) & {leg?.arrival} ({leg?.arrivalICAO})
             </p>

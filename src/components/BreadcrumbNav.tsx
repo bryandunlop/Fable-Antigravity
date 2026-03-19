@@ -47,7 +47,7 @@ const routeLabels: Record<string, string> = {
   '/assigned-tasks': 'Assigned Tasks',
   '/aog-management': 'AOG Management',
   '/fuel-load-request': 'Fuel Load Request',
-  '/airport-evaluations': 'Airport Evaluations',
+  '/airport-evaluations': 'Airport Information',
   '/lead-dashboard': 'Lead Dashboard',
   '/manager-insights': 'Manager Insights',
   '/admin': 'User Management',

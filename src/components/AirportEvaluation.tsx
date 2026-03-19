@@ -459,7 +459,7 @@ export default function AirportEvaluation() {
       <div className="mb-6">
         <h1 className="flex items-center gap-2">
           <Plane className="w-6 h-6" />
-          Airport Evaluations
+          Airport Information
         </h1>
         <p className="text-muted-foreground">Access detailed airport information and evaluations</p>
       </div>
@@ -583,7 +583,7 @@ export default function AirportEvaluation() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="w-5 h-5" />
-                Search Airport Evaluations
+                Search Airport Information
               </CardTitle>
             </CardHeader>
             <CardContent>

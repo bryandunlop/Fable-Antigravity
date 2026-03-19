@@ -192,7 +192,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Preflight Workflow', href: '/frat', icon: ClipboardList, roles: ['pilot', 'admin'] },
         { name: 'Standalone FRAT', href: '/frat/standalone', icon: Shield, roles: ['pilot', 'admin'] },
         { name: 'My FRAT Submissions', href: '/frat/my-submissions', icon: FileText, roles: ['pilot', 'admin'] },
-        { name: 'Airport Evaluations', href: '/airport-evaluations', icon: MapPin, roles: ['pilot', 'admin'] },
+        { name: 'Airport Information', href: '/airport-evaluations', icon: MapPin, roles: ['pilot', 'admin'] },
         { name: 'Pilot Currency', href: '/pilot-currency', icon: UserCheck, roles: ['pilot', 'admin', 'lead'] },
         { name: 'Fuel Load Request', href: '/fuel-load-request', icon: Fuel, roles: ['pilot', 'admin'] },
       ]
