@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Checkbox } from './ui/checkbox';
 import { 
   Target, 
@@ -44,7 +45,6 @@ export default function InternalAuditManagement() {
 
   const [showNewFindingForm, setShowNewFindingForm] = useState(false);
   const [newFindingForm, setNewFindingForm] = useState({ description: '', severity: 'Medium', status: 'Open' });
-  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
 
   const [newAuditForm, setNewAuditForm] = useState({
     title: '',
@@ -60,8 +60,16 @@ export default function InternalAuditManagement() {
     initialAssignment: 'None'
   });
 
+  const [quickAddMonth, setQuickAddMonth] = useState<string | null>(null);
+  const [showQuickAddPool, setShowQuickAddPool] = useState(false);
+
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [selectedAuditIds, setSelectedAuditIds] = useState<string[]>([]);
+
   const { audits, addAudit, updateAudit, deleteAudit } = useAudits();
   const currentAudit = audits.find(a => a.id === activeAuditId);
+
+  const POOL_KEY = '📁 Audit Pool (Drafts)';
 
   // Auditors with role information
   const auditorsPool = [
@@ -106,6 +114,58 @@ export default function InternalAuditManagement() {
     return matchesFilter && matchesSearch;
   });
 
+  const groupAudits = (auditsToGroup: Audit[]) => {
+    const groups: Record<string, Audit[]> = {};
+    
+    // Sort audits overall
+    const sorted = [...auditsToGroup].sort((a, b) => {
+      // Drafts always come first if we aren't filtering specifically
+      if (a.status === 'Draft' && b.status !== 'Draft') return -1;
+      if (a.status !== 'Draft' && b.status === 'Draft') return 1;
+      
+      // Chronological for scheduled
+      if (a.scheduledDate && b.scheduledDate) {
+        return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
+      }
+      return 0;
+    });
+
+    sorted.forEach(audit => {
+      let groupKey = 'Other';
+      if (audit.status === 'Draft') {
+        groupKey = POOL_KEY;
+      } else if (audit.scheduledDate) {
+        const date = new Date(audit.scheduledDate);
+        groupKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+      }
+      
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(audit);
+    });
+
+    // Ensure groups are returned in a specific order: Pool first, then chronological
+    const orderedGroups: Record<string, Audit[]> = {};
+    if (groups[POOL_KEY]) {
+      orderedGroups[POOL_KEY] = groups[POOL_KEY];
+    }
+    
+    Object.keys(groups)
+      .filter(k => k !== POOL_KEY && k !== 'Other')
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+      .forEach(k => {
+        orderedGroups[k] = groups[k];
+      });
+      
+    if (groups['Other']) orderedGroups['Other'] = groups['Other'];
+    
+    return orderedGroups;
+  };
+
+  const auditGroups = groupAudits(filteredAudits);
+
+  const poolAudits = audits.filter(audit => audit.status === 'Draft');
+  const activeAudits = audits.filter(audit => audit.status !== 'Draft');
+
   const handleRandomAssignment = (byRole = false) => {
     let availableAuditors = auditorsPool;
     
@@ -135,6 +195,21 @@ export default function InternalAuditManagement() {
     
     toast.success(`Audit ${selectedAudit.id} assigned to ${randomAuditor.name}${roleInfo}`);
     setShowAssignDialog(false);
+  };
+
+  const handleBatchDelete = () => {
+    if (confirm(`Are you sure you want to delete ${selectedAuditIds.length} audits?`)) {
+      selectedAuditIds.forEach(id => deleteAudit(id));
+      setSelectedAuditIds([]);
+      setActiveAuditId(null);
+      toast.success(`${selectedAuditIds.length} audits deleted`);
+    }
+  };
+
+  const toggleAuditSelection = (id: string) => {
+    setSelectedAuditIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
   };
 
   const handleManualAssignment = (auditorName: string, auditorRole: string) => {
@@ -193,40 +268,6 @@ export default function InternalAuditManagement() {
     return { label: `${daysUntil}d left`, color: 'bg-green-100 text-green-800 border-green-200', dot: '🟢' };
   };
 
-  // Annual schedule generator: distribute 30 audits across 12 months randomly
-  const generateAnnualSchedule = () => {
-    const categories = Object.keys(AUDIT_TEMPLATES);
-    const year = new Date().getFullYear() + 1;
-    const created: string[] = [];
-    for (let i = 0; i < 30; i++) {
-      const month = Math.floor(i / 2.5); // spread ~2-3/month
-      const day = Math.floor(Math.random() * 20) + 1;
-      const scheduledDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const category = categories[i % categories.length];
-      const templateItems = (AUDIT_TEMPLATES[category as keyof typeof AUDIT_TEMPLATES] || []);
-      addAudit({
-        title: `${year} ${category} Audit #${i + 1}`,
-        type: 'Scheduled',
-        category,
-        status: 'Scheduled',
-        priority: i % 5 === 0 ? 'High' : 'Medium',
-        scheduledDate,
-        dueDate: scheduledDate,
-        expirationDate: `${year}-${String(month + 1).padStart(2, '0')}-${String(Math.min(day + 30, 28)).padStart(2, '0')}`,
-        protocolLink: 'ISBAO Stage III',
-        assignedTo: 'Unassigned',
-        assignedRole: '',
-        assignmentType: 'None',
-        description: `Annual scheduled ${category.toLowerCase()} audit`,
-        checklist: templateItems.map((item, idx) => ({ id: Date.now() + idx + i * 100, item, completed: false, status: 'Pending' as const })),
-        findings: [],
-        completionRate: 0
-      });
-      created.push(scheduledDate);
-    }
-    toast.success(`30 audits scheduled across ${year}. Sent for assignment.`);
-    setShowScheduleDialog(false);
-  };
 
   const generateAuditReport = (auditId: string) => {
     toast.success(`Generating PDF report for audit ${auditId}`);
@@ -244,10 +285,6 @@ export default function InternalAuditManagement() {
         </div>
         
         <div className="flex gap-2 mt-4 lg:mt-0">
-          <Button variant="outline" onClick={() => setShowScheduleDialog(true)}>
-            <Shuffle className="w-4 h-4 mr-2" />
-            Annual Schedule
-          </Button>
           <Button onClick={() => setShowNewAuditDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Schedule New Audit
@@ -255,27 +292,6 @@ export default function InternalAuditManagement() {
         </div>
       </div>
 
-      {/* Annual Schedule Dialog */}
-      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shuffle className="w-5 h-5 text-blue-600" />
-              Generate Annual Audit Schedule
-            </DialogTitle>
-            <DialogDescription>
-              This will auto-create 30 ISBAO Stage III audits spread across {new Date().getFullYear() + 1}, distributed randomly across all categories (5–6 per month). You can then assign auditors.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2 pt-4">
-            <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={generateAnnualSchedule}>
-              <Shuffle className="w-4 h-4 mr-2" />
-              Yes, Send &amp; Assign
-            </Button>
-            <Button variant="outline" onClick={() => setShowScheduleDialog(false)}>Cancel</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showAssignDialog} onOpenChange={(open) => {
         if (!open) setSelectedAudit(null);
@@ -564,16 +580,38 @@ export default function InternalAuditManagement() {
                       findings: [],
                       completionRate: 0
                     });
-                    toast.success('Audit created and template loaded');
+                    toast.success('Audit created and scheduled');
                     setShowNewAuditDialog(false);
-                    setNewAuditForm({ 
-                      title: '', type: 'Scheduled', category: 'Safety Management', 
-                      priority: 'Medium', scheduledDate: '', dueDate: '',
-                      expirationDate: '', protocolLink: '',
-                      description: '', useTemplate: true, initialAssignment: 'None' 
-                    });
                   }}>
-                    Create Audit
+                    Create & Schedule
+                  </Button>
+                  <Button className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 border" onClick={() => {
+                     const templateItems = newAuditForm.useTemplate 
+                      ? (AUDIT_TEMPLATES[newAuditForm.category as keyof typeof AUDIT_TEMPLATES] || [])
+                      : [];
+                    
+                    addAudit({
+                      title: newAuditForm.title || `${newAuditForm.category} Audit`,
+                      type: newAuditForm.type,
+                      category: newAuditForm.category,
+                      status: 'Draft',
+                      priority: newAuditForm.priority,
+                      scheduledDate: undefined,
+                      dueDate: undefined,
+                      expirationDate: newAuditForm.expirationDate || undefined,
+                      protocolLink: newAuditForm.protocolLink || undefined,
+                      assignedTo: 'Unassigned',
+                      assignedRole: '',
+                      assignmentType: 'None',
+                      description: newAuditForm.description,
+                      checklist: templateItems.map((item, idx) => ({ id: Date.now() + idx, item, completed: false, status: 'Pending' as const })),
+                      findings: [],
+                      completionRate: 0
+                    });
+                    toast.success('Audit added to Pool (Unscheduled)');
+                    setShowNewAuditDialog(false);
+                  }}>
+                    Save to Pool
                   </Button>
                   <Button variant="outline" onClick={() => setShowNewAuditDialog(false)}>
                     Cancel
@@ -583,67 +621,61 @@ export default function InternalAuditManagement() {
             </DialogContent>
           </Dialog>
 
-      {/* Summary Cards */}
+      {/* Summary Cards (Command Center) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Scheduled</p>
-                <p className="text-2xl">
-                  {audits.filter(a => a.status === 'Scheduled').length}
-                </p>
+        {[
+          { label: 'Scheduled', count: audits.filter(a => a.status === 'Scheduled').length, color: 'text-blue-600', icon: Calendar, filterValue: 'scheduled' },
+          { label: 'In Progress', count: audits.filter(a => a.status === 'In Progress').length, color: 'text-yellow-600', icon: Clock, filterValue: 'inprogress' },
+          { label: 'Complete', count: audits.filter(a => a.status === 'Complete').length, color: 'text-green-600', icon: CheckCircle, filterValue: 'complete' },
+          { label: 'Overdue', count: audits.filter(a => a.status === 'Overdue').length, color: 'text-red-600', icon: AlertTriangle, filterValue: 'overdue' },
+        ].map((card) => (
+          <Card 
+            key={card.label} 
+            className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary/20 ${filter === card.filterValue ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+            onClick={() => setFilter(filter === card.filterValue ? 'all' : card.filterValue)}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg bg-background border ${card.color}`}>
+                  <card.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{card.label}</p>
+                  <p className="text-2xl font-bold">{card.count}</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-yellow-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">In Progress</p>
-                <p className="text-2xl">
-                  {audits.filter(a => a.status === 'In Progress').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Complete</p>
-                <p className="text-2xl">
-                  {audits.filter(a => a.status === 'Complete').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Overdue</p>
-                <p className="text-2xl">
-                  {audits.filter(a => a.status === 'Overdue').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <div className="flex-1 flex overflow-hidden border rounded-xl bg-muted/20">
-        {/* Left Sidebar - Audit List */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+          <Button 
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+            size="sm" 
+            className="h-8 px-3"
+            onClick={() => setViewMode('list')}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Workspace
+          </Button>
+          <Button 
+            variant={viewMode === 'kanban' ? 'secondary' : 'ghost'} 
+            size="sm" 
+            className="h-8 px-3"
+            onClick={() => setViewMode('kanban')}
+          >
+            <Shuffle className="w-4 h-4 mr-2" />
+            Board
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden border rounded-xl bg-muted/20 relative">
+        {viewMode === 'list' ? (
+          <>
+            {/* Left Sidebar - Audit List */}
         <div className="w-full lg:w-80 border-r flex flex-col bg-background">
           <div className="p-4 border-b space-y-3">
             <div className="relative">
@@ -655,51 +687,96 @@ export default function InternalAuditManagement() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-full h-9">
-                <Filter className="w-3 h-3 mr-2" />
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="inprogress">In Progress</SelectItem>
-                <SelectItem value="complete">Complete</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={filter} onValueChange={setFilter}>
+                <SelectTrigger className="flex-1 h-9">
+                  <Filter className="w-3 h-3 mr-2" />
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="draft">📁 Audit Pool (Drafts)</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="inprogress">In Progress</SelectItem>
+                  <SelectItem value="complete">Complete</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+              {selectedAuditIds.length > 0 && (
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" onClick={() => setSelectedAuditIds([])}>
+                  <XCircle className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {filteredAudits.length > 0 ? (
-              <div className="divide-y">
-                {filteredAudits.map((audit) => (
-                  <button
-                    key={audit.id}
-                    onClick={() => setActiveAuditId(audit.id)}
-                    className={`w-full text-left p-4 hover:bg-muted/50 transition-colors relative ${
-                      activeAuditId === audit.id ? 'bg-muted border-l-4 border-blue-600' : ''
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="text-[10px] font-mono text-muted-foreground">{audit.id}</span>
-                      <Badge className={`${getPriorityColor(audit.priority)} text-[9px] h-4 py-0`} variant="outline">
-                        {audit.priority}
-                      </Badge>
-                    </div>
-                    <p className="text-sm font-semibold truncate mb-1">{audit.title}</p>
-                    <div className="flex items-center justify-between mt-2">
-                       <Badge className={`${getStatusColor(audit.status)} text-[10px] h-4`}>
-                        {audit.status}
-                      </Badge>
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {audit.dueDate}
-                      </span>
-                    </div>
-                  </button>
+            {Object.keys(auditGroups).length > 0 ? (
+              <Accordion type="multiple" defaultValue={[Object.keys(auditGroups)[0]]} className="w-full">
+                {Object.entries(auditGroups).map(([groupName, groupAudits]) => (
+                  <AccordionItem key={groupName} value={groupName} className="border-b">
+                    <AccordionTrigger className="px-4 py-2 hover:no-underline bg-muted/30 group/header">
+                      <div className="flex items-center justify-between w-full pr-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{groupName}</span>
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{groupAudits.length}</Badge>
+                        </div>
+                        {groupName !== POOL_KEY && groupName !== 'Other' && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 opacity-0 group-hover/header:opacity-100 transition-opacity hover:bg-blue-100 hover:text-blue-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQuickAddMonth(groupName);
+                            }}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-0">
+                      <div className="divide-y border-t">
+                        {groupAudits.map((audit) => (
+                          <div key={audit.id} className="relative group">
+                            <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                               <Checkbox 
+                                 checked={selectedAuditIds.includes(audit.id)}
+                                 onCheckedChange={() => toggleAuditSelection(audit.id)}
+                               />
+                            </div>
+                            <button
+                              onClick={() => setActiveAuditId(audit.id)}
+                              className={`w-full text-left p-4 pr-4 hover:bg-muted/50 transition-colors relative ${
+                                activeAuditId === audit.id ? 'bg-muted border-l-4 border-blue-600' : ''
+                              } ${selectedAuditIds.includes(audit.id) ? 'bg-blue-50/40' : ''}`}
+                              style={{ paddingLeft: selectedAuditIds.includes(audit.id) || activeAuditId === audit.id ? '3rem' : '1rem' }}
+                            >
+                              <div className="flex justify-between items-start mb-1">
+                                <span className="text-[10px] font-mono text-muted-foreground">{audit.id}</span>
+                                <Badge className={`${getPriorityColor(audit.priority)} text-[9px] h-4 py-0`} variant="outline">
+                                  {audit.priority}
+                                </Badge>
+                              </div>
+                              <p className="text-sm font-semibold truncate mb-1">{audit.title}</p>
+                              <div className="flex items-center justify-between mt-2">
+                                <Badge className={`${getStatusColor(audit.status)} text-[10px] h-4`}>
+                                  {audit.status}
+                                </Badge>
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {audit.status === 'Draft' ? 'Unscheduled' : audit.dueDate}
+                                </span>
+                              </div>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
                 ))}
-              </div>
+              </Accordion>
             ) : (
               <div className="p-8 text-center">
                 <Target className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-20" />
@@ -759,9 +836,47 @@ export default function InternalAuditManagement() {
                   </div>
                   <div className="bg-muted/30 p-2 rounded-lg text-center">
                      <p className="text-[10px] text-muted-foreground uppercase">Due Date</p>
-                     <p className="text-xs font-semibold mt-1">{currentAudit.dueDate}</p>
+                     <p className="text-xs font-semibold mt-1">{currentAudit.status === 'Draft' ? 'TBD' : currentAudit.dueDate}</p>
                   </div>
                 </div>
+                
+                {currentAudit.status === 'Draft' && (
+                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                        <Calendar className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-blue-900">This audit is in the Pool</p>
+                        <p className="text-xs text-blue-700">Schedule it to a month to start the audit process.</p>
+                      </div>
+                    </div>
+                    <Select onValueChange={(month: string) => {
+                      const year = new Date().getFullYear();
+                      const scheduledDate = `${year}-${String(new Date(month + ' 1, ' + year).getMonth() + 1).padStart(2, '0')}-01`;
+                      updateAudit(currentAudit.id, { 
+                        status: 'Scheduled', 
+                        scheduledDate,
+                        dueDate: scheduledDate
+                      });
+                      toast.success(`Audit scheduled for ${month}`);
+                    }}>
+                      <SelectTrigger className="w-48 bg-white">
+                        <SelectValue placeholder="Schedule to Month..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const date = new Date(2024, i, 1);
+                          return (
+                            <SelectItem key={i} value={date.toLocaleString('default', { month: 'long' })}>
+                              {date.toLocaleString('default', { month: 'long' })}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 overflow-hidden p-6">
@@ -881,7 +996,7 @@ export default function InternalAuditManagement() {
                             onChange={e => setNewFindingForm({ ...newFindingForm, description: e.target.value })}
                           />
                           <div className="grid grid-cols-2 gap-3">
-                            <Select value={newFindingForm.severity} onValueChange={v => setNewFindingForm({ ...newFindingForm, severity: v })}>
+                            <Select value={newFindingForm.severity} onValueChange={(v: string) => setNewFindingForm({ ...newFindingForm, severity: v })}>
                               <SelectTrigger><SelectValue placeholder="Severity" /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="Low">Low</SelectItem>
@@ -889,7 +1004,7 @@ export default function InternalAuditManagement() {
                                 <SelectItem value="High">High</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Select value={newFindingForm.status} onValueChange={v => setNewFindingForm({ ...newFindingForm, status: v })}>
+                            <Select value={newFindingForm.status} onValueChange={(v: string) => setNewFindingForm({ ...newFindingForm, status: v })}>
                               <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="Open">Open</SelectItem>
@@ -1005,21 +1120,198 @@ export default function InternalAuditManagement() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-              <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-card/10">
+              <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mb-6">
                 <Target className="w-10 h-10 text-muted-foreground opacity-30" />
               </div>
-              <h2 className="text-xl font-semibold mb-2 text-foreground">Audit Workspace</h2>
-              <p className="text-muted-foreground max-w-sm mb-8">
-                Select an audit from the left sidebar to view details, update checklists, and record findings.
+              <h2 className="text-2xl font-bold mb-3 text-foreground">
+                {audits.length > 0 ? 'Audit Workspace' : 'Get Started with Audits'}
+              </h2>
+              <p className="text-muted-foreground max-w-sm mb-8 text-sm leading-relaxed">
+                {audits.length > 0 
+                  ? 'Select an audit from the left sidebar to view details, update checklists, and record findings.' 
+                  : 'Start your annual audit cycle by scheduling your first audit. You can also add audits to the pool for later scheduling.'}
               </p>
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowNewAuditDialog(true)}>
-                <Plus className="w-4 h-4 mr-2" /> Schedule First Audit
-              </Button>
+              <div className="flex flex-col gap-3 min-w-[200px]">
+                {audits.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4 w-full max-w-md bg-background/50 p-6 rounded-2xl border shadow-sm">
+                    <div className="text-center p-2">
+                      <p className="text-2xl font-bold text-blue-600">{audits.length}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold mt-1">Total Audits</p>
+                    </div>
+                    <div className="text-center p-2 border-l">
+                      <p className="text-2xl font-bold text-yellow-600">{audits.filter(a => a.status === 'In Progress').length}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold mt-1">In Progress</p>
+                    </div>
+                  </div>
+                ) : (
+                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20" onClick={() => setShowNewAuditDialog(true)}>
+                    <Plus className="w-4 h-4 mr-2" /> Schedule First Audit
+                  </Button>
+                )}
+                <Button variant="outline" className="w-full" onClick={() => setShowNewAuditDialog(true)}>
+                  <Plus className="w-4 h-4 mr-2" /> {audits.length > 0 ? 'New Audit' : 'Add to Pool'}
+                </Button>
+              </div>
             </div>
           )}
         </div>
+      </>
+    ) : (
+      <div className="flex-1 overflow-x-auto bg-background p-6">
+        <div className="flex gap-6 h-full min-w-[900px]">
+          {['Scheduled', 'In Progress', 'Complete'].map(status => (
+            <div key={status} className="flex-1 flex flex-col min-w-[300px]">
+              <div className="flex items-center justify-between mb-4 px-2">
+                <h3 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    status === 'Scheduled' ? 'bg-blue-500' : status === 'In Progress' ? 'bg-yellow-500' : 'bg-green-500'
+                  }`} />
+                  {status}
+                  <Badge variant="secondary" className="text-[10px] ml-auto">
+                    {audits.filter(a => a.status === status).length}
+                  </Badge>
+                </h3>
+              </div>
+              <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+                {audits.filter(a => a.status === status).map(audit => (
+                  <Card 
+                    key={audit.id} 
+                    className={`cursor-pointer group hover:shadow-md transition-all border-l-4 ${
+                      audit.priority === 'High' ? 'border-l-red-500' : 
+                      audit.priority === 'Medium' ? 'border-l-yellow-500' : 'border-l-green-500'
+                    } ${activeAuditId === audit.id ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+                    onClick={() => setActiveAuditId(audit.id)}
+                  >
+                     <CardContent className="p-4 space-y-3">
+                        <div className="flex justify-between items-start">
+                           <div className="flex items-center gap-2">
+                              <Checkbox 
+                                checked={selectedAuditIds.includes(audit.id)}
+                                onCheckedChange={() => toggleAuditSelection(audit.id)}
+                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                              />
+                              <span className="text-[10px] font-mono text-muted-foreground">{audit.id}</span>
+                           </div>
+                           <Badge variant="outline" className="text-[9px] h-4 px-1">{audit.category}</Badge>
+                        </div>
+                        <p className="text-sm font-bold leading-tight group-hover:text-primary transition-colors">{audit.title}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                           <User className="w-3.5 h-3.5" />
+                           <span className="truncate">{audit.assignedTo}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t mt-2">
+                           <span className="text-[10px] font-medium flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {audit.dueDate}
+                           </span>
+                           <div className="flex items-center gap-2">
+                              <div className="w-12 bg-muted rounded-full h-1.5">
+                                <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${audit.completionRate}%` }}></div>
+                              </div>
+                              <span className="text-[10px] font-bold">{audit.completionRate}%</span>
+                           </div>
+                        </div>
+                     </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
+    )}
+
+    {/* Batch Action Toolbar */}
+    {selectedAuditIds.length > 0 && (
+       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-white px-6 py-3 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center gap-6 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300">
+          <span className="text-sm font-semibold border-r border-slate-700 pr-6 flex items-center gap-2">
+            <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-[10px]">{selectedAuditIds.length}</div>
+            Selected
+          </span>
+          <div className="flex gap-2">
+             <Button variant="ghost" size="sm" className="text-white hover:bg-slate-800 hover:text-white text-xs h-9 px-4 rounded-full border border-slate-700">
+                <UserCheck className="w-4 h-4 mr-2" /> Assign
+             </Button>
+             <Button variant="ghost" size="sm" className="text-white hover:bg-slate-800 hover:text-white text-xs h-9 px-4 rounded-full border border-slate-700">
+                <Calendar className="w-4 h-4 mr-2" /> Move
+             </Button>
+             <Button variant="ghost" size="sm" className="text-red-400 hover:bg-red-500/20 hover:text-red-300 text-xs h-9 px-4 rounded-full border border-red-900/50" onClick={handleBatchDelete}>
+                <Trash2 className="w-4 h-4 mr-2" /> Delete
+             </Button>
+          </div>
+          <div className="h-4 w-px bg-slate-700 mx-2" />
+          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white h-8 w-8 rounded-full" onClick={() => setSelectedAuditIds([])}>
+             <XCircle className="w-5 h-5" />
+          </Button>
+       </div>
+    )}
+
+    {/* Quick Add / Schedule from Pool Dialog */}
+    <Dialog open={!!quickAddMonth} onOpenChange={(open) => !open && setQuickAddMonth(null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Audit to {quickAddMonth}</DialogTitle>
+          <DialogDescription>
+            Choose an audit from the pool or create a new one for this month.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 pt-4">
+           <Button className="w-full h-12 justify-start bg-blue-600 hover:bg-blue-700" onClick={() => {
+             const year = new Date().getFullYear();
+             const monthIdx = new Date(quickAddMonth + ' 1, ' + year).getMonth();
+             const scheduledDate = `${year}-${String(monthIdx + 1).padStart(2, '0')}-01`;
+             setNewAuditForm({ ...newAuditForm, scheduledDate });
+             setQuickAddMonth(null);
+             setShowNewAuditDialog(true);
+           }}>
+             <Plus className="w-5 h-5 mr-3" />
+             <div className="text-left">
+               <p className="font-bold">Create New Audit</p>
+               <p className="text-[10px] opacity-80">Start from scratch for {quickAddMonth}</p>
+             </div>
+           </Button>
+
+           <div className="relative">
+             <div className="absolute inset-0 flex items-center"><span className="w-full border-t"></span></div>
+             <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or pick from Pool</span></div>
+           </div>
+
+           <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+             {poolAudits.length > 0 ? (
+               poolAudits.map(audit => (
+                 <div key={audit.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                   <div>
+                     <p className="text-sm font-bold">{audit.title}</p>
+                     <p className="text-[10px] text-muted-foreground">{audit.category}</p>
+                   </div>
+                   <Button size="sm" variant="outline" className="h-8" onClick={() => {
+                     const year = new Date().getFullYear();
+                     const monthIdx = new Date(quickAddMonth + ' 1, ' + year).getMonth();
+                     const scheduledDate = `${year}-${String(monthIdx + 1).padStart(2, '0')}-01`;
+                     updateAudit(audit.id, { 
+                       status: 'Scheduled', 
+                       scheduledDate,
+                       dueDate: scheduledDate
+                     });
+                     toast.success(`Audit moved to ${quickAddMonth}`);
+                     setQuickAddMonth(null);
+                   }}>
+                     Add
+                   </Button>
+                 </div>
+               ))
+             ) : (
+               <div className="text-center py-6 text-muted-foreground">
+                 <p className="text-xs">Your audit pool is empty.</p>
+               </div>
+             )}
+           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </div>
     </div>
   );
 }

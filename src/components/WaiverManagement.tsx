@@ -27,6 +27,15 @@ import {
 import { toast } from 'sonner';
 
 export default function WaiverManagement() {
+  interface Approval {
+    tier: number;
+    role: string;
+    assignedTo?: string;
+    status: 'Pending' | 'Approved' | 'Approved with Comments' | 'Denied';
+    comments?: string;
+    actionDate?: string;
+  }
+
   interface Waiver {
     id: string;
     title: string;
@@ -40,7 +49,8 @@ export default function WaiverManagement() {
     justification: string;
     riskAssessment: string;
     assignedTo: string;
-    approvers: string[];
+    approvals: Approval[];
+    currentTier: number;
     duties: { id: number; task: string; assignedTo: string; status: string; }[];
   }
 
@@ -51,7 +61,7 @@ export default function WaiverManagement() {
   const [selectedWaiver, setSelectedWaiver] = useState<Waiver | null>(null);
 
   // Mock data - in real app this would come from backend
-  const waivers = [
+  const [waiverStore, setWaiverStore] = useState<Waiver[]>([
     {
       id: 'WV-001',
       title: 'Night Flying Operations - N123AB',
@@ -65,7 +75,11 @@ export default function WaiverManagement() {
       justification: 'Urgent passenger medical transport required outside normal operating hours',
       riskAssessment: 'Medium risk - experienced crew, good weather conditions, familiar route',
       assignedTo: 'Unassigned',
-      approvers: ['Safety Manager', 'Operations Manager'],
+      currentTier: 1,
+      approvals: [
+        { tier: 1, role: 'Safety Manager', status: 'Pending' },
+        { tier: 2, role: 'Line Manager/VP', status: 'Pending' }
+      ],
       duties: []
     },
     {
@@ -73,7 +87,7 @@ export default function WaiverManagement() {
       title: 'Minimum Weather Deviation - N456CD',
       type: 'Weather',
       priority: 'Critical',
-      status: 'Under Review',
+      status: 'Tier 2 Review',
       submittedBy: 'Sarah Wilson',
       submittedDate: '2024-02-05',
       expirationDate: '2024-02-07',
@@ -81,7 +95,11 @@ export default function WaiverManagement() {
       justification: 'Life-threatening medical emergency requiring immediate transport',
       riskAssessment: 'High risk - marginal weather, but life safety priority',
       assignedTo: 'Mike Johnson',
-      approvers: ['Chief Pilot', 'Safety Manager'],
+      currentTier: 2,
+      approvals: [
+        { tier: 1, role: 'Safety Manager', status: 'Approved', comments: 'Risk is justified by medical emergency.', actionDate: '2024-02-05' },
+        { tier: 2, role: 'Operations Manager', status: 'Pending', assignedTo: 'Mike Johnson' }
+      ],
       duties: [
         { id: 1, task: 'Weather monitoring every 15 minutes', assignedTo: 'Dispatch', status: 'Pending' },
         { id: 2, task: 'Alternate airport confirmation', assignedTo: 'Operations', status: 'Complete' }
@@ -100,18 +118,27 @@ export default function WaiverManagement() {
       justification: 'Mechanical issue caused extended ground time, crew requests duty extension',
       riskAssessment: 'Low risk - crew well rested, short extension requested',
       assignedTo: 'Emily Davis',
-      approvers: ['Chief Pilot'],
+      currentTier: 2,
+      approvals: [
+        { tier: 1, role: 'Safety Manager', status: 'Approved', actionDate: '2024-02-04' },
+        { tier: 2, role: 'Chief Pilot', status: 'Approved', assignedTo: 'Emily Davis', actionDate: '2024-02-04' }
+      ],
       duties: [
         { id: 3, task: 'Crew fatigue monitoring', assignedTo: 'Chief Pilot', status: 'Complete' }
       ]
     }
-  ];
+  ]);
+
+  const [approvalComment, setApprovalComment] = useState('');
+  const [selectedNextApprover, setSelectedNextApprover] = useState('');
+  const [selectedNextRole, setSelectedNextRole] = useState('Line Manager');
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending review': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'under review': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'tier 2 review': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'approved': return 'bg-green-100 text-green-800 border-green-200';
+      case 'approved with comments': return 'bg-teal-100 text-teal-800 border-teal-200';
       case 'denied': return 'bg-red-100 text-red-800 border-red-200';
       case 'expired': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -128,7 +155,7 @@ export default function WaiverManagement() {
     }
   };
 
-  const filteredWaivers = waivers.filter(waiver => {
+  const filteredWaivers = waiverStore.filter(waiver => {
     const matchesFilter = filter === 'all' || waiver.status.toLowerCase().replace(' ', '') === filter;
     const matchesSearch = waiver.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       waiver.submittedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -136,13 +163,60 @@ export default function WaiverManagement() {
     return matchesFilter && matchesSearch;
   });
 
-  const handleApproveWaiver = (waiverId: string) => {
-    toast.success(`Waiver ${waiverId} approved successfully`);
+  const handleApproveWaiver = (waiverId: string, tier: number, withComments: boolean) => {
+    setWaiverStore(prev => prev.map(w => {
+      if (w.id === waiverId) {
+        const newApprovals = [...w.approvals];
+        const currentApproval = newApprovals.find(a => a.tier === tier);
+        if (currentApproval) {
+          currentApproval.status = withComments ? 'Approved with Comments' : 'Approved';
+          currentApproval.comments = approvalComment;
+          currentApproval.actionDate = new Date().toISOString().split('T')[0];
+          
+          if (tier === 1) {
+            // Advance to Tier 2
+            w.currentTier = 2;
+            w.status = 'Tier 2 Review';
+            // Set Tier 2 details if selected
+            const t2 = newApprovals.find(a => a.tier === 2);
+            if (t2) {
+              t2.role = selectedNextRole;
+              t2.assignedTo = selectedNextApprover;
+            }
+          } else {
+            // Final Approval
+            w.status = withComments ? 'Approved with Comments' : 'Approved';
+          }
+        }
+        return { ...w, approvals: newApprovals };
+      }
+      return w;
+    }));
+    toast.success(`Waiver ${waiverId} Tier ${tier} approved`);
+    setApprovalComment('');
     setShowReviewDialog(false);
   };
 
-  const handleDenyWaiver = (waiverId: string) => {
+  const handleDenyWaiver = (waiverId: string, tier: number) => {
+    if (!approvalComment) {
+      toast.error('Comments are required for denial');
+      return;
+    }
+    setWaiverStore(prev => prev.map(w => {
+      if (w.id === waiverId) {
+        const newApprovals = [...w.approvals];
+        const currentApproval = newApprovals.find(a => a.tier === tier);
+        if (currentApproval) {
+          currentApproval.status = 'Denied';
+          currentApproval.comments = approvalComment;
+          currentApproval.actionDate = new Date().toISOString().split('T')[0];
+        }
+        return { ...w, status: 'Denied', approvals: newApprovals };
+      }
+      return w;
+    }));
     toast.success(`Waiver ${waiverId} denied`);
+    setApprovalComment('');
     setShowReviewDialog(false);
   };
 
@@ -173,7 +247,30 @@ export default function WaiverManagement() {
               <DialogTitle>Submit New Waiver Request</DialogTitle>
             </DialogHeader>
             <WaiverRequestForm
-              onSuccess={() => setShowNewWaiverDialog(false)}
+              onSuccess={(data: any) => {
+                const newWaiver: Waiver = {
+                  id: `WV-00${waiverStore.length + 1}`,
+                  title: data.title,
+                  type: data.type,
+                  priority: data.priority,
+                  status: 'Pending Review',
+                  submittedBy: 'Current User', // Mocked
+                  submittedDate: new Date().toISOString().split('T')[0],
+                  expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days
+                  description: data.description,
+                  justification: data.justification,
+                  riskAssessment: data.mitigation,
+                  assignedTo: 'Unassigned',
+                  currentTier: 1,
+                  approvals: [
+                    { tier: 1, role: 'Safety Manager', status: 'Pending' },
+                    { tier: 2, role: 'Line Manager/VP', status: 'Pending' }
+                  ],
+                  duties: []
+                };
+                setWaiverStore([...waiverStore, newWaiver]);
+                setShowNewWaiverDialog(false);
+              }}
               onCancel={() => setShowNewWaiverDialog(false)}
             />
           </DialogContent>
@@ -189,7 +286,7 @@ export default function WaiverManagement() {
               <div>
                 <p className="text-sm text-muted-foreground">Pending Review</p>
                 <p className="text-2xl">
-                  {waivers.filter(w => w.status === 'Pending Review').length}
+                  {waiverStore.filter(w => w.status === 'Pending Review').length}
                 </p>
               </div>
             </div>
@@ -201,9 +298,9 @@ export default function WaiverManagement() {
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-blue-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Under Review</p>
+                <p className="text-sm text-muted-foreground">Tier 2 Review</p>
                 <p className="text-2xl">
-                  {waivers.filter(w => w.status === 'Under Review').length}
+                  {waiverStore.filter(w => w.status === 'Tier 2 Review').length}
                 </p>
               </div>
             </div>
@@ -217,7 +314,7 @@ export default function WaiverManagement() {
               <div>
                 <p className="text-sm text-muted-foreground">Approved</p>
                 <p className="text-2xl">
-                  {waivers.filter(w => w.status === 'Approved').length}
+                  {waiverStore.filter(w => w.status.includes('Approved')).length}
                 </p>
               </div>
             </div>
@@ -231,7 +328,7 @@ export default function WaiverManagement() {
               <div>
                 <p className="text-sm text-muted-foreground">Denied</p>
                 <p className="text-2xl">
-                  {waivers.filter(w => w.status === 'Denied').length}
+                  {waiverStore.filter(w => w.status === 'Denied').length}
                 </p>
               </div>
             </div>
@@ -308,9 +405,16 @@ export default function WaiverManagement() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(waiver.status)}>
-                        {waiver.status}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge className={getStatusColor(waiver.status)}>
+                          {waiver.status}
+                        </Badge>
+                        {waiver.status !== 'Approved' && waiver.status !== 'Denied' && (
+                          <span className="text-[10px] text-muted-foreground font-medium uppercase">
+                            Tier {waiver.currentTier}: {waiver.approvals.find(a => a.tier === waiver.currentTier)?.role}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -395,16 +499,57 @@ export default function WaiverManagement() {
                                   <p>{waiver.riskAssessment}</p>
                                 </div>
 
-                                <div className="flex gap-2 pt-4">
-                                  <Button onClick={() => handleApproveWaiver(waiver.id)} className="bg-green-600 hover:bg-green-700">
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Approve
-                                  </Button>
-                                  <Button onClick={() => handleDenyWaiver(waiver.id)} variant="destructive">
-                                    <XCircle className="w-4 h-4 mr-2" />
-                                    Deny
-                                  </Button>
-                                  <Button variant="outline">Request More Info</Button>
+                                <div className="space-y-4 pt-4 border-t">
+                                  <h4 className="text-sm font-bold uppercase text-gray-500">Tier {waiver.currentTier} Review ({waiver.currentTier === 1 ? 'Safety Manager' : 'Line Manager/VP'})</h4>
+                                  
+                                  <div className="space-y-2">
+                                    <Label>Comments</Label>
+                                    <Textarea 
+                                      placeholder="Enter approval or denial comments..."
+                                      value={approvalComment}
+                                      onChange={(e) => setApprovalComment(e.target.value)}
+                                    />
+                                  </div>
+
+                                  {waiver.currentTier === 1 && (
+                                    <div className="grid grid-cols-2 gap-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                      <div className="space-y-2">
+                                        <Label>Tier 2 Approver Role</Label>
+                                        <Select value={selectedNextRole} onValueChange={setSelectedNextRole}>
+                                          <SelectTrigger><SelectValue /></SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="Line Manager">Line Manager</SelectItem>
+                                            <SelectItem value="VP">VP</SelectItem>
+                                            <SelectItem value="Operations Manager">Operations Manager</SelectItem>
+                                            <SelectItem value="Chief Pilot">Chief Pilot</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Assign To (User)</Label>
+                                        <Input 
+                                          placeholder="Enter name..." 
+                                          value={selectedNextApprover}
+                                          onChange={(e) => setSelectedNextApprover(e.target.value)}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <div className="flex gap-2">
+                                    <Button onClick={() => handleApproveWaiver(waiver.id, waiver.currentTier, false)} className="bg-green-600 hover:bg-green-700 flex-1">
+                                      <CheckCircle className="w-4 h-4 mr-2" />
+                                      Approve
+                                    </Button>
+                                    <Button onClick={() => handleApproveWaiver(waiver.id, waiver.currentTier, true)} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                                      <CheckCircle className="w-4 h-4 mr-2" />
+                                      Approve with Comments
+                                    </Button>
+                                    <Button onClick={() => handleDenyWaiver(waiver.id, waiver.currentTier)} variant="destructive" className="flex-1">
+                                      <XCircle className="w-4 h-4 mr-2" />
+                                      Deny with Comments
+                                    </Button>
+                                  </div>
                                 </div>
                               </TabsContent>
 
@@ -419,7 +564,7 @@ export default function WaiverManagement() {
 
                                 {waiver.duties.length > 0 ? (
                                   <div className="space-y-3">
-                                    {waiver.duties.map((duty) => (
+                                    {waiver.duties.map((duty: any) => (
                                       <div key={duty.id} className="border rounded-lg p-4">
                                         <div className="flex items-start justify-between">
                                           <div className="flex-1">
@@ -449,15 +594,32 @@ export default function WaiverManagement() {
 
                               <TabsContent value="approvals" className="space-y-4">
                                 <div>
-                                  <h3>Required Approvers</h3>
-                                  <div className="space-y-2 mt-4">
-                                    {waiver.approvers.map((approver, index) => (
-                                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                                        <div className="flex items-center gap-2">
-                                          <UserCheck className="w-4 h-4" />
-                                          <span>{approver}</span>
+                                  <h3 className="text-sm font-bold uppercase text-gray-400 mb-4">Approval History</h3>
+                                  <div className="space-y-4">
+                                    {waiver.approvals.map((approval, index) => (
+                                      <div key={index} className={`p-4 border rounded-lg ${approval.status !== 'Pending' ? 'bg-gray-50' : 'bg-white'}`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <div className="flex items-center gap-2">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${approval.status.includes('Approved') ? 'bg-green-100 text-green-700' : approval.status === 'Denied' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
+                                              {approval.tier}
+                                            </div>
+                                            <div>
+                                              <p className="font-bold text-sm">{approval.role}</p>
+                                              {approval.assignedTo && <p className="text-xs text-gray-500">Assigned: {approval.assignedTo}</p>}
+                                            </div>
+                                          </div>
+                                          <Badge className={getStatusColor(approval.status)}>
+                                            {approval.status}
+                                          </Badge>
                                         </div>
-                                        <Badge variant="outline">Pending</Badge>
+                                        {approval.comments && (
+                                          <div className="mt-2 p-2 bg-white border italic text-sm rounded">
+                                            "{approval.comments}"
+                                          </div>
+                                        )}
+                                        {approval.actionDate && (
+                                          <p className="text-[10px] text-gray-400 mt-2">Actioned on: {approval.actionDate}</p>
+                                        )}
                                       </div>
                                     ))}
                                   </div>

@@ -9,7 +9,7 @@ import { CloudUpload } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface WaiverRequestFormProps {
-    onSuccess: () => void;
+    onSuccess: (data: any) => void;
     onCancel: () => void;
 }
 
@@ -41,7 +41,7 @@ export default function WaiverRequestForm({ onSuccess, onCancel }: WaiverRequest
         // In a real app, this would submit to API
         console.log('Submitting waiver:', formData);
         toast.success('Waiver request submitted successfully');
-        onSuccess();
+        onSuccess(formData);
     };
 
     return (

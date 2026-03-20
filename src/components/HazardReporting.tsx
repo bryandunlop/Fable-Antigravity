@@ -67,6 +67,7 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
   const [newHazardTitle, setNewHazardTitle] = useState('');
   const [newHazardDescription, setNewHazardDescription] = useState('');
   const [newHazardImmediateAction, setNewHazardImmediateAction] = useState('');
+  const [newHazardSuggestedAction, setNewHazardSuggestedAction] = useState('');
   const [newHazardConsequences, setNewHazardConsequences] = useState('');
   const [newHazardLocation, setNewHazardLocation] = useState('');
   const [newHazardSeverity, setNewHazardSeverity] = useState('Medium');
@@ -113,8 +114,8 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
       case WORKFLOW_STAGES.SM_INVESTIGATION: return 'bg-purple-100 text-purple-800 border-purple-200';
       case WORKFLOW_STAGES.ASSIGN_MITIGATION: return 'bg-pink-100 text-pink-800 border-pink-200';
       case WORKFLOW_STAGES.MITIGATION_DEVELOPMENT: return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case WORKFLOW_STAGES.SM_REVIEW: return 'bg-violet-100 text-violet-800 border-violet-200';
-      case WORKFLOW_STAGES.LINE_MANAGER_APPROVAL: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case WORKFLOW_STAGES.SM_MITIGATION_REVIEW: return 'bg-violet-100 text-violet-800 border-violet-200';
+      case WORKFLOW_STAGES.MANAGER_APPROVAL: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case WORKFLOW_STAGES.EXEC_APPROVAL: return 'bg-orange-100 text-orange-800 border-orange-200';
       case WORKFLOW_STAGES.IMPLEMENTATION: return 'bg-teal-100 text-teal-800 border-teal-200';
       case WORKFLOW_STAGES.EFFECTIVENESS_REVIEW: return 'bg-cyan-100 text-cyan-800 border-cyan-200';
@@ -142,15 +143,12 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
   const filteredHazards = hazards.filter(hazard => {
     // Visibility Check
     const isSafetyOrAdmin = userRole === 'safety' || userRole === 'admin';
-    const isReporter = hazard.submitterId === currentUserId; // New check using ID
-    // Fallback for legacy data (allow name match if ID is missing)
-    const isLegacyReporter = !hazard.submitterId && !isSafetyOrAdmin && (hazard.reportedBy === (userRole === 'pilot' ? 'Current User' : 'Anonymous')); // Rough heuristic for legacy
+    // 2. User is the submitter (by ID) AND it's NOT in the initial SUBMITTED stage (for security/confidentiality)
+    const isReporter = hazard.submitterId === currentUserId;
+    const isReporterVisible = isReporter && hazard.workflowStage !== WORKFLOW_STAGES.SUBMITTED;
 
-    // Show if:
-    // 1. User is Safety/Admin
-    // 2. User is the submitter (by ID)
     // 3. Hazard is explicitly published
-    const isVisible = isSafetyOrAdmin || isReporter || hazard.isPublished;
+    const isVisible = isSafetyOrAdmin || isReporterVisible || hazard.isPublished;
 
     if (!isVisible) return false;
 
@@ -177,6 +175,7 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
       title: newHazardTitle,
       description: newHazardDescription,
       immediateActions: newHazardImmediateAction,
+      suggestedCorrectiveAction: newHazardSuggestedAction,
       potentialConsequences: newHazardConsequences,
       location: newHazardLocation || 'Unknown',
       severity: newHazardSeverity,
@@ -193,6 +192,7 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
     setNewHazardTitle('');
     setNewHazardDescription('');
     setNewHazardImmediateAction('');
+    setNewHazardSuggestedAction('');
     setNewHazardConsequences('');
     setNewHazardLocation('');
     setNewHazardSeverity('Medium');
@@ -326,6 +326,18 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
                 />
               </div>
 
+              {/* Suggested Corrective Action */}
+              <div>
+                <Label>Suggested Corrective Action (Optional)</Label>
+                <Textarea
+                  placeholder="What do you think could prevent this from happening again?"
+                  rows={2}
+                  className="mt-1"
+                  value={newHazardSuggestedAction}
+                  onChange={(e) => setNewHazardSuggestedAction(e.target.value)}
+                />
+              </div>
+
               {/* Potential Consequences */}
               <div>
                 <Label>Potential Consequences (if ignored)</Label>
@@ -447,7 +459,7 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
               <div>
                 <p className="text-sm text-muted-foreground">In Review</p>
                 <p className="text-2xl">
-                  {hazards.filter(h => [WORKFLOW_STAGES.SM_INVESTIGATION, WORKFLOW_STAGES.ASSIGN_MITIGATION, WORKFLOW_STAGES.MITIGATION_DEVELOPMENT, WORKFLOW_STAGES.SM_REVIEW].includes(h.workflowStage)).length}
+                  {hazards.filter(h => [WORKFLOW_STAGES.SM_INVESTIGATION, WORKFLOW_STAGES.ASSIGN_MITIGATION, WORKFLOW_STAGES.MITIGATION_DEVELOPMENT, WORKFLOW_STAGES.SM_MITIGATION_REVIEW].includes(h.workflowStage)).length}
                 </p>
               </div>
             </div>
@@ -461,7 +473,7 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
               <div>
                 <p className="text-sm text-muted-foreground">Line Manager</p>
                 <p className="text-2xl">
-                  {hazards.filter(h => h.workflowStage === WORKFLOW_STAGES.LINE_MANAGER_APPROVAL).length}
+                  {hazards.filter(h => h.workflowStage === WORKFLOW_STAGES.MANAGER_APPROVAL).length}
                 </p>
               </div>
             </div>
@@ -538,8 +550,8 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
                 <SelectItem value={WORKFLOW_STAGES.SM_INVESTIGATION.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.SM_INVESTIGATION}</SelectItem>
                 <SelectItem value={WORKFLOW_STAGES.ASSIGN_MITIGATION.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.ASSIGN_MITIGATION}</SelectItem>
                 <SelectItem value={WORKFLOW_STAGES.MITIGATION_DEVELOPMENT.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.MITIGATION_DEVELOPMENT}</SelectItem>
-                <SelectItem value={WORKFLOW_STAGES.SM_REVIEW.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.SM_REVIEW}</SelectItem>
-                <SelectItem value={WORKFLOW_STAGES.LINE_MANAGER_APPROVAL.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.LINE_MANAGER_APPROVAL}</SelectItem>
+                <SelectItem value={WORKFLOW_STAGES.SM_MITIGATION_REVIEW.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.SM_MITIGATION_REVIEW}</SelectItem>
+                <SelectItem value={WORKFLOW_STAGES.MANAGER_APPROVAL.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.MANAGER_APPROVAL}</SelectItem>
                 <SelectItem value={WORKFLOW_STAGES.EXEC_APPROVAL.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.EXEC_APPROVAL}</SelectItem>
                 <SelectItem value={WORKFLOW_STAGES.IMPLEMENTATION.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.IMPLEMENTATION}</SelectItem>
                 <SelectItem value={WORKFLOW_STAGES.EFFECTIVENESS_REVIEW.replace(/\s/g, '').toLowerCase()}>{WORKFLOW_STAGES.EFFECTIVENESS_REVIEW}</SelectItem>
@@ -616,13 +628,13 @@ export default function HazardReporting({ userRole = 'pilot' }: HazardReportingP
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">
-                            {hazard.workflowStage === WORKFLOW_STAGES.LINE_MANAGER_APPROVAL
+                            {hazard.workflowStage === WORKFLOW_STAGES.MANAGER_APPROVAL
                               ? hazard.submitterLineManager
                               : hazard.workflowStage === WORKFLOW_STAGES.EXEC_APPROVAL
                                 ? 'VP Operations'
                                 : hazard.workflowStage === WORKFLOW_STAGES.MITIGATION_DEVELOPMENT
                                   ? 'Process Owner'
-                                  : [WORKFLOW_STAGES.SM_INVESTIGATION, WORKFLOW_STAGES.ASSIGN_MITIGATION, WORKFLOW_STAGES.SM_REVIEW].includes(hazard.workflowStage)
+                                  : [WORKFLOW_STAGES.SM_INVESTIGATION, WORKFLOW_STAGES.ASSIGN_MITIGATION, WORKFLOW_STAGES.SM_MITIGATION_REVIEW].includes(hazard.workflowStage)
                                     ? 'Safety Manager'
                                     : 'N/A'}
                           </span>

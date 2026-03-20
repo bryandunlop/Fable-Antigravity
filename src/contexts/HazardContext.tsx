@@ -6,17 +6,18 @@ export const WORKFLOW_STAGES = {
     SUBMITTED: 'Submitted',
     // Safety Manager Phase 1
     SM_INVESTIGATION: 'Safety Manger Investigation', // Includes Risk Assessment & 5 Whys
-    // PACE Assignment Phase
+    // Mitigation Assignment Phase
     ASSIGN_MITIGATION: 'Assign Mitigation Task',
     // Process Owner Phase
     MITIGATION_DEVELOPMENT: 'Mitigation Development',
     // Safety Manager Phase 2
-    SM_REVIEW: 'Safety Manager Review',
+    SM_MITIGATION_REVIEW: 'Safety Manager Mitigation Review', // NEW
     // Approvals
-    LINE_MANAGER_APPROVAL: 'Line Manager Approval',
+    MANAGER_APPROVAL: 'Manager Approval', // Renamed from MANAGER_APPROVAL
     EXEC_APPROVAL: 'Accountable Executive Approval',
     // Implementation Phase
     IMPLEMENTATION: 'Implementation', // Send Info & R&I
+    FINAL_REPORT: 'Final Report & Publication', // NEW
     // Effectiveness Phase
     EFFECTIVENESS_REVIEW: 'Review for Effectiveness', // 6 months later
     PUBLISHED: 'Published',
@@ -60,6 +61,12 @@ export interface Hazard {
     isAnonymous?: boolean;
     isPublished?: boolean; // Controls visibility to general users
     submitterId?: string; // Tracks who submitted it for "My Hazards" view
+    suggestedCorrectiveAction?: string; // NEW: field on submission
+    smMitigationReviewNotes?: string; // NEW
+    deidentifiedMitigationSummary?: string; // NEW
+    finalReportRaw?: string; // NEW
+    finalReportPublished?: string; // NEW
+    isDeleted?: boolean; // NEW: for double-confirm delete
 
     // Workflow specifics
     riskFactors?: string[];
@@ -86,8 +93,8 @@ export interface Hazard {
         uploadedDate: string;
     }>;
 
-    // PACE Model Assignments & Responses
-    paceAssignments?: {
+    // Mitigation Model Assignments & Responses
+    mitigationAssignments?: {
         processOwner: Array<{ // Changed to Array
             id: string; // Added ID
             type: string;
@@ -208,7 +215,7 @@ const INITIAL_HAZARDS: Hazard[] = [
         title: 'Runway Surface Contamination - LAX Runway 24L',
         category: 'Airport Infrastructure',
         severity: 'Critical',
-        workflowStage: WORKFLOW_STAGES.LINE_MANAGER_APPROVAL,
+        workflowStage: WORKFLOW_STAGES.MANAGER_APPROVAL,
         location: 'LAX - Runway 24L',
         reportedBy: 'John Smith',
         submitterLineManager: 'Sarah Johnson',

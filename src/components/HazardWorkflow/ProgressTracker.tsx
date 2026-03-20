@@ -23,18 +23,22 @@ export const PHASES = [
     {
         id: 'mitigation',
         label: 'Mitigation',
-        stages: [WORKFLOW_STAGES.ASSIGN_MITIGATION, WORKFLOW_STAGES.MITIGATION_DEVELOPMENT, WORKFLOW_STAGES.SM_REVIEW]
+        stages: [WORKFLOW_STAGES.ASSIGN_MITIGATION, WORKFLOW_STAGES.MITIGATION_DEVELOPMENT, WORKFLOW_STAGES.SM_MITIGATION_REVIEW]
     },
     {
         id: 'approvals',
         label: 'Approvals',
-        stages: [WORKFLOW_STAGES.LINE_MANAGER_APPROVAL, WORKFLOW_STAGES.EXEC_APPROVAL]
+        stages: [WORKFLOW_STAGES.MANAGER_APPROVAL, WORKFLOW_STAGES.EXEC_APPROVAL]
+    },
+    {
+        id: 'implementation',
+        label: 'Action',
+        stages: [WORKFLOW_STAGES.IMPLEMENTATION, WORKFLOW_STAGES.FINAL_REPORT]
     },
     {
         id: 'closure',
-        label: 'Closure',
+        label: 'Review',
         stages: [
-            WORKFLOW_STAGES.IMPLEMENTATION,
             WORKFLOW_STAGES.EFFECTIVENESS_REVIEW,
             WORKFLOW_STAGES.CLOSED
         ]

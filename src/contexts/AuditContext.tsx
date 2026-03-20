@@ -22,8 +22,8 @@ export interface Audit {
     category: string;
     status: string;
     priority: string;
-    scheduledDate: string;
-    dueDate: string;
+    scheduledDate?: string;
+    dueDate?: string;
     expirationDate?: string;
     protocolLink?: string;
     assignedTo: string;

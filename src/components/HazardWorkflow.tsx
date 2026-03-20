@@ -61,7 +61,7 @@ export default function HazardWorkflow() {
   const { id } = useParams();
   const navigate = useNavigate();
   const onClose = () => navigate('/safety/manager-dashboard');
-  const { getHazardById, updateHazard } = useHazards();
+  const { getHazardById, updateHazard, deleteHazard } = useHazards();
   const hazard = id ? getHazardById(id) : null;
 
   // -- State --
@@ -79,20 +79,20 @@ export default function HazardWorkflow() {
   const [includeRCA, setIncludeRCA] = useState(false);
   const [includeNotes, setIncludeNotes] = useState(false);
 
-  // Data States (Risk, RCA, PACE)
+  // Data States (Risk, RCA, Mitigation)
   const [riskSeverity, setRiskSeverity] = useState(3);
   const [riskLikelihood, setRiskLikelihood] = useState(3);
   const [whyAnalysis, setWhyAnalysis] = useState(['', '', '', '', '']);
   const [investigationNotes, setInvestigationNotes] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]); // New state for uploads
   const [consolidatedPlan, setConsolidatedPlan] = useState('');
-  const [sharedReportSummary, setSharedReportSummary] = useState(''); // De-identified summary for PACE team
+  const [sharedReportSummary, setSharedReportSummary] = useState(''); // De-identified summary for mitigation team
 
 
 
   // Updated State Definition to match Hazard Interface
   // Updated State Definition to match Hazard Interface
-  const [paceAssignments, setPaceAssignments] = useState({
+  const [mitigationAssignments, setMitigationAssignments] = useState({
     processOwner: [] as Array<{ id: string | number, type: string, value: string, customName: string, customEmail: string, customMessage: string, status: 'pending' | 'submitted', response: string }>,
     approver: [] as Array<{ id: string | number, type: string, value: string, customName: string, customEmail: string, customMessage: string, status: 'pending' | 'approved' | 'rejected' }>,
     contributors: [] as Array<{ id: string | number, type: string, value: string, customName: string, customEmail: string, customMessage?: string, status?: string }>,
@@ -102,6 +102,13 @@ export default function HazardWorkflow() {
   // Final Report / Closure Dialog State
   const [showClosureDialog, setShowClosureDialog] = useState(false);
   const [closureReport, setClosureReport] = useState('');
+
+  // NEW: Additional Workflow States
+  const [smMitigationReviewNotes, setSmMitigationReviewNotes] = useState('');
+  const [deidentifiedSummary, setDeidentifiedSummary] = useState('');
+  const [finalReportRaw, setFinalReportRaw] = useState('');
+  const [effectivenessReviewNotes, setEffectivenessReviewNotes] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Generate draft on open
   useEffect(() => {
@@ -136,10 +143,10 @@ ${investigationNotes || 'No additional notes recorded.'}
 ---
 
 ## 4. Corrective Action Plan
-**Process Owner:** ${paceAssignments.processOwner.map(p => p.customName).join(', ') || 'N/A'}
+**Process Owner:** ${mitigationAssignments.processOwner.map((p: any) => p.customName).join(', ') || 'N/A'}
 
 **Mitigation Plan:**
-${paceAssignments.processOwner.map(p => p.response).filter(Boolean).join('\n---\n') || 'No mitigation recorded.'}
+${mitigationAssignments.processOwner.map((p: any) => p.response).filter(Boolean).join('\n---\n') || 'No mitigation recorded.'}
 
 **Effectiveness Review:**
 The mitigation has been implemented and verified for effectiveness over the monitoring period. The risk is now considered ALARP (As Low As Reasonably Practicable).
@@ -149,7 +156,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
       `;
       setClosureReport(draft.trim());
     }
-  }, [showClosureDialog, closureReport, hazard, riskSeverity, riskLikelihood, whyAnalysis, investigationNotes, paceAssignments]);
+  }, [showClosureDialog, closureReport, hazard, riskSeverity, riskLikelihood, whyAnalysis, investigationNotes, mitigationAssignments]);
 
   const handleFinalClosure = () => {
     advanceStage();
@@ -169,9 +176,9 @@ The mitigation has been implemented and verified for effectiveness over the moni
       if (hazard.investigationNotes) setInvestigationNotes(hazard.investigationNotes);
       if (hazard.attachments) setAttachments(hazard.attachments.map(a => ({ name: a.name, size: a.size, type: a.type } as File))); // Mock File object reconstruction
 
-      if (hazard.paceAssignments) {
-        setPaceAssignments({
-          processOwner: Array.isArray(hazard.paceAssignments.processOwner) ? hazard.paceAssignments.processOwner.map(p => ({
+      if (hazard.mitigationAssignments) {
+        setMitigationAssignments({
+          processOwner: Array.isArray(hazard.mitigationAssignments.processOwner) ? hazard.mitigationAssignments.processOwner.map((p: any) => ({
             id: p.id || Date.now(),
             type: p.type || 'user',
             value: p.value || '',
@@ -181,7 +188,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
             status: p.status || 'pending',
             response: p.response || ''
           })) : [],
-          approver: Array.isArray(hazard.paceAssignments.approver) ? hazard.paceAssignments.approver.map(a => ({
+          approver: Array.isArray(hazard.mitigationAssignments.approver) ? hazard.mitigationAssignments.approver.map((a: any) => ({
             id: a.id || Date.now(),
             type: a.type || 'user',
             value: a.value || '',
@@ -190,7 +197,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
             customMessage: a.customMessage || '',
             status: a.status || 'pending'
           })) : [],
-          contributors: (hazard.paceAssignments.contributors || []).map(c => ({
+          contributors: (hazard.mitigationAssignments.contributors || []).map((c: any) => ({
             id: c.id || Date.now(),
             type: c.type || 'user',
             value: c.value || '',
@@ -199,7 +206,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
             customMessage: c.customMessage || '',
             status: c.status || 'pending'
           })),
-          executers: (hazard.paceAssignments.executers || []).map(e => ({
+          executers: (hazard.mitigationAssignments.executers || []).map((e: any) => ({
             id: e.id || Date.now(),
             type: e.type || 'user',
             value: e.value || '',
@@ -210,12 +217,18 @@ The mitigation has been implemented and verified for effectiveness over the moni
           }))
         });
       }
+
+      // NEW: Hydrate additional fields
+      if (hazard.smMitigationReviewNotes) setSmMitigationReviewNotes(hazard.smMitigationReviewNotes);
+      if (hazard.deidentifiedMitigationSummary) setDeidentifiedSummary(hazard.deidentifiedMitigationSummary);
+      if (hazard.finalReportRaw) setFinalReportRaw(hazard.finalReportRaw);
+      if (hazard.effectivenessReviewNotes) setEffectivenessReviewNotes(hazard.effectivenessReviewNotes);
     }
   }, [hazard]);
 
   // Sample Data Injection for Collection Phase Demo
   useEffect(() => {
-    if (currentStage === WORKFLOW_STAGES.MITIGATION_DEVELOPMENT && paceAssignments.processOwner.some(p => p.status === 'submitted')) {
+    if (currentStage === WORKFLOW_STAGES.MITIGATION_DEVELOPMENT && mitigationAssignments.processOwner.some((p: any) => p.status === 'submitted')) {
       // Logic for "Review Proposal" button 
     } else {
       // Logic for simulate response
@@ -944,21 +957,21 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 Current {activeAssignmentType === 'processOwner' ? 'Owners' : 'Approvers'}
               </Label>
 
-            {activeAssignmentType === 'processOwner' && paceAssignments.processOwner.length === 0 && (
+            {activeAssignmentType === 'processOwner' && mitigationAssignments.processOwner.length === 0 && (
               <div className="p-8 text-center border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
                 <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                 <p className="text-gray-500 italic">No process owners assigned yet.</p>
               </div>
             )}
 
-            {activeAssignmentType === 'approver' && paceAssignments.approver.length === 0 && (
+            {activeAssignmentType === 'approver' && mitigationAssignments.approver.length === 0 && (
               <div className="p-8 text-center border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
                 <ShieldCheck className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                 <p className="text-gray-500 italic">No approvers assigned yet.</p>
               </div>
             )}
 
-            {activeAssignmentType === 'processOwner' && paceAssignments.processOwner.map((po: any, i: number) => (
+            {activeAssignmentType === 'processOwner' && mitigationAssignments.processOwner.map((po: any, i: number) => (
               <div key={i} className="flex items-start justify-between p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-purple-200 transition-colors group">
                 <div className="flex gap-3">
                   <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-lg">
@@ -973,8 +986,8 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 <Button
                   size="sm" variant="ghost" className="text-gray-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => {
-                    const newPo = paceAssignments.processOwner.filter((_, idx) => idx !== i);
-                    setPaceAssignments({ ...paceAssignments, processOwner: newPo });
+                    const newPo = mitigationAssignments.processOwner.filter((_, idx) => idx !== i);
+                    setMitigationAssignments({ ...mitigationAssignments, processOwner: newPo });
                   }}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -982,7 +995,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
               </div>
             ))}
 
-            {activeAssignmentType === 'approver' && paceAssignments.approver.map((ap: any, i: number) => (
+            {activeAssignmentType === 'approver' && mitigationAssignments.approver.map((ap: any, i: number) => (
               <div key={i} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-200 transition-colors group">
                 <div className="flex gap-3 items-center">
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
@@ -996,8 +1009,8 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 <Button
                   size="sm" variant="ghost" className="text-gray-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => {
-                    const newAp = paceAssignments.approver.filter((_, idx) => idx !== i);
-                    setPaceAssignments({ ...paceAssignments, approver: newAp });
+                    const newAp = mitigationAssignments.approver.filter((_, idx) => idx !== i);
+                    setMitigationAssignments({ ...mitigationAssignments, approver: newAp });
                   }}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -1055,9 +1068,9 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   const msgEl = document.getElementById('new-po-msg') as HTMLInputElement;
 
                   if (nameEl.value) {
-                    setPaceAssignments({
-                      ...paceAssignments,
-                      processOwner: [...paceAssignments.processOwner, {
+                    setMitigationAssignments({
+                      ...mitigationAssignments,
+                      processOwner: [...mitigationAssignments.processOwner, {
                         id: Date.now(),
                         type: 'user',
                         value: nameEl.value,
@@ -1116,11 +1129,13 @@ The mitigation has been implemented and verified for effectiveness over the moni
                       <SelectTrigger><SelectValue placeholder="Select Role..." /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Chief Pilot">Chief Pilot</SelectItem>
+                        <SelectItem value="Assistant Chief Pilot">Assistant Chief Pilot</SelectItem>
                         <SelectItem value="Director of Maintenance">Director of Maintenance</SelectItem>
-                        <SelectItem value="Scheduling Manager">Scheduling Manager</SelectItem>
-                        <SelectItem value="VP">VP</SelectItem>
+                        <SelectItem value="Chief Inspector">Chief Inspector</SelectItem>
+                        <SelectItem value="Ground Ops Manager">Ground Ops Manager</SelectItem>
                         <SelectItem value="Flight Attendant Manager">Flight Attendant Manager</SelectItem>
-                        <SelectItem value="Medical">Medical</SelectItem>
+                        <SelectItem value="Accountable Executive">Accountable Executive</SelectItem>
+                        <SelectItem value="Scheduling Manager">Scheduling Manager</SelectItem>
                         <SelectItem value="Security">Security</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1136,9 +1151,9 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   const emailEl = document.getElementById('new-ap-email') as HTMLInputElement;
 
                   if (roleEl && roleEl.value) {
-                    setPaceAssignments({
-                      ...paceAssignments,
-                      approver: [...paceAssignments.approver, {
+                    setMitigationAssignments({
+                      ...mitigationAssignments,
+                      approver: [...mitigationAssignments.approver, {
                         id: Date.now(),
                         type: 'user',
                         value: roleEl.value,
@@ -1190,7 +1205,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
       riskAnalysis: { severity: riskSeverity, likelihood: riskLikelihood },
       whyAnalysis,
       investigationNotes,
-      paceAssignments: paceAssignments as any,
+      mitigationAssignments: mitigationAssignments as any,
       finalCorrectiveAction: consolidatedPlan,
       attachments: formattedAttachments.length > 0 ? formattedAttachments : hazard?.attachments
     });
@@ -1218,11 +1233,11 @@ The mitigation has been implemented and verified for effectiveness over the moni
           toast.warning("5 Whys analysis looks incomplete. You can still proceed.");
         }
         nextStage = WORKFLOW_STAGES.ASSIGN_MITIGATION;
-        toast.success("Investigation complete. Proceed to PACE assignment.");
+        toast.success("Investigation complete. Proceed to mitigation assignment.");
         break;
 
       case WORKFLOW_STAGES.ASSIGN_MITIGATION:
-        if (paceAssignments.processOwner.length === 0) {
+        if (mitigationAssignments.processOwner.length === 0) {
           toast.error("Please assign at least one Process Owner.");
           return;
         }
@@ -1233,41 +1248,54 @@ The mitigation has been implemented and verified for effectiveness over the moni
       case WORKFLOW_STAGES.MITIGATION_DEVELOPMENT:
         // Check if all process owners have responded (or at least one for now, depending on rules. Sticking to 'at least one' for progress or 'all'?)
         // Let's require at least one response for now to proceed.
-        const hasResponse = paceAssignments.processOwner.some(p => p.response || p.status === 'submitted');
+        const hasResponse = mitigationAssignments.processOwner.some((p: any) => p.response || p.status === 'submitted');
         if (!hasResponse) {
           toast.error("Waiting for Process Owner response.");
           return;
         }
-        nextStage = WORKFLOW_STAGES.SM_REVIEW;
+        nextStage = WORKFLOW_STAGES.SM_MITIGATION_REVIEW;
         toast.success("Mitigation proposal received. Reviewing...");
         break;
 
-      case WORKFLOW_STAGES.SM_REVIEW:
+      case WORKFLOW_STAGES.SM_MITIGATION_REVIEW:
         if (!consolidatedPlan) {
           toast.error("Please finalize the Corrective Action Plan.");
           return;
         }
-        if (paceAssignments.approver.length === 0) {
-          toast.error("Please assign at least one Approver before sending for approval.");
+        if (mitigationAssignments.approver.length === 0) {
+          toast.error("Please assign at least one Approver (Manager/AE) before sending for approval.");
           return;
         }
-        nextStage = WORKFLOW_STAGES.LINE_MANAGER_APPROVAL;
-        toast.success("Plan finalized. Sent to Line Manager.");
+        nextStage = WORKFLOW_STAGES.MANAGER_APPROVAL;
+        toast.success("Plan finalized. Sent to Manager for approval.");
         break;
 
-      case WORKFLOW_STAGES.LINE_MANAGER_APPROVAL:
+      case WORKFLOW_STAGES.MANAGER_APPROVAL:
+        // In a real app, this would be based on the actual manager's response
         nextStage = WORKFLOW_STAGES.EXEC_APPROVAL;
-        toast.success("Line Manager Approved. Sent to Accountable Exec.");
+        toast.success("Manager Approved. Sent to Accountable Executive.");
         break;
 
       case WORKFLOW_STAGES.EXEC_APPROVAL:
         nextStage = WORKFLOW_STAGES.IMPLEMENTATION;
-        toast.success("Executive Approved. Moving to Implementation.");
+        toast.success("Executive Approved. Moving to Implementation & Reporting.");
         break;
 
       case WORKFLOW_STAGES.IMPLEMENTATION:
+        nextStage = WORKFLOW_STAGES.FINAL_REPORT;
+        toast.success("Implementation complete. Assembling final report...");
+        break;
+
+      case WORKFLOW_STAGES.FINAL_REPORT:
         nextStage = WORKFLOW_STAGES.EFFECTIVENESS_REVIEW;
-        toast.success("Implementation complete. Effectiveness review scheduled.");
+        // Set 6-month review date
+        const reviewDate = new Date();
+        reviewDate.setMonth(reviewDate.getMonth() + 6);
+        updateHazard(hazard.id, { 
+          effectivenessReviewDate: reviewDate.toISOString().split('T')[0],
+          finalReportRaw: finalReportRaw 
+        });
+        toast.success("Final report published. Effectiveness review scheduled (6 months).");
         break;
 
       case WORKFLOW_STAGES.EFFECTIVENESS_REVIEW:
@@ -1289,7 +1317,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
   };
 
   const handleSimulateProcessOwnerResponse = () => {
-    setPaceAssignments(prev => {
+    setMitigationAssignments(prev => {
       const newOwners = [...prev.processOwner];
       if (newOwners.length > 0) {
         newOwners[0] = {
@@ -1429,6 +1457,12 @@ The mitigation has been implemented and verified for effectiveness over the moni
                     <p className="text-sm text-gray-700">{hazard.potentialConsequences}</p>
                   </div>
                 )}
+                {hazard.suggestedCorrectiveAction && (
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1 font-bold text-blue-700">Submitter's Suggested Corrective Action</Label>
+                    <p className="text-sm p-3 bg-blue-50/50 rounded border border-blue-100 italic">"{hazard.suggestedCorrectiveAction}"</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1512,6 +1546,34 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   />
                 </div>
 
+                <div className="space-y-4 pt-4 border-t">
+                  <Label className="text-base font-semibold">Attachments & Media</Label>
+                  {hazard.attachments && hazard.attachments.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {hazard.attachments.map((att, i) => (
+                        <div key={i} className="group relative border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all">
+                          {att.type.startsWith('image/') ? (
+                            <img src={att.url || '#'} alt={att.name} className="w-full h-32 object-cover" />
+                          ) : (
+                            <div className="w-full h-32 flex flex-col items-center justify-center bg-gray-50 border-b">
+                              <FileText className="w-10 h-10 text-gray-400" />
+                              <span className="text-[10px] text-gray-500 uppercase mt-2">{att.type.split('/')[1] || 'FILE'}</span>
+                            </div>
+                          )}
+                          <div className="p-2 border-t flex items-center justify-between">
+                            <span className="text-xs font-medium truncate flex-1 mr-2">{att.name}</span>
+                            <a href={att.url || '#'} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800">
+                              <Eye className="w-4 h-4" />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic py-4 text-center border-2 border-dashed rounded-lg bg-gray-50">No attachments submitted with this report.</p>
+                  )}
+                </div>
+
                 {/* Evidence Upload */}
                 <div className="space-y-2">
                   <Label className="text-base font-semibold">Evidence & Media</Label>
@@ -1586,8 +1648,8 @@ The mitigation has been implemented and verified for effectiveness over the moni
                     </div>
                     <Badge variant="secondary" className="bg-white/50 text-blue-600 border-blue-200 group-hover:bg-blue-600 group-hover:text-white transition-colors">Click to Manage</Badge>
                   </div>
-                  {paceAssignments.processOwner.length === 0 && <p className="text-sm italic text-gray-500 text-center py-2">No Process Owners Assigned</p>}
-                  {paceAssignments.processOwner.map((po, idx) => (
+                  {mitigationAssignments.processOwner.length === 0 && <p className="text-sm italic text-gray-500 text-center py-2">No Process Owners Assigned</p>}
+                  {mitigationAssignments.processOwner.map((po: any, idx: number) => (
                     <div key={idx} className="ml-2 pl-2 border-l-2 border-blue-200">
                       <p className="text-sm font-semibold">{po.customName || po.value || 'Unknown User'}</p>
                       {po.response && (
@@ -1611,12 +1673,12 @@ The mitigation has been implemented and verified for effectiveness over the moni
           )}
 
           {/* 4. PACE Team Approvals */}
-          {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.SM_REVIEW)) && (
+          {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.SM_MITIGATION_REVIEW)) && (
             <Card className="border-l-4 border-l-orange-500 mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-orange-600" />
-                  PACE Approvals
+                  Mitigation Approvals
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1633,8 +1695,8 @@ The mitigation has been implemented and verified for effectiveness over the moni
                     </div>
                     <Badge variant="secondary" className="bg-white/50 text-orange-600 border-orange-200 group-hover:bg-orange-600 group-hover:text-white transition-colors">Click to Manage</Badge>
                   </div>
-                  {paceAssignments.approver.length === 0 && <p className="text-sm italic text-gray-500 text-center py-2">No Approvers Assigned</p>}
-                  {paceAssignments.approver.map((ap, idx) => (
+                  {mitigationAssignments.approver.length === 0 && <p className="text-sm italic text-gray-500 text-center py-2">No Approvers Assigned</p>}
+                  {mitigationAssignments.approver.map((ap: any, idx: number) => (
                     <div key={idx} className="ml-2 pl-2 border-l-2 border-orange-200">
                       <p className="text-sm">{ap.customName || ap.value || 'Unknown Role'}</p>
                     </div>
@@ -1642,7 +1704,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 </div>
 
                 {/* Input for assigning if in assignment stage */}
-                {currentStage === WORKFLOW_STAGES.SM_REVIEW && (
+                {currentStage === WORKFLOW_STAGES.SM_MITIGATION_REVIEW && (
                   <div className="mt-4 pt-4 border-t border-dashed text-center">
                     <p className="text-xs text-gray-500 italic">Click on the Approvers card above to add team members.</p>
                   </div>
@@ -1652,7 +1714,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
           )}
 
           {/* 4. Corrective Action Plan (SM Review) */}
-          {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.SM_REVIEW)) && (
+          {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.SM_MITIGATION_REVIEW)) && (
             <Card className="border-l-4 border-l-yellow-500">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1661,7 +1723,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {currentStage === WORKFLOW_STAGES.SM_REVIEW ? (
+                {currentStage === WORKFLOW_STAGES.SM_MITIGATION_REVIEW ? (
                   <div className="space-y-3">
                     <Label>Curated Action Plan (For Approval)</Label>
                     <Textarea
@@ -1681,29 +1743,97 @@ The mitigation has been implemented and verified for effectiveness over the moni
             </Card>
           )}
 
-          {/* 5. Implementation & Closure */}
+          {/* 5. Implementation Stage */}
           {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.IMPLEMENTATION)) && (
-            <Card className="border-l-4 border-l-green-500">
+            <Card className="border-l-4 border-l-green-500 mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Rocket className="w-5 h-5 text-green-600" />
-                  Implementation & Effectiveness
+                  Implementation Actions
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-green-50 rounded border border-green-100">
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-green-700" />
-                    <span className="text-sm font-medium text-green-900">Communication Sent</span>
+                    <span className="text-sm font-medium text-green-900">Safety Communication Sent</span>
                   </div>
                   <Badge variant="outline" className="bg-white text-green-700">Sent</Badge>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-green-50 rounded border border-green-100">
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-green-700" />
-                    <span className="text-sm font-medium text-green-900">R&I Updated (Compliance)</span>
+                    <span className="text-sm font-medium text-green-900">Manuals/LMS Updated</span>
                   </div>
                   <Badge variant="outline" className="bg-white text-green-700">Linked</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 6. Final Report & Publication */}
+          {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.FINAL_REPORT)) && (
+            <Card className="border-l-4 border-l-indigo-500 mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                  Final Report & Publication
+                </CardTitle>
+                <CardDescription>Assemble the final narrative for the safety database and organizational learning.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {currentStage === WORKFLOW_STAGES.FINAL_REPORT ? (
+                  <div className="space-y-3">
+                    <Label>Final Report Content (Editable)</Label>
+                    <Textarea
+                      className="min-h-[200px]"
+                      value={finalReportRaw}
+                      onChange={(e) => setFinalReportRaw(e.target.value)}
+                      placeholder="Draft the final report here. Include de-identified findings and the permanent mitigation strategy..."
+                    />
+                    <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded text-xs text-indigo-700">
+                      <Shield className="w-3 h-3" />
+                      Ensure all names and tail numbers are redacted before publication.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gray-50 rounded border border-gray-200">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Published Report</h4>
+                    <div className="text-sm whitespace-pre-wrap leading-relaxed">{finalReportRaw}</div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 7. Effectiveness Review */}
+          {(Object.values(WORKFLOW_STAGES).indexOf(currentStage) >= Object.values(WORKFLOW_STAGES).indexOf(WORKFLOW_STAGES.EFFECTIVENESS_REVIEW)) && (
+            <Card className="border-l-4 border-l-teal-500 mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-teal-600" />
+                  6-Month Effectiveness Review
+                </CardTitle>
+                <CardDescription>Verify if the implemented mitigations are still effective and no new hazards were introduced.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1">Review Notes</Label>
+                    <Textarea
+                      className="min-h-[100px]"
+                      value={effectivenessReviewNotes}
+                      onChange={(e) => setEffectivenessReviewNotes(e.target.value)}
+                      placeholder="Enter the results of the 6-month follow-up..."
+                      disabled={currentStage === WORKFLOW_STAGES.CLOSED}
+                    />
+                  </div>
+                  {currentStage === WORKFLOW_STAGES.CLOSED && (
+                    <div className="p-3 bg-teal-50 border border-teal-100 rounded flex items-center gap-2 text-teal-800 text-sm">
+                      <CheckCircle className="w-4 h-4" />
+                      Review completed and hazard closed.
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1771,9 +1901,9 @@ The mitigation has been implemented and verified for effectiveness over the moni
 
               {currentStage === WORKFLOW_STAGES.ASSIGN_MITIGATION && (
                 <>
-                  <p className="text-xs text-gray-500 mb-2">Assign PACE roles in the "Mitigation & PACE Team" section to the left.</p>
-                  <Button className="w-full" onClick={advanceStage} disabled={paceAssignments.processOwner.length === 0}>
-                    Assign PACE Team & Send
+                  <p className="text-xs text-gray-500 mb-2">Assign mitigation roles in the "Mitigation & Process Owner" section to the left.</p>
+                  <Button className="w-full" onClick={advanceStage} disabled={mitigationAssignments.processOwner.length === 0}>
+                    Assign Mitigation Team & Send
                   </Button>
                 </>
               )}
@@ -1783,7 +1913,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   <div className="p-3 bg-yellow-50 text-yellow-800 text-sm rounded border border-yellow-200 mb-3">
                     Waiting for Process Owner Response.
                   </div>
-                  {paceAssignments.processOwner.some(p => p.status === 'submitted') ? (
+                  {mitigationAssignments.processOwner.some((p: any) => p.status === 'submitted') ? (
                     <Button className="w-full" onClick={advanceStage}>
                       Review Proposal
                     </Button>
@@ -1796,21 +1926,70 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 </>
               )}
 
-              {currentStage === WORKFLOW_STAGES.SM_REVIEW && (
-                <Button className="w-full" onClick={advanceStage}>
-                  Submit for Approval
-                </Button>
+              {currentStage === WORKFLOW_STAGES.SM_MITIGATION_REVIEW && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Checkbox 
+                        id="deidentify" 
+                        checked={!!deidentifiedSummary}
+                        onCheckedChange={(checked: boolean) => {
+                          if (checked) {
+                            // Simple auto-deidentification for demo
+                            setDeidentifiedSummary(consolidatedPlan.replace(/John Doe|Pilot|N12345/g, '[REDACTED]'));
+                          } else {
+                            setDeidentifiedSummary('');
+                          }
+                        }}
+                      />
+                      <Label htmlFor="deidentify" className="text-sm font-medium">De-identify report for mitigation owners</Label>
+                    </div>
+                    <p className="text-[10px] text-blue-600">Redacts names and specific identifiers before AE/Manager review.</p>
+                  </div>
+
+                  <Button className="w-full" onClick={advanceStage}>
+                    <ShieldCheck className="w-4 h-4 mr-2" />
+                    Finalize & Send to Manager
+                  </Button>
+
+                  <Button 
+                    variant="outline" 
+                    className="w-full text-orange-600 border-orange-200 hover:bg-orange-50"
+                    onClick={() => {
+                      setCurrentStage(WORKFLOW_STAGES.MITIGATION_DEVELOPMENT);
+                      toast.info("Sent back to Process Owner for revision.");
+                    }}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Send Back to Process Owner
+                  </Button>
+                </div>
               )}
 
-              {(currentStage === WORKFLOW_STAGES.LINE_MANAGER_APPROVAL || currentStage === WORKFLOW_STAGES.EXEC_APPROVAL) && (
-                <div className="space-y-2">
-                  <div className="p-3 bg-blue-50 text-blue-800 text-sm rounded border border-blue-200">
-                    Pending Approval from {currentStage === WORKFLOW_STAGES.LINE_MANAGER_APPROVAL ? 'Line Manager' : 'Accountable Executive'}.
+              {(currentStage === WORKFLOW_STAGES.MANAGER_APPROVAL || currentStage === WORKFLOW_STAGES.EXEC_APPROVAL) && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-slate-50 border rounded-lg text-sm italic">
+                    <p className="font-bold text-xs uppercase text-slate-500 mb-1">Assigned Approver View</p>
+                    Waiting for {currentStage === WORKFLOW_STAGES.MANAGER_APPROVAL ? 'Manager' : 'Accountable Executive'} sign-off.
                   </div>
-                  <Button className="w-full" onClick={advanceStage}>
-                    <ThumbsUp className="w-4 h-4 mr-2" />
-                    Simulate Approval
-                  </Button>
+                  
+                  <div className="flex gap-2">
+                    <Button className="flex-1 bg-green-600 hover:bg-green-700 font-bold" onClick={advanceStage}>
+                      <ThumbsUp className="w-4 h-4 mr-2" />
+                      Approve
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      className="flex-1 font-bold"
+                      onClick={() => {
+                        setCurrentStage(WORKFLOW_STAGES.SM_MITIGATION_REVIEW);
+                        toast.error(`Denial: Sent back to Safety Manager for ${currentStage === WORKFLOW_STAGES.MANAGER_APPROVAL ? 'Manager' : 'AE'} feedback integration.`);
+                      }}
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Deny
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -1839,9 +2018,53 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 </Button>
               )}
 
+              {currentStage === WORKFLOW_STAGES.FINAL_REPORT && (
+                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setShowClosureDialog(true)}>
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Assemble & Publish Final Report
+                </Button>
+              )}
+
               {currentStage === WORKFLOW_STAGES.CLOSED && (
                 <div className="text-center p-4 bg-gray-100 rounded text-gray-500">
                   Workflow Closed
+                </div>
+              )}
+
+              <Separator className="my-4" />
+
+              {!showDeleteConfirm ? (
+                <Button 
+                  variant="ghost" 
+                  className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Hazard Report
+                </Button>
+              ) : (
+                <div className="space-y-2 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <p className="text-xs font-bold text-red-700 text-center">Are you absolutely sure?</p>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="destructive" 
+                      className="flex-1"
+                      onClick={() => {
+                        deleteHazard(hazard.id);
+                        toast.success('Hazard report deleted successfully');
+                        navigate('/safety/manager-dashboard');
+                      }}
+                    >
+                      Confirm Delete
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => setShowDeleteConfirm(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
