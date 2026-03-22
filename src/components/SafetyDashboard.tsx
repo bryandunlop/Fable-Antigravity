@@ -46,8 +46,10 @@ import {
   ArrowRight,
   MessageSquare,
   XCircle,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
+import { useNotificationContext } from './contexts/NotificationContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from './ui/dropdown-menu';
 import { useHazards, WORKFLOW_STAGES, HAZARD_CATEGORIES, SEVERITY_LEVELS } from '../contexts/HazardContext';
@@ -59,9 +61,10 @@ interface SafetyDashboardProps {
 }
 
 export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardProps) {
-  const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('overview');
   const navigate = useNavigate();
+  const { addNotification } = useNotificationContext();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHazard, setSelectedHazard] = useState<any>(null);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
@@ -184,6 +187,46 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
     'Flight Attendant Manager'
   ];
 
+  const [trendData] = useState([
+    { month: 'Sep', reports: 12, resolved: 10 },
+    { month: 'Oct', reports: 15, resolved: 14 },
+    { month: 'Nov', reports: 18, resolved: 15 },
+    { month: 'Dec', reports: 14, resolved: 13 },
+    { month: 'Jan', reports: 22, resolved: 20 },
+    { month: 'Feb', reports: 16, resolved: 15 }
+  ]);
+
+  const [latestNewsletter, setLatestNewsletter] = useState({
+    title: "February 2024 Safety Newsletter",
+    date: "February 1, 2024",
+    isCustom: false
+  });
+
+  const handleNewsletterUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const title = file.name.replace('.pdf', '');
+      const dateString = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      
+      toast.success(`Successfully published ${file.name}`);
+      
+      setLatestNewsletter({
+         title: title,
+         date: dateString,
+         isCustom: true
+      });
+
+      addNotification({
+        title: 'New Safety Newsletter Published',
+        message: `${title} is now available for review.`,
+        type: 'safety',
+        priority: 'medium',
+        module: 'Safety Systems',
+        actionUrl: '/safety',
+        actionText: 'Read Now'
+      });
+    }
+  };
   // Waiver Requests — rich model with approval chain
   const [waiverRequests, setWaiverRequests] = useState([
     {
@@ -362,10 +405,10 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
   }, [hazards, searchTerm, categoryFilter, severityFilter]);
 
   const pendingHazards = useMemo(() => {
-    return isAdmin
+    return userRole === 'safety'
       ? hazards.filter(h => h.workflowStage !== WORKFLOW_STAGES.PUBLISHED && h.workflowStage !== WORKFLOW_STAGES.CLOSED)
-      : hazards.filter(h => h.workflowStage !== WORKFLOW_STAGES.PUBLISHED && h.workflowStage !== WORKFLOW_STAGES.CLOSED && h.reportedBy === 'Current User');
-  }, [hazards, isAdmin]);
+      : [];
+  }, [hazards, userRole]);
 
   const handlePublish = (id: string) => {
     updateHazard(id, { workflowStage: WORKFLOW_STAGES.PUBLISHED });
@@ -471,7 +514,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
           <TabsTrigger value="hazards" className="gap-2">
             <AlertTriangle className="w-4 h-4" />
             <span className="hidden sm:inline">Hazards</span>
-            {safetyStats.openHazards > 0 && (
+            {userRole === 'safety' && safetyStats.openHazards > 0 && (
               <Badge className="ml-1 h-5 px-1.5 text-xs">{safetyStats.openHazards}</Badge>
             )}
           </TabsTrigger>
@@ -647,7 +690,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
           </div>
 
           {/* Safety Manager Tools */}
-          {isAdmin && (
+          {userRole === 'safety' && (
             <Card className="bg-purple-50 border-purple-200">
               <CardHeader>
                 <CardTitle className="text-purple-900 flex items-center gap-2">
@@ -657,10 +700,10 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                 <CardDescription>Risk assessment and hazard workflow management</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Link to="/safety/manager-dashboard">
+                <Link to="/safety/hazards">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
                     <Shield className="w-4 h-4 mr-2" />
-                    Hazard Workflow Dashboard
+                    Hazard Workspace (New)
                   </Button>
                 </Link>
                 <p className="text-sm text-muted-foreground">
@@ -771,10 +814,19 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                   <CardDescription>Monthly safety updates and communications</CardDescription>
                 </div>
                 {isAdmin && (
-                  <Button variant="outline" size="sm">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Newsletter
-                  </Button>
+                  <div>
+                    <input 
+                      type="file" 
+                      accept="application/pdf" 
+                      className="hidden" 
+                      id="newsletter-upload" 
+                      onChange={handleNewsletterUpload} 
+                    />
+                    <Button variant="outline" size="sm" onClick={() => document.getElementById('newsletter-upload')?.click()}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Publish PDF
+                    </Button>
+                  </div>
                 )}
               </div>
             </CardHeader>
@@ -785,56 +837,68 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <Badge className="bg-blue-600 text-white mb-2">Latest Issue</Badge>
-                      <h3 className="text-xl">February 2024 Safety Newsletter</h3>
-                      <p className="text-sm text-muted-foreground mt-1">Published: February 1, 2024</p>
+                      <h3 className="text-xl">{latestNewsletter.title}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">Published: {latestNewsletter.date}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium mb-2">🎯 This Month's Focus: Winter Operations</h4>
-                      <p className="text-sm text-muted-foreground">
-                        As we continue through winter operations, we're highlighting best practices for cold weather operations,
-                        de-icing procedures, and winter weather decision-making.
-                      </p>
-                    </div>
+                  {!latestNewsletter.isCustom ? (
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-medium mb-2">🎯 This Month's Focus: Winter Operations</h4>
+                        <p className="text-sm text-muted-foreground">
+                          As we continue through winter operations, we're highlighting best practices for cold weather operations,
+                          de-icing procedures, and winter weather decision-making.
+                        </p>
+                      </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
-                      <div className="p-3 bg-white rounded border">
-                        <Award className="w-5 h-5 text-green-600 mb-2" />
-                        <p className="text-sm font-medium">CWS Highlights</p>
-                        <p className="text-xs text-muted-foreground mt-1">12 recognitions this month for exceptional safety practices</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+                        <div className="p-3 bg-white rounded border">
+                          <Award className="w-5 h-5 text-green-600 mb-2" />
+                          <p className="text-sm font-medium">CWS Highlights</p>
+                          <p className="text-xs text-muted-foreground mt-1">12 recognitions this month for exceptional safety practices</p>
+                        </div>
+                        <div className="p-3 bg-white rounded border">
+                          <AlertTriangle className="w-5 h-5 text-orange-600 mb-2" />
+                          <p className="text-sm font-medium">Safety Trends</p>
+                          <p className="text-xs text-muted-foreground mt-1">3 hazard reports addressed with corrective actions</p>
+                        </div>
+                        <div className="p-3 bg-white rounded border">
+                          <Target className="w-5 h-5 text-purple-600 mb-2" />
+                          <p className="text-sm font-medium">Training Updates</p>
+                          <p className="text-xs text-muted-foreground mt-1">New winter ops module available in training center</p>
+                        </div>
                       </div>
-                      <div className="p-3 bg-white rounded border">
-                        <AlertTriangle className="w-5 h-5 text-orange-600 mb-2" />
-                        <p className="text-sm font-medium">Safety Trends</p>
-                        <p className="text-xs text-muted-foreground mt-1">3 hazard reports addressed with corrective actions</p>
-                      </div>
-                      <div className="p-3 bg-white rounded border">
-                        <Target className="w-5 h-5 text-purple-600 mb-2" />
-                        <p className="text-sm font-medium">Training Updates</p>
-                        <p className="text-xs text-muted-foreground mt-1">New winter ops module available in training center</p>
-                      </div>
-                    </div>
 
-                    <div className="pt-4 border-t">
-                      <h4 className="font-medium mb-2">📋 Key Safety Reminders</h4>
-                      <ul className="space-y-2 text-sm text-muted-foreground">
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span>Pre-flight inspections should include thorough checks for ice and snow accumulation</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span>Review de-icing holdover times before each flight in winter conditions</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span>Ensure proper cold weather starting procedures are followed</span>
-                        </li>
-                      </ul>
+                      <div className="pt-4 border-t">
+                        <h4 className="font-medium mb-2">📋 Key Safety Reminders</h4>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span>Pre-flight inspections should include thorough checks for ice and snow accumulation</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span>Review de-icing holdover times before each flight in winter conditions</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span>Ensure proper cold weather starting procedures are followed</span>
+                          </li>
+                        </ul>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
+                       <div className="p-4 bg-blue-100 rounded-full text-blue-600">
+                         <FileText className="w-8 h-8" />
+                       </div>
+                       <div>
+                         <h4 className="font-medium text-lg">Custom Newsletter Uploaded</h4>
+                         <p className="text-sm text-slate-500 max-w-sm mx-auto">Click below to download or view the full contents of the PDF newsletter.</p>
+                       </div>
+                    </div>
+                  )}
 
                   <div className="flex gap-2 mt-6 pt-4 border-t">
                     <Button variant="outline" className="flex-1">
@@ -1100,7 +1164,7 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
                       <div className="flex gap-2 mt-4">
                         <Button
                           className="flex-1 bg-orange-600 hover:bg-orange-700"
-                          onClick={() => navigate(`/safety/hazard-workflow/${submission.id}`)}
+                          onClick={() => navigate(`/safety/hazards`)}
                         >
                           <Edit className="w-4 h-4 mr-2" />
                           Review & Deidentify

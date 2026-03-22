@@ -43,6 +43,8 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { useHazards, WORKFLOW_STAGES, Hazard } from '../contexts/HazardContext';
 import { useNotificationContext } from './contexts/NotificationContext';
+import { useAudits, Audit } from '../contexts/AuditContext';
+import AuditDetailDrawer from './audit/AuditDetailDrawer';
 
 // Import existing types and utilities from ActionItems
 import { ActionItemsProps, ActionItem, NewItemForm } from './ActionItems/types';
@@ -206,6 +208,60 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
 
   // Get action items for current user
   const { hazards } = useHazards();
+  const { audits } = useAudits();
+
+  // Audit drawer state
+  const [drawerAudit, setDrawerAudit] = useState<Audit | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Convert assigned audits into ActionItems
+  const getAuditTasks = (): ActionItem[] => {
+    // In a real app, filter by logged-in user's name.
+    // For demo: show all non-Unassigned audits that aren't complete/draft.
+    return audits
+      .filter(a =>
+        a.assignedTo &&
+        a.assignedTo !== 'Unassigned' &&
+        a.status !== 'Complete' &&
+        a.status !== 'Draft'
+      )
+      .map(audit => {
+        const priority: 'Critical' | 'High' | 'Medium' | 'Low' =
+          audit.priority === 'High' ? 'High' :
+          audit.priority === 'Low' ? 'Low' : 'Medium';
+
+        const completedItems = audit.checklist.filter(c => c.status === 'Pass').length;
+        const totalItems = audit.checklist.length;
+
+        return {
+          id: `AuditTask-${audit.id}`,
+          title: `Audit Assignment: ${audit.title}`,
+          description: [
+            audit.isbaoPart ? `ISBAO: ${audit.isbaoPart}` : '',
+            audit.description || `Complete checklist for ${audit.category} audit.`,
+          ].filter(Boolean).join(' — '),
+          priority,
+          status: audit.status === 'In Progress' ? 'In Progress' : 'Pending',
+          assignedDate: audit.scheduledDate || new Date().toISOString().split('T')[0],
+          dueDate: audit.dueDate || new Date().toISOString().split('T')[0],
+          assignedBy: 'Safety Manager',
+          module: 'Audit',
+          contributors: [
+            { id: 'auditor', name: audit.assignedTo, role: audit.assignedRole || 'Auditor', avatar: audit.assignedTo.split(' ').map((n: string) => n[0]).join('') }
+          ],
+          sections: audit.checklist.slice(0, 4).map(c => ({
+            name: c.item,
+            status: c.status === 'Pass' ? 'completed' : c.status === 'Fail' ? 'in-progress' : 'pending',
+          })),
+          sectionsComplete: completedItems,
+          totalSections: totalItems || 1,
+          progress: audit.completionRate,
+          // Custom field — used in TaskCard to open drawer instead of navigating
+          auditId: audit.id,
+          recentActivity: [] as any[],
+        } as ActionItem & { auditId: string };
+      });
+  };
 
   // Derive action items from Hazard Workflow
   const getHazardTasks = (): ActionItem[] => {
@@ -220,10 +276,10 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
       };
 
       // 1. Process Owner Actions (Assignments)
-      if (hazard.workflowStage === WORKFLOW_STAGES.ASSIGNED_CORRECTIVE_ACTION) {
+      if (hazard.workflowStage === WORKFLOW_STAGES.ASSIGN_MITIGATION) {
         // In real app, check if user is the assigned process owner 
-        const isProcessOwner = hazard.paceAssignments?.processOwner?.value === 'Current User' ||
-          (hazard.paceAssignments?.processOwner?.value && userRole === 'safety'); // Fallback for demo
+        const isProcessOwner = hazard.mitigationAssignments?.processOwner?.[0]?.value === 'Current User' ||
+          (hazard.mitigationAssignments?.processOwner?.[0]?.value && userRole === 'safety'); // Fallback for demo
 
         if (isProcessOwner) {
           tasks.push({
@@ -244,14 +300,14 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
             sectionsComplete: 0,
             totalSections: 2,
             progress: 0,
-            link: `/safety/hazard-workflow/${hazard.id}`,
+            link: `/safety/hazards`,
             recentActivity: [] as any[]
           } as ActionItem);
         }
       }
 
       // 2. Approvals (Line Manager / Exec)
-      if (hazard.workflowStage === WORKFLOW_STAGES.LINE_MANAGER_APPROVAL && userRole === 'lead') {
+      if (hazard.workflowStage === WORKFLOW_STAGES.MANAGER_APPROVAL && userRole === 'lead') {
         tasks.push({
           id: `HzTask-${hazard.id}-Approve`,
           title: `Review & Approve Hazard Report: ${hazard.id}`,
@@ -276,9 +332,9 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
       }
 
       // 3. Execution (Implementation)
-      if (hazard.workflowStage === WORKFLOW_STAGES.IMPLEMENTATION_IN_PROGRESS) {
+      if (hazard.workflowStage === WORKFLOW_STAGES.IMPLEMENTATION) {
         // Check if user is an executer
-        const isExecuter = hazard.paceAssignments?.executers?.some(e => e.value === 'Current User') || userRole === 'maintenance';
+        const isExecuter = hazard.mitigationAssignments?.executers?.some((e: any) => e.value === 'Current User') || userRole === 'maintenance';
 
         if (isExecuter) {
           tasks.push({
@@ -289,7 +345,7 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
             status: 'In Progress',
             assignedDate: hazard.reportedDate,
             dueDate: '2025-03-15', // Fallback 
-            assignedBy: hazard.paceAssignments?.processOwner?.value || 'Process Owner',
+            assignedBy: hazard.mitigationAssignments?.processOwner?.[0]?.value || 'Process Owner',
             module: 'Safety Management',
             contributors: [],
             sections: [
@@ -299,14 +355,14 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
             sectionsComplete: 0,
             totalSections: 2,
             progress: 30, // Mock progress
-            link: `/safety/hazard-workflow/${hazard.id}`,
+            link: `/safety/hazards`,
             recentActivity: [] as any[]
           } as ActionItem);
         }
       }
 
       // 4. Contributors (General)
-      if (hazard.paceAssignments?.contributors?.some(c => c.value === 'Current User')) {
+      if (hazard.mitigationAssignments?.contributors?.some((c: any) => c.value === 'Current User')) {
         tasks.push({
           id: `HzTask-${hazard.id}-Contrib`,
           title: `Contribute to Hazard Report: ${hazard.id}`,
@@ -474,7 +530,7 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
     });
   };
 
-  const userActionItems = applyWaiverDecisions([...getUserActionItems(MOCK_ACTION_ITEMS, userRole), ...getHazardTasks(), ...getWaiverApprovalTasks()]);
+  const userActionItems = applyWaiverDecisions([...getUserActionItems(MOCK_ACTION_ITEMS, userRole), ...getHazardTasks(), ...getWaiverApprovalTasks(), ...getAuditTasks()]);
   const actionItemsStats = getStats(userActionItems);
 
   // Fire notification center alert for pending waiver tasks on first load
@@ -760,7 +816,20 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-3">
                 <h3 className="font-medium">
-                  {(task as any).link ? (
+                  {(task as any).auditId ? (
+                    <button 
+                      onClick={() => {
+                        const originalAudit = audits.find(a => a.id === (task as any).auditId);
+                        if (originalAudit) {
+                          setDrawerAudit(originalAudit);
+                          setDrawerOpen(true);
+                        }
+                      }}
+                      className="hover:underline text-blue-600 text-left font-medium"
+                    >
+                      {task.title}
+                    </button>
+                  ) : (task as any).link ? (
                     <Link to={(task as any).link} className="hover:underline text-blue-600">
                       {task.title}
                     </Link>
@@ -957,6 +1026,12 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      <AuditDetailDrawer
+        audit={drawerAudit}
+        open={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setDrawerAudit(null); }}
+      />
+      
       {/* Header */}
       <div className="text-center">
         <h1>Tasks & Action Items</h1>

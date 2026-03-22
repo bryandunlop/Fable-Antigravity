@@ -5,7 +5,7 @@ export interface AuditChecklistItem {
     id: number;
     item: string;
     completed: boolean; // legacy - kept for compatibility
-    status: 'Acceptable' | 'Unacceptable' | 'Pending';
+    status: 'Pass' | 'Fail' | 'Pending';
 }
 
 export interface AuditFinding {
@@ -26,6 +26,7 @@ export interface Audit {
     dueDate?: string;
     expirationDate?: string;
     protocolLink?: string;
+    isbaoPart?: string; // e.g. "ISBAO Stage III §4.1" - displayed prominently on every card
     assignedTo: string;
     assignedRole: string;
     assignmentType: string;
@@ -38,6 +39,8 @@ export interface Audit {
 interface AuditContextType {
     audits: Audit[];
     getAuditById: (id: string) => Audit | undefined;
+    getAuditsByMonth: (year: number, month: number) => Audit[]; // month is 0-indexed
+    getPoolAudits: () => Audit[];
     addAudit: (audit: Omit<Audit, 'id'>) => void;
     updateAudit: (id: string, updates: Partial<Audit>) => void;
     deleteAudit: (id: string) => void;
@@ -49,21 +52,22 @@ const AuditContext = createContext<AuditContextType | undefined>(undefined);
 const INITIAL_AUDITS: Audit[] = [
     {
         id: 'AUD-001',
-        title: 'Monthly Safety Audit - February 2024',
+        title: 'Monthly Safety Audit - February 2026',
         type: 'Scheduled',
         category: 'Safety Management',
         status: 'In Progress',
         priority: 'High',
-        scheduledDate: '2024-02-15',
-        dueDate: '2024-02-28',
+        isbaoPart: 'ISBAO Stage III §2.1',
+        scheduledDate: '2026-02-15',
+        dueDate: '2026-02-28',
         assignedTo: 'Sarah Wilson',
         assignedRole: 'Safety',
         assignmentType: 'Manual',
         description: 'Comprehensive monthly safety audit covering all operational areas',
         checklist: [
-            { id: 1, item: 'Review incident reports from previous month', completed: true, status: 'Acceptable' as const },
-            { id: 2, item: 'Inspect emergency equipment', completed: true, status: 'Acceptable' as const },
-            { id: 3, item: 'Verify crew training records', completed: false, status: 'Unacceptable' as const },
+            { id: 1, item: 'Review incident reports from previous month', completed: true, status: 'Pass' as const },
+            { id: 2, item: 'Inspect emergency equipment', completed: true, status: 'Pass' as const },
+            { id: 3, item: 'Verify crew training records', completed: false, status: 'Fail' as const },
             { id: 4, item: 'Check fuel handling procedures', completed: false, status: 'Pending' as const },
             { id: 5, item: 'Review maintenance compliance', completed: false, status: 'Pending' as const }
         ],
@@ -73,23 +77,23 @@ const INITIAL_AUDITS: Audit[] = [
     {
         id: 'AUD-002',
         title: 'Ground Operations Audit',
-        type: 'Ad-hoc',
+        type: 'Scheduled',
         category: 'Ground Operations',
         status: 'Scheduled',
         priority: 'Medium',
-        scheduledDate: '2024-02-20',
-        dueDate: '2024-02-25',
+        isbaoPart: 'ISBAO Stage III §4.1',
+        scheduledDate: '2026-03-10',
+        dueDate: '2026-03-20',
         assignedTo: 'Mike Johnson',
         assignedRole: 'Pilot',
-        assignmentType: 'Random (Pilot)',
+        assignmentType: 'Manual',
         description: 'Audit of ground handling procedures and equipment maintenance',
-        protocolLink: 'ISBAO Stage III Section 4.1',
-        expirationDate: '2025-08-20',
+        expirationDate: '2027-03-10',
         checklist: [
             { id: 6, item: 'Inspect ground support equipment', completed: false, status: 'Pending' as const },
             { id: 7, item: 'Review baggage handling procedures', completed: false, status: 'Pending' as const },
             { id: 8, item: 'Check aircraft positioning protocols', completed: false, status: 'Pending' as const },
-            { id: 9, item: 'Verify safety zone compliance', completed: false, status: 'Acceptable' as const }
+            { id: 9, item: 'Verify safety zone compliance', completed: false, status: 'Pass' as const }
         ],
         findings: [],
         completionRate: 0
@@ -101,19 +105,19 @@ const INITIAL_AUDITS: Audit[] = [
         category: 'Documentation',
         status: 'Complete',
         priority: 'Low',
-        scheduledDate: '2024-01-30',
-        dueDate: '2024-02-05',
+        isbaoPart: 'ISBAO Stage III §8.3',
+        scheduledDate: '2026-01-15',
+        dueDate: '2026-01-30',
         assignedTo: 'Emily Davis',
         assignedRole: 'Document Manager',
-        assignmentType: 'Random (Any)',
+        assignmentType: 'Manual',
         description: 'Audit of document management and version control processes',
-        protocolLink: 'ISBAO Stage III Section 8.3',
-        expirationDate: '2024-08-05',
+        expirationDate: '2027-01-30',
         checklist: [
-            { id: 10, item: 'Verify document version control', completed: true, status: 'Acceptable' as const },
-            { id: 11, item: 'Check distribution records', completed: true, status: 'Acceptable' as const },
-            { id: 12, item: 'Review archive procedures', completed: true, status: 'Acceptable' as const },
-            { id: 13, item: 'Validate electronic signatures', completed: true, status: 'Acceptable' as const }
+            { id: 10, item: 'Verify document version control', completed: true, status: 'Pass' as const },
+            { id: 11, item: 'Check distribution records', completed: true, status: 'Pass' as const },
+            { id: 12, item: 'Review archive procedures', completed: true, status: 'Pass' as const },
+            { id: 13, item: 'Validate electronic signatures', completed: true, status: 'Pass' as const }
         ],
         findings: [
             { id: 1, description: 'Minor discrepancy in version numbering', severity: 'Low', status: 'Resolved' },
@@ -128,20 +132,90 @@ const INITIAL_AUDITS: Audit[] = [
         category: 'Maintenance',
         status: 'Scheduled',
         priority: 'High',
-        scheduledDate: '2024-02-25',
-        dueDate: '2024-03-05',
+        isbaoPart: 'ISBAO Stage III §5.2',
+        scheduledDate: '2026-03-25',
+        dueDate: '2026-04-05',
         assignedTo: 'Robert Martinez',
         assignedRole: 'Maintenance',
-        assignmentType: 'Random (Maintenance)',
+        assignmentType: 'Manual',
         description: 'Review maintenance procedures and quality assurance processes',
-        protocolLink: 'ISBAO Stage III Section 5.2',
-        expirationDate: '2025-12-31',
+        expirationDate: '2027-03-25',
         checklist: [
             { id: 14, item: 'Review maintenance logs and records', completed: false, status: 'Pending' as const },
             { id: 15, item: 'Inspect tool calibration records', completed: false, status: 'Pending' as const },
-            { id: 16, item: 'Check parts inventory management', completed: false, status: 'Unacceptable' as const },
+            { id: 16, item: 'Check parts inventory management', completed: false, status: 'Fail' as const },
             { id: 17, item: 'Verify mechanic certifications', completed: false, status: 'Pending' as const },
             { id: 18, item: 'Review work order completion', completed: false, status: 'Pending' as const }
+        ],
+        findings: [],
+        completionRate: 0
+    },
+    {
+        id: 'AUD-005',
+        title: 'Flight Operations Safety Review',
+        type: 'Scheduled',
+        category: 'Flight Operations',
+        status: 'Scheduled',
+        priority: 'High',
+        isbaoPart: 'ISBAO Stage III §3.2',
+        scheduledDate: '2026-04-10',
+        dueDate: '2026-04-20',
+        assignedTo: 'Unassigned',
+        assignedRole: '',
+        assignmentType: 'None',
+        description: 'Review of flight operations procedures and crew compliance',
+        expirationDate: '2027-04-10',
+        checklist: [
+            { id: 19, item: 'Verify flight manual currency', completed: false, status: 'Pending' as const },
+            { id: 20, item: 'Inspect cockpit safety equipment', completed: false, status: 'Pending' as const },
+            { id: 21, item: 'Review recent flight logs', completed: false, status: 'Pending' as const },
+            { id: 22, item: 'Check weight and balance calculations', completed: false, status: 'Pending' as const }
+        ],
+        findings: [],
+        completionRate: 0
+    },
+    {
+        id: 'AUD-006',
+        title: 'Crew Training Records Audit',
+        type: 'Scheduled',
+        category: 'Training',
+        status: 'Scheduled',
+        priority: 'Medium',
+        isbaoPart: 'ISBAO Stage III §6.1',
+        scheduledDate: '2026-04-22',
+        dueDate: '2026-04-30',
+        assignedTo: 'Unassigned',
+        assignedRole: '',
+        assignmentType: 'None',
+        description: 'Verification of crew training records and recurrency requirements',
+        expirationDate: '2027-04-22',
+        checklist: [
+            { id: 23, item: 'Review pilot training records', completed: false, status: 'Pending' as const },
+            { id: 24, item: 'Verify simulator session completions', completed: false, status: 'Pending' as const },
+            { id: 25, item: 'Check instructor certifications', completed: false, status: 'Pending' as const }
+        ],
+        findings: [],
+        completionRate: 0
+    },
+    {
+        id: 'AUD-007',
+        title: 'Emergency Response Procedures',
+        type: 'Compliance',
+        category: 'Safety Management',
+        status: 'Scheduled',
+        priority: 'High',
+        isbaoPart: 'ISBAO Stage III §2.4',
+        scheduledDate: '2026-05-05',
+        dueDate: '2026-05-15',
+        assignedTo: 'Lisa Chen',
+        assignedRole: 'Safety',
+        assignmentType: 'Manual',
+        description: 'Review of emergency response procedures and team readiness',
+        expirationDate: '2027-05-05',
+        checklist: [
+            { id: 26, item: 'Review emergency contact lists', completed: false, status: 'Pending' as const },
+            { id: 27, item: 'Verify emergency equipment inspections', completed: false, status: 'Pending' as const },
+            { id: 28, item: 'Check crew emergency training currency', completed: false, status: 'Pending' as const }
         ],
         findings: [],
         completionRate: 0
@@ -195,7 +269,7 @@ export const AuditProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [audits, setAudits] = useState<Audit[]>([]);
 
     useEffect(() => {
-        const AUDIT_VERSION = 'v2'; // bump to clear stale localStorage
+        const AUDIT_VERSION = 'v4'; // bump to clear stale localStorage
         const storedVersion = localStorage.getItem('antigravity_audits_version');
         const storedAudits = localStorage.getItem('antigravity_audits');
         if (storedAudits && storedVersion === AUDIT_VERSION) {
@@ -265,6 +339,20 @@ export const AuditProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const getAuditById = (id: string) => audits.find(a => a.id === id);
 
+    // Returns all audits scheduled in a given year/month (month is 0-indexed, like Date)
+    const getAuditsByMonth = (year: number, month: number): Audit[] => {
+        return audits.filter(audit => {
+            if (!audit.scheduledDate || audit.status === 'Draft') return false;
+            const d = new Date(audit.scheduledDate + 'T00:00:00'); // force local parse
+            return d.getFullYear() === year && d.getMonth() === month;
+        });
+    };
+
+    // Returns all unscheduled draft audits
+    const getPoolAudits = (): Audit[] => {
+        return audits.filter(audit => audit.status === 'Draft');
+    };
+
     const addAudit = (auditData: Omit<Audit, 'id'>) => {
         const maxId = audits.reduce((max, a) => {
             const numPart = a.id.split('-')[1];
@@ -297,7 +385,7 @@ export const AuditProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     return (
-        <AuditContext.Provider value={{ audits, getAuditById, addAudit, updateAudit, deleteAudit }}>
+        <AuditContext.Provider value={{ audits, getAuditById, getAuditsByMonth, getPoolAudits, addAudit, updateAudit, deleteAudit }}>
             {children}
         </AuditContext.Provider>
     );

@@ -27,9 +27,15 @@ import {
     Send,
     FileText,
     CheckCircle,
-    Eye
+    Eye,
+    BookOpen,
+    ClipboardCheck,
+    Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAudits, Audit } from '../contexts/AuditContext';
+import AuditCard from './audit/AuditCard';
+import AuditDetailDrawer from './audit/AuditDetailDrawer';
 
 interface SafetyMyActivityProps {
     userRole: string;
@@ -79,21 +85,22 @@ export default function SafetyMyActivity({ userRole }: SafetyMyActivityProps) {
         }
     ];
 
-    const myAudits = [
-        {
-            id: 'AUD-001',
-            title: 'Monthly Safety Audit - February 2024',
-            status: 'Assigned',
-            dueDate: '2024-02-28',
-            completionRate: 60,
-            checklist: [
-                { id: 1, item: 'Review emergency procedures knowledge', completed: true },
-                { id: 2, item: 'Demonstrate safety equipment usage', completed: true },
-                { id: 3, item: 'Complete safety questionnaire', completed: false },
-                { id: 4, item: 'Provide improvement suggestions', completed: false }
-            ]
-        }
-    ];
+    // Real audit data — filtered to show only audits assigned to someone (for demo since no auth)
+    const { audits } = useAudits();
+    const [drawerAudit, setDrawerAudit] = useState<Audit | null>(null);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+
+    // In a real app this would filter by the logged-in user's name.
+    // For demo: show all assigned (non-Unassigned) audits so any role can see the experience.
+    const myAudits = audits.filter(a => a.assignedTo && a.assignedTo !== 'Unassigned');
+    const inProgressAudits = myAudits.filter(a => a.status === 'In Progress');
+    const scheduledAudits = myAudits.filter(a => a.status === 'Scheduled');
+    const completedAudits = myAudits.filter(a => a.status === 'Complete');
+
+    const handleAuditClick = (audit: Audit) => {
+        setDrawerAudit(audit);
+        setDrawerOpen(true);
+    };
 
     const myDocuments = [
         {
@@ -595,50 +602,87 @@ export default function SafetyMyActivity({ userRole }: SafetyMyActivityProps) {
                 </TabsContent>
 
                 <TabsContent value="audits" className="mt-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>My Audit Assignments</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-6">
-                                {myAudits.map((audit) => (
-                                    <div key={audit.id} className="border rounded-lg p-6">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div>
-                                                <h3 className="font-medium">{audit.title}</h3>
-                                                <div className="flex items-center gap-4 mt-2">
-                                                    <Badge className={getStatusColor(audit.status)}>
-                                                        {audit.status}
-                                                    </Badge>
-                                                    <span className="text-sm text-muted-foreground">
-                                                        Due: {new Date(audit.dueDate).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-sm font-medium">{audit.completionRate}% Complete</div>
-                                                <Progress value={audit.completionRate} className="w-32 mt-1" />
-                                            </div>
-                                        </div>
+                    {/* Audit Detail Drawer — same component the Safety Manager uses */}
+                    <AuditDetailDrawer
+                        audit={drawerAudit}
+                        open={drawerOpen}
+                        onClose={() => { setDrawerOpen(false); setDrawerAudit(null); }}
+                    />
 
-                                        <div className="space-y-3">
-                                            {audit.checklist.map((item) => (
-                                                <div key={item.id} className="flex items-center gap-3 p-3 border rounded">
-                                                    <Checkbox
-                                                        checked={item.completed}
-                                                        onCheckedChange={() => handleUpdateAuditItem(audit.id, item.id)}
-                                                    />
-                                                    <Label className={item.completed ? 'line-through text-muted-foreground' : ''}>
-                                                        {item.item}
-                                                    </Label>
-                                                </div>
-                                            ))}
-                                        </div>
+                    {myAudits.length === 0 ? (
+                        <Card>
+                            <CardContent className="py-16 flex flex-col items-center text-center">
+                                <Target className="w-10 h-10 text-muted-foreground opacity-20 mb-3" />
+                                <p className="font-semibold text-muted-foreground">No audits assigned to you</p>
+                                <p className="text-sm text-muted-foreground mt-1">The Safety Manager will assign audits to you from the Audit Workspace.</p>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* Summary row */}
+                            <div className="grid grid-cols-3 gap-3">
+                                {[
+                                    { label: 'In Progress', count: inProgressAudits.length, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
+                                    { label: 'Scheduled', count: scheduledAudits.length, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' },
+                                    { label: 'Complete', count: completedAudits.length, color: 'text-green-600', bg: 'bg-green-50 border-green-200' },
+                                ].map(({ label, count, color, bg }) => (
+                                    <div key={label} className={`rounded-xl border p-3 text-center ${bg}`}>
+                                        <p className={`text-2xl font-bold ${color}`}>{count}</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
                                     </div>
                                 ))}
                             </div>
-                        </CardContent>
-                    </Card>
+
+                            {/* In Progress — shown first, most prominent */}
+                            {inProgressAudits.length > 0 && (
+                                <div>
+                                    <h3 className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-amber-500" />
+                                        In Progress
+                                    </h3>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {inProgressAudits.map(audit => (
+                                            <AuditCard key={audit.id} audit={audit} onClick={handleAuditClick} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Scheduled — action needed */}
+                            {scheduledAudits.length > 0 && (
+                                <div>
+                                    <h3 className="text-sm font-bold text-blue-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                        Scheduled — Upcoming
+                                    </h3>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {scheduledAudits.map(audit => (
+                                            <AuditCard key={audit.id} audit={audit} onClick={handleAuditClick} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Completed */}
+                            {completedAudits.length > 0 && (
+                                <div>
+                                    <h3 className="text-sm font-bold text-green-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                                        Completed
+                                    </h3>
+                                    <div className="grid gap-3 sm:grid-cols-2 opacity-75">
+                                        {completedAudits.map(audit => (
+                                            <AuditCard key={audit.id} audit={audit} onClick={handleAuditClick} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <p className="text-xs text-center text-muted-foreground pb-2">
+                                Click any audit card to open the checklist and record findings
+                            </p>
+                        </div>
+                    )}
                 </TabsContent>
 
                 <TabsContent value="documents" className="mt-6">
@@ -660,7 +704,7 @@ export default function SafetyMyActivity({ userRole }: SafetyMyActivityProps) {
                                                     <h4 className="font-medium">{doc.title}</h4>
                                                     <p className="text-sm text-muted-foreground mt-1">{doc.description}</p>
                                                     <div className="flex items-center gap-4 mt-2 text-sm">
-                                                        <span className="text-muted-foreground">Due: {new Date(doc.dueDate).toLocaleDateString()}</span>
+                                                        <span className="text-muted-foreground">Due: {doc.dueDate ? new Date(doc.dueDate).toLocaleDateString() : 'N/A'}</span>
                                                         {doc.readDate && (
                                                             <span className="text-green-600 flex items-center gap-1">
                                                                 <CheckCircle className="w-3 h-3" />

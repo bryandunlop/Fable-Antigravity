@@ -39,6 +39,8 @@ import FuelFarmTracker from './components/FuelFarmTracker';
 import SafetyDashboard from './components/SafetyDashboard';
 import WaiverManagement from './components/WaiverManagement';
 import HazardReporting from './components/HazardReporting';
+import HazardWorkspace from './components/hazard/HazardWorkspace';
+import HazardDetailView from './components/hazard/HazardDetailView';
 import InternalAuditManagement from './components/InternalAuditManagement';
 import DocumentCompliance from './components/DocumentCompliance';
 import UserSafety from './components/UserSafety';
@@ -298,7 +300,8 @@ export default function App() {
                                 <Route path="/user-safety" element={<UserSafety userRole={userRole} />} />
                                 <Route path="/safety" element={<SafetyDashboard userRole={userRole} />} />
                                 <Route path="/safety/waivers" element={<WaiverManagement />} />
-                                <Route path="/safety/hazards" element={<HazardReporting userRole={userRole} />} />
+                                <Route path="/safety/hazards" element={<HazardWorkspace userRole={userRole} />} />
+                                <Route path="/safety/hazards/:id" element={<HazardDetailView userRole={userRole} />} />
                                 <Route path="/safety/audits" element={<InternalAuditManagement />} />
                                 <Route path="/safety/compliance" element={<DocumentCompliance />} />
                                 <Route path="/procedural-bulletins" element={<ProceduralBulletins userRole={userRole} />} />

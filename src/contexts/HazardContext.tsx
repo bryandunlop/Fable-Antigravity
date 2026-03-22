@@ -5,21 +5,21 @@ import { useNotificationContext } from '../components/contexts/NotificationConte
 export const WORKFLOW_STAGES = {
     SUBMITTED: 'Submitted',
     // Safety Manager Phase 1
-    SM_INVESTIGATION: 'Safety Manger Investigation', // Includes Risk Assessment & 5 Whys
+    SM_INVESTIGATION: 'Safety Manger Investigation', // Includes 5 Whys
     // Mitigation Assignment Phase
     ASSIGN_MITIGATION: 'Assign Mitigation Task',
     // Process Owner Phase
     MITIGATION_DEVELOPMENT: 'Mitigation Development',
     // Safety Manager Phase 2
-    SM_MITIGATION_REVIEW: 'Safety Manager Mitigation Review', // NEW
+    SM_MITIGATION_REVIEW: 'Safety Manager Mitigation Review',
     // Approvals
-    MANAGER_APPROVAL: 'Manager Approval', // Renamed from MANAGER_APPROVAL
+    MANAGER_APPROVAL: 'Manager Approval', 
+    SM_POST_MANAGER: 'Post-Manager Review', // NEW: SM intercept
     EXEC_APPROVAL: 'Accountable Executive Approval',
-    // Implementation Phase
-    IMPLEMENTATION: 'Implementation', // Send Info & R&I
-    FINAL_REPORT: 'Final Report & Publication', // NEW
+    SM_POST_EXEC: 'Post-Executive Review', // NEW: SM intercept
+    FINAL_REPORT: 'Final Report & Publication', 
     // Effectiveness Phase
-    EFFECTIVENESS_REVIEW: 'Review for Effectiveness', // 6 months later
+    EFFECTIVENESS_REVIEW: 'Review for Effectiveness', 
     PUBLISHED: 'Published',
     CLOSED: 'Closed'
 };
@@ -211,6 +211,23 @@ const getStoredUserId = () => {
 // Initial Mock Data
 const INITIAL_HAZARDS: Hazard[] = [
     {
+        id: 'HZ-010',
+        title: 'Loose Tooling Found Near APU',
+        category: 'Maintenance',
+        severity: 'Medium',
+        workflowStage: WORKFLOW_STAGES.SUBMITTED,
+        location: 'Hangar Bay 2',
+        reportedBy: 'Demo Line Mechanic',
+        submitterLineManager: 'Lead Tech',
+        reportedDate: new Date().toISOString().split('T')[0],
+        description: 'During a post-flight walkaround, a loose wrench was found abandoned near the APU exhaust panel.',
+        immediateActions: 'Tool recovered and handed to shift lead for tool control inventory.',
+        potentialConsequences: 'FOD damage to APU if ingested or blown across ramp.',
+        priority: 'Medium',
+        isPublished: false,
+        submitterId: 'demo_user'
+    },
+    {
         id: 'HZ-001',
         title: 'Runway Surface Contamination - LAX Runway 24L',
         category: 'Airport Infrastructure',
@@ -374,6 +391,23 @@ const INITIAL_HAZARDS: Hazard[] = [
         isPublished: true,
         correctiveActionDetails: 'Daily FOD walks increased. Local construction crews reminded of tool accountability.',
         submitterId: 'legacy_user'
+    },
+    {
+        id: 'HZ-010',
+        title: 'New Published Safety Bulletin - Ramp Speeding',
+        category: 'Ground Operations',
+        severity: 'High',
+        workflowStage: WORKFLOW_STAGES.PUBLISHED,
+        location: 'All Hubs',
+        reportedBy: 'Safety Department',
+        reportedDate: new Date().toISOString().split('T')[0],
+        description: 'Multiple reports of ground vehicles exceeding 15mph limit near terminal gates. This is a recent safety bulletin regarding the enforcement of speed limits on the active ramp.',
+        immediateActions: 'Speed radar enforcement initiated on all active ramps this week.',
+        potentialConsequences: 'Vehicle collision, aircraft damage, personnel injury.',
+        isPublished: true,
+        finalReportRaw: 'Safety Bulletin 2026-03-21:\n\nRecent trending data shows an unacceptable number of ramp vehicles exceeding the 15mph limit near aircraft gates. Effective immediately, ground managers will be conducting radar spot checks. All personnel are reminded that safety is the first priority.',
+        submitterId: 'safety_manager',
+        effectivenessReviewDate: new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString().split('T')[0],
     }
 ];
 
@@ -482,6 +516,19 @@ export const HazardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
 
         setHazards(prev => [newHazard, ...prev]);
+
+        // Trigger notification for the Safety Manager
+        addNotification({
+            title: `New Hazard: ${newHazard.severity} Severity`,
+            message: `${newHazard.title} (${newHazard.location})`,
+            type: 'safety',
+            priority: newHazard.severity.toLowerCase() === 'critical' ? 'critical' : 'high',
+            actionUrl: `/safety/hazards`,
+            actionText: 'Review Hazard',
+            module: 'Safety Systems',
+            relatedId: newId,
+            daysUntilDue: 0
+        });
     };
 
     const updateHazard = (id: string, updates: Partial<Hazard>) => {

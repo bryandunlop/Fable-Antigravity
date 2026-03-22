@@ -33,7 +33,7 @@ export const PHASES = [
     {
         id: 'implementation',
         label: 'Action',
-        stages: [WORKFLOW_STAGES.IMPLEMENTATION, WORKFLOW_STAGES.FINAL_REPORT]
+        stages: [WORKFLOW_STAGES.FINAL_REPORT]
     },
     {
         id: 'closure',
