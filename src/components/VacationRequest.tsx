@@ -76,6 +76,35 @@ export default function VacationRequest({ userRole, additionalRoles = [] }: Vaca
       ],
       submittedDate: new Date('2024-12-02T14:00:00'),
       lastModified: new Date('2024-12-02T14:00:00')
+    },
+    {
+      id: 'req3',
+      submitterId: 'user3',
+      submitterName: 'Emily Davis',
+      submitterPosition: 'Flight Attendant',
+      requestType: 'Vacation',
+      startDate: '2025-02-14',
+      endDate: '2025-02-21',
+      daysRequested: 7,
+      status: 'denied_by_manager',
+      comments: [
+        {
+          id: 'c3',
+          author: 'Emily Davis',
+          role: 'submitter',
+          comment: 'Requesting off for Valentines week.',
+          timestamp: new Date('2024-12-05T09:00:00')
+        },
+        {
+          id: 'c3-1',
+          author: 'Chief Pilot - Sarah Johnson',
+          role: 'manager',
+          comment: 'Denied due to peak holiday travel period and minimum crew requirements already met.',
+          timestamp: new Date('2024-12-06T11:00:00')
+        }
+      ],
+      submittedDate: new Date('2024-12-05T09:00:00'),
+      lastModified: new Date('2024-12-06T11:00:00')
     }
   ]);
 

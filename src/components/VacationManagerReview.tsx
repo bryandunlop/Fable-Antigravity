@@ -18,7 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 
 export type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical';
-export type RequestStatus = 'pending_manager' | 'denied_by_manager' | 'tentative_manager' | 'approved_awaiting_confirmation';
+export type RequestStatus = 'pending_scheduling' | 'denied_by_scheduling' | 'tentative_scheduling' | 'pending_manager' | 'denied_by_manager' | 'tentative_manager' | 'approved_awaiting_confirmation' | 'confirmed';
 
 export interface Comment {
   id: string;
@@ -172,11 +172,15 @@ export function VacationManagerReview({ requests, onUpdateRequests }: VacationMa
   };
 
   const getStatusBadge = (status: RequestStatus) => {
-    const statusConfig = {
-      pending_manager: { label: 'Pending Your Review', variant: 'default' as const },
-      denied_by_manager: { label: 'Denied', variant: 'destructive' as const },
-      tentative_manager: { label: 'Marked Tentative', variant: 'secondary' as const },
-      approved_awaiting_confirmation: { label: 'Approved', variant: 'outline' as const }
+    const statusConfig: Record<string, { label: string; variant: "default" | "destructive" | "secondary" | "outline" }> = {
+      pending_scheduling: { label: 'Pending Scheduling', variant: 'default' },
+      denied_by_scheduling: { label: 'Denied by Scheduling', variant: 'destructive' },
+      tentative_scheduling: { label: 'Tentative - Scheduling', variant: 'secondary' },
+      pending_manager: { label: 'Pending Your Review', variant: 'default' },
+      denied_by_manager: { label: 'Denied', variant: 'destructive' },
+      tentative_manager: { label: 'Marked Tentative', variant: 'secondary' },
+      approved_awaiting_confirmation: { label: 'Approved', variant: 'outline' },
+      confirmed: { label: 'Confirmed', variant: 'outline' }
     };
 
     return <Badge variant={statusConfig[status].variant}>{statusConfig[status].label}</Badge>;
@@ -184,6 +188,7 @@ export function VacationManagerReview({ requests, onUpdateRequests }: VacationMa
 
   const pendingRequests = requests.filter(r => r.status === 'pending_manager');
   const tentativeRequests = requests.filter(r => r.status === 'tentative_manager');
+  const deniedRequests = requests.filter(r => r.status === 'denied_by_manager' || r.status === 'denied_by_scheduling');
   const expiringPbst = pbstDays.filter(p => !p.used && p.daysRemaining <= 30);
 
   return (
@@ -266,6 +271,12 @@ export function VacationManagerReview({ requests, onUpdateRequests }: VacationMa
             PBST Management
             {expiringPbst.length > 0 && (
               <Badge variant="destructive" className="ml-2">{expiringPbst.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="denied">
+            Denied Requests
+            {deniedRequests.length > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-red-100 text-red-700 hover:bg-red-200">{deniedRequests.length}</Badge>
             )}
           </TabsTrigger>
         </TabsList>
@@ -522,6 +533,76 @@ export function VacationManagerReview({ requests, onUpdateRequests }: VacationMa
                         }`}
                       style={{ width: `${(pbst.daysRemaining / 91) * 100}%` }}
                     />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="denied" className="space-y-4">
+          {deniedRequests.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <XCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No denied requests found</p>
+              </CardContent>
+            </Card>
+          ) : (
+            deniedRequests.map((request) => (
+              <Card key={request.id} className="border-red-200 bg-red-50/10">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-3">
+                        <User className="h-5 w-5" />
+                        {request.submitterName}
+                        <Badge variant="outline">{request.submitterPosition}</Badge>
+                        <Badge variant="destructive">
+                          {request.status === 'denied_by_manager' ? 'Denied by Manager' : 'Denied by Scheduling'}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription className="mt-2">
+                        <strong>{request.requestType}</strong> | {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()} ({request.daysRequested} days)
+                      </CardDescription>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Submitted: {new Date(request.submittedDate).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Comments Thread */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Denial Reason & History
+                    </Label>
+                    {request.comments.map((comment) => (
+                      <div key={comment.id} className={`p-3 rounded-lg border-l-4 ${
+                        comment.role === 'submitter' ? 'bg-blue-50 border-blue-500' :
+                        comment.role === 'scheduling' ? 'bg-purple-50 border-purple-500' :
+                        'bg-orange-50 border-orange-500'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm">{comment.author}</span>
+                          <span className="text-xs text-muted-foreground">{new Date(comment.timestamp).toLocaleString()}</span>
+                        </div>
+                        <p className="text-sm">{comment.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleManagerAction(request, 'approved')}
+                      className="border-green-500 text-green-700 hover:bg-green-50"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Reconsider & Approve
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
