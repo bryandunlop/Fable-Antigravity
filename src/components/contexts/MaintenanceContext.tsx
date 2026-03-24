@@ -351,7 +351,7 @@ const INITIAL_TECHNICIANS: Technician[] = [
 // ==================== VACATION REQUEST TYPES ====================
 
 export type MaintenanceRequestType = 'Vacation' | 'Sick' | 'Personal' | 'Jury Duty' | 'Bereavement' | 'Comp Time';
-export type MaintenanceRequestStatus = 'pending_lead' | 'denied_by_lead' | 'pending_manager' | 'denied_by_manager' | 'approved';
+export type MaintenanceRequestStatus = 'pending_shift_lead' | 'denied_by_shift_lead' | 'pending_chief_inspector' | 'denied_by_chief_inspector' | 'approved';
 
 export interface MaintenanceVacationRequest {
   id: string;
@@ -415,7 +415,7 @@ interface MaintenanceContextType {
   // Vacation Requests
   vacationRequests: MaintenanceVacationRequest[];
   submitVacationRequest: (request: Omit<MaintenanceVacationRequest, 'id' | 'submittedAt' | 'approvalChain' | 'status'>) => void;
-  updateVacationRequestStatus: (requestId: string, level: 'lead' | 'manager', approved: boolean, approverId: string, approverName: string, notes?: string) => void;
+  updateVacationRequestStatus: (requestId: string, level: 'shift-lead' | 'chief-inspector', approved: boolean, approverId: string, approverName: string, notes?: string) => void;
 
   // Resource Management
   technicians: Technician[];
@@ -1173,7 +1173,7 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
       endDate: new Date(new Date().setDate(new Date().getDate() + 21)),
       returnDate: new Date(new Date().setDate(new Date().getDate() + 22)),
       reason: 'Family reunion',
-      status: 'pending_lead',
+      status: 'pending_shift_lead',
       submittedAt: new Date(new Date().setDate(new Date().getDate() - 2)),
       approvalChain: {}
     },
@@ -1186,7 +1186,7 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
       endDate: new Date(new Date().setDate(new Date().getDate() + 6)),
       returnDate: new Date(new Date().setDate(new Date().getDate() + 7)),
       reason: 'Personal appointment',
-      status: 'pending_manager',
+      status: 'pending_chief_inspector',
       submittedAt: new Date(new Date().setDate(new Date().getDate() - 5)),
       approvalChain: {
         lead: {
@@ -2009,7 +2009,7 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
       const newRequest: MaintenanceVacationRequest = {
         id: `VR - ${Date.now()} `,
         ...requestData,
-        status: 'pending_lead',
+        status: 'pending_shift_lead',
         submittedAt: new Date(),
         approvalChain: {}
       };
@@ -2022,7 +2022,7 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
 
         const updatedReq = { ...req };
 
-        if (level === 'lead') {
+        if (level === 'shift-lead') {
           updatedReq.approvalChain.lead = {
             approverId,
             approverName,
@@ -2030,8 +2030,8 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
             notes,
             approved
           };
-          updatedReq.status = approved ? 'pending_manager' : 'denied_by_lead';
-        } else if (level === 'manager') {
+          updatedReq.status = approved ? 'pending_chief_inspector' : 'denied_by_shift_lead';
+        } else if (level === 'chief-inspector') {
           updatedReq.approvalChain.manager = {
             approverId,
             approverName,
@@ -2039,11 +2039,11 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
             notes,
             approved
           };
-          updatedReq.status = approved ? 'approved' : 'denied_by_manager';
+          updatedReq.status = approved ? 'approved' : 'denied_by_chief_inspector';
         }
 
         const action = approved ? 'approved' : 'denied';
-        toast.success(`Request ${action} by ${level === 'lead' ? 'Lead' : 'Manager'} `);
+        toast.success(`Request ${action} by ${level === 'shift-lead' ? 'Shift Lead' : 'Chief Inspector'} `);
         return updatedReq;
       }));
     },

@@ -9,30 +9,35 @@ import { CheckCircle, XCircle, User, Calendar, AlertTriangle } from 'lucide-reac
 import { useMaintenanceContext, MaintenanceVacationRequest } from './contexts/MaintenanceContext';
 
 interface VacationApprovalProps {
-    userRole: 'lead' | 'manager';  // In real app, derived from auth/context
+    userRole: 'shift-lead' | 'chief-inspector';
 }
 
 export function MaintenanceVacationApproval({ userRole }: VacationApprovalProps) {
-    const { vacationRequests, updateVacationRequestStatus, currentUser } = useMaintenanceContext();
+    const { vacationRequests, updateVacationRequestStatus, currentUser, technicians } = useMaintenanceContext();
     const [selectedRequest, setSelectedRequest] = useState<MaintenanceVacationRequest | null>(null);
     const [actionDialog, setActionDialog] = useState<{ open: boolean; type: 'approve' | 'deny' }>({ open: false, type: 'approve' });
     const [notes, setNotes] = useState('');
 
     // Filter requests based on role
     const pendingRequests = vacationRequests.filter(req => {
-        if (userRole === 'lead') {
-            return req.status === 'pending_lead';
-        } else {
-            return req.status === 'pending_manager';
+        const tech = technicians.find(t => t.id === req.technicianId || t.name === req.technicianName);
+        const me = technicians.find(t => t.name === currentUser);
+
+        if (userRole === 'shift-lead') {
+            return req.status === 'pending_shift_lead' && tech?.shift === me?.shift;
+        } else if (userRole === 'chief-inspector') {
+            return req.status === 'pending_chief_inspector';
         }
+        return false;
     });
 
     const processedRequests = vacationRequests.filter(req => {
-        if (userRole === 'lead') {
+        if (userRole === 'shift-lead') {
             return req.approvalChain.lead?.approverName === currentUser;
-        } else {
+        } else if (userRole === 'chief-inspector') {
             return req.approvalChain.manager?.approverName === currentUser;
         }
+        return false;
     });
 
     const handleAction = (request: MaintenanceVacationRequest, type: 'approve' | 'deny') => {
@@ -61,13 +66,13 @@ export function MaintenanceVacationApproval({ userRole }: VacationApprovalProps)
         switch (status) {
             case 'approved':
                 return <Badge className="bg-green-500">Approved</Badge>;
-            case 'denied_by_lead':
-            case 'denied_by_manager':
+            case 'denied_by_shift_lead':
+            case 'denied_by_chief_inspector':
                 return <Badge variant="destructive">Denied</Badge>;
-            case 'pending_lead':
-                return <Badge variant="secondary">Pending Lead</Badge>;
-            case 'pending_manager':
-                return <Badge className="bg-orange-500">Pending Manager</Badge>;
+            case 'pending_shift_lead':
+                return <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">Pending Shift Lead</Badge>;
+            case 'pending_chief_inspector':
+                return <Badge className="bg-orange-500">Pending Chief Inspector</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }
@@ -76,7 +81,13 @@ export function MaintenanceVacationApproval({ userRole }: VacationApprovalProps)
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold tracking-tight">Vacation Approvals ({userRole === 'lead' ? 'Lead' : 'Manager'})</h2>
+                <h2 className="text-2xl font-bold tracking-tight">
+                    Vacation Approvals ({
+                        userRole === 'shift-lead' 
+                            ? `${technicians.find(t => t.name === currentUser)?.shift || ''} Shift Lead` 
+                            : 'Chief Inspector'
+                    })
+                </h2>
                 <p className="text-muted-foreground">Review and process time off requests.</p>
             </div>
 
@@ -148,11 +159,11 @@ export function MaintenanceVacationApproval({ userRole }: VacationApprovalProps)
                                     </div>
 
                                     {/* Previous Approvals if any */}
-                                    {req.approvalChain.lead && userRole === 'manager' && (
+                                    {req.approvalChain.lead && userRole === 'chief-inspector' && (
                                         <div className="bg-blue-50 p-3 rounded-md border border-blue-100 mb-4">
                                             <p className="text-sm font-medium text-blue-800 flex items-center gap-2">
                                                 <CheckCircle className="h-4 w-4" />
-                                                Recommended by Lead: {req.approvalChain.lead.approverName}
+                                                Recommended by Shift Lead: {req.approvalChain.lead.approverName}
                                             </p>
                                             {req.approvalChain.lead.notes && (
                                                 <p className="text-sm text-blue-600 mt-1 pl-6">"{req.approvalChain.lead.notes}"</p>
@@ -174,7 +185,7 @@ export function MaintenanceVacationApproval({ userRole }: VacationApprovalProps)
                                             onClick={() => handleAction(req, 'approve')}
                                         >
                                             <CheckCircle className="h-4 w-4 mr-2" />
-                                            {userRole === 'lead' ? 'Recommend Approval' : 'Approve Request'}
+                                            {userRole === 'chief-inspector' ? 'Final Approval' : 'Recommend Approval'}
                                         </Button>
                                     </div>
                                 </CardContent>
@@ -218,11 +229,11 @@ export function MaintenanceVacationApproval({ userRole }: VacationApprovalProps)
                     </DialogHeader>
 
                     <div className="space-y-4 py-4">
-                        {actionDialog.type === 'approve' && userRole === 'lead' && (
+                        {actionDialog.type === 'approve' && userRole === 'shift-lead' && (
                             <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 flex gap-2">
                                 <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
                                 <p className="text-sm text-yellow-800">
-                                    Approving this request will forward it to the Manager for final approval.
+                                    Recommending this request will forward it to the Chief Inspector for final approval.
                                 </p>
                             </div>
                         )}

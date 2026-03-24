@@ -174,6 +174,11 @@ export default function VacationRequest({ userRole, additionalRoles = [] }: Vaca
 
 
   const isMaintenanceTech = userRole === 'maintenance' || userRole === 'technician' || userRole === 'mechanic' || additionalRoles?.some(r => ['maintenance', 'technician', 'mechanic'].includes(r));
+  const isShiftLead = userRole === 'shift-lead' || additionalRoles?.includes('shift-lead');
+  const isChiefInspector = userRole === 'chief-inspector' || additionalRoles?.includes('chief-inspector');
+  const isChiefPilot = userRole === 'chief-pilot' || additionalRoles?.includes('chief-pilot');
+  const isSchedulingManager = userRole === 'scheduling-manager' || additionalRoles?.includes('scheduling-manager');
+  const isFAManager = userRole === 'fa-manager' || additionalRoles?.includes('fa-manager');
   const isCoordinator = userRole === 'maintenance-coordinator' || additionalRoles?.includes('maintenance-coordinator');
   const isDOM = userRole === 'dom' || additionalRoles?.includes('dom');
 
@@ -184,9 +189,9 @@ export default function VacationRequest({ userRole, additionalRoles = [] }: Vaca
         <Tabs defaultValue={isDOM || isCoordinator ? "approvals" : "request"}>
           <TabsList className="mb-6">
             <TabsTrigger value="request">My Requests</TabsTrigger>
-            {(isCoordinator || isDOM) && (
+            {(isShiftLead || isChiefInspector || isCoordinator || isDOM) && (
               <TabsTrigger value="approvals">
-                {isDOM ? 'Manager Approvals' : 'Lead Approvals'}
+                {isChiefInspector || isDOM ? 'Staff Approvals' : 'Lead Approvals'}
               </TabsTrigger>
             )}
             <TabsTrigger value="calendar">Master Calendar</TabsTrigger>
@@ -197,7 +202,7 @@ export default function VacationRequest({ userRole, additionalRoles = [] }: Vaca
           </TabsContent>
 
           <TabsContent value="approvals">
-            <MaintenanceVacationApproval userRole={isDOM ? "manager" : "lead"} />
+            <MaintenanceVacationApproval userRole={isChiefInspector || isDOM ? "chief-inspector" : "shift-lead"} />
           </TabsContent>
 
           <TabsContent value="calendar">
@@ -209,18 +214,18 @@ export default function VacationRequest({ userRole, additionalRoles = [] }: Vaca
   }
 
   // Fallback for single roles
-  if (isDOM) {
+  if (isChiefInspector || isDOM) {
     return (
       <div className="p-6">
-        <MaintenanceVacationApproval userRole="manager" />
+        <MaintenanceVacationApproval userRole="chief-inspector" />
       </div>
     );
   }
 
-  if (isCoordinator) {
+  if (isShiftLead || isCoordinator) {
     return (
       <div className="p-6">
-        <MaintenanceVacationApproval userRole="lead" />
+        <MaintenanceVacationApproval userRole="shift-lead" />
       </div>
     );
   }
@@ -277,8 +282,8 @@ export default function VacationRequest({ userRole, additionalRoles = [] }: Vaca
     );
   }
 
-  // For lead/manager role - show manager review and calendar
-  if (userRole === 'lead') {
+  // For departmental managers - show manager review and calendar
+  if (isChiefPilot || isSchedulingManager || isFAManager || userRole === 'lead') {
     return (
       <div className="p-6">
         <Tabs defaultValue="review">
