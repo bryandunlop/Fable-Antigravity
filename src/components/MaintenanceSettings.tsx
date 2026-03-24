@@ -4,8 +4,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
-import { Settings, Save, ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { useMaintenance, AircraftConfig, FacilityCheckConfig, AircraftStatusConfig, AdditionalNoteConfig } from './contexts/MaintenanceContext';
+import { Settings, Save, ArrowLeft, Plus, Trash2, UserPlus, Users as UsersIcon } from 'lucide-react';
+import { useMaintenance, AircraftConfig, FacilityCheckConfig, AircraftStatusConfig, AdditionalNoteConfig, Technician } from './contexts/MaintenanceContext';
 import { toast } from 'sonner';
 
 interface MaintenanceSettingsProps {
@@ -17,7 +17,8 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
         aircraftConfig, updateAircraftConfig,
         facilityCheckConfig, updateFacilityCheckConfig,
         aircraftStatusConfig, updateAircraftStatusConfig,
-        additionalNoteConfig, updateAdditionalNoteConfig
+        additionalNoteConfig, updateAdditionalNoteConfig,
+        technicians, updateTechnician, addTechnician, removeTechnician
     } = useMaintenance();
 
     // Local state for edits
@@ -25,6 +26,7 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
     const [localFacility, setLocalFacility] = useState<FacilityCheckConfig[]>([]);
     const [localStatus, setLocalStatus] = useState<AircraftStatusConfig[]>([]);
     const [localNotes, setLocalNotes] = useState<AdditionalNoteConfig[]>([]);
+    const [localTechnicians, setLocalTechnicians] = useState<Technician[]>([]);
 
     // Sync on mount
     useEffect(() => {
@@ -32,13 +34,23 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
         setLocalFacility(facilityCheckConfig);
         setLocalStatus(aircraftStatusConfig);
         setLocalNotes(additionalNoteConfig);
-    }, [aircraftConfig, facilityCheckConfig, aircraftStatusConfig, additionalNoteConfig]);
+        setLocalTechnicians(technicians);
+    }, [aircraftConfig, facilityCheckConfig, aircraftStatusConfig, additionalNoteConfig, technicians]);
 
     const handleSave = () => {
         updateAircraftConfig(localAircraft);
         updateFacilityCheckConfig(localFacility);
         updateAircraftStatusConfig(localStatus);
         updateAdditionalNoteConfig(localNotes);
+        
+        // Batch update technicians (if they were modified)
+        localTechnicians.forEach(localTech => {
+            const original = technicians.find(t => t.id === localTech.id);
+            if (original && JSON.stringify(original) !== JSON.stringify(localTech)) {
+                updateTechnician(localTech.id, localTech);
+            }
+        });
+
         toast.success("All configurations saved successfully!");
         if (onBack) onBack();
     };
@@ -72,6 +84,28 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
     const addFacility = () => addItem(setLocalFacility, { id: `FC-${Date.now()}`, label: 'New Check', isActive: true });
     const addStatus = () => addItem(setLocalStatus, { id: `AS-${Date.now()}`, value: 'New Status', isActive: true });
     const addNote = () => addItem(setLocalNotes, { id: `AN-${Date.now()}`, label: 'New Note Section', isActive: true });
+    
+    const handleAddTechnician = () => {
+        const name = prompt("Enter Technician Name:");
+        if (name) {
+            const newTech: Technician = {
+                id: `T-${Date.now()}`,
+                name,
+                role: 'Mechanic',
+                email: `${name.toLowerCase().replace(' ', '.')}@hangar.next`,
+                status: 'off-shift',
+                skills: [],
+                shift: 'AM'
+            };
+            setLocalTechnicians(prev => [...prev, newTech]);
+            addTechnician(newTech); // Persist immediately for this one to ensure ID stability if needed
+        }
+    };
+
+    const handleDeleteTechnician = (id: string) => {
+        setLocalTechnicians(prev => prev.filter(t => t.id !== id));
+        removeTechnician(id);
+    };
 
     return (
         <div className="p-6 max-w-5xl mx-auto animation-fade-in space-y-8">
@@ -184,36 +218,60 @@ export default function MaintenanceSettings({ onBack }: MaintenanceSettingsProps
                         ))}
                     </CardContent>
                 </Card>
+            </div>
 
-                {/* ADDITIONAL NOTE FIELDS */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <div>
-                            <CardTitle>Note Sections</CardTitle>
-                            <CardDescription>Additional text areas on form</CardDescription>
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={addNote}><Plus className="w-4 h-4" /></Button>
-                    </CardHeader>
-                    <CardContent className="space-y-3 max-h-96 overflow-y-auto">
-                        {localNotes.map((item) => (
-                            <div key={item.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                                <Checkbox
-                                    checked={item.isActive}
-                                    onCheckedChange={(checked: boolean) => updateItem(setLocalNotes, item.id, 'isActive', checked)}
-                                />
-                                <Input
-                                    value={item.label}
-                                    onChange={(e) => updateItem(setLocalNotes, item.id, 'label', e.target.value)}
-                                    className="flex-1"
-                                />
-                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => deleteItem(setLocalNotes, item.id)}>
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+            {/* PERSONNEL MANAGEMENT */}
+            <Card className="border-orange-200">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 bg-orange-50/50">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <UsersIcon className="w-5 h-5 text-orange-600" />
+                            Personnel Management
+                        </CardTitle>
+                        <CardDescription>Assign maintenance staff to shifts (AM / PM)</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleAddTechnician} className="border-orange-200 text-orange-700 hover:bg-orange-100">
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Add Staff
+                    </Button>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {localTechnicians.map((tech) => (
+                            <div key={tech.id} className="flex items-center justify-between p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+                                <div className="space-y-1">
+                                    <p className="font-bold text-slate-900">{tech.name}</p>
+                                    <p className="text-xs text-muted-foreground uppercase font-semibold">{tech.role}</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex bg-slate-100 p-1 rounded-md border">
+                                        <button
+                                            onClick={() => updateItem(setLocalTechnicians, tech.id, 'shift', 'AM')}
+                                            className={`px-3 py-1 rounded-sm text-xs font-bold transition-all ${tech.shift === 'AM' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            AM
+                                        </button>
+                                        <button
+                                            onClick={() => updateItem(setLocalTechnicians, tech.id, 'shift', 'PM')}
+                                            className={`px-3 py-1 rounded-sm text-xs font-bold transition-all ${tech.shift === 'PM' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            PM
+                                        </button>
+                                    </div>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-8 w-8 text-red-400 hover:text-red-700 hover:bg-red-50"
+                                        onClick={() => handleDeleteTechnician(tech.id)}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
                             </div>
                         ))}
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                </CardContent>
+            </Card>
 
         </div>
     );
