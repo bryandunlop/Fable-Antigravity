@@ -91,6 +91,16 @@ export const SYSTEM_USERS = [
     lastLogin: '2025-02-02 10:00',
     department: 'Maintenance',
     hireDate: '2021-03-20'
+  },
+  {
+    id: 'USR010',
+    name: 'Amanda Brooks',
+    email: 'a.brooks@flightops.com',
+    roles: ['maintenance', 'chief-inspector', 'shift-lead'],
+    status: 'Active',
+    lastLogin: '2025-02-02 11:30',
+    department: 'Maintenance',
+    hireDate: '2020-05-15'
   }
 ];
 
@@ -98,12 +108,16 @@ export const SYSTEM_USERS = [
 export const ROLE_CATEGORIES = {
   'Flight Operations': [
     { value: 'pilot', label: 'Pilot', description: 'Flight crew member' },
+    { value: 'chief-pilot', label: 'Chief Pilot', description: 'Head of flight operations' },
   ],
   'Cabin': [
     { value: 'inflight', label: 'Flight Attendant', description: 'Cabin crew member' },
+    { value: 'fa-manager', label: 'Flight Attendant Manager', description: 'Manager of cabin services' },
   ],
   'Maintenance': [
     { value: 'maintenance', label: 'Maintenance', description: 'Maintenance and engineering' },
+    { value: 'chief-inspector', label: 'Chief Inspector', description: 'Quality control and inspections' },
+    { value: 'shift-lead', label: 'Shift Lead', description: 'Maintenance shift leadership' },
   ],
   'Safety': [
     { value: 'safety', label: 'Safety', description: 'Safety reporting and compliance' },
@@ -122,14 +136,11 @@ export const ALL_ROLES = Object.values(ROLE_CATEGORIES).flat();
 
 export const ADDITIONAL_ROLES = [
   { id: 'vp', label: 'VP' },
-  { id: 'chief-pilot', label: 'Chief Pilot' },
   { id: 'assistant-chief-pilot', label: 'Assistant Chief Pilot' },
   { id: 'dom', label: 'Director of Maintenance' },
-  { id: 'chief-inspector', label: 'Chief Inspector' },
   { id: 'maintenance-coordinator', label: 'Maintenance Coordinator' },
   { id: 'scheduling-manager', label: 'Scheduling Manager' },
   { id: 'lead-scheduler', label: 'Lead Scheduler' },
-  { id: 'fa-manager', label: 'Flight Attendant Manager' },
   { id: 'lead-fa', label: 'Lead Flight Attendant' },
   { id: 'standards', label: 'Standards' },
   { id: 'training', label: 'Training' },
