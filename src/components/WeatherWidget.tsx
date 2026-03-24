@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
-import { Clock, AlertCircle, RefreshCw } from 'lucide-react';
+import { Clock, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import { RadarSpinner } from './ui/LoadingSpinners';
 import {
   fetchWeather,
@@ -113,18 +113,27 @@ export default function WeatherWidget({ icaoId = 'KLUK' }: WeatherWidgetProps) {
               </div>
 
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <a
+                  href={`https://aviationweather.gov/metar/data?ids=${metar.icaoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 mb-1 group/link"
+                  title="View official source at Aviation Weather Center"
+                >
                   <Badge
                     variant="outline"
-                    className={`text-sm py-0.5 px-2 ${flightCategoryBadgeClass(metar.fltcat)}`}
+                    className={`text-sm py-0.5 px-2 transition-colors ${flightCategoryBadgeClass(metar.fltcat)} group-hover/link:bg-opacity-80`}
                   >
                     {metar.icaoId}
                   </Badge>
-                  <div className="font-semibold text-lg leading-none">{metar.name}</div>
+                  <div className="font-semibold text-lg leading-none group-hover/link:text-primary transition-colors flex items-center gap-2">
+                    {metar.name}
+                    <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                  </div>
                   <Badge variant="outline" className={`text-xs py-0.5 px-1.5 ${flightCategoryBadgeClass(metar.fltcat)}`}>
                     {metar.fltcat}
                   </Badge>
-                </div>
+                </a>
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
                   <Clock className="w-3 h-3" />
                   <span>{obsTimeLabel(metar.obsTime)}</span>
