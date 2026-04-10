@@ -80,6 +80,8 @@ import FRATFormBuilder from './components/FRATFormBuilder';
 import GRATFormBuilder from './components/GRATFormBuilder';
 import ProceduralBulletins from './components/ProceduralBulletins';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
+import UnifiedTripWorkspace from './components/experimental/UnifiedTripWorkspace';
+import SchedulingCommandCenter from './components/experimental/SchedulingCommandCenter';
 
 import ForeFlightSyncProvider from './components/ForeFlightSyncProvider';
 import ForeFlightTestUpload from './components/ForeFlightTestUpload';
@@ -463,6 +465,8 @@ export default function App() {
                                 <Route path="/maintenance-workflow/analytics" element={
                                   <MaintenanceWorkflowProvider><MWPredictiveAnalytics /></MaintenanceWorkflowProvider>
                                 } />
+                                <Route path="/experimental/scheduling-command" element={<SchedulingCommandCenter />} />
+                                <Route path="/experimental/unified-trip" element={<UnifiedTripWorkspace />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                               </Routes>
                             </div>

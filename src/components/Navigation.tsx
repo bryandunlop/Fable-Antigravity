@@ -268,8 +268,8 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Scheduling Dashboard', href: '/scheduling-dashboard', icon: Calendar, roles: ['scheduling', 'admin'] },
         { name: 'Trip Coordination', href: '/trip-coordination', icon: MapPin, roles: ['scheduling', 'admin'] },
         { name: 'Crew Workload & Travel', href: '/crew-scheduling-workload', icon: BarChart3, roles: ['scheduling', 'admin', 'lead'] },
-        { name: 'Trip Management', href: '/booking-profile', icon: BookOpen, roles: ['admin-assistant', 'admin'] },
-        { name: 'Itinerary Builder', href: '/itinerary-builder', icon: FileText, roles: ['admin-assistant', 'admin'] },
+        // { name: 'Trip Management', href: '/booking-profile', icon: BookOpen, roles: ['admin-assistant', 'admin'] },
+        // { name: 'Itinerary Builder', href: '/itinerary-builder', icon: FileText, roles: ['admin-assistant', 'admin'] },
         { name: 'Passenger Forms', href: '/passenger-forms', icon: FileText, roles: ['scheduling', 'admin'] },
         { name: 'Vacation Request', href: '/vacation-request', icon: CalendarCheck, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },
       ]
@@ -296,10 +296,17 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Predictive Analytics', href: '/maintenance-workflow/analytics', icon: BarChart3, roles: ['maintenance-workflow'] },
       ]
     },
+    // {
+    //   label: "Tax Compliance",
+    //   items: [
+    //     { name: 'Tax Dashboard', href: '/tax-compliance', icon: Calculator, roles: ['tax', 'admin'] },
+    //   ]
+    // },
     {
-      label: "Tax Compliance",
+      label: "Experimental Tools",
       items: [
-        { name: 'Tax Dashboard', href: '/tax-compliance', icon: Calculator, roles: ['tax', 'admin'] },
+        { name: 'Master Command Center', href: '/experimental/scheduling-command', icon: Activity, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+        { name: 'Trip Sandbox (Beta)', href: '/experimental/unified-trip', icon: Sparkles, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
       ]
     },
     {
