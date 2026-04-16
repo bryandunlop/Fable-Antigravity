@@ -5,6 +5,8 @@ import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { SHARED_MOCK_TRIPS } from './mockData';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +34,7 @@ import {
   ArrowRightLeft,
   Bell,
   Check,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   UserCheck,
@@ -74,7 +77,7 @@ interface DocStatus {
 }
 
 type MissionItemStatus = 'requested' | 'in-work' | 'blocked' | 'ready';
-type MissionItemCategory = 'permits' | 'ground-ops' | 'customs' | 'fuel' | 'catering' | 'other';
+type MissionItemCategory = 'dispatch' | 'crew' | 'comms' | 'ground-ops' | 'customs' | 'permits';
 
 interface MissionLogEntry {
   status: MissionItemStatus;
@@ -112,32 +115,47 @@ interface PassengerAlert {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CATEGORY_META: Record<MissionItemCategory, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
-  'permits': { label: 'Permits & Slots', icon: FileText, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-  'ground-ops': { label: 'Ground Operations', icon: MapPin, color: 'text-purple-600', bgColor: 'bg-purple-50' },
-  'customs': { label: 'Customs & Immigration', icon: Shield, color: 'text-slate-600', bgColor: 'bg-slate-100' },
-  'fuel': { label: 'Fuel Coordination', icon: Utensils, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
-  'catering': { label: 'Catering & Cabin', icon: Sparkles, color: 'text-amber-600', bgColor: 'bg-amber-50' },
-  'other': { label: 'Other', icon: ClipboardCheck, color: 'text-slate-500', bgColor: 'bg-slate-50' },
+  'dispatch': { label: 'Dispatch & Planning', icon: FileEdit, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  'crew': { label: 'Crew Logistics', icon: Users, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
+  'comms': { label: 'Communications', icon: MessageSquare, color: 'text-slate-600', bgColor: 'bg-slate-100' },
+  'ground-ops': { label: 'Handling & Services', icon: MapPin, color: 'text-purple-600', bgColor: 'bg-purple-50' },
+  'customs': { label: 'Customs & APIS', icon: Shield, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
+  'permits': { label: 'Permits & Authorizations', icon: FileText, color: 'text-amber-600', bgColor: 'bg-amber-50' },
 };
 
-const CATEGORY_ORDER: MissionItemCategory[] = ['permits', 'ground-ops', 'customs', 'fuel', 'catering', 'other'];
+const CATEGORY_ORDER: MissionItemCategory[] = ['dispatch', 'crew', 'comms', 'ground-ops', 'customs', 'permits'];
 
-const CANNED_ITEMS: { title: string; category: MissionItemCategory }[] = [
-  { title: 'Overflight Permit', category: 'permits' },
-  { title: 'Landing Permit', category: 'permits' },
-  { title: 'Departure Slot', category: 'permits' },
-  { title: 'Arrival Slot', category: 'permits' },
-  { title: 'Ground Handling', category: 'ground-ops' },
-  { title: 'Limo / Ground Transport', category: 'ground-ops' },
-  { title: 'FBO Coordination', category: 'ground-ops' },
-  { title: 'Customs Pre-Clearance', category: 'customs' },
-  { title: 'Passenger Manifest / eAPIS', category: 'customs' },
-  { title: 'Visa Verification', category: 'customs' },
-  { title: 'Fuel Release / Prepay', category: 'fuel' },
-  { title: 'Tankering Decision', category: 'fuel' },
-  { title: 'Catering Order', category: 'catering' },
-  { title: 'Catering Handover Window', category: 'catering' },
-  { title: 'Cabin Amenities / Setup', category: 'catering' },
+
+const INTL_CHECKLIST_TEMPLATE: { title: string; category: MissionItemCategory }[] = [
+  // Dispatch
+  { title: 'Update flight times in MAO (UV plan/Foreflight)', category: 'dispatch' },
+  { title: 'Review airport status (NOTAMS, curfews, events)', category: 'dispatch' },
+  { title: 'Adjust trip type regulation in MAO as needed', category: 'dispatch' },
+  { title: 'Upload final Crew/Pax pdf to attachments', category: 'dispatch' },
+  { title: 'Check Region Tab for additional info', category: 'dispatch' },
+  // Crew
+  { title: 'Check duty day issues', category: 'crew' },
+  { title: 'Check fatigue and WOCL issues', category: 'crew' },
+  { title: 'Mark 18 hrs Pre-Rest Off in MAO if required', category: 'crew' },
+  { title: 'Mark 48 hrs Post-Rest Off in MAO if required', category: 'crew' },
+  { title: 'Confirm PIC is INTL Captain', category: 'crew' },
+  { title: 'Email/mark standby crew as TSB/OSB', category: 'crew' },
+  { title: 'Set Outlook reminder to "Release STBY Crew"', category: 'crew' },
+  // Comms
+  { title: 'Email trip sheet 1-2 months pre-ETD', category: 'comms' },
+  { title: 'Email Crew & Pax Info 2 weeks pre-ETD', category: 'comms' },
+  { title: 'Schedule INTL Trip Brief', category: 'comms' },
+  // Ground Ops
+  { title: 'Verify handler info in MAO', category: 'ground-ops' },
+  { title: 'Confirm sleeping arrangements for pax', category: 'ground-ops' },
+  // Customs
+  { title: 'Send passport check to admin(s)', category: 'customs' },
+  { title: 'Fill out Passport & Visas tab; check UVgo', category: 'customs' },
+  { title: 'Cross-Check Outbound Apis from UV email', category: 'customs' },
+  { title: 'CREW: Confirm Passports and Visas', category: 'customs' },
+  { title: 'PAX: Confirm Passports and Visas', category: 'customs' },
+  // Permits
+  { title: 'Is a waiver required for this trip?', category: 'permits' },
 ];
 
 const COMMENT_PRESETS = [
@@ -160,129 +178,78 @@ export interface TripData {
   missionItems: MissionItem[];
   lateChanges: LateChange[];
   passengerAlerts: PassengerAlert[];
+  readinessScore: number;
+  daysUntilDeparture: number;
 }
 
-export const MOCK_TRIPS: TripData[] = [
-  {
-    tripId: 'TRP-2025-001',
-    route: 'KATL → LFPG',
-    tail: 'N123GS (G650)',
-    date: 'Feb 15',
-    isMissionConfirmed: false,
+export const MOCK_TRIPS: TripData[] = SHARED_MOCK_TRIPS.map((meta, i) => {
+  const isMissionConfirmed = meta.status === 'dispatched';
+  const displayDate = new Date(meta.departureDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const daysUntilDeparture = Math.floor((new Date(meta.departureDate).getTime() - new Date().getTime()) / 86400000);
+  return {
+    tripId: meta.tripNumber,
+    route: meta.route,
+    tail: meta.aircraft,
+    date: displayDate,
+    isMissionConfirmed: isMissionConfirmed,
+    readinessScore: meta.readinessScore,
+    daysUntilDeparture: daysUntilDeparture,
     messages: [
-      { id: '1', sender: 'Sarah Miller', role: 'scheduling', text: 'Initial itinerary uploaded. Ground transport to KATL FBO confirmed.', timestamp: '10:45 AM' },
-      { id: '2', sender: 'Capt. Johnson', role: 'pilot', text: 'Copy Sarah. Checking the slot now for LFPG arrival.', timestamp: '11:02 AM' },
+      { id: '1', sender: 'System Log', role: 'scheduling', text: `Mission file opened. INTL checklist actively tracked.`, timestamp: '08:00 AM' }
     ],
     docs: [
-      { name: 'Flight Plan Package', status: 'Synced', type: 'Performance', lastUpdate: '10:15 AM' },
-      { name: 'FRAT Risk Analysis', status: 'Draft', type: 'Safety', lastUpdate: '30m ago', author: 'Capt. Johnson' },
-      { name: 'Fatigue Summary', status: 'Submitted', type: 'Crew', lastUpdate: '1h ago', author: 'Capt. Johnson' },
-      { name: 'Security Report', status: 'Pending', type: 'Safety', lastUpdate: '-' },
+      { name: 'Flight Plan Package', status: 'Pending', type: 'Performance', lastUpdate: '-' },
+      { name: 'Overflight Clearances', status: isMissionConfirmed ? 'Synced' : 'Pending', type: 'Performance', lastUpdate: '-' }
     ],
-    missionItems: [
-      { id: 'm1', title: 'LFPG Overflight Permit', category: 'permits', status: 'ready', assignedTo: 'Sarah M.', lastComment: 'Document verified by FBO.', history: [{ status: 'ready', comment: 'Document verified by FBO.', timestamp: '09:15 AM', user: 'Sarah M.' }] },
-      { id: 'm2', title: 'KATL Slot Confirmation', category: 'permits', status: 'ready', assignedTo: 'Sarah M.', lastComment: 'Slot confirmed for 14:00z.', history: [{ status: 'ready', comment: 'Slot confirmed for 14:00z.', timestamp: '09:30 AM', user: 'Sarah M.' }] },
-      { id: 'm3', title: 'Ground Handling KATL', category: 'ground-ops', status: 'in-work', assignedTo: 'Mike D.', lastComment: 'Awaiting ramp confirmation.', history: [{ status: 'in-work', comment: 'Awaiting ramp confirmation.', timestamp: '10:00 AM', user: 'Mike D.' }] },
-      { id: 'm4', title: 'Limo Coordination (LFPG)', category: 'ground-ops', status: 'requested', assignedTo: 'Mike D.', history: [] },
-      { id: 'm5', title: 'Customs Pre-Clearance Stage 1', category: 'customs', status: 'blocked', assignedTo: 'Sarah M.', lastComment: 'PAX 3 passport info missing — need scan by EOD.', history: [{ status: 'blocked', comment: 'PAX 3 passport info missing — need scan by EOD.', timestamp: '10:30 AM', user: 'Sarah M.' }], nudged: true },
-      { id: 'm6', title: 'Fuel Release KATL', category: 'fuel', status: 'ready', assignedTo: 'Sarah M.', lastComment: 'Fuel prepay confirmed.', history: [{ status: 'ready', comment: 'Fuel prepay confirmed.', timestamp: '08:45 AM', user: 'Sarah M.' }] },
-      { id: 'm7', title: 'Catering Handover', category: 'catering', status: 'requested', assignedTo: 'Inflight Lead', history: [] },
-    ],
-    lateChanges: [
-      { id: 'l1', field: 'Tail Number Change (N123GS → N456GS)', type: 'mission', timestamp: '1h ago', comment: 'Substitution due to maintenance.', acknowledgedBy: [] },
-    ],
-    passengerAlerts: [
-      { id: 'pa1', name: 'J. Thompson', type: 'added' },
-      { id: 'pa2', name: 'R. Chen', type: 'removed' },
-    ],
-  },
-  {
-    tripId: 'TRP-2025-042',
-    route: 'KTEB → EGGW',
-    tail: 'N994XP (G550)',
-    date: 'Mar 02',
-    isMissionConfirmed: false,
-    messages: [
-      { id: '1', sender: 'System Log', role: 'scheduling', text: 'Tripsheet generated and distributed to crew.', timestamp: '08:00 AM' },
-    ],
-    docs: [
-      { name: 'UK APD Tax Exempt Form', status: 'Pending', type: 'Performance', lastUpdate: '-' },
-      { name: 'FRAT Risk Analysis', status: 'Draft', type: 'Safety', lastUpdate: '10m ago', author: 'Capt. Evans' },
-    ],
-    missionItems: [
-      { id: 'm1', title: 'EGGW Landing Slot', category: 'permits', status: 'in-work', assignedTo: 'James L.', lastComment: 'Waiting for slot coordinator approval.', history: [] },
-      { id: 'm2', title: 'London Ground Transport', category: 'ground-ops', status: 'requested', assignedTo: 'Mike D.', history: [] },
-      { id: 'm3', title: 'UK eBorders Manifest', category: 'customs', status: 'blocked', assignedTo: 'Sarah M.', lastComment: 'Need updated DOB for PAX 1.', history: [] },
-      { id: 'm4', title: 'EGGW Handling', category: 'ground-ops', status: 'ready', assignedTo: 'James L.', lastComment: 'Harrods handling confirmed.', history: [] },
-    ],
+    missionItems: INTL_CHECKLIST_TEMPLATE.map((item, index, arr) => {
+      let status: MissionItemStatus = 'requested';
+      let lastComment: string | undefined = undefined;
+      let nudged = false;
+      let history: any[] = [];
+
+      const totalItems = arr.length;
+      const targetReadyCount = Math.floor((meta.readinessScore / 100) * totalItems);
+
+      if (index < targetReadyCount) {
+        status = 'ready';
+      } else if (index === targetReadyCount && meta.readinessScore < 100 && meta.readinessScore > 0) {
+        status = 'in-work';
+      }
+
+      if (item.title.includes('Email Crew & Pax Info') && meta.daysUntilDeparture <= 14 && meta.daysUntilDeparture > 5 && meta.readinessScore < 80) {
+         if (status === 'requested') status = 'in-work';
+      }
+
+      // If the trip has a critical blocker, attach the blocker to the very next actionable item
+      if (meta.criticalBlocker && index === targetReadyCount) {
+        status = 'blocked';
+        lastComment = meta.criticalBlocker;
+        nudged = true;
+        history = [{ status: 'blocked', comment: meta.criticalBlocker, timestamp: '09:00 AM', user: 'System' }];
+      }
+
+      return {
+        id: `t${i}-m${index}`,
+        title: item.title,
+        category: item.category,
+        status,
+        assignedTo: index % 2 === 0 ? 'Sarah M.' : 'Mike D.',
+        lastComment,
+        nudged,
+        history
+      };
+    }),
     lateChanges: [],
-    passengerAlerts: [
-      { id: 'pa1', name: 'S. Winters', type: 'added' }
-    ],
-  },
-  {
-    tripId: 'TRP-2025-081',
-    route: 'VOMM → WSSS',
-    tail: 'N808Global (Global 7500)',
-    date: 'Mar 15',
-    isMissionConfirmed: true,
-    messages: [
-      { id: '1', sender: 'Mike D.', role: 'scheduling', text: 'All handling for Singapore is solid. Need to confirm catering menu.', timestamp: '04:20 PM' }
-    ],
-    docs: [
-      { name: 'Overflight Clearances', status: 'Synced', type: 'Performance', lastUpdate: '04:15 PM' },
-    ],
-    missionItems: [
-      { id: 'm1', title: 'WSSS Slot', category: 'permits', status: 'ready', assignedTo: 'Mike D.', history: [] },
-      { id: 'm2', title: 'Overflight (Malaysia)', category: 'permits', status: 'ready', assignedTo: 'Mike D.', history: [] },
-      { id: 'm3', title: 'Visa verification (India -> SG)', category: 'customs', status: 'ready', assignedTo: 'Sarah M.', history: [] },
-      { id: 'm4', title: 'Custom Catering (WSSS)', category: 'catering', status: 'in-work', assignedTo: 'Inflight Lead', lastComment: 'Menu out for approval', history: [] }
-    ],
-    lateChanges: [],
-    passengerAlerts: [],
-  },
-  {
-    tripId: 'TRP-2025-104',
-    route: 'KDAL → KASE',
-    tail: 'N112CX (Challenger 350)',
-    date: 'Apr 05',
-    isMissionConfirmed: false,
-    messages: [],
-    docs: [
-      { name: 'Aspen Special Qualification', status: 'Pending', type: 'Crew', lastUpdate: '-' }
-    ],
-    missionItems: [
-      { id: 'm1', title: 'KASE Special Airport Brief', category: 'other', status: 'requested', assignedTo: 'Capt. Richards', history: [] },
-      { id: 'm2', title: 'De-icing Coordination', category: 'ground-ops', status: 'in-work', assignedTo: 'James L.', history: [] },
-      { id: 'm3', title: 'Hangar Space Reservation', category: 'ground-ops', status: 'blocked', assignedTo: 'Mike D.', lastComment: 'FBO is full, looking for alternatives.', history: [] }
-    ],
-    lateChanges: [
-      { id: 'l1', field: 'Weather Warning: High crosswinds at KASE', type: 'mission', timestamp: '20m ago', comment: 'Dispatch monitoring alternative KGEG.', acknowledgedBy: [] }
-    ],
-    passengerAlerts: [],
-  },
-  {
-    tripId: 'TRP-2025-115',
-    route: 'MMMX → MYNN',
-    tail: 'N777LR (G650ER)',
-    date: 'Apr 12',
-    isMissionConfirmed: false,
-    messages: [],
-    docs: [],
-    missionItems: [
-      { id: 'm1', title: 'Bahamas Customs eDeclaration', category: 'customs', status: 'requested', assignedTo: 'Sarah M.', history: [] },
-      { id: 'm2', title: 'MMMX Departure Slot', category: 'permits', status: 'in-work', assignedTo: 'Mike D.', history: [] },
-      { id: 'm3', title: 'Nassau Ground Handling', category: 'ground-ops', status: 'ready', assignedTo: 'Mike D.', history: [] },
-    ],
-    lateChanges: [],
-    passengerAlerts: [],
-  }
-];
+    passengerAlerts: []
+  };
+});
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function UnifiedTripWorkspace() {
-  const [activeTripId, setActiveTripId] = useState('TRP-2025-001');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [activeTripId, setActiveTripId] = useState(location.state?.tripId || 'TRP-2025-001');
   const [activeRole, setActiveRole] = useState<'scheduling' | 'safety' | 'inflight' | 'pilot'>('scheduling');
   
   // Feature State
@@ -452,6 +419,21 @@ export default function UnifiedTripWorkspace() {
     addNewItem(canned.title, canned.category, '');
   };
 
+  const loadIntlTemplate = () => {
+    const newItems: MissionItem[] = INTL_CHECKLIST_TEMPLATE.map((ci, i) => ({
+      id: `m-intl-${Date.now()}-${i}`,
+      title: ci.title,
+      category: ci.category,
+      status: 'requested',
+      assignedTo: 'Unassigned',
+      history: [],
+    }));
+    setMissionItems(prev => [...prev, ...newItems]);
+    postSystemLog(`📋 INTL Checklist Template Loaded`);
+    setIsAddItemOpen(false);
+    toast.success('INTL Checklist applied');
+  };
+
   const triggerNudge = () => {
     if (!nudgeComment.trim()) return;
     const catMap: Record<string, MissionItemCategory> = {
@@ -613,7 +595,7 @@ export default function UnifiedTripWorkspace() {
     );
 
     return (
-      <div className={`group/row flex items-start gap-4 px-5 py-4 rounded-2xl border transition-all ${
+      <div id={item.id} className={`group/row flex items-start gap-4 px-5 py-4 rounded-2xl border transition-all ${
         isReady
           ? 'bg-emerald-50/30 border-emerald-100 opacity-60 hover:opacity-90'
           : isBlocked
@@ -811,6 +793,14 @@ export default function UnifiedTripWorkspace() {
             </button>
           </div>
 
+          {/* Master Templates */}
+          <Button 
+            onClick={loadIntlTemplate}
+            className="w-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 shadow-sm transition-all font-black text-[10px] uppercase tracking-wider h-10 mb-4"
+          >
+            <FileText className="h-4 w-4 mr-2" /> Load INTL Master Checklist
+          </Button>
+
           {/* Toggle: Canned vs Custom */}
           <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-4">
             <button
@@ -830,7 +820,7 @@ export default function UnifiedTripWorkspace() {
           {showCannedItems ? (
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {CATEGORY_ORDER.filter(c => c !== 'other').map(cat => {
-                const catItems = CANNED_ITEMS.filter(ci => ci.category === cat);
+                const catItems = INTL_CHECKLIST_TEMPLATE.filter(ci => ci.category === cat);
                 const meta = CATEGORY_META[cat];
                 const existingTitles = missionItems.map(m => m.title.toLowerCase());
                 return (
@@ -1082,49 +1072,20 @@ export default function UnifiedTripWorkspace() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-slate-50/50 -m-6 font-sans">
-      
-      {/* Sidebar 1: Global Trip Selection */}
-      <div className="w-24 flex-shrink-0 bg-slate-950 flex flex-col items-center py-6 border-r border-slate-800 shadow-2xl z-30">
-        <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/50 mb-10">
-          <Plane className="h-6 w-6 text-white" />
-        </div>
-
-        <div className="flex-1 w-full space-y-4 px-4 overflow-y-auto hide-scrollbar flex flex-col items-center">
-          {MOCK_TRIPS.map((trip) => {
-            const isSelected = trip.tripId === activeTripId;
-            const hasBlocked = trip.missionItems.some(i => i.status === 'blocked');
-            const total = trip.missionItems.length;
-            const ready = trip.missionItems.filter(i => i.status === 'ready').length;
-            const isGo = ready === total && total > 0;
-
-            return (
-              <button
-                key={trip.tripId}
-                onClick={() => setActiveTripId(trip.tripId)}
-                title={`${trip.route} - ${trip.date}`}
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all relative ${
-                  isSelected ? 'bg-white shadow-xl scale-110' : 'bg-slate-900 hover:bg-slate-800'
-                }`}
-              >
-                <span className={`text-[10px] font-black tracking-tight ${isSelected ? 'text-slate-950' : 'text-slate-400'}`}>
-                  {trip.date.split(' ')[1]}
-                </span>
-                
-                {/* Status Dot */}
-                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-950 ${
-                  hasBlocked ? 'bg-rose-500' : isGo ? 'bg-emerald-500' : 'bg-slate-500'
-                }`} />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Sidebar 2: Navigation & Context Switcher for Active Trip */}
+      {/* Navigation & Context Switcher for Active Trip */}
       <div className="w-80 flex-shrink-0 border-r bg-white flex flex-col shadow-lg z-20">
         <div className="p-6 border-b bg-gradient-to-br from-slate-50 to-white">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-black tracking-tighter text-slate-900">{activeTripId}</h2>
+            <div className="flex items-center gap-3">
+              <button 
+                title="Return to Master List"
+                onClick={() => navigate('/experimental/scheduling-command')}
+                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors -ml-2"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <h2 className="text-2xl font-black tracking-tighter text-slate-900">{activeTripId}</h2>
+            </div>
             <Badge variant="outline" className={`font-black px-3 transition-colors ${isMissionConfirmed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
               {isMissionConfirmed ? 'GO' : 'PLAN'}
             </Badge>
@@ -1281,6 +1242,52 @@ export default function UnifiedTripWorkspace() {
           {/* ── SCHEDULING LENS ── */}
           {activeRole === 'scheduling' && (
             <>
+              {(() => {
+                const isBehind = !activeTrip.missionItems.some(i => i.status === 'blocked') && activeTrip.readinessScore < 100 && activeTrip.readinessScore > 0 && ((activeTrip.readinessScore < 90 && activeTrip.daysUntilDeparture < 1) || (activeTrip.readinessScore < 50 && activeTrip.daysUntilDeparture < 3));
+                const isTwoWeekTrigger = activeTrip.daysUntilDeparture <= 14 && activeTrip.daysUntilDeparture > 5 && activeTrip.readinessScore < 80;
+                const hasCriticalBlocker = activeTrip.missionItems.some(i => i.status === 'blocked');
+                const showAction = hasCriticalBlocker || isBehind || isTwoWeekTrigger;
+                
+                let urgentItem = activeTrip.missionItems.find(i => i.status === 'blocked') || activeTrip.missionItems.find(i => i.status === 'in-work') || activeTrip.missionItems.find(i => i.status === 'requested');
+                
+                if (isTwoWeekTrigger && !hasCriticalBlocker) {
+                   const commsItem = activeTrip.missionItems.find(i => i.title.includes('Email Crew & Pax Info'));
+                   if (commsItem) urgentItem = commsItem;
+                }
+
+                const handleScroll = (id: string) => {
+                   const el = document.getElementById(id);
+                   if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el.classList.add('ring-4', 'ring-amber-500', 'ring-offset-2');
+                      setTimeout(() => el.classList.remove('ring-4', 'ring-amber-500', 'ring-offset-2'), 2500);
+                   }
+                };
+
+                return showAction && urgentItem && (
+                   <div className="mb-6 p-6 bg-amber-50 border-2 border-amber-400 rounded-[2rem] shadow-lg shadow-amber-500/10 transition-colors">
+                      <div className="flex items-center gap-3 mb-2">
+                         <span className="flex h-3 w-3 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                         </span>
+                         <h3 className="text-amber-900 font-black tracking-tight text-lg uppercase">Immediate Action Required</h3>
+                      </div>
+                      <p className="text-amber-800 text-sm font-bold opacity-80 mb-3">
+                         {hasCriticalBlocker ? "Critical blocker detected. Immediate resolution required below:" : "This trip is falling behind the target timeline. Outstanding trigger item:"}
+                      </p>
+                      <div 
+                         onClick={() => handleScroll(urgentItem.id)}
+                         className="bg-white px-5 py-4 rounded-xl border border-amber-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-amber-400 hover:shadow-md transition-all group/alertbox"
+                      >
+                         <span className="font-black text-amber-900">{urgentItem.title}</span>
+                         <Badge className="bg-amber-500 flex items-center gap-2 px-3 py-1.5 transition-colors group-hover/alertbox:bg-amber-600">
+                            JUMP TO ACTION <ArrowRight className="h-3 w-3" />
+                         </Badge>
+                      </div>
+                   </div>
+                );
+              })()}
               <ReadinessSummary />
               <SchedulingChecklist />
             </>
