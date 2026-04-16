@@ -130,6 +130,16 @@ const searchableItems: SearchResult[] = [
     keywords: ['schedule', 'calendar', 'flights', 'crew', 'assignment']
   },
   {
+    id: 'currency-dashboard',
+    title: 'Currency Dashboard',
+    description: 'Track pilot and crew currency requirements and compliance',
+    href: '/currency-dashboard',
+    category: 'Operations',
+    icon: UserCheck,
+    keywords: ['currency', 'dashboard', 'pilot', 'crew', 'compliance', 'landings', 'night', 'instrument', '61.58'],
+    roles: ['pilot', 'admin', 'lead', 'scheduling']
+  },
+  {
     id: 'safety-center',
     title: 'Safety Center',
     description: 'Access all safety reporting and management tools',

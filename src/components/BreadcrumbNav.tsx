@@ -42,7 +42,7 @@ const routeLabels: Record<string, string> = {
   '/aircraft-inventory': 'Aircraft Inventory',
   '/post-flight-checklist': 'Post-Flight Checklist',
   '/scheduling-dashboard': 'Scheduling Dashboard',
-  '/pilot-currency': 'Pilot Currency',
+  '/currency-dashboard': 'Currency Dashboard',
   '/passenger-forms': 'Passenger Forms',
   '/assigned-tasks': 'Assigned Tasks',
   '/aog-management': 'AOG Management',

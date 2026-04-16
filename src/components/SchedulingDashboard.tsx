@@ -105,7 +105,7 @@ export default function SchedulingDashboard() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="currency">Pilot Currency</TabsTrigger>
+          <TabsTrigger value="currency">Currency Dashboard</TabsTrigger>
           <TabsTrigger value="forms">Passenger Forms</TabsTrigger>
         </TabsList>
 
@@ -248,13 +248,13 @@ export default function SchedulingDashboard() {
 
 
 
-        {/* Pilot Currency Tab */}
+        {/* Currency Dashboard Tab */}
         <TabsContent value="currency" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <UserCheck className="w-5 h-5" />
-                Pilot Currency Tracking
+                Currency Dashboard
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -264,7 +264,7 @@ export default function SchedulingDashboard() {
                   Pilot Currency Dashboard component will be loaded here
                 </p>
                 <Button asChild>
-                  <Link to="/pilot-currency">View Currency Dashboard</Link>
+                  <Link to="/currency-dashboard">View Currency Dashboard</Link>
                 </Button>
               </div>
             </CardContent>

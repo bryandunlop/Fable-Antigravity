@@ -185,7 +185,7 @@ export default function App() {
                                   }
                                 />
                                 <Route path="/airport-evaluations" element={<AirportEvaluations />} />
-                                <Route path="/pilot-currency" element={<PilotCurrency userRole={userRole} pilotId={userRole === 'pilot' ? 'P001' : undefined} />} />
+                                <Route path="/currency-dashboard" element={<PilotCurrency userRole={userRole} pilotId={userRole === 'pilot' ? 'P001' : undefined} />} />
                                 <Route path="/fuel-load-request" element={<FuelLoadRequest />} />
 
                                 <Route path="/foreflight-test-upload" element={<ForeFlightTestUpload />} />

@@ -8,6 +8,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Alert, AlertDescription } from './ui/alert';
+import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { 
   UserCheck, 
@@ -25,1052 +26,1241 @@ import {
   XCircle,
   Moon,
   Navigation,
-  Database
+  Database,
+  ChevronDown,
+  ChevronRight,
+  MessageSquare,
+  Send,
+  Edit3,
+  Trash2,
+  Flag,
+  Shield,
+  Compass,
+  Timer,
+  FileText,
+  X,
+  Sparkles,
+  Info,
+  Users,
+  CircleDot
 } from 'lucide-react';
-import { format, differenceInDays, addDays, addMonths, subDays, isAfter } from 'date-fns';
+import { format, differenceInDays, addDays, addMonths, subDays, isAfter, subMonths, endOfMonth } from 'date-fns';
+
+// ═══════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════
+
+type AircraftType = 'G500' | 'G650' | 'G800';
+type CurrencyStatus = 'current' | 'warning' | 'expired';
+type ComplianceMethod = 'standard' | 'alternate_6mo' | 'alternate_12mo';
+type CrewRole = 'PILOT' | 'FA';
 
 interface FlightLog {
   id: string;
   date: Date;
   flightNumber: string;
   tailNumber: string;
+  aircraftType: AircraftType;
   origin: string;
   destination: string;
-  flightTime: number; // hours
+  flightTime: number;
   landings: number;
   nightLandings: number;
   instrumentApproaches: number;
   holds: number;
-  isNightFlight: boolean;
-  picId: string;
-  picName: string;
-  sicId: string;
-  sicName: string;
+  crewId: string;
+  crewName: string;
+  crewRole: 'PIC' | 'SIC' | 'FA';
 }
 
-interface PilotCurrency {
-  pilotId: string;
-  pilotName: string;
-  aircraftType: string;
-  lastFlown: Date;
-  totalFlightTime: number;
-  totalLandings90Days: number;
-  nightLandings90Days: number;
-  lastNightLanding: Date | null;
-  instrumentApproaches180Days: number;
-  lastInstrumentApproach: Date | null;
-  holds180Days: number;
-  lastHold: Date | null;
-  lastMedical: Date;
-  medicalClass: string;
-  lastRecurrent: Date;
-  nextRecurrent: Date;
-  status: 'current' | 'warning' | 'expired';
-  recentFlights: FlightLog[];
+interface CurrencyResult {
+  status: CurrencyStatus;
+  count: number;
+  required: number;
+  expiryDate: Date | null;
+  daysRemaining: number;
+  complianceMethod?: ComplianceMethod;
+  notes?: string;
 }
 
-interface CurrencyRequirement {
-  type: string;
-  description: string;
-  warningDays: number;
-  validityDays: number;
-  minimumCount?: number;
+interface PilotTypeCurrency {
+  aircraftType: AircraftType;
+  generalCurrency: CurrencyResult;
+  nightCurrency: CurrencyResult;
+  nightCurrencyAlternate: CurrencyResult | null;
+  nightCurrencyEffective: CurrencyResult;
+  instrumentCurrency: CurrencyResult;
+  holdingCurrency: CurrencyResult;
+  picCheck: CurrencyResult;
+  daysSinceLastFlown: number | null;
+  lastFlownDate: Date | null;
+  totalHoursInType: number;
+  overallStatus: CurrencyStatus;
 }
 
-// Currency requirements
-const currencyRequirements: CurrencyRequirement[] = [
-  {
-    type: 'recency',
-    description: '90-day landing currency (3 landings)',
-    warningDays: 30,
-    validityDays: 90,
-    minimumCount: 3
-  },
-  {
-    type: 'night',
-    description: 'Night currency (3 night landings)',
-    warningDays: 30,
-    validityDays: 90,
-    minimumCount: 3
-  },
-  {
-    type: 'instrument',
-    description: 'Instrument currency (6 approaches, holds, intercepts)',
-    warningDays: 60,
-    validityDays: 180,
-    minimumCount: 6
-  },
-  {
-    type: 'holds',
-    description: 'Holding procedures',
-    warningDays: 60,
-    validityDays: 180,
-    minimumCount: 1
-  },
-  {
-    type: 'recurrent',
-    description: 'Recurrent training (Annual)',
-    warningDays: 30,
-    validityDays: 365
-  }
-];
+interface CrewMember {
+  crewId: string;
+  crewName: string;
+  crewRole: CrewRole;
+  typeCurrencies: Record<AircraftType, PilotTypeCurrency>;
+  notes: CurrencyNote[];
+}
+
+interface CurrencyNote {
+  id: string;
+  authorName: string;
+  content: string;
+  isUrgent: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface PilotCurrencyProps {
   userRole: string;
   pilotId?: string;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+
+const AIRCRAFT_TYPES: AircraftType[] = ['G500', 'G650', 'G800'];
+
+const AIRCRAFT_LABELS: Record<AircraftType, string> = {
+  G500: 'Gulfstream G500',
+  G650: 'Gulfstream G650',
+  G800: 'Gulfstream G800',
+};
+
+// ═══════════════════════════════════════════════════════════════
+// CALCULATION HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+function endOfCalendarMonthPlus(date: Date, monthsToAdd: number): Date {
+  const target = addMonths(date, monthsToAdd);
+  return endOfMonth(target);
+}
+
+function calculateGeneralCurrency(flights: FlightLog[], now: Date): CurrencyResult {
+  const windowStart = subDays(now, 90);
+  const qualifying = flights
+    .filter(f => f.date >= windowStart && f.crewRole === 'PIC' && f.landings > 0)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const landingDates: Date[] = [];
+  qualifying.forEach(f => {
+    for (let i = 0; i < f.landings; i++) landingDates.push(f.date);
+  });
+
+  const total = landingDates.length;
+
+  if (total >= 3) {
+    const thirdOldest = landingDates[total - 3];
+    const expiryDate = addDays(thirdOldest, 90);
+    const daysRemaining = differenceInDays(expiryDate, now);
+    return {
+      status: daysRemaining <= 30 || total === 3 ? 'warning' : 'current',
+      count: total, required: 3, expiryDate, daysRemaining: Math.max(0, daysRemaining)
+    };
+  }
+  return { status: 'expired', count: total, required: 3, expiryDate: null, daysRemaining: 0 };
+}
+
+function calculateNightCurrencyStandard(flights: FlightLog[], now: Date): CurrencyResult {
+  const windowStart = subDays(now, 90);
+  const qualifying = flights
+    .filter(f => f.date >= windowStart && f.crewRole === 'PIC' && f.nightLandings > 0)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const nightDates: Date[] = [];
+  qualifying.forEach(f => {
+    for (let i = 0; i < f.nightLandings; i++) nightDates.push(f.date);
+  });
+
+  const total = nightDates.length;
+
+  if (total >= 3) {
+    const thirdOldest = nightDates[total - 3];
+    const expiryDate = addDays(thirdOldest, 90);
+    const daysRemaining = differenceInDays(expiryDate, now);
+    return {
+      status: daysRemaining <= 30 || total === 3 ? 'warning' : 'current',
+      count: total, required: 3, expiryDate, daysRemaining: Math.max(0, daysRemaining),
+      complianceMethod: 'standard'
+    };
+  }
+  return { status: 'expired', count: total, required: 3, expiryDate: null, daysRemaining: 0, complianceMethod: 'standard' };
+}
+
+function calculateNightCurrencyAlternate(allFlights: FlightLog[], now: Date): CurrencyResult | null {
+  // Simplified: check Option A — 3 night landings in ANY multi-crew turbine in 6 months
+  const sixMonthCutoff = subMonths(now, 6);
+  const qualifying = allFlights
+    .filter(f => f.date >= sixMonthCutoff && f.crewRole === 'PIC' && f.nightLandings > 0)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const nightDates: Date[] = [];
+  qualifying.forEach(f => {
+    for (let i = 0; i < f.nightLandings; i++) nightDates.push(f.date);
+  });
+
+  const total = nightDates.length;
+
+  if (total >= 3) {
+    const thirdOldest = nightDates[total - 3];
+    const expiryDate = endOfCalendarMonthPlus(thirdOldest, 6);
+    const daysRemaining = differenceInDays(expiryDate, now);
+    return {
+      status: daysRemaining <= 60 ? 'warning' : 'current',
+      count: total, required: 3, expiryDate, daysRemaining: Math.max(0, daysRemaining),
+      complianceMethod: 'alternate_6mo',
+      notes: '§ 61.57(e) — 3 night landings in any multi-crew turbine (6-month window)'
+    };
+  }
+  return null;
+}
+
+function calculateInstrumentCurrency(flights: FlightLog[], now: Date): CurrencyResult {
+  const windowStart = subMonths(now, 6);
+  const qualifying = flights
+    .filter(f => f.date >= windowStart && f.instrumentApproaches > 0);
+
+  const total = qualifying.reduce((sum, f) => sum + f.instrumentApproaches, 0);
+
+  if (total >= 6) {
+    const approachDates: Date[] = [];
+    qualifying.sort((a, b) => a.date.getTime() - b.date.getTime())
+      .forEach(f => { for (let i = 0; i < f.instrumentApproaches; i++) approachDates.push(f.date); });
+    
+    const sixthOldest = approachDates[approachDates.length - 6];
+    const expiryDate = endOfCalendarMonthPlus(sixthOldest, 6);
+    const daysRemaining = differenceInDays(expiryDate, now);
+    return {
+      status: daysRemaining <= 60 ? 'warning' : 'current',
+      count: total, required: 6, expiryDate, daysRemaining: Math.max(0, daysRemaining)
+    };
+  }
+  return { status: 'expired', count: total, required: 6, expiryDate: null, daysRemaining: 0 };
+}
+
+function calculateHoldingCurrency(flights: FlightLog[], now: Date): CurrencyResult {
+  const windowStart = subMonths(now, 6);
+  const qualifying = flights
+    .filter(f => f.date >= windowStart && f.holds > 0)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const total = qualifying.reduce((sum, f) => sum + f.holds, 0);
+
+  if (total >= 1) {
+    const oldestHold = qualifying[0].date;
+    const expiryDate = endOfCalendarMonthPlus(oldestHold, 6);
+    const daysRemaining = differenceInDays(expiryDate, now);
+    return {
+      status: daysRemaining <= 60 ? 'warning' : 'current',
+      count: total, required: 1, expiryDate, daysRemaining: Math.max(0, daysRemaining)
+    };
+  }
+  return { status: 'expired', count: total, required: 1, expiryDate: null, daysRemaining: 0 };
+}
+
+function getOverallStatus(statuses: CurrencyStatus[]): CurrencyStatus {
+  if (statuses.includes('expired')) return 'expired';
+  if (statuses.includes('warning')) return 'warning';
+  return 'current';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOCK DATA
+// ═══════════════════════════════════════════════════════════════
+
+function generateMockData(): { pilots: CrewMember[]; fas: CrewMember[]; logs: FlightLog[] } {
+  const now = new Date();
+
+  const mockLogs: FlightLog[] = [
+    // ── John Smith (P001) — G650 & G500 flights ──
+    { id: 'FL001', date: subDays(now, 5), flightNumber: 'OPS-101', tailNumber: 'N650GA', aircraftType: 'G650', origin: 'KTEB', destination: 'KMIA', flightTime: 2.8, landings: 1, nightLandings: 0, instrumentApproaches: 2, holds: 1, crewId: 'P001', crewName: 'John Smith', crewRole: 'PIC' },
+    { id: 'FL002', date: subDays(now, 12), flightNumber: 'OPS-102', tailNumber: 'N650GA', aircraftType: 'G650', origin: 'KMIA', destination: 'KPBI', flightTime: 0.8, landings: 1, nightLandings: 1, instrumentApproaches: 1, holds: 0, crewId: 'P001', crewName: 'John Smith', crewRole: 'PIC' },
+    { id: 'FL003', date: subDays(now, 25), flightNumber: 'OPS-103', tailNumber: 'N650GB', aircraftType: 'G650', origin: 'KTEB', destination: 'KBOS', flightTime: 1.2, landings: 1, nightLandings: 0, instrumentApproaches: 2, holds: 1, crewId: 'P001', crewName: 'John Smith', crewRole: 'PIC' },
+    { id: 'FL004', date: subDays(now, 45), flightNumber: 'OPS-104', tailNumber: 'N650GA', aircraftType: 'G650', origin: 'KBOS', destination: 'KSFO', flightTime: 5.5, landings: 1, nightLandings: 1, instrumentApproaches: 1, holds: 0, crewId: 'P001', crewName: 'John Smith', crewRole: 'PIC' },
+    { id: 'FL005', date: subDays(now, 78), flightNumber: 'OPS-105', tailNumber: 'N650GC', aircraftType: 'G650', origin: 'KSFO', destination: 'KLAX', flightTime: 1.3, landings: 1, nightLandings: 0, instrumentApproaches: 2, holds: 1, crewId: 'P001', crewName: 'John Smith', crewRole: 'PIC' },
+    { id: 'FL006', date: subDays(now, 65), flightNumber: 'OPS-106', tailNumber: 'N500GA', aircraftType: 'G500', origin: 'KTEB', destination: 'KORD', flightTime: 2.1, landings: 1, nightLandings: 1, instrumentApproaches: 1, holds: 0, crewId: 'P001', crewName: 'John Smith', crewRole: 'PIC' },
+    { id: 'FL007', date: subDays(now, 70), flightNumber: 'OPS-107', tailNumber: 'N500GA', aircraftType: 'G500', origin: 'KORD', destination: 'KDFW', flightTime: 2.4, landings: 1, nightLandings: 0, instrumentApproaches: 2, holds: 1, crewId: 'P001', crewName: 'John Smith', crewRole: 'PIC' },
+    { id: 'FL008', date: subDays(now, 82), flightNumber: 'OPS-108', tailNumber: 'N500GA', aircraftType: 'G500', origin: 'KDFW', destination: 'KTEB', flightTime: 3.1, landings: 1, nightLandings: 1, instrumentApproaches: 1, holds: 0, crewId: 'P001', crewName: 'John Smith', crewRole: 'PIC' },
+
+    // ── Sarah Johnson (P002) — G650 flights ──
+    { id: 'FL009', date: subDays(now, 2), flightNumber: 'OPS-201', tailNumber: 'N650GB', aircraftType: 'G650', origin: 'KPBI', destination: 'KTEB', flightTime: 2.5, landings: 1, nightLandings: 1, instrumentApproaches: 2, holds: 1, crewId: 'P002', crewName: 'Sarah Johnson', crewRole: 'PIC' },
+    { id: 'FL010', date: subDays(now, 8), flightNumber: 'OPS-202', tailNumber: 'N650GB', aircraftType: 'G650', origin: 'KTEB', destination: 'KMCO', flightTime: 2.8, landings: 1, nightLandings: 1, instrumentApproaches: 2, holds: 1, crewId: 'P002', crewName: 'Sarah Johnson', crewRole: 'PIC' },
+    { id: 'FL011', date: subDays(now, 18), flightNumber: 'OPS-203', tailNumber: 'N650GC', aircraftType: 'G650', origin: 'KMCO', destination: 'KATL', flightTime: 1.2, landings: 1, nightLandings: 0, instrumentApproaches: 1, holds: 0, crewId: 'P002', crewName: 'Sarah Johnson', crewRole: 'PIC' },
+    { id: 'FL012', date: subDays(now, 35), flightNumber: 'OPS-204', tailNumber: 'N650GA', aircraftType: 'G650', origin: 'KATL', destination: 'KDFW', flightTime: 2.0, landings: 1, nightLandings: 1, instrumentApproaches: 1, holds: 0, crewId: 'P002', crewName: 'Sarah Johnson', crewRole: 'PIC' },
+
+    // ── Mike Davis (P003) — G650 flights (EXPIRED) ──
+    { id: 'FL016', date: subDays(now, 110), flightNumber: 'OPS-301', tailNumber: 'N650GD', aircraftType: 'G650', origin: 'KJFK', destination: 'KLAX', flightTime: 5.5, landings: 1, nightLandings: 0, instrumentApproaches: 1, holds: 0, crewId: 'P003', crewName: 'Mike Davis', crewRole: 'PIC' },
+    { id: 'FL017', date: subDays(now, 120), flightNumber: 'OPS-302', tailNumber: 'N650GD', aircraftType: 'G650', origin: 'KLAX', destination: 'KLAS', flightTime: 1.0, landings: 1, nightLandings: 1, instrumentApproaches: 0, holds: 0, crewId: 'P003', crewName: 'Mike Davis', crewRole: 'PIC' },
+    { id: 'FL018', date: subDays(now, 140), flightNumber: 'OPS-303', tailNumber: 'N650GD', aircraftType: 'G650', origin: 'KLAS', destination: 'KJFK', flightTime: 4.8, landings: 1, nightLandings: 0, instrumentApproaches: 2, holds: 1, crewId: 'P003', crewName: 'Mike Davis', crewRole: 'PIC' },
+
+    // ── Tom Williams (P004) — Only G500 ──
+    { id: 'FL019', date: subDays(now, 10), flightNumber: 'OPS-401', tailNumber: 'N500GA', aircraftType: 'G500', origin: 'KTEB', destination: 'KIAD', flightTime: 0.9, landings: 1, nightLandings: 0, instrumentApproaches: 1, holds: 1, crewId: 'P004', crewName: 'Tom Williams', crewRole: 'PIC' },
+    { id: 'FL020', date: subDays(now, 20), flightNumber: 'OPS-402', tailNumber: 'N500GA', aircraftType: 'G500', origin: 'KIAD', destination: 'KBWI', flightTime: 0.4, landings: 1, nightLandings: 0, instrumentApproaches: 2, holds: 0, crewId: 'P004', crewName: 'Tom Williams', crewRole: 'PIC' },
+    { id: 'FL021', date: subDays(now, 40), flightNumber: 'OPS-403', tailNumber: 'N500GA', aircraftType: 'G500', origin: 'KBWI', destination: 'KTEB', flightTime: 0.8, landings: 1, nightLandings: 1, instrumentApproaches: 2, holds: 1, crewId: 'P004', crewName: 'Tom Williams', crewRole: 'PIC' },
+    { id: 'FL022', date: subDays(now, 55), flightNumber: 'OPS-404', tailNumber: 'N500GA', aircraftType: 'G500', origin: 'KTEB', destination: 'KPHL', flightTime: 0.5, landings: 1, nightLandings: 1, instrumentApproaches: 1, holds: 0, crewId: 'P004', crewName: 'Tom Williams', crewRole: 'PIC' },
+
+    // ── FA: Emily Torres (FA001) ──
+    { id: 'FL023', date: subDays(now, 3), flightNumber: 'OPS-101', tailNumber: 'N650GA', aircraftType: 'G650', origin: 'KTEB', destination: 'KMIA', flightTime: 2.8, landings: 0, nightLandings: 0, instrumentApproaches: 0, holds: 0, crewId: 'FA001', crewName: 'Emily Torres', crewRole: 'FA' },
+    { id: 'FL024', date: subDays(now, 45), flightNumber: 'OPS-106', tailNumber: 'N500GA', aircraftType: 'G500', origin: 'KTEB', destination: 'KORD', flightTime: 2.1, landings: 0, nightLandings: 0, instrumentApproaches: 0, holds: 0, crewId: 'FA001', crewName: 'Emily Torres', crewRole: 'FA' },
+
+    // ── FA: Rachel Kim (FA002) ──
+    { id: 'FL025', date: subDays(now, 8), flightNumber: 'OPS-201', tailNumber: 'N650GB', aircraftType: 'G650', origin: 'KPBI', destination: 'KTEB', flightTime: 2.5, landings: 0, nightLandings: 0, instrumentApproaches: 0, holds: 0, crewId: 'FA002', crewName: 'Rachel Kim', crewRole: 'FA' },
+  ];
+
+  const mockNotes: Record<string, CurrencyNote[]> = {
+    'P001': [
+      { id: 'N001', authorName: 'Jane Doe (Scheduling)', content: 'Needs sim session before Asia trip in May — coordinating with CAE for G650 type.', isUrgent: true, createdAt: subDays(now, 3), updatedAt: subDays(now, 3) },
+      { id: 'N002', authorName: 'Jane Doe (Scheduling)', content: 'G500 currency expiring soon — scheduling a local pattern flight for next week.', isUrgent: false, createdAt: subDays(now, 1), updatedAt: subDays(now, 1) },
+    ],
+    'P003': [
+      { id: 'N003', authorName: 'Jane Doe (Scheduling)', content: 'Mike returning from medical leave — schedule currency rides on G650 before end of month.', isUrgent: true, createdAt: subDays(now, 5), updatedAt: subDays(now, 5) },
+    ],
+  };
+
+  const picChecks: Record<string, Record<AircraftType, { date: Date }>> = {
+    'P001': { G500: { date: subDays(now, 200) }, G650: { date: subDays(now, 60) }, G800: { date: subDays(now, 400) } },
+    'P002': { G500: { date: subDays(now, 30) }, G650: { date: subDays(now, 30) }, G800: { date: subDays(now, 400) } },
+    'P003': { G500: { date: subDays(now, 400) }, G650: { date: subDays(now, 400) }, G800: { date: subDays(now, 400) } },
+    'P004': { G500: { date: subDays(now, 90) }, G650: { date: subDays(now, 400) }, G800: { date: subDays(now, 400) } },
+  };
+
+  const pilotIds = ['P001', 'P002', 'P003', 'P004'];
+  const pilotNames: Record<string, string> = { P001: 'John Smith', P002: 'Sarah Johnson', P003: 'Mike Davis', P004: 'Tom Williams' };
+  const faIds = ['FA001', 'FA002'];
+  const faNames: Record<string, string> = { FA001: 'Emily Torres', FA002: 'Rachel Kim' };
+
+  const buildPilot = (crewId: string): CrewMember => {
+    const typeCurrencies = {} as Record<AircraftType, PilotTypeCurrency>;
+    const allFlightsForPilot = mockLogs.filter(f => f.crewId === crewId);
+
+    AIRCRAFT_TYPES.forEach(type => {
+      const typeFlights = allFlightsForPilot.filter(f => f.aircraftType === type);
+      const general = calculateGeneralCurrency(typeFlights, now);
+      const nightStandard = calculateNightCurrencyStandard(typeFlights, now);
+      const nightAlternate = calculateNightCurrencyAlternate(allFlightsForPilot, now);
+      
+      const statusPriority: Record<string, number> = { current: 3, warning: 2, expired: 1 };
+      const nightEffective = nightAlternate && (statusPriority[nightAlternate.status] || 0) > (statusPriority[nightStandard.status] || 0) 
+        ? nightAlternate 
+        : nightStandard;
+
+      const instrument = calculateInstrumentCurrency(typeFlights, now);
+      const holding = calculateHoldingCurrency(typeFlights, now);
+
+      const checkInfo = picChecks[crewId]?.[type];
+      let picCheck: CurrencyResult;
+      if (checkInfo) {
+        const expiryDate = endOfCalendarMonthPlus(checkInfo.date, 12);
+        const daysRemaining = differenceInDays(expiryDate, now);
+        picCheck = {
+          status: daysRemaining < 0 ? 'expired' : daysRemaining <= 60 ? 'warning' : 'current',
+          count: 1, required: 1, expiryDate,
+          daysRemaining: Math.max(0, daysRemaining),
+          notes: daysRemaining < 0 ? 'Expired' : `Due ${format(expiryDate, 'MMM yyyy')}`
+        };
+      } else {
+        picCheck = { status: 'expired', count: 0, required: 1, expiryDate: null, daysRemaining: 0, notes: 'No record' };
+      }
+
+      const lastFlight = typeFlights.length > 0 ? typeFlights.reduce((latest, f) => f.date > latest.date ? f : latest) : null;
+      const daysSinceLastFlown = lastFlight ? differenceInDays(now, lastFlight.date) : null;
+      const totalHours = typeFlights.reduce((sum, f) => sum + f.flightTime, 0);
+
+      const overallStatus = getOverallStatus([
+        general.status, nightEffective.status, instrument.status, holding.status, picCheck.status
+      ]);
+
+      typeCurrencies[type] = {
+        aircraftType: type,
+        generalCurrency: general,
+        nightCurrency: nightStandard,
+        nightCurrencyAlternate: nightAlternate,
+        nightCurrencyEffective: nightEffective,
+        instrumentCurrency: instrument,
+        holdingCurrency: holding,
+        picCheck,
+        daysSinceLastFlown,
+        lastFlownDate: lastFlight?.date || null,
+        totalHoursInType: Math.round(totalHours * 10) / 10,
+        overallStatus,
+      };
+    });
+
+    return {
+      crewId,
+      crewName: pilotNames[crewId],
+      crewRole: 'PILOT',
+      typeCurrencies,
+      notes: mockNotes[crewId] || [],
+    };
+  };
+
+  const buildFA = (crewId: string): CrewMember => {
+    const typeCurrencies = {} as Record<AircraftType, PilotTypeCurrency>;
+    const allFlightsForFA = mockLogs.filter(f => f.crewId === crewId);
+
+    AIRCRAFT_TYPES.forEach(type => {
+      const typeFlights = allFlightsForFA.filter(f => f.aircraftType === type);
+      const lastFlight = typeFlights.length > 0 ? typeFlights.reduce((latest, f) => f.date > latest.date ? f : latest) : null;
+      const daysSinceLastFlown = lastFlight ? differenceInDays(now, lastFlight.date) : null;
+      const totalHours = typeFlights.reduce((sum, f) => sum + f.flightTime, 0);
+
+      const daysStatus: CurrencyStatus = daysSinceLastFlown === null ? 'expired' : daysSinceLastFlown > 90 ? 'expired' : daysSinceLastFlown > 30 ? 'warning' : 'current';
+
+      const emptyResult: CurrencyResult = { status: 'current', count: 0, required: 0, expiryDate: null, daysRemaining: 0 };
+      typeCurrencies[type] = {
+        aircraftType: type,
+        generalCurrency: emptyResult,
+        nightCurrency: emptyResult,
+        nightCurrencyAlternate: null,
+        nightCurrencyEffective: emptyResult,
+        instrumentCurrency: emptyResult,
+        holdingCurrency: emptyResult,
+        picCheck: emptyResult,
+        daysSinceLastFlown,
+        lastFlownDate: lastFlight?.date || null,
+        totalHoursInType: Math.round(totalHours * 10) / 10,
+        overallStatus: daysStatus,
+      };
+    });
+
+    return {
+      crewId,
+      crewName: faNames[crewId],
+      crewRole: 'FA',
+      typeCurrencies,
+      notes: [],
+    };
+  };
+
+  const pilots = pilotIds.map(buildPilot);
+  const fas = faIds.map(buildFA);
+
+  return { pilots, fas, logs: mockLogs };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATUS BADGE COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+
+const StatusDot = ({ status }: { status: CurrencyStatus }) => {
+  const colors = {
+    current: 'bg-emerald-500 shadow-emerald-500/50',
+    warning: 'bg-amber-500 shadow-amber-500/50',
+    expired: 'bg-red-500 shadow-red-500/50 animate-pulse',
+  };
+  return <div className={`w-2.5 h-2.5 rounded-full shadow-lg ${colors[status]}`} />;
+};
+
+const StatusBadge = ({ status, label }: { status: CurrencyStatus; label?: string }) => {
+  const styles = {
+    current: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-400',
+    warning: 'bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400',
+    expired: 'bg-red-500/15 text-red-700 border-red-500/30 dark:text-red-400',
+  };
+  const icons = {
+    current: <CheckCircle className="w-3 h-3" />,
+    warning: <AlertTriangle className="w-3 h-3" />,
+    expired: <XCircle className="w-3 h-3" />,
+  };
+  const labels = { current: 'Current', warning: 'Due Soon', expired: 'Expired' };
+  return (
+    <Badge className={`${styles[status]} border text-xs gap-1 font-medium`}>
+      {icons[status]}
+      {label || labels[status]}
+    </Badge>
+  );
+};
+
+const CurrencyCell = ({ result, showCount = true }: { result: CurrencyResult; showCount?: boolean }) => {
+  const colors = {
+    current: 'text-emerald-600 dark:text-emerald-400',
+    warning: 'text-amber-600 dark:text-amber-400',
+    expired: 'text-red-600 dark:text-red-400',
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <StatusDot status={result.status} />
+      <div>
+        {showCount && (
+          <span className={`text-sm font-semibold ${colors[result.status]}`}>
+            {result.count}/{result.required}
+          </span>
+        )}
+        {result.daysRemaining > 0 && (
+          <span className="text-xs text-muted-foreground ml-1">({result.daysRemaining}d)</span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════
+
 export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [aircraftFilter, setAircraftFilter] = useState('all');
-  const [selectedPilot, setSelectedPilot] = useState<PilotCurrency | null>(null);
-  const [pilotCurrencies, setPilotCurrencies] = useState<PilotCurrency[]>([]);
-  const [flightLogs, setFlightLogs] = useState<FlightLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [expandedPilotNotes, setExpandedPilotNotes] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'pilots' | 'flight-attendants'>('pilots');
+  const [showDevSpec, setShowDevSpec] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-  
-  // Check if user is pilot (viewing own data) or scheduling (can view all)
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ReturnType<typeof generateMockData> | null>(null);
+
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [newNoteUrgent, setNewNoteUrgent] = useState(false);
+
+  const isScheduling = userRole === 'scheduling' || userRole === 'admin';
   const isPilotView = userRole === 'pilot' && pilotId;
-  const canViewAll = userRole === 'scheduling' || userRole === 'admin' || userRole === 'lead';
 
-  // Fetch flight logs from MyAirOps API
-  const fetchFlightLogs = async () => {
-    setSyncing(true);
-    try {
-      // TODO: Replace with actual MyAirOps API endpoint
-      // const response = await fetch('https://api.myairops.com/v1/flight-logs', {
-      //   headers: {
-      //     'Authorization': `Bearer ${process.env.MYAIROPS_API_KEY}`,
-      //     'Content-Type': 'application/json'
-      //   },
-      //   params: {
-      //     startDate: subDays(new Date(), 365).toISOString(), // Last year
-      //     endDate: new Date().toISOString()
-      //   }
-      // });
-      // const data = await response.json();
-
-      // Mock flight log data
-      const mockFlightLogs: FlightLog[] = [
-        // Recent flights for John Smith (P001)
-        {
-          id: 'FL-001',
-          date: subDays(new Date(), 5),
-          flightNumber: 'OPS-101',
-          tailNumber: 'N650GA',
-          origin: 'KTEB',
-          destination: 'KMIA',
-          flightTime: 2.8,
-          landings: 1,
-          nightLandings: 0,
-          instrumentApproaches: 2,
-          holds: 1,
-          isNightFlight: false,
-          picId: 'P001',
-          picName: 'John Smith',
-          sicId: 'P002',
-          sicName: 'Sarah Johnson'
-        },
-        {
-          id: 'FL-002',
-          date: subDays(new Date(), 12),
-          flightNumber: 'OPS-102',
-          tailNumber: 'N650GA',
-          origin: 'KMIA',
-          destination: 'KPBI',
-          flightTime: 0.8,
-          landings: 1,
-          nightLandings: 1,
-          instrumentApproaches: 1,
-          holds: 0,
-          isNightFlight: true,
-          picId: 'P001',
-          picName: 'John Smith',
-          sicId: 'P002',
-          sicName: 'Sarah Johnson'
-        },
-        {
-          id: 'FL-003',
-          date: subDays(new Date(), 25),
-          flightNumber: 'OPS-103',
-          tailNumber: 'N650GB',
-          origin: 'KTEB',
-          destination: 'KBOS',
-          flightTime: 1.2,
-          landings: 1,
-          nightLandings: 0,
-          instrumentApproaches: 2,
-          holds: 1,
-          isNightFlight: false,
-          picId: 'P001',
-          picName: 'John Smith',
-          sicId: 'P003',
-          sicName: 'Mike Davis'
-        },
-        {
-          id: 'FL-004',
-          date: subDays(new Date(), 45),
-          flightNumber: 'OPS-104',
-          tailNumber: 'N650GA',
-          origin: 'KBOS',
-          destination: 'KSFO',
-          flightTime: 5.5,
-          landings: 1,
-          nightLandings: 1,
-          instrumentApproaches: 1,
-          holds: 0,
-          isNightFlight: true,
-          picId: 'P001',
-          picName: 'John Smith',
-          sicId: 'P002',
-          sicName: 'Sarah Johnson'
-        },
-        {
-          id: 'FL-005',
-          date: subDays(new Date(), 78),
-          flightNumber: 'OPS-105',
-          tailNumber: 'N650GC',
-          origin: 'KSFO',
-          destination: 'KLAX',
-          flightTime: 1.3,
-          landings: 1,
-          nightLandings: 0,
-          instrumentApproaches: 2,
-          holds: 1,
-          isNightFlight: false,
-          picId: 'P001',
-          picName: 'John Smith',
-          sicId: 'P003',
-          sicName: 'Mike Davis'
-        },
-        // Flights for Sarah Johnson (P002)
-        {
-          id: 'FL-006',
-          date: subDays(new Date(), 2),
-          flightNumber: 'OPS-201',
-          tailNumber: 'N650GB',
-          origin: 'KPBI',
-          destination: 'KTEB',
-          flightTime: 2.5,
-          landings: 1,
-          nightLandings: 1,
-          instrumentApproaches: 2,
-          holds: 1,
-          isNightFlight: true,
-          picId: 'P002',
-          picName: 'Sarah Johnson',
-          sicId: 'P001',
-          sicName: 'John Smith'
-        },
-        {
-          id: 'FL-007',
-          date: subDays(new Date(), 18),
-          flightNumber: 'OPS-202',
-          tailNumber: 'N650GB',
-          origin: 'KTEB',
-          destination: 'KMCO',
-          flightTime: 2.8,
-          landings: 1,
-          nightLandings: 0,
-          instrumentApproaches: 1,
-          holds: 0,
-          isNightFlight: false,
-          picId: 'P002',
-          picName: 'Sarah Johnson',
-          sicId: 'P003',
-          sicName: 'Mike Davis'
-        },
-        {
-          id: 'FL-008',
-          date: subDays(new Date(), 35),
-          flightNumber: 'OPS-203',
-          tailNumber: 'N650GC',
-          origin: 'KMCO',
-          destination: 'KATL',
-          flightTime: 1.2,
-          landings: 1,
-          nightLandings: 1,
-          instrumentApproaches: 2,
-          holds: 1,
-          isNightFlight: true,
-          picId: 'P002',
-          picName: 'Sarah Johnson',
-          sicId: 'P001',
-          sicName: 'John Smith'
-        },
-        {
-          id: 'FL-009',
-          date: subDays(new Date(), 55),
-          flightNumber: 'OPS-204',
-          tailNumber: 'N650GA',
-          origin: 'KATL',
-          destination: 'KDFW',
-          flightTime: 2.0,
-          landings: 1,
-          nightLandings: 0,
-          instrumentApproaches: 1,
-          holds: 0,
-          isNightFlight: false,
-          picId: 'P002',
-          picName: 'Sarah Johnson',
-          sicId: 'P003',
-          sicName: 'Mike Davis'
-        },
-        // Old flights for Mike Johnson (P003) - expired currency
-        {
-          id: 'FL-010',
-          date: subDays(new Date(), 110),
-          flightNumber: 'OPS-301',
-          tailNumber: 'N650GD',
-          origin: 'KJFK',
-          destination: 'KLAX',
-          flightTime: 5.5,
-          landings: 1,
-          nightLandings: 0,
-          instrumentApproaches: 1,
-          holds: 0,
-          isNightFlight: false,
-          picId: 'P003',
-          picName: 'Mike Johnson',
-          sicId: 'P001',
-          sicName: 'John Smith'
-        }
-      ];
-
-      setFlightLogs(mockFlightLogs);
-      calculatePilotCurrencies(mockFlightLogs);
-      setLastSync(new Date());
-      toast.success('Flight logs synchronized from MyAirOps');
-    } catch (error) {
-      console.error('Error fetching flight logs:', error);
-      toast.error('Failed to sync flight logs from MyAirOps');
-    } finally {
-      setSyncing(false);
-      setLoading(false);
-    }
+  // Determine which aircraft a pilot/FA is active on
+  const getActiveTypes = (member: CrewMember): AircraftType[] => {
+    return AIRCRAFT_TYPES.filter(type => {
+      const tc = member.typeCurrencies[type];
+      if (member.crewRole === 'FA') {
+        return tc.daysSinceLastFlown !== null || tc.totalHoursInType > 0;
+      }
+      return tc.totalHoursInType > 0 || tc.daysSinceLastFlown !== null || tc.picCheck.status !== 'expired' || tc.lastFlownDate !== null;
+    });
   };
 
-  // Calculate pilot currencies from flight logs
-  const calculatePilotCurrencies = (logs: FlightLog[]) => {
-    const now = new Date();
-    const pilots = new Map<string, PilotCurrency>();
-
-    // Mock medical and recurrent data (in production, this would come from API)
-    const pilotInfo: Record<string, { medical: Date; medicalClass: string; recurrent: Date }> = {
-      P001: {
-        medical: subDays(now, 200),
-        medicalClass: 'First Class',
-        recurrent: subDays(now, 60)
-      },
-      P002: {
-        medical: subDays(now, 30),
-        medicalClass: 'First Class',
-        recurrent: subDays(now, 20)
-      },
-      P003: {
-        medical: subDays(now, 400),
-        medicalClass: 'Second Class',
-        recurrent: subDays(now, 450)
-      }
-    };
-
-    // Process each flight log
-    logs.forEach(log => {
-      // Process PIC
-      if (!pilots.has(log.picId)) {
-        const info = pilotInfo[log.picId] || {
-          medical: subDays(now, 180),
-          medicalClass: 'First Class',
-          recurrent: subDays(now, 180)
-        };
-
-        pilots.set(log.picId, {
-          pilotId: log.picId,
-          pilotName: log.picName,
-          aircraftType: 'G650',
-          lastFlown: log.date,
-          totalFlightTime: 0,
-          totalLandings90Days: 0,
-          nightLandings90Days: 0,
-          lastNightLanding: null,
-          instrumentApproaches180Days: 0,
-          lastInstrumentApproach: null,
-          holds180Days: 0,
-          lastHold: null,
-          lastMedical: info.medical,
-          medicalClass: info.medicalClass,
-          lastRecurrent: info.recurrent,
-          nextRecurrent: addMonths(info.recurrent, 12),
-          status: 'current',
-          recentFlights: []
-        });
-      }
-
-      const pilot = pilots.get(log.picId)!;
-
-      // Update last flown date
-      if (isAfter(log.date, pilot.lastFlown)) {
-        pilot.lastFlown = log.date;
-      }
-
-      // Add to recent flights
-      pilot.recentFlights.push(log);
-
-      // Calculate currency within time windows
-      const daysSinceFlight = differenceInDays(now, log.date);
-
-      // 90-day currency
-      if (daysSinceFlight <= 90) {
-        pilot.totalLandings90Days += log.landings;
-        pilot.nightLandings90Days += log.nightLandings;
-      }
-
-      // 180-day instrument currency
-      if (daysSinceFlight <= 180) {
-        pilot.instrumentApproaches180Days += log.instrumentApproaches;
-        pilot.holds180Days += log.holds;
-      }
-
-      // Track last occurrences
-      if (log.nightLandings > 0) {
-        if (!pilot.lastNightLanding || isAfter(log.date, pilot.lastNightLanding)) {
-          pilot.lastNightLanding = log.date;
-        }
-      }
-
-      if (log.instrumentApproaches > 0) {
-        if (!pilot.lastInstrumentApproach || isAfter(log.date, pilot.lastInstrumentApproach)) {
-          pilot.lastInstrumentApproach = log.date;
-        }
-      }
-
-      if (log.holds > 0) {
-        if (!pilot.lastHold || isAfter(log.date, pilot.lastHold)) {
-          pilot.lastHold = log.date;
-        }
-      }
-
-      // Calculate total flight time
-      pilot.totalFlightTime += log.flightTime;
-
-      // Process SIC (similar logic but as SIC time)
-      if (log.sicId && !pilots.has(log.sicId)) {
-        const info = pilotInfo[log.sicId] || {
-          medical: subDays(now, 180),
-          medicalClass: 'First Class',
-          recurrent: subDays(now, 180)
-        };
-
-        pilots.set(log.sicId, {
-          pilotId: log.sicId,
-          pilotName: log.sicName,
-          aircraftType: 'G650',
-          lastFlown: log.date,
-          totalFlightTime: 0,
-          totalLandings90Days: 0,
-          nightLandings90Days: 0,
-          lastNightLanding: null,
-          instrumentApproaches180Days: 0,
-          lastInstrumentApproach: null,
-          holds180Days: 0,
-          lastHold: null,
-          lastMedical: info.medical,
-          medicalClass: info.medicalClass,
-          lastRecurrent: info.recurrent,
-          nextRecurrent: addMonths(info.recurrent, 12),
-          status: 'current',
-          recentFlights: []
-        });
-      }
-    });
-
-    // Determine overall status for each pilot
-    const pilotArray = Array.from(pilots.values()).map(pilot => {
-      const statuses: string[] = [];
-
-      // Check landing currency
-      if (pilot.totalLandings90Days < 3) {
-        statuses.push('expired');
-      } else if (pilot.lastFlown && differenceInDays(now, pilot.lastFlown) > 60) {
-        statuses.push('warning');
-      }
-
-      // Check night currency
-      if (pilot.nightLandings90Days < 3) {
-        statuses.push('warning');
-      }
-
-      // Check instrument currency
-      if (pilot.instrumentApproaches180Days < 6) {
-        statuses.push('warning');
-      }
-
-      // Check recurrent training
-      const daysSinceRecurrent = differenceInDays(now, pilot.lastRecurrent);
-      if (daysSinceRecurrent > 365) {
-        statuses.push('expired');
-      } else if (daysSinceRecurrent > 335) {
-        statuses.push('warning');
-      }
-
-      // Determine overall status
-      if (statuses.includes('expired')) {
-        pilot.status = 'expired';
-      } else if (statuses.includes('warning')) {
-        pilot.status = 'warning';
-      } else {
-        pilot.status = 'current';
-      }
-
-      // Sort recent flights by date (most recent first)
-      pilot.recentFlights.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-      return pilot;
-    });
-
-    setPilotCurrencies(pilotArray);
+  // Determine the overall status for a dashboard user (worst status among active types)
+  const getWorstStatus = (member: CrewMember): CurrencyStatus => {
+    const activeTypes = getActiveTypes(member);
+    if (activeTypes.length === 0) return 'expired';
+    const statuses = activeTypes.map(t => member.typeCurrencies[t].overallStatus);
+    if (statuses.includes('expired')) return 'expired';
+    if (statuses.includes('warning')) return 'warning';
+    return 'current';
   };
 
   useEffect(() => {
-    fetchFlightLogs();
-
-    // Auto-sync every 10 minutes
-    const interval = setInterval(fetchFlightLogs, 10 * 60 * 1000);
-    return () => clearInterval(interval);
+    setTimeout(() => {
+      setData(generateMockData());
+      setLastSync(new Date());
+      setLoading(false);
+    }, 800);
   }, []);
 
+  const handleSync = () => {
+    setSyncing(true);
+    setTimeout(() => {
+      setData(generateMockData());
+      setLastSync(new Date());
+      setSyncing(false);
+      toast.success('Flight logs synchronized from MyAirOps');
+    }, 1500);
+  };
+
   const filteredPilots = useMemo(() => {
-    let pilotsToShow = pilotCurrencies;
-    
-    // Role-based filtering: pilots only see their own data
-    if (isPilotView && pilotId) {
-      pilotsToShow = pilotCurrencies.filter(pilot => pilot.pilotId === pilotId);
-    }
-    // Scheduling and admins can see all pilots
-    else if (!canViewAll) {
-      // If not pilot view and not allowed to view all, return empty
-      pilotsToShow = [];
-    }
-    
-    return pilotsToShow.filter(pilot => {
-      const matchesSearch = pilot.pilotName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           pilot.aircraftType.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || pilot.status === statusFilter;
-      const matchesAircraft = aircraftFilter === 'all' || pilot.aircraftType === aircraftFilter;
-      
-      return matchesSearch && matchesStatus && matchesAircraft;
+    if (!data) return [];
+    const crew = activeTab === 'pilots' ? data.pilots : data.fas;
+    return crew.filter(member => {
+      const matchesSearch = member.crewName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || getWorstStatus(member) === statusFilter;
+      const matchesPilotView = !isPilotView || member.crewId === pilotId;
+      return matchesSearch && matchesStatus && matchesPilotView;
     });
-  }, [pilotCurrencies, searchTerm, statusFilter, aircraftFilter, isPilotView, pilotId, canViewAll]);
+  }, [data, searchTerm, statusFilter, activeTab, isPilotView, pilotId]);
 
-  const getCurrencyStatus = (pilot: PilotCurrency, requirement: CurrencyRequirement) => {
-    const now = new Date();
-    let lastDate: Date | null = null;
-    let count = 0;
-    let daysRemaining = 0;
+  const summaryStats = useMemo(() => {
+    if (!data) return { total: 0, current: 0, warning: 0, expired: 0 };
+    const crew = activeTab === 'pilots' ? data.pilots : data.fas;
+    
+    // We only aggregate stats for the active tab (using worst status approach)
+    let current = 0;
+    let warning = 0;
+    let expired = 0;
 
-    switch (requirement.type) {
-      case 'recency':
-        lastDate = pilot.lastFlown;
-        count = pilot.totalLandings90Days;
-        daysRemaining = 90 - differenceInDays(now, lastDate);
-        break;
-      case 'night':
-        lastDate = pilot.lastNightLanding;
-        count = pilot.nightLandings90Days;
-        if (lastDate) {
-          daysRemaining = 90 - differenceInDays(now, lastDate);
-        }
-        break;
-      case 'instrument':
-        lastDate = pilot.lastInstrumentApproach;
-        count = pilot.instrumentApproaches180Days;
-        if (lastDate) {
-          daysRemaining = 180 - differenceInDays(now, lastDate);
-        }
-        break;
-      case 'holds':
-        lastDate = pilot.lastHold;
-        count = pilot.holds180Days;
-        if (lastDate) {
-          daysRemaining = 180 - differenceInDays(now, lastDate);
-        }
-        break;
-      case 'recurrent':
-        lastDate = pilot.lastRecurrent;
-        count = 1;
-        daysRemaining = 365 - differenceInDays(now, lastDate);
-        break;
-      default:
-        return { status: 'unknown', daysRemaining: 0, message: 'Unknown', count: 0 };
-    }
+    crew.forEach(member => {
+      const status = getWorstStatus(member);
+      if (status === 'current') current++;
+      if (status === 'warning') warning++;
+      if (status === 'expired') expired++;
+    });
 
-    // Check if meets minimum count requirement
-    const meetsMinimum = !requirement.minimumCount || count >= requirement.minimumCount;
-
-    if (!lastDate || !meetsMinimum || daysRemaining <= 0) {
-      return { status: 'expired', daysRemaining: 0, message: 'Expired', count };
-    } else if (daysRemaining <= requirement.warningDays) {
-      return { status: 'warning', daysRemaining, message: `${daysRemaining} days left`, count };
-    } else {
-      return { status: 'current', daysRemaining, message: `Current (${count})`, count };
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'current':
-        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" />Current</Badge>;
-      case 'warning':
-        return <Badge className="bg-yellow-500"><AlertTriangle className="w-3 h-3 mr-1" />Warning</Badge>;
-      case 'expired':
-        return <Badge className="bg-red-500"><XCircle className="w-3 h-3 mr-1" />Expired</Badge>;
-      default:
-        return <Badge variant="secondary">Unknown</Badge>;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'current': return 'text-green-600';
-      case 'warning': return 'text-yellow-600';
-      case 'expired': return 'text-red-600';
-      default: return 'text-gray-600';
-    }
-  };
-
-  // Calculate summary statistics
-  const summaryStats = {
-    totalPilots: pilotCurrencies.length,
-    currentPilots: pilotCurrencies.filter(p => p.status === 'current').length,
-    warningPilots: pilotCurrencies.filter(p => p.status === 'warning').length,
-    expiredPilots: pilotCurrencies.filter(p => p.status === 'expired').length
-  };
+    return { total: crew.length, current, warning, expired };
+  }, [data, activeTab]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center space-y-4">
-          <RefreshCw className="w-12 h-12 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Loading flight logs from MyAirOps...</p>
+          <RefreshCw className="w-12 h-12 animate-spin mx-auto text-blue-500" />
+          <p className="text-muted-foreground">Syncing flight data from MyAirOps...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="flex items-center gap-2">
-              <UserCheck className="w-6 h-6" />
-              Pilot Currency Dashboard
-            </h1>
-            <p className="text-muted-foreground">Auto-synced from MyAirOps API • Real-time currency tracking</p>
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
+
+      {/* ══════ HEADER — NEW BUILD BANNER ══════ */}
+      <div className="relative">
+        <div className="absolute -top-2 -right-2 z-10">
+          <div className="bg-gradient-to-r from-violet-600 to-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-wider shadow-lg shadow-violet-500/30 flex items-center gap-1.5 animate-pulse">
+            <Sparkles className="w-3.5 h-3.5" />
+            V2 — NEW BUILD
           </div>
-          <div className="flex items-center gap-4">
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+          {/* Left: Title */}
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <UserCheck className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-aviation-gradient">Currency Dashboard</span>
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1 ml-[52px]">
+              Part 91 • Unified View • Auto-synced from MyAirOps
+            </p>
+          </div>
+
+          {/* Center: Massive Developer CTA */}
+          <div className="flex justify-center mt-2 lg:mt-0 shadow-lg shadow-indigo-500/20 rounded-full max-w-sm mx-auto">
+            <Button 
+              size="lg" 
+              className="gap-3 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 text-white border-0 shadow-xl shadow-violet-500/40 font-extrabold px-8 py-6 text-base w-full group relative overflow-hidden" 
+              onClick={() => setShowDevSpec(!showDevSpec)}
+            >
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
+              <FileText className="w-5 h-5 relative z-10" />
+              <span className="relative z-10">Developer Readme & Spec</span>
+            </Button>
+          </div>
+
+          {/* Right: Sync Controls */}
+          <div className="flex items-center lg:justify-end gap-3 flex-wrap mt-2 lg:mt-0 lg:pr-6">
             {lastSync && (
-              <div className="text-sm text-gray-600 flex items-center gap-2">
-                <Database className="w-4 h-4" />
-                Last synced: {format(lastSync, 'HH:mm:ss')}
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 px-3 py-1.5 rounded-full">
+                <Database className="w-3.5 h-3.5" />
+                Synced {format(lastSync, 'HH:mm')}
               </div>
             )}
-            <Button
-              onClick={fetchFlightLogs}
-              disabled={syncing}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              Sync from MyAirOps
+            <Button onClick={handleSync} disabled={syncing} variant="outline" size="sm" className="gap-2 rounded-full">
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              Sync
             </Button>
           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="dashboard">Live Dashboard</TabsTrigger>
-          <TabsTrigger value="flight-logs">Flight Logs</TabsTrigger>
-          <TabsTrigger value="requirements">Requirements</TabsTrigger>
-        </TabsList>
-
-        {/* Live Dashboard Tab */}
-        <TabsContent value="dashboard" className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Pilots</CardTitle>
-                <UserCheck className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{summaryStats.totalPilots}</div>
-                <p className="text-xs text-muted-foreground">Active in system</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Current</CardTitle>
-                <div className="h-4 w-4 rounded-full bg-green-500"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{summaryStats.currentPilots}</div>
-                <p className="text-xs text-muted-foreground">
-                  {summaryStats.totalPilots > 0 
-                    ? ((summaryStats.currentPilots / summaryStats.totalPilots) * 100).toFixed(0) 
-                    : 0}% of fleet
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Warnings</CardTitle>
-                <div className="h-4 w-4 rounded-full bg-yellow-500"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-yellow-600">{summaryStats.warningPilots}</div>
-                <p className="text-xs text-muted-foreground">Require attention</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Expired</CardTitle>
-                <div className="h-4 w-4 rounded-full bg-red-500"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{summaryStats.expiredPilots}</div>
-                <p className="text-xs text-muted-foreground">Not current</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Critical Alerts */}
-          {summaryStats.expiredPilots > 0 && (
-            <Alert className="border-red-200 bg-red-50">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">
-                <strong>Critical Alert:</strong> {summaryStats.expiredPilots} pilot(s) have expired currency and are not eligible for flight duties.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="w-5 h-5" />
-                Filters & Search
+      {/* ══════ DEV SPEC DRAWER ══════ */}
+      {showDevSpec && (
+        <Card className="border-indigo-500/40 bg-indigo-50/50 dark:bg-indigo-950/20 shadow-lg mb-6 animate-in slide-in-from-top-2 duration-300">
+          <CardHeader className="pb-3 border-b border-indigo-500/10 mb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
+                <FileText className="w-5 h-5" />
+                Backend Developer Handoff Readme
               </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="search">Search Pilots</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="search"
-                      placeholder="Search by name..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowDevSpec(false)}><X className="w-4 h-4" /></Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <div className="flex flex-col md:flex-row gap-4">
+               <div className="flex-1 space-y-4">
+                 <Alert className="border-indigo-200 dark:border-indigo-800 bg-white/50 dark:bg-slate-900/50">
+                    <Info className="w-4 h-4 text-indigo-600" />
+                    <AlertDescription className="text-sm leading-relaxed">
+                      <p className="font-semibold mb-1 text-foreground">1. Frontend Math Reference</p>
+                      This layout contains live math parsing for 90-day, 6-month, and 12-month calendar windows. 
+                      You can use functions inside <code className="bg-indigo-100 dark:bg-indigo-900/50 px-1.5 py-0.5 rounded text-xs text-indigo-800 dark:text-indigo-300">PilotCurrency.tsx</code> as direct pseudocode to replicate the exact interval logic on the server.
+                    </AlertDescription>
+                 </Alert>
+                 
+                 <Alert className="border-indigo-200 dark:border-indigo-800 bg-white/50 dark:bg-slate-900/50">
+                    <Database className="w-4 h-4 text-indigo-600" />
+                    <AlertDescription className="text-sm leading-relaxed">
+                      <p className="font-semibold mb-1 text-foreground">2. Formal API Specification</p>
+                      The complete backend schema, OData table integration strategy from MyAirOps, and exact JSON request/response mappings are fully documented.
+                      
+                      <div className="mt-4">
+                        <a 
+                          href="https://github.com/bryandunlop/Antigravity-Aviation-Management-System/blob/main/backend_designs/PilotCurrencyApiSpec.md" 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-xs font-bold transition-all shadow-sm hover:shadow-md"
+                        >
+                          <FileText className="w-4 h-4" />
+                          View PilotCurrencyApiSpec.md on GitHub
+                        </a>
+                      </div>
+                    </AlertDescription>
+                 </Alert>
+               </div>
+               
+               <div className="flex-1">
+                 <div className="bg-slate-950 rounded-xl p-5 border border-slate-800 h-full flex flex-col justify-center shadow-inner">
+                   <h4 className="text-slate-300 text-xs font-bold mb-4 flex items-center justify-between border-b border-slate-800 pb-2">
+                     <span className="uppercase tracking-wider">Crucial Math Intervals (Part 91)</span>
+                     <span className="bg-slate-800 px-2 py-0.5 rounded text-[10px]">Reference</span>
+                   </h4>
+                   <ul className="space-y-3 text-slate-400 text-xs font-mono">
+                     <li className="flex justify-between items-center"><span className="text-emerald-400">General / Night</span> <span className="bg-slate-900 px-2 py-1 rounded">Rolling 90 Days</span></li>
+                     <li className="flex justify-between items-center"><span className="text-amber-400">Inst. Approaches</span> <span className="bg-slate-900 px-2 py-1 rounded">6 Calendar Months Lookback</span></li>
+                     <li className="flex justify-between items-center"><span className="text-amber-400">Holds</span> <span className="bg-slate-900 px-2 py-1 rounded">6 Calendar Months Lookback</span></li>
+                     <li className="flex justify-between items-center"><span className="text-blue-400">Alternate Night</span> <span className="bg-slate-900 px-2 py-1 rounded">6 / 12 Month Target</span></li>
+                     <li className="flex justify-between items-center"><span className="text-violet-400">61.58 PIC Check</span> <span className="bg-slate-900 px-2 py-1 rounded">End of 12th Calendar Month</span></li>
+                   </ul>
+                 </div>
+               </div>
+             </div>
+          </CardContent>
+        </Card>
+      )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status Filter</Label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="current">Current</SelectItem>
-                      <SelectItem value="warning">Warning</SelectItem>
-                      <SelectItem value="expired">Expired</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+      {/* ══════ CREW TYPE TABS & SUMMARY STATS ══════ */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as 'pilots' | 'flight-attendants')} className="w-full max-w-md">
+          <TabsList className="w-full">
+            <TabsTrigger value="pilots" className="gap-2 flex-1">
+              <Plane className="w-4 h-4" /> Pilots
+            </TabsTrigger>
+            <TabsTrigger value="flight-attendants" className="gap-2 flex-1">
+              <Users className="w-4 h-4" /> Flight Attendants
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-                <div className="space-y-2">
-                  <Label htmlFor="aircraft">Aircraft Type</Label>
-                  <Select value={aircraftFilter} onValueChange={setAircraftFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by aircraft" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Aircraft</SelectItem>
-                      <SelectItem value="G650">Gulfstream G650</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Unified Summary Pills */}
+        <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+          <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-500/20 whitespace-nowrap">
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+            {summaryStats.current} Current
+          </div>
+          <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-amber-500/20 whitespace-nowrap">
+            <div className="w-2 h-2 rounded-full bg-amber-500" />
+            {summaryStats.warning} Due Soon
+          </div>
+          <div className="flex items-center gap-1.5 bg-red-500/10 text-red-700 dark:text-red-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-red-500/20 whitespace-nowrap">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            {summaryStats.expired} Expired
+          </div>
+        </div>
+      </div>
 
-          {/* Pilot Currency Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pilot Currency Status (Auto-calculated from MyAirOps)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
+      {/* ══════ CRITICAL ALERT ══════ */}
+      {summaryStats.expired > 0 && (
+        <Alert className="border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800 dark:text-red-300">
+            <strong>Critical:</strong> {summaryStats.expired} crew member(s) have expired or non-current training items. Review immediately.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* ══════ FILTERS ══════ */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 rounded-full" />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40 rounded-full">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Overall</SelectItem>
+            <SelectItem value="current">🟢 Current</SelectItem>
+            <SelectItem value="warning">🟡 Due Soon</SelectItem>
+            <SelectItem value="expired">🔴 Expired</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* ══════ MAIN TABLE — PILOTS ══════ */}
+      {activeTab === 'pilots' && (
+        <Card className="overflow-hidden border-border/50 shadow-md">
+          <CardHeader className="pb-3 bg-muted/30">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Plane className="w-4 h-4" />
+              Pilot Currency Directory (All Assigned Types)
+              <Badge variant="secondary" className="ml-2 text-xs">{filteredPilots.length} pilots</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/20">
+                    <TableHead className="w-14 pl-6">Type</TableHead>
+                    <TableHead className="text-center w-32">Status</TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex flex-col items-center">
+                        <span>General</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">90d</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex flex-col items-center">
+                        <span>Night</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">90d / Alt</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex flex-col items-center">
+                        <span>Inst. Appr.</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">6mo</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex flex-col items-center">
+                        <span>Holds</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">6mo</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex flex-col items-center">
+                        <span>61.58</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">12mo</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center">Last Flown</TableHead>
+                    <TableHead className="text-center">Hrs in Type</TableHead>
+                    <TableHead className="text-center w-20">Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPilots.length === 0 ? (
                     <TableRow>
-                      <TableHead>Pilot</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Last Flown</TableHead>
-                      <TableHead>Landings (90d)</TableHead>
-                      <TableHead>Night (90d)</TableHead>
-                      <TableHead>Instrument (180d)</TableHead>
-                      <TableHead>Recurrent</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-12">
+                        No pilots found matching filters
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPilots.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          No pilots found matching filters
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredPilots.map((pilot) => {
-                        const recencyStatus = getCurrencyStatus(pilot, currencyRequirements.find(r => r.type === 'recency')!);
-                        const nightStatus = getCurrencyStatus(pilot, currencyRequirements.find(r => r.type === 'night')!);
-                        const instrumentStatus = getCurrencyStatus(pilot, currencyRequirements.find(r => r.type === 'instrument')!);
-                        const recurrentStatus = getCurrencyStatus(pilot, currencyRequirements.find(r => r.type === 'recurrent')!);
-                        
-                        return (
-                          <TableRow key={pilot.pilotId}>
-                            <TableCell className="font-medium">{pilot.pilotName}</TableCell>
-                            <TableCell>{getStatusBadge(pilot.status)}</TableCell>
-                            <TableCell>{format(pilot.lastFlown, 'MMM dd, yyyy')}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span className={getStatusColor(recencyStatus.status)}>
-                                  {recencyStatus.count}/3
-                                </span>
-                                {recencyStatus.status === 'expired' && <XCircle className="w-4 h-4 text-red-600" />}
+                  ) : (
+                    filteredPilots.map((pilot) => {
+                      const activeTypes = getActiveTypes(pilot);
+                      const worstStatus = getWorstStatus(pilot);
+                      const isExpandedNotes = expandedPilotNotes === pilot.crewId;
+                      
+                      return (
+                        <React.Fragment key={pilot.crewId}>
+                          {/* ──── PILOT HEADER ROW ──── */}
+                          <TableRow className={`font-semibold bg-muted/40 border-t-2 border-t-muted transition-colors hover:bg-muted/50 ${worstStatus === 'expired' ? 'bg-red-50/40 dark:bg-red-950/20' : ''}`}>
+                            <TableCell colSpan={2} className="pl-6">
+                              <div className="flex items-center justify-between">
+                                <span className="text-base tracking-tight">{pilot.crewName}</span>
+                                <StatusBadge status={worstStatus} label="Overall" />
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Moon className="w-4 h-4 text-blue-600" />
-                                <span className={getStatusColor(nightStatus.status)}>
-                                  {nightStatus.count}/3
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Navigation className="w-4 h-4 text-purple-600" />
-                                <span className={getStatusColor(instrumentStatus.status)}>
-                                  {instrumentStatus.count}/6
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className={getStatusColor(recurrentStatus.status)}>
-                                {format(pilot.nextRecurrent, 'MMM yyyy')}
-                              </span>
-                            </TableCell>
-                            <TableCell>
+                            <TableCell colSpan={7}></TableCell>
+                            <TableCell className="text-center">
                               <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => setSelectedPilot(pilot)}
+                                variant="ghost" 
+                                size="sm" 
+                                className="w-full justify-center px-0 hover:bg-card/50"
+                                onClick={() => setExpandedPilotNotes(isExpandedNotes ? null : pilot.crewId)}
                               >
-                                <Eye className="w-4 h-4" />
+                                {pilot.notes.length > 0 ? (
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                                    <span className="text-xs font-bold">{pilot.notes.length}</span>
+                                    {pilot.notes.some(n => n.isUrgent) && <Flag className="w-3 h-3 text-red-500" />}
+                                    <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpandedNotes ? 'rotate-180' : ''}`} />
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-muted-foreground opacity-50 hover:opacity-100 transition-opacity">
+                                    <MessageSquare className="w-4 h-4" />
+                                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpandedNotes ? 'rotate-180' : ''}`} />
+                                  </div>
+                                )}
                               </Button>
                             </TableCell>
                           </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Flight Logs Tab */}
-        <TabsContent value="flight-logs" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plane className="w-5 h-5" />
-                Recent Flight Logs from MyAirOps
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Flight #</TableHead>
-                      <TableHead>Aircraft</TableHead>
-                      <TableHead>Route</TableHead>
-                      <TableHead>PIC</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Ldgs</TableHead>
-                      <TableHead>Night</TableHead>
-                      <TableHead>Appr</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {flightLogs.slice(0, 20).map((log) => (
-                      <TableRow key={log.id}>
-                        <TableCell>{format(log.date, 'MMM dd, yyyy')}</TableCell>
-                        <TableCell className="font-medium">{log.flightNumber}</TableCell>
-                        <TableCell>{log.tailNumber}</TableCell>
-                        <TableCell>{log.origin} → {log.destination}</TableCell>
-                        <TableCell>{log.picName}</TableCell>
-                        <TableCell>{log.flightTime.toFixed(1)}h</TableCell>
-                        <TableCell>{log.landings}</TableCell>
-                        <TableCell>
-                          {log.nightLandings > 0 && (
-                            <div className="flex items-center gap-1">
-                              <Moon className="w-4 h-4 text-blue-600" />
-                              {log.nightLandings}
-                            </div>
+                          {/* ──── AIRCRAFT ROWS ──── */}
+                          {activeTypes.length === 0 ? (
+                            <TableRow className="bg-card">
+                              <TableCell colSpan={10} className="pl-6 text-sm text-muted-foreground italic text-center py-4">
+                                No active aircraft assignments found for this pilot.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            activeTypes.map(type => {
+                              const tc = pilot.typeCurrencies[type];
+                              return (
+                                <TableRow key={`${pilot.crewId}-${type}`} className="bg-card hover:bg-muted/30 transition-colors">
+                                  <TableCell className="pl-6">
+                                    <div className="flex items-center gap-2 font-medium text-slate-700 dark:text-slate-300">
+                                      <Plane className="w-3.5 h-3.5 text-muted-foreground" />
+                                      {type}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <StatusBadge status={tc.overallStatus} />
+                                  </TableCell>
+                                  <TableCell className="text-center"><CurrencyCell result={tc.generalCurrency} /></TableCell>
+                                  <TableCell className="text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <CurrencyCell result={tc.nightCurrencyEffective} />
+                                      {tc.nightCurrencyEffective.complianceMethod && tc.nightCurrencyEffective.complianceMethod !== 'standard' && (
+                                        <span className="text-[9px] bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-400 px-1 rounded font-bold uppercase tracking-wider">ALT</span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center"><CurrencyCell result={tc.instrumentCurrency} /></TableCell>
+                                  <TableCell className="text-center"><CurrencyCell result={tc.holdingCurrency} /></TableCell>
+                                  <TableCell className="text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <StatusDot status={tc.picCheck.status} />
+                                      <span className={`text-xs font-medium ${tc.picCheck.status === 'current' ? 'text-emerald-600 dark:text-emerald-400' : tc.picCheck.status === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {tc.picCheck.expiryDate ? format(tc.picCheck.expiryDate, 'MMM yy') : '—'}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {tc.daysSinceLastFlown !== null ? (
+                                      <span className={`text-sm font-medium ${tc.daysSinceLastFlown > 90 ? 'text-red-600 dark:text-red-400' : tc.daysSinceLastFlown > 30 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
+                                        {tc.daysSinceLastFlown}d
+                                      </span>
+                                    ) : <span className="text-muted-foreground text-sm">—</span>}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <span className="text-sm font-semibold">{tc.totalHoursInType}h</span>
+                                  </TableCell>
+                                  <TableCell></TableCell>
+                                </TableRow>
+                              )
+                            })
                           )}
-                        </TableCell>
-                        <TableCell>{log.instrumentApproaches}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Requirements Tab */}
-        <TabsContent value="requirements" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>FAA Currency Requirements</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {currencyRequirements.map((requirement, index) => (
-                  <div key={index} className="p-4 border rounded-lg">
-                    <h3 className="font-medium">{requirement.description}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Valid for {requirement.validityDays} days • Warning at {requirement.warningDays} days
-                      {requirement.minimumCount && ` • Minimum: ${requirement.minimumCount}`}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                          {/* ──── EXPANDED NOTES SECTION ──── */}
+                          {isExpandedNotes && (
+                            <TableRow className="bg-card">
+                              <TableCell colSpan={10} className="p-0 border-b-2">
+                                <div className="p-4 bg-muted/10 border-t border-border shadow-inner" onClick={(e) => e.stopPropagation()}>
+                                  <div className="max-w-3xl ml-6">
+                                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                      <MessageSquare className="w-4 h-4" />
+                                      Scheduling Notes for {pilot.crewName}
+                                    </h3>
 
-      {/* Pilot Detail Modal */}
-      {selectedPilot && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle>Currency Details - {selectedPilot.pilotName}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Aircraft Type</Label>
-                  <p>{selectedPilot.aircraftType}</p>
-                </div>
-                <div>
-                  <Label>Overall Status</Label>
-                  {getStatusBadge(selectedPilot.status)}
-                </div>
-                <div>
-                  <Label>Last Flown</Label>
-                  <p>{format(selectedPilot.lastFlown, 'MMM dd, yyyy')}</p>
-                </div>
-                <div>
-                  <Label>Total Flight Time (All Time)</Label>
-                  <p>{selectedPilot.totalFlightTime.toFixed(1)} hours</p>
-                </div>
-              </div>
+                                    {/* Existing notes */}
+                                    <div className="space-y-2 mb-3">
+                                      {pilot.notes.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">No historical notes found.</p>
+                                      )}
+                                      {pilot.notes.map(note => (
+                                        <div key={note.id} className={`p-3 rounded-lg border text-sm ${note.isUrgent ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20 shadow-sm shadow-red-500/5' : 'border-border bg-card'}`}>
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1">
+                                              {note.isUrgent && (
+                                                <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30 text-[10px] mb-1.5 gap-1 font-bold uppercase tracking-wider">
+                                                  <Flag className="w-3 h-3" /> Urgent
+                                                </Badge>
+                                              )}
+                                              <p className="leading-relaxed">{note.content}</p>
+                                              <p className="text-xs text-muted-foreground mt-2 font-medium">
+                                                {note.authorName} • {format(note.createdAt, 'MMM d, yyyy HH:mm')}
+                                              </p>
+                                            </div>
+                                            {isScheduling && (
+                                              <div className="flex gap-1">
+                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                                  <Edit3 className="w-3.5 h-3.5 text-muted-foreground hover:text-blue-500 transition-colors" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                                  <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-red-500 transition-colors" />
+                                                </Button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
 
-              <div>
-                <Label className="text-lg mb-4">Currency Status</Label>
-                <div className="space-y-3 mt-2">
-                  {currencyRequirements.map((req, index) => {
-                    const status = getCurrencyStatus(selectedPilot, req);
-                    return (
-                      <div key={index} className="flex justify-between items-center p-3 border rounded bg-gray-50">
-                        <div>
-                          <span className="text-sm font-medium">{req.description}</span>
-                          {req.minimumCount && (
-                            <p className="text-xs text-muted-foreground">
-                              Count: {status.count}/{req.minimumCount}
-                            </p>
+                                    {/* Add note */}
+                                    {isScheduling && (
+                                      <div className="flex gap-2">
+                                        <Textarea 
+                                          placeholder={`Add a new note for ${pilot.crewName.split(' ')[0]}...`}
+                                          value={newNoteContent}
+                                          onChange={(e) => setNewNoteContent(e.target.value)}
+                                          className="text-sm min-h-[60px] bg-card"
+                                        />
+                                        <div className="flex flex-col gap-1.5">
+                                          <Button 
+                                            size="sm" 
+                                            disabled={!newNoteContent.trim()}
+                                            onClick={() => {
+                                              toast.success('Note added successfully');
+                                              setNewNoteContent('');
+                                              setNewNoteUrgent(false);
+                                            }}
+                                            className="gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                          >
+                                            <Send className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            variant={newNoteUrgent ? 'destructive' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setNewNoteUrgent(!newNoteUrgent)}
+                                            className="gap-1 bg-card"
+                                            title="Mark as urgent"
+                                          >
+                                            <Flag className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </div>
-                        <span className={`text-sm font-medium ${getStatusColor(status.status)}`}>
-                          {status.message}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-lg mb-4">Recent Flights (from MyAirOps)</Label>
-                <div className="space-y-2 mt-2 max-h-60 overflow-y-auto">
-                  {selectedPilot.recentFlights.slice(0, 10).map((flight) => (
-                    <div key={flight.id} className="p-3 border rounded text-sm">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-medium">{flight.flightNumber} • {flight.tailNumber}</div>
-                          <div className="text-muted-foreground">{flight.origin} → {flight.destination}</div>
-                        </div>
-                        <div className="text-right">
-                          <div>{format(flight.date, 'MMM dd, yyyy')}</div>
-                          <div className="text-muted-foreground">{flight.flightTime.toFixed(1)}h</div>
-                        </div>
-                      </div>
-                      <div className="flex gap-4 mt-2 text-xs">
-                        <span>Ldgs: {flight.landings}</span>
-                        {flight.nightLandings > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Moon className="w-3 h-3" /> Night: {flight.nightLandings}
-                          </span>
-                        )}
-                        {flight.instrumentApproaches > 0 && (
-                          <span>Appr: {flight.instrumentApproaches}</span>
-                        )}
-                        {flight.holds > 0 && (
-                          <span>Holds: {flight.holds}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-4">
-                <Button onClick={() => setSelectedPilot(null)}>Close</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
+
+      {/* ══════ MAIN TABLE — FLIGHT ATTENDANTS ══════ */}
+      {activeTab === 'flight-attendants' && (
+        <Card className="overflow-hidden border-border/50 shadow-md">
+          <CardHeader className="pb-3 bg-muted/30">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Flight Attendant Currency Directory
+              <Badge variant="secondary" className="ml-2 text-xs">{filteredPilots.length} FAs</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/20">
+                    <TableHead className="w-14 pl-6">Type</TableHead>
+                    <TableHead className="text-center w-32">Status</TableHead>
+                    <TableHead className="text-center">Days Since Last Flown</TableHead>
+                    <TableHead className="text-center">Last Flown Date</TableHead>
+                    <TableHead className="text-center">Total Hours</TableHead>
+                    <TableHead className="text-center w-20">Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPilots.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                        No flight attendants found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredPilots.map((fa) => {
+                      const activeTypes = getActiveTypes(fa);
+                      const worstStatus = getWorstStatus(fa);
+                      const isExpandedNotes = expandedPilotNotes === fa.crewId;
+
+                      return (
+                        <React.Fragment key={fa.crewId}>
+                          {/* ──── FA HEADER ROW ──── */}
+                          <TableRow className={`font-semibold bg-muted/40 border-t-2 border-t-muted transition-colors hover:bg-muted/50 ${worstStatus === 'expired' ? 'bg-red-50/40 dark:bg-red-950/20' : ''}`}>
+                            <TableCell colSpan={2} className="pl-6">
+                              <div className="flex items-center justify-between">
+                                <span className="text-base tracking-tight">{fa.crewName}</span>
+                                <StatusBadge status={worstStatus} label="Overall" />
+                              </div>
+                            </TableCell>
+                            <TableCell colSpan={3}></TableCell>
+                            <TableCell className="text-center">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="w-full justify-center px-0 hover:bg-card/50"
+                                onClick={() => setExpandedPilotNotes(isExpandedNotes ? null : fa.crewId)}
+                              >
+                                {fa.notes.length > 0 ? (
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                                    <span className="text-xs font-bold">{fa.notes.length}</span>
+                                    {fa.notes.some(n => n.isUrgent) && <Flag className="w-3 h-3 text-red-500" />}
+                                    <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpandedNotes ? 'rotate-180' : ''}`} />
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-muted-foreground opacity-50 hover:opacity-100 transition-opacity">
+                                    <MessageSquare className="w-4 h-4" />
+                                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpandedNotes ? 'rotate-180' : ''}`} />
+                                  </div>
+                                )}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+
+                          {/* ──── AIRCRAFT ROWS ──── */}
+                          {activeTypes.length === 0 ? (
+                            <TableRow className="bg-card">
+                              <TableCell colSpan={6} className="pl-6 text-sm text-muted-foreground italic text-center py-4">
+                                No active aircraft assignments found.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            activeTypes.map(type => {
+                              const tc = fa.typeCurrencies[type];
+                              return (
+                                <TableRow key={`${fa.crewId}-${type}`} className="bg-card hover:bg-muted/30 transition-colors">
+                                  <TableCell className="pl-6">
+                                    <div className="flex items-center gap-2 font-medium text-slate-700 dark:text-slate-300">
+                                      <Plane className="w-3.5 h-3.5 text-muted-foreground" />
+                                      {type}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {tc.daysSinceLastFlown !== null ? (
+                                      <StatusBadge status={tc.overallStatus} />
+                                    ) : (
+                                      <StatusBadge status="expired" label="No Record" />
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {tc.daysSinceLastFlown !== null ? (
+                                      <div className="flex items-center justify-center gap-2">
+                                        <StatusDot status={tc.overallStatus} />
+                                        <span className={`font-semibold ${tc.overallStatus === 'current' ? 'text-emerald-600 dark:text-emerald-400' : tc.overallStatus === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                                          {tc.daysSinceLastFlown} days
+                                        </span>
+                                      </div>
+                                    ) : <span className="text-muted-foreground">—</span>}
+                                  </TableCell>
+                                  <TableCell className="text-center text-sm font-medium">
+                                    {tc.lastFlownDate ? format(tc.lastFlownDate, 'MMM d, yyyy') : '—'}
+                                  </TableCell>
+                                  <TableCell className="text-center text-sm font-semibold">
+                                    {tc.totalHoursInType}h
+                                  </TableCell>
+                                  <TableCell></TableCell>
+                                </TableRow>
+                              )
+                            })
+                          )}
+
+                          {/* ──── EXPANDED NOTES SECTION ──── */}
+                          {isExpandedNotes && (
+                            <TableRow className="bg-card">
+                              <TableCell colSpan={6} className="p-0 border-b-2">
+                                <div className="p-4 bg-muted/10 border-t border-border shadow-inner" onClick={(e) => e.stopPropagation()}>
+                                  <div className="max-w-3xl ml-6">
+                                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                      <MessageSquare className="w-4 h-4" />
+                                      Scheduling Notes for {fa.crewName}
+                                    </h3>
+
+                                    <div className="space-y-2 mb-3">
+                                      {fa.notes.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">No historical notes found.</p>
+                                      )}
+                                      {/* Mapping logic similar to pilots */}
+                                      {fa.notes.map(note => (
+                                        <div key={note.id} className={`p-3 rounded-lg border text-sm ${note.isUrgent ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20 shadow-sm shadow-red-500/5' : 'border-border bg-card'}`}>
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1">
+                                              {note.isUrgent && (
+                                                <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30 text-[10px] mb-1.5 gap-1 font-bold uppercase tracking-wider">
+                                                  <Flag className="w-3 h-3" /> Urgent
+                                                </Badge>
+                                              )}
+                                              <p className="leading-relaxed">{note.content}</p>
+                                              <p className="text-xs text-muted-foreground mt-2 font-medium">
+                                                {note.authorName} • {format(note.createdAt, 'MMM d, yyyy HH:mm')}
+                                              </p>
+                                            </div>
+                                            {isScheduling && (
+                                              <div className="flex gap-1">
+                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                                  <Edit3 className="w-3.5 h-3.5 text-muted-foreground hover:text-blue-500 transition-colors" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                                  <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-red-500 transition-colors" />
+                                                </Button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {isScheduling && (
+                                      <div className="flex gap-2">
+                                        <Textarea 
+                                          placeholder={`Add a new note for ${fa.crewName.split(' ')[0]}...`}
+                                          value={newNoteContent}
+                                          onChange={(e) => setNewNoteContent(e.target.value)}
+                                          className="text-sm min-h-[60px] bg-card"
+                                        />
+                                        <div className="flex flex-col gap-1.5">
+                                          <Button 
+                                            size="sm" 
+                                            disabled={!newNoteContent.trim()}
+                                            onClick={() => {
+                                              toast.success('Note added successfully');
+                                              setNewNoteContent('');
+                                              setNewNoteUrgent(false);
+                                            }}
+                                            className="gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                          >
+                                            <Send className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            variant={newNoteUrgent ? 'destructive' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setNewNoteUrgent(!newNoteUrgent)}
+                                            className="gap-1 bg-card"
+                                            title="Mark as urgent"
+                                          >
+                                            <Flag className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ══════ REGULATORY REFERENCE FOOTER ══════ */}
+      <Card className="bg-muted/30 border-dashed">
+        <CardContent className="py-4">
+          <div className="flex items-start gap-3">
+            <Shield className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground">Regulatory Reference — 14 CFR Part 91</p>
+              <p>
+                <strong>§ 61.57(a)</strong> General: 3 T/O & landings in 90 days •{' '}
+                <strong>§ 61.57(b)</strong> Night: 3 full-stop landings at night in 90 days •{' '}
+                <strong>§ 61.57(c)</strong> Instrument: 6 approaches + holds in 6 calendar months •{' '}
+                <strong>§ 61.57(e)</strong> Alternate night: Multi-crew turbine, 1500+ hrs, 6mo/12mo options •{' '}
+                <strong>§ 61.58</strong> PIC proficiency check: 12/24 calendar months
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

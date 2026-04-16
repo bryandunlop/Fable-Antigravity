@@ -184,6 +184,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         // { name: 'Restaurant Database', href: '/restaurant-database', icon: Utensils, roles: ['pilot', 'inflight', 'maintenance', 'admin'] },
         { name: 'Tasks & Action Items', href: '/tasks-action-items', icon: Target, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
         { name: 'AOG Management', href: '/aog-management', icon: AlertOctagon, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+        { name: 'Currency Dashboard', href: '/currency-dashboard', icon: UserCheck, roles: ['pilot', 'admin', 'lead', 'scheduling'] },
       ]
     },
     {
@@ -193,7 +194,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Standalone FRAT', href: '/frat/standalone', icon: Shield, roles: ['pilot', 'admin'] },
         { name: 'My FRAT Submissions', href: '/frat/my-submissions', icon: FileText, roles: ['pilot', 'admin'] },
         { name: 'Airport Information', href: '/airport-evaluations', icon: MapPin, roles: ['pilot', 'admin'] },
-        { name: 'Pilot Currency', href: '/pilot-currency', icon: UserCheck, roles: ['pilot', 'admin', 'lead'] },
         { name: 'Fuel Load Request', href: '/fuel-load-request', icon: Fuel, roles: ['pilot', 'admin'] },
       ]
     },
