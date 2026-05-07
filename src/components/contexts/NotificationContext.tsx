@@ -152,7 +152,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const [error, setError] = useState<string | null>(null);
 
     const [permission, setPermission] = useState<NotificationPermission>(
-        typeof window !== 'undefined' ? Notification.permission : 'default'
+        typeof window !== 'undefined' && 'Notification' in window ? window.Notification.permission : 'default'
     );
 
     // Register service worker
@@ -210,7 +210,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             return 'default';
         }
 
-        const res = await Notification.requestPermission();
+        const res = await window.Notification.requestPermission();
         setPermission(res);
         return res;
     }, []);
@@ -227,8 +227,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     }
                 });
             });
-        } else if (permission === 'granted') {
-            new Notification(title, {
+        } else if (permission === 'granted' && 'Notification' in window) {
+            new window.Notification(title, {
                 body: message,
                 icon: '/vite.svg'
             });
