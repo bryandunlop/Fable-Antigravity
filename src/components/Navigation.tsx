@@ -262,6 +262,20 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
       ]
     },
     {
+      label: "Inventory V2  ✦ NEW",
+      items: [
+        { name: 'Inventory Dashboard', href: '/inventory-v2', icon: Layers, roles: ['inflight', 'admin', 'pilot'] },
+        { name: 'New Inspection', href: '/inventory-v2/inspection', icon: ClipboardList, roles: ['inflight', 'admin'] },
+        { name: 'My Inspections', href: '/inventory-v2/my-inspections', icon: ClipboardCheck, roles: ['inflight', 'admin'] },
+        { name: 'Stockroom', href: '/inventory-v2/stockroom', icon: Boxes, roles: ['inflight', 'admin'] },
+        { name: 'Physical Count', href: '/inventory-v2/physical-count', icon: Calculator, roles: ['inflight', 'admin'] },
+        { name: 'Pick List', href: '/inventory-v2/pick-list', icon: CheckSquare, roles: ['inflight', 'admin'] },
+        { name: 'Restock', href: '/inventory-v2/restock', icon: Package, roles: ['inflight', 'admin'] },
+        { name: 'Unit Requests', href: '/inventory-v2/unit-requests', icon: Send, roles: ['inflight', 'admin'] },
+        { name: 'Receiving', href: '/inventory-v2/receiving', icon: ArrowRightLeft, roles: ['inflight', 'admin'] },
+      ]
+    },
+    {
       label: "Scheduling",
       items: [
         { name: 'Schedule Calendar', href: '/schedule', icon: Calendar, roles: ['pilot', 'admin'] },

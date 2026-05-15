@@ -118,6 +118,21 @@ import MWPredictiveAnalytics from './components/maintenance-workflow/PredictiveA
 import MaintenanceTurnoverForm from './components/MaintenanceTurnoverForm';
 import { AuditProvider } from './contexts/AuditContext';
 
+// Inventory V2
+import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Context';
+import InventoryV2Dashboard from './components/inventory-v2/pages/InventoryV2Dashboard';
+import InspectionFormV2 from './components/inventory-v2/pages/InspectionForm';
+import InspectionReviewV2 from './components/inventory-v2/pages/InspectionReview';
+import InspectionHistoryV2 from './components/inventory-v2/pages/InspectionHistory';
+import RecentlyCompletedV2 from './components/inventory-v2/pages/RecentlyCompleted';
+import StockroomCountV2 from './components/inventory-v2/pages/StockroomCount';
+import PhysicalCountV2 from './components/inventory-v2/pages/PhysicalCount';
+import PickListV2 from './components/inventory-v2/pages/PickList';
+import RestockListV2 from './components/inventory-v2/pages/RestockList';
+import UnitItemRequestV2 from './components/inventory-v2/pages/UnitItemRequest';
+import UnitItemRequestListV2 from './components/inventory-v2/pages/UnitItemRequestList';
+import ReceivingV2 from './components/inventory-v2/pages/Receiving';
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string>('pilot');
@@ -369,6 +384,20 @@ export default function App() {
                                 <Route path="/catering-orders" element={<CateringOrders />} />
                                 {/* <Route path="/restaurant-database" element={<RestaurantDatabase userRole={userRole} />} /> */}
                                 <Route path="/aircraft-inventory" element={<AircraftInventory />} />
+
+                                {/* ─── Inventory V2 Routes ─── */}
+                                <Route path="/inventory-v2" element={<InventoryV2Provider><InventoryV2Dashboard /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/inspection" element={<InventoryV2Provider><InspectionFormV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/inspection/:id/review" element={<InventoryV2Provider><InspectionReviewV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/my-inspections" element={<InventoryV2Provider><InspectionHistoryV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/recently-completed" element={<InventoryV2Provider><RecentlyCompletedV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/stockroom" element={<InventoryV2Provider><StockroomCountV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/physical-count" element={<InventoryV2Provider><PhysicalCountV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/pick-list" element={<InventoryV2Provider><PickListV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/restock" element={<InventoryV2Provider><RestockListV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/unit-request" element={<InventoryV2Provider><UnitItemRequestV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/unit-requests" element={<InventoryV2Provider><UnitItemRequestListV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/receiving" element={<InventoryV2Provider><ReceivingV2 /></InventoryV2Provider>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />
