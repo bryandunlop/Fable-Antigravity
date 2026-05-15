@@ -26,8 +26,10 @@ import { ItemRow } from '../shared/ItemRow';
 import { BarcodeScannerDialog } from '../shared/BarcodeScannerDialog';
 import DisplaySettingsOverlay from '../shared/DisplaySettingsOverlay';
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+
 import { useInventoryV2 } from '../InventoryV2Context';
-import { V2_THEME } from '../constants';
+import { V2_THEME, MOCK_USERS } from '../constants';
 import { getCompartmentsForAircraft } from '../compartmentConfig';
 
 import type { InspectionCheckedItem } from '../types';
@@ -69,6 +71,7 @@ export default function InspectionForm() {
   const { state } = useInventoryV2();
 
   // ── Local state ──
+  const [selectedUser, setSelectedUser] = useState<typeof MOCK_USERS[number]>(MOCK_USERS[0]);
   const [selectedTailNumber, setSelectedTailNumber] = useState('');
   const [checkedItems, setCheckedItems] = useState<Map<string, InspectionCheckedItem>>(
     new Map(),
@@ -299,11 +302,12 @@ export default function InspectionForm() {
       aircraftType,
       checkedItems: Array.from(checkedItems.values()),
       readinessScore,
+      reportedBy: selectedUser.name,
     };
 
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(draft));
     navigate('/inventory-v2/inspection/new/review');
-  }, [selectedTailNumber, aircraftType, checkedItems, navigate]);
+  }, [selectedTailNumber, aircraftType, checkedItems, selectedUser, navigate]);
 
   // ── Readiness stats per compartment ──
 
@@ -389,6 +393,31 @@ export default function InspectionForm() {
             <Settings className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+
+      {/* ── Inspector Selector ── */}
+      <div className="mb-4">
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Inspector
+        </label>
+        <Select
+          value={selectedUser.id}
+          onValueChange={(id: string) => {
+            const user = MOCK_USERS.find((u) => u.id === id);
+            if (user) setSelectedUser(user);
+          }}
+        >
+          <SelectTrigger className="h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MOCK_USERS.map((user) => (
+              <SelectItem key={user.id} value={user.id}>
+                {user.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* ── Aircraft Selector ── */}

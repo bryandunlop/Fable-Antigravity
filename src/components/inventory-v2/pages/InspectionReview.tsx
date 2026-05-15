@@ -55,6 +55,7 @@ interface InspectionDraft {
   aircraftType: 'G650' | 'G500';
   checkedItems: InspectionCheckedItem[];
   readinessScore: number;
+  reportedBy: string;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -242,7 +243,7 @@ export default function InspectionReview() {
       tailNumber: draft.tailNumber,
       aircraftType: draft.aircraftType,
       date: new Date().toISOString(),
-      reportedBy: MOCK_USERS[0].name,
+      reportedBy: draft.reportedBy ?? MOCK_USERS[0].name,
       reservationId: reservationId || undefined,
       status: hasMissingItems ? 'restocking_needed' : 'submitted',
       checkedItems: draft.checkedItems,
@@ -334,11 +335,18 @@ export default function InspectionReview() {
           </h1>
           <V2Badge variant="v2" />
         </div>
-        {aircraft && (
-          <p className="text-sm text-muted-foreground">
-            {aircraft.displayName} — Readiness: {draft.readinessScore}%
-          </p>
-        )}
+        <div className="text-right">
+          {aircraft && (
+            <p className="text-sm text-muted-foreground">
+              {aircraft.displayName} — Readiness: {draft.readinessScore}%
+            </p>
+          )}
+          {draft?.reportedBy && (
+            <p className="text-sm text-muted-foreground">
+              Inspector: <span className="font-medium text-foreground">{draft.reportedBy}</span>
+            </p>
+          )}
+        </div>
       </div>
 
       {/* ── Section 1: Top-Level Notes ── */}

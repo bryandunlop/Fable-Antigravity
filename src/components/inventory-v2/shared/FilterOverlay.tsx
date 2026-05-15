@@ -69,7 +69,7 @@ export default function FilterOverlay({ open, onOpenChange, filters, onFiltersCh
               <SelectContent>
                 <SelectItem value="everyone">Everyone</SelectItem>
                 {MOCK_USERS.map(user => (
-                  <SelectItem key={user.id} value={user.id}>
+                  <SelectItem key={user.id} value={user.name}>
                     {user.name}
                   </SelectItem>
                 ))}

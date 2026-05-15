@@ -40,9 +40,9 @@ export default function InventoryV2Dashboard() {
   const matchesDateFilter = (dateStr: string) => {
     if (!filters.dateFrom && !filters.dateTo) return true;
     const date = new Date(dateStr).getTime();
-    const from = filters.dateFrom ? new Date(filters.dateFrom).getTime() : -Infinity;
+    const from = filters.dateFrom ? new Date(filters.dateFrom + 'T00:00:00Z').getTime() : -Infinity;
     const to = filters.dateTo
-      ? new Date(filters.dateTo + 'T23:59:59').getTime()
+      ? new Date(filters.dateTo + 'T23:59:59Z').getTime()
       : Infinity;
     return date >= from && date <= to;
   };
