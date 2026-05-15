@@ -1,7 +1,8 @@
 // ─── Inventory V2 — React Context ───────────────────────────────────────────
 
 import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
-import type { InventoryV2State, InventoryV2Action } from './types';
+import type { InventoryV2State, InventoryV2Action, StockroomItem, CommissaryAlert } from './types';
+import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS } from './mockData';
 import { FLEET_V2 } from './constants';
 import { loadCompartmentConfigs } from './compartmentConfig';
@@ -48,7 +49,69 @@ function getDefaultState(): InventoryV2State {
       hideDescriptions: false,
     },
     selectedStockroomId: 'sr-1',
+    currentUser: {
+      id: SYSTEM_USERS[0].id,
+      name: SYSTEM_USERS[0].name,
+      email: SYSTEM_USERS[0].email,
+      role: SYSTEM_USERS[0].roles[0],
+      roles: SYSTEM_USERS[0].roles,
+      department: SYSTEM_USERS[0].department,
+    },
+    alertThresholds: [],
+    alerts: [],
+    pendingChanges: 0,
   };
+}
+
+// ─── Alert Helper ────────────────────────────────────────────────────────────
+
+function generateAlertsAfterStockUpdate(
+  state: InventoryV2State,
+  newStockroomItems: StockroomItem[],
+  changedItems: StockroomItem[]
+): CommissaryAlert[] {
+  let alerts = [...state.alerts];
+
+  for (const changed of changedItems) {
+    const relatedThresholds = state.alertThresholds.filter(
+      t => t.enabled && t.itemId === changed.itemId
+    );
+
+    for (const threshold of relatedThresholds) {
+      const qty = changed.qtyOnHand;
+      const openAlert = alerts.find(
+        a => a.itemId === threshold.itemId &&
+             a.userId === threshold.userId &&
+             !a.resolvedAt &&
+             !a.dismissed
+      );
+
+      if (qty < threshold.threshold) {
+        if (!openAlert) {
+          alerts.push({
+            id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+            itemId: threshold.itemId,
+            stockroomId: changed.stockroomId,
+            userId: threshold.userId,
+            threshold: threshold.threshold,
+            currentQty: qty,
+            triggeredAt: new Date().toISOString(),
+            dismissed: false,
+          });
+        } else {
+          alerts = alerts.map(a =>
+            a === openAlert ? { ...a, currentQty: qty } : a
+          );
+        }
+      } else if (openAlert) {
+        alerts = alerts.map(a =>
+          a === openAlert ? { ...a, resolvedAt: new Date().toISOString(), currentQty: qty } : a
+        );
+      }
+    }
+  }
+
+  return alerts;
 }
 
 // ─── Reducer ────────────────────────────────────────────────────────────────
@@ -96,26 +159,26 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     case 'SET_STOCKROOM_ITEMS':
       return { ...state, stockroomItems: action.payload };
 
-    case 'UPDATE_STOCKROOM_ITEM':
-      return {
-        ...state,
-        stockroomItems: state.stockroomItems.map(si =>
-          si.itemId === action.payload.itemId && si.stockroomId === action.payload.stockroomId
-            ? action.payload
-            : si
-        ),
-      };
+    case 'UPDATE_STOCKROOM_ITEM': {
+      const newStockroomItems = state.stockroomItems.map(si =>
+        si.itemId === action.payload.itemId && si.stockroomId === action.payload.stockroomId
+          ? action.payload
+          : si
+      );
+      const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, [action.payload]);
+      return { ...state, stockroomItems: newStockroomItems, alerts, pendingChanges: state.pendingChanges + 1 };
+    }
 
-    case 'BULK_UPDATE_STOCKROOM':
-      return {
-        ...state,
-        stockroomItems: state.stockroomItems.map(si => {
-          const updated = action.payload.find(
-            u => u.itemId === si.itemId && u.stockroomId === si.stockroomId
-          );
-          return updated ?? si;
-        }),
-      };
+    case 'BULK_UPDATE_STOCKROOM': {
+      const newStockroomItems = state.stockroomItems.map(si => {
+        const updated = action.payload.find(
+          u => u.itemId === si.itemId && u.stockroomId === si.stockroomId
+        );
+        return updated ?? si;
+      });
+      const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, action.payload);
+      return { ...state, stockroomItems: newStockroomItems, alerts, pendingChanges: state.pendingChanges + 1 };
+    }
 
     case 'SET_PICK_LIST':
       return { ...state, pickListItems: action.payload };
@@ -173,6 +236,42 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     case 'SET_SELECTED_STOCKROOM':
       return { ...state, selectedStockroomId: action.payload };
 
+    case 'SET_CURRENT_USER':
+      return { ...state, currentUser: action.payload };
+
+    case 'ADD_ALERT_THRESHOLD': {
+      const existing = state.alertThresholds.findIndex(
+        t => t.userId === action.payload.userId && t.itemId === action.payload.itemId
+      );
+      const updated = existing >= 0
+        ? state.alertThresholds.map((t, i) => i === existing ? action.payload : t)
+        : [...state.alertThresholds, action.payload];
+      return { ...state, alertThresholds: updated };
+    }
+
+    case 'REMOVE_ALERT_THRESHOLD':
+      return { ...state, alertThresholds: state.alertThresholds.filter(t => t.id !== action.payload) };
+
+    case 'DISMISS_ALERT':
+      return {
+        ...state,
+        alerts: state.alerts.map(a => a.id === action.payload ? { ...a, dismissed: true } : a),
+      };
+
+    case 'RESOLVE_ALERT':
+      return {
+        ...state,
+        alerts: state.alerts.map(a =>
+          a.id === action.payload ? { ...a, resolvedAt: new Date().toISOString() } : a
+        ),
+      };
+
+    case 'INCREMENT_PENDING_CHANGES':
+      return { ...state, pendingChanges: state.pendingChanges + 1 };
+
+    case 'RESET_PENDING_CHANGES':
+      return { ...state, pendingChanges: 0 };
+
     case 'RESET_STATE':
       return action.payload;
 
@@ -192,8 +291,33 @@ const InventoryV2Context = createContext<InventoryV2ContextValue | undefined>(un
 
 // ─── Provider ───────────────────────────────────────────────────────────────
 
-export function InventoryV2Provider({ children }: { children: ReactNode }) {
+interface InventoryV2ProviderProps {
+  children: ReactNode;
+  userRole?: string;
+}
+
+export function InventoryV2Provider({ children, userRole }: InventoryV2ProviderProps) {
   const [state, dispatch] = useReducer(inventoryReducer, undefined, loadInitialState);
+
+  // Bridge app-level login role into context on mount
+  useEffect(() => {
+    if (!userRole) return;
+    const match = SYSTEM_USERS.find(u => u.roles.includes(userRole));
+    if (match) {
+      dispatch({
+        type: 'SET_CURRENT_USER',
+        payload: {
+          id: match.id,
+          name: match.name,
+          email: match.email,
+          role: userRole,
+          roles: match.roles,
+          department: match.department,
+        },
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount only
 
   // Persist state to localStorage on every change (debounced)
   useEffect(() => {

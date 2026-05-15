@@ -210,6 +210,39 @@ export interface DisplaySettings {
   hideDescriptions: boolean;
 }
 
+// ─── Users ──────────────────────────────────────────────────────────────────
+
+export interface UserV2 {
+  id: string;
+  name: string;
+  email: string;
+  role: string;   // the active role selected at login (or overridden by UserSwitcher)
+  roles: string[]; // full roles array from SYSTEM_USERS
+  department: string;
+}
+
+// ─── Commissary Alerts ───────────────────────────────────────────────────────
+
+export interface AlertThreshold {
+  id: string;
+  userId: string;
+  itemId: string;
+  threshold: number;
+  enabled: boolean;
+}
+
+export interface CommissaryAlert {
+  id: string;
+  itemId: string;
+  stockroomId: string;
+  userId: string;
+  threshold: number;
+  currentQty: number;
+  triggeredAt: string;
+  resolvedAt?: string;
+  dismissed: boolean;
+}
+
 // ─── Context State ──────────────────────────────────────────────────────────
 
 export interface InventoryV2State {
@@ -226,6 +259,10 @@ export interface InventoryV2State {
   compartmentConfigs: AircraftCompartmentConfig[];
   displaySettings: DisplaySettings;
   selectedStockroomId: string;
+  currentUser: UserV2;
+  alertThresholds: AlertThreshold[];
+  alerts: CommissaryAlert[];
+  pendingChanges: number;
 }
 
 // ─── Context Actions ────────────────────────────────────────────────────────
@@ -267,4 +304,11 @@ export type InventoryV2Action =
   | { type: 'SET_COMPARTMENT_CONFIGS'; payload: AircraftCompartmentConfig[] }
   | { type: 'SET_DISPLAY_SETTINGS'; payload: DisplaySettings }
   | { type: 'SET_SELECTED_STOCKROOM'; payload: string }
-  | { type: 'RESET_STATE'; payload: InventoryV2State };
+  | { type: 'RESET_STATE'; payload: InventoryV2State }
+  | { type: 'SET_CURRENT_USER'; payload: UserV2 }
+  | { type: 'ADD_ALERT_THRESHOLD'; payload: AlertThreshold }
+  | { type: 'REMOVE_ALERT_THRESHOLD'; payload: string } // threshold id
+  | { type: 'DISMISS_ALERT'; payload: string } // alert id
+  | { type: 'RESOLVE_ALERT'; payload: string } // alert id
+  | { type: 'INCREMENT_PENDING_CHANGES' }
+  | { type: 'RESET_PENDING_CHANGES' };
