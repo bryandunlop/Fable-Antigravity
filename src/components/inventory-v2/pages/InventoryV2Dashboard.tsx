@@ -12,6 +12,7 @@ import {
   LayoutDashboard, Filter, Clock, CheckCircle, AlertTriangle,
   PackagePlus, Send, Truck, ArrowRight
 } from 'lucide-react';
+import { OfflineBanner } from '../shared/OfflineBanner';
 
 export default function InventoryV2Dashboard() {
   const navigate = useNavigate();
@@ -125,6 +126,7 @@ export default function InventoryV2Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <OfflineBanner />
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
