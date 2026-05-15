@@ -26,7 +26,7 @@ export const SYSTEM_USERS = [
     id: 'USR003',
     name: 'Mike Johnson',
     email: 'm.johnson@flightops.com',
-    roles: ['inflight', 'lead-fa', 'fa-manager'],
+    roles: ['inflight', 'lead-fa', 'fa-manager', 'commissary-manager'],
     status: 'Active',
     lastLogin: '2025-02-01 16:45',
     department: 'Cabin Services',
@@ -113,6 +113,7 @@ export const ROLE_CATEGORIES = {
   'Cabin': [
     { value: 'inflight', label: 'Flight Attendant', description: 'Cabin crew member' },
     { value: 'fa-manager', label: 'Flight Attendant Manager', description: 'Manager of cabin services' },
+    { value: 'commissary-manager', label: 'Commissary Manager', description: 'Stockroom and supply management' },
   ],
   'Maintenance': [
     { value: 'maintenance', label: 'Maintenance', description: 'Maintenance and engineering' },
