@@ -34,6 +34,7 @@ function getDefaultState(): InventoryV2State {
   return {
     fleet: FLEET_V2,
     items: ITEMS_V2,
+    stockLog: [],
     inspections: MOCK_INSPECTIONS,
     stockrooms: STOCKROOMS,
     stockroomItems: STOCKROOM_ITEMS,
@@ -73,6 +74,10 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       return { ...state, items: state.items.map(i => i.id === action.payload.id ? action.payload : i) };
     case 'REMOVE_ITEM':
       return { ...state, items: state.items.filter(i => i.id !== action.payload) };
+
+    // ── Stock Log ──
+    case 'ADD_STOCK_LOG':
+      return { ...state, stockLog: [action.payload, ...state.stockLog].slice(0, 200) };
 
     case 'SET_INSPECTIONS':
       return { ...state, inspections: action.payload };

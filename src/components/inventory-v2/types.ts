@@ -192,6 +192,17 @@ export interface PurchaseOrder {
   lineItems: POLineItem[];
 }
 
+// ─── Stock Log ──────────────────────────────────────────────────────────────
+
+export interface StockLogEntry {
+  id: string;
+  stockroomId: string;
+  addedBy: string;
+  timestamp: string;
+  items: { itemId: string; qtyAdded: number }[];
+  notes?: string;
+}
+
 // ─── Display Settings ───────────────────────────────────────────────────────
 
 export interface DisplaySettings {
@@ -204,6 +215,7 @@ export interface DisplaySettings {
 export interface InventoryV2State {
   fleet: FleetAircraft[];
   items: InventoryItemV2[];
+  stockLog: StockLogEntry[];
   inspections: InspectionV2[];
   stockrooms: Stockroom[];
   stockroomItems: StockroomItem[];
@@ -245,6 +257,8 @@ export type InventoryV2Action =
   // Requests
   | { type: 'ADD_UNIT_REQUEST'; payload: UnitItemRequest }
   | { type: 'UPDATE_UNIT_REQUEST'; payload: UnitItemRequest }
+  // Stock log
+  | { type: 'ADD_STOCK_LOG'; payload: StockLogEntry }
   // POs
   | { type: 'SET_PURCHASE_ORDERS'; payload: PurchaseOrder[] }
   | { type: 'UPDATE_PURCHASE_ORDER'; payload: PurchaseOrder }
