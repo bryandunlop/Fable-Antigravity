@@ -133,6 +133,8 @@ import UnitItemRequestV2 from './components/inventory-v2/pages/UnitItemRequest';
 import UnitItemRequestListV2 from './components/inventory-v2/pages/UnitItemRequestList';
 import ReceivingV2 from './components/inventory-v2/pages/Receiving';
 import SettingsV2 from './components/inventory-v2/pages/Settings';
+import CommissaryDashboard from './components/inventory-v2/pages/CommissaryDashboard';
+import AlertsPage from './components/inventory-v2/pages/AlertsPage';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -387,19 +389,21 @@ export default function App() {
                                 <Route path="/aircraft-inventory" element={<AircraftInventory />} />
 
                                 {/* ─── Inventory V2 Routes ─── */}
-                                <Route path="/inventory-v2" element={<InventoryV2Provider><InventoryV2Dashboard /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/inspection" element={<InventoryV2Provider><InspectionFormV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/inspection/:id/review" element={<InventoryV2Provider><InspectionReviewV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/my-inspections" element={<InventoryV2Provider><InspectionHistoryV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/recently-completed" element={<InventoryV2Provider><RecentlyCompletedV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/stockroom" element={<InventoryV2Provider><StockroomCountV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/physical-count" element={<InventoryV2Provider><PhysicalCountV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/pick-list" element={<InventoryV2Provider><PickListV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/restock" element={<InventoryV2Provider><RestockListV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/unit-request" element={<InventoryV2Provider><UnitItemRequestV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/unit-requests" element={<InventoryV2Provider><UnitItemRequestListV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/receiving" element={<InventoryV2Provider><ReceivingV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/settings" element={<InventoryV2Provider><SettingsV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2" element={<InventoryV2Provider userRole={userRole}><InventoryV2Dashboard /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/inspection" element={<InventoryV2Provider userRole={userRole}><InspectionFormV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/inspection/:id/review" element={<InventoryV2Provider userRole={userRole}><InspectionReviewV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/my-inspections" element={<InventoryV2Provider userRole={userRole}><InspectionHistoryV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/recently-completed" element={<InventoryV2Provider userRole={userRole}><RecentlyCompletedV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/stockroom" element={<InventoryV2Provider userRole={userRole}><StockroomCountV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/physical-count" element={<InventoryV2Provider userRole={userRole}><PhysicalCountV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/pick-list" element={<InventoryV2Provider userRole={userRole}><PickListV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/restock" element={<InventoryV2Provider userRole={userRole}><RestockListV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/unit-request" element={<InventoryV2Provider userRole={userRole}><UnitItemRequestV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/unit-requests" element={<InventoryV2Provider userRole={userRole}><UnitItemRequestListV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/receiving" element={<InventoryV2Provider userRole={userRole}><ReceivingV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/settings" element={<InventoryV2Provider userRole={userRole}><SettingsV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/commissary" element={<InventoryV2Provider userRole={userRole}><CommissaryDashboard /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/alerts" element={<InventoryV2Provider userRole={userRole}><AlertsPage /></InventoryV2Provider>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />
