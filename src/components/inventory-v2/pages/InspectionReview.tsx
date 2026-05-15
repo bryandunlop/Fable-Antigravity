@@ -30,6 +30,7 @@ import type {
   AdditionalFee,
   MissingItemCharge,
   InspectionV2,
+  PickListItem,
 } from '../types';
 
 // ─── Session Storage Key (must match InspectionForm) ────────────────────────
@@ -100,7 +101,7 @@ export default function InspectionReview() {
           defaultCost,
         };
       });
-  }, [draft]);
+  }, [draft, state.items]);
 
   // Initialize charge flags for new missing items
   useEffect(() => {
@@ -208,7 +209,8 @@ export default function InspectionReview() {
       return;
     }
 
-    // Build missing item charges
+    const hasMissingItems = missingItems.length > 0;
+
     const charges: MissingItemCharge[] = missingItems.map((mi) => {
       const cost = costOverrides[mi.itemId] ?? mi.defaultCost;
       return {
@@ -222,14 +224,16 @@ export default function InspectionReview() {
       };
     });
 
+    const inspectionId = `insp-${Date.now()}`;
+
     const inspection: InspectionV2 = {
-      id: `insp-${Date.now()}`,
+      id: inspectionId,
       tailNumber: draft.tailNumber,
       aircraftType: draft.aircraftType,
       date: new Date().toISOString(),
-      reportedBy: MOCK_USERS[0].name, // default to first user
+      reportedBy: MOCK_USERS[0].name,
       reservationId: reservationId || undefined,
-      status: 'submitted',
+      status: hasMissingItems ? 'restocking_needed' : 'submitted',
       checkedItems: draft.checkedItems,
       topLevelNotes,
       photos,
@@ -241,11 +245,25 @@ export default function InspectionReview() {
 
     dispatch({ type: 'ADD_INSPECTION', payload: inspection });
 
-    // Clean up session storage
-    sessionStorage.removeItem(SESSION_KEY);
-
-    toast.success('Inspection completed successfully');
-    navigate('/inventory-v2/my-inspections');
+    if (hasMissingItems) {
+      const pickItems: PickListItem[] = missingItems.map((mi) => ({
+        id: `pick-${inspectionId}-${mi.itemId}`,
+        inspectionId,
+        unitTailNumber: draft.tailNumber,
+        itemId: mi.itemId,
+        qtyNeeded: mi.qtyMissing,
+        qtyTaken: 0,
+        done: false,
+      }));
+      dispatch({ type: 'ADD_PICK_ITEMS', payload: pickItems });
+      sessionStorage.removeItem(SESSION_KEY);
+      toast.success('Inspection submitted — restock needed. Pick list updated.');
+      navigate('/inventory-v2/pick-list');
+    } else {
+      sessionStorage.removeItem(SESSION_KEY);
+      toast.success('Inspection completed successfully');
+      navigate('/inventory-v2/my-inspections');
+    }
   }, [
     draft,
     aircraft,

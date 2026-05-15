@@ -252,6 +252,7 @@ export type InventoryV2Action =
   // Pick & Restock
   | { type: 'SET_PICK_LIST'; payload: PickListItem[] }
   | { type: 'UPDATE_PICK_ITEM'; payload: PickListItem }
+  | { type: 'ADD_PICK_ITEMS'; payload: PickListItem[] }
   | { type: 'SET_RESTOCK_LIST'; payload: RestockListItem[] }
   | { type: 'UPDATE_RESTOCK_ITEM'; payload: RestockListItem }
   // Requests

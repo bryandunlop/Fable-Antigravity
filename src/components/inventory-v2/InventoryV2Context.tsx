@@ -128,6 +128,9 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         ),
       };
 
+    case 'ADD_PICK_ITEMS':
+      return { ...state, pickListItems: [...state.pickListItems, ...action.payload] };
+
     case 'SET_RESTOCK_LIST':
       return { ...state, restockListItems: action.payload };
 
