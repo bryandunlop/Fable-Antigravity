@@ -99,7 +99,8 @@ export default function AlertsPage() {
     if (!a.resolvedAt && !a.dismissed) return false;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
-    return new Date(a.triggeredAt) >= cutoff;
+    const compareDate = a.resolvedAt ? new Date(a.resolvedAt) : new Date(a.triggeredAt);
+    return compareDate >= cutoff;
   });
 
   return (

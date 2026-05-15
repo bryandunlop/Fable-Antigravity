@@ -103,7 +103,11 @@ export default function CommissaryDashboard() {
   const navigate = useNavigate();
 
   const activeAlerts = state.alerts.filter(
-    a => a.userId === state.currentUser.id && !a.resolvedAt && !a.dismissed
+    a =>
+      a.userId === state.currentUser.id &&
+      a.stockroomId === state.selectedStockroomId &&
+      !a.resolvedAt &&
+      !a.dismissed
   );
 
   const criticalAlerts = activeAlerts.filter(a => {
@@ -113,7 +117,8 @@ export default function CommissaryDashboard() {
     return si && si.qtyOnHand <= si.minimumLevel;
   });
 
-  const thresholdAlerts = activeAlerts.filter(a => !criticalAlerts.includes(a));
+  const criticalIds = new Set(criticalAlerts.map(a => a.id));
+  const thresholdAlerts = activeAlerts.filter(a => !criticalIds.has(a.id));
 
   const stockroomItemCount = state.stockroomItems.filter(
     si => si.stockroomId === state.selectedStockroomId

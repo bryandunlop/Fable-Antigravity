@@ -765,6 +765,7 @@ function MyAlertsTab() {
   }
 
   function setThresholdValue(itemId: string, value: number) {
+    if (!Number.isFinite(value) || value < 0) return;
     const existing = getThreshold(itemId);
     dispatch({
       type: 'ADD_ALERT_THRESHOLD',
