@@ -2,10 +2,21 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Camera, Check } from 'lucide-react';
+import { Plus, Trash2, Camera, Check, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '../../ui/alert-dialog';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Textarea } from '../../ui/textarea';
@@ -304,6 +315,17 @@ export default function InspectionReview() {
 
   return (
     <div className="min-h-screen p-4 md:p-6 space-y-6">
+      {/* ── Back Button ── */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-4 gap-2"
+        onClick={() => navigate('/inventory-v2/inspection')}
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Inspection
+      </Button>
+
       {/* ── Page Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
@@ -576,12 +598,31 @@ export default function InspectionReview() {
       {/* ── Footer ── */}
       <div className="sticky bottom-0 bg-background/80 backdrop-blur-md border-t border-border/40 -mx-4 md:-mx-6 px-4 md:px-6 py-4">
         <div className="flex items-center justify-between gap-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/inventory-v2/inspection')}
-          >
-            Cancel
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline">Cancel</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Discard this inspection?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently discard all inspection data including notes, photos, and fees. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep editing</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => {
+                    sessionStorage.removeItem(SESSION_KEY);
+                    navigate('/inventory-v2');
+                  }}
+                >
+                  Discard inspection
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button
             onClick={handleComplete}
             className={`${V2_THEME.accentBg} text-white hover:bg-purple-600`}
