@@ -32,41 +32,86 @@ export default function InventoryV2Dashboard() {
     return units.some(u => tailNumber.toUpperCase().includes(u));
   };
 
+  const matchesUserFilter = (reportedBy: string) => {
+    if (!filters.userFilter || filters.userFilter === 'everyone') return true;
+    return reportedBy === filters.userFilter;
+  };
+
+  const matchesDateFilter = (dateStr: string) => {
+    if (!filters.dateFrom && !filters.dateTo) return true;
+    const date = new Date(dateStr).getTime();
+    const from = filters.dateFrom ? new Date(filters.dateFrom).getTime() : -Infinity;
+    const to = filters.dateTo
+      ? new Date(filters.dateTo + 'T23:59:59').getTime()
+      : Infinity;
+    return date >= from && date <= to;
+  };
+
   // Panels data
   const inProgress = useMemo(() =>
-    state.inspections.filter(i => i.status === 'in_progress' && matchesUnitFilter(i.tailNumber)),
-    [state.inspections, filters.unitFilter]
+    state.inspections.filter(i =>
+      i.status === 'in_progress' &&
+      matchesUnitFilter(i.tailNumber) &&
+      matchesUserFilter(i.reportedBy) &&
+      matchesDateFilter(i.date)
+    ),
+    [state.inspections, filters]
   );
 
   const recentlyCompleted = useMemo(() =>
     state.inspections
-      .filter(i => (i.status === 'submitted' || i.status === 'restocked') && matchesUnitFilter(i.tailNumber))
+      .filter(i =>
+        (i.status === 'submitted' || i.status === 'restocked') &&
+        matchesUnitFilter(i.tailNumber) &&
+        matchesUserFilter(i.reportedBy) &&
+        matchesDateFilter(i.date)
+      )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10),
-    [state.inspections, filters.unitFilter]
+    [state.inspections, filters]
   );
 
   const restockingNeeded = useMemo(() =>
-    state.inspections.filter(i => i.status === 'restocking_needed' && matchesUnitFilter(i.tailNumber)),
-    [state.inspections, filters.unitFilter]
+    state.inspections.filter(i =>
+      i.status === 'restocking_needed' &&
+      matchesUnitFilter(i.tailNumber) &&
+      matchesUserFilter(i.reportedBy) &&
+      matchesDateFilter(i.date)
+    ),
+    [state.inspections, filters]
   );
 
   const recentlyRestocked = useMemo(() =>
     state.inspections
-      .filter(i => i.status === 'restocked' && matchesUnitFilter(i.tailNumber))
+      .filter(i =>
+        i.status === 'restocked' &&
+        matchesUnitFilter(i.tailNumber) &&
+        matchesUserFilter(i.reportedBy) &&
+        matchesDateFilter(i.date)
+      )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5),
-    [state.inspections, filters.unitFilter]
+    [state.inspections, filters]
   );
 
   const openRequests = useMemo(() =>
-    state.unitItemRequests.filter(r => r.status === 'open' && matchesUnitFilter(r.unitTailNumber)),
-    [state.unitItemRequests, filters.unitFilter]
+    state.unitItemRequests.filter(r =>
+      r.status === 'open' &&
+      matchesUnitFilter(r.unitTailNumber) &&
+      matchesUserFilter(r.requestedBy) &&
+      matchesDateFilter(r.requestDate)
+    ),
+    [state.unitItemRequests, filters]
   );
 
   const completedRequests = useMemo(() =>
-    state.unitItemRequests.filter(r => r.status === 'fulfilled' && matchesUnitFilter(r.unitTailNumber)),
-    [state.unitItemRequests, filters.unitFilter]
+    state.unitItemRequests.filter(r =>
+      r.status === 'fulfilled' &&
+      matchesUnitFilter(r.unitTailNumber) &&
+      matchesUserFilter(r.requestedBy) &&
+      matchesDateFilter(r.requestDate)
+    ),
+    [state.unitItemRequests, filters]
   );
 
   const panels = [
