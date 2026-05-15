@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Bell, Package, PackagePlus, ClipboardList, RefreshCw, Settings } from 'lucide-react';
+import { Home, Bell, Package, PackagePlus, ClipboardList, RefreshCw, RotateCcw, Settings } from 'lucide-react';
 import { CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useInventoryV2 } from '../InventoryV2Context';
@@ -49,12 +49,14 @@ function SidebarLink({
 
 function AlertRow({
   alertId,
+  itemId,
   itemName,
   currentQty,
   threshold,
   triggeredAt,
 }: {
   alertId: string;
+  itemId: string;
   itemName: string;
   currentQty: number;
   threshold: number;
@@ -79,7 +81,7 @@ function AlertRow({
         <Button
           size="sm"
           className="h-7 bg-indigo-600 px-2.5 text-xs hover:bg-indigo-500"
-          onClick={() => navigate(`/inventory-v2/receiving?itemId=${alertId}`)}
+          onClick={() => navigate(`/inventory-v2/receiving?itemId=${itemId}`)}
         >
           Restock →
         </Button>
@@ -148,6 +150,7 @@ export default function CommissaryDashboard() {
           <div className="my-1 border-t border-white/[0.06]" />
           <SidebarLink icon={ClipboardList} label="New Inspection" to="/inventory-v2/inspection" />
           <SidebarLink icon={RefreshCw} label="Pick List" to="/inventory-v2/pick-list" />
+          <SidebarLink icon={RotateCcw} label="Restock List" to="/inventory-v2/restock" />
           <div className="my-1 border-t border-white/[0.06]" />
           <SidebarLink icon={Settings} label="Settings" to="/inventory-v2/settings" />
         </aside>
@@ -199,6 +202,7 @@ export default function CommissaryDashboard() {
                       <AlertRow
                         key={a.id}
                         alertId={a.id}
+                        itemId={a.itemId}
                         itemName={itemName(a.itemId)}
                         currentQty={a.currentQty}
                         threshold={a.threshold}
@@ -218,6 +222,7 @@ export default function CommissaryDashboard() {
                       <AlertRow
                         key={a.id}
                         alertId={a.id}
+                        itemId={a.itemId}
                         itemName={itemName(a.itemId)}
                         currentQty={a.currentQty}
                         threshold={a.threshold}
