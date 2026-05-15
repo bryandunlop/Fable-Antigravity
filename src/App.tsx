@@ -132,6 +132,7 @@ import RestockListV2 from './components/inventory-v2/pages/RestockList';
 import UnitItemRequestV2 from './components/inventory-v2/pages/UnitItemRequest';
 import UnitItemRequestListV2 from './components/inventory-v2/pages/UnitItemRequestList';
 import ReceivingV2 from './components/inventory-v2/pages/Receiving';
+import SettingsV2 from './components/inventory-v2/pages/Settings';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -398,6 +399,7 @@ export default function App() {
                                 <Route path="/inventory-v2/unit-request" element={<InventoryV2Provider><UnitItemRequestV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/unit-requests" element={<InventoryV2Provider><UnitItemRequestListV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/receiving" element={<InventoryV2Provider><ReceivingV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/settings" element={<InventoryV2Provider><SettingsV2 /></InventoryV2Provider>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />

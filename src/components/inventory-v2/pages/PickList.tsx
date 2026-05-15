@@ -7,7 +7,6 @@ import { Checkbox } from '../../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../ui/collapsible';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
 import { SUPPLY_CATEGORIES } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import { toast } from 'sonner';
@@ -29,7 +28,7 @@ export default function PickList() {
     return localItems.filter(p => p.unitTailNumber === unitFilter);
   }, [localItems, unitFilter]);
 
-  const getItem = (itemId: string) => ITEMS_V2.find(i => i.id === itemId);
+  const getItem = (itemId: string) => state.items.find(i => i.id === itemId);
   const getStockroomQty = (itemId: string) => {
     const si = state.stockroomItems.find(s => s.itemId === itemId && s.stockroomId === state.selectedStockroomId);
     return si?.qtyOnHand ?? 0;

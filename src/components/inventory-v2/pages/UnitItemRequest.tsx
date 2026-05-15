@@ -7,7 +7,6 @@ import { Input } from '../../ui/input';
 import { Textarea } from '../../ui/textarea';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../ui/collapsible';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
 import { SUPPLY_CATEGORIES, MOCK_USERS } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import { SearchableUnitSelect } from '../shared/SearchableUnitSelect';
@@ -26,13 +25,13 @@ export default function UnitItemRequest() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const filteredItems = useMemo(() => {
-    if (!search.trim()) return ITEMS_V2;
+    if (!search.trim()) return state.items;
     const q = search.toLowerCase();
-    return ITEMS_V2.filter(i =>
+    return state.items.filter(i =>
       i.itemName.toLowerCase().includes(q) ||
       i.internalItemNumber?.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [search, state.items]);
 
   const groupedByCategory = useMemo(() => {
     const groups: Record<string, typeof filteredItems> = {};
@@ -68,7 +67,7 @@ export default function UnitItemRequest() {
     const items = Object.entries(requestedItems)
       .filter(([_, qty]) => qty > 0)
       .map(([itemId, qty]) => {
-        const item = ITEMS_V2.find(i => i.id === itemId)!;
+        const item = state.items.find(i => i.id === itemId)!;
         return {
           itemId,
           qtyOnHand: getStockroomQty(itemId),

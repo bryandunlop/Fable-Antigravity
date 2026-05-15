@@ -8,7 +8,6 @@ import { Label } from '../../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../ui/collapsible';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
 import { SUPPLY_CATEGORIES, V2_THEME } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import BulkAdjustModal from '../shared/BulkAdjustModal';
@@ -31,7 +30,7 @@ export default function StockroomCount() {
     stockroomItems.find(si => si.itemId === itemId);
 
   const filteredItems = useMemo(() => {
-    let items = ITEMS_V2.map(item => ({
+    let items = state.items.map(item => ({
       ...item,
       stockroom: getStockroomItem(item.id),
     }));
@@ -57,7 +56,7 @@ export default function StockroomCount() {
     }
 
     return items;
-  }, [search, hideZero, showBelowPar, stockroomItems]);
+  }, [search, hideZero, showBelowPar, stockroomItems, state.items]);
 
   const groupedByCategory = useMemo(() => {
     const groups: Record<string, typeof filteredItems> = {};

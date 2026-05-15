@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from '../../ui/popover';
-import { FLEET_V2 } from '../constants';
+import { useInventoryV2 } from '../InventoryV2Context';
 
 interface SearchableUnitSelectProps {
   value: string;
@@ -26,8 +26,10 @@ interface SearchableUnitSelectProps {
 
 export function SearchableUnitSelect({ value, onValueChange }: SearchableUnitSelectProps) {
   const [open, setOpen] = useState(false);
+  const { state } = useInventoryV2();
+  const fleet = state.fleet;
 
-  const selected = FLEET_V2.find((a) => a.tailNumber === value);
+  const selected = fleet.find((a) => a.tailNumber === value);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -52,7 +54,7 @@ export function SearchableUnitSelect({ value, onValueChange }: SearchableUnitSel
           <CommandList>
             <CommandEmpty>No aircraft found.</CommandEmpty>
             <CommandGroup>
-              {FLEET_V2.map((aircraft) => (
+              {fleet.map((aircraft) => (
                 <CommandItem
                   key={aircraft.tailNumber}
                   value={aircraft.displayName}

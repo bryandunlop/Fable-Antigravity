@@ -7,7 +7,6 @@ import { Input } from '../../ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../ui/alert-dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../ui/collapsible';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
 import { SUPPLY_CATEGORIES } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import { toast } from 'sonner';
@@ -25,13 +24,13 @@ export default function PhysicalCount() {
   );
 
   const groupedByCategory = useMemo(() => {
-    const groups: Record<string, typeof ITEMS_V2> = {};
+    const groups: Record<string, typeof state.items> = {};
     SUPPLY_CATEGORIES.forEach(cat => {
-      const catItems = ITEMS_V2.filter(i => i.supplyCategory === cat.id);
+      const catItems = state.items.filter(i => i.supplyCategory === cat.id);
       if (catItems.length > 0) groups[cat.id] = catItems;
     });
     return groups;
-  }, []);
+  }, [state.items]);
 
   const toggleSection = (catId: string) => {
     setOpenSections(prev => ({ ...prev, [catId]: !prev[catId] }));
@@ -55,7 +54,7 @@ export default function PhysicalCount() {
   };
 
   const filledCount = Object.values(counts).filter(v => v !== '').length;
-  const totalItems = ITEMS_V2.length;
+  const totalItems = state.items.length;
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">

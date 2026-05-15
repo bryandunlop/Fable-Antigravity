@@ -22,8 +22,7 @@ import {
 import { V2Badge } from '../shared/V2Badge';
 
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
-import { FLEET_V2, V2_THEME, MOCK_USERS } from '../constants';
+import { V2_THEME, MOCK_USERS } from '../constants';
 import { getCompartmentLabel } from '../compartmentConfig';
 
 import type {
@@ -78,8 +77,8 @@ export default function InspectionReview() {
 
   // ── Derived: aircraft info ──
   const aircraft = useMemo(
-    () => (draft ? FLEET_V2.find((a) => a.tailNumber === draft.tailNumber) : null),
-    [draft],
+    () => (draft ? state.fleet.find((a) => a.tailNumber === draft.tailNumber) : null),
+    [draft, state.fleet],
   );
 
   // ── Derived: missing items (qty < required) ──
@@ -89,7 +88,7 @@ export default function InspectionReview() {
     return draft.checkedItems
       .filter((ci) => ci.qtyInUnit < ci.requiredQty)
       .map((ci) => {
-        const item = ITEMS_V2.find((i) => i.id === ci.itemId);
+        const item = state.items.find((i) => i.id === ci.itemId);
         const qtyMissing = ci.requiredQty - ci.qtyInUnit;
         const defaultCost = item?.costPerUnit ?? 0;
 

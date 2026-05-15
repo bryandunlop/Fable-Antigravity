@@ -27,8 +27,7 @@ import { BarcodeScannerDialog } from '../shared/BarcodeScannerDialog';
 import DisplaySettingsOverlay from '../shared/DisplaySettingsOverlay';
 
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
-import { FLEET_V2, V2_THEME } from '../constants';
+import { V2_THEME } from '../constants';
 import { getCompartmentsForAircraft } from '../compartmentConfig';
 
 import type { InspectionCheckedItem } from '../types';
@@ -41,17 +40,18 @@ const SESSION_KEY = 'inv-v2-inspection-draft';
 
 function buildInitialCheckedItems(
   aircraftType: 'G650' | 'G500',
+  items: import('../types').InventoryItemV2[],
 ): Map<string, InspectionCheckedItem> {
   const map = new Map<string, InspectionCheckedItem>();
 
-  ITEMS_V2.forEach((item) => {
+  items.forEach((item) => {
     const requiredQty = item.defaultQuantities[aircraftType];
-    if (requiredQty == null) return; // item not applicable to this type
+    if (requiredQty == null) return;
 
     map.set(item.id, {
       itemId: item.id,
       requiredQty,
-      qtyInUnit: requiredQty, // default to fully stocked
+      qtyInUnit: requiredQty,
       done: false,
       workOrderFlag: false,
       notes: '',
@@ -77,8 +77,8 @@ export default function InspectionForm() {
 
   // ── Derived ──
   const selectedAircraft = useMemo(
-    () => FLEET_V2.find((a) => a.tailNumber === selectedTailNumber),
-    [selectedTailNumber],
+    () => state.fleet.find((a) => a.tailNumber === selectedTailNumber),
+    [selectedTailNumber, state.fleet],
   );
 
   const aircraftType = selectedAircraft?.type;
@@ -93,10 +93,10 @@ export default function InspectionForm() {
 
   // Items applicable to this aircraft, keyed by compartment
   const itemsByCompartment = useMemo(() => {
-    if (!aircraftType) return new Map<string, typeof ITEMS_V2>();
-    const map = new Map<string, typeof ITEMS_V2>();
+    if (!aircraftType) return new Map<string, typeof state.items>();
+    const map = new Map<string, typeof state.items>();
 
-    ITEMS_V2.forEach((item) => {
+    state.items.forEach((item) => {
       if (item.defaultQuantities[aircraftType] == null) return;
       const list = map.get(item.compartmentId) ?? [];
       list.push(item);
@@ -104,19 +104,19 @@ export default function InspectionForm() {
     });
 
     return map;
-  }, [aircraftType]);
+  }, [aircraftType, state.items]);
 
   // ── Handlers ──
 
   const handleAircraftChange = useCallback(
     (tailNumber: string) => {
-      const aircraft = FLEET_V2.find((a) => a.tailNumber === tailNumber);
+      const aircraft = state.fleet.find((a) => a.tailNumber === tailNumber);
       if (!aircraft) return;
 
       setSelectedTailNumber(tailNumber);
-      setCheckedItems(buildInitialCheckedItems(aircraft.type));
+      setCheckedItems(buildInitialCheckedItems(aircraft.type, state.items));
     },
-    [],
+    [state.fleet, state.items],
   );
 
   const handleQtyChange = useCallback(
@@ -196,7 +196,7 @@ export default function InspectionForm() {
           next.set(itemId, { ...checked, done: true });
           return next;
         });
-        const item = ITEMS_V2.find((i) => i.id === itemId);
+        const item = state.items.find((i) => i.id === itemId);
         toast.success(`Scanned: ${item?.itemName ?? itemId}`);
       } else {
         toast.error('Item not found on this aircraft');

@@ -5,7 +5,6 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui/sheet';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
 import { STATUS_COLORS } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import { toast } from 'sonner';
@@ -22,7 +21,7 @@ export default function UnitItemRequestList() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   };
 
-  const getItem = (itemId: string) => ITEMS_V2.find(i => i.id === itemId);
+  const getItem = (itemId: string) => state.items.find(i => i.id === itemId);
 
   const handleFulfill = (request: UnitItemRequest) => {
     dispatch({

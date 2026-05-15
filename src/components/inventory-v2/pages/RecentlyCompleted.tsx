@@ -5,7 +5,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { ScrollArea } from '../../ui/scroll-area';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
 import { readinessColor } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import { Calendar, User, Plane, Clock } from 'lucide-react';
@@ -149,7 +148,7 @@ export default function RecentlyCompleted() {
                     <p className="text-sm text-muted-foreground mb-2">Checked Items</p>
                     <div className="space-y-1">
                       {selectedInspection.checkedItems.slice(0, 20).map(ci => {
-                        const item = ITEMS_V2.find(i => i.id === ci.itemId);
+                        const item = state.items.find(i => i.id === ci.itemId);
                         if (!item) return null;
                         const isMissing = ci.qtyInUnit < ci.requiredQty;
                         return (

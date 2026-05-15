@@ -202,6 +202,8 @@ export interface DisplaySettings {
 // ─── Context State ──────────────────────────────────────────────────────────
 
 export interface InventoryV2State {
+  fleet: FleetAircraft[];
+  items: InventoryItemV2[];
   inspections: InspectionV2[];
   stockrooms: Stockroom[];
   stockroomItems: StockroomItem[];
@@ -217,20 +219,36 @@ export interface InventoryV2State {
 // ─── Context Actions ────────────────────────────────────────────────────────
 
 export type InventoryV2Action =
+  // Fleet CRUD
+  | { type: 'SET_FLEET'; payload: FleetAircraft[] }
+  | { type: 'ADD_FLEET_UNIT'; payload: FleetAircraft }
+  | { type: 'UPDATE_FLEET_UNIT'; payload: FleetAircraft }
+  | { type: 'REMOVE_FLEET_UNIT'; payload: string } // tailNumber
+  // Item catalog CRUD
+  | { type: 'SET_ITEMS'; payload: InventoryItemV2[] }
+  | { type: 'ADD_ITEM'; payload: InventoryItemV2 }
+  | { type: 'UPDATE_ITEM'; payload: InventoryItemV2 }
+  | { type: 'REMOVE_ITEM'; payload: string } // itemId
+  // Inspections
   | { type: 'SET_INSPECTIONS'; payload: InspectionV2[] }
   | { type: 'ADD_INSPECTION'; payload: InspectionV2 }
   | { type: 'UPDATE_INSPECTION'; payload: InspectionV2 }
+  // Stockroom
   | { type: 'SET_STOCKROOM_ITEMS'; payload: StockroomItem[] }
   | { type: 'UPDATE_STOCKROOM_ITEM'; payload: StockroomItem }
   | { type: 'BULK_UPDATE_STOCKROOM'; payload: StockroomItem[] }
+  // Pick & Restock
   | { type: 'SET_PICK_LIST'; payload: PickListItem[] }
   | { type: 'UPDATE_PICK_ITEM'; payload: PickListItem }
   | { type: 'SET_RESTOCK_LIST'; payload: RestockListItem[] }
   | { type: 'UPDATE_RESTOCK_ITEM'; payload: RestockListItem }
+  // Requests
   | { type: 'ADD_UNIT_REQUEST'; payload: UnitItemRequest }
   | { type: 'UPDATE_UNIT_REQUEST'; payload: UnitItemRequest }
+  // POs
   | { type: 'SET_PURCHASE_ORDERS'; payload: PurchaseOrder[] }
   | { type: 'UPDATE_PURCHASE_ORDER'; payload: PurchaseOrder }
+  // Config
   | { type: 'SET_COMPARTMENT_CONFIGS'; payload: AircraftCompartmentConfig[] }
   | { type: 'SET_DISPLAY_SETTINGS'; payload: DisplaySettings }
   | { type: 'SET_SELECTED_STOCKROOM'; payload: string }

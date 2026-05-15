@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import type { InventoryV2State, InventoryV2Action } from './types';
-import { MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS } from './mockData';
+import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS } from './mockData';
+import { FLEET_V2 } from './constants';
 import { loadCompartmentConfigs } from './compartmentConfig';
 
 // ─── Storage Keys ───────────────────────────────────────────────────────────
@@ -31,6 +32,8 @@ function loadInitialState(): InventoryV2State {
 
 function getDefaultState(): InventoryV2State {
   return {
+    fleet: FLEET_V2,
+    items: ITEMS_V2,
     inspections: MOCK_INSPECTIONS,
     stockrooms: STOCKROOMS,
     stockroomItems: STOCKROOM_ITEMS,
@@ -51,6 +54,26 @@ function getDefaultState(): InventoryV2State {
 
 function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): InventoryV2State {
   switch (action.type) {
+    // ── Fleet ──
+    case 'SET_FLEET':
+      return { ...state, fleet: action.payload };
+    case 'ADD_FLEET_UNIT':
+      return { ...state, fleet: [...state.fleet, action.payload] };
+    case 'UPDATE_FLEET_UNIT':
+      return { ...state, fleet: state.fleet.map(f => f.tailNumber === action.payload.tailNumber ? action.payload : f) };
+    case 'REMOVE_FLEET_UNIT':
+      return { ...state, fleet: state.fleet.filter(f => f.tailNumber !== action.payload) };
+
+    // ── Items ──
+    case 'SET_ITEMS':
+      return { ...state, items: action.payload };
+    case 'ADD_ITEM':
+      return { ...state, items: [...state.items, action.payload] };
+    case 'UPDATE_ITEM':
+      return { ...state, items: state.items.map(i => i.id === action.payload.id ? action.payload : i) };
+    case 'REMOVE_ITEM':
+      return { ...state, items: state.items.filter(i => i.id !== action.payload) };
+
     case 'SET_INSPECTIONS':
       return { ...state, inspections: action.payload };
 

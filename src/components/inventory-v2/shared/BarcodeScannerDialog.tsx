@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '../../ui/dialog';
-import { ITEMS_V2 } from '../mockData';
+import { useInventoryV2 } from '../InventoryV2Context';
 import type { InventoryItemV2 } from '../types';
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -28,11 +28,12 @@ export function BarcodeScannerDialog({
   onOpenChange,
   onItemScanned,
 }: BarcodeScannerDialogProps) {
+  const { state } = useInventoryV2();
   const [scannedItem, setScannedItem] = useState<InventoryItemV2 | null>(null);
 
   function handleScan() {
-    const randomIndex = Math.floor(Math.random() * ITEMS_V2.length);
-    const item = ITEMS_V2[randomIndex];
+    const randomIndex = Math.floor(Math.random() * state.items.length);
+    const item = state.items[randomIndex];
     setScannedItem(item);
     onItemScanned(item.id);
   }

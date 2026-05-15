@@ -6,7 +6,6 @@ import { Checkbox } from '../../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../ui/collapsible';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
 import { V2Badge } from '../shared/V2Badge';
 import { toast } from 'sonner';
 import { PackagePlus, ChevronDown, Package, Check, X } from 'lucide-react';
@@ -55,7 +54,7 @@ export default function RestockList() {
     return groups;
   }, [filteredItems]);
 
-  const getItem = (itemId: string) => ITEMS_V2.find(i => i.id === itemId);
+  const getItem = (itemId: string) => state.items.find(i => i.id === itemId);
 
   const handleDoneChange = (id: string, done: boolean) => {
     setLocalItems(prev => prev.map(r => r.id === id ? { ...r, done } : r));

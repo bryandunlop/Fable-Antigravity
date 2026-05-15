@@ -4,7 +4,6 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { ITEMS_V2 } from '../mockData';
 import { Search, Package } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -23,15 +22,15 @@ export default function BulkAdjustModal({ open, onOpenChange }: BulkAdjustModalP
   );
 
   const filteredItems = useMemo(() => {
-    if (!search.trim()) return ITEMS_V2.slice(0, 20);
+    if (!search.trim()) return state.items.slice(0, 20);
     const q = search.toLowerCase();
-    return ITEMS_V2.filter(
+    return state.items.filter(
       item =>
         item.itemName.toLowerCase().includes(q) ||
         item.internalItemNumber?.toLowerCase().includes(q) ||
         item.vendorItemNumber?.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [search, state.items]);
 
   const getStockroomQty = (itemId: string) => {
     const si = stockroomItems.find(s => s.itemId === itemId);

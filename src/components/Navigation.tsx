@@ -273,6 +273,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Restock', href: '/inventory-v2/restock', icon: Package, roles: ['inflight', 'admin'] },
         { name: 'Unit Requests', href: '/inventory-v2/unit-requests', icon: Send, roles: ['inflight', 'admin'] },
         { name: 'Receiving', href: '/inventory-v2/receiving', icon: ArrowRightLeft, roles: ['inflight', 'admin'] },
+        { name: 'Settings', href: '/inventory-v2/settings', icon: Settings, roles: ['admin'] },
       ]
     },
     {
