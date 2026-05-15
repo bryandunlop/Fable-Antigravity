@@ -243,10 +243,37 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       const existing = state.alertThresholds.findIndex(
         t => t.userId === action.payload.userId && t.itemId === action.payload.itemId
       );
-      const updated = existing >= 0
+      const updatedThresholds = existing >= 0
         ? state.alertThresholds.map((t, i) => i === existing ? action.payload : t)
         : [...state.alertThresholds, action.payload];
-      return { ...state, alertThresholds: updated };
+
+      // Check current stock immediately — if already below threshold, generate alert now
+      let alerts = [...state.alerts];
+      if (action.payload.enabled) {
+        const si = state.stockroomItems.find(s => s.itemId === action.payload.itemId);
+        if (si && si.qtyOnHand < action.payload.threshold) {
+          const openAlert = alerts.find(
+            a => a.itemId === action.payload.itemId &&
+                 a.userId === action.payload.userId &&
+                 !a.resolvedAt &&
+                 !a.dismissed
+          );
+          if (!openAlert) {
+            alerts.push({
+              id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+              itemId: action.payload.itemId,
+              stockroomId: si.stockroomId,
+              userId: action.payload.userId,
+              threshold: action.payload.threshold,
+              currentQty: si.qtyOnHand,
+              triggeredAt: new Date().toISOString(),
+              dismissed: false,
+            });
+          }
+        }
+      }
+
+      return { ...state, alertThresholds: updatedThresholds, alerts };
     }
 
     case 'REMOVE_ALERT_THRESHOLD':
