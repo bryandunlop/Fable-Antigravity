@@ -75,9 +75,53 @@ export default function InspectionForm() {
   );
   const [scannerOpen, setScannerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hasUnsavedDraft, setHasUnsavedDraft] = useState(false);
+
+  // ── Refs ──
+  const autoSaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const didResume = React.useRef(false);
+  const didDetectDraft = React.useRef(false);
+
+  // ── Auto-save draft to sessionStorage on every change (debounced 500ms) ──
+  useEffect(() => {
+    if (!selectedTailNumber || checkedItems.size === 0) return;
+
+    const aircraft = state.fleet.find((a) => a.tailNumber === selectedTailNumber);
+    if (!aircraft) return;
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      const draft = {
+        tailNumber: selectedTailNumber,
+        aircraftType: aircraft.type,
+        checkedItems: Array.from(checkedItems.values()),
+        readinessScore: 0, // recalculated on review
+      };
+      try {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(draft));
+      } catch {
+        // storage full — silently ignore
+      }
+    }, 500);
+
+    return () => clearTimeout(autoSaveTimerRef.current);
+  }, [selectedTailNumber, checkedItems, state.fleet]);
+
+  // ── Detect unsaved draft on mount (only when not resuming via ?resume) ──
+  useEffect(() => {
+    if (didDetectDraft.current) return;
+    const resumeId = searchParams.get('resume');
+    if (resumeId) return; // Task 2 handles this case
+
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (raw) {
+      didDetectDraft.current = true;
+      setHasUnsavedDraft(true);
+    }
+  }, [searchParams]);
 
   // ── Resume in-progress inspection ──
   useEffect(() => {
+    if (didResume.current) return;
     const resumeId = searchParams.get('resume');
     if (!resumeId) return;
 
@@ -87,6 +131,7 @@ export default function InspectionForm() {
       return;
     }
 
+    didResume.current = true;
     setSelectedTailNumber(inspection.tailNumber);
 
     // Restore checkedItems map from saved inspection
@@ -97,7 +142,7 @@ export default function InspectionForm() {
     setCheckedItems(restored);
 
     toast.info(`Resuming inspection for ${inspection.tailNumber}`);
-  }, []); // run once on mount only
+  }, [searchParams, state.inspections]);
 
   // ── Derived ──
   const selectedAircraft = useMemo(
@@ -231,6 +276,8 @@ export default function InspectionForm() {
   );
 
   const handleReview = useCallback(() => {
+    clearTimeout(autoSaveTimerRef.current);
+
     if (!selectedTailNumber || !aircraftType) {
       toast.error('Please select an aircraft first');
       return;
@@ -356,6 +403,46 @@ export default function InspectionForm() {
             <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
               <span>↩</span>
               <span>Resuming in-progress inspection</span>
+            </div>
+          )}
+          {hasUnsavedDraft && !searchParams.get('resume') && (
+            <div className="mb-3 flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-blue-400">
+              <span>↩ You have an unsaved draft from a previous session</span>
+              <div className="flex gap-2">
+                <button
+                  className="underline"
+                  onClick={() => {
+                    try {
+                      const raw = sessionStorage.getItem(SESSION_KEY);
+                      if (!raw) return;
+                      const draft = JSON.parse(raw);
+                      setSelectedTailNumber(draft.tailNumber);
+                      const restored = new Map<string, InspectionCheckedItem>();
+                      draft.checkedItems.forEach((ci: InspectionCheckedItem) => {
+                        if (!ci?.itemId) return;
+                        restored.set(ci.itemId, ci);
+                      });
+                      setCheckedItems(restored);
+                      setHasUnsavedDraft(false); // only on success
+                    } catch {
+                      toast.error('Could not restore draft — it may be corrupted');
+                      sessionStorage.removeItem(SESSION_KEY);
+                      setHasUnsavedDraft(false);
+                    }
+                  }}
+                >
+                  Resume
+                </button>
+                <button
+                  className="underline opacity-60"
+                  onClick={() => {
+                    sessionStorage.removeItem(SESSION_KEY);
+                    setHasUnsavedDraft(false);
+                  }}
+                >
+                  Discard
+                </button>
+              </div>
             </div>
           )}
           <SearchableUnitSelect
