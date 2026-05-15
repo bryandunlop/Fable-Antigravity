@@ -1,7 +1,7 @@
 // ─── Inspection Form — Full Inspection Page ─────────────────────────────────
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Scan, RotateCcw, Settings, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,6 +65,7 @@ function buildInitialCheckedItems(
 
 export default function InspectionForm() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { state } = useInventoryV2();
 
   // ── Local state ──
@@ -74,6 +75,29 @@ export default function InspectionForm() {
   );
   const [scannerOpen, setScannerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // ── Resume in-progress inspection ──
+  useEffect(() => {
+    const resumeId = searchParams.get('resume');
+    if (!resumeId) return;
+
+    const inspection = state.inspections.find((i) => i.id === resumeId);
+    if (!inspection) {
+      toast.error('Inspection not found');
+      return;
+    }
+
+    setSelectedTailNumber(inspection.tailNumber);
+
+    // Restore checkedItems map from saved inspection
+    const restored = new Map<string, InspectionCheckedItem>();
+    inspection.checkedItems.forEach((ci) => {
+      restored.set(ci.itemId, ci);
+    });
+    setCheckedItems(restored);
+
+    toast.info(`Resuming inspection for ${inspection.tailNumber}`);
+  }, []); // run once on mount only
 
   // ── Derived ──
   const selectedAircraft = useMemo(
@@ -328,6 +352,12 @@ export default function InspectionForm() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {searchParams.get('resume') && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+              <span>↩</span>
+              <span>Resuming in-progress inspection</span>
+            </div>
+          )}
           <SearchableUnitSelect
             value={selectedTailNumber}
             onValueChange={handleAircraftChange}
