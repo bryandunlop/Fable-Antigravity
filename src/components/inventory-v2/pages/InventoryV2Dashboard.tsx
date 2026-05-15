@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -17,6 +17,12 @@ import { OfflineBanner } from '../shared/OfflineBanner';
 export default function InventoryV2Dashboard() {
   const navigate = useNavigate();
   const { state } = useInventoryV2();
+
+  useEffect(() => {
+    if (state.currentUser.role === 'commissary-manager') {
+      navigate('/inventory-v2/commissary', { replace: true });
+    }
+  }, [state.currentUser.role, navigate]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hiddenPanels, setHiddenPanels] = useState<Set<string>>(new Set());
