@@ -4,11 +4,22 @@ import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '../../ui/alert-dialog';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { STATUS_COLORS } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import { toast } from 'sonner';
-import { Send, Plus, User, Calendar, Package, Check } from 'lucide-react';
+import { Send, Plus, User, Calendar, Package } from 'lucide-react';
 import type { UnitItemRequest } from '../types';
 
 export default function UnitItemRequestList() {
@@ -23,21 +34,13 @@ export default function UnitItemRequestList() {
 
   const getItem = (itemId: string) => state.items.find(i => i.id === itemId);
 
-  const handleFulfill = (request: UnitItemRequest) => {
-    dispatch({
-      type: 'UPDATE_UNIT_REQUEST',
-      payload: { ...request, status: 'fulfilled' },
-    });
-    setSelectedRequest(null);
-    toast.success('Request marked as fulfilled');
-  };
-
-  const getStatusColors = (status: string) => {
+const getStatusColors = (status: UnitItemRequest['status']) => {
     switch (status) {
-      case 'open': return STATUS_COLORS.open;
-      case 'fulfilled': return STATUS_COLORS.fulfilled;
-      case 'cancelled': return STATUS_COLORS.cancelled;
-      default: return STATUS_COLORS.open;
+      case 'open':        return STATUS_COLORS.open;
+      case 'in_progress': return STATUS_COLORS.in_progress_req; // amber, not blue
+      case 'fulfilled':   return STATUS_COLORS.fulfilled;
+      case 'cancelled':   return STATUS_COLORS.cancelled;
+      default:            return STATUS_COLORS.open;
     }
   };
 
@@ -65,8 +68,10 @@ export default function UnitItemRequestList() {
           return (
             <Card
               key={request.id}
-              className="cursor-pointer hover:border-purple-500/30 transition-colors"
-              onClick={() => setSelectedRequest(request)}
+              className={`cursor-pointer hover:border-purple-500/30 transition-colors ${
+                request.status === 'cancelled' ? 'opacity-50 pointer-events-none' : ''
+              }`}
+              onClick={() => request.status !== 'cancelled' && setSelectedRequest(request)}
             >
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -164,12 +169,86 @@ export default function UnitItemRequestList() {
                   </div>
                 </div>
                 {selectedRequest.status === 'open' && (
-                  <Button
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
-                    onClick={() => handleFulfill(selectedRequest)}
-                  >
-                    <Check className="w-4 h-4 mr-1" /> Mark Fulfilled
-                  </Button>
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                      onClick={() => {
+                        dispatch({
+                          type: 'UPDATE_UNIT_REQUEST',
+                          payload: { ...selectedRequest, status: 'in_progress' },
+                        });
+                        setSelectedRequest(null);
+                        toast.success('Request marked in progress');
+                      }}
+                    >
+                      Mark In Progress
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => {
+                        dispatch({
+                          type: 'UPDATE_UNIT_REQUEST',
+                          payload: { ...selectedRequest, status: 'fulfilled' },
+                        });
+                        setSelectedRequest(null);
+                        toast.success('Request marked fulfilled');
+                      }}
+                    >
+                      Mark Fulfilled
+                    </Button>
+                  </div>
+                )}
+                {selectedRequest.status === 'in_progress' && (
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => {
+                        dispatch({
+                          type: 'UPDATE_UNIT_REQUEST',
+                          payload: { ...selectedRequest, status: 'fulfilled' },
+                        });
+                        setSelectedRequest(null);
+                        toast.success('Request marked fulfilled');
+                      }}
+                    >
+                      Mark Fulfilled
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="border-red-500/40 text-red-400 hover:bg-red-500/10">
+                          Cancel Request
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel this request?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This cannot be undone. The request will be marked cancelled.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Keep request</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                              dispatch({
+                                type: 'UPDATE_UNIT_REQUEST',
+                                payload: { ...selectedRequest, status: 'cancelled' },
+                              });
+                              setSelectedRequest(null);
+                              toast.success('Request cancelled');
+                            }}
+                          >
+                            Cancel request
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 )}
               </div>
             </>
