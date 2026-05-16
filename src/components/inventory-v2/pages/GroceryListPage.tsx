@@ -208,9 +208,20 @@ function GroceryListInner({
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addSearch, setAddSearch] = useState('');
 
-  // ─── Generate grocery list ─────────────────────────────────────────────────
+  // ─── On mount: find or create ──────────────────────────────────────────────
 
-  function generateGroceryList(): GroceryList {
+  useEffect(() => {
+    const existing = state.groceryLists.find(
+      gl => gl.tripId === tripId && gl.legId === activeLeg.id
+    );
+    if (existing) {
+      setGroceryList(existing);
+      // All items that existed at load time are treated as auto (manual set stays empty)
+      // unless we stored that separately — on reload, we can't distinguish, so treat all as auto
+      return;
+    }
+
+    // Generate grocery list inline
     const usageByItem = new Map<string, number>();
     trip.legs.forEach(leg => {
       leg.usageLog.forEach(entry => {
@@ -234,7 +245,7 @@ function GroceryListInner({
       }
     });
 
-    return {
+    const generated: GroceryList = {
       id: `gl-${crypto.randomUUID()}`,
       tripId: trip.id,
       legId: activeLeg.id,
@@ -244,25 +255,10 @@ function GroceryListInner({
       generatedAt: new Date().toISOString(),
       generatedBy: state.currentUser.name,
     };
-  }
 
-  // ─── On mount: find or create ──────────────────────────────────────────────
-
-  useEffect(() => {
-    const existing = state.groceryLists.find(
-      gl => gl.tripId === tripId && gl.legId === activeLeg.id
-    );
-    if (existing) {
-      setGroceryList(existing);
-      // All items that existed at load time are treated as auto (manual set stays empty)
-      // unless we stored that separately — on reload, we can't distinguish, so treat all as auto
-    } else {
-      const generated = generateGroceryList();
-      dispatch({ type: 'ADD_GROCERY_LIST', payload: generated });
-      setGroceryList(generated);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tripId]);
+    dispatch({ type: 'ADD_GROCERY_LIST', payload: generated });
+    setGroceryList(generated);
+  }, [tripId, activeLeg?.id, trip, state.items, state.currentUser, aircraftType, dispatch]);
 
   // ─── Helper: update grocery list ──────────────────────────────────────────
 
