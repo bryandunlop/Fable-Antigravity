@@ -287,7 +287,7 @@ export interface UsageLogEntry {
 export interface GroceryList {
   id: string;
   tripId: string;
-  legId: string;
+  legId?: string;
   tailNumber: string;
   status: 'draft' | 'sent' | 'fulfilled';
   items: GroceryListItem[];
@@ -297,6 +297,7 @@ export interface GroceryList {
 }
 
 export interface GroceryListItem {
+  id: string;
   itemId: string;
   qtyNeeded: number;
   qtyFulfilled: number;
@@ -316,7 +317,7 @@ export interface StockBatch {
   itemId: string;
   stockroomId: string;
   quantity: number;
-  expirationDate: string;
+  expirationDate?: string;
   receivedDate: string;
   batchLabel?: string;
 }
