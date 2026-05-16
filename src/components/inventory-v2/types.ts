@@ -64,6 +64,7 @@ export interface InventoryItemV2 {
   needsReplenishment: boolean;
   priority: 'low' | 'medium' | 'high' | 'critical';
   alternateNames: string[];
+  reorderUrl?: string;
 }
 
 // ─── Inspection ─────────────────────────────────────────────────────────────
@@ -243,6 +244,83 @@ export interface CommissaryAlert {
   dismissed: boolean;
 }
 
+// ── Trip Workflow ──
+
+export interface Trip {
+  id: string;
+  tailNumber: string;
+  aircraftType: 'G650' | 'G500';
+  tripName: string;
+  tripNumber: string;
+  status: 'active' | 'completed' | 'cancelled';
+  startDate: string;
+  endDate?: string;
+  legs: TripLeg[];
+  notes: TripNote[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface TripLeg {
+  id: string;
+  tripId: string;
+  legNumber: number;
+  origin: string;
+  destination: string;
+  date: string;
+  paxCount: number;
+  status: 'upcoming' | 'active' | 'completed';
+  usageLog: UsageLogEntry[];
+  groceryListId?: string;
+  notes: TripNote[];
+}
+
+export interface UsageLogEntry {
+  id: string;
+  legId: string;
+  itemId: string;
+  qtyUsed: number;
+  loggedBy: string;
+  loggedAt: string;
+}
+
+export interface GroceryList {
+  id: string;
+  tripId: string;
+  legId: string;
+  tailNumber: string;
+  status: 'draft' | 'sent' | 'fulfilled';
+  items: GroceryListItem[];
+  generatedAt: string;
+  generatedBy: string;
+  notes?: string;
+}
+
+export interface GroceryListItem {
+  itemId: string;
+  qtyNeeded: number;
+  qtyFulfilled: number;
+}
+
+export interface TripNote {
+  id: string;
+  tripId: string;
+  legId?: string;
+  text: string;
+  author: string;
+  createdAt: string;
+}
+
+export interface StockBatch {
+  id: string;
+  itemId: string;
+  stockroomId: string;
+  quantity: number;
+  expirationDate: string;
+  receivedDate: string;
+  batchLabel?: string;
+}
+
 // ─── Context State ──────────────────────────────────────────────────────────
 
 export interface InventoryV2State {
@@ -263,6 +341,9 @@ export interface InventoryV2State {
   alertThresholds: AlertThreshold[];
   alerts: CommissaryAlert[];
   pendingChanges: number;
+  trips: Trip[];
+  groceryLists: GroceryList[];
+  stockBatches: StockBatch[];
 }
 
 // ─── Context Actions ────────────────────────────────────────────────────────
@@ -311,4 +392,27 @@ export type InventoryV2Action =
   | { type: 'DISMISS_ALERT'; payload: string } // alert id
   | { type: 'RESOLVE_ALERT'; payload: string } // alert id
   | { type: 'INCREMENT_PENDING_CHANGES' }
-  | { type: 'RESET_PENDING_CHANGES' };
+  | { type: 'RESET_PENDING_CHANGES' }
+  // Trip lifecycle
+  | { type: 'ADD_TRIP'; payload: Trip }
+  | { type: 'UPDATE_TRIP'; payload: Trip }
+  | { type: 'COMPLETE_TRIP'; payload: string }
+  // Leg lifecycle
+  | { type: 'UPDATE_LEG'; payload: { tripId: string; leg: TripLeg } }
+  | { type: 'COMPLETE_LEG'; payload: { tripId: string; legId: string } }
+  | { type: 'ADVANCE_TO_NEXT_LEG'; payload: string }
+  // Usage tracking
+  | { type: 'ADD_USAGE_LOG_ENTRY'; payload: { tripId: string; legId: string; entry: UsageLogEntry } }
+  | { type: 'UPDATE_USAGE_LOG_ENTRY'; payload: { tripId: string; legId: string; entry: UsageLogEntry } }
+  | { type: 'REMOVE_USAGE_LOG_ENTRY'; payload: { tripId: string; legId: string; entryId: string } }
+  // Grocery lists
+  | { type: 'ADD_GROCERY_LIST'; payload: GroceryList }
+  | { type: 'UPDATE_GROCERY_LIST'; payload: GroceryList }
+  | { type: 'SEND_GROCERY_LIST'; payload: string }
+  | { type: 'FULFILL_GROCERY_LIST'; payload: string }
+  // Trip notes
+  | { type: 'ADD_TRIP_NOTE'; payload: { tripId: string; note: TripNote } }
+  // Stock batches
+  | { type: 'ADD_STOCK_BATCH'; payload: StockBatch }
+  | { type: 'UPDATE_STOCK_BATCH'; payload: StockBatch }
+  | { type: 'REMOVE_STOCK_BATCH'; payload: string };
