@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, ShoppingCart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -8,6 +8,15 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { V2Badge } from '../shared/V2Badge';
 import type { StockroomItem } from '../types';
+
+function formatRelativeTime(isoString: string): string {
+  const MS_PER_HOUR = 3_600_000;
+  const MS_PER_DAY = 86_400_000;
+  const diff = Date.now() - new Date(isoString).getTime();
+  if (diff < MS_PER_HOUR) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < MS_PER_DAY) return `${Math.floor(diff / MS_PER_HOUR)}h ago`;
+  return new Date(isoString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 // ─── Row ─────────────────────────────────────────────────────────────────────
 
@@ -47,7 +56,8 @@ function StockRow({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function CommissaryDashboard() {
-  const { state } = useInventoryV2();
+  const { state, dispatch } = useInventoryV2();
+  const sentLists = state.groceryLists.filter(gl => gl.status === 'sent');
 
   const stockroomItems = state.stockroomItems.filter(
     si => si.stockroomId === state.selectedStockroomId
@@ -151,6 +161,48 @@ export default function CommissaryDashboard() {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Grocery List Requests */}
+      {sentLists.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShoppingCart size={16} className="text-blue-400" />
+              Grocery List Requests
+              <span className="ml-auto text-xs font-normal text-blue-400 bg-blue-500/15 px-2 py-0.5 rounded-full">
+                {sentLists.length} pending
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {sentLists.map(gl => {
+              const trip = state.trips.find(t => t.id === gl.tripId);
+              return (
+                <div key={gl.id} className="flex items-center justify-between px-4 py-3 border-b last:border-0">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 bg-amber-500/15 text-amber-400 rounded text-xs font-semibold border border-amber-500/30">
+                        {gl.tailNumber}
+                      </span>
+                      <span className="text-sm font-semibold">{trip?.tripName ?? 'Unknown Trip'}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {gl.generatedBy} · {gl.items.length} items · {formatRelativeTime(gl.generatedAt)}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="h-7 shrink-0 px-3 text-xs bg-emerald-600 hover:bg-emerald-500"
+                    onClick={() => dispatch({ type: 'FULFILL_GROCERY_LIST', payload: gl.id })}
+                  >
+                    Mark Fulfilled
+                  </Button>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
       )}
     </div>
   );

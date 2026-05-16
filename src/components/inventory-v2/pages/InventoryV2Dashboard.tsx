@@ -10,13 +10,14 @@ import { V2Badge } from '../shared/V2Badge';
 import FilterOverlay, { type FilterState, DEFAULT_FILTERS } from '../shared/FilterOverlay';
 import {
   LayoutDashboard, Filter, Clock, CheckCircle, AlertTriangle,
-  PackagePlus, Send, Truck, ArrowRight
+  PackagePlus, Send, Truck, ArrowRight, Plane, ChevronRight
 } from 'lucide-react';
 import { OfflineBanner } from '../shared/OfflineBanner';
 
 export default function InventoryV2Dashboard() {
   const navigate = useNavigate();
   const { state } = useInventoryV2();
+  const activeTrips = state.trips.filter(t => t.status === 'active');
 
   useEffect(() => {
     if (state.currentUser.role === 'commissary-manager') {
@@ -144,6 +145,49 @@ export default function InventoryV2Dashboard() {
           <Filter className="w-4 h-4 mr-1" /> Filters
         </Button>
       </div>
+
+      {/* Active Trips */}
+      {activeTrips.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Plane size={16} className="text-amber-400" />
+              Active Trips
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {activeTrips.map(trip => {
+              const activeLeg = trip.legs.find(l => l.status === 'active');
+              const itemsUsed = activeLeg?.usageLog.reduce((sum, e) => sum + e.qtyUsed, 0) ?? 0;
+              return (
+                <div
+                  key={trip.id}
+                  className="flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer hover:bg-slate-900/40 transition-colors"
+                  onClick={() => navigate(`/inventory-v2/trips/${trip.id}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded text-xs font-semibold border border-amber-500/30">
+                      {trip.tailNumber}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold">{trip.tripName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {activeLeg ? `Leg ${activeLeg.legNumber}: ${activeLeg.origin} → ${activeLeg.destination}` : 'No active leg'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-right">
+                    {itemsUsed > 0 && (
+                      <span className="text-xs text-blue-400">{itemsUsed} items used</span>
+                    )}
+                    <ChevronRight size={16} className="text-muted-foreground" />
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

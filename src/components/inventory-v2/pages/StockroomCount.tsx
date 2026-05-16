@@ -20,6 +20,7 @@ export default function StockroomCount() {
   const [showBelowPar, setShowBelowPar] = useState(false);
   const [bulkAdjustOpen, setBulkAdjustOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   const stockroomItems = useMemo(() =>
     state.stockroomItems.filter(si => si.stockroomId === state.selectedStockroomId),
@@ -183,7 +184,7 @@ export default function StockroomCount() {
                 <CollapsibleContent>
                   <div className="mt-1 space-y-0.5">
                     {/* Column headers */}
-                    <div className="grid grid-cols-[1fr_80px_90px_90px_120px_60px_60px] gap-2 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/50 rounded">
+                    <div className="grid grid-cols-[1fr_80px_90px_90px_120px_60px_60px_28px] gap-2 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/50 rounded">
                       <span>Item</span>
                       <span>Bin</span>
                       <span>Vendor #</span>
@@ -191,6 +192,7 @@ export default function StockroomCount() {
                       <span className="text-center">Qty On Hand</span>
                       <span className="text-center">Par</span>
                       <span className="text-center">Min</span>
+                      <span />
                     </div>
                     {catItems.map(item => {
                       const si = item.stockroom;
@@ -199,43 +201,84 @@ export default function StockroomCount() {
                       const min = si?.minimumLevel ?? 0;
                       const isBelowPar = qty < par;
                       const isAtMin = qty <= min;
+                      const batches = si
+                        ? state.stockBatches.filter(
+                            b => b.itemId === item.id && b.stockroomId === si.stockroomId
+                          )
+                        : [];
+                      const isExpanded = expandedItemId === item.id;
 
                       return (
-                        <div
-                          key={item.id}
-                          className={`grid grid-cols-[1fr_80px_90px_90px_120px_60px_60px] gap-2 px-4 py-2 rounded items-center text-sm ${
-                            isBelowPar ? 'bg-blue-100 dark:bg-blue-900/20' : 'hover:bg-muted/30'
-                          }`}
-                        >
-                          <span className="font-medium truncate">{item.itemName}</span>
-                          <span className="text-muted-foreground text-xs">{si?.binLocation ?? '—'}</span>
-                          <span className="text-muted-foreground text-xs truncate">{item.vendorItemNumber ?? '—'}</span>
-                          <span className="text-muted-foreground text-xs truncate">{item.internalItemNumber ?? '—'}</span>
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleQtyChange(item.id, -1)}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </Button>
-                            <span className="w-8 text-center font-mono font-bold">
-                              {qty}
-                              {isAtMin && <span className="text-red-500 font-bold ml-0.5">*</span>}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleQtyChange(item.id, 1)}
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
+                        <React.Fragment key={item.id}>
+                          <div
+                            className={`grid grid-cols-[1fr_80px_90px_90px_120px_60px_60px_28px] gap-2 px-4 py-2 rounded items-center text-sm ${
+                              isBelowPar ? 'bg-blue-100 dark:bg-blue-900/20' : 'hover:bg-muted/30'
+                            }`}
+                          >
+                            <span className="font-medium truncate">{item.itemName}</span>
+                            <span className="text-muted-foreground text-xs">{si?.binLocation ?? '—'}</span>
+                            <span className="text-muted-foreground text-xs truncate">{item.vendorItemNumber ?? '—'}</span>
+                            <span className="text-muted-foreground text-xs truncate">{item.internalItemNumber ?? '—'}</span>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => handleQtyChange(item.id, -1)}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <span className="w-8 text-center font-mono font-bold">
+                                {qty}
+                                {isAtMin && <span className="text-red-500 font-bold ml-0.5">*</span>}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => handleQtyChange(item.id, 1)}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            <span className="text-center text-muted-foreground">{par}</span>
+                            <span className="text-center text-muted-foreground">{min}</span>
+                            <div className="flex items-center justify-center">
+                              {batches.length > 0 && (
+                                <button
+                                  className="p-0.5 rounded hover:bg-muted/50 transition-colors"
+                                  onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
+                                  title={isExpanded ? 'Hide batches' : 'Show batches'}
+                                >
+                                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <span className="text-center text-muted-foreground">{par}</span>
-                          <span className="text-center text-muted-foreground">{min}</span>
-                        </div>
+                          {isExpanded && batches.map(batch => {
+                            const isExpired = batch.expirationDate
+                              ? new Date(batch.expirationDate) < new Date()
+                              : false;
+                            const isExpiringSoon = batch.expirationDate
+                              ? new Date(batch.expirationDate) < new Date(Date.now() + 14 * 86_400_000)
+                              : false;
+
+                            return (
+                              <div key={batch.id} className="flex items-center justify-between px-6 py-1.5 bg-slate-950/40 text-xs">
+                                <span className="text-muted-foreground">{batch.batchLabel ?? 'Batch'}</span>
+                                <span className="text-muted-foreground">Qty: {batch.quantity}</span>
+                                {batch.expirationDate ? (
+                                  <span className={isExpired ? 'text-red-400 line-through' : isExpiringSoon ? 'text-amber-400' : 'text-muted-foreground'}>
+                                    {isExpired ? 'Expired' : `Exp: ${new Date(batch.expirationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}`}
+                                    {isExpiringSoon && !isExpired && ' ⚠'}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">No expiry</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </React.Fragment>
                       );
                     })}
                   </div>
