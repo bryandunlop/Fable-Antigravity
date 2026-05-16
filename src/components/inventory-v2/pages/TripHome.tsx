@@ -7,7 +7,7 @@ import { Badge } from '../../ui/badge';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { V2Badge } from '../shared/V2Badge';
-import { TRIP_STATUS_COLORS, LEG_STATUS_COLORS } from '../constants';
+import { TRIP_STATUS_COLORS } from '../constants';
 import { cn } from '../../ui/utils';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -46,17 +46,21 @@ export default function TripHome() {
   const tripColors = TRIP_STATUS_COLORS[trip.status];
 
   // Day X of Y
+  const MS_PER_DAY = 86400000;
   const startMs = new Date(trip.startDate).getTime();
   let totalDays: number;
   if (trip.endDate) {
-    totalDays = Math.floor((new Date(trip.endDate).getTime() - startMs) / 86400000) + 1;
+    totalDays = Math.floor((new Date(trip.endDate).getTime() - startMs) / MS_PER_DAY) + 1;
   } else if (trip.legs.length > 0) {
     const lastLegDate = trip.legs[trip.legs.length - 1].date;
-    totalDays = Math.floor((new Date(lastLegDate).getTime() - startMs) / 86400000) + 1;
+    totalDays = Math.floor((new Date(lastLegDate).getTime() - startMs) / MS_PER_DAY) + 1;
   } else {
     totalDays = 1;
   }
-  const rawDayX = Math.floor((Date.now() - startMs) / 86400000) + 1;
+  // Timezone-safe: use local midnight instead of Date.now()
+  const now = new Date();
+  const todayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const rawDayX = Math.floor((todayMs - startMs) / MS_PER_DAY) + 1;
   const dayX = Math.max(1, Math.min(rawDayX, totalDays));
 
   // Leg N of M
@@ -228,7 +232,7 @@ export default function TripHome() {
                     <CheckCircle2 className="text-emerald-400" size={20} />
                   )}
                   {leg.status === 'active' && (
-                    <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-xs font-bold text-black">
+                    <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-xs font-bold text-slate-950">
                       {leg.legNumber}
                     </div>
                   )}
