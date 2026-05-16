@@ -28,6 +28,7 @@ import type { Trip } from '../types';
 // ─── Leg Row for New Trip Dialog ─────────────────────────────────────────────
 
 interface LegFormData {
+  id: string;
   origin: string;
   destination: string;
   date: string;
@@ -43,7 +44,7 @@ function LegRow({
 }: {
   leg: LegFormData;
   index: number;
-  onChange: (index: number, field: keyof LegFormData, value: string | number) => void;
+  onChange: (index: number, field: keyof Omit<LegFormData, 'id'>, value: string | number) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
 }) {
@@ -117,15 +118,22 @@ function NewTripDialog({
   const [tripName, setTripName] = useState('');
   const [tripNumber, setTripNumber] = useState('');
   const [legs, setLegs] = useState<LegFormData[]>([
-    { origin: '', destination: '', date: '', paxCount: 0 },
+    { id: crypto.randomUUID(), origin: '', destination: '', date: '', paxCount: 0 },
   ]);
 
-  function handleLegChange(index: number, field: keyof LegFormData, value: string | number) {
+  function resetForm() {
+    setTailNumber('');
+    setTripName('');
+    setTripNumber('');
+    setLegs([{ id: crypto.randomUUID(), origin: '', destination: '', date: '', paxCount: 0 }]);
+  }
+
+  function handleLegChange(index: number, field: keyof Omit<LegFormData, 'id'>, value: string | number) {
     setLegs(prev => prev.map((l, i) => (i === index ? { ...l, [field]: value } : l)));
   }
 
   function addLeg() {
-    setLegs(prev => [...prev, { origin: '', destination: '', date: '', paxCount: 0 }]);
+    setLegs(prev => [...prev, { id: crypto.randomUUID(), origin: '', destination: '', date: '', paxCount: 0 }]);
   }
 
   function removeLeg(index: number) {
@@ -142,17 +150,18 @@ function NewTripDialog({
       tripNumber: tripNumber.trim(),
       legs,
     });
-    // Reset
-    setTailNumber('');
-    setTripName('');
-    setTripNumber('');
-    setLegs([{ origin: '', destination: '', date: '', paxCount: 0 }]);
+    resetForm();
+  }
+
+  function handleClose() {
+    resetForm();
+    onClose();
   }
 
   const isValid = tailNumber && tripName.trim() && tripNumber.trim() && legs.length > 0;
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+    <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>New Trip</DialogTitle>
@@ -210,7 +219,7 @@ function NewTripDialog({
             <div className="divide-y">
               {legs.map((leg, i) => (
                 <LegRow
-                  key={i}
+                  key={leg.id}
                   leg={leg}
                   index={i}
                   onChange={handleLegChange}
@@ -233,7 +242,7 @@ function NewTripDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={!isValid}>
@@ -247,20 +256,20 @@ function NewTripDialog({
 
 // ─── Trip Card ────────────────────────────────────────────────────────────────
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 function TripCard({ trip }: { trip: Trip }) {
   const navigate = useNavigate();
   const colors = TRIP_STATUS_COLORS[trip.status];
   const activeLeg = trip.legs.find(l => l.status === 'active');
   const completedLegs = trip.legs.filter(l => l.status === 'completed').length;
   const currentLegNumber = activeLeg?.legNumber ?? completedLegs;
-
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  }
 
   return (
     <Card
@@ -340,7 +349,7 @@ export default function TripList() {
   const navigate = useNavigate();
 
   const [filterTail, setFilterTail] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
   const [showDialog, setShowDialog] = useState(false);
 
   // Filter
@@ -430,7 +439,7 @@ export default function TripList() {
 
         {/* Status pills */}
         <div className="flex gap-2">
-          {(['all', 'active', 'completed'] as const).map(s => (
+          {(['all', 'active', 'completed', 'cancelled'] as const).map(s => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
