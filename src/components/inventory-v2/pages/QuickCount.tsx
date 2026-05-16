@@ -11,7 +11,7 @@ import { V2Badge } from '../shared/V2Badge';
 import { SUPPLY_CATEGORIES } from '../constants';
 import { getCompartmentsForAircraft, getCompartmentLabel } from '../compartmentConfig';
 import { cn } from '../../ui/utils';
-import type { InventoryItemV2, UsageLogEntry } from '../types';
+import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, InventoryV2State, InventoryV2Action } from '../types';
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -74,24 +74,59 @@ export default function QuickCount() {
   );
 }
 
+// ─── Item Row (module-scope to avoid remount on parent re-render) ─────────────
+
+interface ItemRowProps {
+  item: InventoryItemV2;
+  legUsage: number;
+  onBoard: number;
+  compartmentLabel: string;
+  onIncrement: () => void;
+  onDecrement: () => void;
+}
+
+function ItemRow({ item, legUsage, onBoard, compartmentLabel, onIncrement, onDecrement }: ItemRowProps) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 px-4 py-3 border-b border-slate-800/60',
+        legUsage === 0 && 'opacity-50'
+      )}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold truncate">{item.itemName}</p>
+        <p className="text-xs text-muted-foreground">
+          {compartmentLabel} · {onBoard} on board
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={onDecrement}
+          className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors"
+          disabled={legUsage === 0}
+        >
+          −
+        </button>
+        <span
+          className={cn(
+            'w-8 text-center text-base font-bold',
+            legUsage > 0 ? 'text-blue-400' : 'text-slate-500'
+          )}
+        >
+          {legUsage}
+        </span>
+        <button
+          onClick={onIncrement}
+          className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Inner Component (avoids hooks-after-return issues) ───────────────────────
-
-interface Trip {
-  id: string;
-  tailNumber: string;
-  aircraftType: 'G650' | 'G500';
-  tripName: string;
-  tripNumber: string;
-  legs: import('../types').TripLeg[];
-}
-
-interface TripLeg {
-  id: string;
-  legNumber: number;
-  origin: string;
-  destination: string;
-  usageLog: UsageLogEntry[];
-}
 
 function QuickCountInner({
   tripId,
@@ -120,8 +155,8 @@ function QuickCountInner({
   setSelectedCategory: (c: string) => void;
   showSummary: boolean;
   setShowSummary: (b: boolean) => void;
-  state: import('../types').InventoryV2State;
-  dispatch: (action: import('../types').InventoryV2Action) => void;
+  state: InventoryV2State;
+  dispatch: (action: InventoryV2Action) => void;
   navigate: ReturnType<typeof useNavigate>;
 }) {
   const aircraftType = trip.aircraftType;
@@ -146,7 +181,7 @@ function QuickCountInner({
 
   function getOnBoard(item: InventoryItemV2): number {
     const allLegsUsage = trip.legs
-      .flatMap((l: import('../types').TripLeg) => l.usageLog)
+      .flatMap((l: TripLeg) => l.usageLog)
       .filter(e => e.itemId === item.id)
       .reduce((sum, e) => sum + e.qtyUsed, 0);
     return (item.defaultQuantities[aircraftType] ?? 0) - allLegsUsage;
@@ -228,57 +263,6 @@ function QuickCountInner({
     const cats = new Set(filteredItems.map(i => i.supplyCategory));
     return SUPPLY_CATEGORIES.filter(c => cats.has(c.id)).map(c => c.id);
   }, [filteredItems]);
-
-  // ─── Item row ─────────────────────────────────────────────────────────────
-
-  function ItemRow({ item }: { item: InventoryItemV2 }) {
-    const legUsage = getLegUsage(item);
-    const onBoard = getOnBoard(item);
-    const compartmentLabelText = getCompartmentLabel(
-      state.compartmentConfigs,
-      aircraftType,
-      item.compartmentId
-    );
-
-    return (
-      <div
-        className={cn(
-          'flex items-center gap-3 px-4 py-3 border-b border-slate-800/60',
-          legUsage === 0 && 'opacity-50'
-        )}
-      >
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate">{item.itemName}</p>
-          <p className="text-xs text-muted-foreground">
-            {compartmentLabelText} · {onBoard} on board
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => handleDecrement(item)}
-            className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors"
-            disabled={legUsage === 0}
-          >
-            −
-          </button>
-          <span
-            className={cn(
-              'w-8 text-center text-base font-bold',
-              legUsage > 0 ? 'text-blue-400' : 'text-slate-500'
-            )}
-          >
-            {legUsage}
-          </span>
-          <button
-            onClick={() => handleIncrement(item)}
-            className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors"
-          >
-            +
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -372,7 +356,15 @@ function QuickCountInner({
                   </span>
                 </div>
                 {sectionItems.map(item => (
-                  <ItemRow key={item.id} item={item} />
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    legUsage={getLegUsage(item)}
+                    onBoard={getOnBoard(item)}
+                    compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
+                    onIncrement={() => handleIncrement(item)}
+                    onDecrement={() => handleDecrement(item)}
+                  />
                 ))}
               </div>
             );
@@ -416,7 +408,15 @@ function QuickCountInner({
                   selectedCategory === 'all' || item.supplyCategory === selectedCategory
               )
               .map(item => (
-                <ItemRow key={item.id} item={item} />
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  legUsage={getLegUsage(item)}
+                  onBoard={getOnBoard(item)}
+                  compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
+                  onIncrement={() => handleIncrement(item)}
+                  onDecrement={() => handleDecrement(item)}
+                />
               ))}
             {filteredItems.filter(
               item =>
