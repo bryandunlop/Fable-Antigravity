@@ -137,6 +137,7 @@ import CommissaryDashboard from './components/inventory-v2/pages/CommissaryDashb
 import AlertsPage from './components/inventory-v2/pages/AlertsPage';
 import TripListV2 from './components/inventory-v2/pages/TripList';
 import TripHomeV2 from './components/inventory-v2/pages/TripHome';
+import QuickCountV2 from './components/inventory-v2/pages/QuickCount';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -408,6 +409,7 @@ export default function App() {
                                 <Route path="/inventory-v2/alerts" element={<InventoryV2Provider userRole={userRole}><AlertsPage /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/trips" element={<InventoryV2Provider userRole={userRole}><TripListV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/trips/:tripId" element={<InventoryV2Provider userRole={userRole}><TripHomeV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/trips/:tripId/quick-count" element={<InventoryV2Provider userRole={userRole}><QuickCountV2 /></InventoryV2Provider>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />
