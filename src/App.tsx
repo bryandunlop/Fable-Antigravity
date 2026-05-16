@@ -135,6 +135,7 @@ import ReceivingV2 from './components/inventory-v2/pages/Receiving';
 import SettingsV2 from './components/inventory-v2/pages/Settings';
 import CommissaryDashboard from './components/inventory-v2/pages/CommissaryDashboard';
 import AlertsPage from './components/inventory-v2/pages/AlertsPage';
+import TripListV2 from './components/inventory-v2/pages/TripList';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -404,6 +405,7 @@ export default function App() {
                                 <Route path="/inventory-v2/settings" element={<InventoryV2Provider userRole={userRole}><SettingsV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/commissary" element={<InventoryV2Provider userRole={userRole}><CommissaryDashboard /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/alerts" element={<InventoryV2Provider userRole={userRole}><AlertsPage /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/trips" element={<InventoryV2Provider userRole={userRole}><TripListV2 /></InventoryV2Provider>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />
