@@ -141,6 +141,7 @@ import QuickCountV2 from './components/inventory-v2/pages/QuickCount';
 import GroceryListPageV2 from './components/inventory-v2/pages/GroceryListPage';
 import TripNotesV2 from './components/inventory-v2/pages/TripNotes';
 import LegReconciliationV2 from './components/inventory-v2/pages/LegReconciliation';
+import ItemManagerV2 from './components/inventory-v2/pages/ItemManager';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -416,6 +417,7 @@ export default function App() {
                                 <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryV2Provider userRole={userRole}><GroceryListPageV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/trips/:tripId/notes" element={<InventoryV2Provider userRole={userRole}><TripNotesV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/trips/:tripId/reconcile" element={<InventoryV2Provider userRole={userRole}><LegReconciliationV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2/item-manager" element={<InventoryV2Provider userRole={userRole}><ItemManagerV2 /></InventoryV2Provider>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />
