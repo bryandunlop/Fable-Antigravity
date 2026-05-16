@@ -6,6 +6,7 @@ import type {
   InspectionV2,
   Stockroom,
   StockroomItem,
+  StockBatch,
   PickListItem,
   RestockListItem,
   UnitItemRequest,
@@ -485,6 +486,75 @@ export const MOCK_UNIT_REQUESTS: UnitItemRequest[] = [
     ],
   },
 ];
+
+// ─── Mock Purchase Orders ───────────────────────────────────────────────────
+
+// ─── Stock Batches ──────────────────────────────────────────────────────────
+
+function generateStockBatches(): StockBatch[] {
+  const batches: StockBatch[] = [];
+  let batchId = 1;
+  const perishableCategories: SupplyCategory[] = ['beverages', 'snacks', 'coffee', 'tea', 'wine'];
+
+  // STOCKROOM_ITEMS must be generated before calling this
+  // Call this after STOCKROOM_ITEMS is defined
+  ITEMS_V2.forEach(item => {
+    const si = STOCKROOM_ITEMS.find(s => s.itemId === item.id && s.stockroomId === 'sr-1');
+    if (!si) return;
+    const qty = si.qtyOnHand;
+    const isPerishable = perishableCategories.includes(item.supplyCategory);
+
+    if (isPerishable && qty > 0) {
+      const batchCount = qty > 6 ? 3 : 2;
+      const perBatch = Math.floor(qty / batchCount);
+      const remainder = qty - perBatch * batchCount;
+
+      batches.push({
+        id: `batch-${batchId++}`,
+        itemId: item.id,
+        stockroomId: 'sr-1',
+        quantity: perBatch + remainder,
+        expirationDate: '2026-11-15',
+        receivedDate: '2026-05-01',
+        batchLabel: `LOT-${item.id.padStart(3, '0')}-A`,
+      });
+
+      batches.push({
+        id: `batch-${batchId++}`,
+        itemId: item.id,
+        stockroomId: 'sr-1',
+        quantity: perBatch,
+        expirationDate: '2026-05-29',
+        receivedDate: '2026-04-15',
+        batchLabel: `LOT-${item.id.padStart(3, '0')}-B`,
+      });
+
+      if (batchCount === 3) {
+        batches.push({
+          id: `batch-${batchId++}`,
+          itemId: item.id,
+          stockroomId: 'sr-1',
+          quantity: perBatch,
+          expirationDate: '2026-05-18',
+          receivedDate: '2026-03-01',
+          batchLabel: `LOT-${item.id.padStart(3, '0')}-C`,
+        });
+      }
+    } else if (qty > 0) {
+      batches.push({
+        id: `batch-${batchId++}`,
+        itemId: item.id,
+        stockroomId: 'sr-1',
+        quantity: qty,
+        receivedDate: '2026-04-01',
+      });
+    }
+  });
+
+  return batches;
+}
+
+export const STOCK_BATCHES = generateStockBatches();
 
 // ─── Mock Purchase Orders ───────────────────────────────────────────────────
 

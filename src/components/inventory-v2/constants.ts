@@ -62,6 +62,24 @@ export const STATUS_COLORS = {
   fully_received: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Received' },
 } as const;
 
+export const TRIP_STATUS_COLORS = {
+  active: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Active' },
+  completed: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Completed' },
+  cancelled: { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30', label: 'Cancelled' },
+} as const;
+
+export const LEG_STATUS_COLORS = {
+  upcoming: { bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30', label: 'Upcoming' },
+  active: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'In Flight' },
+  completed: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Completed' },
+} as const;
+
+export const GROCERY_STATUS_COLORS = {
+  draft: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Draft' },
+  sent: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Sent' },
+  fulfilled: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Fulfilled' },
+} as const;
+
 // ─── Priority Colors ────────────────────────────────────────────────────────
 
 export const PRIORITY_COLORS = {
