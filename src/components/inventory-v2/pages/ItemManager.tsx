@@ -208,6 +208,21 @@ export default function ItemManager() {
 
   function handleAdd() {
     if (!form.itemName.trim()) return;
+
+    // Validate numeric inputs
+    if (form.g650Qty !== '') {
+      const g650Parsed = parseInt(form.g650Qty, 10);
+      if (isNaN(g650Parsed) || g650Parsed < 0) return;
+    }
+    if (form.g500Qty !== '') {
+      const g500Parsed = parseInt(form.g500Qty, 10);
+      if (isNaN(g500Parsed) || g500Parsed < 0) return;
+    }
+    if (form.costPerUnit !== '') {
+      const costParsed = parseFloat(form.costPerUnit);
+      if (isNaN(costParsed) || costParsed < 0) return;
+    }
+
     const newItem: InventoryItemV2 = {
       id: `item-${Date.now()}`,
       itemName: form.itemName.trim(),
@@ -235,6 +250,21 @@ export default function ItemManager() {
 
   function handleUpdate() {
     if (!editingItem || !form.itemName.trim()) return;
+
+    // Validate numeric inputs
+    if (form.g650Qty !== '') {
+      const g650Parsed = parseInt(form.g650Qty, 10);
+      if (isNaN(g650Parsed) || g650Parsed < 0) return;
+    }
+    if (form.g500Qty !== '') {
+      const g500Parsed = parseInt(form.g500Qty, 10);
+      if (isNaN(g500Parsed) || g500Parsed < 0) return;
+    }
+    if (form.costPerUnit !== '') {
+      const costParsed = parseFloat(form.costPerUnit);
+      if (isNaN(costParsed) || costParsed < 0) return;
+    }
+
     const updated: InventoryItemV2 = {
       ...editingItem,
       itemName: form.itemName.trim(),
