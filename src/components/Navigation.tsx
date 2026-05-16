@@ -58,7 +58,9 @@ import {
   ArrowRightLeft,
   HardDrive,
   Layers,
-  PackagePlus
+  PackagePlus,
+  ListChecks,
+  ShoppingCart
 } from 'lucide-react';
 
 
@@ -265,16 +267,19 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     {
       label: "Inventory V2  ✦ NEW",
       items: [
-        { name: 'Inventory Dashboard', href: '/inventory-v2', icon: Layers, roles: ['inflight', 'admin', 'pilot'] },
-        { name: 'New Inspection', href: '/inventory-v2/inspection', icon: ClipboardList, roles: ['inflight', 'admin'] },
-        { name: 'My Inspections', href: '/inventory-v2/my-inspections', icon: ClipboardCheck, roles: ['inflight', 'admin'] },
-        { name: 'Stockroom', href: '/inventory-v2/stockroom', icon: Boxes, roles: ['inflight', 'admin'] },
+        { name: 'Dashboard', href: '/inventory-v2', icon: Layers, roles: ['inflight', 'admin', 'pilot', 'commissary-manager'] },
+        { name: 'Trips', href: '/inventory-v2/trips', icon: Plane, roles: ['inflight', 'admin', 'commissary-manager'] },
+        { name: 'New Inspection', href: '/inventory-v2/inspection', icon: ClipboardCheck, roles: ['inflight', 'admin'] },
+        { name: 'My Inspections', href: '/inventory-v2/my-inspections', icon: FileCheck, roles: ['inflight', 'admin'] },
+        { name: 'Stockroom', href: '/inventory-v2/stockroom', icon: Boxes, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Physical Count', href: '/inventory-v2/physical-count', icon: Calculator, roles: ['inflight', 'admin'] },
         { name: 'Pick List', href: '/inventory-v2/pick-list', icon: CheckSquare, roles: ['inflight', 'admin'] },
         { name: 'Restock', href: '/inventory-v2/restock', icon: Package, roles: ['inflight', 'admin'] },
         { name: 'Unit Requests', href: '/inventory-v2/unit-requests', icon: Send, roles: ['inflight', 'admin'] },
-        { name: 'Add to Stock', href: '/inventory-v2/receiving', icon: PackagePlus, roles: ['inflight', 'admin'] },
-        { name: 'Settings', href: '/inventory-v2/settings', icon: Settings, roles: ['admin'] },
+        { name: 'Add to Stock', href: '/inventory-v2/receiving', icon: PackagePlus, roles: ['inflight', 'admin', 'commissary-manager'] },
+        { name: 'Item Manager', href: '/inventory-v2/item-manager', icon: ListChecks, roles: ['admin', 'commissary-manager'] },
+        { name: 'Commissary', href: '/inventory-v2/commissary', icon: ShoppingCart, roles: ['admin', 'commissary-manager'] },
+        { name: 'Settings', href: '/inventory-v2/settings', icon: Settings, roles: ['admin', 'commissary-manager'] },
       ]
     },
     {
