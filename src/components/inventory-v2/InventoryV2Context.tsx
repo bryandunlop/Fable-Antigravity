@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import type { InventoryV2State, InventoryV2Action, StockroomItem, CommissaryAlert } from './types';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
-import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS } from './mockData';
+import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS, STOCK_BATCHES } from './mockData';
+import { MOCK_TRIPS, MOCK_GROCERY_LISTS } from './mockTrips';
 import { FLEET_V2 } from './constants';
 import { loadCompartmentConfigs } from './compartmentConfig';
 
@@ -60,6 +61,9 @@ function getDefaultState(): InventoryV2State {
     alertThresholds: [],
     alerts: [],
     pendingChanges: 0,
+    trips: MOCK_TRIPS,
+    groceryLists: MOCK_GROCERY_LISTS,
+    stockBatches: STOCK_BATCHES,
   };
 }
 
@@ -301,6 +305,210 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
 
     case 'RESET_STATE':
       return action.payload;
+
+    // ── Trip lifecycle ──
+    case 'ADD_TRIP':
+      return { ...state, trips: [...state.trips, action.payload], pendingChanges: state.pendingChanges + 1 };
+
+    case 'UPDATE_TRIP':
+      return {
+        ...state,
+        trips: state.trips.map(t => t.id === action.payload.id ? action.payload : t),
+        pendingChanges: state.pendingChanges + 1,
+      };
+
+    case 'COMPLETE_TRIP': {
+      return {
+        ...state,
+        trips: state.trips.map(t =>
+          t.id === action.payload
+            ? { ...t, status: 'completed' as const, endDate: new Date().toISOString() }
+            : t
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    // ── Leg lifecycle ──
+    case 'UPDATE_LEG': {
+      return {
+        ...state,
+        trips: state.trips.map(t =>
+          t.id === action.payload.tripId
+            ? { ...t, legs: t.legs.map(l => l.id === action.payload.leg.id ? action.payload.leg : l) }
+            : t
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    case 'COMPLETE_LEG': {
+      return {
+        ...state,
+        trips: state.trips.map(t =>
+          t.id === action.payload.tripId
+            ? {
+                ...t,
+                legs: t.legs.map(l =>
+                  l.id === action.payload.legId ? { ...l, status: 'completed' as const } : l
+                ),
+              }
+            : t
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    case 'ADVANCE_TO_NEXT_LEG': {
+      return {
+        ...state,
+        trips: state.trips.map(t => {
+          if (t.id !== action.payload) return t;
+          const currentIdx = t.legs.findIndex(l => l.status === 'active');
+          if (currentIdx === -1) return t;
+          return {
+            ...t,
+            legs: t.legs.map((l, i) => {
+              if (i === currentIdx) return { ...l, status: 'completed' as const };
+              if (i === currentIdx + 1) return { ...l, status: 'active' as const };
+              return l;
+            }),
+          };
+        }),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    // ── Usage tracking ──
+    case 'ADD_USAGE_LOG_ENTRY': {
+      return {
+        ...state,
+        trips: state.trips.map(t =>
+          t.id === action.payload.tripId
+            ? {
+                ...t,
+                legs: t.legs.map(l =>
+                  l.id === action.payload.legId
+                    ? { ...l, usageLog: [...l.usageLog, action.payload.entry] }
+                    : l
+                ),
+              }
+            : t
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    case 'UPDATE_USAGE_LOG_ENTRY': {
+      return {
+        ...state,
+        trips: state.trips.map(t =>
+          t.id === action.payload.tripId
+            ? {
+                ...t,
+                legs: t.legs.map(l =>
+                  l.id === action.payload.legId
+                    ? {
+                        ...l,
+                        usageLog: l.usageLog.map(e =>
+                          e.id === action.payload.entry.id ? action.payload.entry : e
+                        ),
+                      }
+                    : l
+                ),
+              }
+            : t
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    case 'REMOVE_USAGE_LOG_ENTRY': {
+      return {
+        ...state,
+        trips: state.trips.map(t =>
+          t.id === action.payload.tripId
+            ? {
+                ...t,
+                legs: t.legs.map(l =>
+                  l.id === action.payload.legId
+                    ? { ...l, usageLog: l.usageLog.filter(e => e.id !== action.payload.entryId) }
+                    : l
+                ),
+              }
+            : t
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    // ── Grocery lists ──
+    case 'ADD_GROCERY_LIST':
+      return { ...state, groceryLists: [...state.groceryLists, action.payload], pendingChanges: state.pendingChanges + 1 };
+
+    case 'UPDATE_GROCERY_LIST':
+      return {
+        ...state,
+        groceryLists: state.groceryLists.map(gl => gl.id === action.payload.id ? action.payload : gl),
+        pendingChanges: state.pendingChanges + 1,
+      };
+
+    case 'SEND_GROCERY_LIST':
+      return {
+        ...state,
+        groceryLists: state.groceryLists.map(gl =>
+          gl.id === action.payload ? { ...gl, status: 'sent' as const } : gl
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+
+    case 'FULFILL_GROCERY_LIST':
+      return {
+        ...state,
+        groceryLists: state.groceryLists.map(gl =>
+          gl.id === action.payload ? { ...gl, status: 'fulfilled' as const } : gl
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+
+    // ── Trip notes ──
+    case 'ADD_TRIP_NOTE': {
+      const { tripId, note } = action.payload;
+      return {
+        ...state,
+        trips: state.trips.map(t => {
+          if (t.id !== tripId) return t;
+          if (note.legId) {
+            return {
+              ...t,
+              legs: t.legs.map(l =>
+                l.id === note.legId ? { ...l, notes: [...l.notes, note] } : l
+              ),
+            };
+          }
+          return { ...t, notes: [...t.notes, note] };
+        }),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    // ── Stock batches ──
+    case 'ADD_STOCK_BATCH':
+      return { ...state, stockBatches: [...state.stockBatches, action.payload], pendingChanges: state.pendingChanges + 1 };
+
+    case 'UPDATE_STOCK_BATCH':
+      return {
+        ...state,
+        stockBatches: state.stockBatches.map(sb => sb.id === action.payload.id ? action.payload : sb),
+        pendingChanges: state.pendingChanges + 1,
+      };
+
+    case 'REMOVE_STOCK_BATCH':
+      return {
+        ...state,
+        stockBatches: state.stockBatches.filter(sb => sb.id !== action.payload),
+        pendingChanges: state.pendingChanges + 1,
+      };
 
     default:
       return state;
