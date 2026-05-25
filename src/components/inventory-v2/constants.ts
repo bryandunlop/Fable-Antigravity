@@ -75,9 +75,9 @@ export const LEG_STATUS_COLORS = {
 } as const;
 
 export const GROCERY_STATUS_COLORS = {
-  draft: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Draft' },
+  draft: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Shopping List' },
   sent: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Sent' },
-  fulfilled: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Fulfilled' },
+  fulfilled: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Complete' },
 } as const;
 
 // ─── Priority Colors ────────────────────────────────────────────────────────

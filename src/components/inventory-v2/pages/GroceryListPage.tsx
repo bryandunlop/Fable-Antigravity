@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Search, X } from 'lucide-react';
+import { ChevronLeft, Search, X, CheckCircle2, Circle } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Textarea } from '../../ui/textarea';
@@ -76,20 +76,22 @@ function buildCopyText(
   notes: string | undefined
 ): string {
   const lines: string[] = [
-    `🛒 Grocery List — ${trip.tailNumber}`,
+    `🛒 Shopping List — ${trip.tailNumber}`,
     `Trip: ${trip.tripName} (${trip.tripNumber})`,
     `Leg ${activeLeg.legNumber}: ${activeLeg.origin} → ${activeLeg.destination}`,
     '',
     'RESTOCK NEEDED:',
     ...autoItems.map(gi => {
       const itemDef = allItems.find(i => i.id === gi.itemId);
-      return `• ${itemDef?.itemName ?? gi.itemId} — Need ${gi.qtyNeeded}`;
+      const picked = gi.qtyFulfilled >= gi.qtyNeeded;
+      return `${picked ? '✓' : '○'} ${itemDef?.itemName ?? gi.itemId} — ${gi.qtyNeeded}`;
     }),
     '',
-    'MANUALLY ADDED:',
+    'ADDITIONAL ITEMS:',
     ...manualItems.map(gi => {
       const itemDef = allItems.find(i => i.id === gi.itemId);
-      return `• ${itemDef?.itemName ?? gi.itemId} — ${gi.qtyNeeded}`;
+      const picked = gi.qtyFulfilled >= gi.qtyNeeded;
+      return `${picked ? '✓' : '○'} ${itemDef?.itemName ?? gi.itemId} — ${gi.qtyNeeded}`;
     }),
     '',
     notes ? `Notes: ${notes}` : '',
@@ -97,32 +99,51 @@ function buildCopyText(
   return lines.filter(l => l !== undefined).join('\n');
 }
 
-// ─── Auto Item Row ─────────────────────────────────────────────────────────────
+// ─── Item Row ──────────────────────────────────────────────────────────────────
 
-interface AutoItemRowProps {
+interface ItemRowProps {
   groceryItem: GroceryListItem;
   itemDef: InventoryItemV2 | undefined;
-  aircraftType: 'G650' | 'G500';
-  totalUsed: number;
+  picked: boolean;
+  onTogglePicked: () => void;
   onChangeQty: (delta: number) => void;
+  onRemove?: () => void;
+  sublabel?: string;
 }
 
-function AutoItemRow({ groceryItem, itemDef, aircraftType, totalUsed, onChangeQty }: AutoItemRowProps) {
-  const par = itemDef?.defaultQuantities[aircraftType] ?? 0;
-  const remaining = par - totalUsed;
-
+function ItemRow({ groceryItem, itemDef, picked, onTogglePicked, onChangeQty, onRemove, sublabel }: ItemRowProps) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-blue-500/10 last:border-0">
+    <div className={cn(
+      'flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 transition-opacity',
+      picked && 'opacity-50'
+    )}>
+      {/* Check toggle */}
+      <button
+        onClick={onTogglePicked}
+        className="shrink-0 text-muted-foreground hover:text-emerald-400 transition-colors"
+        title={picked ? 'Mark as not picked up' : 'Mark as picked up'}
+      >
+        {picked
+          ? <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+          : <Circle className="w-5 h-5" />
+        }
+      </button>
+
+      {/* Item name */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate">{itemDef?.itemName ?? groceryItem.itemId}</p>
-        <p className="text-xs text-muted-foreground">
-          Used {totalUsed} this trip · {remaining} remaining · Par: {par}
+        <p className={cn('text-sm font-semibold truncate', picked && 'line-through text-muted-foreground')}>
+          {itemDef?.itemName ?? groceryItem.itemId}
         </p>
+        {sublabel && (
+          <p className="text-xs text-muted-foreground mt-0.5">{sublabel}</p>
+        )}
       </div>
+
+      {/* Qty controls */}
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={() => onChangeQty(-1)}
-          disabled={groceryItem.qtyNeeded <= 0}
+          disabled={groceryItem.qtyNeeded <= (onRemove ? 1 : 0)}
           className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors disabled:opacity-40"
         >
           −
@@ -136,49 +157,14 @@ function AutoItemRow({ groceryItem, itemDef, aircraftType, totalUsed, onChangeQt
         >
           +
         </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Manual Item Row ───────────────────────────────────────────────────────────
-
-interface ManualItemRowProps {
-  groceryItem: GroceryListItem;
-  itemDef: InventoryItemV2 | undefined;
-  onChangeQty: (delta: number) => void;
-  onRemove: () => void;
-}
-
-function ManualItemRow({ groceryItem, itemDef, onChangeQty, onRemove }: ManualItemRowProps) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-emerald-500/10 last:border-0">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate">{itemDef?.itemName ?? groceryItem.itemId}</p>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={() => onChangeQty(-1)}
-          disabled={groceryItem.qtyNeeded <= 1}
-          className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors disabled:opacity-40"
-        >
-          −
-        </button>
-        <span className="w-8 text-center text-base font-bold text-emerald-400">
-          {groceryItem.qtyNeeded}
-        </span>
-        <button
-          onClick={() => onChangeQty(1)}
-          className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors"
-        >
-          +
-        </button>
-        <button
-          onClick={onRemove}
-          className="w-8 h-8 rounded-md bg-red-500/10 border border-red-500/30 flex items-center justify-center hover:bg-red-500/20 transition-colors text-red-400"
-        >
-          <X size={14} />
-        </button>
+        {onRemove && (
+          <button
+            onClick={onRemove}
+            className="w-8 h-8 rounded-md bg-red-500/10 border border-red-500/30 flex items-center justify-center hover:bg-red-500/20 transition-colors text-red-400"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -216,12 +202,10 @@ function GroceryListInner({
     );
     if (existing) {
       setGroceryList(existing);
-      // All items that existed at load time are treated as auto (manual set stays empty)
-      // unless we stored that separately — on reload, we can't distinguish, so treat all as auto
       return;
     }
 
-    // Generate grocery list inline
+    // Generate shopping list based on trip usage
     const usageByItem = new Map<string, number>();
     trip.legs.forEach(leg => {
       leg.usageLog.forEach(entry => {
@@ -284,6 +268,21 @@ function GroceryListInner({
     return map;
   }, [trip.legs]);
 
+  // ─── Toggle item picked ────────────────────────────────────────────────────
+
+  function handleTogglePicked(groceryItemId: string) {
+    if (!groceryList) return;
+    const updated: GroceryList = {
+      ...groceryList,
+      items: groceryList.items.map(i => {
+        if (i.id !== groceryItemId) return i;
+        const nowPicked = i.qtyFulfilled < i.qtyNeeded;
+        return { ...i, qtyFulfilled: nowPicked ? i.qtyNeeded : 0 };
+      }),
+    };
+    updateGroceryList(updated);
+  }
+
   // ─── Qty change ───────────────────────────────────────────────────────────
 
   function handleChangeQty(itemId: string, delta: number) {
@@ -319,7 +318,6 @@ function GroceryListInner({
 
   function handleAddItem(inventoryItem: InventoryItemV2) {
     if (!groceryList) return;
-    // Don't add duplicates
     const already = groceryList.items.some(gi => gi.itemId === inventoryItem.id);
     if (already) {
       setShowAddDialog(false);
@@ -341,6 +339,14 @@ function GroceryListInner({
     setAddSearch('');
   }
 
+  // ─── Done Shopping ────────────────────────────────────────────────────────
+
+  function handleDoneShopping() {
+    if (!groceryList) return;
+    dispatch({ type: 'FULFILL_GROCERY_LIST', payload: groceryList.id });
+    setGroceryList({ ...groceryList, status: 'fulfilled' });
+  }
+
   // ─── Copy / Share ──────────────────────────────────────────────────────────
 
   function getCopyText() {
@@ -355,16 +361,10 @@ function GroceryListInner({
   async function handleShare() {
     const text = getCopyText();
     if (navigator.share) {
-      await navigator.share({ title: `Grocery List — ${trip.tailNumber}`, text }).catch(() => {});
+      await navigator.share({ title: `Shopping List — ${trip.tailNumber}`, text }).catch(() => {});
     } else {
       navigator.clipboard.writeText(text).catch(() => {});
     }
-  }
-
-  function handleSendToCommissary() {
-    if (!groceryList) return;
-    dispatch({ type: 'SEND_GROCERY_LIST', payload: groceryList.id });
-    setGroceryList({ ...groceryList, status: 'sent' });
   }
 
   // ─── Filtered items for add dialog ────────────────────────────────────────
@@ -374,11 +374,17 @@ function GroceryListInner({
     return state.items.filter(i => !lower || i.itemName.toLowerCase().includes(lower));
   }, [state.items, addSearch]);
 
+  // ─── Progress ─────────────────────────────────────────────────────────────
+
+  const totalItems = groceryList?.items.length ?? 0;
+  const pickedItems = groceryList?.items.filter(i => i.qtyFulfilled >= i.qtyNeeded).length ?? 0;
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   if (!groceryList) return null;
 
   const statusColors = GROCERY_STATUS_COLORS[groceryList.status];
+  const isComplete = groceryList.status === 'fulfilled';
 
   return (
     <div className="max-w-5xl mx-auto p-6 pb-24">
@@ -395,7 +401,7 @@ function GroceryListInner({
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div>
-          <h1 className="text-2xl font-bold">Grocery List</h1>
+          <h1 className="text-2xl font-bold">Shopping List</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {trip.tailNumber} · Leg {activeLeg.legNumber}: {activeLeg.origin} → {activeLeg.destination}
           </p>
@@ -412,39 +418,56 @@ function GroceryListInner({
         </span>
       </div>
 
-      <p className="text-xs text-muted-foreground mb-6">
-        Auto-generated {new Date(groceryList.generatedAt).toLocaleString()} by {groceryList.generatedBy}
-      </p>
+      {/* Progress */}
+      {totalItems > 0 && (
+        <div className="flex items-center gap-2 mb-6">
+          <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 rounded-full transition-all"
+              style={{ width: `${Math.round((pickedItems / totalItems) * 100)}%` }}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {pickedItems} / {totalItems} picked up
+          </span>
+        </div>
+      )}
 
       <div className="space-y-4">
-        {/* ── Auto-generated section ── */}
+        {/* ── Restock Needed section ── */}
         <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg overflow-hidden">
           <div className="px-4 py-2 border-b border-blue-500/20">
             <span className="text-xs font-semibold uppercase tracking-wide text-blue-400">
-              Auto-Added — Based on Usage This Trip
+              Restock Needed — Based on Trip Usage
             </span>
           </div>
           {autoItems.length > 0 ? (
-            autoItems.map(gi => (
-              <AutoItemRow
-                key={gi.id}
-                groceryItem={gi}
-                itemDef={state.items.find(i => i.id === gi.itemId)}
-                aircraftType={aircraftType}
-                totalUsed={usageByItem.get(gi.itemId) ?? 0}
-                onChangeQty={delta => handleChangeQty(gi.id, delta)}
-              />
-            ))
+            autoItems.map(gi => {
+              const itemDef = state.items.find(i => i.id === gi.itemId);
+              const par = itemDef?.defaultQuantities[aircraftType] ?? 0;
+              const totalUsed = usageByItem.get(gi.itemId) ?? 0;
+              return (
+                <ItemRow
+                  key={gi.id}
+                  groceryItem={gi}
+                  itemDef={itemDef}
+                  picked={gi.qtyFulfilled >= gi.qtyNeeded}
+                  onTogglePicked={() => handleTogglePicked(gi.id)}
+                  onChangeQty={delta => handleChangeQty(gi.id, delta)}
+                  sublabel={`Used ${totalUsed} this trip · Par: ${par}`}
+                />
+              );
+            })
           ) : (
             <p className="px-4 py-3 text-sm text-muted-foreground">No items below par yet.</p>
           )}
         </div>
 
-        {/* ── Manually added section ── */}
+        {/* ── Additional Items section ── */}
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg overflow-hidden">
           <div className="px-4 py-2 border-b border-emerald-500/20 flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-emerald-400">
-              Manually Added
+              Additional Items
             </span>
             <Button size="sm" variant="outline" onClick={() => setShowAddDialog(true)}>
               + Add Item
@@ -452,31 +475,32 @@ function GroceryListInner({
           </div>
           {manualItemsList.length > 0 ? (
             manualItemsList.map(gi => (
-              <ManualItemRow
+              <ItemRow
                 key={gi.id}
                 groceryItem={gi}
                 itemDef={state.items.find(i => i.id === gi.itemId)}
+                picked={gi.qtyFulfilled >= gi.qtyNeeded}
+                onTogglePicked={() => handleTogglePicked(gi.id)}
                 onChangeQty={delta => handleChangeQty(gi.id, delta)}
                 onRemove={() => handleRemoveManual(gi.id)}
               />
             ))
           ) : (
             <p className="px-4 py-3 text-sm text-muted-foreground italic">
-              No items manually added.
+              No additional items. Tap "+ Add Item" to add something to pick up.
             </p>
           )}
         </div>
 
-        {/* ── Notes ── */}
+        {/* ── Shopping Notes ── */}
         <div className="space-y-1">
-          <label className="text-sm text-muted-foreground">
-            Notes for whoever is restocking:
-          </label>
+          <label className="text-sm text-muted-foreground">Shopping Notes</label>
           <Textarea
             className="min-h-[80px] bg-slate-900 border-slate-700"
-            placeholder="e.g. Client requested extra sparkling water and lemons..."
+            placeholder="e.g. Get the organic honey, check if they have Perrier at Costco first..."
             value={groceryList.notes ?? ''}
             onChange={e => updateGroceryList({ ...groceryList, notes: e.target.value })}
+            disabled={isComplete}
           />
         </div>
       </div>
@@ -490,11 +514,16 @@ function GroceryListInner({
           📤 Share
         </Button>
         <Button
-          className="flex-[1.5] bg-blue-600 hover:bg-blue-500"
-          onClick={handleSendToCommissary}
-          disabled={groceryList.status !== 'draft'}
+          className={cn(
+            'flex-[1.5]',
+            isComplete
+              ? 'bg-emerald-700 hover:bg-emerald-700 cursor-default'
+              : 'bg-emerald-600 hover:bg-emerald-500'
+          )}
+          onClick={handleDoneShopping}
+          disabled={isComplete}
         >
-          {groceryList.status === 'sent' ? 'Sent ✓' : 'Send to Commissary'}
+          {isComplete ? 'Shopping Complete ✓' : 'Done Shopping'}
         </Button>
       </div>
 
@@ -502,7 +531,7 @@ function GroceryListInner({
       <Dialog open={showAddDialog} onOpenChange={open => { setShowAddDialog(open); if (!open) setAddSearch(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Item</DialogTitle>
+            <DialogTitle>Add Item to Shopping List</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="relative">

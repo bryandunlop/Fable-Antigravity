@@ -1,5 +1,5 @@
 // ─── Inventory V2 — Self-Contained Mock Data ───────────────────────────────
-// Real P&G item names. No imports from existing inventoryData.ts.
+// Real P&G item names sourced from AC Inventory G500.docx and G650 Stock Inventory.docx
 
 import type {
   InventoryItemV2,
@@ -57,137 +57,366 @@ function itemV2(
   };
 }
 
-// ─── Item Master (~100 items) ───────────────────────────────────────────────
+// ─── Item Master ─────────────────────────────────────────────────────────────
+// Compartments: fwd-lav, fwd-galley, aft-galley, aft-lav, credenza, baggage
+// G500 uses fwd-galley (renamed from 'galley') so shared items appear in both aircraft views
+// Items with null G650/G500 qty are aircraft-specific
 
 export const ITEMS_V2: InventoryItemV2[] = [
-  // ── Beverages ──
-  itemV2('Fiji Water 500ml', 'Water', 'beverages', 'fwd-galley', 'Galley Drawer 1', 'bottle', 12, 8, 2.50, 'FW-500', 'PG-10001'),
-  itemV2('San Pellegrino 250ml', 'Sparkling Water', 'beverages', 'fwd-galley', 'Galley Drawer 1', 'bottle', 8, 6, 3.00),
-  itemV2('Coca-Cola 12oz', 'Soft Drink', 'beverages', 'chiller', 'Chiller Shelf 1', 'ea', 6, 4, 1.50),
-  itemV2('Diet Coke 12oz', 'Soft Drink', 'beverages', 'chiller', 'Chiller Shelf 1', 'ea', 6, 4, 1.50),
-  itemV2('Sprite 12oz', 'Soft Drink', 'beverages', 'chiller', 'Chiller Shelf 1', 'ea', 4, 4, 1.50),
-  itemV2('Ginger Ale 12oz', 'Soft Drink', 'beverages', 'chiller', 'Chiller Shelf 2', 'ea', 4, 4, 1.50),
-  itemV2('Orange Juice 10oz', 'Juice', 'beverages', 'chiller', 'Chiller Shelf 2', 'bottle', 4, 4, 3.50),
-  itemV2('Cranberry Juice 10oz', 'Juice', 'beverages', 'chiller', 'Chiller Shelf 2', 'bottle', 4, 2, 3.50),
-  itemV2('Tonic Water', 'Mixer', 'beverages', 'fwd-galley', 'Galley Drawer 2', 'bottle', 4, 4, 2.00),
-  itemV2('Club Soda', 'Mixer', 'beverages', 'fwd-galley', 'Galley Drawer 2', 'bottle', 4, 4, 1.75),
 
-  // ── Cleaning Supplies ──
-  itemV2('Lysol Wipes (Canister)', 'Disinfectant', 'cleaning-supplies', 'baggage', 'Baggage Bin A', 'ea', 2, 2, 5.99),
-  itemV2('Glass Cleaner Spray', 'Cleaner', 'cleaning-supplies', 'baggage', 'Baggage Bin A', 'bottle', 1, 1, 4.50),
-  itemV2('Stainless Steel Cleaner', 'Cleaner', 'cleaning-supplies', 'baggage', 'Baggage Bin A', 'bottle', 1, 1, 6.00),
-  itemV2('Microfiber Cloth Pack', 'Cleaning Cloth', 'cleaning-supplies', 'baggage', 'Baggage Bin B', 'pkg', 2, 2, 8.00),
-  itemV2('Trash Bags (Small)', 'Waste', 'cleaning-supplies', 'fwd-galley', 'Under Counter', 'roll', 2, 2, 3.50),
-  itemV2('Sponges (3-pack)', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Under Counter', 'pkg', 1, 1, 2.50),
+  // ── Beverages ──────────────────────────────────────────────────────────────
+  // ID 1
+  itemV2('Perrier 330ml', 'Sparkling Water', 'beverages', 'aft-galley', 'Galley Right', 'ea', 8, 8, 2.50),
+  // ID 2
+  itemV2('Coca-Cola', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50),
+  // ID 3
+  itemV2('Coke Zero', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50),
+  // ID 4
+  itemV2('Diet Coke', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50),
+  // ID 5
+  itemV2('Sprite', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50),
+  // ID 6
+  itemV2('Grape Propel', 'Sports Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 5, 5, 2.00),
+  // ID 7
+  itemV2('Small Water Bottles', 'Water', 'beverages', 'baggage', 'Galley Closet', 'case', 1, 1, 18.00),
+  // ID 8
+  itemV2('Liter Water Bottles', 'Water', 'beverages', 'baggage', 'Lower Cabinet', 'ea', 8, 8, 3.00),
+  // ID 9
+  itemV2('Oat Milk', 'Milk', 'beverages', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 4.50),
 
-  // ── Coffee ──
-  itemV2('Nespresso Capsules — Intenso', 'Coffee', 'coffee', 'fwd-galley', 'Galley Drawer 3', 'sleeve', 3, 2, 7.50, 'NSP-INT'),
-  itemV2('Nespresso Capsules — Lungo', 'Coffee', 'coffee', 'fwd-galley', 'Galley Drawer 3', 'sleeve', 3, 2, 7.50, 'NSP-LNG'),
-  itemV2('Nespresso Capsules — Decaf', 'Coffee', 'coffee', 'fwd-galley', 'Galley Drawer 3', 'sleeve', 2, 1, 7.50, 'NSP-DCF'),
-  itemV2('Coffee Stir Sticks', 'Accessory', 'coffee', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 3.00),
-  itemV2('Half & Half Creamers', 'Creamer', 'coffee', 'chiller', 'Chiller Door', 'box', 2, 1, 4.50),
-  itemV2('Descaling Solution', 'Maintenance', 'coffee', 'baggage', 'Baggage Bin C', 'bottle', 1, 1, 12.00),
+  // ── Coffee ─────────────────────────────────────────────────────────────────
+  // ID 10
+  itemV2('Nespresso Pods', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'sleeve', 4, 3, 8.00),
+  // ID 11
+  itemV2('Regular Coffee', 'Coffee', 'coffee', 'aft-galley', 'Galley Right', 'bag', 2, 2, 12.00),
+  // ID 12
+  itemV2('Decaf Via', 'Coffee', 'coffee', 'aft-galley', 'Galley Right', 'box', 10, 10, 2.00),
+  // ID 13
+  itemV2('Coffee Filters', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'box', 1, 1, 3.00),
 
-  // ── First Aid ──
-  itemV2('Adhesive Bandages (Assorted)', 'Bandage', 'first-aid', 'fwd-lav', 'Lav Cabinet', 'box', 1, 1, 6.00),
-  itemV2('Antiseptic Wipes', 'Antiseptic', 'first-aid', 'fwd-lav', 'Lav Cabinet', 'box', 1, 1, 5.00),
-  itemV2('Disposable Gloves (Nitrile)', 'PPE', 'first-aid', 'fwd-lav', 'Lav Cabinet', 'box', 1, 1, 12.00),
-  itemV2('Ice Pack (Instant)', 'Cold Pack', 'first-aid', 'baggage', 'First Aid Kit', 'ea', 2, 2, 3.00),
-  itemV2('Burn Cream', 'Ointment', 'first-aid', 'fwd-lav', 'Lav Cabinet', 'ea', 1, 1, 8.00),
+  // ── Tea ────────────────────────────────────────────────────────────────────
+  // ID 14
+  itemV2('Green Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  // ID 15
+  itemV2('Mint Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  // ID 16
+  itemV2('English Breakfast Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  // ID 17
+  itemV2('Earl Grey Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  // ID 18
+  itemV2('Chamomile Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  // ID 19
+  itemV2('Stir Sticks', 'Accessory', 'coffee', 'fwd-galley', 'Galley Left', 'box', 1, 1, 3.00),
 
-  // ── Kitchen Supplies ──
-  itemV2('Cocktail Napkins (White)', 'Napkin', 'kitchen-supplies', 'fwd-galley', 'Galley Drawer 4', 'pkg', 4, 3, 2.50),
-  itemV2('Dinner Napkins (Linen)', 'Napkin', 'kitchen-supplies', 'credenza', 'Credenza Top Drawer', 'ea', 8, 6, 5.00),
-  itemV2('Plastic Wrap Roll', 'Wrap', 'kitchen-supplies', 'fwd-galley', 'Under Counter', 'roll', 1, 1, 4.00),
-  itemV2('Aluminum Foil Roll', 'Wrap', 'kitchen-supplies', 'fwd-galley', 'Under Counter', 'roll', 1, 1, 4.50),
-  itemV2('Toothpicks (Box)', 'Accessory', 'kitchen-supplies', 'fwd-galley', 'Galley Drawer 4', 'box', 1, 1, 2.00),
-  itemV2('Wine Opener / Corkscrew', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Drawer 5', 'ea', 1, 1, 15.00),
-  itemV2('Can Opener', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Drawer 5', 'ea', 1, 1, 8.00),
-  itemV2('Serving Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Drawer 5', 'ea', 2, 1, 6.00),
-  itemV2('Ice Scoop', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Drawer 5', 'ea', 1, 1, 4.00),
+  // ── Sweeteners ─────────────────────────────────────────────────────────────
+  // ID 20
+  itemV2('White Sugar Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00),
+  // ID 21
+  itemV2('Sugar in the Raw Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00),
+  // ID 22
+  itemV2('Sweet N Low Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 3.50),
+  // ID 23
+  itemV2('Stevia Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.50),
+  // ID 24
+  itemV2('Splenda Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00),
 
-  // ── Linens ──
-  itemV2('Hand Towels (White)', 'Towel', 'linens', 'fwd-lav', 'Lav Shelf', 'ea', 8, 6, 4.00),
-  itemV2('Hand Towels (White) — Aft', 'Towel', 'linens', 'aft-lav', 'Lav Shelf', 'ea', 6, 4, 4.00),
-  itemV2('Blankets (Cashmere)', 'Blanket', 'linens', 'credenza', 'Credenza Lower', 'ea', 4, 4, 85.00),
-  itemV2('Pillowcases', 'Pillow', 'linens', 'credenza', 'Credenza Lower', 'ea', 4, 4, 12.00),
-  itemV2('Pillows (Down)', 'Pillow', 'linens', 'baggage', 'Baggage Bin D', 'ea', 4, 4, 45.00),
-  itemV2('Seat Protectors', 'Cover', 'linens', 'main-cabin', 'Overhead Bin', 'ea', 8, null, 15.00),
+  // ── Medicine ───────────────────────────────────────────────────────────────
+  // ID 25
+  itemV2('Advil', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.00),
+  // ID 26
+  itemV2('Tylenol', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 5.50),
+  // ID 27
+  itemV2('Pepto Bismol', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 5.00),
+  // ID 28
+  itemV2('Benadryl', 'Allergy', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.50),
+  // ID 29
+  itemV2('Cough Drops', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 4.00),
+  // ID 30
+  itemV2('Band-Aids', 'First Aid', 'first-aid', 'fwd-lav', 'Lav Cabinet', 'box', 1, 1, 5.00),
+  // ID 31  (G650 only)
+  itemV2('Dramamine', 'Motion Sickness', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, null, 5.00),
+  // ID 32  (G650 only)
+  itemV2('Imodium', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, null, 8.00),
+  // ID 33  (G650 only)
+  itemV2('Visine', 'Eye Care', 'medicine', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 7.00),
+  // ID 34  (G650 only)
+  itemV2('Alka Seltzer', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 5.00),
+  // ID 35  (G650 only)
+  itemV2('DayQuil', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 7.00),
+  // ID 36  (G650 only)
+  itemV2('NyQuil', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 2, null, 7.00),
 
-  // ── Medicine ──
-  itemV2('Tylenol Extra Strength', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 2, 2, 5.00),
-  itemV2('Advil (Ibuprofen)', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 2, 2, 5.50),
-  itemV2('Benadryl', 'Allergy', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 6.00),
-  itemV2('Pepto-Bismol Tablets', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 4.50),
-  itemV2('Dramamine (Motion Sickness)', 'Motion Sickness', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 5.00),
-  itemV2('Tums Antacid', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 3.50),
+  // ── Toiletries — Forward Lav ───────────────────────────────────────────────
+  // ID 37
+  itemV2('Toothbrush', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 2.50),
+  // ID 38
+  itemV2('Toothpaste', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 3.00),
+  // ID 39
+  itemV2('Scope Mouthwash', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 3.50),
+  // ID 40
+  itemV2('Flossers', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 3.00),
+  // ID 41
+  itemV2('Safeguard Hand Soap', 'Soap', 'toiletries', 'fwd-lav', 'Lav Counter', 'bottle', 1, 1, 5.00),
+  // ID 42
+  itemV2('Pads and Tampons', 'Feminine Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 8.00),
+  // ID 43
+  itemV2('Static Guard', 'Personal Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 1, 1, 5.00),
+  // ID 44
+  itemV2('Hot Towels', 'Amenity', 'linens', 'fwd-lav', 'Lav Counter', 'pkg', 5, 4, 8.00),
+  // ID 45
+  itemV2('Toilet Paper', 'Paper', 'paper-goods', 'fwd-lav', 'Lav Cabinet', 'roll', 3, 2, 2.00),
+  // ID 46
+  itemV2('Square Puffs Box', 'Tissue', 'paper-goods', 'fwd-lav', 'Lav Counter', 'box', 1, 1, 4.00),
+  // ID 47
+  itemV2('Paper Hand Towels', 'Paper', 'paper-goods', 'fwd-lav', 'Lav Counter', 'pkg', 2, 1, 3.50),
+  // ID 48
+  itemV2('Febreze', 'Freshener', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'bottle', 1, 1, 6.00),
+  // ID 49
+  itemV2('Hand Sanitizer', 'Sanitizer', 'self-care', 'fwd-lav', 'Lav Counter', 'bottle', 1, 1, 4.00),
+  // ID 50
+  itemV2('Celeste Wipes', 'Wipes', 'cleaning-supplies', 'fwd-lav', 'Lav Counter', 'pkg', 1, 1, 7.00),
+  // ID 51  (G650 only)
+  itemV2('Lint Roller', 'Personal Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 4.00),
+  // ID 52  (G650 only)
+  itemV2('Hand Lotion', 'Skincare', 'self-care', 'fwd-lav', 'Lav Counter', 'ea', 1, null, 6.00),
+  // ID 53  (G650 only)
+  itemV2('Tide to Go Wipes', 'Stain Remover', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 4.00),
+  // ID 54  (G650 only)
+  itemV2('Tide Pen', 'Stain Remover', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 4.00),
+  // ID 55  (G650 only)
+  itemV2('Chapstick', 'Lip Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 2, null, 3.00),
 
-  // ── Miscellaneous ──
-  itemV2('Shoe Shine Kit', 'Amenity', 'miscellaneous', 'aft-lav', 'Lav Drawer', 'ea', 2, 2, 8.00),
-  itemV2('Sewing Kit', 'Amenity', 'miscellaneous', 'aft-lav', 'Lav Drawer', 'ea', 2, 2, 3.00),
-  itemV2('Earplugs (Foam)', 'Amenity', 'miscellaneous', 'credenza', 'Credenza Top Drawer', 'pair', 8, 6, 1.00),
-  itemV2('Eye Mask (Sleep)', 'Amenity', 'miscellaneous', 'credenza', 'Credenza Top Drawer', 'ea', 6, 4, 3.00),
-  itemV2('Deck of Playing Cards', 'Entertainment', 'miscellaneous', 'credenza', 'Credenza Top Drawer', 'ea', 2, 1, 5.00),
-  itemV2('Pen (Blue — P&G Logo)', 'Office', 'miscellaneous', 'credenza', 'Credenza Top Drawer', 'ea', 6, 4, 2.00),
-  itemV2('Notepad (P&G Branded)', 'Office', 'miscellaneous', 'credenza', 'Credenza Top Drawer', 'ea', 4, 3, 3.00),
+  // ── Toiletries — Aft Lav (G650 only) ──────────────────────────────────────
+  // ID 56
+  itemV2('Shaving Cream', 'Shaving', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 4.00),
+  // ID 57
+  itemV2('Disposable Razors', 'Shaving', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.00),
+  // ID 58
+  itemV2('Scope Mouthwash — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 3.50),
+  // ID 59
+  itemV2('Toothbrush — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.50),
+  // ID 60
+  itemV2('Toothpaste — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 3.00),
+  // ID 61
+  itemV2('Mini Toothbrushes', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.00),
+  // ID 62
+  itemV2('Safeguard Hand Soap — Aft', 'Soap', 'toiletries', 'aft-lav', 'Lav Counter', 'bottle', 1, null, 5.00),
 
-  // ── Paper Goods ──
-  itemV2('Facial Tissues (Kleenex Box)', 'Tissue', 'paper-goods', 'fwd-lav', 'Lav Counter', 'box', 2, 2, 3.00),
-  itemV2('Facial Tissues — Aft', 'Tissue', 'paper-goods', 'aft-lav', 'Lav Counter', 'box', 2, 1, 3.00),
-  itemV2('Toilet Paper Roll', 'Tissue', 'paper-goods', 'fwd-lav', 'Lav Cabinet', 'roll', 4, 3, 2.00),
-  itemV2('Toilet Paper Roll — Aft', 'Tissue', 'paper-goods', 'aft-lav', 'Lav Cabinet', 'roll', 3, 2, 2.00),
-  itemV2('Paper Towel Roll', 'Towel', 'paper-goods', 'fwd-galley', 'Galley Drawer 6', 'roll', 2, 2, 3.50),
-  itemV2('Disposable Cups (8oz Clear)', 'Cup', 'paper-goods', 'fwd-galley', 'Galley Drawer 6', 'sleeve', 2, 2, 4.00),
-  itemV2('Disposable Plates (Appetizer)', 'Plate', 'paper-goods', 'fwd-galley', 'Galley Drawer 6', 'pkg', 1, 1, 6.00),
+  // ── Cleaning Supplies — Galley ─────────────────────────────────────────────
+  // ID 63
+  itemV2('Leather Wipes', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 8.00),
+  // ID 64
+  itemV2('Wine Away', 'Stain Remover', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 10.00),
+  // ID 65
+  itemV2('Disinfecting Wipes', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 5.00),
+  // ID 66
+  itemV2('Dust Cleaning Gel', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00),
+  // ID 67
+  itemV2('Tide Rescue', 'Stain Remover', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 12.00),
+  // ID 68
+  itemV2('Alcohol Spray', 'Sanitizer', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 6.00),
+  // ID 69
+  itemV2('Microfiber Cloths', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 2, 5.00),
+  // ID 70
+  itemV2('Paper Towel Rolls', 'Paper', 'paper-goods', 'fwd-galley', 'Galley Left', 'roll', 2, 2, 3.50),
+  // ID 71
+  itemV2('Dish Soap', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 4.00),
+  // ID 72
+  itemV2('Sponges', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 3.00),
+  // ID 73
+  itemV2('Dish Gloves', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'pair', 1, 1, 4.00),
+  // ID 74
+  itemV2('Black Trash Bags', 'Waste', 'cleaning-supplies', 'aft-galley', 'Under Counter', 'roll', 10, 10, 6.00),
+  // ID 75
+  itemV2('Orange Trash Bags', 'Waste', 'cleaning-supplies', 'aft-galley', 'Under Counter', 'roll', 2, 2, 4.00),
+  // ID 76
+  itemV2('Small Trash Bag Roll', 'Waste', 'cleaning-supplies', 'fwd-lav', 'Under Trash Can', 'roll', 1, 1, 3.50),
 
-  // ── Self-Care ──
-  itemV2('Hand Lotion (Travel)', 'Skincare', 'self-care', 'fwd-lav', 'Lav Counter', 'ea', 2, 2, 8.00),
-  itemV2('Hand Lotion — Aft', 'Skincare', 'self-care', 'aft-lav', 'Lav Counter', 'ea', 2, 1, 8.00),
-  itemV2('Lip Balm', 'Skincare', 'self-care', 'fwd-lav', 'Lav Drawer', 'ea', 4, 3, 3.00),
-  itemV2('Hand Sanitizer (Travel)', 'Sanitizer', 'self-care', 'fwd-galley', 'Galley Counter', 'ea', 2, 2, 4.00),
-  itemV2('Wet Wipes (Individual)', 'Wipe', 'self-care', 'fwd-galley', 'Galley Drawer 4', 'pkg', 2, 2, 3.00),
-  itemV2('Breath Mints', 'Freshener', 'self-care', 'credenza', 'Credenza Top Drawer', 'ea', 4, 3, 2.50),
+  // ── Kitchen Tools ──────────────────────────────────────────────────────────
+  // ID 77
+  itemV2('Wine Opener', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 15.00),
+  // ID 78
+  itemV2('Wine Key', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 12.00),
+  // ID 79
+  itemV2('Wine Stoppers', 'Accessory', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 4, 4, 8.00),
+  // ID 80
+  itemV2('Can Opener', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00),
+  // ID 81
+  itemV2('Vegetable Peeler', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 6.00),
+  // ID 82
+  itemV2('Mandolin Slicer', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 35.00),
+  // ID 83
+  itemV2('Kitchen Shears', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 12.00),
+  // ID 84
+  itemV2('Whisk', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00),
+  // ID 85
+  itemV2('Liquid Measuring Cup', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 10.00),
+  // ID 86
+  itemV2('Cooking Spatulas', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 8.00),
+  // ID 87
+  itemV2('Cooking Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 3, 1, 8.00),
+  // ID 88
+  itemV2('Serving Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 4, 6.00),
+  // ID 89
+  itemV2('Small Serving Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, 1, 5.00),
+  // ID 90
+  itemV2('Cheese Knives Set', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 4, 1, 20.00),
+  // ID 91
+  itemV2('Serving Spoons', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 4, 1, 6.00),
+  // ID 92
+  itemV2('Serving Fork', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 6.00),
+  // ID 93
+  itemV2('Kitchen Knives Set', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 3, 1, 45.00),
+  // ID 94  (G650 only)
+  itemV2('Demitasse Spoons', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, null, 4.00),
+  // ID 95  (G650 only)
+  itemV2('Meat Thermometer', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, null, 15.00),
+  // ID 96
+  itemV2('Hot Pads', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 2, 6.00),
+  // ID 97
+  itemV2('Mini Silicone Oven Mitts', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 2, 8.00),
+  // ID 98  (G650 only)
+  itemV2('Oven Mitts', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, null, 10.00),
+  // ID 99
+  itemV2('Baking Sheets', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 4, 4, 12.00),
+  // ID 100
+  itemV2('Cutting Boards', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 1, 15.00),
+  // ID 101
+  itemV2('Collapsible Dish Tub', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 12.00),
 
-  // ── Snacks ──
-  itemV2('Mixed Nuts (Premium)', 'Nut', 'snacks', 'fwd-galley', 'Galley Drawer 7', 'bag', 4, 3, 6.00),
-  itemV2('Granola Bars (Variety)', 'Bar', 'snacks', 'fwd-galley', 'Galley Drawer 7', 'box', 2, 1, 8.00),
-  itemV2('Dark Chocolate Bar', 'Chocolate', 'snacks', 'fwd-galley', 'Galley Drawer 7', 'ea', 4, 3, 4.50),
-  itemV2('Dried Fruit Mix', 'Fruit', 'snacks', 'fwd-galley', 'Galley Drawer 7', 'bag', 2, 2, 5.00),
-  itemV2('Pretzels (Snack Pack)', 'Cracker', 'snacks', 'fwd-galley', 'Galley Drawer 7', 'bag', 3, 2, 3.00),
-  itemV2('Cheese Crackers', 'Cracker', 'snacks', 'fwd-galley', 'Galley Drawer 7', 'box', 2, 1, 4.00),
+  // ── Silverware ─────────────────────────────────────────────────────────────
+  // ID 102
+  itemV2('Dinner Forks', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00),
+  // ID 103
+  itemV2('Salad Forks', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00),
+  // ID 104
+  itemV2('Dinner Knives', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00),
+  // ID 105  (G650 only)
+  itemV2('Steak Knives', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 10.00),
+  // ID 106
+  itemV2('Teaspoons', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 6.00),
+  // ID 107
+  itemV2('Soup Spoons', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 6.00),
 
-  // ── Sweetener ──
-  itemV2('Sugar Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 3.00),
-  itemV2('Splenda Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 4.00),
-  itemV2('Honey Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 5.00),
-  itemV2('Stevia Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 4.50),
+  // ── Dishware ───────────────────────────────────────────────────────────────
+  // ID 108  (G650 only — G500 uses bamboo)
+  itemV2('Dinner Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 25.00),
+  // ID 109  (G650 only)
+  itemV2('Salad Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 20.00),
+  // ID 110  (G650 only)
+  itemV2('Bread Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 18.00),
+  // ID 111  (G650 only)
+  itemV2('Dinner Bowls', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 20.00),
+  // ID 112
+  itemV2('Silver Ramekins', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, 12, 8.00),
+  // ID 113
+  itemV2('Large Bamboo Plates', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 12.00),
+  // ID 114
+  itemV2('Small Bamboo Plates', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 10.00),
+  // ID 115
+  itemV2('Bamboo Bowls', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 10.00),
+  // ID 116  (G500 only — in red box)
+  itemV2('Wine Glasses', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Left Galley Closet', 'ea', null, 3, 30.00),
+  // ID 117
+  itemV2('Espresso Cups', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 4, 4, 15.00),
+  // ID 118  (G500 only)
+  itemV2('Espresso Saucers', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', null, 4, 12.00),
+  // ID 119
+  itemV2('Pitchers', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 15.00),
+  // ID 120  (G650 only)
+  itemV2('Placemats', 'Linen', 'linens', 'fwd-galley', 'Galley Left', 'ea', 15, null, 8.00),
+  // ID 121
+  itemV2('Crew Trays', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 3, 3, 20.00),
+  // ID 122
+  itemV2('Large Silver Tray', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 35.00),
+  // ID 123
+  itemV2('Small Silver Tray', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 25.00),
 
-  // ── Tea ──
-  itemV2('English Breakfast Tea', 'Black Tea', 'tea', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 5.00),
-  itemV2('Earl Grey Tea', 'Black Tea', 'tea', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 5.00),
-  itemV2('Green Tea', 'Green Tea', 'tea', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 5.00),
-  itemV2('Chamomile Tea', 'Herbal Tea', 'tea', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 5.50),
-  itemV2('Peppermint Tea', 'Herbal Tea', 'tea', 'fwd-galley', 'Galley Drawer 3', 'box', 1, 1, 5.50),
+  // ── Napkins / Paper Goods ──────────────────────────────────────────────────
+  // ID 124
+  itemV2('Cocktail Napkins', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, 1, 5.00),
+  // ID 125
+  itemV2('Paper Dinner Napkins', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, 1, 5.00),
+  // ID 126  (G500 only)
+  itemV2('Linen Napkins', 'Napkin', 'linens', 'credenza', 'Credenza Drawer', 'ea', null, 11, 8.00),
+  // ID 127
+  itemV2('My Drap Roll', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 12.00),
+  // ID 128
+  itemV2('Disposable Hot Beverage Cups', 'Cup', 'paper-goods', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 6.00),
+  // ID 129
+  itemV2('Hot Beverage Cup Lids', 'Cup', 'paper-goods', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 4.00),
+  // ID 130  (G650 only)
+  itemV2('Frosted Disposable Cups', 'Cup', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, null, 5.00),
 
-  // ── Toiletries ──
-  itemV2('Toothbrush (Sealed)', 'Dental', 'toiletries', 'fwd-lav', 'Lav Drawer', 'ea', 4, 3, 2.00),
-  itemV2('Toothpaste (Travel)', 'Dental', 'toiletries', 'fwd-lav', 'Lav Drawer', 'ea', 4, 3, 3.00),
-  itemV2('Mouthwash (Mini)', 'Dental', 'toiletries', 'fwd-lav', 'Lav Drawer', 'ea', 4, 2, 2.50),
-  itemV2('Deodorant (Travel)', 'Personal', 'toiletries', 'aft-lav', 'Lav Drawer', 'ea', 2, 2, 4.00),
-  itemV2('Razor (Disposable)', 'Shaving', 'toiletries', 'aft-lav', 'Lav Drawer', 'ea', 2, 2, 3.00),
-  itemV2('Shaving Cream (Travel)', 'Shaving', 'toiletries', 'aft-lav', 'Lav Drawer', 'ea', 2, 1, 4.00),
-  itemV2('Cotton Swabs', 'Cotton', 'toiletries', 'fwd-lav', 'Lav Drawer', 'box', 1, 1, 2.50),
-  itemV2('Hair Ties', 'Hair', 'toiletries', 'aft-lav', 'Lav Drawer', 'pkg', 1, 1, 2.00),
-  itemV2('Hand Soap (Dispenser Refill)', 'Soap', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'bottle', 1, 1, 6.00),
-  itemV2('Hand Soap Refill — Aft', 'Soap', 'toiletries', 'aft-lav', 'Lav Cabinet', 'bottle', 1, 1, 6.00),
+  // ── Food Storage / Prep ────────────────────────────────────────────────────
+  // ID 131
+  itemV2('Gallon Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 4.50),
+  // ID 132
+  itemV2('Quart Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 3.50),
+  // ID 133
+  itemV2('Jumbo Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 5.00),
+  // ID 134
+  itemV2('Microwave Cooking Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'ea', 4, 4, 2.00),
+  // ID 135
+  itemV2('Food Gloves', 'Food Safety', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'box', 1, 1, 5.00),
+  // ID 136
+  itemV2('Parchment Paper', 'Baking', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 5.00),
+  // ID 137
+  itemV2('Press n Seal', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 5.00),
+  // ID 138
+  itemV2('Nonstick Aluminum Foil', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 4.50),
 
-  // ── Wine ──
-  itemV2('Chardonnay (Half Bottle)', 'White Wine', 'wine', 'chiller', 'Chiller Shelf 3', 'bottle', 2, 2, 18.00),
-  itemV2('Sauvignon Blanc (Half Bottle)', 'White Wine', 'wine', 'chiller', 'Chiller Shelf 3', 'bottle', 2, 1, 16.00),
-  itemV2('Pinot Noir (Half Bottle)', 'Red Wine', 'wine', 'credenza', 'Credenza Wine Rack', 'bottle', 2, 2, 22.00),
-  itemV2('Cabernet Sauvignon (Half Bottle)', 'Red Wine', 'wine', 'credenza', 'Credenza Wine Rack', 'bottle', 2, 1, 25.00),
-  itemV2('Prosecco (187ml)', 'Sparkling', 'wine', 'chiller', 'Chiller Shelf 3', 'bottle', 4, 2, 8.00),
-  itemV2('Champagne (Half Bottle)', 'Sparkling', 'wine', 'chiller', 'Chiller Shelf 3', 'bottle', 2, null, 35.00),
+  // ── Condiments ─────────────────────────────────────────────────────────────
+  // ID 139
+  itemV2('Olive Oil', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 8.00),
+  // ID 140
+  itemV2('Tabasco', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 4.00),
+  // ID 141
+  itemV2('Soy Sauce', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 4.50),
+  // ID 142
+  itemV2('Honey', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 6.00),
+  // ID 143
+  itemV2('Balsamic Vinegar', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 8.00),
+  // ID 144
+  itemV2('Red Chili Flakes', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 4.00),
+  // ID 145
+  itemV2('Salt and Pepper Grinders', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'set', 4, 6, 12.00),
+
+  // ── Safety / Operational ───────────────────────────────────────────────────
+  // ID 146
+  itemV2('Yellow Safety Vests', 'Safety', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 2, 2, 20.00),
+  // ID 147
+  itemV2('Headsets', 'Equipment', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 1, 2, 50.00),
+  // ID 148  (G650 only)
+  itemV2('Ear Protection', 'Safety', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 1, null, 8.00),
+  // ID 149  (G500 only)
+  itemV2('Gear Pins Bag', 'Equipment', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', null, 1, 25.00),
+
+  // ── Office / Miscellaneous ─────────────────────────────────────────────────
+  // ID 150
+  itemV2('Post It Notes', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 1, 2, 4.00),
+  // ID 151
+  itemV2('Black Pens', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 4, 4, 1.00),
+  // ID 152
+  itemV2('Sharpie', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 1, 1, 2.00),
+  // ID 153  (G500 only)
+  itemV2('Printer Paper', 'Office', 'paper-goods', 'credenza', 'Credenza Shelf', 'pkg', null, 1, 8.00),
+  // ID 154  (G500 only)
+  itemV2('Scissors', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 1, 8.00),
+  // ID 155  (G500 only)
+  itemV2('Scotch Tape', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 1, 3.00),
+  // ID 156  (G500 only)
+  itemV2('Playing Cards', 'Entertainment', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 2, 5.00),
+  // ID 157  (G500 only)
+  itemV2('Batteries', 'Equipment', 'miscellaneous', 'credenza', 'Credenza Shelf', 'pkg', null, 1, 8.00),
+  // ID 158  (G500 only)
+  itemV2('Creamer Pitcher', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Cabinets', 'ea', null, 1, 15.00),
+  // ID 159  (G500 only)
+  itemV2('Wine Holders (3D Printed)', 'Accessory', 'miscellaneous', 'credenza', 'Credenza', 'ea', null, 2, 15.00),
+
+  // ── Snacks ─────────────────────────────────────────────────────────────────
+  // ID 160
+  itemV2('Snack Assortment', 'Snacks', 'snacks', 'aft-galley', 'Galley Right', 'ea', 1, 1, 25.00),
 ];
 
 // ─── Stockrooms ─────────────────────────────────────────────────────────────
@@ -218,7 +447,6 @@ export const STOCKROOM_ITEMS: StockroomItem[] = generateStockroomItems();
 // ─── Mock Inspections ───────────────────────────────────────────────────────
 
 export const MOCK_INSPECTIONS: InspectionV2[] = [
-  // In-progress inspections
   {
     id: 'insp-1',
     tailNumber: 'N5PG',
@@ -275,7 +503,6 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     missingItemCharges: [],
     readinessScore: 0,
   },
-  // Restocking needed
   {
     id: 'insp-4',
     tailNumber: 'N2PG',
@@ -320,7 +547,6 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     readinessScore: 55,
     submittedAt: '2026-05-12T17:00:00Z',
   },
-  // Completed / restocked
   {
     id: 'insp-6',
     tailNumber: 'N1PG',
@@ -387,7 +613,6 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     readinessScore: 93,
     submittedAt: '2026-05-09T08:30:00Z',
   },
-  // More completed inspections
   {
     id: 'insp-9',
     tailNumber: 'N1PG',
@@ -423,17 +648,17 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
 // ─── Mock Pick List Items ───────────────────────────────────────────────────
 
 export const MOCK_PICK_LIST: PickListItem[] = [
-  // Items needed from insp-4 (N2PG restocking_needed)
-  { id: 'pl-1', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '1', qtyNeeded: 4, qtyTaken: 0, done: false },
-  { id: 'pl-2', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '17', qtyNeeded: 2, qtyTaken: 0, done: false },
-  { id: 'pl-3', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '37', qtyNeeded: 3, qtyTaken: 0, done: false },
-  { id: 'pl-4', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '50', qtyNeeded: 1, qtyTaken: 0, done: false },
-  { id: 'pl-5', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '65', qtyNeeded: 2, qtyTaken: 0, done: false },
-  // Items needed from insp-5 (N5PG restocking_needed)
-  { id: 'pl-6', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '7', qtyNeeded: 2, qtyTaken: 0, done: false },
-  { id: 'pl-7', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '19', qtyNeeded: 1, qtyTaken: 0, done: false },
-  { id: 'pl-8', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '30', qtyNeeded: 3, qtyTaken: 0, done: false },
-  { id: 'pl-9', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '42', qtyNeeded: 2, qtyTaken: 0, done: false },
+  // Items needed for insp-4 (N2PG G650, restocking_needed)
+  { id: 'pl-1', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '1',  qtyNeeded: 4, qtyTaken: 0, done: false },   // Perrier
+  { id: 'pl-2', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '10', qtyNeeded: 2, qtyTaken: 0, done: false },   // Nespresso Pods
+  { id: 'pl-3', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '25', qtyNeeded: 2, qtyTaken: 0, done: false },   // Advil
+  { id: 'pl-4', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '37', qtyNeeded: 3, qtyTaken: 0, done: false },   // Toothbrush
+  { id: 'pl-5', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '44', qtyNeeded: 2, qtyTaken: 0, done: false },   // Hot Towels
+  // Items needed for insp-5 (N5PG G500, restocking_needed)
+  { id: 'pl-6', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '4',  qtyNeeded: 6, qtyTaken: 0, done: false },   // Diet Coke
+  { id: 'pl-7', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '14', qtyNeeded: 7, qtyTaken: 0, done: false },   // Green Tea
+  { id: 'pl-8', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '26', qtyNeeded: 4, qtyTaken: 0, done: false },   // Tylenol
+  { id: 'pl-9', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '63', qtyNeeded: 1, qtyTaken: 0, done: false },   // Leather Wipes
 ];
 
 // ─── Mock Restock List Items ────────────────────────────────────────────────
@@ -447,14 +672,14 @@ export const MOCK_UNIT_REQUESTS: UnitItemRequest[] = [
     id: 'req-1',
     unitTailNumber: 'N1PG',
     isGuestRequest: true,
-    notes: 'VIP guest requested specific sparkling water brand and extra pillows.',
+    notes: 'VIP guest requested extra sparkling water and hot towels.',
     status: 'open',
     requestedBy: 'Sarah Mitchell',
     requestDate: '2026-05-14T06:00:00Z',
     items: [
-      { itemId: '2', qtyOnHand: 12, qtyRequested: 6, uom: 'bottle' },
-      { itemId: '41', qtyOnHand: 8, qtyRequested: 2, uom: 'ea' },
-      { itemId: '39', qtyOnHand: 6, qtyRequested: 2, uom: 'ea' },
+      { itemId: '1',  qtyOnHand: 8, qtyRequested: 4, uom: 'ea' },   // Perrier
+      { itemId: '44', qtyOnHand: 5, qtyRequested: 2, uom: 'pkg' },  // Hot Towels
+      { itemId: '10', qtyOnHand: 4, qtyRequested: 2, uom: 'sleeve' }, // Nespresso Pods
     ],
   },
   {
@@ -466,9 +691,9 @@ export const MOCK_UNIT_REQUESTS: UnitItemRequest[] = [
     requestedBy: 'David Chen',
     requestDate: '2026-05-13T14:00:00Z',
     items: [
-      { itemId: '11', qtyOnHand: 5, qtyRequested: 4, uom: 'ea' },
-      { itemId: '12', qtyOnHand: 3, qtyRequested: 2, uom: 'bottle' },
-      { itemId: '14', qtyOnHand: 4, qtyRequested: 3, uom: 'pkg' },
+      { itemId: '65', qtyOnHand: 2, qtyRequested: 2, uom: 'ea' },   // Disinfecting Wipes
+      { itemId: '71', qtyOnHand: 1, qtyRequested: 2, uom: 'bottle' }, // Dish Soap
+      { itemId: '69', qtyOnHand: 1, qtyRequested: 2, uom: 'ea' },   // Microfiber Cloths
     ],
   },
   {
@@ -480,14 +705,12 @@ export const MOCK_UNIT_REQUESTS: UnitItemRequest[] = [
     requestedBy: 'Emily Parker',
     requestDate: '2026-05-12T09:00:00Z',
     items: [
-      { itemId: '80', qtyOnHand: 4, qtyRequested: 3, uom: 'box' },
-      { itemId: '82', qtyOnHand: 3, qtyRequested: 2, uom: 'box' },
-      { itemId: '68', qtyOnHand: 10, qtyRequested: 4, uom: 'bag' },
+      { itemId: '17', qtyOnHand: 4, qtyRequested: 7, uom: 'box' },  // Earl Grey Tea
+      { itemId: '18', qtyOnHand: 3, qtyRequested: 7, uom: 'box' },  // Chamomile Tea
+      { itemId: '6',  qtyOnHand: 5, qtyRequested: 5, uom: 'ea' },   // Grape Propel
     ],
   },
 ];
-
-// ─── Mock Purchase Orders ───────────────────────────────────────────────────
 
 // ─── Stock Batches ──────────────────────────────────────────────────────────
 
@@ -496,8 +719,6 @@ function generateStockBatches(): StockBatch[] {
   let batchId = 1;
   const perishableCategories: SupplyCategory[] = ['beverages', 'snacks', 'coffee', 'tea', 'wine'];
 
-  // STOCKROOM_ITEMS must be generated before calling this
-  // Call this after STOCKROOM_ITEMS is defined
   ITEMS_V2.forEach(item => {
     const si = STOCKROOM_ITEMS.find(s => s.itemId === item.id && s.stockroomId === 'sr-1');
     if (!si) return;
@@ -567,10 +788,10 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
     stockroomId: 'sr-1',
     status: 'outstanding',
     lineItems: [
-      { id: 'pol-1', itemId: '1', description: 'Fiji Water 500ml', qtyOrdered: 48, qtyReceived: 0 },
-      { id: 'pol-2', itemId: '2', description: 'San Pellegrino 250ml', qtyOrdered: 36, qtyReceived: 0 },
-      { id: 'pol-3', itemId: '7', description: 'Orange Juice 10oz', qtyOrdered: 24, qtyReceived: 0 },
-      { id: 'pol-4', itemId: '10', description: 'Club Soda', qtyOrdered: 24, qtyReceived: 0 },
+      { id: 'pol-1', itemId: '1',  description: 'Perrier 330ml',    qtyOrdered: 48, qtyReceived: 0 },
+      { id: 'pol-2', itemId: '2',  description: 'Coca-Cola',        qtyOrdered: 36, qtyReceived: 0 },
+      { id: 'pol-3', itemId: '4',  description: 'Diet Coke',        qtyOrdered: 36, qtyReceived: 0 },
+      { id: 'pol-4', itemId: '6',  description: 'Grape Propel',     qtyOrdered: 24, qtyReceived: 0 },
     ],
   },
   {
@@ -581,50 +802,37 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
     stockroomId: 'sr-1',
     status: 'outstanding',
     lineItems: [
-      { id: 'pol-5', itemId: '17', description: 'Nespresso Capsules — Intenso', qtyOrdered: 20, qtyReceived: 0 },
-      { id: 'pol-6', itemId: '18', description: 'Nespresso Capsules — Lungo', qtyOrdered: 20, qtyReceived: 0 },
-      { id: 'pol-7', itemId: '19', description: 'Nespresso Capsules — Decaf', qtyOrdered: 10, qtyReceived: 0 },
-      { id: 'pol-8', itemId: '21', description: 'Half & Half Creamers', qtyOrdered: 12, qtyReceived: 0 },
+      { id: 'pol-5', itemId: '10', description: 'Nespresso Pods',   qtyOrdered: 20, qtyReceived: 0 },
+      { id: 'pol-6', itemId: '11', description: 'Regular Coffee',   qtyOrdered: 10, qtyReceived: 0 },
+      { id: 'pol-7', itemId: '12', description: 'Decaf Via',        qtyOrdered: 50, qtyReceived: 0 },
+      { id: 'pol-8', itemId: '14', description: 'Green Tea',        qtyOrdered: 20, qtyReceived: 0 },
     ],
   },
   {
     id: 'po-3',
     poNumber: 'PO-2026-0485',
-    vendor: 'World Duty Free',
+    vendor: 'Aviation Provisions Inc.',
     orderDate: '2026-05-05T00:00:00Z',
     stockroomId: 'sr-1',
     status: 'partially_received',
     lineItems: [
-      { id: 'pol-9', itemId: '91', description: 'Chardonnay (Half Bottle)', qtyOrdered: 12, qtyReceived: 12 },
-      { id: 'pol-10', itemId: '93', description: 'Pinot Noir (Half Bottle)', qtyOrdered: 12, qtyReceived: 6 },
-      { id: 'pol-11', itemId: '94', description: 'Cabernet Sauvignon (Half Bottle)', qtyOrdered: 8, qtyReceived: 0 },
-      { id: 'pol-12', itemId: '95', description: 'Prosecco (187ml)', qtyOrdered: 24, qtyReceived: 24 },
+      { id: 'pol-9',  itemId: '37', description: 'Toothbrush',      qtyOrdered: 24, qtyReceived: 24 },
+      { id: 'pol-10', itemId: '44', description: 'Hot Towels',      qtyOrdered: 20, qtyReceived: 10 },
+      { id: 'pol-11', itemId: '25', description: 'Advil',           qtyOrdered: 12, qtyReceived: 0  },
+      { id: 'pol-12', itemId: '26', description: 'Tylenol',         qtyOrdered: 12, qtyReceived: 0  },
     ],
   },
   {
     id: 'po-4',
     poNumber: 'PO-2026-0472',
-    vendor: 'Aviation Provisions Inc.',
-    orderDate: '2026-05-03T00:00:00Z',
-    stockroomId: 'sr-1',
-    status: 'outstanding',
-    lineItems: [
-      { id: 'pol-13', itemId: '37', description: 'Hand Towels (White)', qtyOrdered: 40, qtyReceived: 0 },
-      { id: 'pol-14', itemId: '39', description: 'Blankets (Cashmere)', qtyOrdered: 8, qtyReceived: 0 },
-      { id: 'pol-15', itemId: '41', description: 'Pillows (Down)', qtyOrdered: 8, qtyReceived: 0 },
-    ],
-  },
-  {
-    id: 'po-5',
-    poNumber: 'PO-2026-0461',
     vendor: 'SkyClean Products',
-    orderDate: '2026-05-01T00:00:00Z',
+    orderDate: '2026-05-03T00:00:00Z',
     stockroomId: 'sr-2',
     status: 'outstanding',
     lineItems: [
-      { id: 'pol-16', itemId: '11', description: 'Lysol Wipes (Canister)', qtyOrdered: 20, qtyReceived: 0 },
-      { id: 'pol-17', itemId: '12', description: 'Glass Cleaner Spray', qtyOrdered: 10, qtyReceived: 0 },
-      { id: 'pol-18', itemId: '14', description: 'Microfiber Cloth Pack', qtyOrdered: 15, qtyReceived: 0 },
+      { id: 'pol-13', itemId: '65', description: 'Disinfecting Wipes',  qtyOrdered: 20, qtyReceived: 0 },
+      { id: 'pol-14', itemId: '69', description: 'Microfiber Cloths',   qtyOrdered: 20, qtyReceived: 0 },
+      { id: 'pol-15', itemId: '64', description: 'Wine Away',           qtyOrdered: 10, qtyReceived: 0 },
     ],
   },
 ];

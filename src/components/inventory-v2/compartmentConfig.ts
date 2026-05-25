@@ -19,11 +19,10 @@ const G650_COMPARTMENTS: CompartmentDefinition[] = [
 
 const G500_COMPARTMENTS: CompartmentDefinition[] = [
   { id: 'fwd-lav', label: 'Forward Lavatory', icon: 'Droplets', color: 'text-cyan-400', sortOrder: 1 },
-  { id: 'galley', label: 'Galley', icon: 'Coffee', color: 'text-amber-400', sortOrder: 2 },
-  { id: 'aft-lav', label: 'Aft Lavatory', icon: 'Droplets', color: 'text-purple-400', sortOrder: 3 },
+  { id: 'fwd-galley', label: 'Galley', icon: 'Coffee', color: 'text-amber-400', sortOrder: 2 },
+  { id: 'aft-galley', label: 'Aft Galley', icon: 'UtensilsCrossed', color: 'text-orange-400', sortOrder: 3 },
   { id: 'credenza', label: 'Credenza', icon: 'Package', color: 'text-emerald-400', sortOrder: 4 },
-  { id: 'chiller', label: 'Chiller', icon: 'Snowflake', color: 'text-sky-400', sortOrder: 5 },
-  { id: 'baggage', label: 'Baggage Compartment', icon: 'Luggage', color: 'text-indigo-400', sortOrder: 6 },
+  { id: 'baggage', label: 'Baggage Compartment', icon: 'Luggage', color: 'text-indigo-400', sortOrder: 5 },
 ];
 
 // ─── Default Configs ────────────────────────────────────────────────────────

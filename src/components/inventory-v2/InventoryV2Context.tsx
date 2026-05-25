@@ -12,11 +12,21 @@ import { loadCompartmentConfigs } from './compartmentConfig';
 
 const STORAGE_PREFIX = 'inv-v2-';
 const STORAGE_KEY = `${STORAGE_PREFIX}state`;
+// Bump this string any time mock data changes to force a fresh load
+const DATA_VERSION = '2026-05-25-v1';
+const VERSION_KEY = `${STORAGE_PREFIX}data-version`;
 
 // ─── Initial State ──────────────────────────────────────────────────────────
 
 function loadInitialState(): InventoryV2State {
   try {
+    // If the stored data version doesn't match, discard old state and reload from mock data
+    const storedVersion = localStorage.getItem(VERSION_KEY);
+    if (storedVersion !== DATA_VERSION) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(VERSION_KEY, DATA_VERSION);
+      return getDefaultState();
+    }
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
