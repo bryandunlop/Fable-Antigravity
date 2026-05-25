@@ -65,6 +65,7 @@ export interface InventoryItemV2 {
   priority: 'low' | 'medium' | 'high' | 'critical';
   alternateNames: string[];
   reorderUrl?: string;
+  barcode?: string;
 }
 
 // ─── Inspection ─────────────────────────────────────────────────────────────
