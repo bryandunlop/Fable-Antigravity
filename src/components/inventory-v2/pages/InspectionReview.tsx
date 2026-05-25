@@ -270,7 +270,7 @@ export default function InspectionReview() {
       dispatch({ type: 'ADD_PICK_ITEMS', payload: pickItems });
       sessionStorage.removeItem(SESSION_KEY);
       toast.success('Inspection submitted — restock needed. Pick list updated.');
-      navigate('/inventory-v2/pick-list');
+      navigate('/inventory-v2/replenish');
     } else {
       sessionStorage.removeItem(SESSION_KEY);
       toast.success('Inspection completed successfully');

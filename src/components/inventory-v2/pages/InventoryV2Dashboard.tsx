@@ -269,7 +269,7 @@ export default function InventoryV2Dashboard() {
                     <div
                       key={i.id}
                       className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => navigate('/inventory-v2/pick-list')}
+                      onClick={() => navigate('/inventory-v2/replenish')}
                     >
                       <div>
                         <span className="text-sm font-medium">{i.tailNumber}</span>
