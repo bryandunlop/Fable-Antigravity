@@ -25,3 +25,6 @@ Thumbs.db
 *.tmp
 fix-sonner-imports.ps1
 .vercel
+
+# Claude Code worktrees
+.claude/worktrees/
