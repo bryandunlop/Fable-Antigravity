@@ -88,9 +88,14 @@ export default function Receiving() {
   };
 
   const handleScan = (itemId: string) => {
-    setStaged(prev => ({ ...prev, [itemId]: (prev[itemId] ?? 0) + 1 }));
     const item = state.items.find(i => i.id === itemId);
-    toast.success(`Added: ${item?.itemName ?? itemId}`);
+    if (!item) {
+      toast.error('Scanned item not found in inventory');
+      setScannerOpen(false);
+      return;
+    }
+    setStaged(prev => ({ ...prev, [itemId]: (prev[itemId] ?? 0) + 1 }));
+    toast.success(`Added: ${item.itemName}`);
     setScannerOpen(false);
   };
 
