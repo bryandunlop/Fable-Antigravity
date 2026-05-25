@@ -11,7 +11,7 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES, V2_THEME } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import BulkAdjustModal from '../shared/BulkAdjustModal';
-import { Search, Plus, Minus, ChevronDown, ArrowUp, Warehouse, Layers } from 'lucide-react';
+import { Search, Plus, Minus, ChevronDown, ArrowUp, Warehouse, Layers, ExternalLink } from 'lucide-react';
 
 export default function StockroomCount() {
   const { state, dispatch } = useInventoryV2();
@@ -215,7 +215,21 @@ export default function StockroomCount() {
                               isBelowPar ? 'bg-blue-100 dark:bg-blue-900/20' : 'hover:bg-muted/30'
                             }`}
                           >
-                            <span className="font-medium truncate">{item.itemName}</span>
+                            <span className="font-medium truncate flex items-center gap-1.5">
+                              {item.itemName}
+                              {isBelowPar && item.reorderUrl && (
+                                <a
+                                  href={item.reorderUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                                  title="Reorder from vendor"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </span>
                             <span className="text-muted-foreground text-xs">{si?.binLocation ?? '—'}</span>
                             <span className="text-muted-foreground text-xs truncate">{item.vendorItemNumber ?? '—'}</span>
                             <span className="text-muted-foreground text-xs truncate">{item.internalItemNumber ?? '—'}</span>
