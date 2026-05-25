@@ -107,10 +107,17 @@ export default function Replenish() {
   const handleCancel = (pickItem: PickListItem, cancelled: boolean) => {
     const restockItem = getRestockItem(pickItem);
     if (!restockItem) {
-      const newItem = ensureRestockItem(pickItem);
-      setLocalRestockItems(prev =>
-        prev.map(r => (r.id === newItem.id ? { ...r, cancelled } : r))
-      );
+      const newItem: RestockListItem = {
+        id: `restock-${pickItem.id}`,
+        inspectionId: pickItem.inspectionId,
+        unitTailNumber: pickItem.unitTailNumber,
+        itemId: pickItem.itemId,
+        qtyPicked: pickItem.qtyTaken,
+        qtyNeeded: pickItem.qtyNeeded,
+        done: false,
+        cancelled,
+      };
+      setLocalRestockItems(prev => [...prev, newItem]);
       return;
     }
     setLocalRestockItems(prev =>
@@ -159,8 +166,12 @@ export default function Replenish() {
     // Flip inspections to 'restocked' when all their items are loaded
     const inspectionIds = new Set(localPickItems.map(p => p.inspectionId));
     inspectionIds.forEach(inspId => {
+      const pickItemsForInsp = localPickItems.filter(p => p.inspectionId === inspId);
       const restockForInsp = localRestockItems.filter(r => r.inspectionId === inspId);
-      const allDone = restockForInsp.length > 0 && restockForInsp.every(r => r.done || r.cancelled);
+      const allDone =
+        restockForInsp.length > 0 &&
+        restockForInsp.length === pickItemsForInsp.length &&
+        restockForInsp.every(r => r.done || r.cancelled);
       if (allDone) {
         const inspection = state.inspections.find(i => i.id === inspId);
         if (inspection && inspection.status !== 'restocked') {
@@ -173,7 +184,7 @@ export default function Replenish() {
   };
 
   const toggleSection = (unit: string) => {
-    setOpenSections(prev => ({ ...prev, [unit]: prev[unit] === false ? true : false }));
+    setOpenSections(prev => ({ ...prev, [unit]: prev[unit] !== false ? false : true }));
   };
 
   return (
