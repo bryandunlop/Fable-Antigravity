@@ -1,0 +1,54 @@
+<h2>How do threshold alerts surface in the app?</h2>
+<p class="subtitle">When stockroom water drops below the commissary manager's alert threshold, where does it appear?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Notification Bell (Header)</h3>
+      <p>A bell icon in the top nav bar shows a red badge count. Clicking opens a dropdown panel listing unread alerts with timestamp, item name, current qty, and threshold. Alerts can be dismissed or marked read.</p>
+      <div style="margin-top:12px; padding:10px; background:rgba(30,30,40,0.6); border-radius:6px; border:1px solid rgba(255,255,255,0.1); font-size:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="color:#e2e8f0; font-weight:600;">🔔 Alerts <span style="background:#ef4444;color:white;border-radius:999px;padding:1px 6px;font-size:10px;">3</span></span>
+        </div>
+        <div style="color:#fca5a5; border-left:2px solid #ef4444; padding-left:8px; margin-bottom:6px;">🔴 Water — 4 remaining (alert: 12) · 2h ago</div>
+        <div style="color:#fbbf24; border-left:2px solid #f59e0b; padding-left:8px; margin-bottom:6px;">🟡 Coffee pods — 8 remaining (alert: 20) · 5h ago</div>
+        <div style="color:#fbbf24; border-left:2px solid #f59e0b; padding-left:8px;">🟡 Napkins — 15 remaining (alert: 30) · 1d ago</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Dedicated Alerts Page</h3>
+      <p>A full-screen alerts page linked from the commissary manager dashboard and the sidebar nav. Shows alert history, current status per alert, and a "Resolve" action. No header badge — alerts live in one place.</p>
+      <div style="margin-top:12px; padding:10px; background:rgba(30,30,40,0.6); border-radius:6px; border:1px solid rgba(255,255,255,0.1); font-size:12px;">
+        <div style="color:#94a3b8; margin-bottom:6px; font-size:10px; text-transform:uppercase; letter-spacing:0.05em;">Active Alerts · 3 unresolved</div>
+        <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:4px; padding:8px; margin-bottom:6px;">
+          <div style="color:#fca5a5;">🔴 Water · N5PG Stockroom</div>
+          <div style="color:#94a3b8; font-size:10px;">4 on hand · Alert threshold: 12 · Triggered 2h ago</div>
+        </div>
+        <div style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:4px; padding:8px;">
+          <div style="color:#fbbf24;">🟡 Coffee pods · N5PG Stockroom</div>
+          <div style="color:#94a3b8; font-size:10px;">8 on hand · Alert threshold: 20 · Triggered 5h ago</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Both — Bell + Full Page</h3>
+      <p>Bell in the header for quick awareness (badge count only, no dropdown). Clicking the bell navigates to the full Alerts page. Best of both: always-visible indicator without a cluttered dropdown.</p>
+      <div style="margin-top:12px; display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:center;">
+        <div style="padding:8px 12px; background:rgba(30,30,40,0.6); border-radius:6px; border:1px solid rgba(255,255,255,0.1); text-align:center; font-size:12px;">
+          <div style="color:#e2e8f0;">🔔</div>
+          <div style="background:#ef4444;color:white;border-radius:999px;padding:1px 5px;font-size:10px;display:inline-block;margin-top:2px;">3</div>
+        </div>
+        <div style="font-size:12px; color:#94a3b8;">Bell badge shows unread count → click navigates to the full Alerts page with history, resolve actions, and threshold quick-edit links</div>
+      </div>
+    </div>
+  </div>
+</div>

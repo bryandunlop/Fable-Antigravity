@@ -1,0 +1,40 @@
+<h2>Commissary Manager — What's the primary view?</h2>
+<p class="subtitle">The commissary manager opens the app. What's the first thing they need to see?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Alert-First Dashboard</h3>
+      <p>Lead with items that need attention: below-par items highlighted in red/amber, with a count badge. Everything else is secondary. The manager's job is to fix shortages — make that the first thing they see.</p>
+      <div style="margin-top:12px; padding:10px; background:rgba(239,68,68,0.1); border-radius:6px; border-left:3px solid #ef4444; font-size:12px; color:#fca5a5;">
+        🔴 3 items at minimum · 🟡 7 items below par · ✅ 84 items OK
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Activity Feed</h3>
+      <p>Show what's happening: recent FA pulls, new restock requests, incoming stock additions. The manager stays informed about what's moving through the commissary. Alerts are a panel, not the headline.</p>
+      <div style="margin-top:12px; padding:10px; background:rgba(99,102,241,0.1); border-radius:6px; border-left:3px solid #6366f1; font-size:12px; color:#a5b4fc;">
+        Sarah pulled 3 items from N5PG · 2h ago<br>
+        Restock request: N6PG — 4 items pending<br>
+        Stock added: 24 bottles water · today
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Combined Dashboard</h3>
+      <p>A full commissary overview in one view: threshold alert banner at the top (collapsible), then two columns — stockroom status on the left, recent activity on the right. Richer but more to parse at a glance.</p>
+      <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div style="padding:8px; background:rgba(239,68,68,0.1); border-radius:6px; font-size:11px; color:#fca5a5;">📦 Stockroom<br>3 critical · 7 low</div>
+        <div style="padding:8px; background:rgba(99,102,241,0.1); border-radius:6px; font-size:11px; color:#a5b4fc;">📋 Activity<br>5 events today</div>
+      </div>
+    </div>
+  </div>
+</div>

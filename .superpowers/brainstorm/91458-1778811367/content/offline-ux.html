@@ -1,0 +1,52 @@
+<h2>Offline — What does the developer need to see?</h2>
+<p class="subtitle">The app already works offline via localStorage. This is about showing the developer what real offline sync should look like. How much detail?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Offline Banner Only</h3>
+      <p>A simple banner at the top when connectivity is lost. "You're offline — changes will sync automatically when your connection is restored." Disappears when back online. Simple, low-fidelity, communicates the intent.</p>
+      <div style="margin-top:12px; padding:8px 12px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); border-radius:6px; font-size:12px; color:#fbbf24; display:flex; gap:8px; align-items:center;">
+        <span>📡</span>
+        <span>You're offline · 3 changes pending sync</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Sync Queue Panel</h3>
+      <p>Banner + a "Pending Changes" panel accessible from the banner or sidebar. Lists what's queued: "Inspection N5PG submitted (offline)", "Stock update: +12 water". Developer sees the exact data structure they need to build the sync API around.</p>
+      <div style="margin-top:12px; padding:10px; background:rgba(30,30,40,0.6); border-radius:6px; border:1px solid rgba(255,255,255,0.1); font-size:11px;">
+        <div style="color:#94a3b8; margin-bottom:6px; font-size:10px; text-transform:uppercase; letter-spacing:0.05em;">Pending Sync · 3 changes</div>
+        <div style="color:#e2e8f0; border-left:2px solid #6366f1; padding-left:8px; margin-bottom:5px;">📋 Inspection submitted — N5PG · 14 min ago</div>
+        <div style="color:#e2e8f0; border-left:2px solid #6366f1; padding-left:8px; margin-bottom:5px;">📦 Stock update — +12 water bottles · 32 min ago</div>
+        <div style="color:#e2e8f0; border-left:2px solid #6366f1; padding-left:8px;">✏️ Par level changed — Coffee pods → 24 · 1h ago</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Per-Record Sync Status</h3>
+      <p>Each inspection card, stock entry, and request shows a sync status icon: ✅ synced, 🕐 pending, ❌ failed. The developer sees exactly which records need sync endpoints. Most technically informative but most work to build in the demo.</p>
+      <div style="margin-top:12px; padding:10px; background:rgba(30,30,40,0.6); border-radius:6px; border:1px solid rgba(255,255,255,0.1); font-size:11px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; color:#e2e8f0;">
+          <span>Inspection — N5PG · today</span>
+          <span style="color:#fbbf24;">🕐 pending</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; color:#e2e8f0;">
+          <span>Inspection — N6PG · yesterday</span>
+          <span style="color:#22c55e;">✅ synced</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; color:#e2e8f0;">
+          <span>Stock update — water · 2d ago</span>
+          <span style="color:#ef4444;">❌ failed</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
