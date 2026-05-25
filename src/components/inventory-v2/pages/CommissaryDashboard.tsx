@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ShoppingCart } from 'lucide-react';
+import { CheckCircle2, ShoppingCart, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -24,10 +24,12 @@ function StockRow({
   si,
   itemName,
   label,
+  reorderUrl,
 }: {
   si: StockroomItem;
   itemName: string;
   label: 'critical' | 'threshold';
+  reorderUrl?: string;
 }) {
   const navigate = useNavigate();
   const limitLabel = label === 'critical'
@@ -42,13 +44,27 @@ function StockRow({
           {si.qtyOnHand} on hand · {limitLabel}
         </p>
       </div>
-      <Button
-        size="sm"
-        className="h-7 shrink-0 px-3 text-xs"
-        onClick={() => navigate(`/inventory-v2/receiving?itemId=${si.itemId}`)}
-      >
-        Restock →
-      </Button>
+      <div className="flex items-center gap-2 shrink-0">
+        {reorderUrl && (
+          <a
+            href={reorderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            onClick={e => e.stopPropagation()}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Reorder
+          </a>
+        )}
+        <Button
+          size="sm"
+          className="h-7 px-3 text-xs"
+          onClick={() => navigate(`/inventory-v2/receiving?itemId=${si.itemId}`)}
+        >
+          Restock →
+        </Button>
+      </div>
     </div>
   );
 }
@@ -75,6 +91,10 @@ export default function CommissaryDashboard() {
 
   function itemName(itemId: string) {
     return state.items.find(i => i.id === itemId)?.itemName ?? itemId;
+  }
+
+  function itemReorderUrl(itemId: string) {
+    return state.items.find(i => i.id === itemId)?.reorderUrl;
   }
 
   const hasFlags = critical.length > 0 || threshold.length > 0;
@@ -139,7 +159,7 @@ export default function CommissaryDashboard() {
               </CardHeader>
               <CardContent className="pt-0 divide-y">
                 {critical.map(si => (
-                  <StockRow key={si.itemId} si={si} itemName={itemName(si.itemId)} label="critical" />
+                  <StockRow key={si.itemId} si={si} itemName={itemName(si.itemId)} label="critical" reorderUrl={itemReorderUrl(si.itemId)} />
                 ))}
               </CardContent>
             </Card>
@@ -155,7 +175,7 @@ export default function CommissaryDashboard() {
               </CardHeader>
               <CardContent className="pt-0 divide-y">
                 {threshold.map(si => (
-                  <StockRow key={si.itemId} si={si} itemName={itemName(si.itemId)} label="threshold" />
+                  <StockRow key={si.itemId} si={si} itemName={itemName(si.itemId)} label="threshold" reorderUrl={itemReorderUrl(si.itemId)} />
                 ))}
               </CardContent>
             </Card>
