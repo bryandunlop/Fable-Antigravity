@@ -13,8 +13,9 @@ import { V2Badge } from '../shared/V2Badge';
 import { toast } from 'sonner';
 import {
   PackagePlus, Search, Plus, Minus, ChevronDown, Check,
-  User, Clock, ShoppingCart, X, History
+  User, Clock, ShoppingCart, X, History, Camera
 } from 'lucide-react';
+import { BarcodeScannerDialog } from '../shared/BarcodeScannerDialog';
 
 export default function Receiving() {
   const { state, dispatch } = useInventoryV2();
@@ -30,6 +31,7 @@ export default function Receiving() {
   // ── View mode ──
   const [showHistory, setShowHistory] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const stockroomItems = useMemo(() =>
     state.stockroomItems.filter(si => si.stockroomId === state.selectedStockroomId),
@@ -83,6 +85,13 @@ export default function Receiving() {
     } else {
       setStaged(prev => ({ ...prev, [itemId]: n }));
     }
+  };
+
+  const handleScan = (itemId: string) => {
+    setStaged(prev => ({ ...prev, [itemId]: (prev[itemId] ?? 0) + 1 }));
+    const item = state.items.find(i => i.id === itemId);
+    toast.success(`Added: ${item?.itemName ?? itemId}`);
+    setScannerOpen(false);
   };
 
   const handleSubmit = () => {
@@ -143,6 +152,15 @@ export default function Receiving() {
           <V2Badge />
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setScannerOpen(true)}
+            className="gap-1.5"
+          >
+            <Camera className="w-4 h-4" />
+            Scan Item
+          </Button>
           <Button
             variant={showHistory ? 'default' : 'outline'}
             size="sm"
@@ -413,6 +431,11 @@ export default function Receiving() {
           </Card>
         </div>
       </div>
+      <BarcodeScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onItemScanned={handleScan}
+      />
     </div>
   );
 }
