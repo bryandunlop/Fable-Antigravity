@@ -1,7 +1,7 @@
 // ─── Inventory V2 — Item Manager ────────────────────────────────────────────
 
 import React, { useState, useMemo } from 'react';
-import { Search, Pencil, Trash2, Plus, ExternalLink } from 'lucide-react';
+import { Search, Pencil, Trash2, Plus, ExternalLink, Camera, Barcode } from 'lucide-react';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -21,6 +21,7 @@ import {
 } from '../../ui/dialog';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
+import { BarcodeScannerDialog } from '../shared/BarcodeScannerDialog';
 import { V2Badge } from '../shared/V2Badge';
 import { SUPPLY_CATEGORIES, UOM_OPTIONS } from '../constants';
 import { getCompartmentsForAircraft } from '../compartmentConfig';
@@ -51,6 +52,12 @@ function ItemRow({
           >
             <ExternalLink size={10} /> Reorder
           </a>
+        )}
+        {item.barcode && (
+          <div className="flex items-center gap-1 mt-1">
+            <Barcode className="w-3 h-3 text-muted-foreground" />
+            <span className="font-mono text-xs text-muted-foreground">{item.barcode}</span>
+          </div>
         )}
       </td>
       <td className="px-3 py-3 hidden md:table-cell">
@@ -99,6 +106,7 @@ interface ItemFormState {
   costPerUnit: string;
   reorderUrl: string;
   vendorItemNumber: string;
+  barcode: string;
 }
 
 function emptyForm(): ItemFormState {
@@ -113,6 +121,7 @@ function emptyForm(): ItemFormState {
     costPerUnit: '',
     reorderUrl: '',
     vendorItemNumber: '',
+    barcode: '',
   };
 }
 
@@ -128,6 +137,7 @@ function itemToForm(item: InventoryItemV2): ItemFormState {
     costPerUnit: item.costPerUnit != null ? String(item.costPerUnit) : '',
     reorderUrl: item.reorderUrl ?? '',
     vendorItemNumber: item.vendorItemNumber ?? '',
+    barcode: item.barcode ?? '',
   };
 }
 
@@ -141,6 +151,7 @@ export default function ItemManager() {
   const [editingItem, setEditingItem] = useState<InventoryItemV2 | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [form, setForm] = useState<ItemFormState>(emptyForm());
+  const [barcodeScanner, setBarcodeScanner] = useState(false);
 
   // ── Role guard ──────────────────────────────────────────────────────────────
 
@@ -234,6 +245,7 @@ export default function ItemManager() {
       vendorItemNumber: form.vendorItemNumber.trim() || undefined,
       costPerUnit: form.costPerUnit !== '' ? parseFloat(form.costPerUnit) : undefined,
       reorderUrl: form.reorderUrl.trim() || undefined,
+      barcode: form.barcode.trim() || undefined,
       defaultQuantities: {
         ...(form.g650Qty !== '' ? { G650: parseInt(form.g650Qty, 10) } : {}),
         ...(form.g500Qty !== '' ? { G500: parseInt(form.g500Qty, 10) } : {}),
@@ -276,6 +288,7 @@ export default function ItemManager() {
       vendorItemNumber: form.vendorItemNumber.trim() || undefined,
       costPerUnit: form.costPerUnit !== '' ? parseFloat(form.costPerUnit) : undefined,
       reorderUrl: form.reorderUrl.trim() || undefined,
+      barcode: form.barcode.trim() || undefined,
       defaultQuantities: {
         ...(form.g650Qty !== '' ? { G650: parseInt(form.g650Qty, 10) } : {}),
         ...(form.g500Qty !== '' ? { G500: parseInt(form.g500Qty, 10) } : {}),
@@ -509,6 +522,29 @@ export default function ItemManager() {
               />
             </div>
 
+            {/* Barcode */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Barcode (optional)</label>
+              <div className="flex gap-2">
+                <Input
+                  value={form.barcode}
+                  onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
+                  placeholder="e.g. 0012345678901"
+                  className="font-mono"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={() => setBarcodeScanner(true)}
+                >
+                  <Camera className="w-4 h-4" />
+                  Scan
+                </Button>
+              </div>
+            </div>
+
             {/* Vendor Item # */}
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Vendor Item # (optional)</label>
@@ -533,6 +569,16 @@ export default function ItemManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BarcodeScannerDialog
+        open={barcodeScanner}
+        onOpenChange={setBarcodeScanner}
+        onItemScanned={() => {
+          const mockBarcode = String(Math.floor(1000000000000 + Math.random() * 9000000000000));
+          setForm(f => ({ ...f, barcode: mockBarcode }));
+          setBarcodeScanner(false);
+        }}
+      />
     </div>
   );
 }
