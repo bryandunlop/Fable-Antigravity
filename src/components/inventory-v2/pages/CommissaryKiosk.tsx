@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES } from '../constants';
 import type { SupplyCategory } from '../types';
@@ -15,6 +16,12 @@ export default function CommissaryKiosk() {
     [quantities]
   );
 
+  // Memoized Map of itemId -> qtyOnHand for O(1) lookups
+  const stockroomMap = useMemo(
+    () => new Map(state.stockroomItems.map(si => [si.itemId, si.qtyOnHand])),
+    [state.stockroomItems]
+  );
+
   // Items in selected category that exist in the stockroom
   const visibleItems = useMemo(() => {
     return state.items
@@ -23,13 +30,8 @@ export default function CommissaryKiosk() {
       .sort((a, b) => a.itemName.localeCompare(b.itemName));
   }, [state.items, state.stockroomItems, selectedCategory]);
 
-  // Get qtyOnHand for a given itemId
-  const getQtyOnHand = (itemId: string): number => {
-    return state.stockroomItems.find(si => si.itemId === itemId)?.qtyOnHand ?? 0;
-  };
-
   const handleIncrement = (itemId: string) => {
-    const onHand = getQtyOnHand(itemId);
+    const onHand = stockroomMap.get(itemId) ?? 0;
     const current = quantities[itemId] ?? 0;
     if (current >= onHand) return; // can't take more than what's there
     setQuantities(prev => ({ ...prev, [itemId]: current + 1 }));
@@ -45,11 +47,9 @@ export default function CommissaryKiosk() {
     const removals = Object.entries(quantities).filter(([, qty]) => qty > 0);
     if (removals.length === 0) return;
 
-    const updatedStockroomItems = state.stockroomItems.map(si => {
-      const qty = quantities[si.itemId] ?? 0;
-      if (qty === 0) return si;
-      return { ...si, qtyOnHand: Math.max(0, si.qtyOnHand - qty) };
-    });
+    const updatedStockroomItems = state.stockroomItems
+      .filter(si => (quantities[si.itemId] ?? 0) > 0)
+      .map(si => ({ ...si, qtyOnHand: Math.max(0, si.qtyOnHand - quantities[si.itemId]) }));
 
     dispatch({ type: 'BULK_UPDATE_STOCKROOM', payload: updatedStockroomItems });
     setConfirmed(true);
@@ -71,7 +71,7 @@ export default function CommissaryKiosk() {
       {/* ── CONFIRMATION FLASH ── */}
       {confirmed && (
         <div className="absolute inset-0 z-50 bg-emerald-600 flex flex-col items-center justify-center">
-          <div className="text-8xl mb-4">✓</div>
+          <CheckCircle2 className="w-24 h-24 text-white mb-4" />
           <div className="text-4xl font-bold">Logged</div>
         </div>
       )}
@@ -117,7 +117,7 @@ export default function CommissaryKiosk() {
           <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto">
             {visibleItems.map(item => {
               const qty = quantities[item.id] ?? 0;
-              const onHand = getQtyOnHand(item.id);
+              const onHand = stockroomMap.get(item.id) ?? 0;
               return (
                 <div
                   key={item.id}
@@ -133,6 +133,7 @@ export default function CommissaryKiosk() {
                     <button
                       onClick={() => handleDecrement(item.id)}
                       disabled={qty === 0}
+                      aria-label={`Decrease ${item.itemName}`}
                       className="w-12 h-12 rounded-lg bg-slate-700 disabled:opacity-30 flex items-center justify-center text-xl font-bold hover:bg-slate-600 transition-colors"
                     >
                       −
@@ -141,6 +142,7 @@ export default function CommissaryKiosk() {
                     <button
                       onClick={() => handleIncrement(item.id)}
                       disabled={qty >= onHand}
+                      aria-label={`Increase ${item.itemName}`}
                       className="w-12 h-12 rounded-lg bg-blue-600 disabled:opacity-30 flex items-center justify-center text-xl font-bold hover:bg-blue-500 transition-colors"
                     >
                       +
