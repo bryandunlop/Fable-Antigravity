@@ -136,11 +136,10 @@ import CommissaryDashboard from './components/inventory-v2/pages/CommissaryDashb
 import AlertsPage from './components/inventory-v2/pages/AlertsPage';
 import TripListV2 from './components/inventory-v2/pages/TripList';
 import TripHomeV2 from './components/inventory-v2/pages/TripHome';
-import QuickCountV2 from './components/inventory-v2/pages/QuickCount';
 import GroceryListPageV2 from './components/inventory-v2/pages/GroceryListPage';
-import TripNotesV2 from './components/inventory-v2/pages/TripNotes';
 import LegReconciliationV2 from './components/inventory-v2/pages/LegReconciliation';
 import ItemManagerV2 from './components/inventory-v2/pages/ItemManager';
+import CommissaryKiosk from './components/inventory-v2/pages/CommissaryKiosk';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -171,6 +170,14 @@ export default function App() {
                   <Routes>
                     {/* Public Routes - No Authentication Required */}
                     <Route path="/public/passenger-form" element={<PublicPassengerForm />} />
+                    <Route
+                      path="/commissary-kiosk"
+                      element={
+                        <InventoryV2Provider userRole="commissary-kiosk">
+                          <CommissaryKiosk />
+                        </InventoryV2Provider>
+                      }
+                    />
 
                     {/* Login Route */}
                     <Route path="/login" element={
@@ -411,9 +418,7 @@ export default function App() {
                                 <Route path="/inventory-v2/alerts" element={<InventoryV2Provider userRole={userRole}><AlertsPage /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/trips" element={<InventoryV2Provider userRole={userRole}><TripListV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/trips/:tripId" element={<InventoryV2Provider userRole={userRole}><TripHomeV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/trips/:tripId/quick-count" element={<InventoryV2Provider userRole={userRole}><QuickCountV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryV2Provider userRole={userRole}><GroceryListPageV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/trips/:tripId/notes" element={<InventoryV2Provider userRole={userRole}><TripNotesV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/trips/:tripId/reconcile" element={<InventoryV2Provider userRole={userRole}><LegReconciliationV2 /></InventoryV2Provider>} />
                                 <Route path="/inventory-v2/item-manager" element={<InventoryV2Provider userRole={userRole}><ItemManagerV2 /></InventoryV2Provider>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
