@@ -672,19 +672,6 @@ function ParLevelsTab() {
             onChange={e => setSearch(e.target.value)}
             className="max-w-xs"
           />
-          <Select
-            value={state.selectedStockroomId}
-            onValueChange={(v: string) => dispatch({ type: 'SET_SELECTED_STOCKROOM', payload: v })}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {state.stockrooms.map(sr => (
-                <SelectItem key={sr.id} value={sr.id}>{sr.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
         <Button
           size="sm"
