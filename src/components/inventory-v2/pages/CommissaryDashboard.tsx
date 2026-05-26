@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ShoppingCart, ExternalLink } from 'lucide-react';
+import { CheckCircle2, ShoppingCart, ExternalLink, MonitorSmartphone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -106,6 +106,16 @@ export default function CommissaryDashboard() {
       <div className="flex items-center gap-2">
         <h1 className="text-2xl font-bold">Commissary</h1>
         <V2Badge variant="v2" size="md" />
+        <a
+          href="/commissary-kiosk"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+        >
+          <MonitorSmartphone className="w-4 h-4" />
+          Launch Kiosk
+          <ExternalLink className="w-3 h-3 opacity-50" />
+        </a>
       </div>
 
       {/* Summary cards */}
