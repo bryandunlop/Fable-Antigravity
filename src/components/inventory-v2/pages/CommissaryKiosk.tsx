@@ -26,9 +26,9 @@ export default function CommissaryKiosk() {
   const visibleItems = useMemo(() => {
     return state.items
       .filter(item => item.supplyCategory === selectedCategory)
-      .filter(item => state.stockroomItems.some(si => si.itemId === item.id))
+      .filter(item => stockroomMap.has(item.id))
       .sort((a, b) => a.itemName.localeCompare(b.itemName));
-  }, [state.items, state.stockroomItems, selectedCategory]);
+  }, [state.items, stockroomMap, selectedCategory]);
 
   const handleIncrement = (itemId: string) => {
     const onHand = stockroomMap.get(itemId) ?? 0;
@@ -44,6 +44,7 @@ export default function CommissaryKiosk() {
   };
 
   const handleConfirm = () => {
+    if (confirmed) return; // guard against double-tap on slow devices
     const removals = Object.entries(quantities).filter(([, qty]) => qty > 0);
     if (removals.length === 0) return;
 
