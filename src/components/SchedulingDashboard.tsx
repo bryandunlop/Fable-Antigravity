@@ -115,7 +115,7 @@ export default function SchedulingDashboard() {
           <FleetStatusWidget compact={true} showDetailsLink={true} />
 
           {/* NAS Impact Alerts - Prominently displayed */}
-          <NASImpactWidget compact={false} maxFlights={5} />
+          <NASImpactWidget compact={false} />
 
           {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

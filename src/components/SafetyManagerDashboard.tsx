@@ -53,17 +53,17 @@ export default function SafetyManagerDashboard() {
     switch (stage) {
       case WORKFLOW_STAGES.SUBMITTED:
         return <AlertTriangle className="w-4 h-4" />;
-      case WORKFLOW_STAGES.SM_INITIAL_REVIEW:
+      case WORKFLOW_STAGES.SM_INVESTIGATION:
         return <Search className="w-4 h-4" />;
-      case WORKFLOW_STAGES.ASSIGNED_CORRECTIVE_ACTION:
+      case WORKFLOW_STAGES.ASSIGN_MITIGATION:
         return <Users className="w-4 h-4" />;
-      case WORKFLOW_STAGES.SM_CA_REVIEW:
+      case WORKFLOW_STAGES.SM_MITIGATION_REVIEW:
         return <FileText className="w-4 h-4" />;
-      case WORKFLOW_STAGES.LINE_MANAGER_APPROVAL:
+      case WORKFLOW_STAGES.MANAGER_APPROVAL:
       case WORKFLOW_STAGES.EXEC_APPROVAL:
         return <CheckCircle className="w-4 h-4" />;
-      case WORKFLOW_STAGES.IMPLEMENTATION_ASSIGNMENT:
-      case WORKFLOW_STAGES.IMPLEMENTATION_IN_PROGRESS:
+      case WORKFLOW_STAGES.SM_POST_MANAGER:
+      case WORKFLOW_STAGES.MITIGATION_DEVELOPMENT:
         return <PlayCircle className="w-4 h-4" />;
       case WORKFLOW_STAGES.PUBLISHED:
         return <Send className="w-4 h-4" />;
@@ -80,16 +80,16 @@ export default function SafetyManagerDashboard() {
     switch (stage) {
       case WORKFLOW_STAGES.SUBMITTED:
         return 'bg-red-100 text-red-800 border-red-200';
-      case WORKFLOW_STAGES.SM_INITIAL_REVIEW:
-      case WORKFLOW_STAGES.SM_CA_REVIEW:
+      case WORKFLOW_STAGES.SM_INVESTIGATION:
+      case WORKFLOW_STAGES.SM_MITIGATION_REVIEW:
         return 'bg-orange-100 text-orange-800 border-orange-200';
-      case WORKFLOW_STAGES.ASSIGNED_CORRECTIVE_ACTION:
-      case WORKFLOW_STAGES.IMPLEMENTATION_ASSIGNMENT:
+      case WORKFLOW_STAGES.ASSIGN_MITIGATION:
+      case WORKFLOW_STAGES.SM_POST_MANAGER:
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case WORKFLOW_STAGES.LINE_MANAGER_APPROVAL:
+      case WORKFLOW_STAGES.MANAGER_APPROVAL:
       case WORKFLOW_STAGES.EXEC_APPROVAL:
         return 'bg-blue-100 text-blue-800 border-blue-200';
-      case WORKFLOW_STAGES.IMPLEMENTATION_IN_PROGRESS:
+      case WORKFLOW_STAGES.MITIGATION_DEVELOPMENT:
         return 'bg-purple-100 text-purple-800 border-purple-200';
       case WORKFLOW_STAGES.PUBLISHED:
         return 'bg-indigo-100 text-indigo-800 border-indigo-200';
@@ -120,8 +120,8 @@ export default function SafetyManagerDashboard() {
   const needsAttention = (hazard: Hazard) => {
     // Highlight items that need immediate attention
     if (hazard.workflowStage === WORKFLOW_STAGES.SUBMITTED) return true;
-    if (hazard.workflowStage === WORKFLOW_STAGES.SM_INITIAL_REVIEW && (hazard.daysInStage || 0) > 1) return true;
-    if (hazard.workflowStage === WORKFLOW_STAGES.SM_CA_REVIEW) return true;
+    if (hazard.workflowStage === WORKFLOW_STAGES.SM_INVESTIGATION && (hazard.daysInStage || 0) > 1) return true;
+    if (hazard.workflowStage === WORKFLOW_STAGES.SM_MITIGATION_REVIEW) return true;
     if (hazard.severity === 'Critical') return true;
     return false;
   };
@@ -130,10 +130,10 @@ export default function SafetyManagerDashboard() {
   const stats = {
     total: hazards.length,
     needsReview: (hazardsByStage[WORKFLOW_STAGES.SUBMITTED]?.length || 0) +
-      (hazardsByStage[WORKFLOW_STAGES.SM_INITIAL_REVIEW]?.length || 0) +
-      (hazardsByStage[WORKFLOW_STAGES.SM_CA_REVIEW]?.length || 0),
-    inProgress: (hazardsByStage[WORKFLOW_STAGES.IMPLEMENTATION_IN_PROGRESS]?.length || 0),
-    awaitingApproval: (hazardsByStage[WORKFLOW_STAGES.LINE_MANAGER_APPROVAL]?.length || 0) +
+      (hazardsByStage[WORKFLOW_STAGES.SM_INVESTIGATION]?.length || 0) +
+      (hazardsByStage[WORKFLOW_STAGES.SM_MITIGATION_REVIEW]?.length || 0),
+    inProgress: (hazardsByStage[WORKFLOW_STAGES.MITIGATION_DEVELOPMENT]?.length || 0),
+    awaitingApproval: (hazardsByStage[WORKFLOW_STAGES.MANAGER_APPROVAL]?.length || 0) +
       (hazardsByStage[WORKFLOW_STAGES.EXEC_APPROVAL]?.length || 0),
     effectivenessReview: (hazardsByStage[WORKFLOW_STAGES.EFFECTIVENESS_REVIEW]?.length || 0),
     closedThisMonth: (hazardsByStage[WORKFLOW_STAGES.CLOSED]?.length || 0) // Placeholder logic for "This Month"
@@ -368,8 +368,8 @@ export default function SafetyManagerDashboard() {
         <TabsContent value="needs-review" className="space-y-3">
           {[
             ...(hazardsByStage[WORKFLOW_STAGES.SUBMITTED] || []),
-            ...(hazardsByStage[WORKFLOW_STAGES.SM_INITIAL_REVIEW] || []),
-            ...(hazardsByStage[WORKFLOW_STAGES.SM_CA_REVIEW] || [])
+            ...(hazardsByStage[WORKFLOW_STAGES.SM_INVESTIGATION] || []),
+            ...(hazardsByStage[WORKFLOW_STAGES.SM_MITIGATION_REVIEW] || [])
           ].map(hazard => (
             <Card key={hazard.id} className="border-2 border-red-300 bg-red-50/50">
               <CardContent className="p-4">
@@ -402,9 +402,9 @@ export default function SafetyManagerDashboard() {
         {/* In Progress Tab */}
         <TabsContent value="in-progress" className="space-y-3">
           {[
-            ...(hazardsByStage[WORKFLOW_STAGES.ASSIGNED_CORRECTIVE_ACTION] || []),
-            ...(hazardsByStage[WORKFLOW_STAGES.IMPLEMENTATION_ASSIGNMENT] || []),
-            ...(hazardsByStage[WORKFLOW_STAGES.IMPLEMENTATION_IN_PROGRESS] || [])
+            ...(hazardsByStage[WORKFLOW_STAGES.ASSIGN_MITIGATION] || []),
+            ...(hazardsByStage[WORKFLOW_STAGES.SM_POST_MANAGER] || []),
+            ...(hazardsByStage[WORKFLOW_STAGES.MITIGATION_DEVELOPMENT] || [])
           ].map(hazard => (
             <Card key={hazard.id}>
               <CardContent className="p-4">
@@ -437,7 +437,7 @@ export default function SafetyManagerDashboard() {
         {/* Approvals Tab */}
         <TabsContent value="approvals" className="space-y-3">
           {[
-            ...(hazardsByStage[WORKFLOW_STAGES.LINE_MANAGER_APPROVAL] || []),
+            ...(hazardsByStage[WORKFLOW_STAGES.MANAGER_APPROVAL] || []),
             ...(hazardsByStage[WORKFLOW_STAGES.EXEC_APPROVAL] || [])
           ].map(hazard => (
             <Card key={hazard.id}>

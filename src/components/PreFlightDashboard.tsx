@@ -81,21 +81,17 @@ export default function PreFlightDashboard({ tailNumber }: PreFlightDashboardPro
                                 <div key={item.id} className="p-4 border rounded-lg bg-amber-50/50 border-amber-100">
                                     <div className="flex justify-between items-start mb-2">
                                         <Badge variant="outline" className="border-amber-500 text-amber-700 font-bold">
-                                            MEL {item.deferral?.melReference || 'N/A'}
+                                            MEL {item.deferral?.melItemId || 'N/A'}
                                         </Badge>
                                         <span className="text-xs text-muted-foreground font-mono">
-                                            EXP: {item.deferral?.expiryDate ? new Date(item.deferral.expiryDate).toLocaleDateString() : 'N/A'}
+                                            EXP: {item.deferral?.expiresAt ? new Date(item.deferral.expiresAt).toLocaleDateString() : 'N/A'}
                                         </span>
                                     </div>
-                                    <h4 className="font-semibold text-sm mb-1">{item.title || item.description || 'No Description'}</h4>
-                                    {item.deferral?.operationalLimitations && item.deferral.operationalLimitations.length > 0 && (
+                                    <h4 className="font-semibold text-sm mb-1">{item.description || 'No Description'}</h4>
+                                    {item.deferral?.limitations && (
                                         <div className="mt-2 bg-amber-100/50 p-2 rounded text-xs">
                                             <span className="font-bold text-amber-800">LIMITATIONS:</span>
-                                            <ul className="list-disc list-inside mt-1 text-amber-900">
-                                                {item.deferral.operationalLimitations.map((lim, idx) => (
-                                                    <li key={idx}>{lim}</li>
-                                                ))}
-                                            </ul>
+                                            <p className="mt-1 text-amber-900">{item.deferral.limitations}</p>
                                         </div>
                                     )}
                                 </div>
