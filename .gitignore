@@ -29,3 +29,11 @@ fix-sonner-imports.ps1
 # Claude Code worktrees
 .claude/worktrees/
 .superpowers/
+.claude/settings.json
+.claude/launch.json
+
+# Obsidian vault config
+.obsidian/
+
+# Superpowers plan docs
+docs/superpowers/
