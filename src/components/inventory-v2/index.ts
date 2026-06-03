@@ -21,3 +21,6 @@ export { default as GroceryListPage } from './pages/GroceryListPage';
 export { default as LegReconciliation } from './pages/LegReconciliation';
 export { default as ItemManager } from './pages/ItemManager';
 export { default as CommissaryKiosk } from './pages/CommissaryKiosk';
+
+// Shared components
+export { default as QuickTapView } from './shared/QuickTapView';

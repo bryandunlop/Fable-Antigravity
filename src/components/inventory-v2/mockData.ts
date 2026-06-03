@@ -30,6 +30,8 @@ function itemV2(
   costPerUnit: number,
   vendorItemNumber?: string,
   internalItemNumber?: string,
+  isConsumable?: boolean,
+  posCategory?: string,
 ): InventoryItemV2 {
   const id = String(_id++);
   const dq: Partial<Record<'G650' | 'G500', number>> = {};
@@ -54,6 +56,8 @@ function itemV2(
     needsReplenishment: false,
     priority: 'medium',
     alternateNames: [],
+    ...(isConsumable !== undefined && { isConsumable }),
+    ...(posCategory !== undefined && { posCategory }),
   };
 }
 
@@ -66,357 +70,357 @@ export const ITEMS_V2: InventoryItemV2[] = [
 
   // ── Beverages ──────────────────────────────────────────────────────────────
   // ID 1
-  itemV2('Perrier 330ml', 'Sparkling Water', 'beverages', 'aft-galley', 'Galley Right', 'ea', 8, 8, 2.50),
+  itemV2('Perrier 330ml', 'Sparkling Water', 'beverages', 'aft-galley', 'Galley Right', 'ea', 8, 8, 2.50, undefined, undefined, true, 'cold-drinks'),
   // ID 2
-  itemV2('Coca-Cola', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50),
+  itemV2('Coca-Cola', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50, undefined, undefined, true, 'cold-drinks'),
   // ID 3
-  itemV2('Coke Zero', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50),
+  itemV2('Coke Zero', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50, undefined, undefined, true, 'cold-drinks'),
   // ID 4
-  itemV2('Diet Coke', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50),
+  itemV2('Diet Coke', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50, undefined, undefined, true, 'cold-drinks'),
   // ID 5
-  itemV2('Sprite', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50),
+  itemV2('Sprite', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50, undefined, undefined, true, 'cold-drinks'),
   // ID 6
-  itemV2('Grape Propel', 'Sports Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 5, 5, 2.00),
+  itemV2('Grape Propel', 'Sports Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 5, 5, 2.00, undefined, undefined, true, 'cold-drinks'),
   // ID 7
-  itemV2('Small Water Bottles', 'Water', 'beverages', 'baggage', 'Galley Closet', 'case', 1, 1, 18.00),
+  itemV2('Small Water Bottles', 'Water', 'beverages', 'baggage', 'Galley Closet', 'case', 1, 1, 18.00, undefined, undefined, true, 'cold-drinks'),
   // ID 8
-  itemV2('Liter Water Bottles', 'Water', 'beverages', 'baggage', 'Lower Cabinet', 'ea', 8, 8, 3.00),
+  itemV2('Liter Water Bottles', 'Water', 'beverages', 'baggage', 'Lower Cabinet', 'ea', 8, 8, 3.00, undefined, undefined, true, 'cold-drinks'),
   // ID 9
-  itemV2('Oat Milk', 'Milk', 'beverages', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 4.50),
+  itemV2('Oat Milk', 'Milk', 'beverages', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 4.50, undefined, undefined, true, 'cold-drinks'),
 
   // ── Coffee ─────────────────────────────────────────────────────────────────
   // ID 10
-  itemV2('Nespresso Pods', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'sleeve', 4, 3, 8.00),
+  itemV2('Nespresso Pods', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'sleeve', 4, 3, 8.00, undefined, undefined, true, 'hot-drinks'),
   // ID 11
-  itemV2('Regular Coffee', 'Coffee', 'coffee', 'aft-galley', 'Galley Right', 'bag', 2, 2, 12.00),
+  itemV2('Regular Coffee', 'Coffee', 'coffee', 'aft-galley', 'Galley Right', 'bag', 2, 2, 12.00, undefined, undefined, true, 'hot-drinks'),
   // ID 12
-  itemV2('Decaf Via', 'Coffee', 'coffee', 'aft-galley', 'Galley Right', 'box', 10, 10, 2.00),
+  itemV2('Decaf Via', 'Coffee', 'coffee', 'aft-galley', 'Galley Right', 'box', 10, 10, 2.00, undefined, undefined, true, 'hot-drinks'),
   // ID 13
-  itemV2('Coffee Filters', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'box', 1, 1, 3.00),
+  itemV2('Coffee Filters', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'box', 1, 1, 3.00, undefined, undefined, true, 'hot-drinks'),
 
   // ── Tea ────────────────────────────────────────────────────────────────────
   // ID 14
-  itemV2('Green Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  itemV2('Green Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
   // ID 15
-  itemV2('Mint Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  itemV2('Mint Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
   // ID 16
-  itemV2('English Breakfast Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  itemV2('English Breakfast Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
   // ID 17
-  itemV2('Earl Grey Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  itemV2('Earl Grey Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
   // ID 18
-  itemV2('Chamomile Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00),
+  itemV2('Chamomile Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
   // ID 19
-  itemV2('Stir Sticks', 'Accessory', 'coffee', 'fwd-galley', 'Galley Left', 'box', 1, 1, 3.00),
+  itemV2('Stir Sticks', 'Accessory', 'coffee', 'fwd-galley', 'Galley Left', 'box', 1, 1, 3.00, undefined, undefined, true, 'hot-drinks'),
 
   // ── Sweeteners ─────────────────────────────────────────────────────────────
   // ID 20
-  itemV2('White Sugar Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00),
+  itemV2('White Sugar Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00, undefined, undefined, true, 'hot-drinks'),
   // ID 21
-  itemV2('Sugar in the Raw Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00),
+  itemV2('Sugar in the Raw Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00, undefined, undefined, true, 'hot-drinks'),
   // ID 22
-  itemV2('Sweet N Low Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 3.50),
+  itemV2('Sweet N Low Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 3.50, undefined, undefined, true, 'hot-drinks'),
   // ID 23
-  itemV2('Stevia Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.50),
+  itemV2('Stevia Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.50, undefined, undefined, true, 'hot-drinks'),
   // ID 24
-  itemV2('Splenda Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00),
+  itemV2('Splenda Packets', 'Sweetener', 'sweetener', 'fwd-galley', 'Galley Left', 'box', 12, 12, 4.00, undefined, undefined, true, 'hot-drinks'),
 
   // ── Medicine ───────────────────────────────────────────────────────────────
   // ID 25
-  itemV2('Advil', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.00),
+  itemV2('Advil', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 26
-  itemV2('Tylenol', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 5.50),
+  itemV2('Tylenol', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 5.50, undefined, undefined, true, 'medicine-amenities'),
   // ID 27
-  itemV2('Pepto Bismol', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 5.00),
+  itemV2('Pepto Bismol', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 5.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 28
-  itemV2('Benadryl', 'Allergy', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.50),
+  itemV2('Benadryl', 'Allergy', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.50, undefined, undefined, true, 'medicine-amenities'),
   // ID 29
-  itemV2('Cough Drops', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 4.00),
+  itemV2('Cough Drops', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 4.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 30
-  itemV2('Band-Aids', 'First Aid', 'first-aid', 'fwd-lav', 'Lav Cabinet', 'box', 1, 1, 5.00),
+  itemV2('Band-Aids', 'First Aid', 'first-aid', 'fwd-lav', 'Lav Cabinet', 'box', 1, 1, 5.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 31  (G650 only)
-  itemV2('Dramamine', 'Motion Sickness', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, null, 5.00),
+  itemV2('Dramamine', 'Motion Sickness', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, null, 5.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 32  (G650 only)
-  itemV2('Imodium', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, null, 8.00),
+  itemV2('Imodium', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, null, 8.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 33  (G650 only)
-  itemV2('Visine', 'Eye Care', 'medicine', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 7.00),
+  itemV2('Visine', 'Eye Care', 'medicine', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 7.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 34  (G650 only)
-  itemV2('Alka Seltzer', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 5.00),
+  itemV2('Alka Seltzer', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 5.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 35  (G650 only)
-  itemV2('DayQuil', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 7.00),
+  itemV2('DayQuil', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 7.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 36  (G650 only)
-  itemV2('NyQuil', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 2, null, 7.00),
+  itemV2('NyQuil', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 2, null, 7.00, undefined, undefined, true, 'medicine-amenities'),
 
   // ── Toiletries — Forward Lav ───────────────────────────────────────────────
   // ID 37
-  itemV2('Toothbrush', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 2.50),
+  itemV2('Toothbrush', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 2.50, undefined, undefined, true, 'medicine-amenities'),
   // ID 38
-  itemV2('Toothpaste', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 3.00),
+  itemV2('Toothpaste', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 3.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 39
-  itemV2('Scope Mouthwash', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 3.50),
+  itemV2('Scope Mouthwash', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'ea', 3, 3, 3.50, undefined, undefined, true, 'medicine-amenities'),
   // ID 40
-  itemV2('Flossers', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 3.00),
+  itemV2('Flossers', 'Dental', 'toiletries', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 3.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 41
-  itemV2('Safeguard Hand Soap', 'Soap', 'toiletries', 'fwd-lav', 'Lav Counter', 'bottle', 1, 1, 5.00),
+  itemV2('Safeguard Hand Soap', 'Soap', 'toiletries', 'fwd-lav', 'Lav Counter', 'bottle', 1, 1, 5.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 42
-  itemV2('Pads and Tampons', 'Feminine Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 8.00),
+  itemV2('Pads and Tampons', 'Feminine Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 8.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 43
-  itemV2('Static Guard', 'Personal Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 1, 1, 5.00),
+  itemV2('Static Guard', 'Personal Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 1, 1, 5.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 44
-  itemV2('Hot Towels', 'Amenity', 'linens', 'fwd-lav', 'Lav Counter', 'pkg', 5, 4, 8.00),
+  itemV2('Hot Towels', 'Amenity', 'linens', 'fwd-lav', 'Lav Counter', 'pkg', 5, 4, 8.00, undefined, undefined, true, 'paper-supplies'),
   // ID 45
-  itemV2('Toilet Paper', 'Paper', 'paper-goods', 'fwd-lav', 'Lav Cabinet', 'roll', 3, 2, 2.00),
+  itemV2('Toilet Paper', 'Paper', 'paper-goods', 'fwd-lav', 'Lav Cabinet', 'roll', 3, 2, 2.00, undefined, undefined, true, 'paper-supplies'),
   // ID 46
-  itemV2('Square Puffs Box', 'Tissue', 'paper-goods', 'fwd-lav', 'Lav Counter', 'box', 1, 1, 4.00),
+  itemV2('Square Puffs Box', 'Tissue', 'paper-goods', 'fwd-lav', 'Lav Counter', 'box', 1, 1, 4.00, undefined, undefined, true, 'paper-supplies'),
   // ID 47
-  itemV2('Paper Hand Towels', 'Paper', 'paper-goods', 'fwd-lav', 'Lav Counter', 'pkg', 2, 1, 3.50),
+  itemV2('Paper Hand Towels', 'Paper', 'paper-goods', 'fwd-lav', 'Lav Counter', 'pkg', 2, 1, 3.50, undefined, undefined, true, 'paper-supplies'),
   // ID 48
-  itemV2('Febreze', 'Freshener', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'bottle', 1, 1, 6.00),
+  itemV2('Febreze', 'Freshener', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'bottle', 1, 1, 6.00, undefined, undefined, true, 'cleaning'),
   // ID 49
-  itemV2('Hand Sanitizer', 'Sanitizer', 'self-care', 'fwd-lav', 'Lav Counter', 'bottle', 1, 1, 4.00),
+  itemV2('Hand Sanitizer', 'Sanitizer', 'self-care', 'fwd-lav', 'Lav Counter', 'bottle', 1, 1, 4.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 50
-  itemV2('Celeste Wipes', 'Wipes', 'cleaning-supplies', 'fwd-lav', 'Lav Counter', 'pkg', 1, 1, 7.00),
+  itemV2('Celeste Wipes', 'Wipes', 'cleaning-supplies', 'fwd-lav', 'Lav Counter', 'pkg', 1, 1, 7.00, undefined, undefined, true, 'cleaning'),
   // ID 51  (G650 only)
-  itemV2('Lint Roller', 'Personal Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 4.00),
+  itemV2('Lint Roller', 'Personal Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 4.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 52  (G650 only)
-  itemV2('Hand Lotion', 'Skincare', 'self-care', 'fwd-lav', 'Lav Counter', 'ea', 1, null, 6.00),
+  itemV2('Hand Lotion', 'Skincare', 'self-care', 'fwd-lav', 'Lav Counter', 'ea', 1, null, 6.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 53  (G650 only)
-  itemV2('Tide to Go Wipes', 'Stain Remover', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 4.00),
+  itemV2('Tide to Go Wipes', 'Stain Remover', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, null, 4.00, undefined, undefined, true, 'cleaning'),
   // ID 54  (G650 only)
-  itemV2('Tide Pen', 'Stain Remover', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 4.00),
+  itemV2('Tide Pen', 'Stain Remover', 'cleaning-supplies', 'fwd-lav', 'Lav Cabinet', 'ea', 1, null, 4.00, undefined, undefined, true, 'cleaning'),
   // ID 55  (G650 only)
-  itemV2('Chapstick', 'Lip Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 2, null, 3.00),
+  itemV2('Chapstick', 'Lip Care', 'self-care', 'fwd-lav', 'Lav Cabinet', 'ea', 2, null, 3.00, undefined, undefined, true, 'medicine-amenities'),
 
   // ── Toiletries — Aft Lav (G650 only) ──────────────────────────────────────
   // ID 56
-  itemV2('Shaving Cream', 'Shaving', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 4.00),
+  itemV2('Shaving Cream', 'Shaving', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 4.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 57
-  itemV2('Disposable Razors', 'Shaving', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.00),
+  itemV2('Disposable Razors', 'Shaving', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 58
-  itemV2('Scope Mouthwash — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 3.50),
+  itemV2('Scope Mouthwash — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 3.50, undefined, undefined, true, 'medicine-amenities'),
   // ID 59
-  itemV2('Toothbrush — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.50),
+  itemV2('Toothbrush — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.50, undefined, undefined, true, 'medicine-amenities'),
   // ID 60
-  itemV2('Toothpaste — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 3.00),
+  itemV2('Toothpaste — Aft', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 3.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 61
-  itemV2('Mini Toothbrushes', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.00),
+  itemV2('Mini Toothbrushes', 'Dental', 'toiletries', 'aft-lav', 'Lav Cabinet', 'ea', 4, null, 2.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 62
-  itemV2('Safeguard Hand Soap — Aft', 'Soap', 'toiletries', 'aft-lav', 'Lav Counter', 'bottle', 1, null, 5.00),
+  itemV2('Safeguard Hand Soap — Aft', 'Soap', 'toiletries', 'aft-lav', 'Lav Counter', 'bottle', 1, null, 5.00, undefined, undefined, true, 'medicine-amenities'),
 
   // ── Cleaning Supplies — Galley ─────────────────────────────────────────────
   // ID 63
-  itemV2('Leather Wipes', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 8.00),
+  itemV2('Leather Wipes', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 8.00, undefined, undefined, true, 'cleaning'),
   // ID 64
-  itemV2('Wine Away', 'Stain Remover', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 10.00),
+  itemV2('Wine Away', 'Stain Remover', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 10.00, undefined, undefined, true, 'cleaning'),
   // ID 65
-  itemV2('Disinfecting Wipes', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 5.00),
+  itemV2('Disinfecting Wipes', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 5.00, undefined, undefined, true, 'cleaning'),
   // ID 66
-  itemV2('Dust Cleaning Gel', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00),
+  itemV2('Dust Cleaning Gel', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00, undefined, undefined, true, 'cleaning'),
   // ID 67
-  itemV2('Tide Rescue', 'Stain Remover', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 12.00),
+  itemV2('Tide Rescue', 'Stain Remover', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 12.00, undefined, undefined, true, 'cleaning'),
   // ID 68
-  itemV2('Alcohol Spray', 'Sanitizer', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 6.00),
+  itemV2('Alcohol Spray', 'Sanitizer', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 6.00, undefined, undefined, true, 'cleaning'),
   // ID 69
-  itemV2('Microfiber Cloths', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 2, 5.00),
+  itemV2('Microfiber Cloths', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 2, 5.00, undefined, undefined, true, 'cleaning'),
   // ID 70
-  itemV2('Paper Towel Rolls', 'Paper', 'paper-goods', 'fwd-galley', 'Galley Left', 'roll', 2, 2, 3.50),
+  itemV2('Paper Towel Rolls', 'Paper', 'paper-goods', 'fwd-galley', 'Galley Left', 'roll', 2, 2, 3.50, undefined, undefined, true, 'paper-supplies'),
   // ID 71
-  itemV2('Dish Soap', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 4.00),
+  itemV2('Dish Soap', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 4.00, undefined, undefined, true, 'cleaning'),
   // ID 72
-  itemV2('Sponges', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 3.00),
+  itemV2('Sponges', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 3.00, undefined, undefined, true, 'cleaning'),
   // ID 73
-  itemV2('Dish Gloves', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'pair', 1, 1, 4.00),
+  itemV2('Dish Gloves', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'pair', 1, 1, 4.00, undefined, undefined, true, 'cleaning'),
   // ID 74
-  itemV2('Black Trash Bags', 'Waste', 'cleaning-supplies', 'aft-galley', 'Under Counter', 'roll', 10, 10, 6.00),
+  itemV2('Black Trash Bags', 'Waste', 'cleaning-supplies', 'aft-galley', 'Under Counter', 'roll', 10, 10, 6.00, undefined, undefined, true, 'cleaning'),
   // ID 75
-  itemV2('Orange Trash Bags', 'Waste', 'cleaning-supplies', 'aft-galley', 'Under Counter', 'roll', 2, 2, 4.00),
+  itemV2('Orange Trash Bags', 'Waste', 'cleaning-supplies', 'aft-galley', 'Under Counter', 'roll', 2, 2, 4.00, undefined, undefined, true, 'cleaning'),
   // ID 76
-  itemV2('Small Trash Bag Roll', 'Waste', 'cleaning-supplies', 'fwd-lav', 'Under Trash Can', 'roll', 1, 1, 3.50),
+  itemV2('Small Trash Bag Roll', 'Waste', 'cleaning-supplies', 'fwd-lav', 'Under Trash Can', 'roll', 1, 1, 3.50, undefined, undefined, true, 'cleaning'),
 
   // ── Kitchen Tools ──────────────────────────────────────────────────────────
   // ID 77
-  itemV2('Wine Opener', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 15.00),
+  itemV2('Wine Opener', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 15.00, undefined, undefined, false),
   // ID 78
-  itemV2('Wine Key', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 12.00),
+  itemV2('Wine Key', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 12.00, undefined, undefined, false),
   // ID 79
-  itemV2('Wine Stoppers', 'Accessory', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 4, 4, 8.00),
+  itemV2('Wine Stoppers', 'Accessory', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 4, 4, 8.00, undefined, undefined, false),
   // ID 80
-  itemV2('Can Opener', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00),
+  itemV2('Can Opener', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00, undefined, undefined, false),
   // ID 81
-  itemV2('Vegetable Peeler', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 6.00),
+  itemV2('Vegetable Peeler', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 6.00, undefined, undefined, false),
   // ID 82
-  itemV2('Mandolin Slicer', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 35.00),
+  itemV2('Mandolin Slicer', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 35.00, undefined, undefined, false),
   // ID 83
-  itemV2('Kitchen Shears', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 12.00),
+  itemV2('Kitchen Shears', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 12.00, undefined, undefined, false),
   // ID 84
-  itemV2('Whisk', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00),
+  itemV2('Whisk', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00, undefined, undefined, false),
   // ID 85
-  itemV2('Liquid Measuring Cup', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 10.00),
+  itemV2('Liquid Measuring Cup', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 10.00, undefined, undefined, false),
   // ID 86
-  itemV2('Cooking Spatulas', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 8.00),
+  itemV2('Cooking Spatulas', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 8.00, undefined, undefined, false),
   // ID 87
-  itemV2('Cooking Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 3, 1, 8.00),
+  itemV2('Cooking Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 3, 1, 8.00, undefined, undefined, false),
   // ID 88
-  itemV2('Serving Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 4, 6.00),
+  itemV2('Serving Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 4, 6.00, undefined, undefined, false),
   // ID 89
-  itemV2('Small Serving Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, 1, 5.00),
+  itemV2('Small Serving Tongs', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, 1, 5.00, undefined, undefined, false),
   // ID 90
-  itemV2('Cheese Knives Set', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 4, 1, 20.00),
+  itemV2('Cheese Knives Set', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 4, 1, 20.00, undefined, undefined, false),
   // ID 91
-  itemV2('Serving Spoons', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 4, 1, 6.00),
+  itemV2('Serving Spoons', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 4, 1, 6.00, undefined, undefined, false),
   // ID 92
-  itemV2('Serving Fork', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 6.00),
+  itemV2('Serving Fork', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 6.00, undefined, undefined, false),
   // ID 93
-  itemV2('Kitchen Knives Set', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 3, 1, 45.00),
+  itemV2('Kitchen Knives Set', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'set', 3, 1, 45.00, undefined, undefined, false),
   // ID 94  (G650 only)
-  itemV2('Demitasse Spoons', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, null, 4.00),
+  itemV2('Demitasse Spoons', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, null, 4.00, undefined, undefined, false),
   // ID 95  (G650 only)
-  itemV2('Meat Thermometer', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, null, 15.00),
+  itemV2('Meat Thermometer', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, null, 15.00, undefined, undefined, false),
   // ID 96
-  itemV2('Hot Pads', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 2, 6.00),
+  itemV2('Hot Pads', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 2, 6.00, undefined, undefined, false),
   // ID 97
-  itemV2('Mini Silicone Oven Mitts', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 2, 8.00),
+  itemV2('Mini Silicone Oven Mitts', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 2, 8.00, undefined, undefined, false),
   // ID 98  (G650 only)
-  itemV2('Oven Mitts', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, null, 10.00),
+  itemV2('Oven Mitts', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, null, 10.00, undefined, undefined, false),
   // ID 99
-  itemV2('Baking Sheets', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 4, 4, 12.00),
+  itemV2('Baking Sheets', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 4, 4, 12.00, undefined, undefined, false),
   // ID 100
-  itemV2('Cutting Boards', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 1, 15.00),
+  itemV2('Cutting Boards', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 2, 1, 15.00, undefined, undefined, false),
   // ID 101
-  itemV2('Collapsible Dish Tub', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 12.00),
+  itemV2('Collapsible Dish Tub', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 12.00, undefined, undefined, false),
 
   // ── Silverware ─────────────────────────────────────────────────────────────
   // ID 102
-  itemV2('Dinner Forks', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00),
+  itemV2('Dinner Forks', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00, undefined, undefined, false),
   // ID 103
-  itemV2('Salad Forks', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00),
+  itemV2('Salad Forks', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00, undefined, undefined, false),
   // ID 104
-  itemV2('Dinner Knives', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00),
+  itemV2('Dinner Knives', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 8.00, undefined, undefined, false),
   // ID 105  (G650 only)
-  itemV2('Steak Knives', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 10.00),
+  itemV2('Steak Knives', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 10.00, undefined, undefined, false),
   // ID 106
-  itemV2('Teaspoons', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 6.00),
+  itemV2('Teaspoons', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 6.00, undefined, undefined, false),
   // ID 107
-  itemV2('Soup Spoons', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 6.00),
+  itemV2('Soup Spoons', 'Silverware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, 12, 6.00, undefined, undefined, false),
 
   // ── Dishware ───────────────────────────────────────────────────────────────
   // ID 108  (G650 only — G500 uses bamboo)
-  itemV2('Dinner Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 25.00),
+  itemV2('Dinner Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 25.00, undefined, undefined, false),
   // ID 109  (G650 only)
-  itemV2('Salad Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 20.00),
+  itemV2('Salad Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 20.00, undefined, undefined, false),
   // ID 110  (G650 only)
-  itemV2('Bread Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 18.00),
+  itemV2('Bread Plates', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 18.00, undefined, undefined, false),
   // ID 111  (G650 only)
-  itemV2('Dinner Bowls', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 20.00),
+  itemV2('Dinner Bowls', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 14, null, 20.00, undefined, undefined, false),
   // ID 112
-  itemV2('Silver Ramekins', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, 12, 8.00),
+  itemV2('Silver Ramekins', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 6, 12, 8.00, undefined, undefined, false),
   // ID 113
-  itemV2('Large Bamboo Plates', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 12.00),
+  itemV2('Large Bamboo Plates', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 12.00, undefined, undefined, false),
   // ID 114
-  itemV2('Small Bamboo Plates', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 10.00),
+  itemV2('Small Bamboo Plates', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 10.00, undefined, undefined, false),
   // ID 115
-  itemV2('Bamboo Bowls', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 10.00),
+  itemV2('Bamboo Bowls', 'Dishware', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 6, 11, 10.00, undefined, undefined, false),
   // ID 116  (G500 only — in red box)
-  itemV2('Wine Glasses', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Left Galley Closet', 'ea', null, 3, 30.00),
+  itemV2('Wine Glasses', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Left Galley Closet', 'ea', null, 3, 30.00, undefined, undefined, false),
   // ID 117
-  itemV2('Espresso Cups', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 4, 4, 15.00),
+  itemV2('Espresso Cups', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 4, 4, 15.00, undefined, undefined, false),
   // ID 118  (G500 only)
-  itemV2('Espresso Saucers', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', null, 4, 12.00),
+  itemV2('Espresso Saucers', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', null, 4, 12.00, undefined, undefined, false),
   // ID 119
-  itemV2('Pitchers', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 15.00),
+  itemV2('Pitchers', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 1, 15.00, undefined, undefined, false),
   // ID 120  (G650 only)
-  itemV2('Placemats', 'Linen', 'linens', 'fwd-galley', 'Galley Left', 'ea', 15, null, 8.00),
+  itemV2('Placemats', 'Linen', 'linens', 'fwd-galley', 'Galley Left', 'ea', 15, null, 8.00, undefined, undefined, false),
   // ID 121
-  itemV2('Crew Trays', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 3, 3, 20.00),
+  itemV2('Crew Trays', 'Tool', 'kitchen-supplies', 'fwd-galley', 'Galley Left', 'ea', 3, 3, 20.00, undefined, undefined, false),
   // ID 122
-  itemV2('Large Silver Tray', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 35.00),
+  itemV2('Large Silver Tray', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 35.00, undefined, undefined, false),
   // ID 123
-  itemV2('Small Silver Tray', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 25.00),
+  itemV2('Small Silver Tray', 'Tool', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 25.00, undefined, undefined, false),
 
   // ── Napkins / Paper Goods ──────────────────────────────────────────────────
   // ID 124
-  itemV2('Cocktail Napkins', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, 1, 5.00),
+  itemV2('Cocktail Napkins', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, 1, 5.00, undefined, undefined, true, 'paper-supplies'),
   // ID 125
-  itemV2('Paper Dinner Napkins', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, 1, 5.00),
+  itemV2('Paper Dinner Napkins', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, 1, 5.00, undefined, undefined, true, 'paper-supplies'),
   // ID 126  (G500 only)
-  itemV2('Linen Napkins', 'Napkin', 'linens', 'credenza', 'Credenza Drawer', 'ea', null, 11, 8.00),
+  itemV2('Linen Napkins', 'Napkin', 'linens', 'credenza', 'Credenza Drawer', 'ea', null, 11, 8.00, undefined, undefined, true, 'paper-supplies'),
   // ID 127
-  itemV2('My Drap Roll', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 12.00),
+  itemV2('My Drap Roll', 'Napkin', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 12.00, undefined, undefined, true, 'paper-supplies'),
   // ID 128
-  itemV2('Disposable Hot Beverage Cups', 'Cup', 'paper-goods', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 6.00),
+  itemV2('Disposable Hot Beverage Cups', 'Cup', 'paper-goods', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 6.00, undefined, undefined, true, 'paper-supplies'),
   // ID 129
-  itemV2('Hot Beverage Cup Lids', 'Cup', 'paper-goods', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 4.00),
+  itemV2('Hot Beverage Cup Lids', 'Cup', 'paper-goods', 'fwd-galley', 'Galley Left', 'pkg', 1, 1, 4.00, undefined, undefined, true, 'paper-supplies'),
   // ID 130  (G650 only)
-  itemV2('Frosted Disposable Cups', 'Cup', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, null, 5.00),
+  itemV2('Frosted Disposable Cups', 'Cup', 'paper-goods', 'aft-galley', 'Galley Right', 'pkg', 1, null, 5.00, undefined, undefined, true, 'paper-supplies'),
 
   // ── Food Storage / Prep ────────────────────────────────────────────────────
   // ID 131
-  itemV2('Gallon Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 4.50),
+  itemV2('Gallon Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 4.50, undefined, undefined, true, 'paper-supplies'),
   // ID 132
-  itemV2('Quart Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 3.50),
+  itemV2('Quart Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 3.50, undefined, undefined, true, 'paper-supplies'),
   // ID 133
-  itemV2('Jumbo Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 5.00),
+  itemV2('Jumbo Slider Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'box', 1, 1, 5.00, undefined, undefined, true, 'paper-supplies'),
   // ID 134
-  itemV2('Microwave Cooking Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'ea', 4, 4, 2.00),
+  itemV2('Microwave Cooking Bags', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'ea', 4, 4, 2.00, undefined, undefined, true, 'paper-supplies'),
   // ID 135
-  itemV2('Food Gloves', 'Food Safety', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'box', 1, 1, 5.00),
+  itemV2('Food Gloves', 'Food Safety', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'box', 1, 1, 5.00, undefined, undefined, true, 'paper-supplies'),
   // ID 136
-  itemV2('Parchment Paper', 'Baking', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 5.00),
+  itemV2('Parchment Paper', 'Baking', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 5.00, undefined, undefined, true, 'paper-supplies'),
   // ID 137
-  itemV2('Press n Seal', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 5.00),
+  itemV2('Press n Seal', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 5.00, undefined, undefined, true, 'paper-supplies'),
   // ID 138
-  itemV2('Nonstick Aluminum Foil', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 4.50),
+  itemV2('Nonstick Aluminum Foil', 'Storage', 'paper-goods', 'aft-galley', 'Galley Right', 'roll', 1, 1, 4.50, undefined, undefined, true, 'paper-supplies'),
 
   // ── Condiments ─────────────────────────────────────────────────────────────
   // ID 139
-  itemV2('Olive Oil', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 8.00),
+  itemV2('Olive Oil', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 8.00, undefined, undefined, true, 'snacks'),
   // ID 140
-  itemV2('Tabasco', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 4.00),
+  itemV2('Tabasco', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 4.00, undefined, undefined, true, 'snacks'),
   // ID 141
-  itemV2('Soy Sauce', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 4.50),
+  itemV2('Soy Sauce', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 4.50, undefined, undefined, true, 'snacks'),
   // ID 142
-  itemV2('Honey', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 6.00),
+  itemV2('Honey', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 6.00, undefined, undefined, true, 'snacks'),
   // ID 143
-  itemV2('Balsamic Vinegar', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 8.00),
+  itemV2('Balsamic Vinegar', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'bottle', 1, 1, 8.00, undefined, undefined, true, 'snacks'),
   // ID 144
-  itemV2('Red Chili Flakes', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 4.00),
+  itemV2('Red Chili Flakes', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'ea', 1, 1, 4.00, undefined, undefined, true, 'snacks'),
   // ID 145
-  itemV2('Salt and Pepper Grinders', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'set', 4, 6, 12.00),
+  itemV2('Salt and Pepper Grinders', 'Condiment', 'kitchen-supplies', 'aft-galley', 'Galley Right', 'set', 4, 6, 12.00, undefined, undefined, true, 'snacks'),
 
   // ── Safety / Operational ───────────────────────────────────────────────────
   // ID 146
-  itemV2('Yellow Safety Vests', 'Safety', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 2, 2, 20.00),
+  itemV2('Yellow Safety Vests', 'Safety', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 2, 2, 20.00, undefined, undefined, false),
   // ID 147
-  itemV2('Headsets', 'Equipment', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 1, 2, 50.00),
+  itemV2('Headsets', 'Equipment', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 1, 2, 50.00, undefined, undefined, false),
   // ID 148  (G650 only)
-  itemV2('Ear Protection', 'Safety', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 1, null, 8.00),
+  itemV2('Ear Protection', 'Safety', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', 1, null, 8.00, undefined, undefined, false),
   // ID 149  (G500 only)
-  itemV2('Gear Pins Bag', 'Equipment', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', null, 1, 25.00),
+  itemV2('Gear Pins Bag', 'Equipment', 'miscellaneous', 'baggage', 'Right Galley Closet', 'ea', null, 1, 25.00, undefined, undefined, false),
 
   // ── Office / Miscellaneous ─────────────────────────────────────────────────
   // ID 150
-  itemV2('Post It Notes', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 1, 2, 4.00),
+  itemV2('Post It Notes', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 1, 2, 4.00, undefined, undefined, false),
   // ID 151
-  itemV2('Black Pens', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 4, 4, 1.00),
+  itemV2('Black Pens', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 4, 4, 1.00, undefined, undefined, false),
   // ID 152
-  itemV2('Sharpie', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 1, 1, 2.00),
+  itemV2('Sharpie', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', 1, 1, 2.00, undefined, undefined, false),
   // ID 153  (G500 only)
-  itemV2('Printer Paper', 'Office', 'paper-goods', 'credenza', 'Credenza Shelf', 'pkg', null, 1, 8.00),
+  itemV2('Printer Paper', 'Office', 'paper-goods', 'credenza', 'Credenza Shelf', 'pkg', null, 1, 8.00, undefined, undefined, true, 'paper-supplies'),
   // ID 154  (G500 only)
-  itemV2('Scissors', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 1, 8.00),
+  itemV2('Scissors', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 1, 8.00, undefined, undefined, false),
   // ID 155  (G500 only)
-  itemV2('Scotch Tape', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 1, 3.00),
+  itemV2('Scotch Tape', 'Office', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 1, 3.00, undefined, undefined, false),
   // ID 156  (G500 only)
-  itemV2('Playing Cards', 'Entertainment', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 2, 5.00),
+  itemV2('Playing Cards', 'Entertainment', 'miscellaneous', 'credenza', 'Credenza Drawer', 'ea', null, 2, 5.00, undefined, undefined, false),
   // ID 157  (G500 only)
-  itemV2('Batteries', 'Equipment', 'miscellaneous', 'credenza', 'Credenza Shelf', 'pkg', null, 1, 8.00),
+  itemV2('Batteries', 'Equipment', 'miscellaneous', 'credenza', 'Credenza Shelf', 'pkg', null, 1, 8.00, undefined, undefined, false),
   // ID 158  (G500 only)
-  itemV2('Creamer Pitcher', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Cabinets', 'ea', null, 1, 15.00),
+  itemV2('Creamer Pitcher', 'Dishware', 'kitchen-supplies', 'fwd-galley', 'Galley Cabinets', 'ea', null, 1, 15.00, undefined, undefined, false),
   // ID 159  (G500 only)
-  itemV2('Wine Holders (3D Printed)', 'Accessory', 'miscellaneous', 'credenza', 'Credenza', 'ea', null, 2, 15.00),
+  itemV2('Wine Holders (3D Printed)', 'Accessory', 'miscellaneous', 'credenza', 'Credenza', 'ea', null, 2, 15.00, undefined, undefined, false),
 
   // ── Snacks ─────────────────────────────────────────────────────────────────
   // ID 160
-  itemV2('Snack Assortment', 'Snacks', 'snacks', 'aft-galley', 'Galley Right', 'ea', 1, 1, 25.00),
+  itemV2('Snack Assortment', 'Snacks', 'snacks', 'aft-galley', 'Galley Right', 'ea', 1, 1, 25.00, undefined, undefined, true, 'snacks'),
 ];
 
 // ─── Stockrooms ─────────────────────────────────────────────────────────────

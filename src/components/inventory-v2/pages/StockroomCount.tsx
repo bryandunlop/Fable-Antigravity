@@ -89,13 +89,13 @@ export default function StockroomCount() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <Warehouse className="w-6 h-6 text-purple-500" />
+          <Warehouse className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold">Stockroom Count</h1>
           <V2Badge />
         </div>
         <Button
           onClick={() => setBulkAdjustOpen(true)}
-          className="bg-purple-500 hover:bg-purple-600 text-white"
+          className="btn-aviation-primary"
         >
           <Layers className="w-4 h-4 mr-1" /> Bulk Adjust
         </Button>
