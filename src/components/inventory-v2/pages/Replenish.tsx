@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -9,8 +10,8 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { V2Badge } from '../shared/V2Badge';
 import { BarcodeScannerDialog } from '../shared/BarcodeScannerDialog';
 import { toast } from 'sonner';
-import { PackagePlus, ChevronDown, Camera } from 'lucide-react';
-import type { PickListItem, RestockListItem } from '../types';
+import { PackagePlus, ChevronDown, Camera, ArrowDown, ArrowUp } from 'lucide-react';
+import type { PickListItem, RestockListItem, TripReturnItem, StockroomItem } from '../types';
 
 export default function Replenish() {
   const { state, dispatch } = useInventoryV2();
@@ -19,6 +20,69 @@ export default function Replenish() {
   const [localRestockItems, setLocalRestockItems] = useState<RestockListItem[]>(state.restockListItems);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [scannerOpen, setScannerOpen] = useState(false);
+
+  const [searchParams] = useSearchParams();
+  const tailParam = searchParams.get('tail');
+
+  // Find most recently completed trip for this tail that hasn't been returned yet
+  const tripForBaseline = useMemo(() => {
+    if (!tailParam) return null;
+    return (
+      state.trips
+        .filter(t => t.tailNumber === tailParam && t.status === 'completed' && t.returnItems.length === 0)
+        .sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''))
+        [0] ?? null
+    );
+  }, [state.trips, tailParam]);
+
+  // Compute per-item aircraft qty from trip data
+  const baselineItems = useMemo(() => {
+    if (!tripForBaseline) return [];
+
+    type BaselineRow = {
+      itemId: string;
+      par: number;
+      aircraftQty: number;
+      pullQty: number;
+      returnQty: number;
+    };
+
+    const rows: BaselineRow[] = [];
+    const touchedItemIds = new Set<string>();
+
+    tripForBaseline.loadItems.forEach(li => touchedItemIds.add(li.itemId));
+    tripForBaseline.legs.forEach(leg =>
+      leg.usageLog.forEach(e => touchedItemIds.add(e.itemId))
+    );
+
+    touchedItemIds.forEach(itemId => {
+      const item = state.items.find(i => i.id === itemId);
+      if (!item) return;
+      const par = item.defaultQuantities[tripForBaseline.aircraftType] ?? 0;
+      const loadTotal = tripForBaseline.loadItems
+        .filter(li => li.itemId === itemId)
+        .reduce((sum, li) => sum + li.qty, 0);
+      const usageTotal = tripForBaseline.legs
+        .flatMap(l => l.usageLog)
+        .filter(e => e.itemId === itemId)
+        .reduce((sum, e) => sum + e.qtyUsed, 0);
+      const aircraftQty = par + loadTotal - usageTotal;
+      const pullQty = Math.max(0, par - aircraftQty);
+      const returnQty = Math.max(0, aircraftQty - par);
+      if (pullQty > 0 || returnQty > 0) {
+        rows.push({ itemId, par, aircraftQty, pullQty, returnQty });
+      }
+    });
+
+    return rows;
+  }, [tripForBaseline, state.items]);
+
+  const pullRows = useMemo(() => baselineItems.filter(r => r.pullQty > 0), [baselineItems]);
+  const returnRows = useMemo(() => baselineItems.filter(r => r.returnQty > 0), [baselineItems]);
+
+  // Local checkbox state (not persisted — FA ticks off as they physically move items)
+  const [checkedPull, setCheckedPull] = useState<Set<string>>(new Set());
+  const [checkedReturn, setCheckedReturn] = useState<Set<string>>(new Set());
 
   const uniqueUnits = useMemo(() => {
     const units = new Set(localPickItems.map(p => p.unitTailNumber));
@@ -146,6 +210,41 @@ export default function Replenish() {
     });
   };
 
+  function handleBaselineConfirm() {
+    if (!tripForBaseline) return;
+
+    const stockroomUpdates: StockroomItem[] = state.stockroomItems
+      .map(si => {
+        const pullRow = pullRows.find(r => r.itemId === si.itemId);
+        const returnRow = returnRows.find(r => r.itemId === si.itemId);
+        if (!pullRow && !returnRow) return null;
+        const pullDelta = pullRow ? pullRow.pullQty : 0;
+        const returnDelta = returnRow ? returnRow.returnQty : 0;
+        return {
+          ...si,
+          qtyOnHand: Math.max(0, si.qtyOnHand - pullDelta + returnDelta),
+        };
+      })
+      .filter((si): si is StockroomItem => si !== null);
+
+    const returnItems: TripReturnItem[] = returnRows.map(r => ({
+      id: `tr-${crypto.randomUUID()}`,
+      itemId: r.itemId,
+      qty: r.returnQty,
+      returnedBy: state.currentUser.name,
+      returnedAt: new Date().toISOString(),
+    }));
+
+    dispatch({
+      type: 'ADD_TRIP_RETURN_ITEMS',
+      payload: {
+        tripId: tripForBaseline.id,
+        items: returnItems,
+        stockroomUpdates,
+      },
+    });
+  }
+
   const handleScan = (itemId: string) => {
     const match = localPickItems.find(p => p.itemId === itemId && !p.done);
     if (!match) {
@@ -186,6 +285,124 @@ export default function Replenish() {
   const toggleSection = (unit: string) => {
     setOpenSections(prev => ({ ...prev, [unit]: prev[unit] !== false ? false : true }));
   };
+
+  if (tripForBaseline && baselineItems.length > 0) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-4 pb-8">
+        <div>
+          <h1 className="text-2xl font-bold">Return to Baseline</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {tripForBaseline.tailNumber} · {tripForBaseline.tripName || 'Trip'} ·{' '}
+            Pull depleted items and return surplus
+          </p>
+        </div>
+
+        {/* Pull from Commissary */}
+        {pullRows.length > 0 && (
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 border-b border-border">
+              <ArrowDown className="h-4 w-4 text-primary" />
+              <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                Pull from Commissary
+              </span>
+              <span className="ml-auto text-xs font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+                {pullRows.length} {pullRows.length === 1 ? 'item' : 'items'}
+              </span>
+            </div>
+            <div className="divide-y divide-border">
+              {pullRows.map(row => {
+                const item = state.items.find(i => i.id === row.itemId);
+                if (!item) return null;
+                const checked = checkedPull.has(row.itemId);
+                return (
+                  <div key={row.itemId} className="flex items-center gap-3 px-4 py-3">
+                    <button
+                      onClick={() => setCheckedPull(prev => {
+                        const next = new Set(prev);
+                        if (checked) next.delete(row.itemId);
+                        else next.add(row.itemId);
+                        return next;
+                      })}
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        checked ? 'bg-primary border-primary text-primary-foreground' : 'border-border'
+                      }`}
+                    >
+                      {checked && <span className="text-xs">✓</span>}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${checked ? 'line-through text-muted-foreground' : ''}`}>
+                        {item.itemName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Need {row.pullQty} to reach par {row.par}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-primary bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1 shrink-0">
+                      +{row.pullQty} {item.uom}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Return to Commissary */}
+        {returnRows.length > 0 && (
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/30 border-b border-border">
+              <ArrowUp className="h-4 w-4 text-emerald-600" />
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                Return to Commissary
+              </span>
+              <span className="ml-auto text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2 py-0.5">
+                {returnRows.length} {returnRows.length === 1 ? 'item' : 'items'}
+              </span>
+            </div>
+            <div className="divide-y divide-border">
+              {returnRows.map(row => {
+                const item = state.items.find(i => i.id === row.itemId);
+                if (!item) return null;
+                const checked = checkedReturn.has(row.itemId);
+                return (
+                  <div key={row.itemId} className="flex items-center gap-3 px-4 py-3">
+                    <button
+                      onClick={() => setCheckedReturn(prev => {
+                        const next = new Set(prev);
+                        if (checked) next.delete(row.itemId);
+                        else next.add(row.itemId);
+                        return next;
+                      })}
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-border'
+                      }`}
+                    >
+                      {checked && <span className="text-xs">✓</span>}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${checked ? 'line-through text-muted-foreground' : ''}`}>
+                        {item.itemName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {row.returnQty} above par — loaded as overstock
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2.5 py-1 shrink-0">
+                      −{row.returnQty} {item.uom}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <Button className="w-full" size="lg" onClick={handleBaselineConfirm}>
+          Confirm &amp; Restore Baseline
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
