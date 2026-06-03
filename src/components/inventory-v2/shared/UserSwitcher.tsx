@@ -14,7 +14,7 @@ const ROLE_BADGE: Record<string, { label: string; className: string }> = {
   'fa-manager': { label: 'FA MANAGER', className: 'bg-cyan-500/20 text-cyan-300' },
   'lead-fa': { label: 'LEAD FA', className: 'bg-cyan-500/20 text-cyan-300' },
   'commissary-manager': { label: 'COMMISSARY', className: 'bg-indigo-500/20 text-indigo-300' },
-  'admin': { label: 'ADMIN', className: 'bg-purple-500/20 text-purple-300' },
+  'admin': { label: 'ADMIN', className: 'bg-primary/20 text-primary' },
   'pilot': { label: 'PILOT', className: 'bg-blue-500/20 text-blue-300' },
   'chief-pilot': { label: 'CHIEF PILOT', className: 'bg-blue-500/20 text-blue-300' },
   'maintenance': { label: 'MAINTENANCE', className: 'bg-orange-500/20 text-orange-300' },

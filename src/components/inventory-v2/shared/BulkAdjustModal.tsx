@@ -61,7 +61,7 @@ export default function BulkAdjustModal({ open, onOpenChange }: BulkAdjustModalP
       <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Package className="w-5 h-5 text-purple-500" />
+            <Package className="w-5 h-5 text-primary" />
             Bulk Adjust Quantities
           </DialogTitle>
         </DialogHeader>
@@ -119,7 +119,7 @@ export default function BulkAdjustModal({ open, onOpenChange }: BulkAdjustModalP
           </Button>
           <Button
             onClick={handleApply}
-            className="bg-purple-500 hover:bg-purple-600 text-white"
+            className="btn-aviation-primary"
             disabled={Object.keys(adjustments).length === 0}
           >
             Apply Changes ({Object.keys(adjustments).length})

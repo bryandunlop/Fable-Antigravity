@@ -26,7 +26,7 @@ export default function DisplaySettingsOverlay({ open, onOpenChange }: DisplaySe
       <SheetContent>
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-purple-500" />
+            <Settings className="w-5 h-5 text-primary" />
             Display Settings
           </SheetTitle>
         </SheetHeader>

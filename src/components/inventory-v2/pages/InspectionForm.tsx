@@ -559,7 +559,7 @@ export default function InspectionForm() {
             </p>
             <Button
               onClick={handleReview}
-              className={`${V2_THEME.accentBg} text-white hover:bg-purple-600`}
+              className={`${V2_THEME.accentBg} text-white hover:bg-primary/90`}
             >
               Review
               <ArrowRight className="ml-2 h-4 w-4" />

@@ -17,7 +17,7 @@ export function V2Badge({ variant = 'new', size = 'sm', className = '' }: V2Badg
 
   return (
     <span
-      className={`inline-flex items-center font-bold rounded-full bg-purple-500 text-white tracking-wider uppercase ${sizeClasses} ${className}`}
+      className={`inline-flex items-center font-bold rounded-full bg-primary text-white tracking-wider uppercase ${sizeClasses} ${className}`}
     >
       {label}
     </span>
@@ -26,6 +26,6 @@ export function V2Badge({ variant = 'new', size = 'sm', className = '' }: V2Badg
 
 export function V2Dot({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-block w-2 h-2 rounded-full bg-purple-500 ${className}`} />
+    <span className={`inline-block w-2 h-2 rounded-full bg-primary ${className}`} />
   );
 }

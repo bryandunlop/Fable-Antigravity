@@ -44,88 +44,90 @@ export const UOM_OPTIONS: { value: UnitOfMeasure; label: string }[] = [
 ];
 
 // ─── Status Colors ──────────────────────────────────────────────────────────
+// Use .className with the status-badge base class for rendering:
+//   <span className={`status-badge ${s.className}`}>{s.label}</span>
 
 export const STATUS_COLORS = {
   // Inspection statuses
-  in_progress: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'In Progress' },
-  submitted: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Completed' },
-  restocking_needed: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Restock Needed' },
-  restocked: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Restocked' },
+  in_progress:        { className: 'status-info',    label: 'In Progress' },
+  submitted:          { className: 'status-success', label: 'Completed' },
+  restocking_needed:  { className: 'status-warning', label: 'Restock Needed' },
+  restocked:          { className: 'status-success', label: 'Restocked' },
   // Request statuses
-  open: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Open' },
-  in_progress_req: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'In Progress' },
-  fulfilled: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Fulfilled' },
-  cancelled: { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30', label: 'Cancelled' },
+  open:               { className: 'status-info',    label: 'Open' },
+  in_progress_req:    { className: 'status-warning', label: 'In Progress' },
+  fulfilled:          { className: 'status-success', label: 'Fulfilled' },
+  cancelled:          { className: 'status-error',   label: 'Cancelled' },
   // PO statuses
-  outstanding: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Outstanding' },
-  partially_received: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Partial' },
-  fully_received: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Received' },
+  outstanding:        { className: 'status-warning', label: 'Outstanding' },
+  partially_received: { className: 'status-info',    label: 'Partial' },
+  fully_received:     { className: 'status-success', label: 'Received' },
 } as const;
 
 export const TRIP_STATUS_COLORS = {
-  active: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Active' },
-  completed: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Completed' },
-  cancelled: { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30', label: 'Cancelled' },
+  active:    { className: 'status-success', label: 'Active' },
+  completed: { className: 'status-info',    label: 'Completed' },
+  cancelled: { className: 'status-error',   label: 'Cancelled' },
 } as const;
 
 export const LEG_STATUS_COLORS = {
-  upcoming: { bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30', label: 'Upcoming' },
-  active: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'In Flight' },
-  completed: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Completed' },
+  upcoming:  { className: 'status-badge bg-muted text-muted-foreground border-border', label: 'Upcoming' },
+  active:    { className: 'status-warning', label: 'In Flight' },
+  completed: { className: 'status-success', label: 'Completed' },
 } as const;
 
 export const LEG_PHASE_COLORS = {
-  pre_flight: { bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30', label: 'Pre-Flight' },
-  in_flight: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'In Flight' },
-  on_ground: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'On Ground' },
-  complete: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Complete' },
+  pre_flight: { className: 'status-badge bg-muted text-muted-foreground border-border', label: 'Pre-Flight' },
+  in_flight:  { className: 'status-warning', label: 'In Flight' },
+  on_ground:  { className: 'status-info',    label: 'On Ground' },
+  complete:   { className: 'status-success', label: 'Complete' },
 } as const;
 
 export const GROCERY_STATUS_COLORS = {
-  draft: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Shopping List' },
-  sent: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Sent' },
-  fulfilled: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Complete' },
+  draft:     { className: 'status-warning', label: 'Shopping List' },
+  sent:      { className: 'status-info',    label: 'Sent' },
+  fulfilled: { className: 'status-success', label: 'Complete' },
 } as const;
 
 // ─── Priority Colors ────────────────────────────────────────────────────────
 
 export const PRIORITY_COLORS = {
-  critical: 'bg-red-500/15 text-red-400 border border-red-500/30',
-  high: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
-  medium: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30',
-  low: 'bg-slate-500/15 text-muted-foreground border border-slate-500/30',
+  critical: 'status-error',
+  high:     'status-badge bg-orange-50 dark:bg-orange-500/15 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-500/30',
+  medium:   'status-warning',
+  low:      'status-badge bg-muted text-muted-foreground border border-border',
 } as const;
 
 // ─── Readiness Helpers ──────────────────────────────────────────────────────
 
 export function readinessColor(pct: number): string {
-  if (pct >= 90) return 'text-emerald-400';
-  if (pct >= 70) return 'text-yellow-400';
-  return 'text-red-400';
+  if (pct >= 90) return 'text-emerald-600 dark:text-emerald-400';
+  if (pct >= 70) return 'text-amber-600 dark:text-amber-400';
+  return 'text-red-600 dark:text-red-400';
 }
 
 export function readinessBg(pct: number): string {
-  if (pct >= 90) return 'bg-emerald-500/15 border-emerald-500/30';
-  if (pct >= 70) return 'bg-yellow-500/15 border-yellow-500/30';
-  return 'bg-red-500/15 border-red-500/30';
+  if (pct >= 90) return 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-200 dark:border-emerald-500/30';
+  if (pct >= 70) return 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30';
+  return 'bg-red-50 dark:bg-red-500/15 border-red-200 dark:border-red-500/30';
 }
 
 export function stockBarColor(pct: number): string {
-  if (pct >= 90) return 'bg-emerald-500';
-  if (pct >= 60) return 'bg-yellow-500';
-  return 'bg-red-500';
+  if (pct >= 90) return 'bg-emerald-500 dark:bg-emerald-400';
+  if (pct >= 60) return 'bg-amber-500 dark:bg-amber-400';
+  return 'bg-red-500 dark:bg-red-400';
 }
 
-// ─── V2 Theme (Purple accent) ───────────────────────────────────────────────
+// ─── V2 Theme (Design system blue palette) ──────────────────────────────────
 
 export const V2_THEME = {
-  accent: 'text-purple-500',
-  accentBg: 'bg-purple-500',
-  accentBgLight: 'bg-purple-500/10',
-  accentBorder: 'border-purple-500/30',
-  accentHover: 'hover:bg-purple-500/20',
-  badge: 'bg-purple-500 text-white',
-  badgeOutline: 'bg-purple-500/15 text-purple-400 border border-purple-500/30',
+  accent: 'text-primary',
+  accentBg: 'bg-primary',
+  accentBgLight: 'bg-primary/10',
+  accentBorder: 'border-primary/30',
+  accentHover: 'hover:bg-primary/20',
+  badge: 'bg-primary text-primary-foreground',
+  badgeOutline: 'bg-primary/10 text-primary border border-primary/30',
 } as const;
 
 // ─── Mock Users ─────────────────────────────────────────────────────────────
@@ -151,4 +153,86 @@ export const FLEET_V2 = [
   { tailNumber: 'N2PG', type: 'G650' as const, displayName: 'N2PG — G650' },
   { tailNumber: 'N5PG', type: 'G500' as const, displayName: 'N5PG — G500' },
   { tailNumber: 'N6PG', type: 'G500' as const, displayName: 'N6PG — G500' },
+];
+
+// ─── POS Categories (Quick Tap view) ────────────────────────────────────────
+
+export interface POSCategory {
+  id: string;
+  label: string;
+  icon: string;   // Lucide icon name (e.g., 'Coffee', 'GlassWater')
+  color: string;   // Tailwind text color class for the icon
+  /** Which supplyCategory values map into this POS group */
+  supplyCategories: SupplyCategory[];
+  sortOrder: number;
+}
+
+export const POS_CATEGORIES: POSCategory[] = [
+  {
+    id: 'hot-drinks',
+    label: 'Hot Drinks',
+    icon: 'Coffee',
+    color: 'text-amber-400',
+    supplyCategories: ['coffee', 'tea', 'sweetener'],
+    sortOrder: 1,
+  },
+  {
+    id: 'cold-drinks',
+    label: 'Cold Drinks',
+    icon: 'GlassWater',
+    color: 'text-cyan-400',
+    supplyCategories: ['beverages'],
+    sortOrder: 2,
+  },
+  {
+    id: 'snacks',
+    label: 'Snacks & Food',
+    icon: 'Cookie',
+    color: 'text-orange-400',
+    supplyCategories: ['snacks'],
+    sortOrder: 3,
+  },
+  {
+    id: 'wine-spirits',
+    label: 'Wine & Spirits',
+    icon: 'Wine',
+    color: 'text-rose-400',
+    supplyCategories: ['wine'],
+    sortOrder: 4,
+  },
+  {
+    id: 'paper-supplies',
+    label: 'Paper & Supplies',
+    icon: 'Scroll',
+    color: 'text-slate-300',
+    supplyCategories: ['paper-goods', 'linens'],
+    sortOrder: 5,
+  },
+  {
+    id: 'medicine-amenities',
+    label: 'Medicine & Amenities',
+    icon: 'Pill',
+    color: 'text-emerald-400',
+    supplyCategories: ['medicine', 'first-aid', 'toiletries', 'self-care'],
+    sortOrder: 6,
+  },
+  {
+    id: 'cleaning',
+    label: 'Cleaning',
+    icon: 'SprayCan',
+    color: 'text-violet-400',
+    supplyCategories: ['cleaning-supplies'],
+    sortOrder: 7,
+  },
+];
+
+export const DEFAULT_QUICK_ADD_ITEM_IDS: string[] = [
+  '1',   // Perrier 330ml
+  '2',   // Coca-Cola
+  '3',   // Coke Zero
+  '8',   // Liter Water Bottles
+  '10',  // Nespresso Pods
+  '124', // Cocktail Napkins
+  '20',  // White Sugar Packets
+  '44',  // Hot Towels
 ];

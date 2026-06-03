@@ -76,7 +76,7 @@ function FleetTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{state.fleet.length} aircraft in fleet</p>
-        <Button size="sm" onClick={openAdd} className="bg-purple-500 hover:bg-purple-600 text-white">
+        <Button size="sm" onClick={openAdd} className="btn-aviation-primary">
           <Plus className="w-4 h-4 mr-1" /> Add Aircraft
         </Button>
       </div>
@@ -85,7 +85,7 @@ function FleetTab() {
         {state.fleet.map(unit => (
           <div key={unit.tailNumber} className="flex items-center justify-between p-3 rounded-lg border bg-card">
             <div className="flex items-center gap-3">
-              <Plane className="w-4 h-4 text-purple-400" />
+              <Plane className="w-4 h-4 text-primary" />
               <div>
                 <span className="font-medium">{unit.tailNumber}</span>
                 <Badge variant="outline" className="ml-2 text-xs">{unit.type}</Badge>
@@ -157,7 +157,7 @@ function FleetTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} className="bg-purple-500 hover:bg-purple-600 text-white">
+            <Button onClick={handleSave} className="btn-aviation-primary">
               <Check className="w-4 h-4 mr-1" /> {editTarget ? 'Save' : 'Add'}
             </Button>
           </DialogFooter>
@@ -175,7 +175,7 @@ const COLOR_OPTIONS = [
   { label: 'Amber', value: 'text-amber-400' },
   { label: 'Blue', value: 'text-blue-400' },
   { label: 'Orange', value: 'text-orange-400' },
-  { label: 'Purple', value: 'text-purple-400' },
+  { label: 'Purple', value: 'text-primary' },
   { label: 'Emerald', value: 'text-emerald-400' },
   { label: 'Sky', value: 'text-sky-400' },
   { label: 'Indigo', value: 'text-indigo-400' },
@@ -187,7 +187,7 @@ function CompartmentsTab() {
   const [selectedType, setSelectedType] = useState<'G650' | 'G500'>('G650');
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CompartmentDefinition | null>(null);
-  const [form, setForm] = useState({ label: '', icon: 'Package', color: 'text-purple-400' });
+  const [form, setForm] = useState({ label: '', icon: 'Package', color: 'text-primary' });
 
   const config = state.compartmentConfigs.find(c => c.aircraftType === selectedType);
   const compartments = [...(config?.compartments ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -213,7 +213,7 @@ function CompartmentsTab() {
   };
 
   const openAdd = () => {
-    setForm({ label: '', icon: 'Package', color: 'text-purple-400' });
+    setForm({ label: '', icon: 'Package', color: 'text-primary' });
     setEditTarget(null);
     setAddOpen(true);
   };
@@ -258,13 +258,13 @@ function CompartmentsTab() {
               variant={selectedType === t ? 'default' : 'outline'}
               size="sm"
               onClick={() => setSelectedType(t)}
-              className={selectedType === t ? 'bg-purple-500 hover:bg-purple-600 text-white' : ''}
+              className={selectedType === t ? 'btn-aviation-primary' : ''}
             >
               {t}
             </Button>
           ))}
         </div>
-        <Button size="sm" onClick={openAdd} className="bg-purple-500 hover:bg-purple-600 text-white">
+        <Button size="sm" onClick={openAdd} className="btn-aviation-primary">
           <Plus className="w-4 h-4 mr-1" /> Add Section
         </Button>
       </div>
@@ -349,7 +349,7 @@ function CompartmentsTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} className="bg-purple-500 hover:bg-purple-600 text-white">
+            <Button onClick={handleSave} className="btn-aviation-primary">
               <Check className="w-4 h-4 mr-1" /> {editTarget ? 'Save' : 'Add'}
             </Button>
           </DialogFooter>
@@ -440,7 +440,7 @@ function ItemCatalogTab() {
         />
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">{filtered.length} items</span>
-          <Button size="sm" onClick={openAdd} className="bg-purple-500 hover:bg-purple-600 text-white">
+          <Button size="sm" onClick={openAdd} className="btn-aviation-primary">
             <Plus className="w-4 h-4 mr-1" /> Add Item
           </Button>
         </div>
@@ -600,7 +600,7 @@ function ItemCatalogTab() {
           </ScrollArea>
           <DialogFooter className="pt-2">
             <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} className="bg-purple-500 hover:bg-purple-600 text-white">
+            <Button onClick={handleSave} className="btn-aviation-primary">
               <Check className="w-4 h-4 mr-1" /> {editItem ? 'Save Changes' : 'Add Item'}
             </Button>
           </DialogFooter>
@@ -677,7 +677,7 @@ function ParLevelsTab() {
           size="sm"
           disabled={changedCount === 0}
           onClick={handleSave}
-          className="bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50"
+          className="btn-aviation-primary disabled:opacity-50"
         >
           <Check className="w-4 h-4 mr-1" /> Save {changedCount > 0 ? `(${changedCount})` : ''}
         </Button>
@@ -700,7 +700,7 @@ function ParLevelsTab() {
             return (
               <div
                 key={item.id}
-                className={`grid grid-cols-[1fr_80px_100px_100px] gap-3 px-3 py-2 rounded items-center text-sm ${changed ? 'bg-purple-500/5 border border-purple-500/20' : 'hover:bg-muted/30'}`}
+                className={`grid grid-cols-[1fr_80px_100px_100px] gap-3 px-3 py-2 rounded items-center text-sm ${changed ? 'bg-primary/5 border border-primary/20' : 'hover:bg-muted/30'}`}
               >
                 <div>
                   <p className="font-medium truncate">{item.itemName}</p>
@@ -879,7 +879,7 @@ export default function Settings() {
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <SettingsIcon className="w-6 h-6 text-purple-500" />
+        <SettingsIcon className="w-6 h-6 text-primary" />
         <h1 className="text-2xl font-bold">Settings</h1>
         <V2Badge variant="v2" size="md" />
       </div>

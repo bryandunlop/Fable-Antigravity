@@ -633,7 +633,7 @@ export default function InspectionReview() {
           </AlertDialog>
           <Button
             onClick={handleComplete}
-            className={`${V2_THEME.accentBg} text-white hover:bg-purple-600`}
+            className={`${V2_THEME.accentBg} text-white hover:bg-primary/90`}
           >
             <Check className="mr-2 h-4 w-4" />
             Complete Inspection

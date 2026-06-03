@@ -192,7 +192,7 @@ export default function Replenish() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <PackagePlus className="w-6 h-6 text-purple-500" />
+          <PackagePlus className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold">Replenish</h1>
           <V2Badge />
         </div>
@@ -241,7 +241,7 @@ export default function Replenish() {
             <Collapsible key={unit} open={isOpen} onOpenChange={() => toggleSection(unit)}>
               <div id={`replenish-${unit}`}>
                 <CollapsibleTrigger asChild>
-                  <div className="flex items-center justify-between bg-slate-800 text-white rounded-lg px-4 py-2.5 cursor-pointer hover:bg-slate-700 transition-colors">
+                  <div className="flex items-center justify-between bg-muted text-foreground rounded-lg px-4 py-2.5 cursor-pointer hover:bg-muted/80 transition-colors">
                     <div className="flex items-center gap-3">
                       <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
                       <span className="font-bold">{unit}</span>
@@ -374,7 +374,7 @@ export default function Replenish() {
       {/* Footer */}
       {localPickItems.length > 0 && (
         <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t pt-4 pb-2">
-          <Button onClick={handleUpdate} className="bg-purple-500 hover:bg-purple-600 text-white">
+          <Button onClick={handleUpdate} className="btn-aviation-primary">
             UPDATE
           </Button>
         </div>

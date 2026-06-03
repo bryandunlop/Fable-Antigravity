@@ -30,7 +30,7 @@ export default function InspectionHistory() {
         </div>
         <Button
           onClick={() => navigate('/inventory-v2/inspection')}
-          className="bg-purple-500 hover:bg-purple-600 text-white"
+          className="btn-aviation-primary"
         >
           <Plus className="w-4 h-4 mr-1" /> New Inspection
         </Button>
@@ -55,7 +55,7 @@ export default function InspectionHistory() {
             inProgress.map(inspection => (
               <Card
                 key={inspection.id}
-                className="cursor-pointer hover:border-purple-500/30 transition-colors"
+                className="cursor-pointer hover:border-primary/30 transition-colors"
                 onClick={() => navigate(`/inventory-v2/inspection?resume=${inspection.id}`)}
               >
                 <CardContent className="p-4">
@@ -103,7 +103,7 @@ export default function InspectionHistory() {
             restockNeeded.map(inspection => (
               <Card
                 key={inspection.id}
-                className="cursor-pointer hover:border-purple-500/30 transition-colors"
+                className="cursor-pointer hover:border-primary/30 transition-colors"
                 onClick={() => navigate(`/inventory-v2/inspection?resume=${inspection.id}`)}
               >
                 <CardContent className="p-4">

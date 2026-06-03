@@ -48,12 +48,12 @@ export default function RecentlyCompleted() {
 
   const InspectionCard = ({ inspection }: { inspection: InspectionV2 }) => (
     <Card
-      className="cursor-pointer hover:border-purple-500/30 transition-colors"
+      className="cursor-pointer hover:border-primary/30 transition-colors"
       onClick={() => setSelectedInspection(inspection)}
     >
       <CardContent className="p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <Badge className="bg-purple-500/15 text-purple-400 border-purple-500/30">
+          <Badge className="bg-primary/10 text-primary border-primary/30">
             {inspection.tailNumber}
           </Badge>
           <span className={`text-sm font-bold ${readinessColor(inspection.readinessScore)}`}>

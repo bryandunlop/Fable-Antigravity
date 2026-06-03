@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Search, ShoppingCart, Plane, CheckCircle2,
@@ -16,7 +16,8 @@ import { OfflineBanner } from '../shared/OfflineBanner';
 import { LEG_PHASE_COLORS, SUPPLY_CATEGORIES } from '../constants';
 import { getCompartmentsForAircraft, getCompartmentLabel } from '../compartmentConfig';
 import { cn } from '../../ui/utils';
-import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase } from '../types';
+import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
+import QuickTapView from '../shared/QuickTapView';
 
 // ─── Item Row ───────────────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ function ItemRow({ item, legUsage, onBoard, compartmentLabel, onIncrement, onDec
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-4 py-3 border-b border-slate-800/60',
+        'flex items-center gap-3 px-4 py-3 border-b border-border/60',
         legUsage === 0 && 'opacity-50'
       )}
     >
@@ -46,7 +47,7 @@ function ItemRow({ item, legUsage, onBoard, compartmentLabel, onIncrement, onDec
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={onDecrement}
-          className="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors"
+          className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center text-lg hover:bg-muted/80 transition-colors"
           disabled={legUsage === 0}
         >
           −
@@ -54,14 +55,14 @@ function ItemRow({ item, legUsage, onBoard, compartmentLabel, onIncrement, onDec
         <span
           className={cn(
             'w-8 text-center text-base font-bold',
-            legUsage > 0 ? 'text-blue-400' : 'text-slate-500'
+            legUsage > 0 ? 'text-blue-400' : 'text-muted-foreground'
           )}
         >
           {legUsage}
         </span>
         <button
           onClick={onIncrement}
-          className="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors"
+          className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center text-lg hover:bg-muted/80 transition-colors"
         >
           +
         </button>
@@ -253,12 +254,19 @@ function TripViewInner({
   dispatch: ReturnType<typeof useInventoryV2>['dispatch'];
   navigate: ReturnType<typeof useNavigate>;
 }) {
-  const [view, setView] = useState<'compartment' | 'category'>('compartment');
+  const [view, setView] = useState<TripViewMode>(() => {
+    return (localStorage.getItem('inv2-trip-view-mode') as TripViewMode) || 'quick-tap';
+  });
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showNextLeg, setShowNextLeg] = useState(false);
   const [showTripComplete, setShowTripComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+
+  // Persist view mode preference
+  useEffect(() => {
+    localStorage.setItem('inv2-trip-view-mode', view);
+  }, [view]);
 
   const activeLeg = trip.legs.find(l => l.status === 'active') ?? null;
   const activeLegIndex = trip.legs.findIndex(l => l.status === 'active');
@@ -464,7 +472,7 @@ function TripViewInner({
       <OfflineBanner />
 
       {/* ── HEADER ── */}
-      <div className="bg-slate-950/95 backdrop-blur-sm border-b border-slate-800 px-4 py-3 space-y-1.5 shrink-0">
+      <div className="bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 space-y-1.5 shrink-0">
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate('/inventory-v2/trips')}
@@ -486,7 +494,7 @@ function TripViewInner({
               <span className="text-sm font-mono font-semibold">
                 Leg {activeLeg.legNumber}: {activeLeg.origin} → {activeLeg.destination}
               </span>
-              <Badge className={cn('text-xs', phaseColors.bg, phaseColors.text, 'border', phaseColors.border)}>
+              <Badge className={cn('text-xs status-badge', phaseColors.className)}>
                 {phaseColors.label}
               </Badge>
             </div>
@@ -511,12 +519,23 @@ function TripViewInner({
             <>
               {/* View toggle + search */}
               <div className="flex items-center gap-3 mb-4">
-                <div className="flex gap-1 p-1 bg-slate-800 rounded-lg">
+                <div className="flex gap-1 p-1 bg-muted rounded-lg">
+                  <button
+                    className={cn(
+                      'px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-1',
+                      view === 'quick-tap'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                    onClick={() => setView('quick-tap')}
+                  >
+                    ⚡ Quick Tap
+                  </button>
                   <button
                     className={cn(
                       'px-3 py-1.5 rounded text-xs font-medium transition-colors',
                       view === 'compartment'
-                        ? 'bg-slate-600 text-white'
+                        ? 'bg-background text-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
                     )}
                     onClick={() => setView('compartment')}
@@ -527,7 +546,7 @@ function TripViewInner({
                     className={cn(
                       'px-3 py-1.5 rounded text-xs font-medium transition-colors',
                       view === 'category'
-                        ? 'bg-slate-600 text-white'
+                        ? 'bg-background text-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
                     )}
                     onClick={() => setView('category')}
@@ -535,20 +554,36 @@ function TripViewInner({
                     Category
                   </button>
                 </div>
-                <div className="relative flex-1">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="pl-8 h-9 text-sm"
-                    placeholder="Search items..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                  />
-                </div>
+                {view !== 'quick-tap' && (
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="pl-8 h-9 text-sm"
+                      placeholder="Search items..."
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
+
+              {/* ── Quick Tap view ── */}
+              {view === 'quick-tap' && (
+                <QuickTapView
+                  items={filteredItems}
+                  activeLeg={activeLeg}
+                  trip={trip}
+                  aircraftType={aircraftType}
+                  onIncrement={handleIncrement}
+                  onDecrement={handleDecrement}
+                  getLegUsage={getLegUsage}
+                  getOnBoard={getOnBoard}
+                />
+              )}
 
               {/* ── Compartment view ── */}
               {view === 'compartment' && (
-                <Card className="bg-slate-900/60 border-slate-700 overflow-hidden">
+                <Card className="bg-card border-border overflow-hidden">
                   {compartments.map(compartment => {
                     const sectionItems = filteredItems.filter(
                       item => item.compartmentId === compartment.id
@@ -558,7 +593,7 @@ function TripViewInner({
 
                     return (
                       <div key={compartment.id}>
-                        <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-700">
+                        <div className="flex items-center justify-between px-4 py-2 bg-muted/60 border-b border-border">
                           <span className={cn('text-xs font-semibold uppercase tracking-wide', compartment.color)}>
                             {compartment.label}
                           </span>
@@ -600,7 +635,7 @@ function TripViewInner({
                           'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
                           selectedCategory === cat
                             ? 'bg-blue-600 text-white'
-                            : 'bg-slate-800 text-muted-foreground hover:text-foreground'
+                            : 'bg-muted text-muted-foreground hover:text-foreground'
                         )}
                       >
                         {cat === 'all'
@@ -609,7 +644,7 @@ function TripViewInner({
                       </button>
                     ))}
                   </div>
-                  <Card className="bg-slate-900/60 border-slate-700 overflow-hidden">
+                  <Card className="bg-card border-border overflow-hidden">
                     {filteredItems
                       .filter(item => selectedCategory === 'all' || item.supplyCategory === selectedCategory)
                       .map(item => (
@@ -643,26 +678,26 @@ function TripViewInner({
                     Flight Timeline ({trip.legs.length} legs)
                   </button>
                   {showTimeline && (
-                    <div className="mt-2 bg-slate-900/60 border border-slate-700 rounded-lg overflow-hidden">
+                    <div className="mt-2 bg-card border border-border rounded-lg overflow-hidden">
                       {trip.legs.map(leg => {
                         const legUsed = leg.usageLog.reduce((sum, e) => sum + e.qtyUsed, 0);
                         return (
                           <div
                             key={leg.id}
                             className={cn(
-                              'flex items-center gap-3 px-4 py-2.5 border-b border-slate-800 last:border-0',
+                              'flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0',
                               leg.status === 'upcoming' && 'opacity-50'
                             )}
                           >
                             <div className="shrink-0">
                               {leg.status === 'completed' && <CheckCircle2 className="text-emerald-400" size={18} />}
                               {leg.status === 'active' && (
-                                <div className="w-[18px] h-[18px] rounded-full bg-amber-500 flex items-center justify-center text-[10px] font-bold text-slate-950">
+                                <div className="w-[18px] h-[18px] rounded-full bg-amber-500 flex items-center justify-center text-[10px] font-bold text-background">
                                   {leg.legNumber}
                                 </div>
                               )}
                               {leg.status === 'upcoming' && (
-                                <div className="w-[18px] h-[18px] rounded-full border-2 border-slate-600 flex items-center justify-center text-[10px] text-slate-500">
+                                <div className="w-[18px] h-[18px] rounded-full border-2 border-border flex items-center justify-center text-[10px] ">
                                   {leg.legNumber}
                                 </div>
                               )}
@@ -695,7 +730,7 @@ function TripViewInner({
 
       {/* ── STICKY FOOTER ── */}
       {activeLeg && (
-        <div className="bg-slate-950 border-t-2 border-slate-700 px-4 py-3 shrink-0">
+        <div className="bg-background border-t-2 border-border px-4 py-3 shrink-0">
           <div className="max-w-5xl mx-auto flex items-center gap-3">
             {/* Grocery list button */}
             <Button
@@ -706,7 +741,7 @@ function TripViewInner({
               <ShoppingCart className="mr-2 h-4 w-4" />
               Grocery List
               {groceryItemCount > 0 && (
-                <span className="ml-2 bg-amber-500 text-slate-950 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="ml-2 bg-amber-500 text-background text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {groceryItemCount}
                 </span>
               )}

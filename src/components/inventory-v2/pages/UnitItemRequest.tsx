@@ -103,7 +103,7 @@ export default function UnitItemRequest() {
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Send className="w-6 h-6 text-purple-500" />
+        <Send className="w-6 h-6 text-primary" />
         <h1 className="text-2xl font-bold">New Unit Item Request</h1>
         <V2Badge />
       </div>
@@ -121,14 +121,14 @@ export default function UnitItemRequest() {
               <div className="flex gap-2">
                 <Button
                   variant={isGuestRequest ? 'default' : 'outline'}
-                  className={isGuestRequest ? 'bg-purple-500 hover:bg-purple-600 text-white' : ''}
+                  className={isGuestRequest ? 'btn-aviation-primary' : ''}
                   onClick={() => setIsGuestRequest(true)}
                 >
                   <User className="w-4 h-4 mr-1" /> Guest Request
                 </Button>
                 <Button
                   variant={!isGuestRequest ? 'default' : 'outline'}
-                  className={!isGuestRequest ? 'bg-purple-500 hover:bg-purple-600 text-white' : ''}
+                  className={!isGuestRequest ? 'btn-aviation-primary' : ''}
                   onClick={() => setIsGuestRequest(false)}
                 >
                   <Users className="w-4 h-4 mr-1" /> Non-Guest
@@ -220,7 +220,7 @@ export default function UnitItemRequest() {
         <Badge variant="outline">{totalRequested} item(s) requested</Badge>
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => navigate('/inventory-v2/unit-requests')}>Cancel</Button>
-          <Button onClick={handleSubmit} className="bg-purple-500 hover:bg-purple-600 text-white">
+          <Button onClick={handleSubmit} className="btn-aviation-primary">
             <Send className="w-4 h-4 mr-1" /> Submit Request
           </Button>
         </div>

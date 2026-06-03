@@ -152,7 +152,7 @@ export default function Receiving() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <PackagePlus className="w-6 h-6 text-purple-500" />
+          <PackagePlus className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold">Add to Stock</h1>
           <V2Badge />
         </div>
@@ -170,7 +170,7 @@ export default function Receiving() {
             variant={showHistory ? 'default' : 'outline'}
             size="sm"
             onClick={() => setShowHistory(h => !h)}
-            className={showHistory ? 'bg-purple-500 hover:bg-purple-600 text-white' : ''}
+            className={showHistory ? 'btn-aviation-primary' : ''}
           >
             <History className="w-4 h-4 mr-1" /> History {stockroomLog.length > 0 && `(${stockroomLog.length})`}
           </Button>
@@ -182,7 +182,7 @@ export default function Receiving() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <History className="w-4 h-4 text-purple-400" />
+              <History className="w-4 h-4 text-primary" />
               Recent Stock Additions
             </CardTitle>
           </CardHeader>

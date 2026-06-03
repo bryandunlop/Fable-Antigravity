@@ -66,6 +66,8 @@ export interface InventoryItemV2 {
   alternateNames: string[];
   reorderUrl?: string;
   barcode?: string;
+  isConsumable?: boolean;     // true = depleted per use (drinks, napkins), false = durable (tools, silverware)
+  posCategory?: string;       // Simplified POS grouping for Quick Tap view (e.g., 'hot-drinks', 'cold-drinks')
 }
 
 // ─── Inspection ─────────────────────────────────────────────────────────────
@@ -248,6 +250,8 @@ export interface CommissaryAlert {
 // ── Trip Workflow ──
 
 export type LegPhase = 'pre_flight' | 'in_flight' | 'on_ground' | 'complete';
+
+export type TripViewMode = 'quick-tap' | 'compartment' | 'category';
 
 export interface Trip {
   id: string;
