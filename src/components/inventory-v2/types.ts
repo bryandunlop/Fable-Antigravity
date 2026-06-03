@@ -247,12 +247,14 @@ export interface CommissaryAlert {
 
 // ── Trip Workflow ──
 
+export type LegPhase = 'pre_flight' | 'in_flight' | 'on_ground' | 'complete';
+
 export interface Trip {
   id: string;
   tailNumber: string;
   aircraftType: 'G650' | 'G500';
-  tripName: string;
-  tripNumber: string;
+  tripName?: string;
+  tripNumber?: string;
   status: 'active' | 'completed' | 'cancelled';
   startDate: string;
   endDate?: string;
@@ -271,6 +273,7 @@ export interface TripLeg {
   date: string;
   paxCount: number;
   status: 'upcoming' | 'active' | 'completed';
+  phase: LegPhase;
   usageLog: UsageLogEntry[];
   groceryListId?: string;
   notes: TripNote[];
@@ -302,6 +305,8 @@ export interface GroceryListItem {
   itemId: string;
   qtyNeeded: number;
   qtyFulfilled: number;
+  isManual?: boolean;
+  manualItemName?: string;
 }
 
 export interface TripNote {
@@ -403,6 +408,8 @@ export type InventoryV2Action =
   | { type: 'UPDATE_LEG'; payload: { tripId: string; leg: TripLeg } }
   | { type: 'COMPLETE_LEG'; payload: { tripId: string; legId: string } }
   | { type: 'ADVANCE_TO_NEXT_LEG'; payload: string }
+  | { type: 'SET_LEG_PHASE'; payload: { tripId: string; legId: string; phase: LegPhase } }
+  | { type: 'ADD_LEG_TO_TRIP'; payload: { tripId: string; leg: TripLeg } }
   // Usage tracking
   | { type: 'ADD_USAGE_LOG_ENTRY'; payload: { tripId: string; legId: string; entry: UsageLogEntry } }
   | { type: 'UPDATE_USAGE_LOG_ENTRY'; payload: { tripId: string; legId: string; entry: UsageLogEntry } }

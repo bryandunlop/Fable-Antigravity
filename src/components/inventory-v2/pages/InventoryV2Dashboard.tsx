@@ -170,7 +170,7 @@ export default function InventoryV2Dashboard() {
                       {trip.tailNumber}
                     </span>
                     <div>
-                      <p className="text-sm font-semibold">{trip.tripName}</p>
+                      <p className="text-sm font-semibold">{trip.tripName || trip.tailNumber}</p>
                       <p className="text-xs text-muted-foreground">
                         {activeLeg ? `Leg ${activeLeg.legNumber}: ${activeLeg.origin} → ${activeLeg.destination}` : 'No active leg'}
                       </p>

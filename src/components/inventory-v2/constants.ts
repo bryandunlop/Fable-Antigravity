@@ -74,6 +74,13 @@ export const LEG_STATUS_COLORS = {
   completed: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Completed' },
 } as const;
 
+export const LEG_PHASE_COLORS = {
+  pre_flight: { bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30', label: 'Pre-Flight' },
+  in_flight: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'In Flight' },
+  on_ground: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'On Ground' },
+  complete: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Complete' },
+} as const;
+
 export const GROCERY_STATUS_COLORS = {
   draft: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Shopping List' },
   sent: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', label: 'Sent' },

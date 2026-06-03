@@ -13,7 +13,7 @@ import { loadCompartmentConfigs } from './compartmentConfig';
 const STORAGE_PREFIX = 'inv-v2-';
 const STORAGE_KEY = `${STORAGE_PREFIX}state`;
 // Bump this string any time mock data changes to force a fresh load
-const DATA_VERSION = '2026-05-25-v1';
+const DATA_VERSION = '2026-05-25-v2';
 const VERSION_KEY = `${STORAGE_PREFIX}data-version`;
 
 // ─── Initial State ──────────────────────────────────────────────────────────
@@ -379,12 +379,41 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           return {
             ...t,
             legs: t.legs.map((l, i) => {
-              if (i === currentIdx) return { ...l, status: 'completed' as const };
-              if (i === currentIdx + 1) return { ...l, status: 'active' as const };
+              if (i === currentIdx) return { ...l, status: 'completed' as const, phase: 'complete' as const };
+              if (i === currentIdx + 1) return { ...l, status: 'active' as const, phase: 'in_flight' as const };
               return l;
             }),
           };
         }),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    case 'SET_LEG_PHASE': {
+      return {
+        ...state,
+        trips: state.trips.map(t =>
+          t.id === action.payload.tripId
+            ? {
+                ...t,
+                legs: t.legs.map(l =>
+                  l.id === action.payload.legId ? { ...l, phase: action.payload.phase } : l
+                ),
+              }
+            : t
+        ),
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    case 'ADD_LEG_TO_TRIP': {
+      return {
+        ...state,
+        trips: state.trips.map(t =>
+          t.id === action.payload.tripId
+            ? { ...t, legs: [...t.legs, action.payload.leg] }
+            : t
+        ),
         pendingChanges: state.pendingChanges + 1,
       };
     }
