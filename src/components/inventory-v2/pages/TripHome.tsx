@@ -18,6 +18,8 @@ import { getCompartmentsForAircraft, getCompartmentLabel } from '../compartmentC
 import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
 import QuickTapView from '../shared/QuickTapView';
+import { TripLoadExtras } from './TripLoadExtras';
+import { TripRestoreStock } from './TripRestoreStock';
 
 // ─── Item Row ───────────────────────────────────────────────────────────────
 
@@ -262,6 +264,7 @@ function TripViewInner({
   const [showNextLeg, setShowNextLeg] = useState(false);
   const [showTripComplete, setShowTripComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
 
   // Persist view mode preference
   useEffect(() => {
@@ -322,11 +325,15 @@ function TripViewInner({
   }
 
   function getOnBoard(item: InventoryItemV2): number {
+    const par = item.defaultQuantities[aircraftType] ?? 0;
     const allLegsUsage = trip.legs
       .flatMap((l: TripLeg) => l.usageLog)
       .filter(e => e.itemId === item.id)
       .reduce((sum, e) => sum + e.qtyUsed, 0);
-    return (item.defaultQuantities[aircraftType] ?? 0) - allLegsUsage;
+    const loadTotal = trip.loadItems
+      .filter(li => li.itemId === item.id)
+      .reduce((sum, li) => sum + li.qty, 0);
+    return par + loadTotal - allLegsUsage;
   }
 
   function handleIncrement(item: InventoryItemV2) {
@@ -403,6 +410,14 @@ function TripViewInner({
 
   // ─── Phase Actions ────────────────────────────────────────────────────────
 
+  function handleStartFlight() {
+    if (!activeLeg) return;
+    dispatch({
+      type: 'SET_LEG_PHASE',
+      payload: { tripId: trip.id, legId: activeLeg.id, phase: 'in_flight' },
+    });
+  }
+
   function handleLanded() {
     if (!activeLeg) return;
     dispatch({
@@ -466,6 +481,14 @@ function TripViewInner({
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
+
+  // Sub-screen renders
+  if (screen === 'load-extras') {
+    return <TripLoadExtras trip={trip} onBack={() => setScreen('trip')} />;
+  }
+  if (screen === 'restore-stock' && activeLeg) {
+    return <TripRestoreStock trip={trip} activeLeg={activeLeg} onBack={() => setScreen('trip')} />;
+  }
 
   return (
     <div className="-m-6 -mb-20 flex flex-col h-[calc(100dvh-9.125rem)] md:h-[calc(100dvh-4.5625rem)] overflow-hidden">
@@ -731,50 +754,100 @@ function TripViewInner({
       {/* ── STICKY FOOTER ── */}
       {activeLeg && (
         <div className="bg-background border-t-2 border-border px-4 py-3 shrink-0">
-          <div className="max-w-5xl mx-auto flex items-center gap-3">
-            {/* Grocery list button */}
-            <Button
-              variant="outline"
-              className="flex-1 relative"
-              onClick={() => navigate('grocery-list')}
-            >
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Grocery List
-              {groceryItemCount > 0 && (
-                <span className="ml-2 bg-amber-500 text-background text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {groceryItemCount}
-                </span>
+          <div className="max-w-5xl mx-auto space-y-2">
+            {/* on_ground: Grocery + Restore Stock row */}
+            {phase === 'on_ground' && (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 relative"
+                  onClick={() => navigate('grocery-list')}
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Grocery List
+                  {groceryItemCount > 0 && (
+                    <span className="ml-2 bg-amber-500 text-background text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {groceryItemCount}
+                    </span>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setScreen('restore-stock')}
+                >
+                  Restore Stock
+                </Button>
+              </div>
+            )}
+
+            {/* Primary action row */}
+            <div className="flex items-center gap-3">
+              {/* pre_flight: Load Extras + Start Flight */}
+              {phase === 'pre_flight' && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setScreen('load-extras')}
+                  >
+                    Load Extras
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleStartFlight}
+                  >
+                    <Plane className="mr-2 h-4 w-4" />
+                    Start Flight
+                  </Button>
+                </>
               )}
-            </Button>
 
-            {/* Phase-dependent primary action */}
-            {phase === 'in_flight' && (
-              <Button
-                className="flex-1 bg-blue-600 hover:bg-blue-500"
-                onClick={handleLanded}
-              >
-                <Plane className="mr-2 h-4 w-4" />
-                Landed
-              </Button>
-            )}
+              {/* in_flight: Grocery List + Landed */}
+              {phase === 'in_flight' && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="flex-1 relative"
+                    onClick={() => navigate('grocery-list')}
+                  >
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    Grocery List
+                    {groceryItemCount > 0 && (
+                      <span className="ml-2 bg-amber-500 text-background text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {groceryItemCount}
+                      </span>
+                    )}
+                  </Button>
+                  <Button
+                    className="flex-1 bg-blue-600 hover:bg-blue-500"
+                    onClick={handleLanded}
+                  >
+                    <Plane className="mr-2 h-4 w-4" />
+                    Landed
+                  </Button>
+                </>
+              )}
 
-            {phase === 'on_ground' && !isLastLeg && (
-              <Button
-                className="flex-1 bg-amber-600 hover:bg-amber-500"
-                onClick={handleNextLeg}
-              >
-                Next Leg
-              </Button>
-            )}
+              {/* on_ground: Next Leg or Complete Trip */}
+              {phase === 'on_ground' && !isLastLeg && (
+                <Button
+                  className="flex-1 bg-amber-600 hover:bg-amber-500"
+                  onClick={handleNextLeg}
+                >
+                  Next Leg
+                </Button>
+              )}
 
-            {phase === 'on_ground' && isLastLeg && (
-              <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500"
-                onClick={handleCompleteTrip}
-              >
-                Complete Trip
-              </Button>
-            )}
+              {phase === 'on_ground' && isLastLeg && (
+                <Button
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                  onClick={handleCompleteTrip}
+                >
+                  Complete Trip
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
