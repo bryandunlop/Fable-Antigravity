@@ -563,7 +563,11 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           if (loadQty === 0) return si;
           return { ...si, qtyOnHand: Math.max(0, si.qtyOnHand - loadQty) };
         });
-        alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, newStockroomItems);
+        alerts = generateAlertsAfterStockUpdate(
+          state,
+          newStockroomItems,
+          newStockroomItems.filter(si => commissaryItems.some(li => li.itemId === si.itemId))
+        );
       }
       const newTrips = state.trips.map(t =>
         t.id === tripId
