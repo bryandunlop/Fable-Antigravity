@@ -202,6 +202,7 @@ function GroceryListInner({
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addSearch, setAddSearch] = useState('');
   const [freeFormText, setFreeFormText] = useState('');
+  const [shoppingMode, setShoppingMode] = useState(false);
 
   const phase = activeLeg.phase;
   const phaseColors = LEG_PHASE_COLORS[phase];
@@ -413,6 +414,94 @@ function GroceryListInner({
   const statusColors = GROCERY_STATUS_COLORS[groceryList.status];
   const isComplete = groceryList.status === 'fulfilled';
 
+  if (shoppingMode) {
+    const allItems = groceryList.items;
+    const pickedCount = allItems.filter(i => i.qtyFulfilled >= i.qtyNeeded).length;
+    const totalCount = allItems.length;
+    const allPicked = pickedCount === totalCount && totalCount > 0;
+
+    return (
+      <div className="-m-6 -mb-20 flex flex-col h-[calc(100dvh-9.125rem)] md:h-[calc(100dvh-4.5625rem)] overflow-hidden">
+        {/* Header */}
+        <div className="shrink-0 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setShoppingMode(false)}
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft size={16} /> Edit List
+            </button>
+            <span className="text-sm font-semibold text-muted-foreground">
+              {pickedCount}/{totalCount} found
+            </span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+              style={{ width: totalCount > 0 ? `${Math.round((pickedCount / totalCount) * 100)}%` : '0%' }}
+            />
+          </div>
+        </div>
+
+        {/* Item checklist */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-muted/20">
+          {allItems.map(gi => {
+            const picked = gi.qtyFulfilled >= gi.qtyNeeded;
+            const displayName = gi.isManual
+              ? (gi.manualItemName ?? 'Unknown Item')
+              : (state.items.find(i => i.id === gi.itemId)?.itemName ?? gi.itemId);
+            return (
+              <button
+                key={gi.id}
+                onClick={() => handleTogglePicked(gi.id)}
+                className={`w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${
+                  picked
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 opacity-60'
+                    : 'bg-card border-border hover:border-primary/40'
+                }`}
+              >
+                <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  picked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-border'
+                }`}>
+                  {picked && <span className="text-sm font-bold">✓</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`font-semibold text-sm ${picked ? 'line-through text-muted-foreground' : ''}`}>
+                    {displayName}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Need {gi.qtyNeeded}{gi.isManual ? '' : ` ${state.items.find(i => i.id === gi.itemId)?.uom ?? ''}`}
+                  </p>
+                </div>
+                {picked && (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 bg-background border-t-2 border-border px-4 py-3">
+          <Button
+            className={`w-full ${allPicked ? 'bg-emerald-600 hover:bg-emerald-500' : ''}`}
+            disabled={pickedCount === 0}
+            onClick={() => {
+              handleDoneShopping();
+              navigate(`/inventory-v2/trips/${tripId}`);
+            }}
+          >
+            {allPicked
+              ? 'Done Shopping ✓ — Back to Trip'
+              : pickedCount > 0
+              ? `Done Shopping (${pickedCount}/${totalCount} found)`
+              : 'Tap items as you find them'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="-m-6 -mb-20 flex flex-col h-[calc(100dvh-9.125rem)] md:h-[calc(100dvh-4.5625rem)] overflow-hidden">
       <OfflineBanner />
@@ -562,12 +651,14 @@ function GroceryListInner({
               'flex-[1.5]',
               isComplete
                 ? 'bg-emerald-700 hover:bg-emerald-700 cursor-default'
-                : 'bg-emerald-600 hover:bg-emerald-500'
+                : 'bg-primary hover:bg-primary/90'
             )}
-            onClick={handleDoneShopping}
-            disabled={isComplete}
+            onClick={() => {
+              if (!isComplete) setShoppingMode(true);
+            }}
+            disabled={isComplete || groceryList.items.length === 0}
           >
-            {isComplete ? 'Shopping Complete ✓' : 'Done Shopping'}
+            {isComplete ? 'Shopping Complete ✓' : 'Start Shopping'}
           </Button>
         </div>
       </div>
