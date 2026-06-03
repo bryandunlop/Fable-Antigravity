@@ -13,7 +13,7 @@ import { loadCompartmentConfigs } from './compartmentConfig';
 const STORAGE_PREFIX = 'inv-v2-';
 const STORAGE_KEY = `${STORAGE_PREFIX}state`;
 // Bump this string any time mock data changes to force a fresh load
-const DATA_VERSION = '2026-05-25-v2';
+const DATA_VERSION = '2026-06-03-v3';
 const VERSION_KEY = `${STORAGE_PREFIX}data-version`;
 
 // ─── Initial State ──────────────────────────────────────────────────────────

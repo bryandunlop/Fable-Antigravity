@@ -37,6 +37,8 @@ export const MOCK_TRIPS: Trip[] = [
       tripNote('tn-001', 'trip-001', undefined, 'Client prefers Pellegrino over Fiji. Stock extra sparkling.', 'Sarah Mitchell', '2026-05-12T07:30:00Z'),
       tripNote('tn-002', 'trip-001', undefined, 'Crew change at TEB — Mike taking over legs 3-7.', 'Sarah Mitchell', '2026-05-14T09:00:00Z'),
     ],
+    loadItems: [],
+    returnItems: [],
     legs: [
       {
         id: 'leg-001', tripId: 'trip-001', legNumber: 1,
@@ -91,6 +93,8 @@ export const MOCK_TRIPS: Trip[] = [
     createdBy: 'Mike Johnson',
     createdAt: '2026-05-13T18:00:00Z',
     notes: [],
+    loadItems: [],
+    returnItems: [],
     legs: [
       {
         id: 'leg-008', tripId: 'trip-002', legNumber: 1,
@@ -122,6 +126,8 @@ export const MOCK_TRIPS: Trip[] = [
     createdBy: 'Sarah Mitchell',
     createdAt: '2026-05-09T20:00:00Z',
     notes: [],
+    loadItems: [],
+    returnItems: [],
     legs: [
       { id: 'leg-011', tripId: 'trip-003', legNumber: 1, origin: 'LUK', destination: 'TEB', date: '2026-05-10', paxCount: 3, status: 'completed', phase: 'complete', usageLog: [usageEntry('ue-015', 'leg-011', '1', 3, 'Sarah Mitchell', '2026-05-10T09:00:00Z'), usageEntry('ue-016', 'leg-011', '5', 4, 'Sarah Mitchell', '2026-05-10T09:15:00Z')], notes: [] },
       { id: 'leg-012', tripId: 'trip-003', legNumber: 2, origin: 'TEB', destination: 'LUK', date: '2026-05-10', paxCount: 3, status: 'completed', phase: 'complete', usageLog: [usageEntry('ue-017', 'leg-012', '1', 2, 'Sarah Mitchell', '2026-05-10T19:00:00Z'), usageEntry('ue-018', 'leg-012', '10', 1, 'Sarah Mitchell', '2026-05-10T19:20:00Z')], notes: [] },
@@ -141,6 +147,8 @@ export const MOCK_TRIPS: Trip[] = [
     notes: [
       tripNote('tn-005', 'trip-004', undefined, 'Smooth trip. No issues.', 'Mike Johnson', '2026-05-09T18:30:00Z'),
     ],
+    loadItems: [],
+    returnItems: [],
     legs: [
       { id: 'leg-013', tripId: 'trip-004', legNumber: 1, origin: 'LUK', destination: 'OPF', date: '2026-05-08', paxCount: 2, status: 'completed', phase: 'complete', usageLog: [usageEntry('ue-019', 'leg-013', '1', 2, 'Mike Johnson', '2026-05-08T09:00:00Z'), usageEntry('ue-020', 'leg-013', '5', 2, 'Mike Johnson', '2026-05-08T09:15:00Z')], notes: [] },
       { id: 'leg-014', tripId: 'trip-004', legNumber: 2, origin: 'OPF', destination: 'LUK', date: '2026-05-09', paxCount: 2, status: 'completed', phase: 'complete', usageLog: [usageEntry('ue-021', 'leg-014', '1', 1, 'Mike Johnson', '2026-05-09T16:00:00Z')], notes: [] },

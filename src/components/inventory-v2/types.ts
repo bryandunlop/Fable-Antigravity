@@ -264,6 +264,8 @@ export interface Trip {
   endDate?: string;
   legs: TripLeg[];
   notes: TripNote[];
+  loadItems: TripLoadItem[];
+  returnItems: TripReturnItem[];
   createdBy: string;
   createdAt: string;
 }
@@ -320,6 +322,24 @@ export interface TripNote {
   text: string;
   author: string;
   createdAt: string;
+}
+
+export interface TripLoadItem {
+  id: string;
+  itemId: string;
+  qty: number;
+  source: 'commissary' | 'road';
+  loadedBy: string;
+  loadedAt: string;
+  legId?: string; // undefined = pre-trip; set = mid-trip restore for that leg
+}
+
+export interface TripReturnItem {
+  id: string;
+  itemId: string;
+  qty: number;
+  returnedBy: string;
+  returnedAt: string;
 }
 
 export interface StockBatch {
@@ -428,4 +448,7 @@ export type InventoryV2Action =
   // Stock batches
   | { type: 'ADD_STOCK_BATCH'; payload: StockBatch }
   | { type: 'UPDATE_STOCK_BATCH'; payload: StockBatch }
-  | { type: 'REMOVE_STOCK_BATCH'; payload: string };
+  | { type: 'REMOVE_STOCK_BATCH'; payload: string }
+  // Trip load & return
+  | { type: 'ADD_TRIP_LOAD_ITEMS'; payload: { tripId: string; items: TripLoadItem[] } }
+  | { type: 'ADD_TRIP_RETURN_ITEMS'; payload: { tripId: string; items: TripReturnItem[]; stockroomUpdates: StockroomItem[] } };
