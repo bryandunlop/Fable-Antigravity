@@ -243,6 +243,7 @@ export default function Replenish() {
         stockroomUpdates,
       },
     });
+    toast.success('Baseline restored — aircraft back at par');
   }
 
   const handleScan = (itemId: string) => {
