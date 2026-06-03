@@ -549,6 +549,59 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         pendingChanges: state.pendingChanges + 1,
       };
 
+    case 'ADD_TRIP_LOAD_ITEMS': {
+      const { tripId, items } = action.payload;
+      const commissaryItems = items.filter(li => li.source === 'commissary');
+      // Update stockroom quantities for commissary-sourced loads
+      let newStockroomItems = state.stockroomItems;
+      let alerts = state.alerts;
+      if (commissaryItems.length > 0) {
+        newStockroomItems = state.stockroomItems.map(si => {
+          const loadQty = commissaryItems
+            .filter(li => li.itemId === si.itemId)
+            .reduce((sum, li) => sum + li.qty, 0);
+          if (loadQty === 0) return si;
+          return { ...si, qtyOnHand: Math.max(0, si.qtyOnHand - loadQty) };
+        });
+        alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, newStockroomItems);
+      }
+      const newTrips = state.trips.map(t =>
+        t.id === tripId
+          ? { ...t, loadItems: [...t.loadItems, ...items] }
+          : t
+      );
+      return {
+        ...state,
+        trips: newTrips,
+        stockroomItems: newStockroomItems,
+        alerts,
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
+    case 'ADD_TRIP_RETURN_ITEMS': {
+      const { tripId, items, stockroomUpdates } = action.payload;
+      const newStockroomItems = state.stockroomItems.map(si => {
+        const updated = stockroomUpdates.find(
+          u => u.itemId === si.itemId && u.stockroomId === si.stockroomId
+        );
+        return updated ?? si;
+      });
+      const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, stockroomUpdates);
+      const newTrips = state.trips.map(t =>
+        t.id === tripId
+          ? { ...t, returnItems: [...t.returnItems, ...items] }
+          : t
+      );
+      return {
+        ...state,
+        trips: newTrips,
+        stockroomItems: newStockroomItems,
+        alerts,
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
     default:
       return state;
   }
