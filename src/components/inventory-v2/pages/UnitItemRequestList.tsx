@@ -49,13 +49,13 @@ const getStatusColors = (status: UnitItemRequest['status']) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Send className="w-6 h-6 text-purple-500" />
+          <Send className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold">Unit Item Requests</h1>
           <V2Badge />
         </div>
         <Button
           onClick={() => navigate('/inventory-v2/unit-request')}
-          className="bg-purple-500 hover:bg-purple-600 text-white"
+          className="btn-aviation-primary"
         >
           <Plus className="w-4 h-4 mr-1" /> New Request
         </Button>
@@ -68,17 +68,17 @@ const getStatusColors = (status: UnitItemRequest['status']) => {
           return (
             <Card
               key={request.id}
-              className={`cursor-pointer hover:border-purple-500/30 transition-colors ${
+              className={`cursor-pointer hover:border-primary/30 transition-colors ${
                 request.status === 'cancelled' ? 'opacity-50 pointer-events-none' : ''
               }`}
               onClick={() => request.status !== 'cancelled' && setSelectedRequest(request)}
             >
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <Badge className="bg-purple-500/15 text-purple-400 border-purple-500/30">
+                  <Badge className="status-badge bg-primary/10 text-primary border-primary/30">
                     {request.unitTailNumber}
                   </Badge>
-                  <Badge className={`${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}>
+                  <Badge className={`status-badge ${statusStyle.className}`}>
                     {statusStyle.label}
                   </Badge>
                 </div>
@@ -140,7 +140,7 @@ const getStatusColors = (status: UnitItemRequest['status']) => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status</span>
-                    <Badge className={`${getStatusColors(selectedRequest.status).bg} ${getStatusColors(selectedRequest.status).text}`}>
+                    <Badge className={`status-badge ${getStatusColors(selectedRequest.status).className}`}>
                       {getStatusColors(selectedRequest.status).label}
                     </Badge>
                   </div>

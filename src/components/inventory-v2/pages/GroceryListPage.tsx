@@ -105,7 +105,7 @@ function ItemRow({ groceryItem, itemDef, picked, onTogglePicked, onChangeQty, on
         <button
           onClick={() => onChangeQty(-1)}
           disabled={groceryItem.qtyNeeded <= 1}
-          className="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors disabled:opacity-40"
+          className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center text-lg hover:bg-muted/80 transition-colors disabled:opacity-40"
         >
           −
         </button>
@@ -114,7 +114,7 @@ function ItemRow({ groceryItem, itemDef, picked, onTogglePicked, onChangeQty, on
         </span>
         <button
           onClick={() => onChangeQty(1)}
-          className="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-lg hover:bg-slate-700 transition-colors"
+          className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center text-lg hover:bg-muted/80 transition-colors"
         >
           +
         </button>
@@ -418,7 +418,7 @@ function GroceryListInner({
       <OfflineBanner />
 
       {/* ── HEADER ── */}
-      <div className="bg-slate-950/95 backdrop-blur-sm border-b border-slate-800 px-4 py-3 space-y-1.5 shrink-0">
+      <div className="bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 space-y-1.5 shrink-0">
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate(`/inventory-v2/trips/${tripId}`)}
@@ -428,7 +428,7 @@ function GroceryListInner({
           </button>
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold font-mono">{trip.tailNumber}</span>
-            <Badge className={cn('text-xs', statusColors.bg, statusColors.text, 'border', statusColors.border)}>
+            <Badge className={cn('text-xs status-badge', statusColors.className)}>
               {statusColors.label}
             </Badge>
           </div>
@@ -445,7 +445,7 @@ function GroceryListInner({
         </div>
         {/* Progress bar */}
         {totalItems > 0 && (
-          <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+          <div className="h-1 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-emerald-500 rounded-full transition-all"
               style={{ width: `${Math.round((pickedItems / totalItems) * 100)}%` }}
@@ -540,7 +540,7 @@ function GroceryListInner({
           <div className="space-y-1">
             <label className="text-sm text-muted-foreground">Notes & Instructions</label>
             <Textarea
-              className="min-h-[80px] bg-slate-900 border-slate-700"
+              className="min-h-[80px] bg-card border-border"
               placeholder="e.g. Get organic honey, check Costco for Perrier, catering order from Joe's..."
               value={groceryList.notes ?? ''}
               onChange={e => updateGroceryList({ ...groceryList, notes: e.target.value })}
@@ -551,7 +551,7 @@ function GroceryListInner({
       </div>
 
       {/* ── STICKY FOOTER ── */}
-      <div className="bg-slate-950 border-t-2 border-slate-700 px-4 py-3 shrink-0">
+      <div className="bg-background border-t-2 border-border px-4 py-3 shrink-0">
         <div className="max-w-5xl mx-auto flex gap-3">
           <Button variant="outline" className="flex-1" onClick={handleShare}>
             <Share2 className="mr-2 h-4 w-4" />
@@ -604,7 +604,7 @@ function GroceryListInner({
                         'w-full text-left px-3 py-2 rounded text-sm transition-colors',
                         alreadyAdded
                           ? 'opacity-40 cursor-not-allowed'
-                          : 'hover:bg-slate-800'
+                          : 'hover:bg-muted'
                       )}
                     >
                       <span className="font-medium">{item.itemName}</span>

@@ -137,7 +137,7 @@ export default function InventoryV2Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <LayoutDashboard className="w-6 h-6 text-purple-500" />
+          <LayoutDashboard className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold">Inventory Dashboard</h1>
           <V2Badge variant="v2" size="md" />
         </div>
@@ -162,7 +162,7 @@ export default function InventoryV2Dashboard() {
               return (
                 <div
                   key={trip.id}
-                  className="flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer hover:bg-slate-900/40 transition-colors"
+                  className="flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer hover:bg-muted/40 transition-colors"
                   onClick={() => navigate(`/inventory-v2/trips/${trip.id}`)}
                 >
                   <div className="flex items-center gap-3">
@@ -203,9 +203,9 @@ export default function InventoryV2Dashboard() {
             <p className="text-xs text-muted-foreground">Restock Needed</p>
           </CardContent>
         </Card>
-        <Card className="border-purple-500/20">
+        <Card className="border-primary/20">
           <CardContent className="p-3 text-center">
-            <p className="text-2xl font-bold text-purple-400">{openRequests.length}</p>
+            <p className="text-2xl font-bold text-primary">{openRequests.length}</p>
             <p className="text-xs text-muted-foreground">Open Requests</p>
           </CardContent>
         </Card>
@@ -290,7 +290,7 @@ export default function InventoryV2Dashboard() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Send className="w-4 h-4 text-purple-400" />
+                <Send className="w-4 h-4 text-primary" />
                 Open Unit Item Requests
                 <Badge variant="outline" className="ml-auto">{openRequests.length}</Badge>
               </CardTitle>

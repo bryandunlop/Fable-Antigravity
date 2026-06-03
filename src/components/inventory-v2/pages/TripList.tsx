@@ -205,7 +205,7 @@ function AircraftCard({
         'cursor-pointer transition-all hover:scale-[1.02]',
         activeTrip
           ? 'border-amber-500/40 bg-amber-500/5 hover:border-amber-500/60'
-          : 'border-slate-700 hover:border-slate-500'
+          : 'border-border hover:border-primary/40'
       )}
     >
       <CardContent className="p-5 space-y-3">
@@ -218,7 +218,7 @@ function AircraftCard({
           </div>
           <div className={cn(
             'p-2.5 rounded-xl',
-            activeTrip ? 'bg-amber-500/20' : 'bg-slate-800'
+            activeTrip ? 'bg-amber-500/20' : 'bg-muted'
           )}>
             <Plane className={cn(
               'h-6 w-6',
@@ -281,9 +281,9 @@ function TripHistoryRow({ trip }: { trip: Trip }) {
   return (
     <button
       onClick={() => navigate(`/inventory-v2/trips/${trip.id}`)}
-      className="w-full flex items-center gap-3 px-4 py-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors text-left"
+      className="w-full flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors text-left"
     >
-      <Badge className="shrink-0 text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">
+      <Badge className="shrink-0 text-xs font-mono bg-muted text-muted-foreground border border-border">
         {trip.tailNumber}
       </Badge>
       <div className="flex-1 min-w-0">
@@ -297,7 +297,7 @@ function TripHistoryRow({ trip }: { trip: Trip }) {
           {trip.legs.length} leg{trip.legs.length !== 1 ? 's' : ''}
         </p>
       </div>
-      <Badge className={cn('shrink-0 text-xs', colors.bg, colors.text, 'border', colors.border)}>
+      <Badge className={cn('shrink-0 text-xs status-badge', colors.className)}>
         {colors.label}
       </Badge>
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

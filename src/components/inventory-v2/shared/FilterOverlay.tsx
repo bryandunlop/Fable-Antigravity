@@ -42,7 +42,7 @@ export default function FilterOverlay({ open, onOpenChange, filters, onFiltersCh
       <SheetContent>
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-purple-500" />
+            <Filter className="w-5 h-5 text-primary" />
             Filters
           </SheetTitle>
         </SheetHeader>
@@ -102,7 +102,7 @@ export default function FilterOverlay({ open, onOpenChange, filters, onFiltersCh
               Reset
             </Button>
             <Button
-              className="flex-1 bg-purple-500 hover:bg-purple-600 text-white"
+              className="flex-1 btn-aviation-primary"
               onClick={() => onOpenChange(false)}
             >
               Apply

@@ -61,7 +61,7 @@ export default function PhysicalCount() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <ClipboardList className="w-6 h-6 text-purple-500" />
+          <ClipboardList className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold">Physical Count</h1>
           <V2Badge />
         </div>
@@ -71,9 +71,9 @@ export default function PhysicalCount() {
       </div>
 
       {/* Info banner */}
-      <Card className="border-purple-500/30 bg-purple-500/5">
+      <Card className="border-primary/30 bg-primary/5">
         <CardContent className="p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-purple-500 mt-0.5 shrink-0" />
+          <AlertTriangle className="w-5 h-5 text-primary mt-0.5 shrink-0" />
           <div>
             <p className="font-medium text-sm">Fresh Count Mode</p>
             <p className="text-sm text-muted-foreground">
@@ -160,7 +160,7 @@ export default function PhysicalCount() {
         <p className="text-sm text-muted-foreground">{filledCount} items counted</p>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button className="bg-purple-500 hover:bg-purple-600 text-white" disabled={filledCount === 0}>
+            <Button className="btn-aviation-primary" disabled={filledCount === 0}>
               <Check className="w-4 h-4 mr-1" /> COMPLETE
             </Button>
           </AlertDialogTrigger>
@@ -178,7 +178,7 @@ export default function PhysicalCount() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleComplete} className="bg-purple-500 hover:bg-purple-600">
+              <AlertDialogAction onClick={handleComplete} className="bg-primary hover:bg-primary/90">
                 Confirm & Update
               </AlertDialogAction>
             </AlertDialogFooter>
