@@ -140,7 +140,7 @@ function TripLoadExtrasInner({ trip, onBack }: TripLoadExtrasProps) {
                   <div className="min-w-0">
                     <p className="font-semibold text-sm leading-tight">{item.itemName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Par {par} {item.unitOfMeasure} ·{' '}
+                      Par {par} {item.uom} ·{' '}
                       <span className={isLow ? 'text-destructive font-medium' : 'text-emerald-600 font-medium'}>
                         {onHand} avail
                       </span>
