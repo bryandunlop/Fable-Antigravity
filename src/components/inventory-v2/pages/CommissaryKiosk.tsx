@@ -80,7 +80,7 @@ export default function CommissaryKiosk() {
   }, [confirmed]);
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-white overflow-hidden relative">
+    <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-white overflow-hidden relative animate-in fade-in duration-200">
       {/* ── CONFIRMATION FLASH ── */}
       {confirmed && (
         <div className="absolute inset-0 z-50 bg-emerald-600 flex flex-col items-center justify-center">

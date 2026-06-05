@@ -108,7 +108,7 @@ export default function AlertsPage() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="max-w-5xl mx-auto p-6 space-y-6 animate-in fade-in duration-200">
       <div className="flex items-center gap-3">
         <Bell className="h-6 w-6 text-muted-foreground" />
         <h1 className="text-2xl font-bold">My Alerts</h1>

@@ -491,7 +491,7 @@ function TripViewInner({
   }
 
   return (
-    <div className="-m-6 -mb-20 flex flex-col h-[calc(100dvh-9.125rem)] md:h-[calc(100dvh-4.5625rem)] overflow-hidden">
+    <div className="-m-6 -mb-20 flex flex-col h-[calc(100dvh-9.125rem)] md:h-[calc(100dvh-4.5625rem)] overflow-hidden animate-in fade-in duration-200">
       <OfflineBanner />
 
       {/* ── HEADER ── */}

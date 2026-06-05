@@ -315,7 +315,7 @@ export default function InspectionReview() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen p-4 md:p-6 space-y-6">
+    <div className="min-h-screen p-4 md:p-6 space-y-6 animate-in fade-in duration-200">
       {/* ── Back Button ── */}
       <Button
         variant="ghost"

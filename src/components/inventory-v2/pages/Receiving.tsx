@@ -148,7 +148,7 @@ export default function Receiving() {
   const stockroomLog = state.stockLog.filter(l => l.stockroomId === 'sr-1');
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="max-w-5xl mx-auto p-6 space-y-6 animate-in fade-in duration-200">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">

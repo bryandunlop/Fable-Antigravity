@@ -84,7 +84,7 @@ export default function StockroomCount() {
   const currentStockroom = state.stockrooms.find(s => s.id === 'sr-1');
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="max-w-7xl mx-auto p-6 space-y-6 animate-in fade-in duration-200">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
