@@ -13,6 +13,7 @@ import {
   PackagePlus, Send, Truck, ArrowRight, Plane, ChevronRight
 } from 'lucide-react';
 import { OfflineBanner } from '../shared/OfflineBanner';
+import { formatDate } from '../shared/dateUtils';
 
 export default function InventoryV2Dashboard() {
   const navigate = useNavigate();
@@ -27,11 +28,6 @@ export default function InventoryV2Dashboard() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hiddenPanels, setHiddenPanels] = useState<Set<string>>(new Set());
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  };
 
   // Filter helpers
   const matchesUnitFilter = (tailNumber: string) => {

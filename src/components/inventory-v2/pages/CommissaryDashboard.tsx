@@ -8,15 +8,7 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { V2Badge } from '../shared/V2Badge';
 import type { StockroomItem } from '../types';
-
-function formatRelativeTime(isoString: string): string {
-  const MS_PER_HOUR = 3_600_000;
-  const MS_PER_DAY = 86_400_000;
-  const diff = Date.now() - new Date(isoString).getTime();
-  if (diff < MS_PER_HOUR) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < MS_PER_DAY) return `${Math.floor(diff / MS_PER_HOUR)}h ago`;
-  return new Date(isoString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+import { formatRelativeTime } from '../shared/dateUtils';
 
 // ─── Row ─────────────────────────────────────────────────────────────────────
 
@@ -76,7 +68,7 @@ export default function CommissaryDashboard() {
   const sentLists = state.groceryLists.filter(gl => gl.status === 'sent');
 
   const stockroomItems = state.stockroomItems.filter(
-    si => si.stockroomId === state.selectedStockroomId
+    si => si.stockroomId === 'sr-1'
   );
 
   // At or below minimum → Critical
@@ -86,6 +78,7 @@ export default function CommissaryDashboard() {
   const threshold = stockroomItems.filter(
     si => si.qtyOnHand > si.minimumLevel && si.qtyOnHand < si.parLevel
   );
+
 
   const okCount = stockroomItems.length - critical.length - threshold.length;
 
