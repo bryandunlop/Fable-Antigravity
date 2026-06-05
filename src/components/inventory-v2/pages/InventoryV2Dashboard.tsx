@@ -10,7 +10,8 @@ import { V2Badge } from '../shared/V2Badge';
 import FilterOverlay, { type FilterState, DEFAULT_FILTERS } from '../shared/FilterOverlay';
 import {
   LayoutDashboard, Filter, Clock, CheckCircle, AlertTriangle,
-  PackagePlus, Send, Truck, ArrowRight, Plane, ChevronRight
+  PackagePlus, Send, Truck, ArrowRight, Plane, ChevronRight,
+  ClipboardCheck, CheckCircle2
 } from 'lucide-react';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { formatDate } from '../shared/dateUtils';
@@ -253,7 +254,12 @@ export default function InventoryV2Dashboard() {
                       <span className="text-xs text-muted-foreground">{i.reportedBy}</span>
                     </div>
                   ))}
-                  {inProgress.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">None</p>}
+                  {inProgress.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <ClipboardCheck className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No inspections in progress</p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -286,7 +292,12 @@ export default function InventoryV2Dashboard() {
                       <span className="text-xs text-muted-foreground">{formatDate(i.date)}</span>
                     </div>
                   ))}
-                  {restockingNeeded.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">None</p>}
+                  {restockingNeeded.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <AlertTriangle className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">All aircraft fully stocked</p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -321,7 +332,12 @@ export default function InventoryV2Dashboard() {
                       <span className="text-xs text-muted-foreground">{r.items.length} items</span>
                     </div>
                   ))}
-                  {openRequests.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">None</p>}
+                  {openRequests.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <Send className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No open requests</p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -354,7 +370,12 @@ export default function InventoryV2Dashboard() {
                       <span className="text-xs text-muted-foreground">{formatDate(i.date)}</span>
                     </div>
                   ))}
-                  {recentlyCompleted.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">None</p>}
+                  {recentlyCompleted.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <CheckCircle className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No recent inspections</p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -384,7 +405,12 @@ export default function InventoryV2Dashboard() {
                       <span className="text-xs text-muted-foreground">{formatDate(i.date)}</span>
                     </div>
                   ))}
-                  {recentlyRestocked.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">None</p>}
+                  {recentlyRestocked.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <PackagePlus className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No recent restocks</p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -414,7 +440,12 @@ export default function InventoryV2Dashboard() {
                       <span className="text-xs text-muted-foreground">{formatDate(r.requestDate)}</span>
                     </div>
                   ))}
-                  {completedRequests.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">None</p>}
+                  {completedRequests.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <CheckCircle2 className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No completed requests</p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>

@@ -30,7 +30,12 @@ function AlertTable({ alerts }: { alerts: CommissaryAlert[] }) {
   }
 
   if (alerts.length === 0) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">No alerts to show.</p>;
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+        <Bell className="w-8 h-8 mb-2 opacity-40" />
+        <p className="text-sm">No alerts to show</p>
+      </div>
+    );
   }
 
   return (

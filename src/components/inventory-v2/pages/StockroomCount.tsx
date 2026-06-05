@@ -10,7 +10,7 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES, V2_THEME } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import BulkAdjustModal from '../shared/BulkAdjustModal';
-import { Search, Plus, Minus, ChevronDown, ArrowUp, Warehouse, Layers, ExternalLink } from 'lucide-react';
+import { Search, Plus, Minus, ChevronDown, ArrowUp, Warehouse, Layers, ExternalLink, Package } from 'lucide-react';
 
 export default function StockroomCount() {
   const { state, dispatch } = useInventoryV2();
@@ -287,7 +287,10 @@ export default function StockroomCount() {
       </div>
 
       {Object.keys(groupedByCategory).length === 0 && (
-        <p className="text-center text-muted-foreground py-12">No items match your filters</p>
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Package className="w-8 h-8 mb-2 opacity-40" />
+          <p className="text-sm">No items match your filters</p>
+        </div>
       )}
 
       <BulkAdjustModal open={bulkAdjustOpen} onOpenChange={setBulkAdjustOpen} />
