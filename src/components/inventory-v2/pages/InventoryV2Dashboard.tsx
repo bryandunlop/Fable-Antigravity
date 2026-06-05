@@ -400,7 +400,7 @@ export default function InventoryV2Dashboard() {
                     <div
                       key={r.id}
                       className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => navigate('/inventory-v2/requests')}
+                      onClick={() => navigate('/inventory-v2/unit-requests')}
                     >
                       <span className="text-sm font-medium">{r.unitTailNumber}</span>
                       <span className="text-xs text-muted-foreground">{formatDate(r.requestDate)}</span>
