@@ -28,13 +28,16 @@ export const useNotifications = ({ userRole }: UseNotificationsOptions) => {
     const roleNotifications = {
       'pilot': ['task', 'fuel', 'schedule', 'document', 'system', 'safety', 'nas_impact'],
       'maintenance': ['task', 'maintenance', 'audit', 'document', 'system', 'nas_impact'],
-      'inflight': ['task', 'passenger', 'schedule', 'document', 'system', 'nas_impact'],
+      'inflight': ['task', 'passenger', 'inventory', 'schedule', 'document', 'system', 'nas_impact'],
       'safety': ['task', 'audit', 'safety', 'document', 'system', 'nas_impact'],
       'scheduling': ['task', 'schedule', 'trip', 'document', 'system', 'nas_impact'],
-      'admin': ['task', 'audit', 'fuel', 'maintenance', 'safety', 'passenger', 'schedule', 'trip', 'document', 'system', 'nas_impact'],
-      'lead': ['task', 'audit', 'fuel', 'maintenance', 'safety', 'passenger', 'schedule', 'trip', 'document', 'system', 'nas_impact'],
+      'admin': ['task', 'audit', 'fuel', 'maintenance', 'safety', 'passenger', 'inventory', 'schedule', 'trip', 'document', 'system', 'nas_impact'],
+      'lead': ['task', 'audit', 'fuel', 'maintenance', 'safety', 'passenger', 'inventory', 'schedule', 'trip', 'document', 'system', 'nas_impact'],
       'admin-assistant': ['task', 'passenger', 'schedule', 'trip', 'document', 'system'],
-      'document-manager': ['task', 'document', 'system']
+      'document-manager': ['task', 'document', 'system'],
+      'fa': ['task', 'inventory', 'schedule', 'document', 'system', 'nas_impact'],
+      'commissary-manager': ['task', 'inventory', 'document', 'system'],
+      'lead-fa': ['task', 'inventory', 'schedule', 'document', 'system', 'nas_impact'],
     };
 
     const allowedTypes = roleNotifications[userRole as keyof typeof roleNotifications] || [];

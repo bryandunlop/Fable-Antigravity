@@ -4,7 +4,7 @@ export interface Notification {
     id: string;
     title: string;
     message: string;
-    type: 'task' | 'audit' | 'fuel' | 'maintenance' | 'safety' | 'passenger' | 'schedule' | 'document' | 'system' | 'nas_impact' | 'trip';
+    type: 'task' | 'audit' | 'fuel' | 'maintenance' | 'safety' | 'passenger' | 'schedule' | 'document' | 'system' | 'nas_impact' | 'trip' | 'inventory';
     priority: 'low' | 'medium' | 'high' | 'critical';
     timestamp: string;
     isRead: boolean;
