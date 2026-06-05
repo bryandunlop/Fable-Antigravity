@@ -43,7 +43,7 @@ export default function UnitItemRequest() {
   }, [filteredItems]);
 
   const getStockroomQty = (itemId: string) => {
-    const si = state.stockroomItems.find(s => s.itemId === itemId && s.stockroomId === state.selectedStockroomId);
+    const si = state.stockroomItems.find(s => s.itemId === itemId && s.stockroomId === 'sr-1');
     return si?.qtyOnHand ?? 0;
   };
 

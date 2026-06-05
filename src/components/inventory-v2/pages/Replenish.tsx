@@ -98,7 +98,7 @@ export default function Replenish() {
 
   const getBinLocation = (itemId: string) => {
     const si = state.stockroomItems.find(
-      s => s.itemId === itemId && s.stockroomId === state.selectedStockroomId
+      s => s.itemId === itemId && s.stockroomId === 'sr-1'
     );
     return si?.binLocation ?? '—';
   };

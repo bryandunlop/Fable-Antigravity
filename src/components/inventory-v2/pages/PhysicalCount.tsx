@@ -19,8 +19,8 @@ export default function PhysicalCount() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const stockroomItems = useMemo(() =>
-    state.stockroomItems.filter(si => si.stockroomId === state.selectedStockroomId),
-    [state.stockroomItems, state.selectedStockroomId]
+    state.stockroomItems.filter(si => si.stockroomId === 'sr-1'),
+    [state.stockroomItems]
   );
 
   const groupedByCategory = useMemo(() => {
@@ -54,7 +54,7 @@ export default function PhysicalCount() {
   };
 
   const filledCount = Object.values(counts).filter(v => v !== '').length;
-  const totalItems = state.items.length;
+  const totalItems = stockroomItems.length;
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">

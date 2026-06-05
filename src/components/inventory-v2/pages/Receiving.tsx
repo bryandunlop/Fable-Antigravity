@@ -34,8 +34,8 @@ export default function Receiving() {
   const [scannerOpen, setScannerOpen] = useState(false);
 
   const stockroomItems = useMemo(() =>
-    state.stockroomItems.filter(si => si.stockroomId === state.selectedStockroomId),
-    [state.stockroomItems, state.selectedStockroomId]
+    state.stockroomItems.filter(si => si.stockroomId === 'sr-1'),
+    [state.stockroomItems]
   );
 
   const getOnHand = (itemId: string) =>
@@ -112,7 +112,7 @@ export default function Receiving() {
       // Item not in this stockroom yet — create entry
       return {
         itemId,
-        stockroomId: state.selectedStockroomId,
+        stockroomId: 'sr-1',
         qtyOnHand: qty,
         parLevel: 0,
         minimumLevel: 0,
@@ -127,7 +127,7 @@ export default function Receiving() {
       type: 'ADD_STOCK_LOG',
       payload: {
         id: `log-${Date.now()}`,
-        stockroomId: state.selectedStockroomId,
+        stockroomId: 'sr-1',
         addedBy,
         timestamp: new Date().toISOString(),
         items: stagedItems.map(([itemId, qtyAdded]) => ({ itemId, qtyAdded })),
@@ -145,7 +145,7 @@ export default function Receiving() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   };
 
-  const stockroomLog = state.stockLog.filter(l => l.stockroomId === state.selectedStockroomId);
+  const stockroomLog = state.stockLog.filter(l => l.stockroomId === 'sr-1');
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -226,32 +226,17 @@ export default function Receiving() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
         {/* Left — browse items */}
         <div className="space-y-4">
-          {/* Stockroom + search */}
+          {/* Search */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Select
-                  value={state.selectedStockroomId}
-                  onValueChange={(v: string) => dispatch({ type: 'SET_SELECTED_STOCKROOM', payload: v })}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {state.stockrooms.map(sr => (
-                      <SelectItem key={sr.id} value={sr.id}>{sr.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search items..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search items..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
             </CardContent>
           </Card>

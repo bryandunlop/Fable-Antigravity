@@ -5,7 +5,6 @@ import { Badge } from '../../ui/badge';
 import { Input } from '../../ui/input';
 import { Switch } from '../../ui/switch';
 import { Label } from '../../ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../ui/collapsible';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES, V2_THEME } from '../constants';
@@ -23,8 +22,8 @@ export default function StockroomCount() {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   const stockroomItems = useMemo(() =>
-    state.stockroomItems.filter(si => si.stockroomId === state.selectedStockroomId),
-    [state.stockroomItems, state.selectedStockroomId]
+    state.stockroomItems.filter(si => si.stockroomId === 'sr-1'),
+    [state.stockroomItems]
   );
 
   const getStockroomItem = (itemId: string) =>
@@ -82,7 +81,7 @@ export default function StockroomCount() {
     setOpenSections(prev => ({ ...prev, [catId]: !prev[catId] }));
   };
 
-  const currentStockroom = state.stockrooms.find(s => s.id === state.selectedStockroomId);
+  const currentStockroom = state.stockrooms.find(s => s.id === 'sr-1');
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -104,23 +103,7 @@ export default function StockroomCount() {
       {/* Controls */}
       <Card>
         <CardContent className="p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Stockroom</Label>
-              <Select
-                value={state.selectedStockroomId}
-                onValueChange={(v: string) => dispatch({ type: 'SET_SELECTED_STOCKROOM', payload: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {state.stockrooms.map(sr => (
-                    <SelectItem key={sr.id} value={sr.id}>{sr.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">Search</Label>
               <div className="relative">

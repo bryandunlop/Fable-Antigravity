@@ -18,7 +18,7 @@ export default function BulkAdjustModal({ open, onOpenChange }: BulkAdjustModalP
   const [adjustments, setAdjustments] = useState<Record<string, number>>({});
 
   const stockroomItems = state.stockroomItems.filter(
-    si => si.stockroomId === state.selectedStockroomId
+    si => si.stockroomId === 'sr-1'
   );
 
   const filteredItems = useMemo(() => {

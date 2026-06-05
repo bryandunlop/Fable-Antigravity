@@ -618,7 +618,7 @@ function ParLevelsTab() {
   const [edits, setEdits] = useState<Record<string, { par?: number; min?: number }>>({});
 
   const stockroomItems = state.stockroomItems.filter(
-    si => si.stockroomId === state.selectedStockroomId
+    si => si.stockroomId === 'sr-1'
   );
 
   const filteredItems = state.items.filter(item => {
@@ -846,7 +846,7 @@ function MyAlertsTab() {
           </p>
           {itemsWithout.map(item => {
             const si = state.stockroomItems.find(
-              s => s.itemId === item.id && s.stockroomId === state.selectedStockroomId
+              s => s.itemId === item.id && s.stockroomId === 'sr-1'
             );
             return (
               <div key={item.id} className="flex items-center gap-3 rounded-lg border border-white/[0.05] px-3 py-2">
