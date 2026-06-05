@@ -10,7 +10,9 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES, V2_THEME } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import BulkAdjustModal from '../shared/BulkAdjustModal';
-import { Search, Plus, Minus, ChevronDown, ArrowUp, Warehouse, Layers, ExternalLink, Package } from 'lucide-react';
+import { Search, Plus, Minus, ChevronDown, ArrowUp, Warehouse, Layers, ExternalLink, Package, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { getBatchExpirationStatus, formatDateShort } from '../shared/dateUtils';
 
 export default function StockroomCount() {
   const { state, dispatch } = useInventoryV2();
@@ -28,6 +30,16 @@ export default function StockroomCount() {
 
   const getStockroomItem = (itemId: string) =>
     stockroomItems.find(si => si.itemId === itemId);
+
+  const getBatchesForItem = (itemId: string) =>
+    state.stockBatches
+      .filter(b => b.itemId === itemId && b.stockroomId === 'sr-1')
+      .sort((a, b) => {
+        if (!a.expirationDate && !b.expirationDate) return 0;
+        if (!a.expirationDate) return 1;
+        if (!b.expirationDate) return -1;
+        return a.expirationDate.localeCompare(b.expirationDate);
+      });
 
   const filteredItems = useMemo(() => {
     let items = state.items.map(item => ({
@@ -184,19 +196,16 @@ export default function StockroomCount() {
                       const min = si?.minimumLevel ?? 0;
                       const isBelowPar = qty < par;
                       const isAtMin = qty <= min;
-                      const batches = si
-                        ? state.stockBatches.filter(
-                            b => b.itemId === item.id && b.stockroomId === si.stockroomId
-                          )
-                        : [];
+                      const batchList = getBatchesForItem(item.id);
                       const isExpanded = expandedItemId === item.id;
 
                       return (
                         <React.Fragment key={item.id}>
                           <div
-                            className={`grid grid-cols-[1fr_80px_90px_90px_120px_60px_60px_28px] gap-2 px-4 py-2 rounded items-center text-sm ${
+                            className={`grid grid-cols-[1fr_80px_90px_90px_120px_60px_60px_28px] gap-2 px-4 py-2 rounded items-center text-sm cursor-pointer ${
                               isBelowPar ? 'bg-blue-100 dark:bg-blue-900/20' : 'hover:bg-muted/30'
                             }`}
+                            onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
                           >
                             <span className="font-medium truncate flex items-center gap-1.5">
                               {item.itemName}
@@ -221,7 +230,7 @@ export default function StockroomCount() {
                                 variant="outline"
                                 size="icon"
                                 className="h-6 w-6"
-                                onClick={() => handleQtyChange(item.id, -1)}
+                                onClick={e => { e.stopPropagation(); handleQtyChange(item.id, -1); }}
                               >
                                 <Minus className="w-3 h-3" />
                               </Button>
@@ -233,7 +242,7 @@ export default function StockroomCount() {
                                 variant="outline"
                                 size="icon"
                                 className="h-6 w-6"
-                                onClick={() => handleQtyChange(item.id, 1)}
+                                onClick={e => { e.stopPropagation(); handleQtyChange(item.id, 1); }}
                               >
                                 <Plus className="w-3 h-3" />
                               </Button>
@@ -241,40 +250,58 @@ export default function StockroomCount() {
                             <span className="text-center text-muted-foreground">{par}</span>
                             <span className="text-center text-muted-foreground">{min}</span>
                             <div className="flex items-center justify-center">
-                              {batches.length > 0 && (
-                                <button
-                                  className="p-0.5 rounded hover:bg-muted/50 transition-colors"
-                                  onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
-                                  title={isExpanded ? 'Hide batches' : 'Show batches'}
-                                >
-                                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                </button>
+                              {batchList.length > 0 && (
+                                <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                               )}
                             </div>
                           </div>
-                          {isExpanded && batches.map(batch => {
-                            const isExpired = batch.expirationDate
-                              ? new Date(batch.expirationDate) < new Date()
-                              : false;
-                            const isExpiringSoon = batch.expirationDate
-                              ? new Date(batch.expirationDate) < new Date(Date.now() + 14 * 86_400_000)
-                              : false;
-
-                            return (
-                              <div key={batch.id} className="flex items-center justify-between px-6 py-1.5 bg-slate-950/40 text-xs">
-                                <span className="text-muted-foreground">{batch.batchLabel ?? 'Batch'}</span>
-                                <span className="text-muted-foreground">Qty: {batch.quantity}</span>
-                                {batch.expirationDate ? (
-                                  <span className={isExpired ? 'text-red-400 line-through' : isExpiringSoon ? 'text-amber-400' : 'text-muted-foreground'}>
-                                    {isExpired ? 'Expired' : `Exp: ${new Date(batch.expirationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}`}
-                                    {isExpiringSoon && !isExpired && ' ⚠'}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">No expiry</span>
-                                )}
-                              </div>
-                            );
-                          })}
+                          {isExpanded && (
+                            <div className="px-4 py-2 bg-muted/30 border-t border-border/40">
+                              {batchList.length === 0 ? (
+                                <p className="text-xs text-muted-foreground py-2">No batch data</p>
+                              ) : (
+                                <div className="space-y-1">
+                                  <div className="grid grid-cols-5 gap-2 text-xs text-muted-foreground font-medium px-1">
+                                    <span>Lot</span><span>Qty</span><span>Received</span><span>Expires</span><span></span>
+                                  </div>
+                                  {batchList.map(batch => {
+                                    const status = getBatchExpirationStatus(batch.expirationDate);
+                                    const statusColor = status === 'expired' ? 'text-red-500' : status === 'expiring-soon' ? 'text-amber-500' : 'text-green-500';
+                                    return (
+                                      <div key={batch.id} className="grid grid-cols-5 gap-2 text-xs items-center px-1 py-1 rounded hover:bg-muted/50">
+                                        <span className="font-mono truncate">{batch.batchLabel ?? '—'}</span>
+                                        <span>{batch.quantity}</span>
+                                        <span>{formatDateShort(batch.receivedDate)}</span>
+                                        <span className={statusColor}>
+                                          {batch.expirationDate ? formatDateShort(batch.expirationDate) : 'N/A'}
+                                          {status === 'expired' && ' (expired)'}
+                                        </span>
+                                        <span>
+                                          {status === 'expired' && (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-2 text-xs text-red-500 hover:text-red-400"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                dispatch({
+                                                  type: 'DISPOSE_EXPIRED_BATCH',
+                                                  payload: { batchId: batch.id, itemId: batch.itemId, stockroomId: batch.stockroomId, qty: batch.quantity }
+                                                });
+                                                toast.success(`Disposed ${batch.quantity}x ${item.itemName} (${batch.batchLabel ?? 'batch'})`);
+                                              }}
+                                            >
+                                              <Trash2 className="w-3 h-3 mr-1" /> Dispose
+                                            </Button>
+                                          )}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </React.Fragment>
                       );
                     })}
