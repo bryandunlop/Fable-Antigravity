@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ShoppingCart, ExternalLink, MonitorSmartphone } from 'lucide-react';
+import { CheckCircle2, ShoppingCart, ExternalLink, MonitorSmartphone, AlertCircle, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -115,7 +115,7 @@ export default function CommissaryDashboard() {
       <div className="grid grid-cols-3 gap-4">
         <Card className="border-red-500/40 bg-red-500/5">
           <CardContent className="flex items-center gap-3 p-4">
-            <span className="text-xl">🔴</span>
+            <AlertCircle className="w-6 h-6 text-red-500 shrink-0" />
             <div>
               <p className="text-2xl font-bold text-red-500">{critical.length}</p>
               <p className="text-xs text-muted-foreground">At or below minimum</p>
@@ -124,7 +124,7 @@ export default function CommissaryDashboard() {
         </Card>
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="flex items-center gap-3 p-4">
-            <span className="text-xl">🟡</span>
+            <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
             <div>
               <p className="text-2xl font-bold text-amber-500">{threshold.length}</p>
               <p className="text-xs text-muted-foreground">Below par level</p>
@@ -133,7 +133,7 @@ export default function CommissaryDashboard() {
         </Card>
         <Card className="border-green-500/40 bg-green-500/5">
           <CardContent className="flex items-center gap-3 p-4">
-            <span className="text-xl">✅</span>
+            <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0" />
             <div>
               <p className="text-2xl font-bold text-green-500">{okCount}</p>
               <p className="text-xs text-muted-foreground">Items OK</p>
@@ -156,7 +156,8 @@ export default function CommissaryDashboard() {
             <Card className="border-red-500/40">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm text-red-500">
-                  🔴 Critical — At or Below Minimum
+                  <AlertCircle className="w-4 h-4" />
+                  Critical — At or Below Minimum
                   <Badge variant="destructive" className="ml-auto">{critical.length}</Badge>
                 </CardTitle>
               </CardHeader>
@@ -172,7 +173,8 @@ export default function CommissaryDashboard() {
             <Card className="border-amber-500/30">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm text-amber-500">
-                  🟡 Below Par Level
+                  <AlertTriangle className="w-4 h-4" />
+                  Below Par Level
                   <Badge className="ml-auto bg-amber-500/20 text-amber-600 border-amber-500/30">{threshold.length}</Badge>
                 </CardTitle>
               </CardHeader>
