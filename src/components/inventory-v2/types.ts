@@ -447,6 +447,7 @@ export type InventoryV2Action =
   | { type: 'ADD_STOCK_BATCH'; payload: StockBatch }
   | { type: 'UPDATE_STOCK_BATCH'; payload: StockBatch }
   | { type: 'REMOVE_STOCK_BATCH'; payload: string }
+  | { type: 'DISPOSE_EXPIRED_BATCH'; payload: { batchId: string; itemId: string; stockroomId: string; qty: number } }
   // Trip load & return
   | { type: 'ADD_TRIP_LOAD_ITEMS'; payload: { tripId: string; items: TripLoadItem[] } }
   | { type: 'ADD_TRIP_RETURN_ITEMS'; payload: { tripId: string; items: TripReturnItem[]; stockroomUpdates: StockroomItem[] } };

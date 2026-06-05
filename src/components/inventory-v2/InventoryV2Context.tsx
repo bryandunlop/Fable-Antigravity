@@ -7,6 +7,7 @@ import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST
 import { MOCK_TRIPS, MOCK_GROCERY_LISTS } from './mockTrips';
 import { FLEET_V2 } from './constants';
 import { loadCompartmentConfigs } from './compartmentConfig';
+import { deductFromBatches } from './shared/batchUtils';
 
 // ─── Storage Keys ───────────────────────────────────────────────────────────
 
@@ -190,7 +191,21 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         return updated ?? si;
       });
       const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, action.payload);
-      return { ...state, stockroomItems: newStockroomItems, alerts, pendingChanges: state.pendingChanges + 1 };
+
+      // FIFO batch deduction for items where qty decreased
+      let updatedBatches = state.stockBatches;
+      for (const updated of action.payload) {
+        const original = state.stockroomItems.find(
+          si => si.itemId === updated.itemId && si.stockroomId === updated.stockroomId
+        );
+        if (original && updated.qtyOnHand < original.qtyOnHand) {
+          const deducted = original.qtyOnHand - updated.qtyOnHand;
+          const result = deductFromBatches(updatedBatches, updated.itemId, updated.stockroomId, deducted);
+          updatedBatches = result.updatedBatches;
+        }
+      }
+
+      return { ...state, stockroomItems: newStockroomItems, stockBatches: updatedBatches, alerts, pendingChanges: state.pendingChanges + 1 };
     }
 
     case 'SET_PICK_LIST':
@@ -545,6 +560,24 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         pendingChanges: state.pendingChanges + 1,
       };
 
+    case 'DISPOSE_EXPIRED_BATCH': {
+      const { batchId, itemId, stockroomId, qty } = action.payload;
+      const newBatches = state.stockBatches.filter(sb => sb.id !== batchId);
+      const newStockroomItems = state.stockroomItems.map(si =>
+        si.itemId === itemId && si.stockroomId === stockroomId
+          ? { ...si, qtyOnHand: Math.max(0, si.qtyOnHand - qty) }
+          : si
+      );
+      const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, newStockroomItems.filter(si => si.itemId === itemId));
+      return {
+        ...state,
+        stockBatches: newBatches,
+        stockroomItems: newStockroomItems,
+        alerts,
+        pendingChanges: state.pendingChanges + 1,
+      };
+    }
+
     case 'ADD_TRIP_LOAD_ITEMS': {
       const { tripId, items } = action.payload;
       const commissaryItems = items.filter(li => li.source === 'commissary');
@@ -565,6 +598,13 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           newStockroomItems.filter(si => commissaryItems.some(li => li.itemId === si.itemId))
         );
       }
+      // Deduct from batches FIFO for items loaded from commissary
+      let updatedBatches = state.stockBatches;
+      for (const li of commissaryItems) {
+        const result = deductFromBatches(updatedBatches, li.itemId, 'sr-1', li.qty);
+        updatedBatches = result.updatedBatches;
+      }
+
       const newTrips = state.trips.map(t =>
         t.id === tripId
           ? { ...t, loadItems: [...t.loadItems, ...items] }
@@ -574,6 +614,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         ...state,
         trips: newTrips,
         stockroomItems: newStockroomItems,
+        stockBatches: updatedBatches,
         alerts,
         pendingChanges: state.pendingChanges + 1,
       };
