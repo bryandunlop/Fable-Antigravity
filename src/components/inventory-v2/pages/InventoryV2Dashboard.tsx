@@ -187,25 +187,37 @@ export default function InventoryV2Dashboard() {
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-blue-500/20">
+        <Card
+          className="border-blue-500/20 cursor-pointer hover:bg-muted/40 transition-colors"
+          onClick={() => document.getElementById('panel-in-progress')?.scrollIntoView({ behavior: 'smooth' })}
+        >
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-blue-400">{inProgress.length}</p>
             <p className="text-xs text-muted-foreground">In Progress</p>
           </CardContent>
         </Card>
-        <Card className="border-amber-500/20">
+        <Card
+          className="border-amber-500/20 cursor-pointer hover:bg-muted/40 transition-colors"
+          onClick={() => document.getElementById('panel-restocking-needed')?.scrollIntoView({ behavior: 'smooth' })}
+        >
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-amber-400">{restockingNeeded.length}</p>
             <p className="text-xs text-muted-foreground">Restock Needed</p>
           </CardContent>
         </Card>
-        <Card className="border-primary/20">
+        <Card
+          className="border-primary/20 cursor-pointer hover:bg-muted/40 transition-colors"
+          onClick={() => document.getElementById('panel-open-requests')?.scrollIntoView({ behavior: 'smooth' })}
+        >
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-primary">{openRequests.length}</p>
             <p className="text-xs text-muted-foreground">Open Requests</p>
           </CardContent>
         </Card>
-        <Card className="border-emerald-500/20">
+        <Card
+          className="border-emerald-500/20 cursor-pointer hover:bg-muted/40 transition-colors"
+          onClick={() => document.getElementById('panel-recently-completed')?.scrollIntoView({ behavior: 'smooth' })}
+        >
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-emerald-400">{recentlyCompleted.length}</p>
             <p className="text-xs text-muted-foreground">Completed</p>
@@ -217,7 +229,7 @@ export default function InventoryV2Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* In Progress */}
         {!hiddenPanels.has('in-progress') && (
-          <Card>
+          <Card id="panel-in-progress">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Clock className="w-4 h-4 text-blue-400" />
@@ -250,7 +262,7 @@ export default function InventoryV2Dashboard() {
 
         {/* Restocking Needed */}
         {!hiddenPanels.has('restocking-needed') && (
-          <Card>
+          <Card id="panel-restocking-needed">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-400" />
@@ -283,7 +295,7 @@ export default function InventoryV2Dashboard() {
 
         {/* Open Requests */}
         {!hiddenPanels.has('open-requests') && (
-          <Card>
+          <Card id="panel-open-requests">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Send className="w-4 h-4 text-primary" />
@@ -318,7 +330,7 @@ export default function InventoryV2Dashboard() {
 
         {/* Recently Completed */}
         {!hiddenPanels.has('recently-completed') && (
-          <Card>
+          <Card id="panel-recently-completed">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
@@ -351,7 +363,7 @@ export default function InventoryV2Dashboard() {
 
         {/* Recently Restocked */}
         {!hiddenPanels.has('recently-restocked') && (
-          <Card>
+          <Card id="panel-recently-restocked">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <PackagePlus className="w-4 h-4 text-emerald-400" />
@@ -381,7 +393,7 @@ export default function InventoryV2Dashboard() {
 
         {/* Completed Requests */}
         {!hiddenPanels.has('completed-requests') && (
-          <Card>
+          <Card id="panel-completed-requests">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
