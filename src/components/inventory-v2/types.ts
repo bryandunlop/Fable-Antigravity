@@ -367,7 +367,6 @@ export interface InventoryV2State {
   purchaseOrders: PurchaseOrder[];
   compartmentConfigs: AircraftCompartmentConfig[];
   displaySettings: DisplaySettings;
-  selectedStockroomId: string;
   currentUser: UserV2;
   alertThresholds: AlertThreshold[];
   alerts: CommissaryAlert[];
@@ -415,7 +414,6 @@ export type InventoryV2Action =
   // Config
   | { type: 'SET_COMPARTMENT_CONFIGS'; payload: AircraftCompartmentConfig[] }
   | { type: 'SET_DISPLAY_SETTINGS'; payload: DisplaySettings }
-  | { type: 'SET_SELECTED_STOCKROOM'; payload: string }
   | { type: 'RESET_STATE'; payload: InventoryV2State }
   | { type: 'SET_CURRENT_USER'; payload: UserV2 }
   | { type: 'ADD_ALERT_THRESHOLD'; payload: AlertThreshold }

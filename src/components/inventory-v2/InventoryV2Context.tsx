@@ -59,7 +59,6 @@ function getDefaultState(): InventoryV2State {
       hideItemNamesOnPhone: false,
       hideDescriptions: false,
     },
-    selectedStockroomId: 'sr-1',
     currentUser: {
       id: SYSTEM_USERS[0].id,
       name: SYSTEM_USERS[0].name,
@@ -246,9 +245,6 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
 
     case 'SET_DISPLAY_SETTINGS':
       return { ...state, displaySettings: action.payload };
-
-    case 'SET_SELECTED_STOCKROOM':
-      return { ...state, selectedStockroomId: action.payload };
 
     case 'SET_CURRENT_USER':
       return { ...state, currentUser: action.payload };
