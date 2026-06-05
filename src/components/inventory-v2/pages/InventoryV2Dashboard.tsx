@@ -12,10 +12,19 @@ import FilterOverlay, { type FilterState, DEFAULT_FILTERS } from '../shared/Filt
 import {
   LayoutDashboard, Filter, Clock, CheckCircle, AlertTriangle,
   PackagePlus, Send, Truck, ArrowRight, Plane, ChevronRight,
-  ClipboardCheck, CheckCircle2, Sun, Moon
+  ClipboardCheck, CheckCircle2, Sun, Moon, Eye, EyeOff
 } from 'lucide-react';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { formatDate } from '../shared/dateUtils';
+
+const HIDDEN_PANELS_KEY = 'inv-v2-hidden-panels';
+
+function loadHiddenPanels(): Set<string> {
+  try {
+    const saved = localStorage.getItem(HIDDEN_PANELS_KEY);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  } catch { return new Set(); }
+}
 
 export default function InventoryV2Dashboard() {
   const navigate = useNavigate();
@@ -30,7 +39,20 @@ export default function InventoryV2Dashboard() {
   }, [state.currentUser.role, navigate]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [hiddenPanels, setHiddenPanels] = useState<Set<string>>(new Set());
+  const [hiddenPanels, setHiddenPanels] = useState<Set<string>>(loadHiddenPanels);
+
+  useEffect(() => {
+    localStorage.setItem(HIDDEN_PANELS_KEY, JSON.stringify([...hiddenPanels]));
+  }, [hiddenPanels]);
+
+  function togglePanel(id: string) {
+    setHiddenPanels(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Filter helpers
   const matchesUnitFilter = (tailNumber: string) => {
@@ -141,6 +163,12 @@ export default function InventoryV2Dashboard() {
           <V2Badge variant="v2" size="md" />
         </div>
         <div className="flex items-center gap-2">
+          {hiddenPanels.size > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setHiddenPanels(new Set())}>
+              <Eye className="w-4 h-4 mr-1" />
+              Show all ({hiddenPanels.size} hidden)
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setFiltersOpen(true)}>
             <Filter className="w-4 h-4 mr-1" /> Filters
           </Button>
@@ -243,6 +271,9 @@ export default function InventoryV2Dashboard() {
                 <Clock className="w-4 h-4 text-blue-400" />
                 Inspections In Progress
                 <Badge variant="outline" className="ml-auto">{inProgress.length}</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={() => togglePanel('in-progress')}>
+                  <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -281,6 +312,9 @@ export default function InventoryV2Dashboard() {
                 <AlertTriangle className="w-4 h-4 text-amber-400" />
                 Restocking Needed
                 <Badge variant="outline" className="ml-auto">{restockingNeeded.length}</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={() => togglePanel('restocking-needed')}>
+                  <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -319,6 +353,9 @@ export default function InventoryV2Dashboard() {
                 <Send className="w-4 h-4 text-primary" />
                 Open Unit Item Requests
                 <Badge variant="outline" className="ml-auto">{openRequests.length}</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={() => togglePanel('open-requests')}>
+                  <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -359,6 +396,9 @@ export default function InventoryV2Dashboard() {
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
                 Recently Completed
                 <Badge variant="outline" className="ml-auto">{recentlyCompleted.length}</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={() => togglePanel('recently-completed')}>
+                  <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -397,6 +437,9 @@ export default function InventoryV2Dashboard() {
                 <PackagePlus className="w-4 h-4 text-emerald-400" />
                 Recently Restocked
                 <Badge variant="outline" className="ml-auto">{recentlyRestocked.length}</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={() => togglePanel('recently-restocked')}>
+                  <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -432,6 +475,9 @@ export default function InventoryV2Dashboard() {
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
                 Completed Requests
                 <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={() => togglePanel('completed-requests')}>
+                  <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
