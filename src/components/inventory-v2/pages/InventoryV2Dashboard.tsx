@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -11,7 +12,7 @@ import FilterOverlay, { type FilterState, DEFAULT_FILTERS } from '../shared/Filt
 import {
   LayoutDashboard, Filter, Clock, CheckCircle, AlertTriangle,
   PackagePlus, Send, Truck, ArrowRight, Plane, ChevronRight,
-  ClipboardCheck, CheckCircle2
+  ClipboardCheck, CheckCircle2, Sun, Moon
 } from 'lucide-react';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { formatDate } from '../shared/dateUtils';
@@ -19,6 +20,7 @@ import { formatDate } from '../shared/dateUtils';
 export default function InventoryV2Dashboard() {
   const navigate = useNavigate();
   const { state } = useInventoryV2();
+  const { theme, setTheme } = useTheme();
   const activeTrips = state.trips.filter(t => t.status === 'active');
 
   useEffect(() => {
@@ -138,9 +140,14 @@ export default function InventoryV2Dashboard() {
           <h1 className="text-2xl font-bold">Inventory Dashboard</h1>
           <V2Badge variant="v2" size="md" />
         </div>
-        <Button variant="outline" onClick={() => setFiltersOpen(true)}>
-          <Filter className="w-4 h-4 mr-1" /> Filters
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setFiltersOpen(true)}>
+            <Filter className="w-4 h-4 mr-1" /> Filters
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
+        </div>
       </div>
 
       {/* Active Trips */}
