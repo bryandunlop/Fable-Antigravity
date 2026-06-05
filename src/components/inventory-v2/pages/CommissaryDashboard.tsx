@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ShoppingCart, ExternalLink, MonitorSmartphone, AlertCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, ShoppingCart, ExternalLink, MonitorSmartphone, AlertCircle, AlertTriangle, Clock, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -8,7 +8,8 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { V2Badge } from '../shared/V2Badge';
 import type { StockroomItem } from '../types';
-import { formatRelativeTime } from '../shared/dateUtils';
+import { formatRelativeTime, getBatchExpirationStatus, daysUntilExpiration, formatDateShort } from '../shared/dateUtils';
+import { toast } from 'sonner';
 
 // ─── Row ─────────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,26 @@ export default function CommissaryDashboard() {
 
   const hasFlags = critical.length > 0 || threshold.length > 0;
 
+  const expiringBatches = useMemo(() => {
+    return state.stockBatches
+      .filter(b => {
+        if (!b.expirationDate) return false;
+        const days = daysUntilExpiration(b.expirationDate);
+        return days <= 14;
+      })
+      .sort((a, b) => (a.expirationDate ?? '').localeCompare(b.expirationDate ?? ''));
+  }, [state.stockBatches]);
+
+  const expiredBatches = expiringBatches.filter(b => daysUntilExpiration(b.expirationDate!) < 0);
+  const thisWeekBatches = expiringBatches.filter(b => {
+    const d = daysUntilExpiration(b.expirationDate!);
+    return d >= 0 && d <= 7;
+  });
+  const nextWeekBatches = expiringBatches.filter(b => {
+    const d = daysUntilExpiration(b.expirationDate!);
+    return d > 7 && d <= 14;
+  });
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6 animate-in fade-in duration-200">
       <OfflineBanner />
@@ -141,6 +162,78 @@ export default function CommissaryDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Expiring Soon */}
+      {expiringBatches.length > 0 && (
+        <Card className="border-amber-500/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-amber-500">
+              <Clock className="w-4 h-4" />
+              Expiring Soon
+              <Badge className="ml-auto bg-amber-500/20 text-amber-600 border-amber-500/30">{expiringBatches.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            {expiredBatches.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-red-500 mb-1">Expired</p>
+                <div className="divide-y">
+                  {expiredBatches.map(batch => (
+                    <div key={batch.id} className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-sm font-medium">{itemName(batch.itemId)}</p>
+                        <p className="text-xs text-muted-foreground">{batch.batchLabel ?? '—'} · {batch.quantity} {state.items.find(i => i.id === batch.itemId)?.uom ?? 'ea'}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs text-red-500"
+                        onClick={() => {
+                          dispatch({ type: 'DISPOSE_EXPIRED_BATCH', payload: { batchId: batch.id, itemId: batch.itemId, stockroomId: batch.stockroomId, qty: batch.quantity } });
+                          toast.success(`Disposed ${batch.quantity}x ${itemName(batch.itemId)}`);
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" /> Dispose
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {thisWeekBatches.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-amber-500 mb-1">This Week</p>
+                <div className="divide-y">
+                  {thisWeekBatches.map(batch => (
+                    <div key={batch.id} className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-sm font-medium">{itemName(batch.itemId)}</p>
+                        <p className="text-xs text-muted-foreground">{batch.batchLabel ?? '—'} · {batch.quantity} {state.items.find(i => i.id === batch.itemId)?.uom ?? 'ea'} · Expires {formatDateShort(batch.expirationDate!)}</p>
+                      </div>
+                      <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 text-xs">Use First</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {nextWeekBatches.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-yellow-500 mb-1">Next Week</p>
+                <div className="divide-y">
+                  {nextWeekBatches.map(batch => (
+                    <div key={batch.id} className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-sm font-medium">{itemName(batch.itemId)}</p>
+                        <p className="text-xs text-muted-foreground">{batch.batchLabel ?? '—'} · {batch.quantity} {state.items.find(i => i.id === batch.itemId)?.uom ?? 'ea'} · Expires {formatDateShort(batch.expirationDate!)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Alert sections */}
       {!hasFlags ? (
