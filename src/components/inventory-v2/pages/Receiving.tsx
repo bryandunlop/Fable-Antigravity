@@ -17,6 +17,12 @@ import {
 } from 'lucide-react';
 import { BarcodeScannerDialog } from '../shared/BarcodeScannerDialog';
 
+interface StagedItem {
+  qty: number;
+  expirationDate?: string;
+  batchLabel?: string;
+}
+
 export default function Receiving() {
   const { state, dispatch } = useInventoryV2();
 
@@ -25,8 +31,8 @@ export default function Receiving() {
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
 
-  // ── Staged additions: { itemId → qty to add } ──
-  const [staged, setStaged] = useState<Record<string, number>>({});
+  // ── Staged additions: { itemId → StagedItem } ──
+  const [staged, setStaged] = useState<Record<string, StagedItem>>({});
 
   // ── View mode ──
   const [showHistory, setShowHistory] = useState(false);
@@ -62,18 +68,18 @@ export default function Receiving() {
     return out;
   }, [filteredItems]);
 
-  const stagedCount = Object.values(staged).filter(q => q > 0).length;
-  const stagedItems = Object.entries(staged).filter(([, q]) => q > 0);
+  const stagedCount = Object.values(staged).filter(s => s.qty > 0).length;
+  const stagedItems = Object.entries(staged).filter(([, s]) => s.qty > 0);
 
   const adjustStaged = (itemId: string, delta: number) => {
     setStaged(prev => {
-      const current = prev[itemId] ?? 0;
+      const current = prev[itemId]?.qty ?? 0;
       const next = Math.max(0, current + delta);
       if (next === 0) {
         const { [itemId]: _, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [itemId]: next };
+      return { ...prev, [itemId]: { ...prev[itemId], qty: next } };
     });
   };
 
@@ -83,7 +89,7 @@ export default function Receiving() {
     if (n === 0) {
       setStaged(prev => { const { [itemId]: _, ...rest } = prev; return rest; });
     } else {
-      setStaged(prev => ({ ...prev, [itemId]: n }));
+      setStaged(prev => ({ ...prev, [itemId]: { ...prev[itemId], qty: n } }));
     }
   };
 
@@ -94,7 +100,7 @@ export default function Receiving() {
       setScannerOpen(false);
       return;
     }
-    setStaged(prev => ({ ...prev, [itemId]: (prev[itemId] ?? 0) + 1 }));
+    setStaged(prev => ({ ...prev, [itemId]: { ...prev[itemId], qty: (prev[itemId]?.qty ?? 0) + 1 } }));
     toast.success(`Added: ${item.itemName}`);
     setScannerOpen(false);
   };
@@ -104,16 +110,16 @@ export default function Receiving() {
     if (!addedBy.trim()) { toast.error('Select who is adding stock'); return; }
 
     // Update stockroom quantities
-    const updatedItems = stagedItems.map(([itemId, qty]) => {
+    const updatedItems = stagedItems.map(([itemId, info]) => {
       const existing = stockroomItems.find(si => si.itemId === itemId);
       if (existing) {
-        return { ...existing, qtyOnHand: existing.qtyOnHand + qty };
+        return { ...existing, qtyOnHand: existing.qtyOnHand + info.qty };
       }
       // Item not in this stockroom yet — create entry
       return {
         itemId,
         stockroomId: 'sr-1',
-        qtyOnHand: qty,
+        qtyOnHand: info.qty,
         parLevel: 0,
         minimumLevel: 0,
         binLocation: '',
@@ -130,9 +136,27 @@ export default function Receiving() {
         stockroomId: 'sr-1',
         addedBy,
         timestamp: new Date().toISOString(),
-        items: stagedItems.map(([itemId, qtyAdded]) => ({ itemId, qtyAdded })),
+        items: stagedItems.map(([itemId, info]) => ({ itemId, qtyAdded: info.qty })),
         notes: notes.trim() || undefined,
       },
+    });
+
+    // Create stock batches for each staged item
+    Object.entries(staged).forEach(([itemId, info]) => {
+      if (info.qty > 0) {
+        dispatch({
+          type: 'ADD_STOCK_BATCH',
+          payload: {
+            id: `batch-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+            itemId,
+            stockroomId: 'sr-1',
+            quantity: info.qty,
+            expirationDate: info.expirationDate,
+            receivedDate: new Date().toISOString(),
+            batchLabel: info.batchLabel || `LOT-${itemId.slice(-4)}-${new Date().toISOString().split('T')[0]}`,
+          },
+        });
+      }
     });
 
     toast.success(`Stock updated — ${stagedItems.length} item${stagedItems.length > 1 ? 's' : ''} added`);
@@ -246,7 +270,7 @@ export default function Receiving() {
             {SUPPLY_CATEGORIES.filter(cat => grouped[cat.id]).map(cat => {
               const catItems = grouped[cat.id];
               const isOpen = openSections[cat.id] ?? true;
-              const catStaged = catItems.filter(i => (staged[i.id] ?? 0) > 0).length;
+              const catStaged = catItems.filter(i => (staged[i.id]?.qty ?? 0) > 0).length;
 
               return (
                 <Collapsible
@@ -273,7 +297,7 @@ export default function Receiving() {
                       <div className="border-t">
                         {catItems.map(item => {
                           const onHand = getOnHand(item.id);
-                          const adding = staged[item.id] ?? 0;
+                          const adding = staged[item.id]?.qty ?? 0;
                           return (
                             <div
                               key={item.id}
@@ -286,6 +310,29 @@ export default function Receiving() {
                                   On hand: <span className="font-medium text-foreground">{onHand}</span>
                                   {item.internalItemNumber && ` · ${item.internalItemNumber}`}
                                 </p>
+                                {staged[item.id] && staged[item.id].qty > 0 && (
+                                  <div className="flex gap-2 mt-1">
+                                    <Input
+                                      type="date"
+                                      placeholder="Expiration"
+                                      className="h-7 text-xs w-32"
+                                      value={staged[item.id]?.expirationDate ?? ''}
+                                      onChange={e => setStaged(prev => ({
+                                        ...prev,
+                                        [item.id]: { ...prev[item.id], expirationDate: e.target.value || undefined }
+                                      }))}
+                                    />
+                                    <Input
+                                      placeholder="Lot label"
+                                      className="h-7 text-xs w-28"
+                                      value={staged[item.id]?.batchLabel ?? ''}
+                                      onChange={e => setStaged(prev => ({
+                                        ...prev,
+                                        [item.id]: { ...prev[item.id], batchLabel: e.target.value || undefined }
+                                      }))}
+                                    />
+                                  </div>
+                                )}
                               </div>
 
                               {/* Qty controls */}
@@ -363,13 +410,13 @@ export default function Receiving() {
                 </p>
               ) : (
                 <div className="space-y-1.5">
-                  {stagedItems.map(([itemId, qty]) => {
+                  {stagedItems.map(([itemId, info]) => {
                     const item = state.items.find(i => i.id === itemId);
                     return (
                       <div key={itemId} className="flex items-center justify-between text-sm">
                         <span className="truncate text-foreground">{item?.itemName ?? itemId}</span>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <Badge variant="outline" className="text-emerald-400 border-emerald-500/30">+{qty}</Badge>
+                          <Badge variant="outline" className="text-emerald-400 border-emerald-500/30">+{info.qty}</Badge>
                           <button
                             onClick={() => setStaged(p => { const { [itemId]: _, ...r } = p; return r; })}
                             className="text-muted-foreground hover:text-destructive transition-colors"
