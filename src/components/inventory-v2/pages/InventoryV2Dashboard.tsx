@@ -367,7 +367,11 @@ export default function InventoryV2Dashboard() {
               <ScrollArea className="h-[200px]">
                 <div className="space-y-2">
                   {recentlyRestocked.map(i => (
-                    <div key={i.id} className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
+                    <div
+                      key={i.id}
+                      className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => navigate('/inventory-v2/recently-completed')}
+                    >
                       <span className="text-sm font-medium">{i.tailNumber}</span>
                       <span className="text-xs text-muted-foreground">{formatDate(i.date)}</span>
                     </div>
@@ -393,7 +397,11 @@ export default function InventoryV2Dashboard() {
               <ScrollArea className="h-[200px]">
                 <div className="space-y-2">
                   {completedRequests.map(r => (
-                    <div key={r.id} className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => navigate('/inventory-v2/requests')}
+                    >
                       <span className="text-sm font-medium">{r.unitTailNumber}</span>
                       <span className="text-xs text-muted-foreground">{formatDate(r.requestDate)}</span>
                     </div>
