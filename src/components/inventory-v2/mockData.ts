@@ -11,6 +11,7 @@ import type {
   RestockListItem,
   UnitItemRequest,
   PurchaseOrder,
+  StorageLocation,
   SupplyCategory,
   UnitOfMeasure,
 } from './types';
@@ -32,6 +33,8 @@ function itemV2(
   internalItemNumber?: string,
   isConsumable?: boolean,
   posCategory?: string,
+  vendor?: string,
+  reorderUrl?: string,
 ): InventoryItemV2 {
   const id = String(_id++);
   const dq: Partial<Record<'G650' | 'G500', number>> = {};
@@ -58,6 +61,8 @@ function itemV2(
     alternateNames: [],
     ...(isConsumable !== undefined && { isConsumable }),
     ...(posCategory !== undefined && { posCategory }),
+    ...(vendor !== undefined && { vendor }),
+    ...(reorderUrl !== undefined && { reorderUrl }),
   };
 }
 
@@ -70,9 +75,9 @@ export const ITEMS_V2: InventoryItemV2[] = [
 
   // ── Beverages ──────────────────────────────────────────────────────────────
   // ID 1
-  itemV2('Perrier 330ml', 'Sparkling Water', 'beverages', 'aft-galley', 'Galley Right', 'ea', 8, 8, 2.50, undefined, undefined, true, 'cold-drinks'),
+  itemV2('Perrier 330ml', 'Sparkling Water', 'beverages', 'aft-galley', 'Galley Right', 'ea', 8, 8, 2.50, undefined, undefined, true, 'cold-drinks', 'Amazon', 'https://www.amazon.com/s?k=perrier+sparkling+water+330ml'),
   // ID 2
-  itemV2('Coca-Cola', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50, undefined, undefined, true, 'cold-drinks'),
+  itemV2('Coca-Cola', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50, undefined, undefined, true, 'cold-drinks', 'Instacart', 'https://www.instacart.com/products/17279069-coca-cola-soda'),
   // ID 3
   itemV2('Coke Zero', 'Soft Drink', 'beverages', 'aft-galley', 'Galley Right', 'ea', 6, 6, 1.50, undefined, undefined, true, 'cold-drinks'),
   // ID 4
@@ -90,21 +95,21 @@ export const ITEMS_V2: InventoryItemV2[] = [
 
   // ── Coffee ─────────────────────────────────────────────────────────────────
   // ID 10
-  itemV2('Nespresso Pods', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'sleeve', 4, 3, 8.00, undefined, undefined, true, 'hot-drinks'),
+  itemV2('Nespresso Pods', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'sleeve', 4, 3, 8.00, undefined, undefined, true, 'hot-drinks', 'Amazon', 'https://www.amazon.com/s?k=nespresso+pods+original+line'),
   // ID 11
   itemV2('Regular Coffee', 'Coffee', 'coffee', 'aft-galley', 'Galley Right', 'bag', 2, 2, 12.00, undefined, undefined, true, 'hot-drinks'),
   // ID 12
   itemV2('Decaf Via', 'Coffee', 'coffee', 'aft-galley', 'Galley Right', 'box', 10, 10, 2.00, undefined, undefined, true, 'hot-drinks'),
   // ID 13
-  itemV2('Coffee Filters', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'box', 1, 1, 3.00, undefined, undefined, true, 'hot-drinks'),
+  itemV2('Coffee Filters', 'Coffee', 'coffee', 'fwd-galley', 'Galley Left', 'box', 1, 1, 3.00, undefined, undefined, true, 'hot-drinks', 'Amazon', 'https://www.amazon.com/s?k=coffee+filters+basket'),
 
   // ── Tea ────────────────────────────────────────────────────────────────────
   // ID 14
-  itemV2('Green Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
+  itemV2('Green Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks', 'Amazon', 'https://www.amazon.com/s?k=green+tea+bags+box'),
   // ID 15
-  itemV2('Mint Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
+  itemV2('Mint Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks', 'Amazon', 'https://www.amazon.com/s?k=peppermint+tea+bags+box'),
   // ID 16
-  itemV2('English Breakfast Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
+  itemV2('English Breakfast Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks', 'Amazon', 'https://www.amazon.com/s?k=english+breakfast+tea+bags'),
   // ID 17
   itemV2('Earl Grey Tea', 'Tea', 'tea', 'fwd-galley', 'Galley Left', 'box', 7, 7, 5.00, undefined, undefined, true, 'hot-drinks'),
   // ID 18
@@ -126,13 +131,13 @@ export const ITEMS_V2: InventoryItemV2[] = [
 
   // ── Medicine ───────────────────────────────────────────────────────────────
   // ID 25
-  itemV2('Advil', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.00, undefined, undefined, true, 'medicine-amenities'),
+  itemV2('Advil', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.00, undefined, undefined, true, 'medicine-amenities', 'Amazon', 'https://www.amazon.com/s?k=advil+ibuprofen+tablets+travel+pack'),
   // ID 26
   itemV2('Tylenol', 'Pain Relief', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 5.50, undefined, undefined, true, 'medicine-amenities'),
   // ID 27
   itemV2('Pepto Bismol', 'Stomach', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 5.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 28
-  itemV2('Benadryl', 'Allergy', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.50, undefined, undefined, true, 'medicine-amenities'),
+  itemV2('Benadryl', 'Allergy', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 4, 4, 6.50, undefined, undefined, true, 'medicine-amenities', 'Amazon', 'https://www.amazon.com/s?k=benadryl+diphenhydramine+travel+pack'),
   // ID 29
   itemV2('Cough Drops', 'Cold & Flu', 'medicine', 'fwd-lav', 'Lav Cabinet', 'pkg', 1, 1, 4.00, undefined, undefined, true, 'medicine-amenities'),
   // ID 30
@@ -212,7 +217,7 @@ export const ITEMS_V2: InventoryItemV2[] = [
   // ID 64
   itemV2('Wine Away', 'Stain Remover', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 10.00, undefined, undefined, true, 'cleaning'),
   // ID 65
-  itemV2('Disinfecting Wipes', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 5.00, undefined, undefined, true, 'cleaning'),
+  itemV2('Disinfecting Wipes', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 5.00, undefined, undefined, true, 'cleaning', 'Amazon', 'https://www.amazon.com/s?k=lysol+disinfecting+wipes+canister'),
   // ID 66
   itemV2('Dust Cleaning Gel', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 1, 1, 8.00, undefined, undefined, true, 'cleaning'),
   // ID 67
@@ -222,7 +227,7 @@ export const ITEMS_V2: InventoryItemV2[] = [
   // ID 69
   itemV2('Microfiber Cloths', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'ea', 2, 2, 5.00, undefined, undefined, true, 'cleaning'),
   // ID 70
-  itemV2('Paper Towel Rolls', 'Paper', 'paper-goods', 'fwd-galley', 'Galley Left', 'roll', 2, 2, 3.50, undefined, undefined, true, 'paper-supplies'),
+  itemV2('Paper Towel Rolls', 'Paper', 'paper-goods', 'fwd-galley', 'Galley Left', 'roll', 2, 2, 3.50, undefined, undefined, true, 'paper-supplies', 'Kroger', 'https://www.kroger.com/p/bounty-select-a-size-paper-towels/0003700080433'),
   // ID 71
   itemV2('Dish Soap', 'Cleaning', 'cleaning-supplies', 'fwd-galley', 'Galley Left', 'bottle', 1, 1, 4.00, undefined, undefined, true, 'cleaning'),
   // ID 72
@@ -432,7 +437,42 @@ export const STOCKROOMS: Stockroom[] = [
   { id: 'sr-4', name: 'Aircraft Supply Closet', location: 'Hangar 1 — Gate Area' },
 ];
 
+// ─── Storage Locations (Commissary shelves/bins) ─────────────────────────────
+export const STORAGE_LOCATIONS: StorageLocation[] = [
+  { id: 'loc-a',  name: 'Shelf A — Beverages',               type: 'shelf',   sortOrder: 0 },
+  { id: 'loc-b',  name: 'Shelf B — Coffee, Tea & Sweetener',  type: 'shelf',   sortOrder: 1 },
+  { id: 'loc-mc', name: 'Medicine Cabinet',                    type: 'cabinet', sortOrder: 2 },
+  { id: 'loc-c',  name: 'Shelf C — Toiletries & Self-Care',   type: 'shelf',   sortOrder: 3 },
+  { id: 'loc-d',  name: 'Shelf D — Cleaning Supplies',        type: 'shelf',   sortOrder: 4 },
+  { id: 'loc-e',  name: 'Shelf E — Kitchen & Dishware',       type: 'shelf',   sortOrder: 5 },
+  { id: 'loc-f',  name: 'Shelf F — Paper Goods & Food Storage', type: 'shelf', sortOrder: 6 },
+  { id: 'loc-wr', name: 'Wine Rack',                          type: 'rack',    sortOrder: 7 },
+  { id: 'loc-cl', name: 'Closet — Linens & Miscellaneous',    type: 'closet',  sortOrder: 8 },
+  { id: 'loc-g',  name: 'Shelf G — Snacks & Condiments',      type: 'shelf',   sortOrder: 9 },
+];
+
 // ─── Stockroom Items (for Main Stockroom) ───────────────────────────────────
+
+function categoryToLocationId(cat: SupplyCategory): string {
+  const map: Record<SupplyCategory, string> = {
+    'beverages':        'loc-a',
+    'coffee':           'loc-b',
+    'tea':              'loc-b',
+    'sweetener':        'loc-b',
+    'medicine':         'loc-mc',
+    'first-aid':        'loc-mc',
+    'toiletries':       'loc-c',
+    'self-care':        'loc-c',
+    'cleaning-supplies': 'loc-d',
+    'kitchen-supplies': 'loc-e',
+    'paper-goods':      'loc-f',
+    'wine':             'loc-wr',
+    'linens':           'loc-cl',
+    'miscellaneous':    'loc-cl',
+    'snacks':           'loc-g',
+  };
+  return map[cat] ?? 'loc-cl';
+}
 
 function generateStockroomItems(): StockroomItem[] {
   const bins = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3', 'D1', 'D2', 'D3', 'E1', 'E2', 'F1', 'F2'];
@@ -443,6 +483,7 @@ function generateStockroomItems(): StockroomItem[] {
     parLevel: Math.max((item.defaultQuantities.G650 ?? item.defaultQuantities.G500 ?? 2) * 3, 6),
     minimumLevel: Math.max((item.defaultQuantities.G650 ?? item.defaultQuantities.G500 ?? 1) * 1, 2),
     binLocation: bins[i % bins.length],
+    locationId: categoryToLocationId(item.supplyCategory),
   }));
 }
 

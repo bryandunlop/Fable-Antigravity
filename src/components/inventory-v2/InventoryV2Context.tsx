@@ -1,10 +1,10 @@
 // ─── Inventory V2 — React Context ───────────────────────────────────────────
 
 import React, { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
-import type { InventoryV2State, InventoryV2Action, StockroomItem, ActivityLogEntry } from './types';
+import type { InventoryV2State, InventoryV2Action, StockroomItem, ActivityLogEntry, StorageLocation } from './types';
 import type { Notification } from '../contexts/NotificationContext';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
-import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS, STOCK_BATCHES } from './mockData';
+import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS, STOCK_BATCHES, STORAGE_LOCATIONS } from './mockData';
 import { MOCK_TRIPS, MOCK_GROCERY_LISTS } from './mockTrips';
 import { FLEET_V2 } from './constants';
 import { loadCompartmentConfigs } from './compartmentConfig';
@@ -15,7 +15,7 @@ import { deductFromBatches } from './shared/batchUtils';
 const STORAGE_PREFIX = 'inv-v2-';
 const STORAGE_KEY = `${STORAGE_PREFIX}state`;
 // Bump this string any time mock data changes to force a fresh load
-const DATA_VERSION = '2026-06-05-v1';
+const DATA_VERSION = '2026-06-06-v1';
 const VERSION_KEY = `${STORAGE_PREFIX}data-version`;
 
 // ─── Initial State ──────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ function getDefaultState(): InventoryV2State {
     trips: MOCK_TRIPS,
     groceryLists: MOCK_GROCERY_LISTS,
     stockBatches: STOCK_BATCHES,
-    storageLocations: [],
+    storageLocations: STORAGE_LOCATIONS,
     favoriteItems: {},
   };
 }
@@ -174,6 +174,34 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
 
       const bulkLogEntry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'stock_adjusted', module: 'stockroom', description: `Adjusted stock for ${action.payload.length} item(s)` };
       return { ...state, stockroomItems: newStockroomItems, stockBatches: updatedBatches, pendingChanges: state.pendingChanges + 1, activityLog: [bulkLogEntry, ...state.activityLog].slice(0, 500) };
+    }
+
+    // ── Storage Locations ──
+    case 'ADD_STORAGE_LOCATION':
+      return { ...state, storageLocations: [...state.storageLocations, action.payload] };
+    case 'UPDATE_STORAGE_LOCATION': {
+      const { id, ...updates } = action.payload;
+      return {
+        ...state,
+        storageLocations: state.storageLocations.map(loc =>
+          loc.id === id ? { ...loc, ...updates } : loc
+        ),
+      };
+    }
+    case 'REMOVE_STORAGE_LOCATION':
+      return {
+        ...state,
+        storageLocations: state.storageLocations.filter(loc => loc.id !== action.payload),
+      };
+    case 'REORDER_STORAGE_LOCATIONS': {
+      const orderedIds = action.payload;
+      const reordered = orderedIds
+        .map((id, idx) => {
+          const loc = state.storageLocations.find(l => l.id === id);
+          return loc ? { ...loc, sortOrder: idx } : null;
+        })
+        .filter(Boolean) as StorageLocation[];
+      return { ...state, storageLocations: reordered };
     }
 
     case 'SET_PICK_LIST':
