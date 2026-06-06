@@ -195,13 +195,11 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       };
     case 'REORDER_STORAGE_LOCATIONS': {
       const orderedIds = action.payload;
-      const reordered = orderedIds
-        .map((id, idx) => {
-          const loc = state.storageLocations.find(l => l.id === id);
-          return loc ? { ...loc, sortOrder: idx } : null;
-        })
-        .filter(Boolean) as StorageLocation[];
-      return { ...state, storageLocations: reordered };
+      const updated = state.storageLocations.map(loc => {
+        const idx = orderedIds.indexOf(loc.id);
+        return idx !== -1 ? { ...loc, sortOrder: idx } : loc;
+      });
+      return { ...state, storageLocations: updated.sort((a, b) => a.sortOrder - b.sortOrder) };
     }
 
     case 'SET_PICK_LIST':
