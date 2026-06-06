@@ -15,6 +15,7 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { V2Badge } from '../shared/V2Badge';
 import { SUPPLY_CATEGORIES } from '../constants';
 import BulkAdjustModal from '../shared/BulkAdjustModal';
+import ReceiveStockModal from '../shared/ReceiveStockModal';
 import type { InventoryItemV2, StockroomItem, StorageLocation, StockBatch } from '../types';
 
 // ─── Helper functions ───────────────────────────────────────────────────────
@@ -657,7 +658,7 @@ export default function Commissary() {
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       <BulkAdjustModal open={bulkAdjustOpen} onOpenChange={setBulkAdjustOpen} />
-      {/* <ReceiveStockModal open={receiveOpen} onOpenChange={setReceiveOpen} />      — Task 6 */}
+      <ReceiveStockModal open={receiveOpen} onOpenChange={setReceiveOpen} />
       {/* <ShoppingListModal open={shoppingOpen} onOpenChange={setShoppingOpen} />    — Task 6 */}
       {/* <EditItemDialog open={addItemOpen} onOpenChange={setAddItemOpen} />         — Task 7 */}
       {/* <ManageLocationsDialog open={locationsOpen} onOpenChange={setLocationsOpen} /> — Task 8 */}
