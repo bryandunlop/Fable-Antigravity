@@ -498,12 +498,12 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     aircraftType: 'G500',
     date: '2026-05-14T08:30:00Z',
     reportedBy: 'Sarah Mitchell',
-    status: 'in_progress',
+    status: 'restocked',
     checkedItems: ITEMS_V2.filter(i => i.defaultQuantities.G500).slice(0, 20).map(i => ({
       itemId: i.id,
       requiredQty: i.defaultQuantities.G500!,
-      qtyInUnit: Math.max(0, i.defaultQuantities.G500! - Math.floor(Math.random() * 3)),
-      done: Math.random() > 0.6,
+      qtyInUnit: i.defaultQuantities.G500!,
+      done: true,
       workOrderFlag: false,
       notes: '',
     })),
@@ -511,7 +511,8 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     photos: [],
     additionalFees: [],
     missingItemCharges: [],
-    readinessScore: 72,
+    readinessScore: 100,
+    submittedAt: '2026-05-14T10:00:00Z',
   },
   {
     id: 'insp-2',
@@ -519,20 +520,21 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     aircraftType: 'G650',
     date: '2026-05-14T07:15:00Z',
     reportedBy: 'James Cooper',
-    status: 'in_progress',
+    status: 'restocked',
     checkedItems: ITEMS_V2.filter(i => i.defaultQuantities.G650).slice(0, 15).map(i => ({
       itemId: i.id,
       requiredQty: i.defaultQuantities.G650!,
       qtyInUnit: i.defaultQuantities.G650!,
-      done: Math.random() > 0.4,
+      done: true,
       workOrderFlag: false,
       notes: '',
     })),
-    topLevelNotes: 'Starting pre-flight check',
+    topLevelNotes: '',
     photos: [],
     additionalFees: [],
     missingItemCharges: [],
-    readinessScore: 95,
+    readinessScore: 100,
+    submittedAt: '2026-05-14T09:00:00Z',
   },
   {
     id: 'insp-3',
@@ -540,13 +542,21 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     aircraftType: 'G500',
     date: '2026-05-13T14:00:00Z',
     reportedBy: 'Maria Rodriguez',
-    status: 'in_progress',
-    checkedItems: [],
+    status: 'restocked',
+    checkedItems: ITEMS_V2.filter(i => i.defaultQuantities.G500).slice(0, 20).map(i => ({
+      itemId: i.id,
+      requiredQty: i.defaultQuantities.G500!,
+      qtyInUnit: i.defaultQuantities.G500!,
+      done: true,
+      workOrderFlag: false,
+      notes: '',
+    })),
     topLevelNotes: '',
     photos: [],
     additionalFees: [],
     missingItemCharges: [],
-    readinessScore: 0,
+    readinessScore: 100,
+    submittedAt: '2026-05-13T15:00:00Z',
   },
   {
     id: 'insp-4',
@@ -554,20 +564,20 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     aircraftType: 'G650',
     date: '2026-05-13T09:00:00Z',
     reportedBy: 'Emily Parker',
-    status: 'restocking_needed',
+    status: 'restocked',
     checkedItems: ITEMS_V2.filter(i => i.defaultQuantities.G650).slice(0, 30).map(i => ({
       itemId: i.id,
       requiredQty: i.defaultQuantities.G650!,
-      qtyInUnit: Math.max(0, i.defaultQuantities.G650! - Math.floor(Math.random() * 4)),
+      qtyInUnit: i.defaultQuantities.G650!,
       done: true,
-      workOrderFlag: Math.random() > 0.9,
+      workOrderFlag: false,
       notes: '',
     })),
-    topLevelNotes: 'Post-flight inspection. Several items low after TETERBORO trip.',
+    topLevelNotes: 'Post-flight inspection. Restocked after TETERBORO trip.',
     photos: [],
     additionalFees: [{ id: 'fee-1', description: 'Wine stain cleaning', amount: 75.00 }],
     missingItemCharges: [],
-    readinessScore: 68,
+    readinessScore: 100,
     submittedAt: '2026-05-13T10:30:00Z',
   },
   {
@@ -576,20 +586,20 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
     aircraftType: 'G500',
     date: '2026-05-12T16:00:00Z',
     reportedBy: 'Sarah Mitchell',
-    status: 'restocking_needed',
+    status: 'restocked',
     checkedItems: ITEMS_V2.filter(i => i.defaultQuantities.G500).slice(5, 25).map(i => ({
       itemId: i.id,
       requiredQty: i.defaultQuantities.G500!,
-      qtyInUnit: Math.max(0, i.defaultQuantities.G500! - 2),
+      qtyInUnit: i.defaultQuantities.G500!,
       done: true,
       workOrderFlag: false,
       notes: '',
     })),
-    topLevelNotes: 'Multiple items depleted after back-to-back flights.',
+    topLevelNotes: 'Restocked after back-to-back flights.',
     photos: [],
     additionalFees: [],
     missingItemCharges: [],
-    readinessScore: 55,
+    readinessScore: 100,
     submittedAt: '2026-05-12T17:00:00Z',
   },
   {
@@ -692,19 +702,7 @@ export const MOCK_INSPECTIONS: InspectionV2[] = [
 
 // ─── Mock Pick List Items ───────────────────────────────────────────────────
 
-export const MOCK_PICK_LIST: PickListItem[] = [
-  // Items needed for insp-4 (N2PG G650, restocking_needed)
-  { id: 'pl-1', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '1',  qtyNeeded: 4, qtyTaken: 0, done: false },   // Perrier
-  { id: 'pl-2', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '10', qtyNeeded: 2, qtyTaken: 0, done: false },   // Nespresso Pods
-  { id: 'pl-3', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '25', qtyNeeded: 2, qtyTaken: 0, done: false },   // Advil
-  { id: 'pl-4', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '37', qtyNeeded: 3, qtyTaken: 0, done: false },   // Toothbrush
-  { id: 'pl-5', inspectionId: 'insp-4', unitTailNumber: 'N2PG', itemId: '44', qtyNeeded: 2, qtyTaken: 0, done: false },   // Hot Towels
-  // Items needed for insp-5 (N5PG G500, restocking_needed)
-  { id: 'pl-6', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '4',  qtyNeeded: 6, qtyTaken: 0, done: false },   // Diet Coke
-  { id: 'pl-7', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '14', qtyNeeded: 7, qtyTaken: 0, done: false },   // Green Tea
-  { id: 'pl-8', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '26', qtyNeeded: 4, qtyTaken: 0, done: false },   // Tylenol
-  { id: 'pl-9', inspectionId: 'insp-5', unitTailNumber: 'N5PG', itemId: '63', qtyNeeded: 1, qtyTaken: 0, done: false },   // Leather Wipes
-];
+export const MOCK_PICK_LIST: PickListItem[] = [];
 
 // ─── Mock Restock List Items ────────────────────────────────────────────────
 

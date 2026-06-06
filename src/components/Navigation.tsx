@@ -263,7 +263,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     {
       label: "Inventory V2  ✦ NEW",
       items: [
-        { name: 'Dashboard', href: '/inventory-v2', icon: Layers, roles: ['inflight', 'admin', 'pilot', 'commissary-manager'] },
         { name: 'Trips', href: '/inventory-v2/trips', icon: Plane, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Inspections', href: '/inventory-v2/inspections', icon: ClipboardCheck, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Commissary', href: '/inventory-v2/commissary', icon: Warehouse, roles: ['inflight', 'admin', 'commissary-manager'] },

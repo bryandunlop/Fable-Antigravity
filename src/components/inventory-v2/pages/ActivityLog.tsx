@@ -95,10 +95,10 @@ export default function ActivityLog() {
 
       <div className="flex items-center gap-2">
         <button
-          onClick={() => navigate('/inventory-v2')}
+          onClick={() => navigate('/inventory-v2/inspections')}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ChevronLeft size={16} /> Dashboard
+          <ChevronLeft size={16} /> Back
         </button>
         <h1 className="text-2xl font-bold ml-2">Activity Log</h1>
         <span className="ml-auto text-xs text-muted-foreground">{filtered.length} entries</span>

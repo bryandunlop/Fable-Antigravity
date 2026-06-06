@@ -15,7 +15,7 @@ import { deductFromBatches } from './shared/batchUtils';
 const STORAGE_PREFIX = 'inv-v2-';
 const STORAGE_KEY = `${STORAGE_PREFIX}state`;
 // Bump this string any time mock data changes to force a fresh load
-const DATA_VERSION = '2026-06-06-v1';
+const DATA_VERSION = '2026-06-06-v2-fa-arrival';
 const VERSION_KEY = `${STORAGE_PREFIX}data-version`;
 
 // ─── Initial State ──────────────────────────────────────────────────────────

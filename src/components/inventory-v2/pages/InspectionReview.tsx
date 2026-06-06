@@ -623,7 +623,7 @@ export default function InspectionReview() {
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   onClick={() => {
                     sessionStorage.removeItem(SESSION_KEY);
-                    navigate('/inventory-v2');
+                    navigate('/inventory-v2/inspections');
                   }}
                 >
                   Discard inspection

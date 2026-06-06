@@ -4,7 +4,6 @@
 export { InventoryV2Provider, useInventoryV2 } from './InventoryV2Context';
 
 // Pages
-export { default as InventoryV2Dashboard } from './pages/InventoryV2Dashboard';
 export { default as AircraftInspections } from './pages/AircraftInspections';
 export { default as Commissary } from './pages/Commissary';
 export { default as InspectionForm } from './pages/InspectionForm';

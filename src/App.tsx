@@ -120,7 +120,6 @@ import { AuditProvider } from './contexts/AuditContext';
 
 // Inventory V2
 import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Context';
-import InventoryV2Dashboard from './components/inventory-v2/pages/InventoryV2Dashboard';
 import InspectionFormV2 from './components/inventory-v2/pages/InspectionForm';
 import InspectionReviewV2 from './components/inventory-v2/pages/InspectionReview';
 import AircraftInspectionsV2 from './components/inventory-v2/pages/AircraftInspections';
@@ -412,7 +411,7 @@ export default function App() {
                                 <Route path="/aircraft-inventory" element={<AircraftInventory />} />
 
                                 {/* ─── Inventory V2 Routes ─── */}
-                                <Route path="/inventory-v2" element={<InventoryRouteWrapper userRole={userRole}><InventoryV2Dashboard /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2" element={<Navigate to="/inventory-v2/inspections" replace />} />
                                 <Route path="/inventory-v2/inspection" element={<InventoryRouteWrapper userRole={userRole}><InspectionFormV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/inspection/:id/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/inspections" element={<InventoryRouteWrapper userRole={userRole}><AircraftInspectionsV2 /></InventoryRouteWrapper>} />
