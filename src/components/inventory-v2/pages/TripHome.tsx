@@ -22,7 +22,6 @@ import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
 import QuickTapView from '../shared/QuickTapView';
 import { TripLoadExtras } from './TripLoadExtras';
-import { TripRestoreStock } from './TripRestoreStock';
 
 // ─── Item Row ───────────────────────────────────────────────────────────────
 
@@ -232,7 +231,7 @@ function TripCompleteDialog({
           </Button>
           <Button onClick={onStartReplenish} variant="outline" className="w-full">
             <Package className="mr-2 h-4 w-4" />
-            Skip — Go to Replenish
+            Restock Aircraft
           </Button>
           <Button variant="ghost" onClick={onClose} className="w-full text-muted-foreground">
             Done
@@ -346,7 +345,7 @@ function TripViewInner({
   const [showTripComplete, setShowTripComplete] = useState(false);
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
-  const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
+  const [screen, setScreen] = useState<'trip' | 'load-extras'>('trip');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const undoToastRef = useRef<string | number | undefined>(undefined);
 
@@ -363,33 +362,9 @@ function TripViewInner({
 
   const phaseColors = LEG_PHASE_COLORS[phase];
 
-  // If trip is completed, show the complete state
-  if (trip.status === 'completed') {
-    return (
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
-        <OfflineBanner />
-        <button
-          onClick={() => navigate('/inventory-v2/trips')}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft size={16} /> Fleet
-        </button>
-        <div className="text-center py-12 space-y-4">
-          <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
-          <h1 className="text-2xl font-bold">Trip Complete</h1>
-          <p className="text-muted-foreground">
-            {trip.tailNumber} · {trip.legs.length} legs · {trip.tripName || 'Unnamed Trip'}
-          </p>
-          <Button
-            onClick={() => navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`)}
-            className="bg-emerald-600 hover:bg-emerald-500"
-          >
-            Start Replenish
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // NOTE: the completed-trip early return lives AFTER all hooks below — moving
+  // it here would skip later hooks and break the Rules of Hooks when a trip
+  // transitions to 'completed' mid-render.
 
   // ─── Quick Count Logic ──────────────────────────────────────────────────
 
@@ -454,7 +429,7 @@ function TripViewInner({
       .flatMap((l: TripLeg) => l.usageLog)
       .filter(e => e.itemId === item.id)
       .reduce((sum, e) => sum + e.qtyUsed, 0);
-    const loadTotal = trip.loadItems
+    const loadTotal = (trip.loadItems ?? [])
       .filter(li => li.itemId === item.id)
       .reduce((sum, li) => sum + li.qty, 0);
     return par + loadTotal - allLegsUsage;
@@ -532,6 +507,35 @@ function TripViewInner({
     return gl?.items.length ?? 0;
   }, [state.groceryLists, trip.id]);
 
+  // If trip is completed, show the complete state.
+  // MUST stay below all hooks — see note near the top of this component.
+  if (trip.status === 'completed') {
+    return (
+      <div className="max-w-5xl mx-auto p-6 space-y-6">
+        <OfflineBanner />
+        <button
+          onClick={() => navigate('/inventory-v2/trips')}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft size={16} /> Fleet
+        </button>
+        <div className="text-center py-12 space-y-4">
+          <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
+          <h1 className="text-2xl font-bold">Trip Complete</h1>
+          <p className="text-muted-foreground">
+            {trip.tailNumber} · {trip.legs.length} legs · {trip.tripName || 'Unnamed Trip'}
+          </p>
+          <Button
+            onClick={() => navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`)}
+            className="bg-emerald-600 hover:bg-emerald-500"
+          >
+            Start Replenish
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // ─── Phase Actions ────────────────────────────────────────────────────────
 
   function handleStartFlight() {
@@ -548,7 +552,13 @@ function TripViewInner({
       type: 'SET_LEG_PHASE',
       payload: { tripId: trip.id, legId: activeLeg.id, phase: 'on_ground' },
     });
-    setShowNextLeg(true);
+    // On the last leg there's nowhere to go but restock — skip the Next Leg
+    // dialog and go straight to trip completion.
+    if (isLastLeg) {
+      handleCompleteTrip();
+    } else {
+      setShowNextLeg(true);
+    }
   }
 
   function handleNextLeg() {
@@ -632,9 +642,6 @@ function TripViewInner({
   // Sub-screen renders
   if (screen === 'load-extras') {
     return <TripLoadExtras trip={trip} onBack={() => setScreen('trip')} />;
-  }
-  if (screen === 'restore-stock' && activeLeg) {
-    return <TripRestoreStock trip={trip} activeLeg={activeLeg} onBack={() => setScreen('trip')} />;
   }
 
   return (
@@ -986,7 +993,7 @@ function TripViewInner({
       {activeLeg && (
         <div className="bg-background border-t-2 border-border px-4 py-3 shrink-0">
           <div className="max-w-5xl mx-auto space-y-2">
-            {/* on_ground: Grocery + Restore Stock row */}
+            {/* on_ground: Grocery List (mid-trip sourcing happens via the grocery list) */}
             {phase === 'on_ground' && (
               <div className="flex items-center gap-3">
                 <Button
@@ -1001,13 +1008,6 @@ function TripViewInner({
                       {groceryItemCount}
                     </span>
                   )}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setScreen('restore-stock')}
-                >
-                  Restore Stock
                 </Button>
               </div>
             )}
