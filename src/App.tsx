@@ -5,7 +5,7 @@ import { Toaster } from 'sonner';
 import NetworkStatus from './components/NetworkStatus';
 import { HazardProvider } from './contexts/HazardContext';
 import { MaintenanceProvider } from './components/contexts/MaintenanceContext';
-import { NotificationProvider } from './components/contexts/NotificationContext';
+import { NotificationProvider, useNotificationContext } from './components/contexts/NotificationContext';
 import { PassengerFormProvider } from './components/contexts/PassengerFormContext';
 import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
@@ -141,6 +141,19 @@ import LegReconciliationV2 from './components/inventory-v2/pages/LegReconciliati
 import ItemManagerV2 from './components/inventory-v2/pages/ItemManager';
 import CommissaryKiosk from './components/inventory-v2/pages/CommissaryKiosk';
 
+// ─── Wrapper: bridges NotificationContext into InventoryV2Provider ───────────
+// Must live outside App so it's a stable component reference, but it's defined
+// here because it needs to be inside the module scope where InventoryV2Provider
+// is imported. It reads from NotificationProvider (which wraps all routes).
+function InventoryRouteWrapper({ children, userRole }: { children: React.ReactNode; userRole: string }) {
+  const { addNotification } = useNotificationContext();
+  return (
+    <InventoryV2Provider userRole={userRole} addNotification={addNotification}>
+      {children}
+    </InventoryV2Provider>
+  );
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string>('pilot');
@@ -173,9 +186,9 @@ export default function App() {
                     <Route
                       path="/commissary-kiosk"
                       element={
-                        <InventoryV2Provider userRole="commissary-kiosk">
+                        <InventoryRouteWrapper userRole="commissary-kiosk">
                           <CommissaryKiosk />
-                        </InventoryV2Provider>
+                        </InventoryRouteWrapper>
                       }
                     />
 
@@ -402,25 +415,25 @@ export default function App() {
                                 <Route path="/aircraft-inventory" element={<AircraftInventory />} />
 
                                 {/* ─── Inventory V2 Routes ─── */}
-                                <Route path="/inventory-v2" element={<InventoryV2Provider userRole={userRole}><InventoryV2Dashboard /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/inspection" element={<InventoryV2Provider userRole={userRole}><InspectionFormV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/inspection/:id/review" element={<InventoryV2Provider userRole={userRole}><InspectionReviewV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/my-inspections" element={<InventoryV2Provider userRole={userRole}><InspectionHistoryV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/recently-completed" element={<InventoryV2Provider userRole={userRole}><RecentlyCompletedV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/stockroom" element={<InventoryV2Provider userRole={userRole}><StockroomCountV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/physical-count" element={<InventoryV2Provider userRole={userRole}><PhysicalCountV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/replenish" element={<InventoryV2Provider userRole={userRole}><ReplenishV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/unit-request" element={<InventoryV2Provider userRole={userRole}><UnitItemRequestV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/unit-requests" element={<InventoryV2Provider userRole={userRole}><UnitItemRequestListV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/receiving" element={<InventoryV2Provider userRole={userRole}><ReceivingV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/settings" element={<InventoryV2Provider userRole={userRole}><SettingsV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/commissary" element={<InventoryV2Provider userRole={userRole}><CommissaryDashboard /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/alerts" element={<InventoryV2Provider userRole={userRole}><AlertsPage /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/trips" element={<InventoryV2Provider userRole={userRole}><TripListV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/trips/:tripId" element={<InventoryV2Provider userRole={userRole}><TripHomeV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryV2Provider userRole={userRole}><GroceryListPageV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/trips/:tripId/reconcile" element={<InventoryV2Provider userRole={userRole}><LegReconciliationV2 /></InventoryV2Provider>} />
-                                <Route path="/inventory-v2/item-manager" element={<InventoryV2Provider userRole={userRole}><ItemManagerV2 /></InventoryV2Provider>} />
+                                <Route path="/inventory-v2" element={<InventoryRouteWrapper userRole={userRole}><InventoryV2Dashboard /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/inspection" element={<InventoryRouteWrapper userRole={userRole}><InspectionFormV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/inspection/:id/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/my-inspections" element={<InventoryRouteWrapper userRole={userRole}><InspectionHistoryV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/recently-completed" element={<InventoryRouteWrapper userRole={userRole}><RecentlyCompletedV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/stockroom" element={<InventoryRouteWrapper userRole={userRole}><StockroomCountV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/physical-count" element={<InventoryRouteWrapper userRole={userRole}><PhysicalCountV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/replenish" element={<InventoryRouteWrapper userRole={userRole}><ReplenishV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/unit-request" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/unit-requests" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestListV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/receiving" element={<InventoryRouteWrapper userRole={userRole}><ReceivingV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/settings" element={<InventoryRouteWrapper userRole={userRole}><SettingsV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/commissary" element={<InventoryRouteWrapper userRole={userRole}><CommissaryDashboard /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/alerts" element={<InventoryRouteWrapper userRole={userRole}><AlertsPage /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/trips" element={<InventoryRouteWrapper userRole={userRole}><TripListV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/trips/:tripId" element={<InventoryRouteWrapper userRole={userRole}><TripHomeV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryRouteWrapper userRole={userRole}><GroceryListPageV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/trips/:tripId/reconcile" element={<InventoryRouteWrapper userRole={userRole}><LegReconciliationV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/item-manager" element={<InventoryRouteWrapper userRole={userRole}><ItemManagerV2 /></InventoryRouteWrapper>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />

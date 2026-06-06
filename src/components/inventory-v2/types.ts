@@ -235,18 +235,6 @@ export interface AlertThreshold {
   enabled: boolean;
 }
 
-export interface CommissaryAlert {
-  id: string;
-  itemId: string;
-  stockroomId: string;
-  userId: string;
-  threshold: number;
-  currentQty: number;
-  triggeredAt: string;
-  resolvedAt?: string;
-  dismissed: boolean;
-}
-
 // ── Trip Workflow ──
 
 export type LegPhase = 'pre_flight' | 'in_flight' | 'on_ground' | 'complete';
@@ -369,7 +357,6 @@ export interface InventoryV2State {
   displaySettings: DisplaySettings;
   currentUser: UserV2;
   alertThresholds: AlertThreshold[];
-  alerts: CommissaryAlert[];
   pendingChanges: number;
   trips: Trip[];
   groceryLists: GroceryList[];
@@ -418,8 +405,6 @@ export type InventoryV2Action =
   | { type: 'SET_CURRENT_USER'; payload: UserV2 }
   | { type: 'ADD_ALERT_THRESHOLD'; payload: AlertThreshold }
   | { type: 'REMOVE_ALERT_THRESHOLD'; payload: string } // threshold id
-  | { type: 'DISMISS_ALERT'; payload: string } // alert id
-  | { type: 'RESOLVE_ALERT'; payload: string } // alert id
   | { type: 'INCREMENT_PENDING_CHANGES' }
   | { type: 'RESET_PENDING_CHANGES' }
   // Trip lifecycle

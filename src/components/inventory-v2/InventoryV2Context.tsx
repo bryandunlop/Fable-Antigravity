@@ -1,7 +1,8 @@
 // ─── Inventory V2 — React Context ───────────────────────────────────────────
 
-import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
-import type { InventoryV2State, InventoryV2Action, StockroomItem, CommissaryAlert } from './types';
+import React, { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
+import type { InventoryV2State, InventoryV2Action, StockroomItem } from './types';
+import type { Notification } from '../contexts/NotificationContext';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS, STOCK_BATCHES } from './mockData';
 import { MOCK_TRIPS, MOCK_GROCERY_LISTS } from './mockTrips';
@@ -69,63 +70,11 @@ function getDefaultState(): InventoryV2State {
       department: SYSTEM_USERS[0].department,
     },
     alertThresholds: [],
-    alerts: [],
     pendingChanges: 0,
     trips: MOCK_TRIPS,
     groceryLists: MOCK_GROCERY_LISTS,
     stockBatches: STOCK_BATCHES,
   };
-}
-
-// ─── Alert Helper ────────────────────────────────────────────────────────────
-
-function generateAlertsAfterStockUpdate(
-  state: InventoryV2State,
-  newStockroomItems: StockroomItem[],
-  changedItems: StockroomItem[]
-): CommissaryAlert[] {
-  let alerts = [...state.alerts];
-
-  for (const changed of changedItems) {
-    const relatedThresholds = state.alertThresholds.filter(
-      t => t.enabled && t.itemId === changed.itemId
-    );
-
-    for (const threshold of relatedThresholds) {
-      const qty = changed.qtyOnHand;
-      const openAlert = alerts.find(
-        a => a.itemId === threshold.itemId &&
-             a.userId === threshold.userId &&
-             !a.resolvedAt &&
-             !a.dismissed
-      );
-
-      if (qty < threshold.threshold) {
-        if (!openAlert) {
-          alerts.push({
-            id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-            itemId: threshold.itemId,
-            stockroomId: changed.stockroomId,
-            userId: threshold.userId,
-            threshold: threshold.threshold,
-            currentQty: qty,
-            triggeredAt: new Date().toISOString(),
-            dismissed: false,
-          });
-        } else {
-          alerts = alerts.map(a =>
-            a === openAlert ? { ...a, currentQty: qty } : a
-          );
-        }
-      } else if (openAlert) {
-        alerts = alerts.map(a =>
-          a === openAlert ? { ...a, resolvedAt: new Date().toISOString(), currentQty: qty } : a
-        );
-      }
-    }
-  }
-
-  return alerts;
 }
 
 // ─── Reducer ────────────────────────────────────────────────────────────────
@@ -179,8 +128,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           ? action.payload
           : si
       );
-      const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, [action.payload]);
-      return { ...state, stockroomItems: newStockroomItems, alerts, pendingChanges: state.pendingChanges + 1 };
+      return { ...state, stockroomItems: newStockroomItems, pendingChanges: state.pendingChanges + 1 };
     }
 
     case 'BULK_UPDATE_STOCKROOM': {
@@ -190,7 +138,6 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         );
         return updated ?? si;
       });
-      const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, action.payload);
 
       // FIFO batch deduction for items where qty decreased
       let updatedBatches = state.stockBatches;
@@ -205,7 +152,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         }
       }
 
-      return { ...state, stockroomItems: newStockroomItems, stockBatches: updatedBatches, alerts, pendingChanges: state.pendingChanges + 1 };
+      return { ...state, stockroomItems: newStockroomItems, stockBatches: updatedBatches, pendingChanges: state.pendingChanges + 1 };
     }
 
     case 'SET_PICK_LIST':
@@ -272,51 +219,11 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         ? state.alertThresholds.map((t, i) => i === existing ? action.payload : t)
         : [...state.alertThresholds, action.payload];
 
-      // Check current stock immediately — if already below threshold, generate alert now
-      let alerts = [...state.alerts];
-      if (action.payload.enabled) {
-        const si = state.stockroomItems.find(s => s.itemId === action.payload.itemId);
-        if (si && si.qtyOnHand < action.payload.threshold) {
-          const openAlert = alerts.find(
-            a => a.itemId === action.payload.itemId &&
-                 a.userId === action.payload.userId &&
-                 !a.resolvedAt &&
-                 !a.dismissed
-          );
-          if (!openAlert) {
-            alerts.push({
-              id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-              itemId: action.payload.itemId,
-              stockroomId: si.stockroomId,
-              userId: action.payload.userId,
-              threshold: action.payload.threshold,
-              currentQty: si.qtyOnHand,
-              triggeredAt: new Date().toISOString(),
-              dismissed: false,
-            });
-          }
-        }
-      }
-
-      return { ...state, alertThresholds: updatedThresholds, alerts };
+      return { ...state, alertThresholds: updatedThresholds };
     }
 
     case 'REMOVE_ALERT_THRESHOLD':
       return { ...state, alertThresholds: state.alertThresholds.filter(t => t.id !== action.payload) };
-
-    case 'DISMISS_ALERT':
-      return {
-        ...state,
-        alerts: state.alerts.map(a => a.id === action.payload ? { ...a, dismissed: true } : a),
-      };
-
-    case 'RESOLVE_ALERT':
-      return {
-        ...state,
-        alerts: state.alerts.map(a =>
-          a.id === action.payload ? { ...a, resolvedAt: new Date().toISOString() } : a
-        ),
-      };
 
     case 'INCREMENT_PENDING_CHANGES':
       return { ...state, pendingChanges: state.pendingChanges + 1 };
@@ -568,12 +475,10 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           ? { ...si, qtyOnHand: Math.max(0, si.qtyOnHand - qty) }
           : si
       );
-      const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, newStockroomItems.filter(si => si.itemId === itemId));
       return {
         ...state,
         stockBatches: newBatches,
         stockroomItems: newStockroomItems,
-        alerts,
         pendingChanges: state.pendingChanges + 1,
       };
     }
@@ -583,7 +488,6 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       const commissaryItems = items.filter(li => li.source === 'commissary');
       // Update stockroom quantities for commissary-sourced loads
       let newStockroomItems = state.stockroomItems;
-      let alerts = state.alerts;
       if (commissaryItems.length > 0) {
         newStockroomItems = state.stockroomItems.map(si => {
           const loadQty = commissaryItems
@@ -592,11 +496,6 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           if (loadQty === 0) return si;
           return { ...si, qtyOnHand: Math.max(0, si.qtyOnHand - loadQty) };
         });
-        alerts = generateAlertsAfterStockUpdate(
-          state,
-          newStockroomItems,
-          newStockroomItems.filter(si => commissaryItems.some(li => li.itemId === si.itemId))
-        );
       }
       // Deduct from batches FIFO for items loaded from commissary
       let updatedBatches = state.stockBatches;
@@ -615,7 +514,6 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         trips: newTrips,
         stockroomItems: newStockroomItems,
         stockBatches: updatedBatches,
-        alerts,
         pendingChanges: state.pendingChanges + 1,
       };
     }
@@ -628,7 +526,6 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         );
         return updated ?? si;
       });
-      const alerts = generateAlertsAfterStockUpdate(state, newStockroomItems, stockroomUpdates);
       const newTrips = state.trips.map(t =>
         t.id === tripId
           ? { ...t, returnItems: [...t.returnItems, ...items] }
@@ -638,7 +535,6 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         ...state,
         trips: newTrips,
         stockroomItems: newStockroomItems,
-        alerts,
         pendingChanges: state.pendingChanges + 1,
       };
     }
@@ -662,10 +558,15 @@ const InventoryV2Context = createContext<InventoryV2ContextValue | undefined>(un
 interface InventoryV2ProviderProps {
   children: ReactNode;
   userRole?: string;
+  addNotification?: (notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => void;
 }
 
-export function InventoryV2Provider({ children, userRole }: InventoryV2ProviderProps) {
+export function InventoryV2Provider({ children, userRole, addNotification }: InventoryV2ProviderProps) {
   const [state, dispatch] = useReducer(inventoryReducer, undefined, loadInitialState);
+
+  // Keep addNotification ref stable so useEffect deps don't change on every render
+  const addNotifRef = useRef(addNotification);
+  addNotifRef.current = addNotification;
 
   // Bridge app-level login role into context on mount
   useEffect(() => {
@@ -698,6 +599,42 @@ export function InventoryV2Provider({ children, userRole }: InventoryV2ProviderP
     }, 300);
     return () => clearTimeout(timeout);
   }, [state]);
+
+  // Fire global notifications when stockroom qty drops below thresholds
+  const prevStockroomItemsRef = useRef<StockroomItem[]>(state.stockroomItems);
+
+  useEffect(() => {
+    const prev = prevStockroomItemsRef.current;
+    prevStockroomItemsRef.current = state.stockroomItems;
+    if (!addNotifRef.current) return;
+    const addNotif = addNotifRef.current;
+
+    for (const si of state.stockroomItems) {
+      const prevSi = prev.find(p => p.itemId === si.itemId && p.stockroomId === si.stockroomId);
+      if (!prevSi || si.qtyOnHand >= prevSi.qtyOnHand) continue; // only fire on qty decrease
+      const item = state.items.find(i => i.id === si.itemId);
+      if (!item) continue;
+      if (si.qtyOnHand <= si.minimumLevel) {
+        addNotif({
+          type: 'inventory',
+          priority: 'critical',
+          title: `${item.itemName} critically low`,
+          message: `${si.qtyOnHand} on hand (minimum: ${si.minimumLevel})`,
+          module: 'Inventory',
+          actionUrl: '/inventory-v2/commissary',
+        });
+      } else if (si.qtyOnHand < si.parLevel) {
+        addNotif({
+          type: 'inventory',
+          priority: 'medium',
+          title: `${item.itemName} below par`,
+          message: `${si.qtyOnHand} on hand (par: ${si.parLevel})`,
+          module: 'Inventory',
+          actionUrl: '/inventory-v2/commissary',
+        });
+      }
+    }
+  }, [state.stockroomItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <InventoryV2Context.Provider value={{ state, dispatch }}>

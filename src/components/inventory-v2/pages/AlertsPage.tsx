@@ -5,31 +5,40 @@ import { formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
 import { Button } from '../../ui/button';
 import { useInventoryV2 } from '../InventoryV2Context';
-import type { CommissaryAlert } from '../types';
+import { useNotificationContext } from '../../contexts/NotificationContext';
+import type { Notification } from '../../contexts/NotificationContext';
 
-function StatusBadge({ alert }: { alert: Pick<CommissaryAlert, 'resolvedAt' | 'dismissed'> }) {
-  if (alert.dismissed) {
-    return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-muted text-muted-foreground">Dismissed</span>;
+function PriorityBadge({ priority }: { priority: Notification['priority'] }) {
+  if (priority === 'critical') {
+    return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-red-500/15 text-red-600">Critical</span>;
   }
-  if (alert.resolvedAt) {
-    return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-green-500/15 text-green-600">Resolved</span>;
+  if (priority === 'high') {
+    return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-orange-500/15 text-orange-600">High</span>;
   }
-  return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-red-500/15 text-red-600">Active</span>;
+  if (priority === 'medium') {
+    return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-yellow-500/15 text-yellow-600">Medium</span>;
+  }
+  return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-muted text-muted-foreground">Low</span>;
 }
 
-function AlertTable({ alerts }: { alerts: CommissaryAlert[] }) {
-  const { state, dispatch } = useInventoryV2();
+function ReadBadge({ isRead }: { isRead: boolean }) {
+  if (isRead) {
+    return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-muted text-muted-foreground">Read</span>;
+  }
+  return <span className="rounded px-2 py-0.5 text-[10px] font-semibold bg-red-500/15 text-red-600">Unread</span>;
+}
+
+function AlertTable({ notifications }: { notifications: Notification[] }) {
+  const { state } = useInventoryV2();
+  const { markAsRead, deleteNotification } = useNotificationContext();
   const navigate = useNavigate();
 
-  function itemName(itemId: string) {
-    return state.items.find(i => i.id === itemId)?.itemName ?? itemId;
-  }
-
+  // Try to extract an item name from the notification title (best effort)
   function stockroomName(stockroomId: string) {
     return state.stockrooms.find(s => s.id === stockroomId)?.name ?? stockroomId;
   }
 
-  if (alerts.length === 0) {
+  if (notifications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
         <Bell className="w-8 h-8 mb-2 opacity-40" />
@@ -43,44 +52,44 @@ function AlertTable({ alerts }: { alerts: CommissaryAlert[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
-            <th className="pb-2 font-medium">Item</th>
-            <th className="pb-2 font-medium">Stockroom</th>
-            <th className="pb-2 text-right font-medium">On Hand</th>
-            <th className="pb-2 text-right font-medium">Threshold</th>
-            <th className="pb-2 font-medium">Triggered</th>
+            <th className="pb-2 font-medium">Title</th>
+            <th className="pb-2 font-medium">Message</th>
+            <th className="pb-2 font-medium">Priority</th>
+            <th className="pb-2 font-medium">When</th>
             <th className="pb-2 font-medium">Status</th>
             <th className="pb-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y">
-          {alerts.map(a => (
-            <tr key={a.id}>
-              <td className="py-2.5 font-medium">{itemName(a.itemId)}</td>
-              <td className="py-2.5 text-muted-foreground">{stockroomName(a.stockroomId)}</td>
-              <td className="py-2.5 text-right">{a.currentQty}</td>
-              <td className="py-2.5 text-right">{a.threshold}</td>
+          {notifications.map(n => (
+            <tr key={n.id}>
+              <td className="py-2.5 font-medium">{n.title}</td>
+              <td className="py-2.5 text-muted-foreground max-w-xs">{n.message}</td>
+              <td className="py-2.5"><PriorityBadge priority={n.priority} /></td>
               <td className="py-2.5 text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(a.triggeredAt), { addSuffix: true })}
+                {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true })}
               </td>
-              <td className="py-2.5"><StatusBadge alert={a} /></td>
+              <td className="py-2.5"><ReadBadge isRead={n.isRead} /></td>
               <td className="py-2.5">
-                {!a.resolvedAt && !a.dismissed && (
-                  <div className="flex gap-2">
+                <div className="flex gap-2">
+                  {n.actionUrl && (
                     <Button
                       size="sm"
                       className="h-6 px-2 text-[11px]"
-                      onClick={() => navigate(`/inventory-v2/receiving?itemId=${a.itemId}`)}
+                      onClick={() => navigate(n.actionUrl!)}
                     >
-                      Restock →
+                      View →
                     </Button>
+                  )}
+                  {!n.isRead && (
                     <button
                       className="text-[11px] text-muted-foreground underline hover:text-foreground"
-                      onClick={() => dispatch({ type: 'DISMISS_ALERT', payload: a.id })}
+                      onClick={() => markAsRead(n.id)}
                     >
                       dismiss
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -91,20 +100,19 @@ function AlertTable({ alerts }: { alerts: CommissaryAlert[] }) {
 }
 
 export default function AlertsPage() {
-  const { state } = useInventoryV2();
+  const { notifications } = useNotificationContext();
 
-  const myAlerts = state.alerts
-    .filter(a => a.userId === state.currentUser.id)
-    .sort((a, b) => new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime());
+  const inventoryNotifs = notifications
+    .filter(n => n.module === 'Inventory')
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  const active = myAlerts.filter(a => !a.resolvedAt && !a.dismissed);
+  const active = inventoryNotifs.filter(n => !n.isRead);
 
-  const history = myAlerts.filter(a => {
-    if (!a.resolvedAt && !a.dismissed) return false;
+  const history = inventoryNotifs.filter(n => {
+    if (!n.isRead) return false;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
-    const compareDate = a.resolvedAt ? new Date(a.resolvedAt) : new Date(a.triggeredAt);
-    return compareDate >= cutoff;
+    return new Date(n.timestamp) >= cutoff;
   });
 
   return (
@@ -127,10 +135,10 @@ export default function AlertsPage() {
           <TabsTrigger value="history">History (30d)</TabsTrigger>
         </TabsList>
         <TabsContent value="active" className="mt-4">
-          <AlertTable alerts={active} />
+          <AlertTable notifications={active} />
         </TabsContent>
         <TabsContent value="history" className="mt-4">
-          <AlertTable alerts={history} />
+          <AlertTable notifications={history} />
         </TabsContent>
       </Tabs>
     </div>
