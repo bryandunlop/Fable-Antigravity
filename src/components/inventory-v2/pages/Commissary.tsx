@@ -18,6 +18,7 @@ import BulkAdjustModal from '../shared/BulkAdjustModal';
 import ReceiveStockModal from '../shared/ReceiveStockModal';
 import ShoppingListModal from '../shared/ShoppingListModal';
 import EditItemDialog from '../shared/EditItemDialog';
+import ManageLocationsDialog from '../shared/ManageLocationsDialog';
 import type { InventoryItemV2, StockroomItem, StorageLocation, StockBatch } from '../types';
 
 // ─── Helper functions ───────────────────────────────────────────────────────
@@ -676,7 +677,7 @@ export default function Commissary() {
           if (!v) setEditItem(null);
         }}
       />
-      {/* <ManageLocationsDialog open={locationsOpen} onOpenChange={setLocationsOpen} /> — Task 8 */}
+      <ManageLocationsDialog open={locationsOpen} onOpenChange={setLocationsOpen} />
     </div>
   );
 }
