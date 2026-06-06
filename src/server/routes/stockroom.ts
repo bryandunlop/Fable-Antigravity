@@ -16,6 +16,7 @@ stockroomRoute.put('/item', async (c) => {
     parLevel: body.parLevel,
     minimumLevel: body.minimumLevel,
     binLocation: body.binLocation,
+    locationId: body.locationId ?? null,
   }).where(
     and(
       eq(stockroomItems.itemId, body.itemId),
@@ -31,6 +32,7 @@ stockroomRoute.put('/bulk', async (c) => {
   const { items: updatedItems } = await c.req.json<{ items: Array<{
     itemId: string; stockroomId: string; qtyOnHand: number;
     parLevel: number; minimumLevel: number; binLocation: string;
+    locationId?: string;
   }> }>();
 
   // Update each item — Neon HTTP driver doesn't support transactions,
@@ -41,6 +43,7 @@ stockroomRoute.put('/bulk', async (c) => {
       parLevel: item.parLevel,
       minimumLevel: item.minimumLevel,
       binLocation: item.binLocation,
+      locationId: item.locationId ?? null,
     }).where(
       and(
         eq(stockroomItems.itemId, item.itemId),
