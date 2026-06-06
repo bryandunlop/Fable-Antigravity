@@ -26,7 +26,6 @@ import {
   Shield,
   AlertTriangle,
   Target,
-  FileCheck,
   UserCheck,
   Utensils,
   Package,
@@ -268,8 +267,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
       items: [
         { name: 'Dashboard', href: '/inventory-v2', icon: Layers, roles: ['inflight', 'admin', 'pilot', 'commissary-manager'] },
         { name: 'Trips', href: '/inventory-v2/trips', icon: Plane, roles: ['inflight', 'admin', 'commissary-manager'] },
-        { name: 'New Inspection', href: '/inventory-v2/inspection', icon: ClipboardCheck, roles: ['inflight', 'admin'] },
-        { name: 'My Inspections', href: '/inventory-v2/my-inspections', icon: FileCheck, roles: ['inflight', 'admin'] },
+        { name: 'Inspections', href: '/inventory-v2/inspections', icon: ClipboardCheck, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Stockroom', href: '/inventory-v2/stockroom', icon: Boxes, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Physical Count', href: '/inventory-v2/physical-count', icon: Calculator, roles: ['inflight', 'admin'] },
         { name: 'Replenish', href: '/inventory-v2/replenish', icon: PackagePlus, roles: ['inflight', 'admin'] },

@@ -123,7 +123,7 @@ import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Contex
 import InventoryV2Dashboard from './components/inventory-v2/pages/InventoryV2Dashboard';
 import InspectionFormV2 from './components/inventory-v2/pages/InspectionForm';
 import InspectionReviewV2 from './components/inventory-v2/pages/InspectionReview';
-import InspectionHistoryV2 from './components/inventory-v2/pages/InspectionHistory';
+import AircraftInspectionsV2 from './components/inventory-v2/pages/AircraftInspections';
 import RecentlyCompletedV2 from './components/inventory-v2/pages/RecentlyCompleted';
 import StockroomCountV2 from './components/inventory-v2/pages/StockroomCount';
 import PhysicalCountV2 from './components/inventory-v2/pages/PhysicalCount';
@@ -419,7 +419,7 @@ export default function App() {
                                 <Route path="/inventory-v2" element={<InventoryRouteWrapper userRole={userRole}><InventoryV2Dashboard /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/inspection" element={<InventoryRouteWrapper userRole={userRole}><InspectionFormV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/inspection/:id/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/my-inspections" element={<InventoryRouteWrapper userRole={userRole}><InspectionHistoryV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/inspections" element={<InventoryRouteWrapper userRole={userRole}><AircraftInspectionsV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/recently-completed" element={<InventoryRouteWrapper userRole={userRole}><RecentlyCompletedV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/stockroom" element={<InventoryRouteWrapper userRole={userRole}><StockroomCountV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/physical-count" element={<InventoryRouteWrapper userRole={userRole}><PhysicalCountV2 /></InventoryRouteWrapper>} />
