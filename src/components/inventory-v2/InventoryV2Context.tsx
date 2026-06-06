@@ -675,6 +675,63 @@ export function InventoryV2Provider({ children, userRole, addNotification }: Inv
     }
   }, [state.stockroomItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fire global notifications on inspection/grocery/trip state transitions
+  const prevStateRef = useRef(state);
+
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = state;
+    if (!addNotifRef.current) return;
+    const addNotif = addNotifRef.current;
+
+    // Inspection submitted with shortages
+    for (const insp of state.inspections) {
+      const prevInsp = prev.inspections.find(i => i.id === insp.id);
+      if (insp.status === 'restocking_needed' && prevInsp?.status !== 'restocking_needed') {
+        const shortages = insp.checkedItems?.filter(ci => ci.qtyInUnit < ci.requiredQty).length ?? 0;
+        addNotif({
+          type: 'inventory',
+          priority: 'high',
+          title: `Inspection shortages on ${insp.tailNumber}`,
+          message: `${shortages} item${shortages !== 1 ? 's' : ''} below par on ${insp.tailNumber}. Restocking needed.`,
+          module: 'Inventory',
+          actionUrl: '/inventory-v2/replenish',
+        });
+      }
+    }
+
+    // Grocery list sent
+    for (const gl of state.groceryLists) {
+      const prevGl = prev.groceryLists?.find(g => g.id === gl.id);
+      if (gl.status === 'sent' && prevGl?.status !== 'sent') {
+        const trip = state.trips.find(t => t.id === gl.tripId);
+        addNotif({
+          type: 'inventory',
+          priority: 'medium',
+          title: `Grocery list from ${gl.generatedBy ?? 'FA'} for ${gl.tailNumber ?? trip?.tailNumber ?? ''}`,
+          message: `${gl.items.length} item${gl.items.length !== 1 ? 's' : ''} requested for ${trip?.tripName ?? gl.tailNumber ?? ''}`,
+          module: 'Inventory',
+          actionUrl: '/inventory-v2/commissary',
+        });
+      }
+    }
+
+    // Trip completed
+    for (const trip of state.trips) {
+      const prevTrip = prev.trips.find(t => t.id === trip.id);
+      if (trip.status === 'completed' && prevTrip?.status !== 'completed') {
+        addNotif({
+          type: 'inventory',
+          priority: 'medium',
+          title: `Trip complete — ${trip.tailNumber} ready for inspection`,
+          message: `${trip.tripName ?? trip.tailNumber} has been completed. Post-trip inspection recommended.`,
+          module: 'Inventory',
+          actionUrl: '/inventory-v2/inspection',
+        });
+      }
+    }
+  }, [state.inspections, state.groceryLists, state.trips]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <InventoryV2Context.Provider value={{ state, dispatch }}>
       {children}
