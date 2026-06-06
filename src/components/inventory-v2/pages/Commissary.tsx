@@ -4,7 +4,7 @@ import {
   Warehouse, Search, Plus, Minus, ChevronDown, Pencil,
   PackagePlus, ShoppingCart, Settings2, AlertTriangle,
   ExternalLink, Trash2, Package, Clock, List, LayoutGrid,
-  Boxes, SlidersHorizontal, CalendarClock,
+  Boxes, SlidersHorizontal, CalendarClock, Zap,
 } from 'lucide-react';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -20,6 +20,7 @@ import ReceiveStockModal from '../shared/ReceiveStockModal';
 import ShoppingListModal from '../shared/ShoppingListModal';
 import EditItemDialog from '../shared/EditItemDialog';
 import ManageLocationsDialog from '../shared/ManageLocationsDialog';
+import ManageQuickAddDialog from '../shared/ManageQuickAddDialog';
 import ItemThumbnail from '../shared/ItemThumbnail';
 import CommissaryGridCard from '../shared/CommissaryGridCard';
 import CommissaryParLevelsView from './CommissaryParLevelsView';
@@ -49,6 +50,7 @@ export default function Commissary() {
   const [shoppingOpen, setShoppingOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [locationsOpen, setLocationsOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [bulkAdjustOpen, setBulkAdjustOpen] = useState(false);
 
   // Edit item dialog
@@ -259,6 +261,15 @@ export default function Commissary() {
           >
             <Settings2 className="w-4 h-4" />
             Locations
+          </Button>
+
+          <Button
+            variant="ghost"
+            className="gap-2"
+            onClick={() => setQuickAddOpen(true)}
+          >
+            <Zap className="w-4 h-4" />
+            Quick Add
           </Button>
 
           <Button
@@ -763,6 +774,7 @@ export default function Commissary() {
         }}
       />
       <ManageLocationsDialog open={locationsOpen} onOpenChange={setLocationsOpen} />
+      <ManageQuickAddDialog open={quickAddOpen} onOpenChange={setQuickAddOpen} />
     </div>
   );
 }

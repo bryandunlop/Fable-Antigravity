@@ -6,7 +6,7 @@ import type { Notification } from '../contexts/NotificationContext';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS, STOCK_BATCHES, STORAGE_LOCATIONS } from './mockData';
 import { MOCK_TRIPS, MOCK_GROCERY_LISTS } from './mockTrips';
-import { FLEET_V2 } from './constants';
+import { FLEET_V2, DEFAULT_QUICK_ADD_ITEM_IDS } from './constants';
 import { loadCompartmentConfigs } from './compartmentConfig';
 import { deductFromBatches } from './shared/batchUtils';
 import { useApiSync } from './useApiSync';
@@ -100,6 +100,7 @@ function getDefaultState(): InventoryV2State {
     stockBatches: STOCK_BATCHES,
     storageLocations: STORAGE_LOCATIONS,
     favoriteItems: {},
+    quickAddItemIds: DEFAULT_QUICK_ADD_ITEM_IDS,
   };
 }
 
@@ -663,6 +664,9 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       return { ...state, favoriteItems: { ...state.favoriteItems, [userId]: updated } };
     }
 
+    case 'SET_QUICK_ADD_ITEMS':
+      return { ...state, quickAddItemIds: action.payload };
+
     default:
       return state;
   }
@@ -708,6 +712,7 @@ export function InventoryV2Provider({ children, userRole, addNotification }: Inv
             compartmentConfigs: loadCompartmentConfigs(),
             currentUser: state.currentUser,
             favoriteItems: state.favoriteItems ?? {},
+            quickAddItemIds: state.quickAddItemIds ?? DEFAULT_QUICK_ADD_ITEM_IDS,
             // The API doesn't track POs (descoped) or fleet config — keep defaults
             purchaseOrders: MOCK_PURCHASE_ORDERS,
             fleet: server.fleet?.length ? server.fleet : FLEET_V2,
