@@ -292,6 +292,7 @@ export interface Trip {
   notes: TripNote[];
   loadItems: TripLoadItem[];
   returnItems: TripReturnItem[];
+  baselineConfirmedAt?: string;
   createdBy: string;
   createdAt: string;
   lastEditedBy?: string;

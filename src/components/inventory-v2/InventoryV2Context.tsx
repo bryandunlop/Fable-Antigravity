@@ -15,7 +15,7 @@ import { deductFromBatches } from './shared/batchUtils';
 const STORAGE_PREFIX = 'inv-v2-';
 const STORAGE_KEY = `${STORAGE_PREFIX}state`;
 // Bump this string any time mock data changes to force a fresh load
-const DATA_VERSION = '2026-06-03-v3';
+const DATA_VERSION = '2026-06-05-v1';
 const VERSION_KEY = `${STORAGE_PREFIX}data-version`;
 
 // ─── Initial State ──────────────────────────────────────────────────────────
@@ -585,7 +585,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       });
       const newTrips = state.trips.map(t =>
         t.id === tripId
-          ? { ...t, returnItems: [...t.returnItems, ...items] }
+          ? { ...t, returnItems: [...t.returnItems, ...items], baselineConfirmedAt: new Date().toISOString() }
           : t
       );
       const returnEntry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'return_to_baseline', module: 'trip', description: `Returned items to baseline` };

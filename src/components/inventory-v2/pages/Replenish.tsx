@@ -29,7 +29,7 @@ export default function Replenish() {
     if (!tailParam) return null;
     return (
       state.trips
-        .filter(t => t.tailNumber === tailParam && t.status === 'completed' && t.returnItems.length === 0)
+        .filter(t => t.tailNumber === tailParam && t.status === 'completed' && !t.baselineConfirmedAt)
         .sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''))
         [0] ?? null
     );
