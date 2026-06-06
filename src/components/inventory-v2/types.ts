@@ -65,6 +65,7 @@ export interface InventoryItemV2 {
   priority: 'low' | 'medium' | 'high' | 'critical';
   alternateNames: string[];
   reorderUrl?: string;
+  vendor?: string;        // "Amazon" | "Kroger" | "Instacart" | custom string — for shopping list grouping
   barcode?: string;
   isConsumable?: boolean;     // true = depleted per use (drinks, napkins), false = durable (tools, silverware)
   posCategory?: string;       // Simplified POS grouping for Quick Tap view (e.g., 'hot-drinks', 'cold-drinks')
@@ -131,6 +132,18 @@ export interface StockroomItem {
   parLevel: number;
   minimumLevel: number;
   binLocation: string;
+  locationId?: string;    // references StorageLocation.id
+}
+
+// ─── Storage Locations (Commissary shelf/bin organization) ──────────────────
+
+export type StorageLocationType = 'shelf' | 'cabinet' | 'rack' | 'closet' | 'other';
+
+export interface StorageLocation {
+  id: string;
+  name: string;           // "Shelf A — Beverages", "Medicine Cabinet", etc.
+  type: StorageLocationType;
+  sortOrder: number;
 }
 
 // ─── Pick & Restock ─────────────────────────────────────────────────────────
@@ -374,6 +387,7 @@ export interface InventoryV2State {
   inspections: InspectionV2[];
   stockrooms: Stockroom[];
   stockroomItems: StockroomItem[];
+  storageLocations: StorageLocation[];
   pickListItems: PickListItem[];
   restockListItems: RestockListItem[];
   unitItemRequests: UnitItemRequest[];
@@ -409,6 +423,11 @@ export type InventoryV2Action =
   | { type: 'SET_STOCKROOM_ITEMS'; payload: StockroomItem[] }
   | { type: 'UPDATE_STOCKROOM_ITEM'; payload: StockroomItem }
   | { type: 'BULK_UPDATE_STOCKROOM'; payload: StockroomItem[] }
+  // Storage locations
+  | { type: 'ADD_STORAGE_LOCATION'; payload: StorageLocation }
+  | { type: 'UPDATE_STORAGE_LOCATION'; payload: Partial<StorageLocation> & { id: string } }
+  | { type: 'REMOVE_STORAGE_LOCATION'; payload: string } // locationId
+  | { type: 'REORDER_STORAGE_LOCATIONS'; payload: string[] } // ordered ids
   // Pick & Restock
   | { type: 'SET_PICK_LIST'; payload: PickListItem[] }
   | { type: 'UPDATE_PICK_ITEM'; payload: PickListItem }
