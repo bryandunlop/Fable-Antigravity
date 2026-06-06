@@ -235,7 +235,7 @@ export default function AircraftInspections() {
                         <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           {inspection.submittedAt ? `Submitted ${formatDateTime(inspection.submittedAt)}` : `Started ${formatDateTime(inspection.date)}`}
-                          <span>· Status: {inspection.status.replace('_', ' ')}</span>
+                          <span>· Status: {inspection.status.replaceAll('_', ' ')}</span>
                         </div>
                       </div>
                     </CollapsibleContent>

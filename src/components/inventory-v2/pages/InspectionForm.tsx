@@ -84,6 +84,7 @@ export default function InspectionForm() {
   const autoSaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const didResume = React.useRef(false);
   const didDetectDraft = React.useRef(false);
+  const didApplyTailParam = React.useRef(false);
 
   // ── Auto-save draft to sessionStorage on every change (debounced 500ms) ──
   useEffect(() => {
@@ -111,10 +112,12 @@ export default function InspectionForm() {
 
   // ── Pre-select aircraft from ?tail= query param ──
   useEffect(() => {
+    if (didApplyTailParam.current) return;
     const tailParam = searchParams.get('tail');
-    if (!tailParam || selectedTailNumber) return; // don't override if already selected
+    if (!tailParam) return;
     const aircraft = state.fleet.find(a => a.tailNumber === tailParam);
     if (aircraft) {
+      didApplyTailParam.current = true;
       setSelectedTailNumber(tailParam);
     }
   }, [searchParams, state.fleet]);
