@@ -91,7 +91,6 @@ export const items = pgTable('items', {
   isConsumable: boolean('is_consumable'),
   posCategory: text('pos_category'),
   vendor: text('vendor'),
-  locationId: text('location_id'),
 });
 
 // ─── Storage Locations ──────────────────────────────────────────────────────
@@ -118,6 +117,7 @@ export const stockroomItems = pgTable('stockroom_items', {
   parLevel: integer('par_level').notNull().default(0),
   minimumLevel: integer('minimum_level').notNull().default(0),
   binLocation: text('bin_location').notNull().default(''),
+  locationId: text('location_id'),
 }, (t) => [
   primaryKey({ columns: [t.itemId, t.stockroomId] }),
 ]);
