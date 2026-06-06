@@ -61,6 +61,8 @@ export const api = {
       apiFetch(`/trips/${id}`, { method: 'PUT', body: JSON.stringify(trip) }),
     complete: (id: string) =>
       apiFetch(`/trips/${id}/complete`, { method: 'POST' }),
+    reopen: (id: string) =>
+      apiFetch(`/trips/${id}/reopen`, { method: 'POST' }),
     addLeg: (tripId: string, leg: any) =>
       apiFetch(`/trips/${tripId}/legs`, { method: 'POST', body: JSON.stringify(leg) }),
     updateLeg: (tripId: string, legId: string, leg: any) =>

@@ -71,6 +71,17 @@ tripsRoute.post('/:id/complete', async (c) => {
   return c.json({ ok: true });
 });
 
+// POST /api/trips/:id/reopen — reopen a completed trip
+tripsRoute.post('/:id/reopen', async (c) => {
+  const db = c.get('db');
+  const id = c.req.param('id');
+  await db.update(trips).set({
+    status: 'active',
+    endDate: null,
+  }).where(eq(trips.id, id));
+  return c.json({ ok: true });
+});
+
 // POST /api/trips/:id/legs — add a leg
 tripsRoute.post('/:id/legs', async (c) => {
   const db = c.get('db');
