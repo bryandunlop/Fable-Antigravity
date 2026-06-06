@@ -16,6 +16,8 @@ import { V2Badge } from '../shared/V2Badge';
 import { SUPPLY_CATEGORIES } from '../constants';
 import BulkAdjustModal from '../shared/BulkAdjustModal';
 import ReceiveStockModal from '../shared/ReceiveStockModal';
+import ShoppingListModal from '../shared/ShoppingListModal';
+import EditItemDialog from '../shared/EditItemDialog';
 import type { InventoryItemV2, StockroomItem, StorageLocation, StockBatch } from '../types';
 
 // ─── Helper functions ───────────────────────────────────────────────────────
@@ -45,12 +47,16 @@ export default function Commissary() {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Modal states — wired up in later tasks; declared now
+  // Modal states
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [shoppingOpen, setShoppingOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [locationsOpen, setLocationsOpen] = useState(false);
   const [bulkAdjustOpen, setBulkAdjustOpen] = useState(false);
+
+  // Edit item dialog
+  const [editItem, setEditItem] = useState<InventoryItemV2 | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   // ─── Data + filtering ──────────────────────────────────────────────────────
 
@@ -554,9 +560,10 @@ export default function Commissary() {
                                   variant="ghost"
                                   size="sm"
                                   className="w-7 h-7 p-0"
-                                  onClick={() => {
-                                    // placeholder — EditItemDialog wired in Task 7
-                                    toast.info('Edit item — coming soon');
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setEditItem(item);
+                                    setEditOpen(true);
                                   }}
                                   aria-label="Edit item"
                                 >
@@ -659,8 +666,16 @@ export default function Commissary() {
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       <BulkAdjustModal open={bulkAdjustOpen} onOpenChange={setBulkAdjustOpen} />
       <ReceiveStockModal open={receiveOpen} onOpenChange={setReceiveOpen} />
-      {/* <ShoppingListModal open={shoppingOpen} onOpenChange={setShoppingOpen} />    — Task 6 */}
-      {/* <EditItemDialog open={addItemOpen} onOpenChange={setAddItemOpen} />         — Task 7 */}
+      <ShoppingListModal open={shoppingOpen} onOpenChange={setShoppingOpen} />
+      <EditItemDialog
+        item={editItem}
+        open={editOpen || addItemOpen}
+        onOpenChange={v => {
+          setEditOpen(v);
+          setAddItemOpen(v);
+          if (!v) setEditItem(null);
+        }}
+      />
       {/* <ManageLocationsDialog open={locationsOpen} onOpenChange={setLocationsOpen} /> — Task 8 */}
     </div>
   );
