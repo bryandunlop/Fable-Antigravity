@@ -51,14 +51,12 @@ import {
   Sparkles,
   GripVertical,
   RotateCcw,
-  Calculator,
   HardHat,
   ArrowRightLeft,
   HardDrive,
   Layers,
   PackagePlus,
-  ListChecks,
-  ShoppingCart
+  Warehouse
 } from 'lucide-react';
 
 
@@ -268,13 +266,9 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Dashboard', href: '/inventory-v2', icon: Layers, roles: ['inflight', 'admin', 'pilot', 'commissary-manager'] },
         { name: 'Trips', href: '/inventory-v2/trips', icon: Plane, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Inspections', href: '/inventory-v2/inspections', icon: ClipboardCheck, roles: ['inflight', 'admin', 'commissary-manager'] },
-        { name: 'Stockroom', href: '/inventory-v2/stockroom', icon: Boxes, roles: ['inflight', 'admin', 'commissary-manager'] },
-        { name: 'Physical Count', href: '/inventory-v2/physical-count', icon: Calculator, roles: ['inflight', 'admin'] },
+        { name: 'Commissary', href: '/inventory-v2/commissary', icon: Warehouse, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Replenish', href: '/inventory-v2/replenish', icon: PackagePlus, roles: ['inflight', 'admin'] },
         { name: 'Unit Requests', href: '/inventory-v2/unit-requests', icon: Send, roles: ['inflight', 'admin'] },
-        { name: 'Add to Stock', href: '/inventory-v2/receiving', icon: PackagePlus, roles: ['inflight', 'admin', 'commissary-manager'] },
-        { name: 'Item Manager', href: '/inventory-v2/item-manager', icon: ListChecks, roles: ['admin', 'commissary-manager'] },
-        { name: 'Commissary', href: '/inventory-v2/commissary', icon: ShoppingCart, roles: ['admin', 'commissary-manager'] },
         { name: 'Settings', href: '/inventory-v2/settings', icon: Settings, roles: ['admin', 'commissary-manager'] },
       ]
     },

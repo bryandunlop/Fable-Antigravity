@@ -33,11 +33,6 @@ export default function InventoryV2Dashboard() {
   const { theme, setTheme } = useTheme();
   const activeTrips = state.trips.filter(t => t.status === 'active');
 
-  useEffect(() => {
-    if (state.currentUser.role === 'commissary-manager') {
-      navigate('/inventory-v2/commissary', { replace: true });
-    }
-  }, [state.currentUser.role, navigate]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { open: searchOpen, setOpen: setSearchOpen } = useInventorySearch();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);

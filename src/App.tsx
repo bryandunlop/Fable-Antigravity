@@ -125,20 +125,16 @@ import InspectionFormV2 from './components/inventory-v2/pages/InspectionForm';
 import InspectionReviewV2 from './components/inventory-v2/pages/InspectionReview';
 import AircraftInspectionsV2 from './components/inventory-v2/pages/AircraftInspections';
 import RecentlyCompletedV2 from './components/inventory-v2/pages/RecentlyCompleted';
-import StockroomCountV2 from './components/inventory-v2/pages/StockroomCount';
-import PhysicalCountV2 from './components/inventory-v2/pages/PhysicalCount';
 import ReplenishV2 from './components/inventory-v2/pages/Replenish';
 import UnitItemRequestV2 from './components/inventory-v2/pages/UnitItemRequest';
 import UnitItemRequestListV2 from './components/inventory-v2/pages/UnitItemRequestList';
-import ReceivingV2 from './components/inventory-v2/pages/Receiving';
 import SettingsV2 from './components/inventory-v2/pages/Settings';
-import CommissaryDashboard from './components/inventory-v2/pages/CommissaryDashboard';
+import CommissaryV2 from './components/inventory-v2/pages/Commissary';
 import AlertsPage from './components/inventory-v2/pages/AlertsPage';
 import TripListV2 from './components/inventory-v2/pages/TripList';
 import TripHomeV2 from './components/inventory-v2/pages/TripHome';
 import GroceryListPageV2 from './components/inventory-v2/pages/GroceryListPage';
 import LegReconciliationV2 from './components/inventory-v2/pages/LegReconciliation';
-import ItemManagerV2 from './components/inventory-v2/pages/ItemManager';
 import CommissaryKiosk from './components/inventory-v2/pages/CommissaryKiosk';
 import ActivityLog from './components/inventory-v2/pages/ActivityLog';
 
@@ -421,20 +417,16 @@ export default function App() {
                                 <Route path="/inventory-v2/inspection/:id/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/inspections" element={<InventoryRouteWrapper userRole={userRole}><AircraftInspectionsV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/recently-completed" element={<InventoryRouteWrapper userRole={userRole}><RecentlyCompletedV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/stockroom" element={<InventoryRouteWrapper userRole={userRole}><StockroomCountV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/physical-count" element={<InventoryRouteWrapper userRole={userRole}><PhysicalCountV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/replenish" element={<InventoryRouteWrapper userRole={userRole}><ReplenishV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/unit-request" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/unit-requests" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestListV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/receiving" element={<InventoryRouteWrapper userRole={userRole}><ReceivingV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/settings" element={<InventoryRouteWrapper userRole={userRole}><SettingsV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/commissary" element={<InventoryRouteWrapper userRole={userRole}><CommissaryDashboard /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/commissary" element={<InventoryRouteWrapper userRole={userRole}><CommissaryV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/alerts" element={<InventoryRouteWrapper userRole={userRole}><AlertsPage /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips" element={<InventoryRouteWrapper userRole={userRole}><TripListV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId" element={<InventoryRouteWrapper userRole={userRole}><TripHomeV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryRouteWrapper userRole={userRole}><GroceryListPageV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId/reconcile" element={<InventoryRouteWrapper userRole={userRole}><LegReconciliationV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/item-manager" element={<InventoryRouteWrapper userRole={userRole}><ItemManagerV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/activity-log" element={<InventoryRouteWrapper userRole={userRole}><ActivityLog /></InventoryRouteWrapper>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
