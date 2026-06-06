@@ -109,6 +109,16 @@ export default function InspectionForm() {
     return () => clearTimeout(autoSaveTimerRef.current);
   }, [selectedTailNumber, checkedItems, state.fleet]);
 
+  // ── Pre-select aircraft from ?tail= query param ──
+  useEffect(() => {
+    const tailParam = searchParams.get('tail');
+    if (!tailParam || selectedTailNumber) return; // don't override if already selected
+    const aircraft = state.fleet.find(a => a.tailNumber === tailParam);
+    if (aircraft) {
+      setSelectedTailNumber(tailParam);
+    }
+  }, [searchParams, state.fleet]);
+
   // ── Detect unsaved draft on mount (only when not resuming via ?resume) ──
   useEffect(() => {
     if (didDetectDraft.current) return;
