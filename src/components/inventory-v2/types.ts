@@ -294,6 +294,8 @@ export interface Trip {
   returnItems: TripReturnItem[];
   createdBy: string;
   createdAt: string;
+  lastEditedBy?: string;
+  lastEditedAt?: string;
 }
 
 export interface TripLeg {
@@ -330,6 +332,8 @@ export interface GroceryList {
   generatedAt: string;
   generatedBy: string;
   notes?: string;
+  lastEditedBy?: string;
+  lastEditedAt?: string;
 }
 
 export interface GroceryListItem {
@@ -455,6 +459,7 @@ export type InventoryV2Action =
   | { type: 'ADD_TRIP'; payload: Trip }
   | { type: 'UPDATE_TRIP'; payload: Trip }
   | { type: 'COMPLETE_TRIP'; payload: string }
+  | { type: 'REOPEN_TRIP'; payload: string }
   // Leg lifecycle
   | { type: 'UPDATE_LEG'; payload: { tripId: string; leg: TripLeg } }
   | { type: 'COMPLETE_LEG'; payload: { tripId: string; legId: string } }

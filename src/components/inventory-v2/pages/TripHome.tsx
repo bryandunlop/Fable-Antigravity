@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Search, ShoppingCart, Plane, CheckCircle2,
-  Users, Package, Plus, X, ChevronDown,
+  Users, Package, Plus, X, ChevronDown, ClipboardCheck, FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card } from '../../ui/card';
 import { Button } from '../../ui/button';
@@ -11,9 +12,11 @@ import { Input } from '../../ui/input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '../../ui/dialog';
+import { toast } from 'sonner';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { LEG_PHASE_COLORS, SUPPLY_CATEGORIES } from '../constants';
+import { formatRelativeTime } from '../shared/dateUtils';
 import { getCompartmentsForAircraft, getCompartmentLabel } from '../compartmentConfig';
 import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
@@ -166,11 +169,13 @@ function TripCompleteDialog({
   onClose,
   trip,
   onStartReplenish,
+  onStartInspection,
 }: {
   open: boolean;
   onClose: () => void;
   trip: Trip;
   onStartReplenish: () => void;
+  onStartInspection: () => void;
 }) {
   const totalUsed = trip.legs.reduce(
     (sum, l) => sum + l.usageLog.reduce((s, e) => s + e.qtyUsed, 0), 0
@@ -182,7 +187,7 @@ function TripCompleteDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-            Trip Complete
+            Trip Complete — What's Next?
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -208,11 +213,74 @@ function TripCompleteDialog({
           </div>
         </div>
         <DialogFooter className="flex-col gap-2">
-          <Button onClick={onStartReplenish} className="w-full bg-emerald-600 hover:bg-emerald-500">
-            Start Replenish
+          <Button onClick={onStartInspection} className="w-full bg-blue-600 hover:bg-blue-500">
+            <ClipboardCheck className="mr-2 h-4 w-4" />
+            Start Inspection
           </Button>
-          <Button variant="outline" onClick={onClose} className="w-full">
+          <Button onClick={onStartReplenish} variant="outline" className="w-full">
+            <Package className="mr-2 h-4 w-4" />
+            Skip — Go to Replenish
+          </Button>
+          <Button variant="ghost" onClick={onClose} className="w-full text-muted-foreground">
             Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Confirm Complete Dialog ─────────────────────────────────────────────────
+
+function ConfirmCompleteDialog({
+  open,
+  onClose,
+  onConfirm,
+  trip,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  trip: Trip;
+}) {
+  const totalUsed = trip.legs.reduce(
+    (sum, l) => sum + l.usageLog.reduce((s, e) => s + e.qtyUsed, 0), 0
+  );
+  const sentLists = trip.legs.filter(l => l.groceryListId).length;
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Complete Trip?</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2 text-sm">
+          <p className="text-muted-foreground">
+            This will mark {trip.tailNumber} as returned and begin the return-to-baseline process.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-muted-foreground text-xs">Legs completed</p>
+              <p className="font-bold">{trip.legs.length}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Total items used</p>
+              <p className="font-bold">{totalUsed}</p>
+            </div>
+            {sentLists > 0 && (
+              <div>
+                <p className="text-muted-foreground text-xs">Grocery lists sent</p>
+                <p className="font-bold">{sentLists}</p>
+              </div>
+            )}
+          </div>
+        </div>
+        <DialogFooter className="flex gap-2">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} className="flex-1 bg-emerald-600 hover:bg-emerald-500">
+            Complete Trip
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -263,8 +331,10 @@ function TripViewInner({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showNextLeg, setShowNextLeg] = useState(false);
   const [showTripComplete, setShowTripComplete] = useState(false);
+  const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
+  const undoToastRef = useRef<string | number | undefined>(undefined);
 
   // Persist view mode preference
   useEffect(() => {
@@ -466,18 +536,41 @@ function TripViewInner({
   }
 
   function handleCompleteTrip() {
+    setShowConfirmComplete(true);
+  }
+
+  function handleConfirmCompleteTrip() {
     if (!activeLeg) return;
+    setShowConfirmComplete(false);
     dispatch({
       type: 'SET_LEG_PHASE',
       payload: { tripId: trip.id, legId: activeLeg.id, phase: 'complete' },
     });
     dispatch({ type: 'COMPLETE_TRIP', payload: trip.id });
+
+    const tripId = trip.id;
+    undoToastRef.current = toast('Trip completed.', {
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          dispatch({ type: 'REOPEN_TRIP', payload: tripId });
+          setShowTripComplete(false);
+        },
+      },
+    });
+
     setShowTripComplete(true);
   }
 
   function handleStartReplenish() {
     setShowTripComplete(false);
     navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`);
+  }
+
+  function handleStartInspection() {
+    setShowTripComplete(false);
+    navigate(`/inventory-v2/inspection?tail=${trip.tailNumber}`);
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -533,6 +626,28 @@ function TripViewInner({
             </div>
           </div>
         )}
+
+        {/* Multi-user awareness */}
+        {trip.lastEditedBy && trip.lastEditedAt && (() => {
+          const editedSecondsAgo = (Date.now() - new Date(trip.lastEditedAt).getTime()) / 1000;
+          const editedByOther = trip.lastEditedBy !== state.currentUser.name;
+          if (editedByOther && editedSecondsAgo < 60) {
+            return (
+              <div className="flex items-center gap-1.5 text-xs text-amber-500 bg-amber-500/10 rounded px-2 py-1">
+                <AlertTriangle size={12} />
+                {trip.lastEditedBy} is also editing this trip
+              </div>
+            );
+          }
+          if (trip.lastEditedBy) {
+            return (
+              <p className="text-xs text-muted-foreground">
+                Last edited by {trip.lastEditedBy} · {formatRelativeTime(trip.lastEditedAt)}
+              </p>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       {/* ── SCROLLABLE CONTENT ── */}
@@ -829,7 +944,18 @@ function TripViewInner({
                 </>
               )}
 
-              {/* on_ground: Next Leg or Complete Trip */}
+              {/* on_ground: Review Leg + Next Leg or Complete Trip */}
+              {phase === 'on_ground' && (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => activeLeg && navigate(`/inventory-v2/leg-reconciliation/${activeLeg.id}`)}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Review Leg
+                </Button>
+              )}
+
               {phase === 'on_ground' && !isLastLeg && (
                 <Button
                   className="flex-1 bg-amber-600 hover:bg-amber-500"
@@ -863,6 +989,13 @@ function TripViewInner({
         />
       )}
 
+      <ConfirmCompleteDialog
+        open={showConfirmComplete}
+        onClose={() => setShowConfirmComplete(false)}
+        onConfirm={handleConfirmCompleteTrip}
+        trip={trip}
+      />
+
       <TripCompleteDialog
         open={showTripComplete}
         onClose={() => {
@@ -871,6 +1004,7 @@ function TripViewInner({
         }}
         trip={trip}
         onStartReplenish={handleStartReplenish}
+        onStartInspection={handleStartInspection}
       />
     </div>
   );

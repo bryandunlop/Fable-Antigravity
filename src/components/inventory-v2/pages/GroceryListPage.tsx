@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Search, X, CheckCircle2, Circle, Plus, Share2, Camera, Users, Package } from 'lucide-react';
+import { ChevronLeft, Search, X, CheckCircle2, Circle, Plus, Share2, Camera, Users, Package, AlertTriangle } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Textarea } from '../../ui/textarea';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialo
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { LEG_PHASE_COLORS, GROCERY_STATUS_COLORS } from '../constants';
+import { formatRelativeTime } from '../shared/dateUtils';
 import { cn } from '../../ui/utils';
 import type {
   GroceryList,
@@ -541,6 +542,25 @@ function GroceryListInner({
             />
           </div>
         )}
+
+        {/* Multi-user awareness */}
+        {groceryList?.lastEditedBy && groceryList?.lastEditedAt && (() => {
+          const editedSecondsAgo = (Date.now() - new Date(groceryList.lastEditedAt!).getTime()) / 1000;
+          const editedByOther = groceryList.lastEditedBy !== state.currentUser.name;
+          if (editedByOther && editedSecondsAgo < 60) {
+            return (
+              <div className="flex items-center gap-1.5 text-xs text-amber-500 bg-amber-500/10 rounded px-2 py-1">
+                <AlertTriangle size={12} />
+                {groceryList.lastEditedBy} is also editing this list
+              </div>
+            );
+          }
+          return (
+            <p className="text-xs text-muted-foreground">
+              Last edited by {groceryList.lastEditedBy} · {formatRelativeTime(groceryList.lastEditedAt!)}
+            </p>
+          );
+        })()}
       </div>
 
       {/* ── SCROLLABLE CONTENT ── */}

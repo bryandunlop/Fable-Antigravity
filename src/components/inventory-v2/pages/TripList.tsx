@@ -182,10 +182,14 @@ function AircraftCard({
   aircraft,
   activeTrip,
   onStartTrip,
+  lastInspection,
+  stockStatus,
 }: {
   aircraft: FleetAircraft;
   activeTrip: Trip | undefined;
   onStartTrip: () => void;
+  lastInspection?: { readinessScore: number; date: string } | null;
+  stockStatus: 'ok' | 'low' | 'critical';
 }) {
   const navigate = useNavigate();
   const activeLeg = activeTrip?.legs.find(l => l.status === 'active');
@@ -248,6 +252,27 @@ function AircraftCard({
         ) : (
           <p className="text-sm text-muted-foreground">No active trip</p>
         )}
+
+        {/* Fleet readiness */}
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              'w-2 h-2 rounded-full',
+              stockStatus === 'ok' ? 'bg-emerald-400' :
+              stockStatus === 'low' ? 'bg-amber-400' : 'bg-red-400'
+            )} />
+            <span className="text-muted-foreground">
+              {stockStatus === 'ok' ? 'Stock OK' : stockStatus === 'low' ? 'Stock low' : 'Stock critical'}
+            </span>
+          </div>
+          {lastInspection ? (
+            <span className="text-muted-foreground">
+              {lastInspection.readinessScore}% · {new Date(lastInspection.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">No inspection</span>
+          )}
+        </div>
 
         <div className="flex items-center justify-end">
           {activeTrip ? (
@@ -323,6 +348,33 @@ export default function TripList() {
     return state.trips.find(t => t.tailNumber === tailNumber && t.status === 'active');
   }
 
+  function getLastInspection(tailNumber: string) {
+    const completed = state.inspections
+      .filter(i => i.tailNumber === tailNumber && (i.status === 'submitted' || i.status === 'restocked'))
+      .sort((a, b) => (b.submittedAt ?? b.date).localeCompare(a.submittedAt ?? a.date));
+    if (!completed.length) return null;
+    return { readinessScore: completed[0].readinessScore, date: completed[0].submittedAt ?? completed[0].date };
+  }
+
+  function getStockStatus(tailNumber: string): 'ok' | 'low' | 'critical' {
+    const aircraft = state.fleet.find(f => f.tailNumber === tailNumber);
+    if (!aircraft) return 'ok';
+    const srItems = state.stockroomItems.filter(si => si.stockroomId === 'sr-1');
+    const relevantItems = state.items.filter(i => {
+      const qty = i.defaultQuantities[aircraft.type as 'G650' | 'G500'];
+      return qty != null && qty > 0;
+    });
+    let hasCritical = false;
+    let hasLow = false;
+    for (const item of relevantItems) {
+      const si = srItems.find(s => s.itemId === item.id);
+      if (!si) continue;
+      if (si.qtyOnHand <= si.minimumLevel) { hasCritical = true; break; }
+      if (si.qtyOnHand < si.parLevel) hasLow = true;
+    }
+    return hasCritical ? 'critical' : hasLow ? 'low' : 'ok';
+  }
+
   function handleStartTrip(aircraft: FleetAircraft) {
     setSelectedAircraft(aircraft);
     setShowDialog(true);
@@ -392,6 +444,8 @@ export default function TripList() {
             aircraft={aircraft}
             activeTrip={getActiveTrip(aircraft.tailNumber)}
             onStartTrip={() => handleStartTrip(aircraft)}
+            lastInspection={getLastInspection(aircraft.tailNumber)}
+            stockStatus={getStockStatus(aircraft.tailNumber)}
           />
         ))}
       </div>

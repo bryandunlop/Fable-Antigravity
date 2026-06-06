@@ -74,6 +74,7 @@ function getDefaultState(): InventoryV2State {
     trips: MOCK_TRIPS,
     groceryLists: MOCK_GROCERY_LISTS,
     stockBatches: STOCK_BATCHES,
+    storageLocations: [],
   };
 }
 
@@ -265,7 +266,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     case 'UPDATE_TRIP':
       return {
         ...state,
-        trips: state.trips.map(t => t.id === action.payload.id ? action.payload : t),
+        trips: state.trips.map(t => t.id === action.payload.id ? { ...action.payload, lastEditedBy: state.currentUser.name, lastEditedAt: new Date().toISOString() } : t),
         pendingChanges: state.pendingChanges + 1,
       };
 
@@ -280,6 +281,25 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         ),
         pendingChanges: state.pendingChanges + 1,
         activityLog: [entry, ...state.activityLog].slice(0, 500),
+      };
+    }
+
+    case 'REOPEN_TRIP': {
+      return {
+        ...state,
+        trips: state.trips.map(t => {
+          if (t.id !== action.payload) return t;
+          const lastLeg = [...t.legs].reverse().find(l => l.status === 'completed');
+          return {
+            ...t,
+            status: 'active' as const,
+            endDate: undefined,
+            legs: t.legs.map(l =>
+              l.id === lastLeg?.id ? { ...l, status: 'active' as const, phase: 'on_ground' as const } : l
+            ),
+          };
+        }),
+        pendingChanges: state.pendingChanges + 1,
       };
     }
 
@@ -439,7 +459,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     case 'UPDATE_GROCERY_LIST':
       return {
         ...state,
-        groceryLists: state.groceryLists.map(gl => gl.id === action.payload.id ? action.payload : gl),
+        groceryLists: state.groceryLists.map(gl => gl.id === action.payload.id ? { ...action.payload, lastEditedBy: state.currentUser.name, lastEditedAt: new Date().toISOString() } : gl),
         pendingChanges: state.pendingChanges + 1,
       };
 
@@ -447,7 +467,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       return {
         ...state,
         groceryLists: state.groceryLists.map(gl =>
-          gl.id === action.payload ? { ...gl, status: 'sent' as const } : gl
+          gl.id === action.payload ? { ...gl, status: 'sent' as const, lastEditedBy: state.currentUser.name, lastEditedAt: new Date().toISOString() } : gl
         ),
         pendingChanges: state.pendingChanges + 1,
       };

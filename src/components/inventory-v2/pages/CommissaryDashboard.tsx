@@ -1,10 +1,12 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ShoppingCart, ExternalLink, MonitorSmartphone, AlertCircle, AlertTriangle, Clock, Trash2 } from 'lucide-react';
+import { CheckCircle2, ShoppingCart, ExternalLink, MonitorSmartphone, AlertCircle, AlertTriangle, Clock, Trash2, Plane } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { useInventoryV2 } from '../InventoryV2Context';
+import { LEG_PHASE_COLORS } from '../constants';
+import { cn } from '../../ui/utils';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { V2Badge } from '../shared/V2Badge';
 import type { StockroomItem } from '../types';
@@ -66,6 +68,7 @@ function StockRow({
 
 export default function CommissaryDashboard() {
   const { state, dispatch } = useInventoryV2();
+  const navigate = useNavigate();
   const sentLists = state.groceryLists.filter(gl => gl.status === 'sent');
 
   const stockroomItems = state.stockroomItems.filter(
@@ -92,6 +95,17 @@ export default function CommissaryDashboard() {
   }
 
   const hasFlags = critical.length > 0 || threshold.length > 0;
+
+  const activeTrips = useMemo(() => {
+    return state.trips
+      .filter(t => t.status === 'active')
+      .map(t => {
+        const activeLeg = t.legs.find(l => l.status === 'active');
+        const gl = state.groceryLists.find(gl => gl.tripId === t.id && gl.status !== 'fulfilled');
+        const totalUsed = t.legs.flatMap(l => l.usageLog).reduce((sum, e) => sum + e.qtyUsed, 0);
+        return { trip: t, activeLeg, groceryList: gl, totalUsed };
+      });
+  }, [state.trips, state.groceryLists]);
 
   const expiringBatches = useMemo(() => {
     return state.stockBatches
@@ -131,6 +145,57 @@ export default function CommissaryDashboard() {
           <ExternalLink className="w-3 h-3 opacity-50" />
         </a>
       </div>
+
+      {/* Active Flights */}
+      {activeTrips.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Plane className="w-4 h-4 text-blue-400" />
+              Active Flights ({activeTrips.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 divide-y">
+            {activeTrips.map(({ trip, activeLeg, groceryList, totalUsed }) => {
+              const phase = activeLeg?.phase ?? 'pre_flight';
+              const phaseColors = LEG_PHASE_COLORS[phase];
+              return (
+                <div
+                  key={trip.id}
+                  className="py-3 flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 px-6"
+                  onClick={() => navigate(`/inventory-v2/trips/${trip.id}`)}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm">{trip.tailNumber}</span>
+                      {activeLeg && (
+                        <span className="text-sm text-muted-foreground font-mono">
+                          {activeLeg.origin} → {activeLeg.destination}
+                        </span>
+                      )}
+                      {activeLeg && (
+                        <Badge className={cn('text-xs status-badge', phaseColors.className)}>
+                          {phaseColors.label}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {activeLeg && <span>Leg {activeLeg.legNumber}</span>}
+                      <span>{totalUsed} items used</span>
+                      {groceryList && (
+                        <span className="flex items-center gap-1">
+                          <ShoppingCart className="w-3 h-3" />
+                          Grocery: {groceryList.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
