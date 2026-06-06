@@ -171,8 +171,8 @@ export default function Commissary() {
     return { critical, low };
   };
 
-  const toggleSection = (key: string) => {
-    setOpenSections(prev => ({ ...prev, [key]: prev[key] === false ? true : !prev[key] }));
+  const toggleSection = (key: string, currentlyOpen: boolean) => {
+    setOpenSections(prev => ({ ...prev, [key]: !currentlyOpen }));
   };
 
   const isSectionOpen = (key: string, idx: number) => {
@@ -249,7 +249,7 @@ export default function Commissary() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => setAddItemOpen(true)}
+            onClick={() => { setEditItem(null); setAddItemOpen(true); }}
           >
             <Plus className="w-4 h-4" />
             Add Item
@@ -437,7 +437,7 @@ export default function Commissary() {
               <Collapsible
                 key={groupKey}
                 open={open}
-                onOpenChange={() => toggleSection(groupKey)}
+                onOpenChange={() => toggleSection(groupKey, isSectionOpen(groupKey, idx))}
               >
                 <Card className="glass-panel overflow-hidden">
                   <CollapsibleTrigger asChild>

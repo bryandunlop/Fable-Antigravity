@@ -143,11 +143,16 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       return { ...state, stockroomItems: action.payload };
 
     case 'UPDATE_STOCKROOM_ITEM': {
-      const newStockroomItems = state.stockroomItems.map(si =>
-        si.itemId === action.payload.itemId && si.stockroomId === action.payload.stockroomId
-          ? action.payload
-          : si
+      const exists = state.stockroomItems.some(
+        si => si.itemId === action.payload.itemId && si.stockroomId === action.payload.stockroomId
       );
+      const newStockroomItems = exists
+        ? state.stockroomItems.map(si =>
+            si.itemId === action.payload.itemId && si.stockroomId === action.payload.stockroomId
+              ? action.payload
+              : si
+          )
+        : [...state.stockroomItems, action.payload];
       return { ...state, stockroomItems: newStockroomItems, pendingChanges: state.pendingChanges + 1 };
     }
 
