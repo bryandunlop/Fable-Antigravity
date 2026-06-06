@@ -5,7 +5,9 @@
       "dependencies": {
             "@azure/msal-browser": "^4.27.0",
             "@azure/msal-react": "^3.0.23",
+            "@hono/node-server": "^2.0.4",
             "@microsoft/microsoft-graph-client": "^3.0.7",
+            "@neondatabase/serverless": "^1.1.0",
             "@radix-ui/react-accordion": "^1.2.3",
             "@radix-ui/react-alert-dialog": "^1.1.6",
             "@radix-ui/react-aspect-ratio": "^1.1.2",
@@ -36,6 +38,7 @@
             "clsx": "*",
             "cmdk": "^1.1.1",
             "date-fns": "*",
+            "drizzle-orm": "^0.45.2",
             "embla-carousel-react": "^8.6.0",
             "hono": "*",
             "input-otp": "^1.4.2",
@@ -68,9 +71,12 @@
             "@types/react-dom": "^19.2.3",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "autoprefixer": "^10.4.22",
+            "dotenv": "^17.4.2",
+            "drizzle-kit": "^0.31.10",
             "postcss": "^8.5.6",
             "tailwindcss": "^4.1.17",
             "terser": "^5.44.1",
+            "tsx": "^4.22.4",
             "typescript": "^5.9.3",
             "vite": "6.3.5"
       },
@@ -78,6 +84,10 @@
             "dev": "vite",
             "build": "vite build",
             "preview": "vite preview",
-            "type-check": "tsc --noEmit"
+            "type-check": "tsc --noEmit",
+            "db:generate": "drizzle-kit generate",
+            "db:push": "drizzle-kit push",
+            "db:seed": "tsx src/server/db/seed.ts",
+            "db:studio": "drizzle-kit studio"
       }
 }
