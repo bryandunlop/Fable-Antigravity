@@ -75,6 +75,7 @@ function getDefaultState(): InventoryV2State {
     groceryLists: MOCK_GROCERY_LISTS,
     stockBatches: STOCK_BATCHES,
     storageLocations: [],
+    favoriteItems: {},
   };
 }
 
@@ -596,6 +597,15 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         pendingChanges: state.pendingChanges + 1,
         activityLog: [returnEntry, ...state.activityLog].slice(0, 500),
       };
+    }
+
+    case 'TOGGLE_FAVORITE_ITEM': {
+      const { userId, itemId } = action.payload;
+      const current = state.favoriteItems[userId] ?? [];
+      const updated = current.includes(itemId)
+        ? current.filter(id => id !== itemId)
+        : [...current, itemId];
+      return { ...state, favoriteItems: { ...state.favoriteItems, [userId]: updated } };
     }
 
     default:

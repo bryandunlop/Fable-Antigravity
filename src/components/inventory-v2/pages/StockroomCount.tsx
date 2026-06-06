@@ -10,9 +10,10 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES, V2_THEME } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import BulkAdjustModal from '../shared/BulkAdjustModal';
-import { Search, Plus, Minus, ChevronDown, ArrowUp, Warehouse, Layers, ExternalLink, Package, Trash2 } from 'lucide-react';
+import { Search, Plus, Minus, ChevronDown, ArrowUp, Warehouse, Layers, ExternalLink, Package, Trash2, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { getBatchExpirationStatus, formatDateShort } from '../shared/dateUtils';
+import { downloadCSV } from '../shared/exportUtils';
 
 export default function StockroomCount() {
   const { state, dispatch } = useInventoryV2();
@@ -95,6 +96,17 @@ export default function StockroomCount() {
 
   const currentStockroom = state.stockrooms.find(s => s.id === 'sr-1');
 
+  function handleExport() {
+    downloadCSV('stockroom-count.csv',
+      ['Item Name', 'Category', 'Qty On Hand', 'Par Level', 'Min Level', 'Status'],
+      filteredItems.map(item => {
+        const si = getStockroomItem(item.id);
+        const status = si ? (si.qtyOnHand <= si.minimumLevel ? 'Critical' : si.qtyOnHand < si.parLevel ? 'Below Par' : 'OK') : 'No Stock Record';
+        return [item.itemName, item.supplyCategory, si?.qtyOnHand?.toString() ?? '0', si?.parLevel?.toString() ?? '0', si?.minimumLevel?.toString() ?? '0', status];
+      })
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6 animate-in fade-in duration-200">
       {/* Header */}
@@ -104,12 +116,18 @@ export default function StockroomCount() {
           <h1 className="text-2xl font-bold">Stockroom Count</h1>
           <V2Badge />
         </div>
-        <Button
-          onClick={() => setBulkAdjustOpen(true)}
-          className="btn-aviation-primary"
-        >
-          <Layers className="w-4 h-4 mr-1" /> Bulk Adjust
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} className="flex items-center gap-1.5">
+            <Download className="w-3.5 h-3.5" />
+            Export
+          </Button>
+          <Button
+            onClick={() => setBulkAdjustOpen(true)}
+            className="btn-aviation-primary"
+          >
+            <Layers className="w-4 h-4 mr-1" /> Bulk Adjust
+          </Button>
+        </div>
       </div>
 
       {/* Controls */}

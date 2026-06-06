@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { CheckCircle2, LogOut } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { CheckCircle2, LogOut, Star } from 'lucide-react';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES } from '../constants';
 import type { SupplyCategory } from '../types';
+import { cn } from '../../ui/utils';
 
 function exitKiosk() {
   // If opened as a new tab from the app, close the tab.
@@ -22,6 +23,14 @@ export default function CommissaryKiosk() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [confirmed, setConfirmed] = useState(false);
 
+  // Kiosk has no user — use a shared "kiosk" key for favorites
+  const KIOSK_USER_ID = 'kiosk';
+  const kioskFavorites = state.favoriteItems[KIOSK_USER_ID] ?? [];
+  const isFavorite = (itemId: string) => kioskFavorites.includes(itemId);
+  function toggleFavorite(itemId: string) {
+    dispatch({ type: 'TOGGLE_FAVORITE_ITEM', payload: { userId: KIOSK_USER_ID, itemId } });
+  }
+
   // Total items across all categories
   const totalItems = useMemo(
     () => Object.values(quantities).reduce((sum, q) => sum + q, 0),
@@ -34,13 +43,18 @@ export default function CommissaryKiosk() {
     [state.stockroomItems]
   );
 
-  // Items in selected category that exist in the stockroom
+  // Items in selected category that exist in the stockroom, favorites first
   const visibleItems = useMemo(() => {
     return state.items
       .filter(item => item.supplyCategory === selectedCategory)
       .filter(item => stockroomMap.has(item.id))
-      .sort((a, b) => a.itemName.localeCompare(b.itemName));
-  }, [state.items, stockroomMap, selectedCategory]);
+      .sort((a, b) => {
+        const aFav = kioskFavorites.includes(a.id) ? 0 : 1;
+        const bFav = kioskFavorites.includes(b.id) ? 0 : 1;
+        if (aFav !== bFav) return aFav - bFav;
+        return a.itemName.localeCompare(b.itemName);
+      });
+  }, [state.items, stockroomMap, selectedCategory, kioskFavorites]);
 
   const handleIncrement = (itemId: string) => {
     const onHand = stockroomMap.get(itemId) ?? 0;
@@ -55,7 +69,7 @@ export default function CommissaryKiosk() {
     setQuantities(prev => ({ ...prev, [itemId]: current - 1 }));
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     if (confirmed) return; // guard against double-tap on slow devices
     const removals = Object.entries(quantities).filter(([, qty]) => qty > 0);
     if (removals.length === 0) return;
@@ -66,7 +80,7 @@ export default function CommissaryKiosk() {
 
     dispatch({ type: 'BULK_UPDATE_STOCKROOM', payload: updatedStockroomItems });
     setConfirmed(true);
-  };
+  }, [confirmed, quantities, state.stockroomItems, dispatch]);
 
   // Auto-reset after 2 seconds
   useEffect(() => {
@@ -78,6 +92,24 @@ export default function CommissaryKiosk() {
     }, 2000);
     return () => clearTimeout(timer);
   }, [confirmed]);
+
+  // Keyboard shortcuts: 1-9 → category, Enter → confirm, Escape → reset
+  useEffect(() => {
+    const catIds = SUPPLY_CATEGORIES.map(c => c.id);
+    function onKey(e: KeyboardEvent) {
+      if (confirmed) return;
+      const num = parseInt(e.key);
+      if (!isNaN(num) && num >= 1 && num <= catIds.length) {
+        setSelectedCategory(catIds[num - 1] as typeof selectedCategory);
+      } else if (e.key === 'Enter') {
+        handleConfirm();
+      } else if (e.key === 'Escape') {
+        setQuantities({});
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [confirmed, handleConfirm]);
 
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-white overflow-hidden relative animate-in fade-in duration-200">
@@ -144,12 +176,19 @@ export default function CommissaryKiosk() {
               return (
                 <div
                   key={item.id}
-                  className={`bg-slate-100 dark:bg-slate-800 rounded-xl p-4 flex items-center justify-between ${
-                    qty > 0 ? 'ring-2 ring-blue-500' : ''
-                  }`}
+                  className={cn('bg-slate-100 dark:bg-slate-800 rounded-xl p-4 flex items-center justify-between', qty > 0 && 'ring-2 ring-blue-500')}
                 >
                   <div className="min-w-0 mr-3">
-                    <p className="font-semibold text-sm truncate">{item.itemName}</p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => toggleFavorite(item.id)}
+                        className="shrink-0 text-slate-400 hover:text-amber-400 transition-colors"
+                        aria-label={isFavorite(item.id) ? 'Unpin' : 'Pin'}
+                      >
+                        <Star size={13} className={cn(isFavorite(item.id) && 'fill-amber-400 text-amber-400')} />
+                      </button>
+                      <p className="font-semibold text-sm truncate">{item.itemName}</p>
+                    </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{onHand} in stock</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

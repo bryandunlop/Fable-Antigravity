@@ -12,10 +12,11 @@ import FilterOverlay, { type FilterState, DEFAULT_FILTERS } from '../shared/Filt
 import {
   LayoutDashboard, Filter, Clock, CheckCircle, AlertTriangle,
   PackagePlus, Send, Truck, ArrowRight, Plane, ChevronRight,
-  ClipboardCheck, CheckCircle2, Sun, Moon, Eye, EyeOff
+  ClipboardCheck, CheckCircle2, Sun, Moon, Eye, EyeOff, Search, History,
 } from 'lucide-react';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { formatDate } from '../shared/dateUtils';
+import { InventorySearchDialog, useInventorySearch } from '../shared/InventorySearchDialog';
 
 const HIDDEN_PANELS_KEY = 'inv-v2-hidden-panels';
 
@@ -38,6 +39,7 @@ export default function InventoryV2Dashboard() {
     }
   }, [state.currentUser.role, navigate]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const { open: searchOpen, setOpen: setSearchOpen } = useInventorySearch();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hiddenPanels, setHiddenPanels] = useState<Set<string>>(loadHiddenPanels);
 
@@ -169,6 +171,13 @@ export default function InventoryV2Dashboard() {
               Show all ({hiddenPanels.size} hidden)
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => navigate('/inventory-v2/activity-log')}>
+            <History className="w-4 h-4 mr-1" /> Activity
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setSearchOpen(true)}>
+            <Search className="w-4 h-4 mr-1" /> Search
+            <kbd className="ml-1 text-xs text-muted-foreground bg-muted px-1 rounded">⌘K</kbd>
+          </Button>
           <Button variant="outline" onClick={() => setFiltersOpen(true)}>
             <Filter className="w-4 h-4 mr-1" /> Filters
           </Button>
@@ -410,11 +419,21 @@ export default function InventoryV2Dashboard() {
                       className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() => navigate('/inventory-v2/recently-completed')}
                     >
-                      <div>
-                        <span className="text-sm font-medium">{i.tailNumber}</span>
-                        <span className="text-xs text-muted-foreground ml-2">{i.reportedBy}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium shrink-0">{i.tailNumber}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{i.reportedBy}</span>
+                        {i.photos.length > 0 && (
+                          <div className="flex items-center gap-0.5 ml-1">
+                            {i.photos.slice(0, 3).map((photo, idx) => (
+                              <img key={idx} src={photo} alt="" className="w-6 h-6 rounded object-cover border border-border" />
+                            ))}
+                            {i.photos.length > 3 && (
+                              <span className="text-xs text-muted-foreground ml-0.5">+{i.photos.length - 3}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground">{formatDate(i.date)}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">{formatDate(i.date)}</span>
                     </div>
                   ))}
                   {recentlyCompleted.length === 0 && (
@@ -507,6 +526,7 @@ export default function InventoryV2Dashboard() {
       </div>
 
       <FilterOverlay open={filtersOpen} onOpenChange={setFiltersOpen} filters={filters} onFiltersChange={setFilters} />
+      <InventorySearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

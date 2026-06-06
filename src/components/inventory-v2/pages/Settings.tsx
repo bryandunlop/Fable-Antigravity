@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -16,7 +16,7 @@ import { V2Badge } from '../shared/V2Badge';
 import { toast } from 'sonner';
 import {
   Settings as SettingsIcon, Plus, Trash2, Pencil, Check, X,
-  Plane, Package, Layers, SlidersHorizontal, ArrowUp, ArrowDown
+  Plane, Package, Layers, SlidersHorizontal, ArrowUp, ArrowDown, Lightbulb,
 } from 'lucide-react';
 import type { FleetAircraft, InventoryItemV2, CompartmentDefinition } from '../types';
 
@@ -662,8 +662,42 @@ function ParLevelsTab() {
     toast.success(`Saved par/min levels for ${updates.length} item(s)`);
   };
 
+  const parSuggestions = useMemo(() => {
+    const completedTrips = state.trips.filter(t => t.status === 'completed');
+    if (!completedTrips.length) return {} as Record<string, number>;
+    const usageByItem: Record<string, number[]> = {};
+    for (const trip of completedTrips) {
+      const tripTotals: Record<string, number> = {};
+      for (const leg of trip.legs) {
+        for (const entry of leg.usageLog) {
+          tripTotals[entry.itemId] = (tripTotals[entry.itemId] ?? 0) + entry.qtyUsed;
+        }
+      }
+      for (const [itemId, qty] of Object.entries(tripTotals)) {
+        if (!usageByItem[itemId]) usageByItem[itemId] = [];
+        usageByItem[itemId].push(qty);
+      }
+    }
+    const suggestions: Record<string, number> = {};
+    for (const [itemId, usages] of Object.entries(usageByItem)) {
+      const avg = usages.reduce((a, b) => a + b, 0) / usages.length;
+      const suggested = Math.ceil(avg * 1.2);
+      const currentPar = stockroomItems.find(si => si.itemId === itemId)?.parLevel ?? 0;
+      if (suggested > currentPar) suggestions[itemId] = suggested;
+    }
+    return suggestions;
+  }, [state.trips, stockroomItems]);
+
+  const suggestionCount = Object.keys(parSuggestions).length;
+
   return (
     <div className="space-y-4">
+      {suggestionCount > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-500">
+          <Lightbulb className="w-4 h-4 shrink-0" />
+          <span>{suggestionCount} item{suggestionCount > 1 ? 's have' : ' has'} a par level suggestion based on trip usage.</span>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Input
@@ -705,6 +739,15 @@ function ParLevelsTab() {
                 <div>
                   <p className="font-medium truncate">{item.itemName}</p>
                   <p className="text-xs text-muted-foreground">{item.internalItemNumber}</p>
+                  {parSuggestions[item.id] && (
+                    <button
+                      onClick={() => setEdit(item.id, 'par', parSuggestions[item.id])}
+                      className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-400 mt-0.5"
+                    >
+                      <Lightbulb className="w-3 h-3" />
+                      Suggest: {parSuggestions[item.id]}
+                    </button>
+                  )}
                 </div>
                 <span className={`text-center font-medium ${onHand < min ? 'text-red-400' : onHand < par ? 'text-amber-400' : 'text-emerald-400'}`}>
                   {onHand}

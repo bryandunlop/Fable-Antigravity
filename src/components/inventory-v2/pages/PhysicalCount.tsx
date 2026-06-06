@@ -10,7 +10,8 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
 import { toast } from 'sonner';
-import { ClipboardList, ChevronDown, Check, AlertTriangle } from 'lucide-react';
+import { ClipboardList, ChevronDown, Check, AlertTriangle, Download } from 'lucide-react';
+import { downloadCSV } from '../shared/exportUtils';
 
 export default function PhysicalCount() {
   const navigate = useNavigate();
@@ -65,9 +66,25 @@ export default function PhysicalCount() {
           <h1 className="text-2xl font-bold">Physical Count</h1>
           <V2Badge />
         </div>
-        <Badge variant="outline" className="text-sm">
-          {filledCount} / {totalItems} counted
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => {
+            downloadCSV('physical-count.csv',
+              ['Item Name', 'System Qty', 'Counted Qty', 'Variance'],
+              state.items.map(item => {
+                const si = stockroomItems.find(s => s.itemId === item.id);
+                const sysQty = si?.qtyOnHand ?? 0;
+                const counted = counts[item.id] !== undefined && counts[item.id] !== '' ? parseInt(counts[item.id]) : sysQty;
+                return [item.itemName, sysQty.toString(), counted.toString(), (counted - sysQty).toString()];
+              })
+            );
+          }} className="flex items-center gap-1.5">
+            <Download className="w-3.5 h-3.5" />
+            Export
+          </Button>
+          <Badge variant="outline" className="text-sm">
+            {filledCount} / {totalItems} counted
+          </Badge>
+        </div>
       </div>
 
       {/* Info banner */}

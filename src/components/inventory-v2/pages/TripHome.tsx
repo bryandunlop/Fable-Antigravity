@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Search, ShoppingCart, Plane, CheckCircle2,
   Users, Package, Plus, X, ChevronDown, ClipboardCheck, FileText,
-  AlertTriangle,
+  AlertTriangle, Star,
 } from 'lucide-react';
 import { Card } from '../../ui/card';
 import { Button } from '../../ui/button';
@@ -33,16 +33,29 @@ interface ItemRowProps {
   compartmentLabel: string;
   onIncrement: () => void;
   onDecrement: () => void;
+  selected?: boolean;
+  starred?: boolean;
+  onToggleStar?: () => void;
 }
 
-function ItemRow({ item, legUsage, onBoard, compartmentLabel, onIncrement, onDecrement }: ItemRowProps) {
+function ItemRow({ item, legUsage, onBoard, compartmentLabel, onIncrement, onDecrement, selected, starred, onToggleStar }: ItemRowProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-4 py-3 border-b border-border/60',
-        legUsage === 0 && 'opacity-50'
+        'flex items-center gap-3 px-4 py-3 border-b border-border/60 transition-colors',
+        legUsage === 0 && 'opacity-50',
+        selected && 'bg-primary/10 border-l-2 border-l-primary'
       )}
     >
+      {onToggleStar && (
+        <button
+          onClick={onToggleStar}
+          className="shrink-0 text-muted-foreground hover:text-amber-400 transition-colors"
+          aria-label={starred ? 'Unpin item' : 'Pin item'}
+        >
+          <Star size={14} className={cn(starred && 'fill-amber-400 text-amber-400')} />
+        </button>
+      )}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate">{item.itemName}</p>
         <p className="text-xs text-muted-foreground">
@@ -334,6 +347,7 @@ function TripViewInner({
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const undoToastRef = useRef<string | number | undefined>(undefined);
 
   // Persist view mode preference
@@ -388,6 +402,46 @@ function TripViewInner({
       return true;
     });
   }, [state.items, aircraftType, search]);
+
+  // ─── Favorites ────────────────────────────────────────────────────────────
+
+  const userFavorites = state.favoriteItems[state.currentUser.id] ?? [];
+
+  const isFavorite = useCallback((itemId: string) => userFavorites.includes(itemId), [userFavorites]);
+
+  function toggleFavorite(itemId: string) {
+    dispatch({ type: 'TOGGLE_FAVORITE_ITEM', payload: { userId: state.currentUser.id, itemId } });
+  }
+
+  const favoriteItems = useMemo(
+    () => filteredItems.filter(item => isFavorite(item.id)),
+    [filteredItems, isFavorite]
+  );
+
+  // ─── Keyboard Shortcuts ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!activeLeg) return;
+      // Don't intercept when user is typing in a search input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => prev === null ? 0 : Math.min(prev + 1, filteredItems.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => prev === null ? 0 : Math.max(prev - 1, 0));
+      } else if ((e.key === '+' || e.key === '=') && selectedIndex !== null) {
+        handleIncrement(filteredItems[selectedIndex]);
+      } else if (e.key === '-' && selectedIndex !== null) {
+        handleDecrement(filteredItems[selectedIndex]);
+      } else if (e.key === 'Escape') {
+        setSelectedIndex(null);
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [activeLeg, filteredItems, selectedIndex]);
 
   function getLegUsage(item: InventoryItemV2): number {
     if (!activeLeg) return 0;
@@ -722,6 +776,31 @@ function TripViewInner({
               {/* ── Compartment view ── */}
               {view === 'compartment' && (
                 <Card className="bg-card border-border overflow-hidden">
+                  {favoriteItems.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-border">
+                        <Star size={12} className="fill-amber-400 text-amber-400" />
+                        <span className="text-xs font-semibold uppercase tracking-wide text-amber-500">Pinned</span>
+                      </div>
+                      {favoriteItems.map(item => {
+                        const idx = filteredItems.findIndex(i => i.id === item.id);
+                        return (
+                          <ItemRow
+                            key={`fav-${item.id}`}
+                            item={item}
+                            legUsage={getLegUsage(item)}
+                            onBoard={getOnBoard(item)}
+                            compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
+                            onIncrement={() => handleIncrement(item)}
+                            onDecrement={() => handleDecrement(item)}
+                            selected={selectedIndex === idx}
+                            starred
+                            onToggleStar={() => toggleFavorite(item.id)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
                   {compartments.map(compartment => {
                     const sectionItems = filteredItems.filter(
                       item => item.compartmentId === compartment.id
@@ -739,17 +818,23 @@ function TripViewInner({
                             {sectionUsage > 0 ? `${sectionUsage} used` : ''}
                           </span>
                         </div>
-                        {sectionItems.map(item => (
-                          <ItemRow
-                            key={item.id}
-                            item={item}
-                            legUsage={getLegUsage(item)}
-                            onBoard={getOnBoard(item)}
-                            compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                            onIncrement={() => handleIncrement(item)}
-                            onDecrement={() => handleDecrement(item)}
-                          />
-                        ))}
+                        {sectionItems.map(item => {
+                          const idx = filteredItems.findIndex(i => i.id === item.id);
+                          return (
+                            <ItemRow
+                              key={item.id}
+                              item={item}
+                              legUsage={getLegUsage(item)}
+                              onBoard={getOnBoard(item)}
+                              compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
+                              onIncrement={() => handleIncrement(item)}
+                              onDecrement={() => handleDecrement(item)}
+                              selected={selectedIndex === idx}
+                              starred={isFavorite(item.id)}
+                              onToggleStar={() => toggleFavorite(item.id)}
+                            />
+                          );
+                        })}
                       </div>
                     );
                   })}
@@ -783,19 +868,50 @@ function TripViewInner({
                     ))}
                   </div>
                   <Card className="bg-card border-border overflow-hidden">
+                    {favoriteItems.length > 0 && selectedCategory === 'all' && (
+                      <div>
+                        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-border">
+                          <Star size={12} className="fill-amber-400 text-amber-400" />
+                          <span className="text-xs font-semibold uppercase tracking-wide text-amber-500">Pinned</span>
+                        </div>
+                        {favoriteItems.map(item => {
+                          const idx = filteredItems.findIndex(i => i.id === item.id);
+                          return (
+                            <ItemRow
+                              key={`fav-${item.id}`}
+                              item={item}
+                              legUsage={getLegUsage(item)}
+                              onBoard={getOnBoard(item)}
+                              compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
+                              onIncrement={() => handleIncrement(item)}
+                              onDecrement={() => handleDecrement(item)}
+                              selected={selectedIndex === idx}
+                              starred
+                              onToggleStar={() => toggleFavorite(item.id)}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
                     {filteredItems
                       .filter(item => selectedCategory === 'all' || item.supplyCategory === selectedCategory)
-                      .map(item => (
-                        <ItemRow
-                          key={item.id}
-                          item={item}
-                          legUsage={getLegUsage(item)}
-                          onBoard={getOnBoard(item)}
-                          compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                          onIncrement={() => handleIncrement(item)}
-                          onDecrement={() => handleDecrement(item)}
-                        />
-                      ))}
+                      .map(item => {
+                        const idx = filteredItems.findIndex(i => i.id === item.id);
+                        return (
+                          <ItemRow
+                            key={item.id}
+                            item={item}
+                            legUsage={getLegUsage(item)}
+                            onBoard={getOnBoard(item)}
+                            compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
+                            onIncrement={() => handleIncrement(item)}
+                            onDecrement={() => handleDecrement(item)}
+                            selected={selectedIndex === idx}
+                            starred={isFavorite(item.id)}
+                            onToggleStar={() => toggleFavorite(item.id)}
+                          />
+                        );
+                      })}
                     {filteredItems.filter(item => selectedCategory === 'all' || item.supplyCategory === selectedCategory).length === 0 && (
                       <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                         No items match your search.

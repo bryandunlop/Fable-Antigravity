@@ -405,6 +405,7 @@ export interface InventoryV2State {
   trips: Trip[];
   groceryLists: GroceryList[];
   stockBatches: StockBatch[];
+  favoriteItems: Record<string, string[]>; // userId → itemId[]
 }
 
 // ─── Context Actions ────────────────────────────────────────────────────────
@@ -485,4 +486,6 @@ export type InventoryV2Action =
   | { type: 'DISPOSE_EXPIRED_BATCH'; payload: { batchId: string; itemId: string; stockroomId: string; qty: number } }
   // Trip load & return
   | { type: 'ADD_TRIP_LOAD_ITEMS'; payload: { tripId: string; items: TripLoadItem[] } }
-  | { type: 'ADD_TRIP_RETURN_ITEMS'; payload: { tripId: string; items: TripReturnItem[]; stockroomUpdates: StockroomItem[] } };
+  | { type: 'ADD_TRIP_RETURN_ITEMS'; payload: { tripId: string; items: TripReturnItem[]; stockroomUpdates: StockroomItem[] } }
+  // Favorites
+  | { type: 'TOGGLE_FAVORITE_ITEM'; payload: { userId: string; itemId: string } };
