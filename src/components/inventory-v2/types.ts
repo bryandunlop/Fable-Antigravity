@@ -207,6 +207,31 @@ export interface StockLogEntry {
   notes?: string;
 }
 
+// ─── Activity Log ────────────────────────────────────────────────────────────
+
+export type ActivityAction =
+  | 'inspection_started' | 'inspection_submitted' | 'inspection_restocked'
+  | 'stock_added' | 'stock_adjusted' | 'batch_disposed'
+  | 'trip_created' | 'trip_completed' | 'leg_started' | 'leg_completed'
+  | 'grocery_list_generated' | 'grocery_list_sent' | 'grocery_list_fulfilled'
+  | 'request_created' | 'request_fulfilled' | 'request_cancelled'
+  | 'kiosk_transaction'
+  | 'item_created' | 'item_updated' | 'item_deleted'
+  | 'load_extras' | 'restore_stock' | 'return_to_baseline';
+
+export type ActivityModule = 'inspection' | 'stockroom' | 'trip' | 'request' | 'commissary' | 'system';
+
+export interface ActivityLogEntry {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  action: ActivityAction;
+  module: ActivityModule;
+  description: string;
+  metadata?: Record<string, string | number>;
+}
+
 // ─── Display Settings ───────────────────────────────────────────────────────
 
 export interface DisplaySettings {
@@ -345,7 +370,7 @@ export interface StockBatch {
 export interface InventoryV2State {
   fleet: FleetAircraft[];
   items: InventoryItemV2[];
-  stockLog: StockLogEntry[];
+  activityLog: ActivityLogEntry[];
   inspections: InspectionV2[];
   stockrooms: Stockroom[];
   stockroomItems: StockroomItem[];
@@ -393,8 +418,8 @@ export type InventoryV2Action =
   // Requests
   | { type: 'ADD_UNIT_REQUEST'; payload: UnitItemRequest }
   | { type: 'UPDATE_UNIT_REQUEST'; payload: UnitItemRequest }
-  // Stock log
-  | { type: 'ADD_STOCK_LOG'; payload: StockLogEntry }
+  // Activity log
+  | { type: 'ADD_ACTIVITY_LOG'; payload: ActivityLogEntry }
   // POs
   | { type: 'SET_PURCHASE_ORDERS'; payload: PurchaseOrder[] }
   | { type: 'UPDATE_PURCHASE_ORDER'; payload: PurchaseOrder }

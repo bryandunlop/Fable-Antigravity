@@ -130,14 +130,16 @@ export default function Receiving() {
 
     // Log the addition
     dispatch({
-      type: 'ADD_STOCK_LOG',
+      type: 'ADD_ACTIVITY_LOG',
       payload: {
-        id: `log-${Date.now()}`,
-        stockroomId: 'sr-1',
-        addedBy,
+        id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
         timestamp: new Date().toISOString(),
-        items: stagedItems.map(([itemId, info]) => ({ itemId, qtyAdded: info.qty })),
-        notes: notes.trim() || undefined,
+        userId: state.currentUser.id,
+        userName: addedBy,
+        action: 'stock_added',
+        module: 'stockroom',
+        description: `Added stock: ${stagedItems.length} item type(s)${notes.trim() ? ` — ${notes.trim()}` : ''}`,
+        metadata: Object.fromEntries(stagedItems.map(([itemId, info]) => [itemId, info.qty])),
       },
     });
 
@@ -169,7 +171,7 @@ export default function Receiving() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   };
 
-  const stockroomLog = state.stockLog.filter(l => l.stockroomId === 'sr-1');
+  const stockroomLog = state.activityLog.filter(e => e.module === 'stockroom' && (e.action === 'stock_added' || e.action === 'stock_adjusted'));
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6 animate-in fade-in duration-200">
@@ -221,24 +223,26 @@ export default function Receiving() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm">
                         <User className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="font-medium">{entry.addedBy}</span>
+                        <span className="font-medium">{entry.userName}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
                         {formatTime(entry.timestamp)}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {entry.items.map(({ itemId, qtyAdded }) => {
-                        const item = state.items.find(i => i.id === itemId);
-                        return (
-                          <Badge key={itemId} variant="outline" className="text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-400">
-                            +{qtyAdded} {item?.itemName ?? itemId}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                    {entry.notes && <p className="text-xs text-muted-foreground italic">{entry.notes}</p>}
+                    <p className="text-sm text-muted-foreground">{entry.description}</p>
+                    {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(entry.metadata).map(([itemId, qtyAdded]) => {
+                          const item = state.items.find(i => i.id === itemId);
+                          return (
+                            <Badge key={itemId} variant="outline" className="text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-400">
+                              +{qtyAdded} {item?.itemName ?? itemId}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

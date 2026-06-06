@@ -1,7 +1,7 @@
 // ─── Inventory V2 — React Context ───────────────────────────────────────────
 
 import React, { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
-import type { InventoryV2State, InventoryV2Action, StockroomItem } from './types';
+import type { InventoryV2State, InventoryV2Action, StockroomItem, ActivityLogEntry } from './types';
 import type { Notification } from '../contexts/NotificationContext';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS, STOCK_BATCHES } from './mockData';
@@ -48,7 +48,7 @@ function getDefaultState(): InventoryV2State {
   return {
     fleet: FLEET_V2,
     items: ITEMS_V2,
-    stockLog: [],
+    activityLog: [],
     inspections: MOCK_INSPECTIONS,
     stockrooms: STOCKROOMS,
     stockroomItems: STOCKROOM_ITEMS,
@@ -77,6 +77,12 @@ function getDefaultState(): InventoryV2State {
   };
 }
 
+// ─── Activity Log Helpers ────────────────────────────────────────────────────
+
+function createLogId(): string {
+  return `log-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+}
+
 // ─── Reducer ────────────────────────────────────────────────────────────────
 
 function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): InventoryV2State {
@@ -94,30 +100,42 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     // ── Items ──
     case 'SET_ITEMS':
       return { ...state, items: action.payload };
-    case 'ADD_ITEM':
-      return { ...state, items: [...state.items, action.payload] };
-    case 'UPDATE_ITEM':
-      return { ...state, items: state.items.map(i => i.id === action.payload.id ? action.payload : i) };
-    case 'REMOVE_ITEM':
-      return { ...state, items: state.items.filter(i => i.id !== action.payload) };
+    case 'ADD_ITEM': {
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'item_created', module: 'system', description: `Added item ${action.payload.itemName}` };
+      return { ...state, items: [...state.items, action.payload], activityLog: [entry, ...state.activityLog].slice(0, 500) };
+    }
+    case 'UPDATE_ITEM': {
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'item_updated', module: 'system', description: `Updated item ${action.payload.itemName}` };
+      return { ...state, items: state.items.map(i => i.id === action.payload.id ? action.payload : i), activityLog: [entry, ...state.activityLog].slice(0, 500) };
+    }
+    case 'REMOVE_ITEM': {
+      const removedItem = state.items.find(i => i.id === action.payload);
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'item_deleted', module: 'system', description: `Deleted item ${removedItem?.itemName ?? action.payload}` };
+      return { ...state, items: state.items.filter(i => i.id !== action.payload), activityLog: [entry, ...state.activityLog].slice(0, 500) };
+    }
 
-    // ── Stock Log ──
-    case 'ADD_STOCK_LOG':
-      return { ...state, stockLog: [action.payload, ...state.stockLog].slice(0, 200) };
+    // ── Activity Log ──
+    case 'ADD_ACTIVITY_LOG':
+      return { ...state, activityLog: [action.payload, ...state.activityLog].slice(0, 500) };
 
     case 'SET_INSPECTIONS':
       return { ...state, inspections: action.payload };
 
-    case 'ADD_INSPECTION':
-      return { ...state, inspections: [...state.inspections, action.payload] };
+    case 'ADD_INSPECTION': {
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'inspection_started', module: 'inspection', description: `Started inspection on ${action.payload.tailNumber}` };
+      return { ...state, inspections: [...state.inspections, action.payload], activityLog: [entry, ...state.activityLog].slice(0, 500) };
+    }
 
-    case 'UPDATE_INSPECTION':
-      return {
-        ...state,
-        inspections: state.inspections.map(i =>
-          i.id === action.payload.id ? action.payload : i
-        ),
-      };
+    case 'UPDATE_INSPECTION': {
+      const updatedInspections = state.inspections.map(i => i.id === action.payload.id ? action.payload : i);
+      const inspLogEntries: ActivityLogEntry[] = [];
+      if (action.payload.status === 'submitted') {
+        inspLogEntries.push({ id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'inspection_submitted', module: 'inspection', description: `Submitted inspection on ${action.payload.tailNumber}` });
+      } else if (action.payload.status === 'restocked') {
+        inspLogEntries.push({ id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'inspection_restocked', module: 'inspection', description: `Restocked ${action.payload.tailNumber} after inspection` });
+      }
+      return { ...state, inspections: updatedInspections, activityLog: [...inspLogEntries, ...state.activityLog].slice(0, 500) };
+    }
 
     case 'SET_STOCKROOM_ITEMS':
       return { ...state, stockroomItems: action.payload };
@@ -152,7 +170,8 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         }
       }
 
-      return { ...state, stockroomItems: newStockroomItems, stockBatches: updatedBatches, pendingChanges: state.pendingChanges + 1 };
+      const bulkLogEntry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'stock_adjusted', module: 'stockroom', description: `Adjusted stock for ${action.payload.length} item(s)` };
+      return { ...state, stockroomItems: newStockroomItems, stockBatches: updatedBatches, pendingChanges: state.pendingChanges + 1, activityLog: [bulkLogEntry, ...state.activityLog].slice(0, 500) };
     }
 
     case 'SET_PICK_LIST':
@@ -180,16 +199,19 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         ),
       };
 
-    case 'ADD_UNIT_REQUEST':
-      return { ...state, unitItemRequests: [...state.unitItemRequests, action.payload] };
+    case 'ADD_UNIT_REQUEST': {
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'request_created', module: 'request', description: `Created item request for ${action.payload.unitTailNumber}` };
+      return { ...state, unitItemRequests: [...state.unitItemRequests, action.payload], activityLog: [entry, ...state.activityLog].slice(0, 500) };
+    }
 
-    case 'UPDATE_UNIT_REQUEST':
-      return {
-        ...state,
-        unitItemRequests: state.unitItemRequests.map(r =>
-          r.id === action.payload.id ? action.payload : r
-        ),
-      };
+    case 'UPDATE_UNIT_REQUEST': {
+      const updatedRequests = state.unitItemRequests.map(r => r.id === action.payload.id ? action.payload : r);
+      const reqLogEntries: ActivityLogEntry[] = [];
+      if (action.payload.status === 'fulfilled' || action.payload.status === 'cancelled') {
+        reqLogEntries.push({ id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: action.payload.status === 'fulfilled' ? 'request_fulfilled' : 'request_cancelled', module: 'request', description: `Request ${action.payload.status} for ${action.payload.unitTailNumber}` });
+      }
+      return { ...state, unitItemRequests: updatedRequests, activityLog: [...reqLogEntries, ...state.activityLog].slice(0, 500) };
+    }
 
     case 'SET_PURCHASE_ORDERS':
       return { ...state, purchaseOrders: action.payload };
@@ -235,8 +257,10 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       return action.payload;
 
     // ── Trip lifecycle ──
-    case 'ADD_TRIP':
-      return { ...state, trips: [...state.trips, action.payload], pendingChanges: state.pendingChanges + 1 };
+    case 'ADD_TRIP': {
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'trip_created', module: 'trip', description: `Created trip for ${action.payload.tailNumber}` };
+      return { ...state, trips: [...state.trips, action.payload], pendingChanges: state.pendingChanges + 1, activityLog: [entry, ...state.activityLog].slice(0, 500) };
+    }
 
     case 'UPDATE_TRIP':
       return {
@@ -246,6 +270,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       };
 
     case 'COMPLETE_TRIP': {
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'trip_completed', module: 'trip', description: `Completed trip ${action.payload}` };
       return {
         ...state,
         trips: state.trips.map(t =>
@@ -254,6 +279,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
             : t
         ),
         pendingChanges: state.pendingChanges + 1,
+        activityLog: [entry, ...state.activityLog].slice(0, 500),
       };
     }
 
@@ -308,6 +334,12 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     }
 
     case 'SET_LEG_PHASE': {
+      const legPhaseLogEntries: ActivityLogEntry[] = [];
+      if (action.payload.phase === 'in_flight') {
+        legPhaseLogEntries.push({ id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'leg_started', module: 'trip', description: `Leg started` });
+      } else if (action.payload.phase === 'complete') {
+        legPhaseLogEntries.push({ id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'leg_completed', module: 'trip', description: `Leg completed` });
+      }
       return {
         ...state,
         trips: state.trips.map(t =>
@@ -321,6 +353,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
             : t
         ),
         pendingChanges: state.pendingChanges + 1,
+        activityLog: [...legPhaseLogEntries, ...state.activityLog].slice(0, 500),
       };
     }
 
@@ -475,11 +508,13 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           ? { ...si, qtyOnHand: Math.max(0, si.qtyOnHand - qty) }
           : si
       );
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'batch_disposed', module: 'stockroom', description: `Disposed expired batch (${batchId.slice(-6)})` };
       return {
         ...state,
         stockBatches: newBatches,
         stockroomItems: newStockroomItems,
         pendingChanges: state.pendingChanges + 1,
+        activityLog: [entry, ...state.activityLog].slice(0, 500),
       };
     }
 
@@ -509,12 +544,14 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           ? { ...t, loadItems: [...t.loadItems, ...items] }
           : t
       );
+      const loadEntry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'load_extras', module: 'trip', description: `Loaded extras for trip` };
       return {
         ...state,
         trips: newTrips,
         stockroomItems: newStockroomItems,
         stockBatches: updatedBatches,
         pendingChanges: state.pendingChanges + 1,
+        activityLog: [loadEntry, ...state.activityLog].slice(0, 500),
       };
     }
 
@@ -531,11 +568,13 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           ? { ...t, returnItems: [...t.returnItems, ...items] }
           : t
       );
+      const returnEntry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'return_to_baseline', module: 'trip', description: `Returned items to baseline` };
       return {
         ...state,
         trips: newTrips,
         stockroomItems: newStockroomItems,
         pendingChanges: state.pendingChanges + 1,
+        activityLog: [returnEntry, ...state.activityLog].slice(0, 500),
       };
     }
 
