@@ -6,6 +6,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { createDb, type Db } from './db';
+import { state } from './routes/state';
 
 type Env = { Variables: { db: Db } };
 
@@ -25,6 +26,8 @@ app.use('*', async (c, next) => {
 
 // Health check
 app.get('/health', (c) => c.json({ ok: true }));
+
+app.route('/state', state);
 
 export { app };
 export type { Env };
