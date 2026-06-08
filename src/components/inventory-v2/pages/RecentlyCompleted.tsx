@@ -131,6 +131,12 @@ export default function RecentlyCompleted() {
                   <span className="text-muted-foreground">Date</span>
                   <span className="font-medium">{formatDate(selectedInspection.date)}</span>
                 </div>
+                {selectedInspection.reservationId && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Reservation ID</span>
+                    <span className="font-medium font-mono">{selectedInspection.reservationId}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Readiness</span>
                   <span className={`font-bold ${readinessColor(selectedInspection.readinessScore)}`}>
@@ -163,6 +169,81 @@ export default function RecentlyCompleted() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+
+                {selectedInspection.photos.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Photos</p>
+                    <div className="flex flex-wrap gap-3">
+                      {selectedInspection.photos.map((photo, index) => (
+                        <a
+                          key={index}
+                          href={photo}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-24 h-24 rounded-lg overflow-hidden border border-border/40 block"
+                        >
+                          <img
+                            src={photo}
+                            alt={`Inspection photo ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedInspection.additionalFees.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Additional Fees</p>
+                    <div className="space-y-1">
+                      {selectedInspection.additionalFees.map(fee => (
+                        <div
+                          key={fee.id}
+                          className="flex items-center justify-between text-sm p-2 rounded bg-muted/30"
+                        >
+                          <span className="truncate flex-1">{fee.description || 'Fee'}</span>
+                          <span className="font-mono">${fee.amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between text-sm font-medium pt-1.5 px-2">
+                        <span>Total</span>
+                        <span className="font-mono">
+                          ${selectedInspection.additionalFees.reduce((sum, f) => sum + f.amount, 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedInspection.missingItemCharges.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Missing Item Charges</p>
+                    <div className="space-y-1">
+                      {selectedInspection.missingItemCharges.map(charge => (
+                        <div
+                          key={charge.itemId}
+                          className="flex items-center justify-between text-sm p-2 rounded bg-red-500/10"
+                        >
+                          <span className="truncate flex-1">
+                            {charge.description}
+                            <span className="text-xs text-muted-foreground ml-1.5">
+                              ×{charge.qtyMissing}
+                              {charge.chargeToGuest ? ' · guest' : ''}
+                            </span>
+                          </span>
+                          <span className="font-mono text-red-400">${charge.total.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between text-sm font-medium pt-1.5 px-2">
+                        <span>Total</span>
+                        <span className="font-mono">
+                          ${selectedInspection.missingItemCharges.reduce((sum, c) => sum + c.total, 0).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}
