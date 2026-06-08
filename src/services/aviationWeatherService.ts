@@ -3,10 +3,34 @@
  * Fetches live METARs and TAFs from the FAA/NWS Aviation Weather Center.
  * API docs: https://aviationweather.gov/api/docs
  *
- * No API key required. CORS is supported — safe to call directly from the browser.
+ * aviationweather.gov no longer sends CORS headers, so the browser can't call
+ * it directly — we go through our own `/api/weather` proxy (Hono on Vercel Edge),
+ * which fetches AWC server-side and returns the raw { metar, taf } JSON arrays.
  */
 
-const BASE_URL = 'https://aviationweather.gov/api/data';
+const PROXY_URL = '/api/weather';
+
+/** Converts an AWC obsTime (Unix seconds OR ISO string) to an ISO 8601 string. */
+function toIso(obsTime: unknown): string {
+  if (typeof obsTime === 'number') return new Date(obsTime * 1000).toISOString();
+  if (typeof obsTime === 'string' && obsTime) {
+    // Numeric-looking string → treat as Unix seconds
+    const n = Number(obsTime);
+    if (!Number.isNaN(n) && obsTime.trim() !== '' && !obsTime.includes('-')) {
+      return new Date(n * 1000).toISOString();
+    }
+    return obsTime;
+  }
+  return new Date().toISOString();
+}
+
+/** AWC now reports altimeter in hectopascals; convert to inHg for display. */
+function toInHg(altim: unknown): number {
+  const n = Number(altim ?? 0);
+  if (!n) return 0;
+  // Values > 100 are hPa (e.g. 1015.7); values ~28–31 are already inHg.
+  return n > 100 ? n / 33.8639 : n;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,104 +157,80 @@ export function obsTimeLabel(isoTime: string): string {
 
 // ─── API fetch ────────────────────────────────────────────────────────────────
 
-/**
- * Fetches the latest METAR for one or more airports.
- * @param icaoIds - One or more ICAO identifiers, e.g. ['KLUK', 'KORD']
- * @param hoursBack - How many hours back to search (default: 2)
- */
-export async function fetchMetar(
-  icaoIds: string[],
-  hoursBack = 2,
-): Promise<MetarData[]> {
-  const ids = icaoIds.join(',');
-  const url = `${BASE_URL}/metar?ids=${ids}&format=json&hours=${hoursBack}`;
+/** Parses a raw AWC METAR record into our normalised MetarData shape. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function parseMetar(d: any): MetarData {
+  // visib can be a number or a string like "10+" — keep strings, coerce numerics.
+  const visibNum = parseFloat(d.visib);
+  const visib: number | string =
+    typeof d.visib === 'string' && Number.isNaN(visibNum) ? d.visib : (Number.isNaN(visibNum) ? d.visib : visibNum);
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`METAR fetch failed: ${res.status} ${res.statusText}`);
-  }
+  const clouds = Array.isArray(d.clouds)
+    ? d.clouds.map((c: { cover: string; base: number }) => ({ cover: c.cover, base: c.base }))
+    : undefined;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any[] = await res.json();
-  if (!Array.isArray(data)) return [];
+  // Ceiling = lowest BKN or OVC layer
+  const ceiling = clouds
+    ?.filter((c: { cover: string; base: number }) => c.cover === 'BKN' || c.cover === 'OVC')
+    .sort((a: { base: number }, b: { base: number }) => a.base - b.base)[0]?.base;
 
-  return data.map((d): MetarData => {
-    const visib = parseFloat(d.visib) ?? d.visib;
-    const clouds = Array.isArray(d.clouds)
-      ? d.clouds.map((c: { cover: string; base: number }) => ({ cover: c.cover, base: c.base }))
-      : undefined;
+  // AWC returns the category as `fltCat` (camelCase); older docs used `fltcat`.
+  const rawCat = d.fltCat ?? d.fltcat;
+  const fltcat: FlightCategory =
+    rawCat && ['VFR', 'MVFR', 'IFR', 'LIFR'].includes(rawCat)
+      ? (rawCat as FlightCategory)
+      : typeof visib === 'number'
+        ? deriveFlightCategory(visib, ceiling)
+        : 'UNKN';
 
-    // Ceiling = lowest BKN or OVC layer
-    const ceiling = clouds
-      ?.filter((c: { cover: string; base: number }) => c.cover === 'BKN' || c.cover === 'OVC')
-      .sort((a: { base: number }, b: { base: number }) => a.base - b.base)[0]?.base;
-
-    const fltcat: FlightCategory =
-      d.fltcat && ['VFR', 'MVFR', 'IFR', 'LIFR'].includes(d.fltcat)
-        ? (d.fltcat as FlightCategory)
-        : typeof visib === 'number'
-          ? deriveFlightCategory(visib, ceiling)
-          : 'UNKN';
-
-    return {
-      rawOb: d.rawOb ?? '',
-      icaoId: d.icaoId ?? '',
-      name: d.name ?? d.icaoId ?? '',
-      obsTime: d.obsTime ?? new Date().toISOString(),
-      wdir: d.wdir === 'VRB' ? 'VRB' : Number(d.wdir ?? 0),
-      wspd: Number(d.wspd ?? 0),
-      wgst: d.wgst != null ? Number(d.wgst) : undefined,
-      visib,
-      temp: Number(d.temp ?? 0),
-      dewp: Number(d.dewp ?? 0),
-      altim: Number(d.altim ?? 0),
-      fltcat,
-      clouds,
-      wxString: d.wxString ?? undefined,
-    };
-  });
+  return {
+    rawOb: d.rawOb ?? '',
+    icaoId: d.icaoId ?? '',
+    name: d.name ?? d.icaoId ?? '',
+    obsTime: toIso(d.obsTime),
+    wdir: d.wdir === 'VRB' ? 'VRB' : Number(d.wdir ?? 0),
+    wspd: Number(d.wspd ?? 0),
+    wgst: d.wgst != null ? Number(d.wgst) : undefined,
+    visib,
+    temp: Number(d.temp ?? 0),
+    dewp: Number(d.dewp ?? 0),
+    altim: toInHg(d.altim),
+    fltcat,
+    clouds,
+    wxString: d.wxString ?? undefined,
+  };
 }
 
-/**
- * Fetches the latest TAF for one or more airports.
- * @param icaoIds - One or more ICAO identifiers
- */
-export async function fetchTaf(icaoIds: string[]): Promise<TafData[]> {
-  const ids = icaoIds.join(',');
-  const url = `${BASE_URL}/taf?ids=${ids}&format=json`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`TAF fetch failed: ${res.status} ${res.statusText}`);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any[] = await res.json();
-  if (!Array.isArray(data)) return [];
-
-  return data.map((d): TafData => ({
+/** Parses a raw AWC TAF record into our normalised TafData shape. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function parseTaf(d: any): TafData {
+  return {
     rawTAF: d.rawTAF ?? '',
     icaoId: d.icaoId ?? '',
     issueTime: d.issueTime ?? new Date().toISOString(),
-    validTimeFrom: d.validTimeFrom ?? new Date().toISOString(),
-    validTimeTo: d.validTimeTo ?? new Date().toISOString(),
-  }));
+    validTimeFrom: typeof d.validTimeFrom === 'number' ? toIso(d.validTimeFrom) : (d.validTimeFrom ?? new Date().toISOString()),
+    validTimeTo: typeof d.validTimeTo === 'number' ? toIso(d.validTimeTo) : (d.validTimeTo ?? new Date().toISOString()),
+  };
 }
 
 /**
- * Fetches both METAR and TAF for a single airport in one call.
+ * Fetches both METAR and TAF for a single airport via our `/api/weather` proxy.
  * Returns nulls on error rather than throwing, suitable for UI use.
  */
 export async function fetchWeather(icaoId: string): Promise<WeatherResult> {
   try {
-    const [metars, tafs] = await Promise.all([
-      fetchMetar([icaoId]),
-      fetchTaf([icaoId]),
-    ]);
+    const res = await fetch(`${PROXY_URL}?ids=${encodeURIComponent(icaoId)}`);
+    if (!res.ok) {
+      throw new Error(`Weather fetch failed: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    const metars: unknown[] = Array.isArray(data?.metar) ? data.metar : [];
+    const tafs: unknown[] = Array.isArray(data?.taf) ? data.taf : [];
 
     return {
-      metar: metars[0] ?? null,
-      taf: tafs[0] ?? null,
+      metar: metars[0] ? parseMetar(metars[0]) : null,
+      taf: tafs[0] ? parseTaf(tafs[0]) : null,
       fetchedAt: new Date(),
     };
   } catch (err) {
