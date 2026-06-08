@@ -32,6 +32,31 @@ function toInHg(altim: unknown): number {
   return n > 100 ? n / 33.8639 : n;
 }
 
+/**
+ * Returns true if the sun is above the horizon at the given coordinates/time.
+ * Uses a low-precision NOAA solar-position approximation (good to ~1 min),
+ * which is far more than enough to pick a sun vs. moon icon. Accounts for
+ * atmospheric refraction + the sun's radius via the standard −0.833° horizon.
+ */
+export function isDaytime(lat: number, lon: number, date: Date = new Date()): boolean {
+  const rad = Math.PI / 180;
+  const n = date.getTime() / 86400000 + 2440587.5 - 2451545.0; // days since J2000
+  const g = (357.529 + 0.98560028 * n) * rad;                  // mean anomaly
+  const q = 280.459 + 0.98564736 * n;                          // mean longitude
+  const L = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * rad; // ecliptic longitude
+  const e = (23.439 - 0.00000036 * n) * rad;                   // obliquity
+  const dec = Math.asin(Math.sin(e) * Math.sin(L));            // declination
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L)) / rad; // right ascension (deg)
+  const gmst = 280.46061837 + 360.98564736629 * n;             // Greenwich sidereal time
+  let H = ((gmst + lon - ra) % 360 + 540) % 360 - 180;         // hour angle (deg), −180..180
+  H *= rad;
+  const alt = Math.asin(
+    Math.sin(lat * rad) * Math.sin(dec) +
+    Math.cos(lat * rad) * Math.cos(dec) * Math.cos(H),
+  ) / rad;
+  return alt > -0.833;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type FlightCategory = 'VFR' | 'MVFR' | 'IFR' | 'LIFR' | 'UNKN';
@@ -65,6 +90,10 @@ export interface MetarData {
   clouds?: Array<{ cover: string; base: number }>;
   /** Weather phenomena, e.g. ["-RA", "BR"] */
   wxString?: string;
+  /** Airport latitude in decimal degrees */
+  lat?: number;
+  /** Airport longitude in decimal degrees */
+  lon?: number;
 }
 
 export interface TafData {
@@ -198,6 +227,8 @@ export function parseMetar(d: any): MetarData {
     fltcat,
     clouds,
     wxString: d.wxString ?? undefined,
+    lat: d.lat != null ? Number(d.lat) : undefined,
+    lon: d.lon != null ? Number(d.lon) : undefined,
   };
 }
 
