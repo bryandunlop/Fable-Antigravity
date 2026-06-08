@@ -10,7 +10,8 @@ import {
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { cn } from '../../ui/utils';
-import { POS_CATEGORIES, DEFAULT_QUICK_ADD_ITEM_IDS } from '../constants';
+import { POS_CATEGORIES } from '../constants';
+import { useInventoryV2 } from '../InventoryV2Context';
 import type { InventoryItemV2, TripLeg, Trip } from '../types';
 
 // ─── Icon Map ───────────────────────────────────────────────────────────────
@@ -404,6 +405,7 @@ export default function QuickTapView({
   getLegUsage,
   getOnBoard,
 }: QuickTapViewProps) {
+  const { state } = useInventoryV2();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [showCart, setShowCart] = useState(false);
   const [qtyPickerItem, setQtyPickerItem] = useState<InventoryItemV2 | null>(null);
@@ -413,16 +415,16 @@ export default function QuickTapView({
     return items.filter(item => item.isConsumable !== false);
   }, [items]);
 
-  // ── Quick Add items (pinned top 8) ──
+  // ── Quick Add items (configurable global list, managed in Commissary) ──
   const quickAddItems = useMemo(() => {
-    return DEFAULT_QUICK_ADD_ITEM_IDS
+    return state.quickAddItemIds
       .map(id => consumableItems.find(i => i.id === id))
       .filter((item): item is InventoryItemV2 => {
         if (!item) return false;
         const qty = item.defaultQuantities[aircraftType];
         return qty !== undefined && qty > 0;
       });
-  }, [consumableItems, aircraftType]);
+  }, [consumableItems, aircraftType, state.quickAddItemIds]);
 
   // ── Items grouped by POS category ──
   const categoryGroups = useMemo(() => {

@@ -406,6 +406,7 @@ export interface InventoryV2State {
   groceryLists: GroceryList[];
   stockBatches: StockBatch[];
   favoriteItems: Record<string, string[]>; // userId → itemId[]
+  quickAddItemIds: string[]; // ordered item IDs shown in the trip Quick Add grid
 }
 
 // ─── Context Actions ────────────────────────────────────────────────────────
@@ -488,4 +489,6 @@ export type InventoryV2Action =
   | { type: 'ADD_TRIP_LOAD_ITEMS'; payload: { tripId: string; items: TripLoadItem[] } }
   | { type: 'ADD_TRIP_RETURN_ITEMS'; payload: { tripId: string; items: TripReturnItem[]; stockroomUpdates: StockroomItem[] } }
   // Favorites
-  | { type: 'TOGGLE_FAVORITE_ITEM'; payload: { userId: string; itemId: string } };
+  | { type: 'TOGGLE_FAVORITE_ITEM'; payload: { userId: string; itemId: string } }
+  // Quick Add list
+  | { type: 'SET_QUICK_ADD_ITEMS'; payload: string[] };

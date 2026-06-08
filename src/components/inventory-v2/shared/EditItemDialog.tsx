@@ -21,6 +21,7 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES, UOM_OPTIONS } from '../constants';
 import { toast } from 'sonner';
 import type { InventoryItemV2, SupplyCategory, UnitOfMeasure, StockroomItem } from '../types';
+import ItemThumbnail from './ItemThumbnail';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ interface ItemFormState {
   vendorItemNumber: string;
   vendor: string;
   reorderUrl: string;
+  thumbnailUrl: string;
   barcode: string;
   locationId: string;
   binLocation: string;
@@ -64,6 +66,7 @@ function emptyForm(): ItemFormState {
     vendorItemNumber: '',
     vendor: '',
     reorderUrl: '',
+    thumbnailUrl: '',
     barcode: '',
     locationId: '',
     binLocation: '',
@@ -85,6 +88,7 @@ function itemToForm(item: InventoryItemV2, si?: StockroomItem): ItemFormState {
     vendorItemNumber: item.vendorItemNumber ?? '',
     vendor: item.vendor ?? '',
     reorderUrl: item.reorderUrl ?? '',
+    thumbnailUrl: item.thumbnailUrl ?? '',
     barcode: item.barcode ?? '',
     locationId: si?.locationId ?? '',
     binLocation: si?.binLocation ?? '',
@@ -150,6 +154,7 @@ export default function EditItemDialog({ item, open, onOpenChange }: EditItemDia
         vendor: form.vendor.trim() || undefined,
         costPerUnit: costParsed,
         reorderUrl: form.reorderUrl.trim() || undefined,
+        thumbnailUrl: form.thumbnailUrl.trim() || undefined,
         barcode: form.barcode.trim() || undefined,
         defaultQuantities: {
           ...(g650Parsed !== undefined ? { G650: g650Parsed } : {}),
@@ -188,6 +193,7 @@ export default function EditItemDialog({ item, open, onOpenChange }: EditItemDia
         vendor: form.vendor.trim() || undefined,
         costPerUnit: costParsed,
         reorderUrl: form.reorderUrl.trim() || undefined,
+        thumbnailUrl: form.thumbnailUrl.trim() || undefined,
         barcode: form.barcode.trim() || undefined,
         defaultQuantities: {
           ...(g650Parsed !== undefined ? { G650: g650Parsed } : {}),
@@ -340,6 +346,23 @@ export default function EditItemDialog({ item, open, onOpenChange }: EditItemDia
                 placeholder="https://..."
               />
             </div>
+          </div>
+
+          {/* Picture URL */}
+          <div className="space-y-1.5">
+            <Label>Picture URL (optional)</Label>
+            <div className="flex items-center gap-3">
+              <ItemThumbnail name={form.itemName || 'Item'} url={form.thumbnailUrl} size={44} />
+              <Input
+                value={form.thumbnailUrl}
+                onChange={e => setField('thumbnailUrl', e.target.value)}
+                placeholder="https://… (paste a product image URL)"
+                className="flex-1"
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Paste an image link for now. Photo upload will come with a backend.
+            </p>
           </div>
 
           {/* Barcode */}

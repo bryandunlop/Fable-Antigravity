@@ -22,7 +22,6 @@ import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
 import QuickTapView from '../shared/QuickTapView';
 import { TripLoadExtras } from './TripLoadExtras';
-import { TripRestoreStock } from './TripRestoreStock';
 
 // ─── Item Row ───────────────────────────────────────────────────────────────
 
@@ -232,7 +231,7 @@ function TripCompleteDialog({
           </Button>
           <Button onClick={onStartReplenish} variant="outline" className="w-full">
             <Package className="mr-2 h-4 w-4" />
-            Skip — Go to Replenish
+            Restock Aircraft
           </Button>
           <Button variant="ghost" onClick={onClose} className="w-full text-muted-foreground">
             Done
@@ -346,7 +345,7 @@ function TripViewInner({
   const [showTripComplete, setShowTripComplete] = useState(false);
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
-  const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
+  const [screen, setScreen] = useState<'trip' | 'load-extras'>('trip');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const undoToastRef = useRef<string | number | undefined>(undefined);
 
@@ -363,33 +362,9 @@ function TripViewInner({
 
   const phaseColors = LEG_PHASE_COLORS[phase];
 
-  // If trip is completed, show the complete state
-  if (trip.status === 'completed') {
-    return (
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
-        <OfflineBanner />
-        <button
-          onClick={() => navigate('/inventory-v2/trips')}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft size={16} /> Fleet
-        </button>
-        <div className="text-center py-12 space-y-4">
-          <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
-          <h1 className="text-2xl font-bold">Trip Complete</h1>
-          <p className="text-muted-foreground">
-            {trip.tailNumber} · {trip.legs.length} legs · {trip.tripName || 'Unnamed Trip'}
-          </p>
-          <Button
-            onClick={() => navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`)}
-            className="bg-emerald-600 hover:bg-emerald-500"
-          >
-            Start Replenish
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // NOTE: the completed-trip early return lives AFTER all hooks below — moving
+  // it here would skip later hooks and break the Rules of Hooks when a trip
+  // transitions to 'completed' mid-render.
 
   // ─── Quick Count Logic ──────────────────────────────────────────────────
 
@@ -454,7 +429,7 @@ function TripViewInner({
       .flatMap((l: TripLeg) => l.usageLog)
       .filter(e => e.itemId === item.id)
       .reduce((sum, e) => sum + e.qtyUsed, 0);
-    const loadTotal = trip.loadItems
+    const loadTotal = (trip.loadItems ?? [])
       .filter(li => li.itemId === item.id)
       .reduce((sum, li) => sum + li.qty, 0);
     return par + loadTotal - allLegsUsage;
@@ -462,6 +437,14 @@ function TripViewInner({
 
   function handleIncrement(item: InventoryItemV2) {
     if (!activeLeg) return;
+    // Logging an item is itself the signal that the flight is underway — no need
+    // to tap "Start Flight" first. First tap in pre_flight advances the phase.
+    if (activeLeg.phase === 'pre_flight') {
+      dispatch({
+        type: 'SET_LEG_PHASE',
+        payload: { tripId: trip.id, legId: activeLeg.id, phase: 'in_flight' },
+      });
+    }
     const existing = activeLeg.usageLog.find(e => e.itemId === item.id);
     if (existing) {
       dispatch({
@@ -532,6 +515,35 @@ function TripViewInner({
     return gl?.items.length ?? 0;
   }, [state.groceryLists, trip.id]);
 
+  // If trip is completed, show the complete state.
+  // MUST stay below all hooks — see note near the top of this component.
+  if (trip.status === 'completed') {
+    return (
+      <div className="max-w-5xl mx-auto p-6 space-y-6">
+        <OfflineBanner />
+        <button
+          onClick={() => navigate('/inventory-v2/trips')}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft size={16} /> Fleet
+        </button>
+        <div className="text-center py-12 space-y-4">
+          <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
+          <h1 className="text-2xl font-bold">Trip Complete</h1>
+          <p className="text-muted-foreground">
+            {trip.tailNumber} · {trip.legs.length} legs · {trip.tripName || 'Unnamed Trip'}
+          </p>
+          <Button
+            onClick={() => navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`)}
+            className="bg-emerald-600 hover:bg-emerald-500"
+          >
+            Start Replenish
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // ─── Phase Actions ────────────────────────────────────────────────────────
 
   function handleStartFlight() {
@@ -544,16 +556,28 @@ function TripViewInner({
 
   function handleLanded() {
     if (!activeLeg) return;
+    // Always land into on_ground and let the footer present the choice
+    // (Add Another Leg vs Complete Trip) — even on a single-leg trip.
     dispatch({
       type: 'SET_LEG_PHASE',
       payload: { tripId: trip.id, legId: activeLeg.id, phase: 'on_ground' },
     });
-    setShowNextLeg(true);
   }
 
   function handleNextLeg() {
     if (!activeLeg) return;
     dispatch({ type: 'ADVANCE_TO_NEXT_LEG', payload: trip.id });
+  }
+
+  // "Add Another Leg" — always available on the ground. If the trip was planned
+  // with a subsequent leg, advance into it; otherwise open the dialog to create
+  // a brand-new leg and keep the trip going.
+  function handleAddOrAdvanceLeg() {
+    if (!isLastLeg) {
+      handleNextLeg();
+    } else {
+      setShowNextLeg(true);
+    }
   }
 
   function handleAddNextLeg(data: { origin: string; destination: string; date: string; paxCount: number }) {
@@ -633,9 +657,6 @@ function TripViewInner({
   if (screen === 'load-extras') {
     return <TripLoadExtras trip={trip} onBack={() => setScreen('trip')} />;
   }
-  if (screen === 'restore-stock' && activeLeg) {
-    return <TripRestoreStock trip={trip} activeLeg={activeLeg} onBack={() => setScreen('trip')} />;
-  }
 
   return (
     <div className="-m-6 -mb-20 flex flex-col h-[calc(100dvh-9.125rem)] md:h-[calc(100dvh-4.5625rem)] overflow-hidden animate-in fade-in duration-200">
@@ -651,6 +672,16 @@ function TripViewInner({
             <ChevronLeft size={16} /> Fleet
           </button>
           <div className="flex items-center gap-2">
+            {activeLeg && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs text-muted-foreground"
+                onClick={() => setScreen('load-extras')}
+              >
+                <Package size={14} /> Load Extras
+              </Button>
+            )}
             <span className="text-lg font-bold font-mono">{trip.tailNumber}</span>
             <Badge className="bg-blue-500/15 text-blue-400 border border-blue-500/30 text-xs">
               {trip.aircraftType}
@@ -662,7 +693,7 @@ function TripViewInner({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-mono font-semibold">
-                Leg {activeLeg.legNumber}: {activeLeg.origin} → {activeLeg.destination}
+                Leg {activeLeg.legNumber}: {activeLeg.origin || '—'} → {activeLeg.destination || '—'}
               </span>
               <Badge className={cn('text-xs status-badge', phaseColors.className)}>
                 {phaseColors.label}
@@ -986,7 +1017,7 @@ function TripViewInner({
       {activeLeg && (
         <div className="bg-background border-t-2 border-border px-4 py-3 shrink-0">
           <div className="max-w-5xl mx-auto space-y-2">
-            {/* on_ground: Grocery + Restore Stock row */}
+            {/* on_ground: Grocery List (mid-trip sourcing happens via the grocery list) */}
             {phase === 'on_ground' && (
               <div className="flex items-center gap-3">
                 <Button
@@ -1001,13 +1032,6 @@ function TripViewInner({
                       {groceryItemCount}
                     </span>
                   )}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setScreen('restore-stock')}
-                >
-                  Restore Stock
                 </Button>
               </div>
             )}
@@ -1060,34 +1084,32 @@ function TripViewInner({
                 </>
               )}
 
-              {/* on_ground: Review Leg + Next Leg or Complete Trip */}
+              {/* on_ground: Review Leg + Add Another Leg + Complete Trip
+                  (all three always available, regardless of leg count) */}
               {phase === 'on_ground' && (
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => activeLeg && navigate(`/inventory-v2/leg-reconciliation/${activeLeg.id}`)}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Review Leg
-                </Button>
-              )}
-
-              {phase === 'on_ground' && !isLastLeg && (
-                <Button
-                  className="flex-1 bg-amber-600 hover:bg-amber-500"
-                  onClick={handleNextLeg}
-                >
-                  Next Leg
-                </Button>
-              )}
-
-              {phase === 'on_ground' && isLastLeg && (
-                <Button
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500"
-                  onClick={handleCompleteTrip}
-                >
-                  Complete Trip
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => activeLeg && navigate(`/inventory-v2/leg-reconciliation/${activeLeg.id}`)}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Review Leg
+                  </Button>
+                  <Button
+                    className="flex-1 bg-amber-600 hover:bg-amber-500"
+                    onClick={handleAddOrAdvanceLeg}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Another Leg
+                  </Button>
+                  <Button
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                    onClick={handleCompleteTrip}
+                  >
+                    Complete Trip
+                  </Button>
+                </>
               )}
             </div>
           </div>

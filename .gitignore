@@ -37,3 +37,6 @@ fix-sonner-imports.ps1
 
 # Superpowers plan docs
 docs/superpowers/
+
+# Drizzle migration output (we use db:push, no migrations committed)
+drizzle/

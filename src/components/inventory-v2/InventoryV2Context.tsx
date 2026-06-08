@@ -1,14 +1,16 @@
 // ─── Inventory V2 — React Context ───────────────────────────────────────────
 
-import React, { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { InventoryV2State, InventoryV2Action, StockroomItem, ActivityLogEntry, StorageLocation } from './types';
 import type { Notification } from '../contexts/NotificationContext';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS, STOCK_BATCHES, STORAGE_LOCATIONS } from './mockData';
 import { MOCK_TRIPS, MOCK_GROCERY_LISTS } from './mockTrips';
-import { FLEET_V2 } from './constants';
+import { FLEET_V2, DEFAULT_QUICK_ADD_ITEM_IDS } from './constants';
 import { loadCompartmentConfigs } from './compartmentConfig';
 import { deductFromBatches } from './shared/batchUtils';
+import { useApiSync } from './useApiSync';
+import { api } from './api-client';
 
 // ─── Storage Keys ───────────────────────────────────────────────────────────
 
@@ -32,16 +34,38 @@ function loadInitialState(): InventoryV2State {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Merge stored state with defaults for any missing keys
-      return {
+      // Merge stored state with defaults for any missing keys.
+      // NOTE: this is a shallow merge — it only backfills missing top-level
+      // keys, not nested fields. Trips persisted before loadItems/returnItems
+      // existed must be repaired explicitly, see normalizeTrips below.
+      const merged = {
         ...getDefaultState(),
         ...parsed,
+      };
+      return {
+        ...merged,
+        trips: normalizeTrips(merged.trips),
       };
     }
   } catch {
     // fall through to defaults
   }
   return getDefaultState();
+}
+
+// Backfill fields that were added to the Trip/TripLeg shape after data may have
+// already been persisted. Guards against TypeErrors when reading arrays that
+// older persisted trips don't have (e.g. trip.loadItems.filter()).
+function normalizeTrips(trips: InventoryV2State['trips']): InventoryV2State['trips'] {
+  if (!Array.isArray(trips)) return [];
+  return trips.map(trip => ({
+    ...trip,
+    loadItems: trip.loadItems ?? [],
+    returnItems: trip.returnItems ?? [],
+    legs: Array.isArray(trip.legs)
+      ? trip.legs.map(leg => ({ ...leg, usageLog: leg.usageLog ?? [] }))
+      : [],
+  }));
 }
 
 function getDefaultState(): InventoryV2State {
@@ -76,6 +100,7 @@ function getDefaultState(): InventoryV2State {
     stockBatches: STOCK_BATCHES,
     storageLocations: STORAGE_LOCATIONS,
     favoriteItems: {},
+    quickAddItemIds: DEFAULT_QUICK_ADD_ITEM_IDS,
   };
 }
 
@@ -639,6 +664,9 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       return { ...state, favoriteItems: { ...state.favoriteItems, [userId]: updated } };
     }
 
+    case 'SET_QUICK_ADD_ITEMS':
+      return { ...state, quickAddItemIds: action.payload };
+
     default:
       return state;
   }
@@ -649,6 +677,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
 interface InventoryV2ContextValue {
   state: InventoryV2State;
   dispatch: React.Dispatch<InventoryV2Action>;
+  loading: boolean;
 }
 
 const InventoryV2Context = createContext<InventoryV2ContextValue | undefined>(undefined);
@@ -662,7 +691,42 @@ interface InventoryV2ProviderProps {
 }
 
 export function InventoryV2Provider({ children, userRole, addNotification }: InventoryV2ProviderProps) {
-  const [state, dispatch] = useReducer(inventoryReducer, undefined, loadInitialState);
+  const [state, rawDispatch] = useReducer(inventoryReducer, undefined, loadInitialState);
+  const [loading, setLoading] = useState(true);
+
+  // Wrap dispatch: optimistic local update + background API persistence
+  const dispatch = useApiSync(rawDispatch);
+
+  // Load full state from /api/state on mount. The cached localStorage state shown
+  // during the fetch keeps the UI from flashing empty, then RESET_STATE replaces it.
+  useEffect(() => {
+    let cancelled = false;
+    api.state.load()
+      .then((server) => {
+        if (cancelled) return;
+        rawDispatch({
+          type: 'RESET_STATE',
+          payload: {
+            ...server,
+            // These fields are local-only — preserve from current state
+            compartmentConfigs: loadCompartmentConfigs(),
+            currentUser: state.currentUser,
+            favoriteItems: state.favoriteItems ?? {},
+            quickAddItemIds: state.quickAddItemIds ?? DEFAULT_QUICK_ADD_ITEM_IDS,
+            // The API doesn't track POs (descoped) or fleet config — keep defaults
+            purchaseOrders: MOCK_PURCHASE_ORDERS,
+            fleet: server.fleet?.length ? server.fleet : FLEET_V2,
+          },
+        });
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('[InventoryV2] Failed to load from API, using cached state:', err);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // mount only
 
   // Keep addNotification ref stable so useEffect deps don't change on every render
   const addNotifRef = useRef(addNotification);
@@ -673,7 +737,8 @@ export function InventoryV2Provider({ children, userRole, addNotification }: Inv
     if (!userRole) return;
     const match = SYSTEM_USERS.find(u => u.roles.includes(userRole));
     if (match) {
-      dispatch({
+      // Use rawDispatch — currentUser is local-only, no API sync needed
+      rawDispatch({
         type: 'SET_CURRENT_USER',
         payload: {
           id: match.id,
@@ -794,8 +859,14 @@ export function InventoryV2Provider({ children, userRole, addNotification }: Inv
   }, [state.inspections, state.groceryLists, state.trips]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <InventoryV2Context.Provider value={{ state, dispatch }}>
-      {children}
+    <InventoryV2Context.Provider value={{ state, dispatch, loading }}>
+      {loading ? (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="animate-pulse text-muted-foreground">Loading inventory…</div>
+        </div>
+      ) : (
+        children
+      )}
     </InventoryV2Context.Provider>
   );
 }

@@ -3,7 +3,8 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   Warehouse, Search, Plus, Minus, ChevronDown, Pencil,
   PackagePlus, ShoppingCart, Settings2, AlertTriangle,
-  ExternalLink, Trash2, Package, Clock,
+  ExternalLink, Trash2, Package, Clock, List, LayoutGrid,
+  Boxes, SlidersHorizontal, CalendarClock, Zap,
 } from 'lucide-react';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -19,29 +20,25 @@ import ReceiveStockModal from '../shared/ReceiveStockModal';
 import ShoppingListModal from '../shared/ShoppingListModal';
 import EditItemDialog from '../shared/EditItemDialog';
 import ManageLocationsDialog from '../shared/ManageLocationsDialog';
-import type { InventoryItemV2, StockroomItem, StorageLocation, StockBatch } from '../types';
+import ManageQuickAddDialog from '../shared/ManageQuickAddDialog';
+import ItemThumbnail from '../shared/ItemThumbnail';
+import CommissaryGridCard from '../shared/CommissaryGridCard';
+import CommissaryParLevelsView from './CommissaryParLevelsView';
+import CommissaryExpiringView from './CommissaryExpiringView';
+import { formatDateShort, getBatchStatus, getSoonestExpiry } from '../commissaryUtils';
+import type { InventoryItemV2, StockroomItem, StockBatch } from '../types';
 
-// ─── Helper functions ───────────────────────────────────────────────────────
-
-function formatDateShort(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function getBatchStatus(expDate?: string): 'fresh' | 'expiring-soon' | 'expired' | 'none' {
-  if (!expDate) return 'none';
-  const now = Date.now();
-  const exp = new Date(expDate).getTime();
-  if (exp < now) return 'expired';
-  if (exp - now < 14 * 24 * 60 * 60 * 1000) return 'expiring-soon';
-  return 'fresh';
-}
+type CommissaryMode = 'stock' | 'par' | 'expiring';
+type StockDisplay = 'list' | 'grid';
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Commissary() {
   const { state, dispatch } = useInventoryV2();
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'location' | 'category'>('location');
+  const [groupBy, setGroupBy] = useState<'location' | 'category'>('location');
+  const [mode, setMode] = useState<CommissaryMode>('stock');
+  const [display, setDisplay] = useState<StockDisplay>('list');
   const [showLowOnly, setShowLowOnly] = useState(false);
   const [hideZero, setHideZero] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
@@ -53,6 +50,7 @@ export default function Commissary() {
   const [shoppingOpen, setShoppingOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [locationsOpen, setLocationsOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [bulkAdjustOpen, setBulkAdjustOpen] = useState(false);
 
   // Edit item dialog
@@ -150,10 +148,10 @@ export default function Commissary() {
     return groups;
   }, [filteredItems]);
 
-  const grouped = viewMode === 'location' ? groupedByLocation : groupedByCategory;
+  const grouped = groupBy === 'location' ? groupedByLocation : groupedByCategory;
 
   const getGroupLabel = (key: string): string => {
-    if (viewMode === 'location') {
+    if (groupBy === 'location') {
       if (key === 'unassigned') return 'Unassigned';
       return state.storageLocations.find(l => l.id === key)?.name ?? key;
     }
@@ -267,6 +265,15 @@ export default function Commissary() {
 
           <Button
             variant="ghost"
+            className="gap-2"
+            onClick={() => setQuickAddOpen(true)}
+          >
+            <Zap className="w-4 h-4" />
+            Quick Add
+          </Button>
+
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => setBulkAdjustOpen(true)}
           >
@@ -365,6 +372,31 @@ export default function Commissary() {
         </Card>
       )}
 
+      {/* ── Mode Switcher ───────────────────────────────────────────────────── */}
+      <div className="inline-flex bg-muted rounded-lg p-1 gap-1">
+        {([
+          { id: 'stock', label: 'Stock', icon: Boxes },
+          { id: 'par', label: 'Par levels', icon: SlidersHorizontal },
+          { id: 'expiring', label: 'Expiring', icon: CalendarClock },
+        ] as { id: CommissaryMode; label: string; icon: typeof Boxes }[]).map(m => {
+          const Icon = m.icon;
+          return (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                mode === m.id
+                  ? 'bg-background text-primary shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* ── Controls Row ────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -377,51 +409,86 @@ export default function Commissary() {
           />
         </div>
 
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          <button
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'location'
-                ? 'bg-primary text-white'
-                : 'bg-background text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setViewMode('location')}
-          >
-            By Location
-          </button>
-          <button
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'category'
-                ? 'bg-primary text-white'
-                : 'bg-background text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setViewMode('category')}
-          >
-            By Category
-          </button>
-        </div>
+        {mode !== 'expiring' && (
+          <div className="flex items-center rounded-lg border border-border overflow-hidden">
+            <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                groupBy === 'location'
+                  ? 'bg-primary text-white'
+                  : 'bg-background text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setGroupBy('location')}
+            >
+              By Location
+            </button>
+            <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                groupBy === 'category'
+                  ? 'bg-primary text-white'
+                  : 'bg-background text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setGroupBy('category')}
+            >
+              By Category
+            </button>
+          </div>
+        )}
 
-        <Button
-          variant={showLowOnly ? 'default' : 'outline'}
-          size="sm"
-          className="gap-1.5 text-xs"
-          onClick={() => setShowLowOnly(v => !v)}
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          Low / Critical Only
-        </Button>
+        {mode === 'stock' && (
+          <>
+            <Button
+              variant={showLowOnly ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setShowLowOnly(v => !v)}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Low / Critical Only
+            </Button>
 
-        <Button
-          variant={hideZero ? 'default' : 'outline'}
-          size="sm"
-          className="text-xs"
-          onClick={() => setHideZero(v => !v)}
-        >
-          Hide Zero
-        </Button>
+            <Button
+              variant={hideZero ? 'default' : 'outline'}
+              size="sm"
+              className="text-xs"
+              onClick={() => setHideZero(v => !v)}
+            >
+              Hide Zero
+            </Button>
+
+            <div className="flex items-center rounded-lg border border-border overflow-hidden ml-auto">
+              <button
+                className={`px-2.5 py-1.5 transition-colors ${
+                  display === 'list'
+                    ? 'bg-primary text-white'
+                    : 'bg-background text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => setDisplay('list')}
+                aria-label="List view"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                className={`px-2.5 py-1.5 transition-colors ${
+                  display === 'grid'
+                    ? 'bg-primary text-white'
+                    : 'bg-background text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => setDisplay('grid')}
+                aria-label="Grid view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* ── Item Groups ─────────────────────────────────────────────────────── */}
-      {groupEntries.length === 0 ? (
+      {/* ── Body ────────────────────────────────────────────────────────────── */}
+      {mode === 'expiring' ? (
+        <CommissaryExpiringView search={search} />
+      ) : mode === 'par' ? (
+        <CommissaryParLevelsView groups={groupEntries} getGroupLabel={getGroupLabel} />
+      ) : groupEntries.length === 0 ? (
         <div className="flex flex-col items-center py-20 text-muted-foreground gap-3">
           <Package className="w-12 h-12 opacity-30" />
           <p className="text-base font-medium">No items match your filters</p>
@@ -468,194 +535,223 @@ export default function Commissary() {
                   </CollapsibleTrigger>
 
                   <CollapsibleContent>
-                    <div className="divide-y divide-border">
-                      {groupItems.map(item => {
-                        const si = item.stockroom;
-                        const isCritical = si && si.qtyOnHand <= si.minimumLevel;
-                        const isLow = si && !isCritical && si.qtyOnHand < si.parLevel;
-                        const batches = getBatchesForItem(item.id);
-                        const isExpanded = expandedItemId === item.id;
+                    {display === 'grid' ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4">
+                        {groupItems.map(item => (
+                          <CommissaryGridCard
+                            key={item.id}
+                            item={item}
+                            batches={getBatchesForItem(item.id)}
+                            onQty={delta => handleQtyChange(item.id, delta)}
+                            onEdit={() => {
+                              setEditItem(item);
+                              setEditOpen(true);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {groupItems.map(item => {
+                          const si = item.stockroom;
+                          const isCritical = si && si.qtyOnHand <= si.minimumLevel;
+                          const isLow = si && !isCritical && si.qtyOnHand < si.parLevel;
+                          const batches = getBatchesForItem(item.id);
+                          const soonest = getSoonestExpiry(batches);
+                          const isExpanded = expandedItemId === item.id;
 
-                        return (
-                          <div key={item.id}>
-                            {/* ── Item Row ─────────────────────────────────── */}
-                            <div className="flex items-center gap-3 px-4 py-3 hover:bg-accent/20 transition-colors">
-                              {/* Left: bin + name + badges */}
-                              <div className="flex-1 min-w-0 flex items-center gap-3">
-                                {si?.binLocation && (
-                                  <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
-                                    {si.binLocation}
-                                  </span>
-                                )}
-                                <div className="min-w-0">
-                                  <span className="text-sm font-medium text-foreground truncate block">
-                                    {item.itemName}
-                                  </span>
-                                  {(isCritical || isLow) && (
-                                    <div className="flex items-center gap-1 mt-0.5">
-                                      {isCritical && (
-                                        <Badge className="text-[10px] px-1.5 py-0 bg-red-500/20 text-red-400 border border-red-500/30">
-                                          CRITICAL
-                                        </Badge>
+                          return (
+                            <div key={item.id}>
+                              {/* ── Item Row ─────────────────────────────────── */}
+                              <div className="flex items-center gap-3 px-4 py-3 hover:bg-accent/20 transition-colors">
+                                {/* Left: thumbnail + bin + name + badges */}
+                                <div className="flex-1 min-w-0 flex items-center gap-3">
+                                  <ItemThumbnail name={item.itemName} url={item.thumbnailUrl} size={36} />
+                                  {si?.binLocation && (
+                                    <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+                                      {si.binLocation}
+                                    </span>
+                                  )}
+                                  <div className="min-w-0">
+                                    <span className="text-sm font-medium text-foreground truncate block">
+                                      {item.itemName}
+                                    </span>
+                                    {(isCritical || isLow || soonest.status === 'expired' || soonest.status === 'expiring-soon') && (
+                                      <div className="flex items-center gap-1 mt-0.5">
+                                        {isCritical && (
+                                          <Badge className="text-[10px] px-1.5 py-0 bg-red-500/20 text-red-400 border border-red-500/30">
+                                            CRITICAL
+                                          </Badge>
+                                        )}
+                                        {isLow && (
+                                          <Badge className="text-[10px] px-1.5 py-0 bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                            LOW
+                                          </Badge>
+                                        )}
+                                        {soonest.status === 'expired' && (
+                                          <Badge className="text-[10px] px-1.5 py-0 bg-red-500/20 text-red-400 border border-red-500/30">
+                                            EXPIRED
+                                          </Badge>
+                                        )}
+                                        {soonest.status === 'expiring-soon' && soonest.date && (
+                                          <Badge className="text-[10px] px-1.5 py-0 bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                            EXP {formatDateShort(soonest.date)}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Middle: meta */}
+                                <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
+                                  <span>Min {si?.minimumLevel ?? '—'}</span>
+                                  <span>Par {si?.parLevel ?? '—'}</span>
+                                  <span className="uppercase">{item.uom}</span>
+                                  {item.vendor && (
+                                    <span className="flex items-center gap-1">
+                                      {item.reorderUrl ? (
+                                        <a
+                                          href={item.reorderUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-0.5 text-primary hover:underline"
+                                          onClick={e => e.stopPropagation()}
+                                        >
+                                          {item.vendor}
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                      ) : (
+                                        item.vendor
                                       )}
-                                      {isLow && (
-                                        <Badge className="text-[10px] px-1.5 py-0 bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                                          LOW
-                                        </Badge>
-                                      )}
-                                    </div>
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Right: qty controls + edit + expand */}
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    className="w-7 h-7 flex items-center justify-center rounded-md border border-border hover:bg-accent text-muted-foreground transition-colors"
+                                    onClick={() => handleQtyChange(item.id, -1)}
+                                    disabled={!si}
+                                    aria-label="Decrease quantity"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <span className={`w-10 text-center text-sm font-bold tabular-nums ${getQtyColor(si)}`}>
+                                    {si?.qtyOnHand ?? '—'}
+                                  </span>
+
+                                  <button
+                                    className="w-7 h-7 flex items-center justify-center rounded-md border border-border hover:bg-accent text-muted-foreground transition-colors"
+                                    onClick={() => handleQtyChange(item.id, 1)}
+                                    disabled={!si}
+                                    aria-label="Increase quantity"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-7 h-7 p-0"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      setEditItem(item);
+                                      setEditOpen(true);
+                                    }}
+                                    aria-label="Edit item"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                                  </Button>
+
+                                  {batches.length > 0 && (
+                                    <button
+                                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground transition-colors"
+                                      onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
+                                      aria-label={isExpanded ? 'Collapse batches' : 'Expand batches'}
+                                    >
+                                      <ChevronDown
+                                        className={`w-3.5 h-3.5 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                                      />
+                                    </button>
                                   )}
                                 </div>
                               </div>
 
-                              {/* Middle: meta */}
-                              <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-                                <span>Min {si?.minimumLevel ?? '—'}</span>
-                                <span>Par {si?.parLevel ?? '—'}</span>
-                                <span className="uppercase">{item.uom}</span>
-                                {item.vendor && (
-                                  <span className="flex items-center gap-1">
-                                    {item.reorderUrl ? (
-                                      <a
-                                        href={item.reorderUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-0.5 text-primary hover:underline"
-                                        onClick={e => e.stopPropagation()}
-                                      >
-                                        {item.vendor}
-                                        <ExternalLink className="w-3 h-3" />
-                                      </a>
-                                    ) : (
-                                      item.vendor
-                                    )}
-                                  </span>
-                                )}
-                              </div>
+                              {/* ── Batch Detail ──────────────────────────────── */}
+                              {isExpanded && batches.length > 0 && (
+                                <div className="px-4 pb-3 bg-muted/30">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="text-muted-foreground">
+                                        <th className="text-left py-1.5 font-medium pr-4">Lot / Label</th>
+                                        <th className="text-left py-1.5 font-medium pr-4">Qty</th>
+                                        <th className="text-left py-1.5 font-medium pr-4">Received</th>
+                                        <th className="text-left py-1.5 font-medium pr-4">Expires</th>
+                                        <th className="text-left py-1.5 font-medium" />
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                      {batches.map(batch => {
+                                        const status = getBatchStatus(batch.expirationDate);
+                                        const expColor =
+                                          status === 'expired'
+                                            ? 'text-red-400'
+                                            : status === 'expiring-soon'
+                                            ? 'text-amber-400'
+                                            : 'text-muted-foreground';
 
-                              {/* Right: qty controls + edit + expand */}
-                              <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                  className="w-7 h-7 flex items-center justify-center rounded-md border border-border hover:bg-accent text-muted-foreground transition-colors"
-                                  onClick={() => handleQtyChange(item.id, -1)}
-                                  disabled={!si}
-                                  aria-label="Decrease quantity"
-                                >
-                                  <Minus className="w-3.5 h-3.5" />
-                                </button>
-
-                                <span className={`w-10 text-center text-sm font-bold tabular-nums ${getQtyColor(si)}`}>
-                                  {si?.qtyOnHand ?? '—'}
-                                </span>
-
-                                <button
-                                  className="w-7 h-7 flex items-center justify-center rounded-md border border-border hover:bg-accent text-muted-foreground transition-colors"
-                                  onClick={() => handleQtyChange(item.id, 1)}
-                                  disabled={!si}
-                                  aria-label="Increase quantity"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                </button>
-
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-7 h-7 p-0"
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    setEditItem(item);
-                                    setEditOpen(true);
-                                  }}
-                                  aria-label="Edit item"
-                                >
-                                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                                </Button>
-
-                                {batches.length > 0 && (
-                                  <button
-                                    className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground transition-colors"
-                                    onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
-                                    aria-label={isExpanded ? 'Collapse batches' : 'Expand batches'}
-                                  >
-                                    <ChevronDown
-                                      className={`w-3.5 h-3.5 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
-                                    />
-                                  </button>
-                                )}
-                              </div>
+                                        return (
+                                          <tr key={batch.id}>
+                                            <td className="py-2 pr-4 font-mono text-foreground">
+                                              {batch.batchLabel ?? batch.id.slice(-6)}
+                                            </td>
+                                            <td className="py-2 pr-4 text-foreground">{batch.quantity}</td>
+                                            <td className="py-2 pr-4 text-muted-foreground">
+                                              {formatDateShort(batch.receivedDate)}
+                                            </td>
+                                            <td className={`py-2 pr-4 ${expColor}`}>
+                                              {batch.expirationDate
+                                                ? formatDateShort(batch.expirationDate)
+                                                : '—'}
+                                              {status === 'expired' && (
+                                                <span className="ml-1 text-[10px] font-bold uppercase text-red-400">
+                                                  EXPIRED
+                                                </span>
+                                              )}
+                                              {status === 'expiring-soon' && (
+                                                <span className="ml-1 text-[10px] font-bold uppercase text-amber-400">
+                                                  SOON
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="py-2">
+                                              {status === 'expired' && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-6 px-2 text-red-400 hover:text-red-500 hover:bg-red-500/10 gap-1"
+                                                  onClick={() => handleDisposeBatch(batch)}
+                                                >
+                                                  <Trash2 className="w-3 h-3" />
+                                                  Dispose
+                                                </Button>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
                             </div>
-
-                            {/* ── Batch Detail ──────────────────────────────── */}
-                            {isExpanded && batches.length > 0 && (
-                              <div className="px-4 pb-3 bg-muted/30">
-                                <table className="w-full text-xs">
-                                  <thead>
-                                    <tr className="text-muted-foreground">
-                                      <th className="text-left py-1.5 font-medium pr-4">Lot / Label</th>
-                                      <th className="text-left py-1.5 font-medium pr-4">Qty</th>
-                                      <th className="text-left py-1.5 font-medium pr-4">Received</th>
-                                      <th className="text-left py-1.5 font-medium pr-4">Expires</th>
-                                      <th className="text-left py-1.5 font-medium" />
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-border">
-                                    {batches.map(batch => {
-                                      const status = getBatchStatus(batch.expirationDate);
-                                      const expColor =
-                                        status === 'expired'
-                                          ? 'text-red-400'
-                                          : status === 'expiring-soon'
-                                          ? 'text-amber-400'
-                                          : 'text-muted-foreground';
-
-                                      return (
-                                        <tr key={batch.id}>
-                                          <td className="py-2 pr-4 font-mono text-foreground">
-                                            {batch.batchLabel ?? batch.id.slice(-6)}
-                                          </td>
-                                          <td className="py-2 pr-4 text-foreground">{batch.quantity}</td>
-                                          <td className="py-2 pr-4 text-muted-foreground">
-                                            {formatDateShort(batch.receivedDate)}
-                                          </td>
-                                          <td className={`py-2 pr-4 ${expColor}`}>
-                                            {batch.expirationDate
-                                              ? formatDateShort(batch.expirationDate)
-                                              : '—'}
-                                            {status === 'expired' && (
-                                              <span className="ml-1 text-[10px] font-bold uppercase text-red-400">
-                                                EXPIRED
-                                              </span>
-                                            )}
-                                            {status === 'expiring-soon' && (
-                                              <span className="ml-1 text-[10px] font-bold uppercase text-amber-400">
-                                                SOON
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="py-2">
-                                            {status === 'expired' && (
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-2 text-red-400 hover:text-red-500 hover:bg-red-500/10 gap-1"
-                                                onClick={() => handleDisposeBatch(batch)}
-                                              >
-                                                <Trash2 className="w-3 h-3" />
-                                                Dispose
-                                              </Button>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CollapsibleContent>
                 </Card>
               </Collapsible>
@@ -678,6 +774,7 @@ export default function Commissary() {
         }}
       />
       <ManageLocationsDialog open={locationsOpen} onOpenChange={setLocationsOpen} />
+      <ManageQuickAddDialog open={quickAddOpen} onOpenChange={setQuickAddOpen} />
     </div>
   );
 }

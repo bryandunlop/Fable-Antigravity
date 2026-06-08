@@ -58,7 +58,6 @@ function NewTripDialog({
   }
 
   function handleSubmit() {
-    if (!origin.trim() || !destination.trim()) return;
     onSubmit({
       tailNumber: aircraft.tailNumber,
       aircraftType: aircraft.type,
@@ -76,8 +75,6 @@ function NewTripDialog({
     resetForm();
     onClose();
   }
-
-  const isValid = origin.trim() && destination.trim();
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
@@ -167,7 +164,7 @@ function NewTripDialog({
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!isValid}>
+          <Button onClick={handleSubmit}>
             Start Trip
           </Button>
         </DialogFooter>
@@ -189,7 +186,7 @@ function AircraftCard({
   activeTrip: Trip | undefined;
   onStartTrip: () => void;
   lastInspection?: { readinessScore: number; date: string } | null;
-  stockStatus: 'ok' | 'low' | 'critical';
+  stockStatus: { status: 'stocked' | 'attention'; count: number };
 }) {
   const navigate = useNavigate();
   const activeLeg = activeTrip?.legs.find(l => l.status === 'active');
@@ -234,9 +231,9 @@ function AircraftCard({
         {activeTrip && activeLeg ? (
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5 text-sm font-mono text-amber-400">
-              <span>{activeLeg.origin}</span>
+              <span>{activeLeg.origin || '—'}</span>
               <span className="text-muted-foreground">→</span>
-              <span>{activeLeg.destination}</span>
+              <span>{activeLeg.destination || '—'}</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
@@ -258,11 +255,12 @@ function AircraftCard({
           <div className="flex items-center gap-2">
             <span className={cn(
               'w-2 h-2 rounded-full',
-              stockStatus === 'ok' ? 'bg-emerald-400' :
-              stockStatus === 'low' ? 'bg-amber-400' : 'bg-red-400'
+              stockStatus.status === 'stocked' ? 'bg-emerald-400' : 'bg-amber-400'
             )} />
             <span className="text-muted-foreground">
-              {stockStatus === 'ok' ? 'Stock OK' : stockStatus === 'low' ? 'Stock low' : 'Stock critical'}
+              {stockStatus.status === 'stocked'
+                ? 'Stocked'
+                : `${stockStatus.count} item${stockStatus.count === 1 ? '' : 's'} requested`}
             </span>
           </div>
           {lastInspection ? (
@@ -356,23 +354,14 @@ export default function TripList() {
     return { readinessScore: completed[0].readinessScore, date: completed[0].submittedAt ?? completed[0].date };
   }
 
-  function getStockStatus(tailNumber: string): 'ok' | 'low' | 'critical' {
-    const aircraft = state.fleet.find(f => f.tailNumber === tailNumber);
-    if (!aircraft) return 'ok';
-    const srItems = state.stockroomItems.filter(si => si.stockroomId === 'sr-1');
-    const relevantItems = state.items.filter(i => {
-      const qty = i.defaultQuantities[aircraft.type as 'G650' | 'G500'];
-      return qty != null && qty > 0;
-    });
-    let hasCritical = false;
-    let hasLow = false;
-    for (const item of relevantItems) {
-      const si = srItems.find(s => s.itemId === item.id);
-      if (!si) continue;
-      if (si.qtyOnHand <= si.minimumLevel) { hasCritical = true; break; }
-      if (si.qtyOnHand < si.parLevel) hasLow = true;
-    }
-    return hasCritical ? 'critical' : hasLow ? 'low' : 'ok';
+  // Aircraft is "Stocked" (at baseline) by default; only shows attention when
+  // there are open unit item requests for that tail (something actually needed).
+  function getStockStatus(tailNumber: string): { status: 'stocked' | 'attention'; count: number } {
+    const count = state.unitItemRequests
+      .filter(r => r.unitTailNumber === tailNumber &&
+                   (r.status === 'open' || r.status === 'in_progress'))
+      .reduce((n, r) => n + r.items.length, 0);
+    return { status: count > 0 ? 'attention' : 'stocked', count };
   }
 
   function handleStartTrip(aircraft: FleetAircraft) {
@@ -392,11 +381,14 @@ export default function TripList() {
   }) {
     const now = Date.now();
     const tripId = `trip-${now}`;
+    const tripDate = data.date || new Date().toISOString().split('T')[0];
+    // All fields are optional — fall back to a readable auto name when blank.
+    const autoName = `${data.tailNumber} · ${tripDate}`;
     const newTrip: Trip = {
       id: tripId,
       tailNumber: data.tailNumber,
       aircraftType: data.aircraftType,
-      tripName: data.tripName || undefined,
+      tripName: data.tripName || autoName,
       tripNumber: data.tripNumber || undefined,
       status: 'active',
       startDate: data.date || new Date().toISOString().split('T')[0],
