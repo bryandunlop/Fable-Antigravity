@@ -274,7 +274,7 @@ export default function InspectionReview() {
     } else {
       sessionStorage.removeItem(SESSION_KEY);
       toast.success('Inspection completed successfully');
-      navigate('/inventory-v2/my-inspections');
+      navigate('/inventory-v2/inspections');
     }
   }, [
     draft,

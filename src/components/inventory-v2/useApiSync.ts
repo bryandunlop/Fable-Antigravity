@@ -238,7 +238,8 @@ async function syncToApi(action: InventoryV2Action): Promise<void> {
     case 'RESET_PENDING_CHANGES':
     case 'RESET_STATE':
     case 'TOGGLE_FAVORITE_ITEM':
-      // Fleet is seeded once and rarely changes; POs are descoped; favorites are local UI.
+    case 'SET_QUICK_ADD_ITEMS':
+      // Fleet is seeded once and rarely changes; POs are descoped; favorites and quick-add are local UI.
       // RESET_STATE is fired by the provider on initial /api/state load.
       return;
 

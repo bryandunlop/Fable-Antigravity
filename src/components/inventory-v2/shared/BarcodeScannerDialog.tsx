@@ -32,6 +32,7 @@ export function BarcodeScannerDialog({
   const [scannedItem, setScannedItem] = useState<InventoryItemV2 | null>(null);
 
   function handleScan() {
+    if (state.items.length === 0) return;
     const randomIndex = Math.floor(Math.random() * state.items.length);
     const item = state.items[randomIndex];
     setScannedItem(item);

@@ -22,6 +22,7 @@ import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
 import QuickTapView from '../shared/QuickTapView';
 import { TripLoadExtras } from './TripLoadExtras';
+import { TripRestoreStock } from './TripRestoreStock';
 
 // ─── Item Row ───────────────────────────────────────────────────────────────
 
@@ -345,7 +346,7 @@ function TripViewInner({
   const [showTripComplete, setShowTripComplete] = useState(false);
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
-  const [screen, setScreen] = useState<'trip' | 'load-extras'>('trip');
+  const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const undoToastRef = useRef<string | number | undefined>(undefined);
 
@@ -656,6 +657,10 @@ function TripViewInner({
   // Sub-screen renders
   if (screen === 'load-extras') {
     return <TripLoadExtras trip={trip} onBack={() => setScreen('trip')} />;
+  }
+
+  if (screen === 'restore-stock' && activeLeg) {
+    return <TripRestoreStock trip={trip} leg={activeLeg} onBack={() => setScreen('trip')} />;
   }
 
   return (
@@ -1017,7 +1022,7 @@ function TripViewInner({
       {activeLeg && (
         <div className="bg-background border-t-2 border-border px-4 py-3 shrink-0">
           <div className="max-w-5xl mx-auto space-y-2">
-            {/* on_ground: Grocery List (mid-trip sourcing happens via the grocery list) */}
+            {/* on_ground: Grocery List + Restore Stock (mid-trip road-sourced loads) */}
             {phase === 'on_ground' && (
               <div className="flex items-center gap-3">
                 <Button
@@ -1032,6 +1037,14 @@ function TripViewInner({
                       {groceryItemCount}
                     </span>
                   )}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setScreen('restore-stock')}
+                >
+                  <Package className="mr-2 h-4 w-4" />
+                  Restore Stock
                 </Button>
               </div>
             )}
@@ -1091,7 +1104,7 @@ function TripViewInner({
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => activeLeg && navigate(`/inventory-v2/leg-reconciliation/${activeLeg.id}`)}
+                    onClick={() => activeLeg && navigate(`/inventory-v2/trips/${trip.id}/reconcile`)}
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     Review Leg
