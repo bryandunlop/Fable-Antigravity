@@ -1091,7 +1091,7 @@ function TripViewInner({
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => activeLeg && navigate(`/inventory-v2/leg-reconciliation/${activeLeg.id}`)}
+                    onClick={() => activeLeg && navigate(`/inventory-v2/trips/${trip.id}/reconcile`)}
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     Review Leg

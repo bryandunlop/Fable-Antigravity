@@ -528,7 +528,7 @@ function ItemCatalogTab() {
                   <Select value={form.uom} onValueChange={(v: InventoryItemV2['uom']) => setForm(f => ({ ...f, uom: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {UOM_OPTIONS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      {UOM_OPTIONS.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

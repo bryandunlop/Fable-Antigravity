@@ -1,12 +1,13 @@
 // ─── Aircraft Inspections — Unified Audit + History Page ──────────────────
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardCheck, ChevronDown, ChevronRight, Calendar, User, AlertTriangle } from 'lucide-react';
+import { ClipboardCheck, ChevronDown, Calendar, User, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { V2Badge } from '../shared/V2Badge';
+import { getCompartmentsForAircraft } from '../compartmentConfig';
 import type { InspectionV2 } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -176,12 +177,23 @@ export default function AircraftInspections() {
             historyInspections.map(inspection => {
               const isExpanded = expandedId === inspection.id;
               const missingItems = inspection.checkedItems.filter(ci => ci.qtyInUnit < ci.requiredQty);
+              const itemsMap = new Map(state.items.map(i => [i.id, i]));
+              const compartments = getCompartmentsForAircraft(state.compartmentConfigs, inspection.aircraftType);
+
+              // Group checked items by compartment
+              const byCompartment = new Map<string, typeof inspection.checkedItems>();
+              inspection.checkedItems.forEach(ci => {
+                const item = itemsMap.get(ci.itemId);
+                const cid = item?.compartmentId ?? 'other';
+                if (!byCompartment.has(cid)) byCompartment.set(cid, []);
+                byCompartment.get(cid)!.push(ci);
+              });
 
               return (
                 <Collapsible key={inspection.id} open={isExpanded} onOpenChange={() => setExpandedId(isExpanded ? null : inspection.id)}>
-                  <Card className="glass-panel transition-all duration-300">
+                  <Card className="glass-panel overflow-hidden">
                     <CollapsibleTrigger asChild>
-                      <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors rounded-xl">
+                      <button type="button" className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors text-left">
                         <div>
                           <div className="text-sm font-semibold text-foreground">
                             {inspection.tailNumber} — {formatDate(inspection.date)}
@@ -196,34 +208,53 @@ export default function AircraftInspections() {
                             {inspection.readinessScore}%
                             {missingItems.length > 0 && ` — ${missingItems.length} missing`}
                           </Badge>
-                          {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                         </div>
-                      </div>
+                      </button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <div className="px-4 pb-4 pt-0 border-t border-border/40">
+                      <div className="border-t border-border/40">
                         {inspection.topLevelNotes && (
-                          <p className="text-xs text-muted-foreground italic mt-3 mb-2">{inspection.topLevelNotes}</p>
+                          <p className="text-xs text-muted-foreground italic px-4 pt-3">{inspection.topLevelNotes}</p>
                         )}
-                        {missingItems.length > 0 && (
-                          <div className="mt-3">
-                            <div className="text-xs font-medium text-red-400 flex items-center gap-1 mb-2">
-                              <AlertTriangle className="w-3 h-3" /> Missing Items
+
+                        {/* Compartment-grouped items */}
+                        {compartments.map(comp => {
+                          const items = byCompartment.get(comp.id);
+                          if (!items || items.length === 0) return null;
+                          const missing = items.filter(ci => ci.qtyInUnit < ci.requiredQty);
+                          return (
+                            <div key={comp.id} className="px-4 pt-3">
+                              <div className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                                {missing.length > 0 && <AlertTriangle className="w-3 h-3 text-red-400" />}
+                                {comp.label}
+                                <span className="text-muted-foreground/50">({items.length})</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {items.map(ci => {
+                                  const item = itemsMap.get(ci.itemId);
+                                  const isMissing = ci.qtyInUnit < ci.requiredQty;
+                                  return (
+                                    <Badge
+                                      key={ci.itemId}
+                                      variant="outline"
+                                      className={`text-xs ${isMissing ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-muted/40 border-border/50 text-muted-foreground'}`}
+                                    >
+                                      {isMissing ? (
+                                        <><AlertTriangle className="w-2.5 h-2.5 mr-1" />{item?.itemName ?? ci.itemId}: {ci.qtyInUnit}/{ci.requiredQty}</>
+                                      ) : (
+                                        <><CheckCircle2 className="w-2.5 h-2.5 mr-1 text-emerald-400" />{item?.itemName ?? ci.itemId}</>
+                                      )}
+                                    </Badge>
+                                  );
+                                })}
+                              </div>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {missingItems.map(ci => {
-                                const item = state.items.find(i => i.id === ci.itemId);
-                                return (
-                                  <Badge key={ci.itemId} variant="outline" className="text-xs bg-red-500/10 border-red-500/30 text-red-400">
-                                    {item?.itemName ?? ci.itemId}: {ci.qtyInUnit}/{ci.requiredQty}
-                                  </Badge>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })}
+
                         {inspection.additionalFees.length > 0 && (
-                          <div className="mt-3">
+                          <div className="px-4 pt-3">
                             <div className="text-xs font-medium text-muted-foreground mb-1">Additional Fees</div>
                             {inspection.additionalFees.map(fee => (
                               <div key={fee.id} className="text-xs text-muted-foreground">
@@ -232,7 +263,7 @@ export default function AircraftInspections() {
                             ))}
                           </div>
                         )}
-                        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="px-4 py-3 flex items-center gap-2 text-xs text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           {inspection.submittedAt ? `Submitted ${formatDateTime(inspection.submittedAt)}` : `Started ${formatDateTime(inspection.date)}`}
                           <span>· Status: {inspection.status.replaceAll('_', ' ')}</span>
