@@ -538,7 +538,7 @@ function TripViewInner({
             onClick={() => navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`)}
             className="bg-emerald-600 hover:bg-emerald-500"
           >
-            Start Replenish
+            Restock Aircraft
           </Button>
         </div>
       </div>
