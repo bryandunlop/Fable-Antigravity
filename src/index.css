@@ -130,7 +130,7 @@
   --font-sans: 'Montserrat', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  --radius: 0.625rem;
+  --radius: 0.25rem;
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: var(--radius);
@@ -421,23 +421,23 @@
   }
 
   .aviation-gradient {
-    background: linear-gradient(135deg, #0037B1 0%, #00A1DF 50%, #44BEEE 100%);
+    background: var(--gfo-midnight);
   }
 
   .aviation-gradient-subtle {
-    background: linear-gradient(135deg, rgba(0, 55, 177, 0.1) 0%, rgba(0, 161, 223, 0.1) 50%, rgba(68, 190, 238, 0.1) 100%);
+    background: rgba(20, 45, 126, 0.08);
   }
 
   .aviation-shadow {
-    box-shadow: 0 4px 20px rgba(0, 161, 223, 0.15);
+    box-shadow: 0 1px 0 rgba(20, 45, 126, 0.06);
   }
 
   .aviation-shadow-lg {
-    box-shadow: 0 10px 40px rgba(0, 161, 223, 0.2);
+    box-shadow: 0 4px 12px rgba(20, 45, 126, 0.08);
   }
 
   .aviation-shadow-xl {
-    box-shadow: 0 25px 50px rgba(0, 161, 223, 0.25);
+    box-shadow: 0 12px 32px rgba(20, 45, 126, 0.14);
   }
 
   .aviation-focus {
@@ -446,27 +446,27 @@
 
   .btn-aviation-primary {
     @apply bg-primary hover:bg-primary/90 text-primary-foreground;
-    box-shadow: 0 2px 8px rgba(0, 55, 177, 0.2);
+    box-shadow: 0 1px 0 rgba(20, 45, 126, 0.06);
   }
 
   .btn-aviation-secondary {
     @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground;
-    box-shadow: 0 2px 8px rgba(68, 190, 238, 0.2);
+    box-shadow: 0 1px 0 rgba(20, 45, 126, 0.06);
   }
 
   .btn-aviation-accent {
     @apply bg-accent hover:bg-accent/90 text-accent-foreground;
-    box-shadow: 0 2px 8px rgba(0, 161, 223, 0.2);
+    box-shadow: 0 1px 0 rgba(20, 45, 126, 0.06);
   }
 
   .aviation-card {
     @apply bg-card border border-border/50 rounded-lg;
-    box-shadow: 0 1px 3px rgba(0, 161, 223, 0.05);
+    box-shadow: 0 1px 0 rgba(20, 45, 126, 0.06);
   }
 
   .aviation-card-featured {
     @apply bg-card border-2 border-accent/20 rounded-lg;
-    box-shadow: 0 4px 12px rgba(0, 161, 223, 0.1);
+    box-shadow: 0 4px 12px rgba(20, 45, 126, 0.08);
   }
 
   .border-3 {
@@ -476,30 +476,6 @@
   .request-button-glow {
     position: relative;
     overflow: hidden;
-  }
-
-  .request-button-glow::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
-  }
-
-  .request-button-glow:hover::before {
-    left: 100%;
-  }
-
-  @keyframes aviation-pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50%       { transform: scale(1.05); opacity: 0.8; }
-  }
-
-  .aviation-pulse {
-    animation: aviation-pulse 2s infinite;
   }
 
   .gfo-eyebrow {
