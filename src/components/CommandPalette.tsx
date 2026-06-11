@@ -44,21 +44,30 @@ interface InventoryData {
 }
 
 // Session-level cache; one fetch per page load, shared across palette opens.
+// The payload is normalized at this seam so a missing or renamed field in
+// /api/state degrades to an empty section instead of throwing during render.
 let inventoryPromise: Promise<InventoryData | null> | null = null;
 function loadInventoryData(): Promise<InventoryData | null> {
   if (!inventoryPromise) {
-    inventoryPromise = api.state.load().catch((err: unknown) => {
-      console.warn('Command palette: inventory search unavailable', err);
-      inventoryPromise = null;
-      return null;
-    });
+    inventoryPromise = api.state.load()
+      .then((d: any): InventoryData => ({
+        items: d?.items ?? [],
+        trips: d?.trips ?? [],
+        inspections: d?.inspections ?? [],
+        unitItemRequests: d?.unitItemRequests ?? [],
+      }))
+      .catch((err: unknown) => {
+        console.warn('Command palette: inventory search unavailable', err);
+        inventoryPromise = null;
+        return null;
+      });
   }
   return inventoryPromise;
 }
 
-function pageToResult(entry: NavEntry, index: number): PaletteResult {
+function pageToResult(entry: NavEntry): PaletteResult {
   return {
-    id: `page-${entry.path}-${index}`,
+    id: `page-${entry.path}-${entry.label}`,
     title: entry.label,
     href: entry.href ?? entry.path,
     category: DOMAIN_LABELS[entry.domain],
@@ -93,7 +102,7 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
   // Recent sections — only when not searching. Stored paths are manifest
   // section paths, so a role-scoped matchEntry doubles as the access filter.
   const recentResults: PaletteResult[] = [];
-  if (!searchTerm) {
+  if (isOpen && !searchTerm) {
     try {
       const recents: string[] = JSON.parse(localStorage.getItem('nav-recents') ?? '[]');
       for (const path of recents) {
@@ -170,9 +179,11 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      if (filteredResults.length === 0) return;
       setSelectedIndex((prev) => (prev + 1) % filteredResults.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (filteredResults.length === 0) return;
       setSelectedIndex((prev) => (prev - 1 + filteredResults.length) % filteredResults.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
