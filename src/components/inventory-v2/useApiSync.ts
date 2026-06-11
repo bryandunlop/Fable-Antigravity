@@ -7,25 +7,34 @@
 // For 4 testers this is sufficient. No optimistic rollback, no retry queue.
 
 import { useCallback } from 'react';
-import type { InventoryV2Action } from './types';
+import type { InventoryV2Action, InventoryV2State } from './types';
 import { api } from './api-client';
 
-export function useApiSync(dispatch: React.Dispatch<InventoryV2Action>) {
+export function useApiSync(
+  dispatch: React.Dispatch<InventoryV2Action>,
+  // Holds the latest committed state. Read synchronously inside the dispatch
+  // wrapper (before React re-renders), so it reflects the PRE-dispatch state —
+  // which the few multi-entity actions below need to compute their API calls.
+  stateRef: React.MutableRefObject<InventoryV2State>
+) {
   return useCallback(
     (action: InventoryV2Action) => {
+      // Snapshot state before the optimistic update mutates anything downstream.
+      const prevState = stateRef.current;
+
       // 1. Optimistic local update via the reducer
       dispatch(action);
 
       // 2. Background API persistence
-      syncToApi(action).catch((err) => {
+      syncToApi(action, prevState).catch((err) => {
         console.error('[API Sync] Failed to persist action:', action.type, err);
       });
     },
-    [dispatch]
+    [dispatch, stateRef]
   );
 }
 
-async function syncToApi(action: InventoryV2Action): Promise<void> {
+async function syncToApi(action: InventoryV2Action, prevState: InventoryV2State): Promise<void> {
   switch (action.type) {
     // ── Items ─────────────────────────────────────────────────────────────
     case 'ADD_ITEM':
@@ -127,10 +136,30 @@ async function syncToApi(action: InventoryV2Action): Promise<void> {
     case 'ADD_LEG_TO_TRIP':
       await api.trips.addLeg(action.payload.tripId, action.payload.leg);
       return;
-    case 'ADVANCE_TO_NEXT_LEG':
-      // Modifies multiple legs in one reducer pass. State will be correct on next /api/state load.
-      console.warn('[API Sync] ADVANCE_TO_NEXT_LEG — not synced; reconcile on reload');
+    case 'ADVANCE_TO_NEXT_LEG': {
+      // Mirrors the reducer: complete the active leg, activate the next one.
+      // The affected legs are derived from the pre-dispatch snapshot. Full leg
+      // objects are sent so the absolute-set leg route doesn't null other fields.
+      const trip = prevState.trips.find((t) => t.id === action.payload);
+      if (!trip) return;
+      const currentIdx = trip.legs.findIndex((l) => l.status === 'active');
+      if (currentIdx === -1) return;
+      const activeLeg = trip.legs[currentIdx];
+      const nextLeg = trip.legs[currentIdx + 1];
+      await api.trips.updateLeg(trip.id, activeLeg.id, {
+        ...activeLeg,
+        status: 'completed',
+        phase: 'complete',
+      });
+      if (nextLeg) {
+        await api.trips.updateLeg(trip.id, nextLeg.id, {
+          ...nextLeg,
+          status: 'active',
+          phase: 'in_flight',
+        });
+      }
       return;
+    }
 
     // ── Usage tracking ────────────────────────────────────────────────────
     case 'ADD_USAGE_LOG_ENTRY':
@@ -185,11 +214,23 @@ async function syncToApi(action: InventoryV2Action): Promise<void> {
     case 'REMOVE_STOCK_BATCH':
       await api.stock.removeBatch(action.payload);
       return;
-    case 'DISPOSE_EXPIRED_BATCH':
-      // Deletes batch + decrements stockroom qty. Only the batch delete is synced here;
-      // the local reducer adjusts stockroom qty optimistically and will reconcile on reload.
-      await api.stock.removeBatch(action.payload.batchId);
+    case 'DISPOSE_EXPIRED_BATCH': {
+      // Deletes the batch AND persists the stockroom qty decrement. The full
+      // stockroom item (from the pre-dispatch snapshot) is sent with the new qty
+      // so the absolute-set route doesn't null parLevel/binLocation/locationId.
+      const { batchId, itemId, stockroomId, qty } = action.payload;
+      await api.stock.removeBatch(batchId);
+      const si = prevState.stockroomItems.find(
+        (s) => s.itemId === itemId && s.stockroomId === stockroomId
+      );
+      if (si) {
+        await api.stockroom.updateItem({
+          ...si,
+          qtyOnHand: Math.max(0, si.qtyOnHand - qty),
+        });
+      }
       return;
+    }
 
     // ── Trip load & return ────────────────────────────────────────────────
     case 'ADD_TRIP_LOAD_ITEMS':

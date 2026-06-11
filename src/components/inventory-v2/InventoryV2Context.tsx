@@ -694,8 +694,14 @@ export function InventoryV2Provider({ children, userRole, addNotification }: Inv
   const [state, rawDispatch] = useReducer(inventoryReducer, undefined, loadInitialState);
   const [loading, setLoading] = useState(true);
 
+  // Mirror the latest committed state into a ref so useApiSync can read the
+  // pre-dispatch snapshot synchronously (needed by multi-entity actions like
+  // ADVANCE_TO_NEXT_LEG / DISPOSE_EXPIRED_BATCH to derive their API calls).
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
+
   // Wrap dispatch: optimistic local update + background API persistence
-  const dispatch = useApiSync(rawDispatch);
+  const dispatch = useApiSync(rawDispatch, latestStateRef);
 
   // Load full state from /api/state on mount. The cached localStorage state shown
   // during the fetch keeps the UI from flashing empty, then RESET_STATE replaces it.
