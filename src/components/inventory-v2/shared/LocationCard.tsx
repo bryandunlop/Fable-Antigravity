@@ -75,7 +75,7 @@ export default function LocationCard({
                 <Camera className="mr-2 h-4 w-4" />Set photo
               </DropdownMenuItem>
             )}
-            {(onMoveUp || onMoveDown) && <DropdownMenuSeparator />}
+            {(onMoveUp || onMoveDown) && (onEdit || onSetPhoto) && <DropdownMenuSeparator />}
             {onMoveUp && (
               <DropdownMenuItem onClick={onMoveUp}>
                 <ArrowUp className="mr-2 h-4 w-4" />Move up
@@ -89,7 +89,7 @@ export default function LocationCard({
             {onDelete && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <DropdownMenuItem onClick={onDelete} variant="destructive">
                   <Trash2 className="mr-2 h-4 w-4" />Delete location
                 </DropdownMenuItem>
               </>
