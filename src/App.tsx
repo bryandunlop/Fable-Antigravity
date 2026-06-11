@@ -11,6 +11,7 @@ import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
+import NotFound from './components/NotFound';
 import MobileBottomNav from './components/MobileBottomNav';
 import AircraftStatus from './components/AircraftStatus';
 import FRATForm from './components/FRATForm';
@@ -525,7 +526,7 @@ export default function App() {
                                 } />
                                 <Route path="/experimental/scheduling-command" element={<SchedulingCommandCenter />} />
                                 <Route path="/experimental/unified-trip" element={<UnifiedTripWorkspace />} />
-                                <Route path="*" element={<Navigate to="/" replace />} />
+                                <Route path="*" element={<NotFound />} />
                               </Routes>
                             </div>
                           </Navigation>
