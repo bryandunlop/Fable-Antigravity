@@ -45,6 +45,7 @@ export function GfoStatCard({ label, value, unit, trend, accent = 'midnight', on
         className,
       )}
     >
+      {/* text-muted-foreground intentionally overrides gfo-eyebrow's primary color in this context */}
       <div className="gfo-eyebrow text-muted-foreground">{label}</div>
       <div className="gfo-numeric mt-2 text-3xl text-primary dark:text-foreground">
         {value}
