@@ -176,7 +176,7 @@ export default function CommissaryKiosk() {
               return (
                 <div
                   key={item.id}
-                  className={cn('bg-slate-100 dark:bg-slate-800 rounded-xl p-4 flex items-center justify-between', qty > 0 && 'ring-2 ring-blue-500')}
+                  className={cn('rounded-lg border border-border bg-card shadow-sm p-4 flex items-center justify-between', qty > 0 && 'ring-2 ring-blue-500')}
                 >
                   <div className="min-w-0 mr-3">
                     <div className="flex items-center gap-1.5">
@@ -196,7 +196,7 @@ export default function CommissaryKiosk() {
                       onClick={() => handleDecrement(item.id)}
                       disabled={qty === 0}
                       aria-label={`Decrease ${item.itemName}`}
-                      className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-700 disabled:opacity-30 flex items-center justify-center text-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                      className="w-12 h-12 rounded-lg bg-muted disabled:opacity-30 flex items-center justify-center text-xl font-bold hover:bg-muted/80 transition-colors"
                     >
                       −
                     </button>
