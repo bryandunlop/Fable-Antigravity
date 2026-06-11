@@ -126,12 +126,12 @@ export default function ShoppingListModal({ open, onOpenChange }: ShoppingListMo
                           <div className="flex items-center gap-2 shrink-0 ml-3">
                             <Badge className="bg-amber-500/15 text-amber-400 border-0 text-xs">
                               Order {item.qtyToOrder}
-                              {item.costPerUnit !== undefined && (
-                                <span className="text-xs text-muted-foreground">
-                                  {' '}· est. ${(item.qtyToOrder * item.costPerUnit).toFixed(2)}
-                                </span>
-                              )}
                             </Badge>
+                            {item.costPerUnit !== undefined && (
+                              <span className="text-xs text-muted-foreground">
+                                est. ${(item.qtyToOrder * item.costPerUnit).toFixed(2)}
+                              </span>
+                            )}
                             {item.reorderUrl && (
                               <a
                                 href={item.reorderUrl}
