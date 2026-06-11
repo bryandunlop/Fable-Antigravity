@@ -44,7 +44,10 @@ export default function CommissaryItemDetail() {
     [state.stockBatches, itemId],
   );
   const history = useMemo(
-    () => state.activityLog.filter((e) => e.metadata?.itemId === itemId).slice(0, 20),
+    () => state.activityLog.filter((e) =>
+      e.metadata !== undefined &&
+      (e.metadata.itemId === itemId || itemId! in e.metadata)
+    ).slice(0, 20),
     [state.activityLog, itemId],
   );
 
@@ -198,8 +201,8 @@ export default function CommissaryItemDetail() {
     navigate('/inventory-v2/commissary');
   };
 
-  const backTarget = stockroom?.locationId
-    ? `/inventory-v2/commissary/location/${stockroom.locationId}`
+  const backTarget = location
+    ? `/inventory-v2/commissary/location/${location.id}`
     : '/inventory-v2/commissary';
 
   const row = (label: string, value: React.ReactNode) => (

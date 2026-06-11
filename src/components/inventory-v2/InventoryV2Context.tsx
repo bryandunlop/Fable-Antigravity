@@ -208,7 +208,14 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
         }
       }
 
-      const bulkLogEntry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'stock_adjusted', module: 'stockroom', description: `Adjusted stock for ${action.payload.length} item(s)` };
+      const changedDeltas: [string, number][] = action.payload.flatMap((updated) => {
+        const original = state.stockroomItems.find(
+          si => si.itemId === updated.itemId && si.stockroomId === updated.stockroomId
+        );
+        const delta = updated.qtyOnHand - (original?.qtyOnHand ?? 0);
+        return delta !== 0 ? [[updated.itemId, delta]] : [];
+      });
+      const bulkLogEntry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'stock_adjusted', module: 'stockroom', description: `Adjusted stock for ${action.payload.length} item(s)`, metadata: Object.fromEntries(changedDeltas) };
       return { ...state, stockroomItems: newStockroomItems, stockBatches: updatedBatches, pendingChanges: state.pendingChanges + 1, activityLog: [bulkLogEntry, ...state.activityLog].slice(0, 500) };
     }
 
