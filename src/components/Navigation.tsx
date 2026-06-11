@@ -555,7 +555,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
           {/* Main content area */}
           <main className="flex-1 overflow-auto p-6 pb-20 md:pb-6">
-            <BreadcrumbNav />
+            <BreadcrumbNav userRole={userRole} additionalRoles={additionalRoles} />
             {children}
           </main>
         </div>

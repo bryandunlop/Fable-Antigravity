@@ -43,7 +43,7 @@ export interface NavEntry {
   detailLabel?: string;   // breadcrumb leaf for sub-paths (e.g. trip detail)
 }
 
-export const NAV_ENTRIES: NavEntry[] = [
+export const NAV_ENTRIES: readonly NavEntry[] = [
   // ── Home ──────────────────────────────────────────────────────────────────
   { path: '/', label: 'Dashboard', domain: 'home', icon: Home, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/tasks-action-items', label: 'Tasks & Action Items', domain: 'home', icon: Target, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
@@ -171,11 +171,12 @@ export function entriesForRoles(userRole: string, additionalRoles: string[] = []
  * '/' matches only exactly (the Dashboard must not match every route).
  * Prefix boundaries are segment-aware: '/inventory-v2/unit-request' does NOT
  * match '/inventory-v2/unit-requests'.
- * Among entries with the same path (role-variant labels), the first wins.
+ * Among entries with the same path (role-variant labels), the first wins —
+ * pass `entriesForRoles(...)` as `entries` to get role-correct labels.
  */
-export function matchEntry(pathname: string): NavEntry | undefined {
+export function matchEntry(pathname: string, entries: readonly NavEntry[] = NAV_ENTRIES): NavEntry | undefined {
   let best: NavEntry | undefined;
-  for (const e of NAV_ENTRIES) {
+  for (const e of entries) {
     if (e.path === '/') {
       if (pathname === '/' && !best) best = e;
       continue;
