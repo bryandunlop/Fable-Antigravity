@@ -130,6 +130,7 @@ import UnitItemRequestListV2 from './components/inventory-v2/pages/UnitItemReque
 import SettingsV2 from './components/inventory-v2/pages/Settings';
 import CommissaryHome from './components/inventory-v2/pages/CommissaryHome';
 import CommissaryLocation from './components/inventory-v2/pages/CommissaryLocation';
+import CommissaryItemDetail from './components/inventory-v2/pages/CommissaryItemDetail';
 import AlertsPage from './components/inventory-v2/pages/AlertsPage';
 import TripListV2 from './components/inventory-v2/pages/TripList';
 import TripHomeV2 from './components/inventory-v2/pages/TripHome';
@@ -423,6 +424,7 @@ export default function App() {
                                 <Route path="/inventory-v2/settings" element={<InventoryRouteWrapper userRole={userRole}><SettingsV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/commissary" element={<InventoryRouteWrapper userRole={userRole}><CommissaryHome /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/commissary/location/:locationId" element={<InventoryRouteWrapper userRole={userRole}><CommissaryLocation /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/commissary/item/:itemId" element={<InventoryRouteWrapper userRole={userRole}><CommissaryItemDetail /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/alerts" element={<InventoryRouteWrapper userRole={userRole}><AlertsPage /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips" element={<InventoryRouteWrapper userRole={userRole}><TripListV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId" element={<InventoryRouteWrapper userRole={userRole}><TripHomeV2 /></InventoryRouteWrapper>} />
