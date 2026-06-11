@@ -6,6 +6,7 @@ import NotificationCenter from './NotificationCenter';
 import { ThemeToggle } from './ThemeToggle';
 import BreadcrumbNav from './BreadcrumbNav';
 import CommandPalette from './CommandPalette';
+import { matchEntry } from '../navigation/navConfig';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import {
@@ -171,12 +172,15 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isCommandPaletteOpen]);
 
-  // Record visited pages for the command palette's "Recent" section
+  // Record visited sections for the command palette's "Recent" section.
+  // The matched manifest path (not the raw pathname) is stored so detail
+  // pages collapse into their section — labels always match destinations.
   useEffect(() => {
-    if (location.pathname === '/') return;
+    const sectionPath = matchEntry(location.pathname)?.path;
+    if (!sectionPath || sectionPath === '/') return;
     try {
       const prev: string[] = JSON.parse(localStorage.getItem('nav-recents') ?? '[]');
-      const next = [location.pathname, ...prev.filter(p => p !== location.pathname)].slice(0, 5);
+      const next = [sectionPath, ...prev.filter(p => p !== sectionPath)].slice(0, 5);
       localStorage.setItem('nav-recents', JSON.stringify(next));
     } catch {
       // corrupted localStorage — drop it
