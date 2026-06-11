@@ -42,13 +42,13 @@
 
     --radius: 0.25rem;
 
-    --sidebar: #142D7E;
-    --sidebar-foreground: rgba(255, 255, 255, 0.78);
-    --sidebar-primary: #0096FC;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #4A4A4A;
+    --sidebar-primary: #142D7E;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #ffffff;
+    --sidebar-accent: #E6F4FF;
     --sidebar-accent-foreground: #142D7E;
-    --sidebar-border: rgba(255, 255, 255, 0.14);
+    --sidebar-border: #E5E7EB;
     --sidebar-ring: #0096FC;
 
     --chart-1: #142D7E;
@@ -129,6 +129,13 @@
 @theme {
   --font-sans: 'Montserrat', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* Montserrat's x-height is ~25% smaller than Inter's; +1px per step keeps UI text legible */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1.0625rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.3125rem;
 
   --radius: 0.25rem;
   --radius-sm: calc(var(--radius) - 2px);
