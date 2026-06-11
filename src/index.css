@@ -40,7 +40,7 @@
     --switch-background: #cbced4;
     --ring: #0096FC;
 
-    --radius: 0.25rem;
+    --radius: 0.625rem;
 
     --sidebar: #ffffff;
     --sidebar-foreground: #4A4A4A;
@@ -137,13 +137,11 @@
   --text-lg: 1.1875rem;
   --text-xl: 1.3125rem;
 
-  --radius: 0.25rem;
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: var(--radius);
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
-  --radius-2xl: var(--radius);
-  --radius-3xl: var(--radius);
+  --radius-xl: calc(var(--radius) + 8px);
 
   --animate-duration-fast: 200ms;
   --animate-duration-normal: 300ms;

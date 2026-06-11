@@ -38,7 +38,7 @@ export function GfoStatCard({ label, value, unit, trend, accent = 'midnight', on
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       className={cn(
-        'border border-border border-t-[3px] bg-card p-4 shadow-sm',
+        'rounded-lg border border-border border-t-[3px] bg-card p-4 shadow-sm',
         ACCENT_CLASS[accent],
         onClick &&
           'cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',

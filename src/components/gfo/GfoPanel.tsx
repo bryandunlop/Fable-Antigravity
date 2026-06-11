@@ -14,7 +14,7 @@ export function GfoPanel({ title, action, children, className }: GfoPanelProps) 
   return (
     <section
       aria-labelledby={title ? titleId : undefined}
-      className={cn('rounded border border-border bg-card p-5 shadow-sm', className)}
+      className={cn('rounded-lg border border-border bg-card p-5 shadow-sm', className)}
     >
       {(title || action) && (
         <div className={cn('mb-4 flex items-end gap-3', title ? 'justify-between' : 'justify-end')}>
