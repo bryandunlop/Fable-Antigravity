@@ -18,7 +18,6 @@ import { requestsRoute } from './routes/requests';
 import { activityRoute } from './routes/activity';
 import { storageLocationsRoute } from './routes/storage-locations';
 import { weatherRoute } from './routes/weather';
-import { uploadRoute } from './routes/upload';
 
 type Env = { Variables: { db: Db } };
 
@@ -50,7 +49,6 @@ app.route('/pick-restock', pickRestockRoute);
 app.route('/requests', requestsRoute);
 app.route('/activity', activityRoute);
 app.route('/storage-locations', storageLocationsRoute);
-app.route('/upload', uploadRoute);
 app.route('/weather', weatherRoute);
 
 export { app };

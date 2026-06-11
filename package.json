@@ -70,6 +70,7 @@
             "@types/node": "^20.10.0",
             "@types/react": "^19.2.7",
             "@types/react-dom": "^19.2.3",
+            "@vercel/node": "^5.8.17",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "autoprefixer": "^10.4.22",
             "dotenv": "^17.4.2",
