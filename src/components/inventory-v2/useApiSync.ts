@@ -186,9 +186,12 @@ async function syncToApi(action: InventoryV2Action): Promise<void> {
       await api.stock.removeBatch(action.payload);
       return;
     case 'DISPOSE_EXPIRED_BATCH':
-      // Deletes batch + decrements stockroom qty. Only the batch delete is synced here;
-      // the local reducer adjusts stockroom qty optimistically and will reconcile on reload.
-      await api.stock.removeBatch(action.payload.batchId);
+      // One server call deletes the batch and decrements stockroom qty together.
+      await api.stock.disposeBatch(action.payload.batchId, {
+        itemId: action.payload.itemId,
+        stockroomId: action.payload.stockroomId,
+        qty: action.payload.qty,
+      });
       return;
 
     // ── Trip load & return ────────────────────────────────────────────────

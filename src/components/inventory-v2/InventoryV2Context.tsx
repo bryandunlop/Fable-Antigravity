@@ -138,7 +138,13 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     case 'REMOVE_ITEM': {
       const removedItem = state.items.find(i => i.id === action.payload);
       const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'item_deleted', module: 'system', description: `Deleted item ${removedItem?.itemName ?? action.payload}` };
-      return { ...state, items: state.items.filter(i => i.id !== action.payload), activityLog: [entry, ...state.activityLog].slice(0, 500) };
+      return {
+        ...state,
+        items: state.items.filter(i => i.id !== action.payload),
+        stockroomItems: state.stockroomItems.filter(si => si.itemId !== action.payload),
+        stockBatches: state.stockBatches.filter(b => b.itemId !== action.payload),
+        activityLog: [entry, ...state.activityLog].slice(0, 500),
+      };
     }
 
     // ── Activity Log ──
@@ -222,6 +228,9 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
       return {
         ...state,
         storageLocations: state.storageLocations.filter(loc => loc.id !== action.payload),
+        stockroomItems: state.stockroomItems.map(si =>
+          si.locationId === action.payload ? { ...si, locationId: undefined } : si
+        ),
       };
     case 'REORDER_STORAGE_LOCATIONS': {
       const orderedIds = action.payload;
@@ -585,7 +594,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
           ? { ...si, qtyOnHand: Math.max(0, si.qtyOnHand - qty) }
           : si
       );
-      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'batch_disposed', module: 'stockroom', description: `Disposed expired batch (${batchId.slice(-6)})` };
+      const entry: ActivityLogEntry = { id: createLogId(), timestamp: new Date().toISOString(), userId: state.currentUser.id, userName: state.currentUser.name, action: 'batch_disposed', module: 'stockroom', description: `Disposed expired batch (${batchId.slice(-6)})`, metadata: { itemId, batchId } };
       return {
         ...state,
         stockBatches: newBatches,

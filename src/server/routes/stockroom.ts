@@ -7,22 +7,26 @@ import type { Db } from '../db';
 type Env = { Variables: { db: Db } };
 const stockroomRoute = new Hono<Env>();
 
-// PUT /api/stockroom/item — update single stockroom item
+// PUT /api/stockroom/item — upsert single stockroom item.
+// Insert path matters: newly created items dispatch UPDATE_STOCKROOM_ITEM for a row that doesn't exist yet.
 stockroomRoute.put('/item', async (c) => {
   const db = c.get('db');
   const body = await c.req.json();
-  await db.update(stockroomItems).set({
+  const values = {
     qtyOnHand: body.qtyOnHand,
     parLevel: body.parLevel,
     minimumLevel: body.minimumLevel,
-    binLocation: body.binLocation,
+    binLocation: body.binLocation ?? '',
     locationId: body.locationId ?? null,
-  }).where(
-    and(
-      eq(stockroomItems.itemId, body.itemId),
-      eq(stockroomItems.stockroomId, body.stockroomId),
-    )
-  );
+  };
+  await db.insert(stockroomItems).values({
+    itemId: body.itemId,
+    stockroomId: body.stockroomId,
+    ...values,
+  }).onConflictDoUpdate({
+    target: [stockroomItems.itemId, stockroomItems.stockroomId],
+    set: values,
+  });
   return c.json({ ok: true });
 });
 

@@ -1,7 +1,7 @@
 // src/server/routes/items.ts
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { items } from '../db/schema';
+import { items, stockroomItems, stockBatches } from '../db/schema';
 import type { Db } from '../db';
 
 type Env = { Variables: { db: Db } };
@@ -67,6 +67,9 @@ itemsRoute.put('/:id', async (c) => {
 itemsRoute.delete('/:id', async (c) => {
   const db = c.get('db');
   const id = c.req.param('id');
+  // stockroom_items.item_id references items.id with no cascade — clear dependents first.
+  await db.delete(stockroomItems).where(eq(stockroomItems.itemId, id));
+  await db.delete(stockBatches).where(eq(stockBatches.itemId, id));
   await db.delete(items).where(eq(items.id, id));
   return c.json({ ok: true });
 });

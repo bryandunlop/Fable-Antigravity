@@ -113,6 +113,8 @@ export const api = {
       apiFetch(`/stock/batches/${id}`, { method: 'PUT', body: JSON.stringify(batch) }),
     removeBatch: (id: string) =>
       apiFetch(`/stock/batches/${id}`, { method: 'DELETE' }),
+    disposeBatch: (id: string, payload: { itemId: string; stockroomId: string; qty: number }) =>
+      apiFetch(`/stock/batches/${id}/dispose`, { method: 'POST', body: JSON.stringify(payload) }),
     addAlertThreshold: (threshold: any) =>
       apiFetch('/stock/alert-thresholds', { method: 'POST', body: JSON.stringify(threshold) }),
     removeAlertThreshold: (id: string) =>

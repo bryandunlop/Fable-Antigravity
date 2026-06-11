@@ -1,7 +1,7 @@
 // src/server/routes/storage-locations.ts
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { storageLocations } from '../db/schema';
+import { storageLocations, stockroomItems } from '../db/schema';
 import type { Db } from '../db';
 
 type Env = { Variables: { db: Db } };
@@ -54,6 +54,8 @@ storageLocationsRoute.put('/:id', async (c) => {
 storageLocationsRoute.delete('/:id', async (c) => {
   const db = c.get('db');
   const id = c.req.param('id');
+  // Unassign items first so they appear in the "Unassigned" folder, then delete the location.
+  await db.update(stockroomItems).set({ locationId: null }).where(eq(stockroomItems.locationId, id));
   await db.delete(storageLocations).where(eq(storageLocations.id, id));
   return c.json({ ok: true });
 });
