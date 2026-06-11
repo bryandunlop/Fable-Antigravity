@@ -171,6 +171,19 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isCommandPaletteOpen]);
 
+  // Record visited pages for the command palette's "Recent" section
+  useEffect(() => {
+    if (location.pathname === '/') return;
+    try {
+      const prev: string[] = JSON.parse(localStorage.getItem('nav-recents') ?? '[]');
+      const next = [location.pathname, ...prev.filter(p => p !== location.pathname)].slice(0, 5);
+      localStorage.setItem('nav-recents', JSON.stringify(next));
+    } catch {
+      // corrupted localStorage — drop it
+      localStorage.removeItem('nav-recents');
+    }
+  }, [location.pathname]);
+
   // Default navigation groups organized by category
   const defaultNavigationGroups = [
     {
