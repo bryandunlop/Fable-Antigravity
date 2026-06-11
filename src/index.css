@@ -1,7 +1,12 @@
 @custom-variant dark (&:is(.dark *));
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
+
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Light.ttf') format('truetype'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-SemiBold.ttf') format('truetype'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
 
 @layer base {
   :root {
@@ -105,7 +110,7 @@
 }
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: 'Montserrat', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --radius: 0.625rem;
@@ -224,7 +229,7 @@
   }
 
   html {
-    font-family: "Inter", sans-serif;
+    font-family: 'Montserrat', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
