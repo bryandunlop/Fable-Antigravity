@@ -100,6 +100,7 @@ export const storageLocations = pgTable('storage_locations', {
   name: text('name').notNull(),
   type: storageLocationTypeEnum('type').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
+  thumbnailUrl: text('thumbnail_url'),
 });
 
 // ─── Stockrooms ─────────────────────────────────────────────────────────────

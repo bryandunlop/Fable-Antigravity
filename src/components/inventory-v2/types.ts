@@ -144,6 +144,7 @@ export interface StorageLocation {
   name: string;           // "Shelf A — Beverages", "Medicine Cabinet", etc.
   type: StorageLocationType;
   sortOrder: number;
+  thumbnailUrl?: string;
 }
 
 // ─── Pick & Restock ─────────────────────────────────────────────────────────

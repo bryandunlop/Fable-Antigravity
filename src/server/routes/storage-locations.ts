@@ -16,6 +16,7 @@ storageLocationsRoute.post('/', async (c) => {
     name: body.name,
     type: body.type,
     sortOrder: body.sortOrder ?? 0,
+    thumbnailUrl: body.thumbnailUrl ?? null,
   });
   return c.json({ ok: true });
 });
@@ -42,6 +43,7 @@ storageLocationsRoute.put('/:id', async (c) => {
   if (body.name !== undefined) update.name = body.name;
   if (body.type !== undefined) update.type = body.type;
   if (body.sortOrder !== undefined) update.sortOrder = body.sortOrder;
+  if (body.thumbnailUrl !== undefined) update.thumbnailUrl = body.thumbnailUrl;
   if (Object.keys(update).length > 0) {
     await db.update(storageLocations).set(update).where(eq(storageLocations.id, id));
   }
