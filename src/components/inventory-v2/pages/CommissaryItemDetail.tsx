@@ -63,7 +63,7 @@ export default function CommissaryItemDetail() {
     dispatch({
       type: 'ADD_ACTIVITY_LOG',
       payload: {
-        id: `act-${Date.now()}`,
+        id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         timestamp: new Date().toISOString(),
         userId: state.currentUser.id,
         userName: state.currentUser.name,
@@ -94,7 +94,7 @@ export default function CommissaryItemDetail() {
     dispatch({
       type: 'ADD_ACTIVITY_LOG',
       payload: {
-        id: `act-${Date.now()}`,
+        id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         timestamp: new Date().toISOString(),
         userId: state.currentUser.id,
         userName: state.currentUser.name,
@@ -131,6 +131,7 @@ export default function CommissaryItemDetail() {
   };
 
   const saveEdit = () => {
+    const parsedCost = parseFloat(draft.costPerUnit);
     dispatch({
       type: 'UPDATE_ITEM',
       payload: {
@@ -138,7 +139,7 @@ export default function CommissaryItemDetail() {
         itemName: draft.itemName.trim() || item.itemName,
         description: draft.description,
         vendor: draft.vendor || undefined,
-        costPerUnit: draft.costPerUnit ? parseFloat(draft.costPerUnit) : undefined,
+        costPerUnit: Number.isFinite(parsedCost) ? parsedCost : undefined,
         reorderUrl: draft.reorderUrl || undefined,
         barcode: draft.barcode || undefined,
         vendorItemNumber: draft.vendorItemNumber || undefined,
@@ -161,6 +162,8 @@ export default function CommissaryItemDetail() {
   };
 
   const saveBatch = (b: StockBatch, newQty: number, newExp: string, newLabel: string) => {
+    // Direct batch edits bypass the FIFO batch-deduction used elsewhere (trip loads, bulk updates) —
+    // stockroom qty is adjusted by delta here, but other batches' quantities are not rebalanced.
     const delta = newQty - b.quantity;
     dispatch({
       type: 'UPDATE_STOCK_BATCH',
