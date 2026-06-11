@@ -277,20 +277,20 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(0, 161, 223, 0.2);
+    background: rgba(20, 45, 126, 0.20);
     border-radius: 10px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 161, 223, 0.4);
+    background: rgba(20, 45, 126, 0.35);
   }
 
   .dark ::-webkit-scrollbar-thumb {
-    background: rgba(68, 190, 238, 0.2);
+    background: rgba(127, 204, 254, 0.25);
   }
 
   .dark ::-webkit-scrollbar-thumb:hover {
-    background: rgba(68, 190, 238, 0.4);
+    background: rgba(127, 204, 254, 0.40);
   }
 
   body {
@@ -313,21 +313,15 @@
     -webkit-user-select: none;
   }
 
-  .status-success {
-    @apply bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900;
-  }
+  .status-success { background-color: rgba(0, 177, 64, 0.12); color: #00712A; border-color: rgba(0, 177, 64, 0.30); }
+  .status-warning { background-color: rgba(241, 180, 52, 0.15); color: #8A5F00; border-color: rgba(241, 180, 52, 0.40); }
+  .status-error   { background-color: rgba(239, 51, 64, 0.10); color: #A31017; border-color: rgba(239, 51, 64, 0.30); }
+  .status-info    { background-color: rgba(0, 150, 252, 0.10); color: #0058A3; border-color: rgba(0, 150, 252, 0.30); }
 
-  .status-warning {
-    @apply bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900;
-  }
-
-  .status-error {
-    @apply bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-900;
-  }
-
-  .status-info {
-    @apply bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900;
-  }
+  .dark .status-success { background-color: rgba(0, 177, 64, 0.22); color: #7BE3A3; border-color: rgba(0, 177, 64, 0.35); }
+  .dark .status-warning { background-color: rgba(241, 180, 52, 0.20); color: #EDD9A9; border-color: rgba(241, 180, 52, 0.40); }
+  .dark .status-error   { background-color: rgba(239, 51, 64, 0.22); color: #F09595; border-color: rgba(239, 51, 64, 0.40); }
+  .dark .status-info    { background-color: rgba(0, 150, 252, 0.18); color: #7FCCFE; border-color: rgba(0, 150, 252, 0.40); }
 }
 
 @layer components {
