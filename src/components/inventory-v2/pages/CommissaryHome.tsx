@@ -57,9 +57,12 @@ export default function CommissaryHome() {
 
   const perLocation = useMemo(() => {
     const expiringItemIds = new Set(attention.expiring.map((e) => e.batch.itemId));
+    const liveLocationIds = new Set(state.storageLocations.map((l) => l.id));
     const map = new Map<string, { count: number; low: number; expiring: number }>();
     for (const ci of commissaryItems) {
-      const key = ci.stockroom?.locationId ?? 'unassigned';
+      const locId = ci.stockroom?.locationId;
+      // Orphaned locationIds (location deleted out-of-band) fold into Unassigned instead of vanishing.
+      const key = locId && liveLocationIds.has(locId) ? locId : 'unassigned';
       const entry = map.get(key) ?? { count: 0, low: 0, expiring: 0 };
       entry.count++;
       if (ci.stockroom && ci.stockroom.qtyOnHand < ci.stockroom.parLevel) entry.low++;
@@ -67,7 +70,7 @@ export default function CommissaryHome() {
       map.set(key, entry);
     }
     return map;
-  }, [commissaryItems, attention.expiring]);
+  }, [commissaryItems, attention.expiring, state.storageLocations]);
 
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
