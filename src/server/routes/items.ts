@@ -67,7 +67,7 @@ itemsRoute.put('/:id', async (c) => {
 itemsRoute.delete('/:id', async (c) => {
   const db = c.get('db');
   const id = c.req.param('id');
-  // stockroom_items.item_id references items.id with no cascade — clear dependents first.
+  // stockroom_items.item_id FK requires clearing first; stock_batches has no FK but is cleaned up to avoid orphans (matches the reducer's REMOVE_ITEM).
   await db.delete(stockroomItems).where(eq(stockroomItems.itemId, id));
   await db.delete(stockBatches).where(eq(stockBatches.itemId, id));
   await db.delete(items).where(eq(items.id, id));

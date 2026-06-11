@@ -44,6 +44,7 @@ stockRoute.delete('/batches/:id', async (c) => {
 
 // POST /api/stock/batches/:id/dispose — delete the batch AND decrement stockroom qty.
 // Two sequential statements (Neon HTTP driver has no transactions) — same pattern as /stockroom/bulk.
+// Delete-first: if the decrement then fails, stock over-counts until corrected — but keeping delete-first avoids re-dispose double-decrements.
 stockRoute.post('/batches/:id/dispose', async (c) => {
   const db = c.get('db');
   const id = c.req.param('id');
