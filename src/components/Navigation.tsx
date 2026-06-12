@@ -194,7 +194,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
       label: "Overview",
       items: [
         { name: 'Dashboard', href: '/', icon: Home, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
-        { name: 'Settings', href: '/settings', icon: Settings, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'admin-assistant'] },
         // { name: 'Flight Family', href: '/flight-family', icon: MessageSquare, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'admin-assistant'] },
         { name: 'Procedural Bulletins', href: '/procedural-bulletins', icon: BookOpen, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
         // { name: 'Restaurant Database', href: '/restaurant-database', icon: Utensils, roles: ['pilot', 'inflight', 'maintenance', 'admin'] },
@@ -211,14 +210,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'My FRAT Submissions', href: '/frat/my-submissions', icon: FileText, roles: ['pilot', 'admin'] },
         { name: 'Airport Information', href: '/airport-evaluations', icon: MapPin, roles: ['pilot', 'admin'] },
         { name: 'Fuel Load Request', href: '/fuel-load-request', icon: Fuel, roles: ['pilot', 'admin'] },
-      ]
-    },
-    {
-      label: "ForeFlight Integration",
-      items: [
-        { name: 'ForeFlight Settings', href: '/foreflight-settings', icon: Settings, roles: ['admin'] },
-        { name: 'Test Upload', href: '/foreflight-test-upload', icon: Upload, roles: ['admin'] },
-        { name: 'Sync Diagnostics', href: '/foreflight-diagnostics', icon: Database, roles: ['admin'] },
       ]
     },
     {
@@ -330,13 +321,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     //   ]
     // },
     {
-      label: "Experimental Tools",
-      items: [
-        { name: 'Master Command Center', href: '/experimental/scheduling-command', icon: Activity, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-        { name: 'Trip Sandbox (Beta)', href: '/experimental/unified-trip', icon: Sparkles, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-      ]
-    },
-    {
       label: "Management",
       items: [
         { name: 'Lead Dashboard', href: '/lead-dashboard', icon: BarChart3, roles: ['lead', 'admin'] },
@@ -344,6 +328,10 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Live Metrics', href: '/live-metrics', icon: Activity, roles: ['lead', 'admin'], description: 'Real-time operations KPIs' },
         { name: 'Critical Functions', href: '/critical-functions', icon: Shield, roles: ['lead', 'admin'] },
         { name: 'Airport Evaluation Officer', href: '/admin/airport-evaluation-officer', icon: MapPin, roles: ['airport-evaluator', 'admin'] },
+        { name: 'ForeFlight Test Upload', href: '/foreflight-test-upload', icon: Upload, roles: ['admin'] },
+        { name: 'ForeFlight Sync Diagnostics', href: '/foreflight-diagnostics', icon: Database, roles: ['admin'] },
+        { name: 'Master Command Center', href: '/experimental/scheduling-command', icon: Activity, roles: ['admin'] },
+        { name: 'Trip Sandbox (Beta)', href: '/experimental/unified-trip', icon: Sparkles, roles: ['admin'] },
         { name: 'Admin Panel', href: '/admin', icon: Settings, roles: ['admin'] },
       ]
     }
