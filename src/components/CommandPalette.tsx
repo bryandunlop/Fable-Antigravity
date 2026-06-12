@@ -47,6 +47,7 @@ interface InventoryData {
 // The payload is normalized at this seam so a missing or renamed field in
 // /api/state degrades to an empty section instead of throwing during render.
 let inventoryPromise: Promise<InventoryData | null> | null = null;
+let inventoryWarned = false;
 function loadInventoryData(): Promise<InventoryData | null> {
   if (!inventoryPromise) {
     inventoryPromise = api.state.load()
@@ -57,7 +58,10 @@ function loadInventoryData(): Promise<InventoryData | null> {
         unitItemRequests: d?.unitItemRequests ?? [],
       }))
       .catch((err: unknown) => {
-        console.warn('Command palette: inventory search unavailable', err);
+        if (!inventoryWarned) {
+          console.warn('Command palette: inventory search unavailable', err);
+          inventoryWarned = true;
+        }
         inventoryPromise = null;
         return null;
       });
