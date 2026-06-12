@@ -8,7 +8,7 @@ export default function NotFound() {
       <h1 className="mt-2 text-2xl font-semibold text-foreground">Page not found</h1>
       <p className="mt-2 text-muted-foreground">
         No page exists at{' '}
-        <code className="font-mono text-sm bg-muted px-1.5 py-0.5 rounded">{location.pathname}</code>
+        <code className="font-mono text-sm bg-muted px-1.5 py-0.5 rounded break-all max-w-full">{location.pathname}</code>
       </p>
       <Link
         to="/"
