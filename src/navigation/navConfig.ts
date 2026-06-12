@@ -8,8 +8,8 @@ import {
   BookOpen, Boxes, Building2, Calendar, CalendarCheck, Clipboard,
   ClipboardCheck, ClipboardList, Database, FileText, Fuel, HardDrive, HardHat,
   Home, Layers, MapPin, Monitor, Package, PackagePlus, Plane, Send, Settings,
-  Shield, Sliders, Sparkles, Target, UserCheck, Users, Utensils, Warehouse,
-  Wrench,
+  Shield, Sliders, Sparkles, Target, Upload, UserCheck, Users, Utensils,
+  Warehouse, Wrench,
 } from 'lucide-react';
 
 export type Domain =
@@ -143,7 +143,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/live-metrics', label: 'Live Metrics', domain: 'admin', icon: Activity, primary: true, keywords: ['kpi'], roles: ['lead', 'admin'] },
   { path: '/critical-functions', label: 'Critical Functions', domain: 'admin', icon: Shield, primary: true, roles: ['lead', 'admin'] },
   { path: '/admin/airport-evaluation-officer', label: 'Airport Evaluation Officer', domain: 'admin', icon: MapPin, primary: false, roles: ['airport-evaluator', 'admin'] },
-  { path: '/foreflight-test-upload', label: 'ForeFlight Test Upload', domain: 'admin', icon: Database, primary: false, keywords: ['foreflight'], roles: ['admin'] },
+  { path: '/foreflight-test-upload', label: 'ForeFlight Test Upload', domain: 'admin', icon: Upload, primary: false, keywords: ['foreflight'], roles: ['admin'] },
   { path: '/foreflight-diagnostics', label: 'ForeFlight Sync Diagnostics', domain: 'admin', icon: Database, primary: false, keywords: ['foreflight', 'sync'], roles: ['admin'] },
   { path: '/experimental/scheduling-command', label: 'Master Command Center', domain: 'admin', icon: Activity, primary: false, roles: ['admin'] },
   { path: '/experimental/unified-trip', label: 'Trip Sandbox (Beta)', domain: 'admin', icon: Sparkles, primary: false, roles: ['admin'] },
