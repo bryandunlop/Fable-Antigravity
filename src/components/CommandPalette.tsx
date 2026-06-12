@@ -4,8 +4,9 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Search, FileText, Clock, Package, Plane, ClipboardCheck, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { entriesForRoles, matchEntry, DOMAIN_LABELS } from '../navigation/navConfig';
+import { entriesForRoles, DOMAIN_LABELS } from '../navigation/navConfig';
 import type { NavEntry } from '../navigation/navConfig';
+import type { LucideIcon } from 'lucide-react';
 import { api } from './inventory-v2/api-client';
 
 type Section = 'recent' | 'pages' | 'inventory';
@@ -16,7 +17,7 @@ interface PaletteResult {
   description?: string;
   href: string;
   category: string;
-  icon: any;
+  icon: LucideIcon;
   section: Section;
 }
 
@@ -103,14 +104,15 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
   const visibleEntries = entriesForRoles(userRole, additionalRoles).filter(e => e.searchable !== false);
   const searchTerm = query.toLowerCase().trim();
 
-  // Recent sections — only when not searching. Stored paths are manifest
-  // section paths, so a role-scoped matchEntry doubles as the access filter.
+  // Recent sections — only when not searching. Stored paths are exact manifest
+  // section paths, so an exact match against the role-visible entries doubles
+  // as the access filter (prefix matching could mislabel after a role switch).
   const recentResults: PaletteResult[] = [];
   if (isOpen && !searchTerm) {
     try {
       const recents: string[] = JSON.parse(localStorage.getItem('nav-recents') ?? '[]');
       for (const path of recents) {
-        const entry = matchEntry(path, visibleEntries);
+        const entry = visibleEntries.find(e => e.path === path);
         if (entry) {
           recentResults.push({
             id: `recent-${path}`,
