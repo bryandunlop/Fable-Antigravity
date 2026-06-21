@@ -30,14 +30,14 @@ export function computeRepairDue(
   const value = item.repairIntervalValue ?? CATEGORY_DAYS[category] ?? 0;
 
   if (CALENDAR_UNITS.includes(unit)) {
-    // Per the working agreement's PL-25 acceptance example (Cat C discovered Jan 26 -> due Feb 5 00:00 UTC):
-    // day 1 is clock_start (midnight after discovery); the deferral is overdue from 00:00 of the interval-th day,
-    // i.e. repair_due = clock_start + (interval - 1) days  (== midnight(day_of_discovery) + interval days).
-    // FLAGGED: true PL-25 may instead ground at the END of the final day (Feb 6 00:00). Confirm with the DOM
-    // before production; the demo follows the documented spec/acceptance example (Feb 5).
+    // True PL-25 (confirmed by SME/DOM 2026-06-21): day 1 is clock_start (midnight after discovery); the item
+    // gets `interval` FULL calendar days and is overdue at the END of the final day.
+    //   repair_due = clock_start + interval days.
+    // Worked check: Cat C discovered Jan 26 10:00 -> clock_start Jan 27 00:00 -> due Feb 6 00:00 UTC
+    // (10 full dispatchable days Jan 27..Feb 5; grounded from Feb 6 00:00).
+    // NOTE: the source spec §5.4/§15.4 worked example said "Feb 5" — that is an off-by-one; corrected to Feb 6.
     const start = new Date(clockStartDateUtc).getTime();
-    const days = value > 0 ? value - 1 : 0;
-    const repairDueDateUtc = new Date(start + days * DAY_MS).toISOString();
+    const repairDueDateUtc = new Date(start + value * DAY_MS).toISOString();
     return { repairDueDateUtc, repairIntervalUnit: unit, repairIntervalValue: value };
   }
   // usage-based (FLIGHT / CYCLE / HOUR)
