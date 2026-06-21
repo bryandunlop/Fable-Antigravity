@@ -7,7 +7,7 @@ export function PersonaSwitcher() {
   return (
     <div className="flex items-center gap-2" title="Demo persona (no real auth)">
       <UserCog className="h-4 w-4 text-muted-foreground" />
-      <Select value={state.currentUserOid} onValueChange={v => dispatch({ type: 'SET_PERSONA', payload: v })}>
+      <Select value={state.currentUserOid} onValueChange={(v: string) => dispatch({ type: 'SET_PERSONA', payload: v })}>
         <SelectTrigger className="h-9 w-[240px]">
           <SelectValue placeholder="Persona" />
         </SelectTrigger>

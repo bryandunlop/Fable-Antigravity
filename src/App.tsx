@@ -63,7 +63,7 @@ import UnifiedTasksActionItems from './components/UnifiedTasksActionItems';
 import AOGManagement from './components/AOGManagement';
 import LobbyDisplay from './components/LobbyDisplay';
 import UpcomingFlights from './components/UpcomingFlights';
-import TechLog from './components/TechLog';
+import TechLogRoutes from './components/tech-log/TechLogRoutes';
 import BookingProfile from './components/BookingProfile';
 import TripBuilder from './components/TripBuilder';
 import FlightFamily from './components/FlightFamily';
@@ -450,7 +450,7 @@ export default function App() {
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
                                 <Route path="/aog-management" element={<AOGManagement />} />
                                 <Route path="/upcoming-flights" element={<UpcomingFlights userRole={userRole} />} />
-                                <Route path="/tech-log" element={<TechLog userRole={userRole} />} />
+                                <Route path="/tech-log/*" element={<TechLogRoutes />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
                                   path="/flight-operations-center"
