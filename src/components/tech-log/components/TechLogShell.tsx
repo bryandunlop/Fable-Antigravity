@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Check } from 'lucide-react';
 import { DemoBanner } from './DemoBanner';
 import { PersonaSwitcher } from './PersonaSwitcher';
 import { ResetDemoButton } from './ResetDemoButton';
@@ -47,6 +48,12 @@ export function TechLogShell({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {actions}
+          <span
+            className="hidden items-center gap-1 rounded-full border border-[var(--gfo-success,#00B140)]/40 bg-[var(--gfo-success,#00B140)]/10 px-2 py-1 text-xs text-[var(--gfo-success,#00B140)] sm:inline-flex"
+            title="All signed records confirmed by the server. In offline use this shows 'N entries not yet synced' until the server ACKs."
+          >
+            <Check className="h-3 w-3" /> Synced
+          </span>
           <PersonaSwitcher />
           <ResetDemoButton />
         </div>
