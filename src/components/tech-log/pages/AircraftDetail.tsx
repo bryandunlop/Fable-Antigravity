@@ -1,11 +1,17 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, Wrench, FilePlus, ClipboardList, Clock, ShieldAlert } from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowLeft, AlertTriangle, Wrench, FilePlus, ClipboardList, Clock, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
 import { isDeferralExpired } from '../engine/pl25';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
+import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
+import { INTENT } from '../constants';
+import { newId } from '../util/id';
+import type { Signature } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -21,9 +27,11 @@ const RULE_TEXT: Record<number, string> = {
 export default function AircraftDetail() {
   const { tail } = useParams();
   const navigate = useNavigate();
-  const { state } = useTechLog();
+  const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [pendingAcceptId, setPendingAcceptId] = useState('');
 
   const ac = state.aircraft.find(a => a.tailNumber === tail);
   if (!ac) {
@@ -42,6 +50,14 @@ export default function AircraftDetail() {
   const deferrals = currentRows(state.deferrals).filter(d => d.aircraftId === ac.id && d.status !== 'CLEARED');
   const airframe = { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles };
   const auditRows = state.audit.filter(a => defects.some(d => d.id === a.entityId) || deferrals.some(d => d.id === a.entityId)).slice(0, 8);
+  const lastAcceptance = state.signatures.filter(s => s.signedEntity === 'ACCEPTANCE' && s.signedEntityId === ac.id).slice(-1)[0];
+
+  const beginAccept = () => { setPendingAcceptId(newId('acc')); setAcceptOpen(true); };
+  const onAccepted = (sig: Signature) => {
+    dispatch({ type: 'ADD_SIGNATURE', payload: sig });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'AIRCRAFT_ACCEPTED', entityType: 'Aircraft', entityId: ac.id, atUtc: new Date().toISOString(), summary: `${ac.tailNumber} accepted for flight by PIC ${user.displayName}` } });
+    toast.success(`${ac.tailNumber} accepted for flight by ${user.displayName}.`);
+  };
 
   return (
     <TechLogShell
@@ -60,15 +76,25 @@ export default function AircraftDetail() {
               <ClipboardList className="mr-1.5 h-4 w-4" /> Deferrals
             </Button>
           )}
+          {!isMaint && !ac.isProvisional && sv.status !== 'RED' && (
+            <Button size="sm" variant="secondary" onClick={beginAccept}>
+              <CheckCircle2 className="mr-1.5 h-4 w-4" /> Accept (PIC)
+            </Button>
+          )}
         </>
       }
     >
       {/* Status / why */}
       <Card className="mb-4">
         <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            {ac.isProvisional ? <Badge variant="outline">Provisional</Badge> : <ServiceabilityChip status={sv.status} />}
-            <span className="text-sm text-muted-foreground">{RULE_TEXT[sv.governingRule]}</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              {ac.isProvisional ? <Badge variant="outline">Provisional</Badge> : <ServiceabilityChip status={sv.status} />}
+              <span className="text-sm text-muted-foreground">{RULE_TEXT[sv.governingRule]}</span>
+            </div>
+            {lastAcceptance && (
+              <span className="text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {lastAcceptance.signerName} · {new Date(lastAcceptance.signedAtUtc).toLocaleString()}</span>
+            )}
           </div>
           <div className="text-xs text-muted-foreground">as of {new Date(now).toLocaleString()}</div>
         </CardContent>
@@ -161,6 +187,17 @@ export default function AircraftDetail() {
           </CardContent>
         </Card>
       )}
+
+      <SignCeremonyDialog
+        open={acceptOpen}
+        onOpenChange={setAcceptOpen}
+        signer={user}
+        signedEntity="ACCEPTANCE"
+        signedEntityId={pendingAcceptId}
+        intentStatement={INTENT.ACCEPTANCE}
+        onSigned={onAccepted}
+        title="Crew acceptance (PIC)"
+      />
     </TechLogShell>
   );
 }

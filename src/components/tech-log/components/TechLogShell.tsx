@@ -14,6 +14,7 @@ const TABS: Tab[] = [
   { label: 'Defects', to: '/tech-log/defects' },
   { label: 'Deferrals', to: '/tech-log/deferrals' },
   { label: 'Releases', to: '/tech-log/releases' },
+  { label: 'AOG', to: '/tech-log/aog' },
   { label: 'Audit', to: '/tech-log/audit' },
 ];
 const ADMIN_TABS: Tab[] = [

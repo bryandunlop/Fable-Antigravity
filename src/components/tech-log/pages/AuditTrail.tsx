@@ -1,10 +1,11 @@
 import { useTechLog } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
+import { CFR_MATRIX } from '../constants';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
-import { History, FileSignature, Database, Lock } from 'lucide-react';
+import { History, FileSignature, Database, Lock, Scale } from 'lucide-react';
 
 export default function AuditTrail() {
   const { state } = useTechLog();
@@ -33,6 +34,7 @@ export default function AuditTrail() {
           <TabsTrigger value="activity"><History className="mr-1.5 h-4 w-4" /> Activity</TabsTrigger>
           <TabsTrigger value="signatures"><FileSignature className="mr-1.5 h-4 w-4" /> Signatures</TabsTrigger>
           <TabsTrigger value="ledger"><Database className="mr-1.5 h-4 w-4" /> Ledger</TabsTrigger>
+          <TabsTrigger value="compliance"><Scale className="mr-1.5 h-4 w-4" /> Compliance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="activity">
@@ -69,6 +71,18 @@ export default function AuditTrail() {
                 </div>
               );
             })}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="compliance">
+          <Card><CardContent className="space-y-1 p-4 text-sm">
+            <p className="mb-2 text-xs text-muted-foreground">Function → regulation traceability (see docs/COMPLIANCE_TRACEABILITY.md). Confirm citations with the DOM against final AC revisions.</p>
+            {CFR_MATRIX.map((r, i) => (
+              <div key={i} className="flex flex-col gap-0.5 border-b py-1.5 last:border-0 md:flex-row md:justify-between md:gap-3">
+                <span className="font-medium">{r.capability}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{r.reg}</span>
+              </div>
+            ))}
           </CardContent></Card>
         </TabsContent>
       </Tabs>

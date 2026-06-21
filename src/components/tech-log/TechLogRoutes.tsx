@@ -10,6 +10,7 @@ import AdminFleet from './pages/AdminFleet';
 import AdminPersonnel from './pages/AdminPersonnel';
 import AdminMel from './pages/AdminMel';
 import AuditTrail from './pages/AuditTrail';
+import Aog from './pages/Aog';
 
 /**
  * Self-contained eTechLog domain. Mounted at "/tech-log/*" in App.tsx.
@@ -25,6 +26,7 @@ export default function TechLogRoutes() {
         <Route path="defects" element={<Defects />} />
         <Route path="deferrals" element={<Deferrals />} />
         <Route path="releases" element={<Releases />} />
+        <Route path="aog" element={<Aog />} />
         <Route path="audit" element={<AuditTrail />} />
         <Route path="admin/fleet" element={<AdminFleet />} />
         <Route path="admin/personnel" element={<AdminPersonnel />} />

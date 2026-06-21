@@ -81,6 +81,10 @@ export default function FleetStatus() {
         {stat('Provisional', counts.prov, 'bg-muted-foreground/40')}
       </div>
 
+      <p className="mb-3 text-xs text-muted-foreground">
+        Note: work performed by outside MROs is recorded in CAMP and may not appear here — this board reflects myGFO-signed records only.
+      </p>
+
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {rows.map(({ ac, sv, openDefects, activeDeferrals, nearestDue }) => {
           const cd = countdown(nearestDue);

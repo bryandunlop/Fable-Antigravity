@@ -124,7 +124,7 @@ export interface MaintenanceRelease {
   supersedesId?: string;
 }
 
-export type SignedEntity = 'FLIGHT_LOG' | 'DEFECT' | 'DEFERRAL' | 'CRS';
+export type SignedEntity = 'FLIGHT_LOG' | 'DEFECT' | 'DEFERRAL' | 'CRS' | 'ACCEPTANCE';
 
 export interface Signature {
   id: string;

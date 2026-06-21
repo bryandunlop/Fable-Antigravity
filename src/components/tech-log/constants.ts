@@ -23,7 +23,24 @@ export const INTENT = {
     'I certify the required (M) procedure and/or placard installation for this deferral was accomplished.',
   RII:
     'I have independently inspected the required item and find it correctly accomplished.',
+  ACCEPTANCE:
+    'I, as PIC, accept this aircraft for the intended flight, having reviewed its airworthiness status and any active MEL deferrals/restrictions.',
 } as const;
+
+// Function -> regulation traceability (mirrors docs/COMPLIANCE_TRACEABILITY.md §1) for the Audit > Compliance view.
+export const CFR_MATRIX: { capability: string; reg: string }[] = [
+  { capability: 'Journey/flight log (OOOI, hours, cycles)', reg: '14 CFR 91.417(b); PIC airworthiness 91.7(b)/91.403(a)' },
+  { capability: 'Defect / snag capture', reg: '14 CFR 91.7 (airworthy condition); 91.403' },
+  { capability: 'MEL deferral + PL-25 clock', reg: '14 CFR 91.213(a)/(d); FAA PL-25' },
+  { capability: 'Provisional-MEL block (G800)', reg: '14 CFR 91.213(a) — no operation under an unapproved MEL' },
+  { capability: '(M)/placard gating; two sign-offs', reg: '14 CFR 91.213(d)(3) — O/M procedures & placarding' },
+  { capability: 'Maintenance release / CRS (A&P cert)', reg: '14 CFR 91.407(a); record content 91.417(a)(1)(i–iii)' },
+  { capability: 'RII dual sign-off', reg: 'Operator RII program (91K/§121.369(b) discipline)' },
+  { capability: 'Append-only immutability + supersede', reg: 'AC 43-9 / AC 120-78B (unalterable; original retained)' },
+  { capability: 'Electronic signature service', reg: 'AC 120-78B §2.1.2 (8 key elements incl. non-repudiation)' },
+  { capability: 'Records retention & transfer', reg: '14 CFR 91.417(b)(1)/(b)(2); 91.419' },
+  { capability: 'Crew acceptance (PIC)', reg: '14 CFR 91.7(b) — PIC determines airworthiness before flight' },
+];
 
 export const ATA_CHAPTERS: { code: string; title: string }[] = [
   { code: '21', title: 'Air Conditioning' }, { code: '22', title: 'Autoflight' },
