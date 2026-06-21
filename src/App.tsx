@@ -450,7 +450,7 @@ export default function App() {
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
                                 <Route path="/aog-management" element={<AOGManagement />} />
                                 <Route path="/upcoming-flights" element={<UpcomingFlights userRole={userRole} />} />
-                                <Route path="/tech-log/*" element={<TechLogRoutes />} />
+                                <Route path="/tech-log/*" element={<TechLogRoutes userRole={userRole} />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
                                   path="/flight-operations-center"

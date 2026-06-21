@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Check } from 'lucide-react';
+import { UserCircle } from 'lucide-react';
 import { DemoBanner } from './DemoBanner';
-import { PersonaSwitcher } from './PersonaSwitcher';
 import { ResetDemoButton } from './ResetDemoButton';
 import { useCurrentUser } from '../TechLogContext';
 import { cn } from '../../ui/utils';
@@ -55,7 +55,12 @@ export function TechLogShell({
           >
             <Check className="h-3 w-3" /> Synced
           </span>
-          <PersonaSwitcher />
+          <span
+            className="hidden items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground sm:inline-flex"
+            title="Identity comes from how you logged in (role-based)"
+          >
+            <UserCircle className="h-3.5 w-3.5" /> {user.displayName} · {user.role === 'MAINTENANCE' ? 'Maintenance' : 'Pilot'}
+          </span>
           <ResetDemoButton />
         </div>
       </div>

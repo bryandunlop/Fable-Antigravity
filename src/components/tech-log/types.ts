@@ -202,5 +202,6 @@ export type TechLogAction =
   | { type: 'SET_PERSONA'; payload: string }
   | { type: 'EDIT_AIRCRAFT'; payload: Aircraft }
   | { type: 'EDIT_PERSONNEL'; payload: Personnel }
+  | { type: 'UPSERT_PERSONNEL'; payload: Personnel }
   | { type: 'EDIT_MEL_ITEM'; payload: MelItem }
   | { type: 'RESET_STATE'; payload: TechLogState };

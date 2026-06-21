@@ -16,9 +16,9 @@ import Aog from './pages/Aog';
  * Self-contained eTechLog domain. Mounted at "/tech-log/*" in App.tsx.
  * One TechLogProvider wraps all sub-pages so persona + mock state are shared.
  */
-export default function TechLogRoutes() {
+export default function TechLogRoutes({ userRole }: { userRole?: string }) {
   return (
-    <TechLogProvider>
+    <TechLogProvider userRole={userRole}>
       <Routes>
         <Route path="/" element={<FleetStatus />} />
         <Route path="aircraft/:tail" element={<AircraftDetail />} />

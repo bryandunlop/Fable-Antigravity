@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useReducer, useState, useCallback, ReactNode } from 'react';
 import { toast } from 'sonner';
-import type { TechLogState, TechLogAction } from './types';
+import type { TechLogState, TechLogAction, Personnel } from './types';
 import { getDefaultState } from './mockData/scenarios';
+import { SYSTEM_USERS } from '../../lib/mockUsers';
 
 const STORAGE_KEY = 'tech-log-state';
 const VERSION_KEY = 'tech-log-data-version';
@@ -43,6 +44,10 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       return { ...state, aircraft: state.aircraft.map(a => (a.id === action.payload.id ? action.payload : a)) };
     case 'EDIT_PERSONNEL':
       return { ...state, personnel: state.personnel.map(p => (p.oid === action.payload.oid ? action.payload : p)) };
+    case 'UPSERT_PERSONNEL':
+      return state.personnel.some(p => p.oid === action.payload.oid)
+        ? state
+        : { ...state, personnel: [...state.personnel, action.payload] };
     case 'EDIT_MEL_ITEM':
       return { ...state, melItems: state.melItems.map(m => (m.id === action.payload.id ? action.payload : m)) };
     case 'RESET_STATE':
@@ -59,9 +64,31 @@ interface Ctx {
 }
 const TechLogContext = createContext<Ctx | undefined>(undefined);
 
-export function TechLogProvider({ children }: { children: ReactNode }) {
+// Identity comes from how the user logged in (no persona switcher). Map the app role -> a Personnel record.
+const MAINT_ROLES = ['maintenance', 'chief-inspector', 'shift-lead', 'maintenance-coordinator', 'dom'];
+function resolveFromLogin(userRole: string | undefined, personnel: Personnel[]): { oid: string; ensure?: Personnel } {
+  if (!userRole) return { oid: personnel[0]?.oid ?? 'USR001' };
+  const sys = SYSTEM_USERS.find((u: { id: string; roles?: string[] }) => u.roles?.includes(userRole));
+  if (!sys) return { oid: personnel[0]?.oid ?? 'USR001' };
+  if (personnel.some(p => p.oid === sys.id)) return { oid: sys.id };
+  const isMaint = (sys.roles ?? []).some((r: string) => MAINT_ROLES.includes(r));
+  return {
+    oid: sys.id,
+    ensure: { oid: sys.id, displayName: (sys as { name?: string }).name ?? sys.id, role: isMaint ? 'MAINTENANCE' : 'PILOT', riiAuthorized: false, riiAuthorizedAta: [], active: true },
+  };
+}
+
+export function TechLogProvider({ children, userRole }: { children: ReactNode; userRole?: string }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadInitialState);
   const [loading] = useState(false);
+
+  // Resolve the signed-in identity from the login role (overrides any persisted persona).
+  useEffect(() => {
+    const { oid, ensure } = resolveFromLogin(userRole, state.personnel);
+    if (ensure) dispatch({ type: 'UPSERT_PERSONNEL', payload: ensure });
+    dispatch({ type: 'SET_PERSONA', payload: oid });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole]);
 
   useEffect(() => {
     const t = setTimeout(() => {
