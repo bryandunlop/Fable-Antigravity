@@ -1,5 +1,5 @@
 import type { TechLogState, Defect, Deferral, Signature, AuditEntry } from '../types';
-import { SEED_AIRCRAFT, SEED_PERSONNEL } from './fleet';
+import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
 import { computeClockStart, computeRepairDue } from '../engine/pl25';
 import { makeSignature } from '../engine/signing';
@@ -69,7 +69,7 @@ export function getDefaultState(): TechLogState {
 
   return {
     aircraft: SEED_AIRCRAFT,
-    melItems: SEED_MEL,
+    melItems: [...SEED_MEL, ...SEED_MEL_G800],
     personnel,
     flightLogs: [],
     defects,

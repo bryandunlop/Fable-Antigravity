@@ -5,6 +5,11 @@ import AircraftDetail from './pages/AircraftDetail';
 import Defects from './pages/Defects';
 import Deferrals from './pages/Deferrals';
 import Releases from './pages/Releases';
+import JourneyLog from './pages/JourneyLog';
+import AdminFleet from './pages/AdminFleet';
+import AdminPersonnel from './pages/AdminPersonnel';
+import AdminMel from './pages/AdminMel';
+import AuditTrail from './pages/AuditTrail';
 
 /**
  * Self-contained eTechLog domain. Mounted at "/tech-log/*" in App.tsx.
@@ -16,9 +21,14 @@ export default function TechLogRoutes() {
       <Routes>
         <Route path="/" element={<FleetStatus />} />
         <Route path="aircraft/:tail" element={<AircraftDetail />} />
+        <Route path="journey" element={<JourneyLog />} />
         <Route path="defects" element={<Defects />} />
         <Route path="deferrals" element={<Deferrals />} />
         <Route path="releases" element={<Releases />} />
+        <Route path="audit" element={<AuditTrail />} />
+        <Route path="admin/fleet" element={<AdminFleet />} />
+        <Route path="admin/personnel" element={<AdminPersonnel />} />
+        <Route path="admin/mel" element={<AdminMel />} />
         <Route path="*" element={<Navigate to="/tech-log" replace />} />
       </Routes>
     </TechLogProvider>

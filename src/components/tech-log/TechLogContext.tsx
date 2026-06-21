@@ -41,6 +41,10 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       return { ...state, currentUserOid: action.payload };
     case 'EDIT_AIRCRAFT':
       return { ...state, aircraft: state.aircraft.map(a => (a.id === action.payload.id ? action.payload : a)) };
+    case 'EDIT_PERSONNEL':
+      return { ...state, personnel: state.personnel.map(p => (p.oid === action.payload.oid ? action.payload : p)) };
+    case 'EDIT_MEL_ITEM':
+      return { ...state, melItems: state.melItems.map(m => (m.id === action.payload.id ? action.payload : m)) };
     case 'RESET_STATE':
       return action.payload;
     default:

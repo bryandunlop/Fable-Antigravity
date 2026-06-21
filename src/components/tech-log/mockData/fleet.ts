@@ -1,4 +1,4 @@
-import type { Aircraft, Personnel } from '../types';
+import type { Aircraft, Personnel, MelItem } from '../types';
 
 export const SEED_AIRCRAFT: Aircraft[] = [
   { id: 'ac-n1pg', tailNumber: 'N1PG', type: 'G650ER', serialNumber: '6260', status: 'ACTIVE', isProvisional: false, homeBase: 'KLUK', airframeTotalHours: 2450.5, airframeTotalCycles: 980 },
@@ -23,3 +23,14 @@ export const SEED_PERSONNEL: Personnel[] = [
 
 export const PILOT_OIDS = ['USR001', 'USR007'];
 export const MAINT_OIDS = ['USR002', 'USR008', 'USR009', 'USR010'];
+
+// Draft G800 D195 content — PENDING_FSDO. Viewable but deferrals are blocked until approved.
+// Used to demo the provisional-MEL block and the type-onboarding (approve -> activate) flow.
+const G800 = { aircraftType: 'G800' as const, mmelRevision: 'Draft R0', effectiveDate: '2027-01-01', approvalState: 'PENDING_FSDO' as const };
+export const SEED_MEL_G800: MelItem[] = [
+  { id: 'mel-g800-21-01-01', ...G800, ataReference: '21', itemNumber: '21-01', subItemNumber: '21-01-01', title: 'Cabin Pressure Control System', category: 'C', numberInstalled: 2, numberRequired: 1, mProcedure: 'Per draft G800 MEL (M) procedure.', provisos: 'Draft — pending FSDO approval.', repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10 },
+  { id: 'mel-g800-24-02-01', ...G800, ataReference: '24', itemNumber: '24-02', subItemNumber: '24-02-01', title: 'APU Generator', category: 'B', numberInstalled: 1, numberRequired: 0, mProcedure: 'Pull and collar APU GCU.', provisos: 'Draft — pending FSDO approval.', repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 3 },
+  { id: 'mel-g800-32-41-01', ...G800, ataReference: '32', itemNumber: '32-41', subItemNumber: '32-41-01', title: 'Brake Temperature Monitoring', category: 'C', numberInstalled: 2, numberRequired: 1, provisos: 'Draft — pending FSDO approval.', repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10 },
+  { id: 'mel-g800-33-51-01', ...G800, ataReference: '33', itemNumber: '33-51', subItemNumber: '33-51-01', title: 'Cabin Reading Lights', category: 'D', numberInstalled: 12, numberRequired: 8, provisos: 'Draft — pending FSDO approval.', placardLocation: 'At affected seat', repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 120 },
+  { id: 'mel-g800-34-12-01', ...G800, ataReference: '34', itemNumber: '34-12', subItemNumber: '34-12-01', title: 'Standby Attitude Indicator', category: 'A', numberInstalled: 1, numberRequired: 1, provisos: 'Draft — pending FSDO approval; per proviso.' },
+];
