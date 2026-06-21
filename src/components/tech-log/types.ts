@@ -176,6 +176,25 @@ export interface AuditEntry {
   summary: string;
 }
 
+// ── Phase-2 integration correlation (OFF-ledger, per spec §18.1) ──
+export type CampPushState = 'PENDING' | 'PUSHED' | 'FAILED';
+export interface CampCorrelation {
+  mygfoEntityId: string;
+  entityType: 'DEFECT' | 'DEFERRAL';
+  campDiscrepancyRef?: string;   // returned by CAMP IntegrateDiscrepancies
+  pushState: CampPushState;
+  lastPushedUtc?: string;
+  lastError?: string;
+}
+export interface IntegrationEvent {
+  id: string;
+  system: 'CAMP' | 'MYAIROPS';
+  op: string;
+  summary: string;               // identifiers + outcome only (no payloads/PII)
+  outcome: 'OK' | 'ERROR' | 'EMPTY';
+  atUtc: string;
+}
+
 export interface TechLogState {
   aircraft: Aircraft[];
   melItems: MelItem[];
@@ -186,6 +205,8 @@ export interface TechLogState {
   releases: MaintenanceRelease[];
   signatures: Signature[];
   audit: AuditEntry[];
+  campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
+  integrationEvents: IntegrationEvent[];
   currentUserOid: string;
   nowOverrideUtc?: string; // optional demo clock
 }
@@ -204,4 +225,6 @@ export type TechLogAction =
   | { type: 'EDIT_PERSONNEL'; payload: Personnel }
   | { type: 'UPSERT_PERSONNEL'; payload: Personnel }
   | { type: 'EDIT_MEL_ITEM'; payload: MelItem }
+  | { type: 'UPSERT_CAMP_CORRELATION'; payload: CampCorrelation }
+  | { type: 'ADD_INTEGRATION_EVENT'; payload: IntegrationEvent }
   | { type: 'RESET_STATE'; payload: TechLogState };

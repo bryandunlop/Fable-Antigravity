@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { PlaneTakeoff, Check, X, FilePlus } from 'lucide-react';
+import { PlaneTakeoff, Check, X, FilePlus, Download } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useIntegration } from '../integration/useIntegration';
 import { currentRows } from '../engine/supersede';
 import { newId } from '../util/id';
 import type { FlightLog } from '../types';
@@ -26,6 +27,7 @@ export default function JourneyLog() {
   const [params] = useSearchParams();
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
+  const integration = useIntegration();
   const pilots = state.personnel.filter(p => p.role === 'PILOT');
   const dispatchable = state.aircraft.filter(a => !a.isProvisional);
 
@@ -59,6 +61,16 @@ export default function JourneyLog() {
   );
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
   const nameOf = (oid: string) => state.personnel.find(p => p.oid === oid)?.displayName ?? oid;
+
+  const doPrefill = () => {
+    const p = integration.prefillFlight(tail, `${date}T00:00:00.000Z`);
+    setOut(p.outUtc.slice(11, 16));
+    setOff(p.offUtc.slice(11, 16));
+    setOn(p.onUtc.slice(11, 16));
+    setInn(p.inUtc.slice(11, 16));
+    setLandings(String(p.landings));
+    toast.success('Prefilled from myairops — review and sign.');
+  };
 
   const beginSign = () => {
     if (!valid) return toast.error('Resolve the validation errors before signing.');
@@ -133,6 +145,9 @@ export default function JourneyLog() {
               </div>
               <div><Label>Date (UTC)</Label><Input type="date" className="mt-1" value={date} onChange={e => setDate(e.target.value)} /></div>
             </div>
+            <Button type="button" variant="outline" size="sm" onClick={doPrefill}>
+              <Download className="mr-1.5 h-4 w-4" /> Prefill from myairops
+            </Button>
             <div className="grid grid-cols-4 gap-2">
               <div><Label className="text-xs">Out</Label><Input type="time" className="mt-1" value={out} onChange={e => setOut(e.target.value)} /></div>
               <div><Label className="text-xs">Off</Label><Input type="time" className="mt-1" value={off} onChange={e => setOff(e.target.value)} /></div>

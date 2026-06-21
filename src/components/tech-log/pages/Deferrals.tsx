@@ -6,6 +6,7 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
 import { computeClockStart, computeRepairDue, isDeferralExpired } from '../engine/pl25';
 import { CATEGORY_DAYS, INTENT } from '../constants';
+import { useIntegration } from '../integration/useIntegration';
 import { newId } from '../util/id';
 import type { Defect, Deferral, MelItem } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
@@ -27,6 +28,7 @@ export default function Deferrals() {
   const navigate = useNavigate();
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
+  const integration = useIntegration();
   const isMaint = user.role === 'MAINTENANCE';
 
   const defectId = params.get('defect') ?? undefined;
@@ -84,6 +86,14 @@ export default function Deferrals() {
     dispatch({ type: 'SUPERSEDE_DEFECT', payload: supDefect });
     dispatch({ type: 'ADD_DEFERRAL', payload: deferral });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFERRAL_SIGNED', entityType: 'Deferral', entityId: deferral.id, atUtc: now, summary: `${aircraft.tailNumber} deferred under MEL ${selectedMel.subItemNumber} (Cat ${selectedMel.category})` } });
+
+    // Phase-2 integration: push the MEL deferral to CAMP via IntegrateDiscrepancies (mock connector).
+    integration.pushDiscrepancy({
+      entityType: 'DEFERRAL', entityId: deferral.id, aircraftId: aircraft.id,
+      ata: selectedMel.ataReference, description: `MEL ${selectedMel.subItemNumber} — ${selectedMel.title}`,
+      restriction: deferral.restrictionText, nextDue: deferral.repairDueDateUtc,
+      category: selectedMel.category, technician: user.displayName,
+    });
 
     if (mProcedureRequired) {
       toast.warning(`Deferral pending (M)/placard — ${aircraft.tailNumber} stays GROUNDED until the gating release is signed.`);
@@ -216,6 +226,7 @@ export default function Deferrals() {
           const expired = isDeferralExpired(d, new Date().toISOString(), { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles });
           const effective = expired ? 'EXPIRED' : d.status;
           const ms = d.repairDueDateUtc ? new Date(d.repairDueDateUtc).getTime() - Date.now() : null;
+          const corr = state.campCorrelation.find(c => c.mygfoEntityId === d.id);
           return (
             <Card key={d.id}>
               <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
@@ -225,6 +236,7 @@ export default function Deferrals() {
                     <Badge variant="outline">MEL {mel?.subItemNumber ?? '—'}</Badge>
                     <Badge variant="outline">Cat {d.category}</Badge>
                     <Badge variant={effective === 'ACTIVE' ? 'secondary' : 'destructive'}>{effective}</Badge>
+                    {corr?.campDiscrepancyRef && <Badge variant="outline">CAMP {corr.campDiscrepancyRef}</Badge>}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{mel?.title}</p>
                   {d.repairDueDateUtc && (

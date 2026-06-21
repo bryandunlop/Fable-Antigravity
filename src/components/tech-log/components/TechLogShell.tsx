@@ -18,6 +18,7 @@ const TABS: Tab[] = [
   { label: 'Audit', to: '/tech-log/audit' },
 ];
 const ADMIN_TABS: Tab[] = [
+  { label: 'Integration', to: '/tech-log/integration' },
   { label: 'Fleet admin', to: '/tech-log/admin/fleet' },
   { label: 'Personnel', to: '/tech-log/admin/personnel' },
   { label: 'MEL', to: '/tech-log/admin/mel' },

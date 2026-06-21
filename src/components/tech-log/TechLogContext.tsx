@@ -6,7 +6,7 @@ import { SYSTEM_USERS } from '../../lib/mockUsers';
 
 const STORAGE_KEY = 'tech-log-state';
 const VERSION_KEY = 'tech-log-data-version';
-const DATA_VERSION = '2026-06-21-v1';
+const DATA_VERSION = '2026-06-21-v2';
 
 function loadInitialState(): TechLogState {
   try {
@@ -50,6 +50,15 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
         : { ...state, personnel: [...state.personnel, action.payload] };
     case 'EDIT_MEL_ITEM':
       return { ...state, melItems: state.melItems.map(m => (m.id === action.payload.id ? action.payload : m)) };
+    case 'UPSERT_CAMP_CORRELATION':
+      return {
+        ...state,
+        campCorrelation: state.campCorrelation.some(c => c.mygfoEntityId === action.payload.mygfoEntityId)
+          ? state.campCorrelation.map(c => (c.mygfoEntityId === action.payload.mygfoEntityId ? action.payload : c))
+          : [...state.campCorrelation, action.payload],
+      };
+    case 'ADD_INTEGRATION_EVENT':
+      return { ...state, integrationEvents: [action.payload, ...state.integrationEvents].slice(0, 200) };
     case 'RESET_STATE':
       return action.payload;
     default:

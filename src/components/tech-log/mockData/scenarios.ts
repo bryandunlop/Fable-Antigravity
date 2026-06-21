@@ -77,6 +77,8 @@ export function getDefaultState(): TechLogState {
     releases: [],
     signatures,
     audit,
+    campCorrelation: [],
+    integrationEvents: [],
     currentUserOid: 'USR001',
   };
 }
