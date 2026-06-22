@@ -22,11 +22,26 @@ describe('deferralsRequiringAck', () => {
   it('excludes non-ACTIVE deferrals', () => {
     expect(deferralsRequiringAck('ac1', { deferrals: [deferral({ status: 'PENDING_PLACARD', restrictionText: 'x' })], melItems: [mel()] }, NOW)).toHaveLength(0);
   });
+  it('excludes ACTIVE deferrals on a different aircraft', () => {
+    const otherDeferral = deferral({ id: 'df2', aircraftId: 'ac2', restrictionText: 'Day VMC only' });
+    expect(deferralsRequiringAck('ac1', { deferrals: [otherDeferral], melItems: [mel()] }, NOW)).toHaveLength(0);
+  });
 });
 
 describe('canAcceptDispatch', () => {
   it('blocks a RED aircraft', () => {
     expect(canAcceptDispatch('ac1', { aircraft: [ac], defects: [open()], deferrals: [] }, NOW).ok).toBe(false);
+  });
+  it('returns a non-empty reason string when RED', () => {
+    const result = canAcceptDispatch('ac1', { aircraft: [ac], defects: [open()], deferrals: [] }, NOW);
+    expect(result.ok).toBe(false);
+    expect(typeof result.reason).toBe('string');
+    expect(result.reason!.length).toBeGreaterThan(0);
+  });
+  it('reason is undefined when ok is true', () => {
+    const result = canAcceptDispatch('ac1', { aircraft: [ac], defects: [], deferrals: [] }, NOW);
+    expect(result.ok).toBe(true);
+    expect(result.reason).toBeUndefined();
   });
   it('allows GREEN', () => {
     expect(canAcceptDispatch('ac1', { aircraft: [ac], defects: [], deferrals: [] }, NOW).ok).toBe(true);

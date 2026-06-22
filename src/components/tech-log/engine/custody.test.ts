@@ -22,9 +22,11 @@ describe('deriveCustody §E', () => {
     expect(r.state).toBe('OFFERED');
     expect(r.drivingBriefingId).toBe('brief1');
   });
-  it('WITH_CREW after the PIC acknowledges', () => {
+  it('WITH_CREW after the PIC acknowledges, driving briefing id is set', () => {
     const b = brief({ status: 'ACKNOWLEDGED', releasedAtUtc: '2026-06-21T08:00:00Z', acknowledgedAtUtc: '2026-06-21T09:00:00Z' });
-    expect(deriveCustody(AC, { briefings: [b], postflights: [] }, '2026-06-21T10:00:00Z').state).toBe('WITH_CREW');
+    const r = deriveCustody(AC, { briefings: [b], postflights: [] }, '2026-06-21T10:00:00Z');
+    expect(r.state).toBe('WITH_CREW');
+    expect(r.drivingBriefingId).toBe('brief1');
   });
   it('IN_MAINTENANCE after a postflight reclaims it', () => {
     const b = brief({ status: 'ACKNOWLEDGED', releasedAtUtc: '2026-06-21T08:00:00Z', acknowledgedAtUtc: '2026-06-21T09:00:00Z' });
@@ -41,5 +43,24 @@ describe('deriveCustody §E', () => {
   it('respects asOfUtc — ignores future events', () => {
     const b = brief({ status: 'RELEASED', releasedAtUtc: '2026-06-25T00:00:00Z' });
     expect(deriveCustody(AC, { briefings: [b], postflights: [] }, '2026-06-22T00:00:00Z').state).toBe('IN_MAINTENANCE');
+  });
+
+  it('superseded postflight is excluded — only the replacement drives custody', () => {
+    // P1 is superseded by P2; deriveCustody must use P2 (currentRows fold) and report P2's id.
+    const p1 = postflight({ id: 'pf1', performedAtUtc: '2026-06-22T06:00:00Z' });
+    const p2 = postflight({ id: 'pf2', performedAtUtc: '2026-06-22T07:00:00Z', supersedesId: 'pf1' });
+    const r = deriveCustody(AC, { briefings: [], postflights: [p1, p2] }, '2026-06-22T08:00:00Z');
+    expect(r.state).toBe('IN_MAINTENANCE');
+    expect(r.drivingPostflightId).toBe('pf2');
+  });
+
+  it('events for a different aircraft do not affect ac1 custody', () => {
+    // A briefing release + postflight for 'ac2' must be invisible to deriveCustody('ac1').
+    const bOther = brief({ id: 'bOther', aircraftId: 'ac2', status: 'RELEASED', releasedAtUtc: '2026-06-21T08:00:00Z' });
+    const pOther = postflight({ id: 'pfOther', aircraftId: 'ac2', performedAtUtc: '2026-06-22T07:00:00Z' });
+    const r = deriveCustody(AC, { briefings: [bOther], postflights: [pOther] }, '2026-06-22T12:00:00Z');
+    expect(r.state).toBe('IN_MAINTENANCE');
+    expect(r.drivingBriefingId).toBeUndefined();
+    expect(r.drivingPostflightId).toBeUndefined();
   });
 });

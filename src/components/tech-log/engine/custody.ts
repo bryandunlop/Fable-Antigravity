@@ -1,4 +1,5 @@
 import type { TechLogState } from '../types';
+import { currentRows } from './supersede';
 
 export type CustodyState = 'IN_MAINTENANCE' | 'OFFERED' | 'WITH_CREW';
 
@@ -34,11 +35,18 @@ export function deriveCustody(
     if (b.releasedAtUtc) events.push({ at: b.releasedAtUtc, state: 'OFFERED', briefingId: b.id });
     if (b.acknowledgedAtUtc) events.push({ at: b.acknowledgedAtUtc, state: 'WITH_CREW', briefingId: b.id });
   }
-  for (const p of state.postflights.filter(p => p.aircraftId === aircraftId)) {
+  // Use currentRows to fold superseded postflights — a superseded postflight must not appear
+  // as a live custody event (which would double-count it alongside its replacement).
+  for (const p of currentRows(state.postflights).filter(p => p.aircraftId === aircraftId)) {
     events.push({ at: p.performedAtUtc, state: 'IN_MAINTENANCE', postflightId: p.id });
   }
 
-  const past = events.filter(e => e.at <= asOfUtc).sort((a, b) => a.at.localeCompare(b.at));
+  // Tie-break: on equal timestamps the later-stage state wins
+  // (e.g. a reclaim at the same instant as an ack resolves to IN_MAINTENANCE > WITH_CREW > OFFERED).
+  const rank: Record<CustodyState, number> = { OFFERED: 1, WITH_CREW: 2, IN_MAINTENANCE: 3 };
+  const past = events
+    .filter(e => e.at <= asOfUtc)
+    .sort((a, b) => a.at.localeCompare(b.at) || rank[a.state] - rank[b.state]);
   const last = past[past.length - 1];
   if (!last) return { state: 'IN_MAINTENANCE', computedAtUtc: asOfUtc };
   return {
