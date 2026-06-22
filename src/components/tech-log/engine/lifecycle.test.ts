@@ -29,4 +29,14 @@ describe('lifecycleStep', () => {
     const pf: Postflight = { id: 'pf1', aircraftId: AC, performedByOid: 'm', performedAtUtc: '2026-06-22T07:00:00Z', checklist: [], gatheredDefectIds: [], signatureId: 's' };
     expect(lifecycleStep(AC, { ...base, briefings: [b], postflights: [pf] }, '2026-06-22T08:00:00Z').step).toBe('PREFLIGHT');
   });
+  it('pre-acceptance leg does NOT promote to IN_SERVICE', () => {
+    const b = brief({ status: 'ACKNOWLEDGED', releasedAtUtc: '2026-06-21T08:00:00Z', acknowledgedAtUtc: '2026-06-21T09:00:00Z' });
+    const fl = leg({ flightDateUtc: '2026-06-21T07:00:00Z' });
+    expect(lifecycleStep(AC, { ...base, briefings: [b], flightLogs: [fl] }, '2026-06-21T10:00:00Z').step).toBe('ACCEPTED');
+  });
+  it('exact-boundary leg (flightDateUtc === acknowledgedAtUtc) promotes to IN_SERVICE', () => {
+    const b = brief({ status: 'ACKNOWLEDGED', releasedAtUtc: '2026-06-21T08:00:00Z', acknowledgedAtUtc: '2026-06-21T09:00:00Z' });
+    const fl = leg({ flightDateUtc: '2026-06-21T09:00:00Z' });
+    expect(lifecycleStep(AC, { ...base, briefings: [b], flightLogs: [fl] }, '2026-06-21T10:00:00Z').step).toBe('IN_SERVICE');
+  });
 });

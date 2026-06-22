@@ -9,7 +9,6 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
-import { canSupersede } from '../engine/authz';
 import { isDeferralExpired, computeRepairDue } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
 import { CATEGORY_DAYS, INTENT } from '../constants';
@@ -157,8 +156,6 @@ export default function AircraftDetail() {
     ...state.postflights.filter(p => p.aircraftId === ac.id).map(p => p.id),
   ]);
   const auditRows = state.audit.filter(a => acEntityIds.has(a.entityId) || a.summary.includes(ac.tailNumber)).slice(0, 25);
-
-  const signerOfDefect = (id: string) => sigById(allDefects.find(d => d.id === id)?.signatureId)?.signerOid ?? '';
 
   // ── recurring-check handlers (unchanged engine path) ──
   const accCheck = accCheckId ? state.recurringChecks.find(c => c.id === accCheckId) : undefined;
