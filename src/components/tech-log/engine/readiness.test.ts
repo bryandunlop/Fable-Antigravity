@@ -28,6 +28,12 @@ describe('deriveTripReadiness §9', () => {
     expect(r.state).toBe('RED');
     expect(r.blocker).toMatch(/grounded/i);
   });
+  it('RED precedence: aircraft grounded outranks a FRAT no-go (blocker is the aircraft, no driving leg)', () => {
+    const r = deriveTripReadiness(trip([leg({ fratScore: 25, fratStatus: 'NOT_STARTED' })]), { ...clean, defects: [defect()] }, NOW);
+    expect(r.state).toBe('RED');
+    expect(r.blocker).toMatch(/grounded/i);
+    expect(r.drivingLegId).toBeUndefined();
+  });
   it('RED: a FRAT no-go (>=25) grounds the trip', () => {
     const r = deriveTripReadiness(trip([leg({ fratScore: 25 })]), clean, NOW);
     expect(r.state).toBe('RED');

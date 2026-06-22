@@ -30,7 +30,7 @@ export function deriveTripReadiness(
   const aircraft = state.aircraft.find(a => a.id === trip.aircraftId);
   const legs = trip.legs ?? [];
 
-  // A FRAT no-go grounds the trip at the same precedence as an aircraft RED.
+  // (2) A FRAT no-go (>= 25) grounds the trip independently of serviceability — evaluated only after the aircraft-RED check above.
   const noGo = legs.find(l => l.fratScore != null && l.fratScore >= FRAT_NO_GO);
   if (noGo) return verdict('RED', { blocker: 'FRAT no-go (>= 25)', drivingLegId: noGo.id });
 
