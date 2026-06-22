@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, AlertTriangle, Wrench, FilePlus, Clock, ShieldAlert, CheckCircle2, CalendarClock, Plus,
+  ArrowLeft, Wrench, FilePlus, Clock, ShieldAlert, CheckCircle2, CalendarClock, Plus,
   Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, CloudDownload,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
@@ -27,7 +27,7 @@ import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
-import { BriefingPanel, latestBriefing } from '../components/BriefingPanel';
+import { BriefingPanel } from '../components/BriefingPanel';
 import { PostflightPanel } from '../components/PostflightPanel';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
 import { RectifyPanel } from '../components/panels/RectifyPanel';
@@ -238,7 +238,6 @@ export default function AircraftDetail() {
     });
   };
 
-  const activeBriefing = latestBriefing(state.briefings, ac.id);
   const tabCount: Partial<Record<WorkspaceTab, number>> = {
     defects: openDefects.length, deferrals: deferrals.length, workcards: workCards.filter(w => w.status !== 'COMPLETED').length,
   };
