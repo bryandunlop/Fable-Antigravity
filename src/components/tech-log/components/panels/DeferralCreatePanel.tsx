@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Search, ClipboardCheck, ShieldAlert } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { computeClockStart, computeRepairDue } from '../../engine/pl25';
+import { canDeferDefect } from '../../engine/disposition';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
 import { newId } from '../../util/id';
@@ -89,6 +90,7 @@ export function DeferralCreatePanel({
     const airframe = { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles };
     const due = dueFromCategory(selectedMel, clockStart, airframe);
     const mProcedureRequired = !!selectedMel.mProcedure?.trim();
+    const placardRequired = !!(selectedMel.placardText?.trim() || selectedMel.placardLocation?.trim());
 
     const supDefect: Defect = { ...defect, id: newId('def'), status: 'DEFERRED', supersedesId: defect.id, signatureId: sig.id };
     const deferral: Deferral = {
@@ -96,10 +98,10 @@ export function DeferralCreatePanel({
       governingMmelRevision: selectedMel.mmelRevision, governingEffectiveDate: selectedMel.effectiveDate,
       category: selectedMel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: clockStart,
       repairDueDateUtc: due.repairDueDateUtc, repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
-      restrictionText: restriction.trim() || selectedMel.provisos, placardRequired: false,
+      restrictionText: restriction.trim() || selectedMel.provisos, placardRequired,
       mProcedureRequired, placardLocation: selectedMel.placardLocation, extensionUsed: false,
       riiRequired: false, melReviewAcknowledged: true, signedByOid: user.oid, signatureId: sig.id,
-      status: mProcedureRequired ? 'PENDING_PLACARD' : 'ACTIVE',
+      status: (mProcedureRequired || placardRequired) ? 'PENDING_PLACARD' : 'ACTIVE',
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig as any });
     dispatch({ type: 'SUPERSEDE_DEFECT', payload: supDefect });
@@ -178,9 +180,9 @@ export function DeferralCreatePanel({
 
               <div className="flex gap-2">
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>
-                <Button onClick={beginSign} disabled={!isMaint || !ack}>Sign deferral</Button>
+                <Button onClick={beginSign} disabled={!canDeferDefect(user, selectedMel) || !ack}>Sign deferral</Button>
               </div>
-              {!isMaint && <p className="text-xs text-[var(--gfo-error,#EF3340)]">Only maintenance can sign deferrals.</p>}
+              {!canDeferDefect(user, selectedMel) && <p className="text-xs text-[var(--gfo-error,#EF3340)]">{user.role === 'MAINTENANCE' ? '' : 'Crew may only defer flight-crew-deferrable (FC-deferrable) MEL items.'}</p>}
             </>
           )}
         </CardContent>

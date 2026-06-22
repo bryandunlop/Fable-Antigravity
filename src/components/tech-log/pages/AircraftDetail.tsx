@@ -390,10 +390,10 @@ export default function AircraftDetail() {
                       </div>
                     ) : null}
                   </div>
-                  {isMaint && isOpen && d.status === 'OPEN' && (
+                  {(isMaint || user.crewDeferralAuthorized) && isOpen && d.status === 'OPEN' && (
                     <div className="flex shrink-0 flex-wrap gap-2">
                       <Button size="sm" variant="secondary" onClick={() => startTriage(d.id, 'defer')}><Wrench className="mr-1.5 h-4 w-4" /> Defer (MEL)</Button>
-                      <Button size="sm" onClick={() => startTriage(d.id, 'rectify')}><CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify (CRS)</Button>
+                      {isMaint && <Button size="sm" onClick={() => startTriage(d.id, 'rectify')}><CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify (CRS)</Button>}
                     </div>
                   )}
                 </CardContent>
