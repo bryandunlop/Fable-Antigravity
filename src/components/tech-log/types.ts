@@ -340,7 +340,7 @@ export interface Postflight {
   supersedesId?: string;
 }
 
-type RecordNoteTarget = 'DEFECT' | 'DEFERRAL' | 'BRIEFING' | 'POSTFLIGHT';
+export type RecordNoteTarget = 'DEFECT' | 'DEFERRAL' | 'BRIEFING' | 'POSTFLIGHT';
 export interface CoordinationMessage { id: string; aircraftId: string; authorOid: string; text: string; attachments?: Attachment[]; atUtc: string; editedAtUtc?: string; promotedToNoteId?: string; }
 export interface RecordNote { id: string; aircraftId: string; targetType: RecordNoteTarget; targetId: string; authorOid: string; authorName: string; text: string; attachments?: Attachment[]; atUtc: string; sourceMessageId?: string; supersedesId?: string; }
 
