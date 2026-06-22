@@ -15,11 +15,13 @@ export function TechLogShell({
   title,
   subtitle,
   actions,
+  status,
   children,
 }: {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  status?: ReactNode;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -45,6 +47,7 @@ export function TechLogShell({
         <div className="flex flex-wrap items-center gap-2">
           {actions}
           <DemoBanner variant="chip" />
+          {status}
           <NotificationsBell
             notifications={notifications}
             onOpen={(link) => navigate(link)}
