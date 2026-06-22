@@ -483,6 +483,8 @@ export type TechLogAction =
   | { type: 'EDIT_TRIP'; payload: Trip }
   | { type: 'ADD_BRIEFING'; payload: FlightBriefing }
   | { type: 'EDIT_BRIEFING'; payload: FlightBriefing }
+  | { type: 'ADD_POSTFLIGHT'; payload: Postflight }
+  | { type: 'SUPERSEDE_POSTFLIGHT'; payload: Postflight }
   | { type: 'DISMISS_NOTIFICATION'; payload: string }
   | { type: 'SET_PERSONA'; payload: string }
   | { type: 'EDIT_AIRCRAFT'; payload: Aircraft }

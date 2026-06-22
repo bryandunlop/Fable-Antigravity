@@ -33,6 +33,8 @@ export const INTENT = {
     'I release this aircraft for flight: the preflight maintenance items below are complete and the airworthiness status summarized in this briefing is accurate as of this signature.',
   BRIEFING_ACK:
     'I, as PIC, have reviewed this flight briefing — airworthiness status, active MEL deferrals and restrictions, open items, and fuel — and accept the aircraft for the intended flight.',
+  POSTFLIGHT:
+    'I, as maintenance, certify the postflight check below was accomplished, the aircraft is received back into maintenance custody, and any open crew squawks have been gathered for action.',
 } as const;
 
 // Standing maintenance preflight checklist (maintenance ticks these, then releases the briefing).

@@ -71,6 +71,9 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       return { ...state, briefings: [...state.briefings, action.payload] };
     case 'EDIT_BRIEFING':
       return { ...state, briefings: state.briefings.map(b => (b.id === action.payload.id ? action.payload : b)) };
+    case 'ADD_POSTFLIGHT':
+    case 'SUPERSEDE_POSTFLIGHT':
+      return { ...state, postflights: [...state.postflights, action.payload] };
     case 'DISMISS_NOTIFICATION':
       return state.dismissedNotifications.includes(action.payload)
         ? state
