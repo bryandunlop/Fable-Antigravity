@@ -153,6 +153,8 @@ export default function AircraftDetail() {
     ...workCards.map(w => w.id), ...flights.map(f => f.id), ac.id,
     ...state.recurringChecks.filter(c => c.aircraftId === ac.id).map(c => c.id),
     ...currentRows(state.recordNotes).filter(n => n.aircraftId === ac.id).map(n => n.id),
+    ...state.briefings.filter(b => b.aircraftId === ac.id).map(b => b.id),
+    ...state.postflights.filter(p => p.aircraftId === ac.id).map(p => p.id),
   ]);
   const auditRows = state.audit.filter(a => acEntityIds.has(a.entityId) || a.summary.includes(ac.tailNumber)).slice(0, 25);
 
