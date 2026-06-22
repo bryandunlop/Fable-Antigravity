@@ -40,7 +40,6 @@ export function DeferralCreatePanel({
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
   const integration = useIntegration();
-  const isMaint = user.role === 'MAINTENANCE';
   const aircraft = state.aircraft.find(a => a.id === defect.aircraftId);
 
   const [query, setQuery] = useState(`${defect.ataChapter}-`);
