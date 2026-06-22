@@ -20,11 +20,14 @@ import type {
   Signature, RecurringCheck, RecurringCheckAccomplishment, RecurringIntervalUnit, Deferral,
   MaintenanceRelease, WorkCard,
 } from '../types';
+import { deriveCustody } from '../engine/custody';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
+import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
 import { BriefingPanel, latestBriefing } from '../components/BriefingPanel';
+import { PostflightPanel } from '../components/PostflightPanel';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
 import { RectifyPanel } from '../components/panels/RectifyPanel';
 import { GatingReleasePanel } from '../components/panels/GatingReleasePanel';
@@ -47,10 +50,11 @@ const RULE_TEXT: Record<number, string> = {
 
 const CHECK_BADGE: Record<string, 'secondary' | 'destructive' | 'outline'> = { CURRENT: 'secondary', DUE_SOON: 'outline', EXPIRED: 'destructive', NEVER_DONE: 'destructive' };
 
-type WorkspaceTab = 'overview' | 'briefing' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
+type WorkspaceTab = 'overview' | 'briefing' | 'postflight' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
 const TABS: { key: WorkspaceTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'briefing', label: 'Briefing' },
+  { key: 'postflight', label: 'Postflight' },
   { key: 'defects', label: 'Defects' },
   { key: 'deferrals', label: 'Deferrals' },
   { key: 'releases', label: 'Releases' },
@@ -75,8 +79,6 @@ export default function AircraftDetail() {
 
   const [inline, setInline] = useState<Inline>(null);
   const [reportOpen, setReportOpen] = useState(false);
-  const [acceptOpen, setAcceptOpen] = useState(false);
-  const [pendingAcceptId, setPendingAcceptId] = useState('');
   // recurring checks
   const [accCheckId, setAccCheckId] = useState<string | null>(null);
   const [accSignOpen, setAccSignOpen] = useState(false);
@@ -121,13 +123,15 @@ export default function AircraftDetail() {
   const melOf = (id: string) => state.melItems.find(m => m.id === id);
   const sigById = (id?: string) => (id ? state.signatures.find(s => s.id === id) : undefined);
 
+  const custody = deriveCustody(ac.id, state, now);
+  const acceptedBriefing = currentRows(state.briefings).filter(b => b.aircraftId === ac.id && b.status === 'ACKNOWLEDGED').sort((a, b) => (b.acknowledgedAtUtc ?? '').localeCompare(a.acknowledgedAtUtc ?? ''))[0];
+
   const allDefects = currentRows(state.defects).filter(d => d.aircraftId === ac.id).sort((a, b) => b.reportedAtUtc.localeCompare(a.reportedAtUtc));
   const openDefects = allDefects.filter(d => d.status === 'OPEN' || d.status === 'DEFERRED');
   const deferrals = currentRows(state.deferrals).filter(d => d.aircraftId === ac.id && d.status !== 'CLEARED');
   const releases = currentRows(state.releases).filter(r => r.aircraftId === ac.id).sort((a, b) => b.completionDateUtc.localeCompare(a.completionDateUtc));
   const workCards = state.workCards.filter(w => w.aircraftId === ac.id).sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc));
   const flights = currentRows(state.flightLogs).filter(f => f.aircraftId === ac.id).sort((a, b) => b.flightDateUtc.localeCompare(a.flightDateUtc));
-  const lastAcceptance = state.signatures.filter(s => s.signedEntity === 'ACCEPTANCE' && s.signedEntityId === ac.id).slice(-1)[0];
 
   const checkProjections = state.recurringChecks
     .filter(c => c.aircraftId === ac.id)
@@ -170,13 +174,6 @@ export default function AircraftDetail() {
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'RECURRING_CHECK_ADDED', entityType: 'RecurringCheck', entityId: check.id, atUtc: check.createdAtUtc, summary: `${ac.tailNumber} recurring check added: ${check.name} (due until first accomplished)` } });
     setAddCheckOpen(false); setCkName(''); setCkValue('24'); setCkAta('');
     toast.warning(`${check.name} added — due immediately until accomplished and signed.`);
-  };
-
-  const beginAccept = () => { setPendingAcceptId(newId('acc')); setAcceptOpen(true); };
-  const onAccepted = (sig: Signature) => {
-    dispatch({ type: 'ADD_SIGNATURE', payload: sig });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'AIRCRAFT_ACCEPTED', entityType: 'Aircraft', entityId: ac.id, atUtc: new Date().toISOString(), summary: `${ac.tailNumber} accepted for flight by PIC ${user.displayName}` } });
-    toast.success(`${ac.tailNumber} accepted for flight by ${user.displayName}.`);
   };
 
   const extend = (d: Deferral) => {
@@ -250,9 +247,6 @@ export default function AircraftDetail() {
         <>
           <Button variant="outline" size="sm" onClick={() => navigate('/tech-log')}><ArrowLeft className="mr-1.5 h-4 w-4" /> Fleet</Button>
           <Button size="sm" onClick={() => setReportOpen(true)}><FilePlus className="mr-1.5 h-4 w-4" /> Report defect</Button>
-          {!isMaint && !ac.isProvisional && sv.status !== 'RED' && (
-            <Button size="sm" variant="secondary" onClick={beginAccept}><CheckCircle2 className="mr-1.5 h-4 w-4" /> Accept (PIC)</Button>
-          )}
         </>
       }
     >
@@ -262,10 +256,11 @@ export default function AircraftDetail() {
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-3">
               {ac.isProvisional ? <Badge variant="outline">Provisional</Badge> : <ServiceabilityChip status={sv.status} />}
+              <CustodyChip state={custody.state} />
               <span className="text-sm text-muted-foreground">{RULE_TEXT[sv.governingRule]}</span>
             </div>
-            {lastAcceptance && (
-              <span className="text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {lastAcceptance.signerName} · {new Date(lastAcceptance.signedAtUtc).toLocaleString()}</span>
+            {acceptedBriefing?.acknowledgedByOid && (
+              <span className="text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {nameOf(acceptedBriefing.acknowledgedByOid)} · {acceptedBriefing.acknowledgedAtUtc ? new Date(acceptedBriefing.acknowledgedAtUtc).toLocaleString() : ''}</span>
             )}
           </div>
           <div className="text-xs text-muted-foreground">as of {new Date(now).toLocaleString()}</div>
@@ -386,6 +381,9 @@ export default function AircraftDetail() {
 
       {/* ===== BRIEFING ===== */}
       {tab === 'briefing' && <BriefingPanel aircraft={ac} />}
+
+      {/* ===== POSTFLIGHT ===== */}
+      {tab === 'postflight' && <PostflightPanel aircraft={ac} />}
 
       {/* ===== DEFECTS (with inline triage) ===== */}
       {tab === 'defects' && (
@@ -583,8 +581,6 @@ export default function AircraftDetail() {
 
       {/* dialogs */}
       <ReportDefectDialog open={reportOpen} onOpenChange={setReportOpen} lockTail={ac.isProvisional ? undefined : ac.tailNumber} onReported={() => setTab('defects')} />
-
-      <SignCeremonyDialog open={acceptOpen} onOpenChange={setAcceptOpen} signer={user} signedEntity="ACCEPTANCE" signedEntityId={pendingAcceptId} intentStatement={INTENT.ACCEPTANCE} onSigned={onAccepted} title="Crew acceptance (PIC)" />
 
       <Dialog open={addCheckOpen} onOpenChange={setAddCheckOpen}>
         <DialogContent>
