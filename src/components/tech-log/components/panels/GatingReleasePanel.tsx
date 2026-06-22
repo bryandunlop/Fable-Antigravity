@@ -27,7 +27,7 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
   if (!aircraft) return null;
 
   const canSign = canSignPlacardDischarge(user, deferral);
-  const crewAttestation = !isMaint; // an authorized crew member signs a non-CRS placard attestation
+  const crewAttestation = !isMaint && canSign; // an *authorized* crew member signs a non-CRS placard attestation
 
   const begin = () => {
     if (!canSign) return toast.error(isMaint ? 'Cannot sign this discharge.' : 'An (M) procedure requires maintenance — crew may only attest a placard-only item.');
