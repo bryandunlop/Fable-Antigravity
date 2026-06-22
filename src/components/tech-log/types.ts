@@ -402,6 +402,8 @@ export interface Personnel {
   apCertificateNumber?: string;
   riiAuthorized: boolean;
   riiAuthorizedAta: string[];
+  crewDeferralAuthorized?: boolean; // may defer flightCrewDeferral MEL items (en-route crew lane)
+  placardAuthorized?: boolean;      // may sign a placard-only (non-(M)) discharge
   isSupervisor?: boolean;  // Chief Pilot / DOM / Chief Inspector — may file third-party corrections (SE-1)
   active: boolean;
 }
