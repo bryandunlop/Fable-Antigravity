@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { TechLogProvider } from './TechLogContext';
+import PilotHome from './pages/PilotHome';
 import FleetStatus from './pages/FleetStatus';
 import AircraftDetail from './pages/AircraftDetail';
 import WorkQueue from './pages/WorkQueue';
@@ -29,7 +30,8 @@ export default function TechLogRoutes({ userRole }: { userRole?: string }) {
   return (
     <TechLogProvider userRole={userRole}>
       <Routes>
-        <Route path="/" element={<FleetStatus />} />
+        <Route path="/" element={<PilotHome />} />
+        <Route path="fleet" element={<FleetStatus />} />
         <Route path="aircraft/:tail" element={<AircraftDetail />} />
         <Route path="work-queue" element={<WorkQueue />} />
         <Route path="journey" element={<JourneyLog />} />
