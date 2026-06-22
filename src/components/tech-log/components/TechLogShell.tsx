@@ -45,9 +45,9 @@ export function TechLogShell({
           {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {status}
           {actions}
           <DemoBanner variant="chip" />
-          {status}
           <NotificationsBell
             notifications={notifications}
             onOpen={(link) => navigate(link)}
