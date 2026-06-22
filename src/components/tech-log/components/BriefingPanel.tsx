@@ -7,6 +7,7 @@ import { currentRows } from '../engine/supersede';
 import { isDeferralExpired } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
 import { campForecast } from '../integration/campClient';
+import { deferralsRequiringAck, canAcceptDispatch } from '../engine/handover';
 import { INTENT, DEFAULT_PREFLIGHT_CHECKLIST } from '../constants';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { newId } from '../util/id';
@@ -33,6 +34,10 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   const [relOpen, setRelOpen] = useState(false);
   const [ackOpen, setAckOpen] = useState(false);
   const [pendingSigId, setPendingSigId] = useState('');
+  const [ackChecks, setAckChecks] = useState<Record<string, boolean>>({});
+  const ackDeferrals = deferralsRequiringAck(aircraft.id, state, now);
+  const allAcked = ackDeferrals.every(d => ackChecks[d.id]);
+  const acceptGate = canAcceptDispatch(aircraft.id, state, now);
 
   const briefing = latestBriefing(state.briefings, aircraft.id);
   const sv = deriveServiceability(aircraft.id, state, now);
@@ -80,7 +85,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   const onAcked = (b: FlightBriefing) => (sig: Signature) => {
     const nowIso = new Date().toISOString();
     dispatch({ type: 'ADD_SIGNATURE', payload: sig });
-    dispatch({ type: 'EDIT_BRIEFING', payload: { ...b, status: 'ACKNOWLEDGED', acknowledgedByOid: user.oid, acknowledgedAtUtc: nowIso, ackSignatureId: sig.id } });
+    dispatch({ type: 'EDIT_BRIEFING', payload: { ...b, status: 'ACKNOWLEDGED', acknowledgedByOid: user.oid, acknowledgedAtUtc: nowIso, ackSignatureId: sig.id, acknowledgedDeferralIds: ackDeferrals.map(d => d.id) } });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'BRIEFING_ACKNOWLEDGED', entityType: 'FlightBriefing', entityId: b.id, atUtc: nowIso, summary: `${aircraft.tailNumber} briefing acknowledged by PIC ${user.displayName}` } });
     toast.success(`Briefing acknowledged — ${aircraft.tailNumber} accepted for flight.`);
   };
@@ -167,15 +172,35 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   return (
     <div className="space-y-3">
       <BriefingReadout b={briefing} />
+      {!isMaint && ackDeferrals.length > 0 && (
+        <Card>
+          <CardContent className="space-y-2 p-4 text-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acknowledge each active MEL item before accepting</div>
+            {ackDeferrals.map(d => {
+              const mel = melOf(d.melItemId);
+              return (
+                <label key={d.id} className="flex items-start gap-2">
+                  <input type="checkbox" className="mt-1" checked={!!ackChecks[d.id]} onChange={() => setAckChecks(prev => ({ ...prev, [d.id]: !prev[d.id] }))} />
+                  <span>MEL {mel?.subItemNumber ?? '—'} (Cat {d.category}) — {d.restrictionText || mel?.oProcedure || mel?.title || 'restriction/placard'}</span>
+                </label>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="ghost" onClick={() => printBriefing(briefing)}><Printer className="mr-1.5 h-4 w-4" /> View / Print</Button>
         {!isMaint && (
-          <Button size="sm" onClick={beginAck}><CheckCircle2 className="mr-1.5 h-4 w-4" /> Acknowledge (PIC)</Button>
+          <Button size="sm" disabled={!acceptGate.ok || !allAcked} onClick={beginAck}>
+            <CheckCircle2 className="mr-1.5 h-4 w-4" /> Acknowledge &amp; accept (PIC)
+          </Button>
         )}
-        {isMaint && <span className="self-center text-xs text-muted-foreground">Released — awaiting crew acknowledgement.</span>}
       </div>
+      {!isMaint && !acceptGate.ok && <p className="text-xs text-[var(--gfo-error,#EF3340)]">{acceptGate.reason}</p>}
       <SignCeremonyDialog open={ackOpen} onOpenChange={setAckOpen} signer={user} signedEntity="BRIEFING" signedEntityId={pendingSigId}
-        intentStatement={INTENT.BRIEFING_ACK} payloadSummary={`${aircraft.tailNumber} briefing — serviceability ${briefing.serviceabilityAtRelease ?? sv.status}, ${deferrals.length} active MEL(s).`}
+        intentStatement={INTENT.BRIEFING_ACK} validate={() => ({ ok: acceptGate.ok, error: acceptGate.reason })}
+        payloadExtra={ackDeferrals.map(d => d.id).join(',')}
+        payloadSummary={`${aircraft.tailNumber} briefing — serviceability ${briefing.serviceabilityAtRelease ?? sv.status}, ${ackDeferrals.length} MEL item(s) acknowledged.`}
         onSigned={onAcked(briefing)} title="Acknowledge flight briefing (PIC)" />
     </div>
   );

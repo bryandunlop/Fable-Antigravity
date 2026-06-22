@@ -320,6 +320,7 @@ export interface FlightBriefing {
   acknowledgedByOid?: string;
   acknowledgedAtUtc?: string;
   ackSignatureId?: string;
+  acknowledgedDeferralIds?: string[]; // (O)/restriction/placard items the PIC ticked at acceptance
 }
 
 /**
