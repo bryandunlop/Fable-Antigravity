@@ -6,7 +6,7 @@ import { SYSTEM_USERS } from '../../lib/mockUsers';
 
 const STORAGE_KEY = 'tech-log-state';
 const VERSION_KEY = 'tech-log-data-version';
-const DATA_VERSION = '2026-06-21-v4';
+const DATA_VERSION = '2026-06-22-v5';
 
 function loadInitialState(): TechLogState {
   try {

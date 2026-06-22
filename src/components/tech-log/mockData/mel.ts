@@ -71,6 +71,7 @@ export const SEED_MEL: MelItem[] = [
     "numberInstalled": 1,
     "numberRequired": 0,
     "placardLocation": "Near Pressurization Auto/Manual Switch",
+    "placardText": "INOP — MANUAL PRESSURIZATION CTRL INOP",
     "provisos": "May be inoperative provided both automatic pressurization control systems are operative.",
     "flightCrewDeferral": true
   },
@@ -88,6 +89,7 @@ export const SEED_MEL: MelItem[] = [
     "numberInstalled": 3,
     "numberRequired": 2,
     "placardLocation": "Near Cockpit/Cabin Temp Control Switch",
+    "placardText": "INOP — TEMP CTRL ZONE INOP (1 OF 3)",
     "flightCrewDeferral": true
   },
   {
@@ -122,6 +124,7 @@ export const SEED_MEL: MelItem[] = [
     "numberInstalled": 3,
     "numberRequired": 0,
     "placardLocation": "Near Cockpit/Cabin Temp Control Switch",
+    "placardText": "INOP — AUTO TEMP CTRL INOP, USE MANUAL",
     "provisos": "May be inoperative provided: a) Associated manual control system is operative, and b) Associated temperature indicator is operative.",
     "flightCrewDeferral": true
   },

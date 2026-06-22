@@ -59,7 +59,7 @@ export function DeferralCreatePanel({
   }, [state.melItems, aircraft, query]);
 
   const selectedMel = state.melItems.find(m => m.id === selectedMelId);
-  const willGate = !!(selectedMel?.mProcedure?.trim() || selectedMel?.placardText?.trim() || selectedMel?.placardLocation?.trim());
+  const willGate = !!(selectedMel?.mProcedure?.trim() || selectedMel?.placardText?.trim());
   const cat = selectedMel?.category;
 
   if (!aircraft) return null;
@@ -90,7 +90,7 @@ export function DeferralCreatePanel({
     const airframe = { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles };
     const due = dueFromCategory(selectedMel, clockStart, airframe);
     const mProcedureRequired = !!selectedMel.mProcedure?.trim();
-    const placardRequired = !!(selectedMel.placardText?.trim() || selectedMel.placardLocation?.trim());
+    const placardRequired = !!selectedMel.placardText?.trim();
 
     const supDefect: Defect = { ...defect, id: newId('def'), status: 'DEFERRED', supersedesId: defect.id, signatureId: sig.id };
     const deferral: Deferral = {
