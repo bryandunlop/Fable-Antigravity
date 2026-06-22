@@ -21,6 +21,8 @@ export const INTENT = {
     'I certify the work described was performed and the aircraft is approved for return to service per 14 CFR 91.417.',
   GATING_RELEASE:
     'I certify the required (M) procedure and/or placard installation for this deferral was accomplished.',
+  PLACARD_ATTESTATION:
+    'I confirm the required placard is installed per the MEL provisions for this deferral.',
   RII:
     'I have independently inspected the required item and find it correctly accomplished.',
   ACCEPTANCE:

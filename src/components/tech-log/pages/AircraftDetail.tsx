@@ -11,6 +11,7 @@ import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
 import { isDeferralExpired, computeRepairDue } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
+import { canSignPlacardDischarge } from '../engine/disposition';
 import { CATEGORY_DAYS, INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
@@ -434,8 +435,8 @@ export default function AircraftDetail() {
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    {effective === 'PENDING_PLACARD' && isMaint && (
-                      <Button size="sm" onClick={() => setInline({ kind: 'gating', id: d.id })}><Wrench className="mr-1.5 h-4 w-4" /> Sign (M)/placard release</Button>
+                    {effective === 'PENDING_PLACARD' && canSignPlacardDischarge(user, d) && (
+                      <Button size="sm" onClick={() => setInline({ kind: 'gating', id: d.id })}><Wrench className="mr-1.5 h-4 w-4" /> {user.role === 'MAINTENANCE' ? 'Sign (M)/placard release' : 'Attest placard'}</Button>
                     )}
                     {effective === 'ACTIVE' && isMaint && (
                       <Button size="sm" variant="outline" onClick={() => extend(d)}><TimerReset className="mr-1.5 h-4 w-4" /> Extend</Button>
