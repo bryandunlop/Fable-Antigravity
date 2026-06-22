@@ -275,6 +275,19 @@ export interface IntermittentFaultOccurrence {
 // ── §17.5: optional multi-leg trip aggregate over per-sector journey logs. ──
 export type TripStatus = 'OPEN' | 'CLOSED';
 
+export interface TripLeg {
+  id: string;
+  sequence: number;                 // 1-based order within the trip
+  departureIcao: string;            // exact-match against Aircraft.homeBase for the fuel rule
+  arrivalIcao: string;
+  departureTimeUtc: string;
+  arrivalTimeUtc: string;
+  fratStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  fratScore?: number;               // cumulative FRAT points; >= 25 is a no-go
+  airportReviewed: boolean;         // origin + destination airport info acknowledged
+  fuelRequestId?: string;           // set when a home-base fuel-farm submission exists
+}
+
 export interface Trip {
   id: string;
   tripNumber: string;
@@ -282,6 +295,7 @@ export interface Trip {
   name: string;
   status: TripStatus;
   flightLogIds: string[];   // per-sector logs remain authoritative
+  legs?: TripLeg[];         // planned legs + per-leg preflight enrichment (non-ledger working state)
   createdByOid: string;
   createdAtUtc: string;
 }
