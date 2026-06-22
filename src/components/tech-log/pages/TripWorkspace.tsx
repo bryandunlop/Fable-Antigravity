@@ -116,7 +116,7 @@ export default function TripWorkspace() {
                   <span className={frat.cls}>{frat.label}</span>
                   <span className={l.airportReviewed ? 'text-muted-foreground' : 'text-[var(--gfo-warning,#F1B434)]'}>{l.airportReviewed ? 'Airport reviewed' : 'Airport pending'}</span>
                   {ac && requiresFuelFarmSubmission(l, ac) && (
-                    <span className={cn(fuelDue ? 'text-[var(--gfo-warning,#F1B434)]' : 'text-muted-foreground')}>{l.fuelRequestId ? 'Fuel submitted' : 'Fuel due (LUK)'}</span>
+                    <span className={cn(fuelDue ? 'text-[var(--gfo-warning,#F1B434)]' : 'text-muted-foreground')}>{l.fuelRequestId ? 'Fuel submitted' : `Fuel due (${l.departureIcao})`}</span>
                   )}
                 </div>
               </div>
