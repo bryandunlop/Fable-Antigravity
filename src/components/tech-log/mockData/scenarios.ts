@@ -224,7 +224,32 @@ export function getDefaultState(): TechLogState {
 
   // ── §17.5 optional trip aggregate over per-sector logs ──
   const trips: Trip[] = [
-    { id: 'trip-1', tripNumber: 'TRIP-2041', aircraftId: 'ac-n5pg', name: 'KLUK–KTEB–KLUK round trip', status: 'CLOSED', flightLogIds: ['fl-seed-1', 'fl-seed-3'], createdByOid: pilot.oid, createdAtUtc: iso(26 * D) },
+    {
+      id: 'trip-1', tripNumber: 'TRIP-2041', aircraftId: 'ac-n5pg', name: 'KLUK–KTEB–KLUK round trip', status: 'CLOSED',
+      flightLogIds: ['fl-seed-1', 'fl-seed-3'],
+      legs: [
+        { id: 'leg-1a', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'KTEB', departureTimeUtc: '2026-05-27T19:00:00Z', arrivalTimeUtc: '2026-05-27T21:10:00Z', fratStatus: 'COMPLETED', fratScore: 11, airportReviewed: true, fuelRequestId: 'fr-seed-1' },
+        { id: 'leg-1b', sequence: 2, departureIcao: 'KTEB', arrivalIcao: 'KLUK', departureTimeUtc: '2026-06-13T19:00:00Z', arrivalTimeUtc: '2026-06-13T20:50:00Z', fratStatus: 'COMPLETED', fratScore: 8, airportReviewed: true },
+      ],
+      createdByOid: pilot.oid, createdAtUtc: iso(26 * D),
+    },
+    {
+      id: 'trip-2', tripNumber: 'TRIP-2050', aircraftId: 'ac-n2pg', name: 'KLUK–KASE–KLUK round trip', status: 'OPEN',
+      flightLogIds: [],
+      legs: [
+        { id: 'leg-2a', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'KASE', departureTimeUtc: '2026-06-23T14:30:00Z', arrivalTimeUtc: '2026-06-23T16:35:00Z', fratStatus: 'COMPLETED', fratScore: 14, airportReviewed: true },
+        { id: 'leg-2b', sequence: 2, departureIcao: 'KASE', arrivalIcao: 'KLUK', departureTimeUtc: '2026-06-24T15:00:00Z', arrivalTimeUtc: '2026-06-24T17:05:00Z', fratStatus: 'COMPLETED', fratScore: 9, airportReviewed: true },
+      ],
+      createdByOid: pilot.oid, createdAtUtc: iso(1 * D),
+    },
+    {
+      id: 'trip-3', tripNumber: 'TRIP-2055', aircraftId: 'ac-n5pg', name: 'KTEB–KLUK repositioning', status: 'OPEN',
+      flightLogIds: [],
+      legs: [
+        { id: 'leg-3a', sequence: 1, departureIcao: 'KTEB', arrivalIcao: 'KLUK', departureTimeUtc: '2026-06-23T12:00:00Z', arrivalTimeUtc: '2026-06-23T13:50:00Z', fratStatus: 'COMPLETED', fratScore: 7, airportReviewed: true },
+      ],
+      createdByOid: pilot.oid, createdAtUtc: iso(2 * D),
+    },
   ];
 
   // ── A maintenance flight briefing on N2PG (GREEN), RELEASED and awaiting PIC acknowledgement —
