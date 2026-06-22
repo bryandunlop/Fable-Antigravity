@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Route as RouteIcon, Plus, Plane, Lock, Unlock } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
 import { newId } from '../util/id';
 import type { Trip, FlightLog } from '../types';
+import { deriveTripReadiness } from '../engine/readiness';
+import { TripReadinessChip } from '../components/TripReadinessChip';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -24,8 +27,10 @@ function aggregate(flights: FlightLog[]) {
 
 export default function Trips() {
   const { state, dispatch } = useTechLog();
+  const navigate = useNavigate();
   const user = useCurrentUser();
   const dispatchable = state.aircraft.filter(a => !a.isProvisional);
+  const now = new Date().toISOString();
 
   const [open, setOpen] = useState(false);
   const [tail, setTail] = useState(dispatchable[0]?.tailNumber ?? '');
@@ -78,6 +83,7 @@ export default function Trips() {
         {trips.map(t => {
           const flights = t.flightLogIds.map(flightById).filter(Boolean) as FlightLog[];
           const agg = aggregate(flights);
+          const readiness = deriveTripReadiness(t, state, now);
           return (
             <Card key={t.id}>
               <CardContent className="p-4">
@@ -85,9 +91,10 @@ export default function Trips() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <RouteIcon className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold">{t.tripNumber}</span>
+                      <button className="font-semibold hover:underline" onClick={() => navigate(`/tech-log/trips/${t.id}`)}>{t.tripNumber}</button>
                       <span className="font-semibold">{tailOf(t.aircraftId)}</span>
                       <Badge variant={t.status === 'OPEN' ? 'secondary' : 'outline'}>{t.status}</Badge>
+                      <TripReadinessChip state={readiness.state} />
                     </div>
                     <p className="mt-1 text-sm">{t.name}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
