@@ -21,6 +21,7 @@ import type {
   MaintenanceRelease, WorkCard,
 } from '../types';
 import { deriveCustody } from '../engine/custody';
+import { lifecycleStep } from '../engine/lifecycle';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
 import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
@@ -31,6 +32,8 @@ import { PostflightPanel } from '../components/PostflightPanel';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
 import { RectifyPanel } from '../components/panels/RectifyPanel';
 import { GatingReleasePanel } from '../components/panels/GatingReleasePanel';
+import { LifecycleStepper, type StepKey } from '../components/LifecycleStepper';
+import { ActivityFeed } from '../components/ActivityFeed';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -50,11 +53,8 @@ const RULE_TEXT: Record<number, string> = {
 
 const CHECK_BADGE: Record<string, 'secondary' | 'destructive' | 'outline'> = { CURRENT: 'secondary', DUE_SOON: 'outline', EXPIRED: 'destructive', NEVER_DONE: 'destructive' };
 
-type WorkspaceTab = 'overview' | 'briefing' | 'postflight' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
+type WorkspaceTab = 'workspace' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
 const TABS: { key: WorkspaceTab; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'briefing', label: 'Briefing' },
-  { key: 'postflight', label: 'Postflight' },
   { key: 'defects', label: 'Defects' },
   { key: 'deferrals', label: 'Deferrals' },
   { key: 'releases', label: 'Releases' },
@@ -74,7 +74,7 @@ export default function AircraftDetail() {
   const integration = useIntegration();
   const isMaint = user.role === 'MAINTENANCE';
 
-  const tab = (params.get('tab') as WorkspaceTab) || 'overview';
+  const tab = (params.get('tab') as WorkspaceTab) || 'workspace';
   const setTab = (t: WorkspaceTab) => setParams(prev => { const p = new URLSearchParams(prev); p.set('tab', t); p.delete('deferral'); p.delete('gating'); p.delete('defect'); return p; }, { replace: true });
 
   const [inline, setInline] = useState<Inline>(null);
@@ -124,6 +124,11 @@ export default function AircraftDetail() {
   const sigById = (id?: string) => (id ? state.signatures.find(s => s.id === id) : undefined);
 
   const custody = deriveCustody(ac.id, state, now);
+  const { step } = lifecycleStep(ac.id, state, now);
+  const [activeStep, setActiveStep] = useState<StepKey>('PREFLIGHT');
+  const shownStep: StepKey = activeStep;
+  useEffect(() => { setActiveStep(prev => (prev === 'PREFLIGHT' ? step : prev)); }, [step]);
+
   const acceptedBriefing = currentRows(state.briefings).filter(b => b.aircraftId === ac.id && b.status === 'ACKNOWLEDGED').sort((a, b) => (b.acknowledgedAtUtc ?? '').localeCompare(a.acknowledgedAtUtc ?? ''))[0];
 
   const allDefects = currentRows(state.defects).filter(d => d.aircraftId === ac.id).sort((a, b) => b.reportedAtUtc.localeCompare(a.reportedAtUtc));
@@ -236,7 +241,6 @@ export default function AircraftDetail() {
   const activeBriefing = latestBriefing(state.briefings, ac.id);
   const tabCount: Partial<Record<WorkspaceTab, number>> = {
     defects: openDefects.length, deferrals: deferrals.length, workcards: workCards.filter(w => w.status !== 'COMPLETED').length,
-    briefing: activeBriefing?.status === 'RELEASED' ? 1 : 0,
   };
 
   return (
@@ -276,114 +280,32 @@ export default function AircraftDetail() {
         </Card>
       )}
 
-      {/* Workspace tab strip (distinct from the global nav) */}
-      <div className="mb-4 flex flex-wrap gap-1 rounded-lg border bg-muted/30 p-1">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={cn('rounded-md px-3 py-1.5 text-sm transition-colors', tab === t.key ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
-            {t.label}
-            {tabCount[t.key] ? <span className="ml-1.5 rounded-full bg-muted px-1.5 text-xs">{tabCount[t.key]}</span> : null}
-          </button>
-        ))}
+      {/* Lifecycle stepper drives the workspace; reference data lives behind Records */}
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div className="flex-1">
+          {tab === 'workspace' && <LifecycleStepper aircraft={ac} onSelect={(k) => { setActiveStep(k); setTab('workspace'); }} />}
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
+          <button onClick={() => setTab('workspace')} className={cn('rounded-md px-3 py-1.5 text-sm', tab === 'workspace' ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>Workspace</button>
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} className={cn('rounded-md px-3 py-1.5 text-sm', tab === t.key ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              {t.label}{tabCount[t.key] ? <span className="ml-1.5 rounded-full bg-muted px-1.5 text-xs">{tabCount[t.key]}</span> : null}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* ===== OVERVIEW ===== */}
-      {tab === 'overview' && (
+      {/* ===== WORKSPACE (stepper-driven active panel + unified feed) ===== */}
+      {tab === 'workspace' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4" /> Open defects ({openDefects.length})</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                {openDefects.length === 0 && <p className="text-sm text-muted-foreground">No open defects.</p>}
-                {openDefects.slice(0, 4).map(d => (
-                  <div key={d.id} className="rounded-md border p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">ATA {d.ataChapter} · {d.severity}</span>
-                      <Badge variant={d.status === 'OPEN' ? 'destructive' : 'secondary'}>{d.status}</Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{d.description}</p>
-                  </div>
-                ))}
-                {openDefects.length > 0 && <Button size="sm" variant="ghost" onClick={() => setTab('defects')}>Work defects →</Button>}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4" /> MEL deferrals ({deferrals.length})</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                {deferrals.length === 0 && <p className="text-sm text-muted-foreground">No active deferrals.</p>}
-                {deferrals.slice(0, 4).map(d => {
-                  const expired = isDeferralExpired(d, now, airframe);
-                  const effective = expired ? 'EXPIRED' : d.status;
-                  return (
-                    <div key={d.id} className="rounded-md border p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">MEL {melOf(d.melItemId)?.subItemNumber ?? '—'} · Cat {d.category}</span>
-                        <Badge variant={effective === 'ACTIVE' ? 'secondary' : 'destructive'}>{effective}</Badge>
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">{melOf(d.melItemId)?.title}</p>
-                    </div>
-                  );
-                })}
-                {deferrals.length > 0 && <Button size="sm" variant="ghost" onClick={() => setTab('deferrals')}>Manage deferrals →</Button>}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recurring checks */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-4 w-4" /> Recurring checks ({checkProjections.length})</CardTitle>
-              {isMaint && <Button size="sm" variant="outline" onClick={() => setAddCheckOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add check</Button>}
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {checkProjections.length === 0 && <p className="text-sm text-muted-foreground">No recurring checks defined for this aircraft.</p>}
-              {checkProjections.map(p => {
-                const grounding = p.state === 'EXPIRED' || p.state === 'NEVER_DONE';
-                const due = p.dueUtc ? new Date(p.dueUtc).toLocaleDateString() : p.dueUsage != null ? `${p.dueUsage} ${p.check.intervalUnit === 'FLIGHT_HOUR' ? 'h' : 'cyc'}` : '—';
-                const remain = p.remainingDays != null ? (p.remainingDays >= 0 ? `${p.remainingDays}d left` : `${-p.remainingDays}d overdue`) : p.remainingUsage != null ? (p.remainingUsage >= 0 ? `${p.remainingUsage} to go` : `${-p.remainingUsage} over`) : '';
-                return (
-                  <div key={p.check.id} className={`rounded-md border p-3 ${grounding ? 'border-[var(--gfo-error,#EF3340)]/40' : ''}`}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{p.check.name}</span>
-                        {p.check.ataChapter && <Badge variant="outline">ATA {p.check.ataChapter}</Badge>}
-                        <Badge variant={CHECK_BADGE[p.state]}>{p.state === 'NEVER_DONE' ? 'NEVER DONE' : p.state.replace('_', ' ')}</Badge>
-                        <span className="text-xs text-muted-foreground">every {p.check.intervalValue} {p.check.intervalUnit.replace('_', ' ').toLowerCase()}</span>
-                      </div>
-                      {isMaint && <Button size="sm" variant={grounding ? 'default' : 'outline'} onClick={() => beginAccomplish(p.check.id)}>Accomplish &amp; sign</Button>}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {p.latest ? `Last done ${new Date(p.latest.accomplishedAtUtc).toLocaleDateString()} · due ${due}${remain ? ` · ${remain}` : ''}` : 'Never accomplished — due now (grounds the aircraft until signed).'}
-                    </div>
-                    {grounding && <div className="mt-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error,#EF3340)]">Expired — aircraft is RED (rule 3) until this check is re-accomplished and signed.</div>}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          {auditRows.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4" /> Recent activity</CardTitle></CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                {auditRows.slice(0, 8).map(a => (
-                  <div key={a.id} className="flex justify-between gap-3 border-b py-1 last:border-0">
-                    <span className="text-muted-foreground">{a.summary}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{new Date(a.atUtc).toLocaleString()}</span>
-                  </div>
-                ))}
-                {auditRows.length > 8 && <Button size="sm" variant="ghost" onClick={() => setTab('audit')}>Full activity →</Button>}
-              </CardContent>
-            </Card>
+          {(shownStep === 'PREFLIGHT' || shownStep === 'RELEASED' || shownStep === 'ACCEPTED') && <BriefingPanel aircraft={ac} />}
+          {shownStep === 'IN_SERVICE' && (
+            <Card><CardContent className="p-4 text-sm text-muted-foreground">Aircraft in service with the crew. Squawks raised in flight appear in the feed below; run the Postflight step on return.</CardContent></Card>
           )}
+          {shownStep === 'POSTFLIGHT' && <PostflightPanel aircraft={ac} />}
+          <ActivityFeed aircraft={ac} auditIds={acEntityIds} />
         </div>
       )}
-
-      {/* ===== BRIEFING ===== */}
-      {tab === 'briefing' && <BriefingPanel aircraft={ac} />}
-
-      {/* ===== POSTFLIGHT ===== */}
-      {tab === 'postflight' && <PostflightPanel aircraft={ac} />}
 
       {/* ===== DEFECTS (with inline triage) ===== */}
       {tab === 'defects' && (
