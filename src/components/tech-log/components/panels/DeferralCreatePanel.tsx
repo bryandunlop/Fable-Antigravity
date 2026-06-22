@@ -60,7 +60,7 @@ export function DeferralCreatePanel({
   }, [state.melItems, aircraft, query]);
 
   const selectedMel = state.melItems.find(m => m.id === selectedMelId);
-  const willGate = !!selectedMel?.mProcedure?.trim();
+  const willGate = !!(selectedMel?.mProcedure?.trim() || selectedMel?.placardText?.trim() || selectedMel?.placardLocation?.trim());
   const cat = selectedMel?.category;
 
   if (!aircraft) return null;
@@ -79,6 +79,7 @@ export function DeferralCreatePanel({
   const beginSign = () => {
     if (!selectedMel) return toast.error('Select a governing MEL item.');
     if (!ack) return toast.error('You must acknowledge the MEL review before signing.');
+    if (!canDeferDefect(user, selectedMel)) return toast.error('You are not authorized to defer this MEL item.');
     setPendingDeferralId(newId('df'));
     setSignOpen(true);
   };
@@ -164,8 +165,8 @@ export function DeferralCreatePanel({
 
               <div className={`rounded-md p-2 text-xs ${willGate ? 'bg-[var(--gfo-error,#EF3340)]/10' : 'bg-[var(--gfo-warning,#F1B434)]/15'}`}>
                 {willGate
-                  ? 'This item carries an (M) procedure → deferral starts PENDING_PLACARD and the aircraft stays RED until a gating-discharge MaintenanceRelease is signed (two sign-offs).'
-                  : 'No (M) procedure → deferral goes ACTIVE on signing and the aircraft moves to AMBER (dispatchable under restriction).'}
+                  ? 'This item requires an (M) procedure and/or a placard → the deferral starts PENDING_PLACARD and the aircraft stays RED until the gating discharge is signed.'
+                  : 'No (M) procedure or placard → the deferral goes ACTIVE on signing and the aircraft moves to AMBER (dispatchable under restriction).'}
               </div>
 
               <div>
