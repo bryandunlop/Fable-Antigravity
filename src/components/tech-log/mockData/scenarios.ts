@@ -269,6 +269,10 @@ export function getDefaultState(): TechLogState {
     trips,
     briefings,
     postflights: [],
+    coordinationMessages: [
+      { id: 'cm-seed-1', aircraftId: 'ac-n2pg', authorOid: tech.oid, text: 'Aircraft fueled and ready for the morning KLUK–KTEB leg.', atUtc: iso(3 * H) },
+    ],
+    recordNotes: [],
     dismissedNotifications: [],
     campCorrelation: [],
     integrationEvents: [],

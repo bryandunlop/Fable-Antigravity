@@ -340,6 +340,10 @@ export interface Postflight {
   supersedesId?: string;
 }
 
+type RecordNoteTarget = 'DEFECT' | 'DEFERRAL' | 'BRIEFING' | 'POSTFLIGHT';
+export interface CoordinationMessage { id: string; aircraftId: string; authorOid: string; text: string; attachments?: Attachment[]; atUtc: string; editedAtUtc?: string; promotedToNoteId?: string; }
+export interface RecordNote { id: string; aircraftId: string; targetType: RecordNoteTarget; targetId: string; authorOid: string; authorName: string; text: string; attachments?: Attachment[]; atUtc: string; sourceMessageId?: string; supersedesId?: string; }
+
 export interface Signature {
   id: string;
   signedEntity: SignedEntity;
@@ -451,6 +455,8 @@ export interface TechLogState {
   trips: Trip[];
   briefings: FlightBriefing[];
   postflights: Postflight[];
+  coordinationMessages: CoordinationMessage[];
+  recordNotes: RecordNote[];
   dismissedNotifications: string[];     // notification keys the user has cleared
   campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
   integrationEvents: IntegrationEvent[];
@@ -486,6 +492,11 @@ export type TechLogAction =
   | { type: 'EDIT_BRIEFING'; payload: FlightBriefing }
   | { type: 'ADD_POSTFLIGHT'; payload: Postflight }
   | { type: 'SUPERSEDE_POSTFLIGHT'; payload: Postflight }
+  | { type: 'ADD_COORDINATION_MESSAGE'; payload: CoordinationMessage }
+  | { type: 'EDIT_COORDINATION_MESSAGE'; payload: CoordinationMessage }
+  | { type: 'DELETE_COORDINATION_MESSAGE'; payload: string }
+  | { type: 'ADD_RECORD_NOTE'; payload: RecordNote }
+  | { type: 'SUPERSEDE_RECORD_NOTE'; payload: RecordNote }
   | { type: 'DISMISS_NOTIFICATION'; payload: string }
   | { type: 'SET_PERSONA'; payload: string }
   | { type: 'EDIT_AIRCRAFT'; payload: Aircraft }

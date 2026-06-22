@@ -74,6 +74,15 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
     case 'ADD_POSTFLIGHT':
     case 'SUPERSEDE_POSTFLIGHT':
       return { ...state, postflights: [...state.postflights, action.payload] };
+    case 'ADD_COORDINATION_MESSAGE':
+      return { ...state, coordinationMessages: [...state.coordinationMessages, action.payload] };
+    case 'EDIT_COORDINATION_MESSAGE':
+      return { ...state, coordinationMessages: state.coordinationMessages.map(m => (m.id === action.payload.id ? action.payload : m)) };
+    case 'DELETE_COORDINATION_MESSAGE':
+      return { ...state, coordinationMessages: state.coordinationMessages.filter(m => m.id !== action.payload) };
+    case 'ADD_RECORD_NOTE':
+    case 'SUPERSEDE_RECORD_NOTE':
+      return { ...state, recordNotes: [...state.recordNotes, action.payload] };
     case 'DISMISS_NOTIFICATION':
       return state.dismissedNotifications.includes(action.payload)
         ? state
