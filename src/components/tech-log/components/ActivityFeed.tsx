@@ -33,7 +33,7 @@ export function ActivityFeed({ aircraft, auditIds }: { aircraft: Aircraft; audit
     setDraft('');
   };
 
-  // Promote a chat message onto the latest open defect (demo: simplest target); falls back to the briefing.
+  // Promote a chat message onto the latest open/deferred defect for this aircraft; toasts an error if none exists.
   const promote = (messageId: string) => {
     const m = state.coordinationMessages.find(c => c.id === messageId);
     if (!m) return;

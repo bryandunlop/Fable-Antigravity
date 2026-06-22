@@ -95,6 +95,14 @@ export default function AircraftDetail() {
 
   const ac = state.aircraft.find(a => a.tailNumber === tail);
 
+  // FIX 2: `now` and step computation must precede the early return so hooks are unconditional
+  const now = new Date().toISOString();
+  const step = ac ? lifecycleStep(ac.id, state, now).step : undefined;
+
+  // FIX 2: both hooks must be unconditional — placed above the `if (!ac)` guard
+  const [activeStep, setActiveStep] = useState<StepKey>('PREFLIGHT');
+  useEffect(() => { if (step) setActiveStep(prev => (prev === 'PREFLIGHT' ? step : prev)); }, [step]);
+
   // Deep-link: ?tab=deferrals&deferral=ID&gating=1 auto-opens the inline gating panel.
   useEffect(() => {
     const dfr = params.get('deferral');
@@ -116,7 +124,6 @@ export default function AircraftDetail() {
     );
   }
 
-  const now = new Date().toISOString();
   const sv = deriveServiceability(ac.id, state, now);
   const airframe = { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles };
   const nameOf = (oid: string) => state.personnel.find(p => p.oid === oid)?.displayName ?? oid;
@@ -124,10 +131,7 @@ export default function AircraftDetail() {
   const sigById = (id?: string) => (id ? state.signatures.find(s => s.id === id) : undefined);
 
   const custody = deriveCustody(ac.id, state, now);
-  const { step } = lifecycleStep(ac.id, state, now);
-  const [activeStep, setActiveStep] = useState<StepKey>('PREFLIGHT');
   const shownStep: StepKey = activeStep;
-  useEffect(() => { setActiveStep(prev => (prev === 'PREFLIGHT' ? step : prev)); }, [step]);
 
   const acceptedBriefing = currentRows(state.briefings).filter(b => b.aircraftId === ac.id && b.status === 'ACKNOWLEDGED').sort((a, b) => (b.acknowledgedAtUtc ?? '').localeCompare(a.acknowledgedAtUtc ?? ''))[0];
 
@@ -143,11 +147,12 @@ export default function AircraftDetail() {
     .map(c => projectCheck(c, state.recurringAccomplishments, now, airframe))
     .sort((a, b) => (a.state === 'EXPIRED' || a.state === 'NEVER_DONE' ? -1 : 1) - (b.state === 'EXPIRED' || b.state === 'NEVER_DONE' ? -1 : 1));
 
-  // per-aircraft audit slice
+  // per-aircraft audit slice (FIX 3: include record-note ids so NOTE_PROMOTED events appear in the feed)
   const acEntityIds = new Set<string>([
     ...allDefects.map(d => d.id), ...deferrals.map(d => d.id), ...releases.map(r => r.id),
     ...workCards.map(w => w.id), ...flights.map(f => f.id), ac.id,
     ...state.recurringChecks.filter(c => c.aircraftId === ac.id).map(c => c.id),
+    ...currentRows(state.recordNotes).filter(n => n.aircraftId === ac.id).map(n => n.id),
   ]);
   const auditRows = state.audit.filter(a => acEntityIds.has(a.entityId) || a.summary.includes(ac.tailNumber)).slice(0, 25);
 
@@ -302,6 +307,40 @@ export default function AircraftDetail() {
             <Card><CardContent className="p-4 text-sm text-muted-foreground">Aircraft in service with the crew. Squawks raised in flight appear in the feed below; run the Postflight step on return.</CardContent></Card>
           )}
           {shownStep === 'POSTFLIGHT' && <PostflightPanel aircraft={ac} />}
+
+          {/* FIX 1: Recurring-checks card — dispatch-gating; an expired check grounds the aircraft RED (rule 3) */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-4 w-4" /> Recurring checks ({checkProjections.length})</CardTitle>
+              {isMaint && <Button size="sm" variant="outline" onClick={() => setAddCheckOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add check</Button>}
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {checkProjections.length === 0 && <p className="text-sm text-muted-foreground">No recurring checks defined for this aircraft.</p>}
+              {checkProjections.map(p => {
+                const grounding = p.state === 'EXPIRED' || p.state === 'NEVER_DONE';
+                const due = p.dueUtc ? new Date(p.dueUtc).toLocaleDateString() : p.dueUsage != null ? `${p.dueUsage} ${p.check.intervalUnit === 'FLIGHT_HOUR' ? 'h' : 'cyc'}` : '—';
+                const remain = p.remainingDays != null ? (p.remainingDays >= 0 ? `${p.remainingDays}d left` : `${-p.remainingDays}d overdue`) : p.remainingUsage != null ? (p.remainingUsage >= 0 ? `${p.remainingUsage} to go` : `${-p.remainingUsage} over`) : '';
+                return (
+                  <div key={p.check.id} className={`rounded-md border p-3 ${grounding ? 'border-[var(--gfo-error,#EF3340)]/40' : ''}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{p.check.name}</span>
+                        {p.check.ataChapter && <Badge variant="outline">ATA {p.check.ataChapter}</Badge>}
+                        <Badge variant={CHECK_BADGE[p.state]}>{p.state === 'NEVER_DONE' ? 'NEVER DONE' : p.state.replace('_', ' ')}</Badge>
+                        <span className="text-xs text-muted-foreground">every {p.check.intervalValue} {p.check.intervalUnit.replace('_', ' ').toLowerCase()}</span>
+                      </div>
+                      {isMaint && <Button size="sm" variant={grounding ? 'default' : 'outline'} onClick={() => beginAccomplish(p.check.id)}>Accomplish &amp; sign</Button>}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {p.latest ? `Last done ${new Date(p.latest.accomplishedAtUtc).toLocaleDateString()} · due ${due}${remain ? ` · ${remain}` : ''}` : 'Never accomplished — due now (grounds the aircraft until signed).'}
+                    </div>
+                    {grounding && <div className="mt-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error,#EF3340)]">Expired — aircraft is RED (rule 3) until this check is re-accomplished and signed.</div>}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
           <ActivityFeed aircraft={ac} auditIds={acEntityIds} />
         </div>
       )}
