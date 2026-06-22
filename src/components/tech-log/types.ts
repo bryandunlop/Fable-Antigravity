@@ -154,7 +154,8 @@ export type SignedEntity =
   | 'ACCEPTANCE'
   | 'RECURRING_CHECK'
   | 'WORK_CARD'
-  | 'BRIEFING';
+  | 'BRIEFING'
+  | 'POSTFLIGHT';
 
 // ── Phase 3: work-card execution + parts/labor (D10) ──
 export type WorkCardStatus = 'OPEN' | 'IN_WORK' | 'COMPLETED';
@@ -321,6 +322,23 @@ export interface FlightBriefing {
   ackSignatureId?: string;
 }
 
+/**
+ * Maintenance postflight on return. Signing this reclaims custody to maintenance (design §E) and
+ * gathers the trip's still-open squawks into the work queue. Not a CRS, not a pilot handback.
+ */
+export interface Postflight {
+  id: string;
+  aircraftId: string;
+  briefingId?: string;        // the dispatch this closes, if known
+  performedByOid: string;     // maintenance
+  performedAtUtc: string;
+  checklist: BriefingChecklistItem[];
+  notes?: string;
+  gatheredDefectIds: string[]; // still-open squawks gathered for the work queue
+  signatureId: string;
+  supersedesId?: string;
+}
+
 export interface Signature {
   id: string;
   signedEntity: SignedEntity;
@@ -431,6 +449,7 @@ export interface TechLogState {
   intermittentOccurrences: IntermittentFaultOccurrence[];
   trips: Trip[];
   briefings: FlightBriefing[];
+  postflights: Postflight[];
   dismissedNotifications: string[];     // notification keys the user has cleared
   campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
   integrationEvents: IntegrationEvent[];

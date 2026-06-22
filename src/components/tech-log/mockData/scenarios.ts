@@ -268,6 +268,7 @@ export function getDefaultState(): TechLogState {
     intermittentOccurrences,
     trips,
     briefings,
+    postflights: [],
     dismissedNotifications: [],
     campCorrelation: [],
     integrationEvents: [],
