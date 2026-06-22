@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { PenLine, ShieldCheck, Fingerprint } from 'lucide-react';
+import { PenLine, ShieldCheck, Fingerprint, Paperclip } from 'lucide-react';
 import type { Personnel, Signature, SignedEntity } from '../types';
 import { makeSignature } from '../engine/signing';
 import { newId } from '../util/id';
@@ -21,6 +21,8 @@ export function SignCeremonyDialog({
   validate,
   onSigned,
   title = 'Electronic signature',
+  payloadExtra,
+  payloadSummary,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -33,6 +35,8 @@ export function SignCeremonyDialog({
   validate?: () => { ok: boolean; error?: string };
   onSigned: (sig: Signature) => void;
   title?: string;
+  payloadExtra?: string;       // extra bytes folded into the content hash (e.g. attachment digests)
+  payloadSummary?: ReactNode;  // human note shown in the ceremony, e.g. "Covers 2 attachments"
 }) {
   const [pin, setPin] = useState('');
   const stepUpOk = !requireStepUp || pin.trim().length >= 4;
@@ -51,6 +55,7 @@ export function SignCeremonyDialog({
       intentStatement,
       signedAtUtc: new Date().toISOString(),
       certNumber: certNumber ?? signer.apCertificateNumber,
+      payloadExtra,
     });
     onSigned(sig);
     setPin('');
@@ -81,6 +86,13 @@ export function SignCeremonyDialog({
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Intent</div>
             {intentStatement}
           </div>
+
+          {payloadSummary && (
+            <div className="flex items-start gap-2 rounded-md border border-dashed p-2 text-xs text-muted-foreground">
+              <Paperclip className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{payloadSummary}</span>
+            </div>
+          )}
 
           {requireStepUp ? (
             <div>

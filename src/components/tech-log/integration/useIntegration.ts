@@ -83,6 +83,25 @@ export function useIntegration() {
     }
   }
 
+  /** Refresh the airworthiness read-views (due list + component times + AD/SB) and log the reads. */
+  function refreshAirworthiness(aircraftId: string) {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    if (!ac) return;
+    camp.campLogin();
+    logEvent('CAMP', 'LogIn', 'OK', `session opened (${camp.campMeta.env})`);
+    try {
+      const due = camp.campForecast(ac.serialNumber, { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles });
+      logEvent('CAMP', 'GetAircraftDueList', 'OK', `${ac.tailNumber}: ${due.length} item(s) within 3 months`);
+      const t = camp.campComponentTimes(ac.serialNumber, ac.airframeTotalHours, ac.airframeTotalCycles);
+      logEvent('CAMP', 'GetLatestAircraftTimes', 'OK', `${ac.tailNumber}: AF ${t.airframe.hours}h · E1 ${t.eng1.hours}h · E2 ${t.eng2.hours}h · APU ${t.apu.hours}h`);
+      logEvent('CAMP', 'GetAdSbStatus (TBC fn)', 'OK', `${ac.tailNumber}: ${camp.campAdSb(ac.serialNumber).filter(x => x.status === 'OPEN').length} open AD/SB`);
+      toast.success(`Airworthiness refreshed from CAMP (sandbox) for ${ac.tailNumber}`);
+    } finally {
+      camp.campLogoff();
+      logEvent('CAMP', 'LogOff', 'OK', 'session closed');
+    }
+  }
+
   /** myairops OData prefill (pull-only, faked). */
   function prefillFlight(tailNumber: string, dateUtc: string) {
     const p = odataPullLatestFlight(tailNumber, dateUtc);
@@ -90,5 +109,39 @@ export function useIntegration() {
     return p;
   }
 
-  return { pushDiscrepancy, refreshCampReads, prefillFlight };
+  /** List open CAMP work orders for an aircraft (mock listOpenWorkOrders). */
+  function listWorkOrders(aircraftId: string) {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    if (!ac) return [];
+    camp.campLogin();
+    try {
+      const res = camp.listOpenWorkOrders(ac.serialNumber);
+      logEvent('CAMP', 'ListOpenWorkOrders', res.ok ? 'OK' : 'ERROR', `${ac.tailNumber}: ${res.data?.length ?? 0} open WO(s)`);
+      return res.data ?? [];
+    } finally {
+      camp.campLogoff();
+    }
+  }
+
+  /** Pull a CAMP work order's task-card detail (mock GetWODetails). Runs LogIn → call → LogOff. */
+  function pullWorkOrder(aircraftId: string, woNumber: string): camp.CampWoDetails | undefined {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    if (!ac) return;
+    camp.campLogin();
+    logEvent('CAMP', 'LogIn', 'OK', `session opened (${camp.campMeta.env})`);
+    try {
+      const res = camp.getWODetails(ac.serialNumber, woNumber);
+      if (res.ok && res.data) {
+        logEvent('CAMP', 'GetWODetails', 'OK', `${ac.tailNumber} ${woNumber}: ${res.data.lines.length} line(s)`);
+        return res.data;
+      }
+      logEvent('CAMP', 'GetWODetails', 'ERROR', `${res.errorCode} — ${res.errorMsg}`);
+      return undefined;
+    } finally {
+      camp.campLogoff();
+      logEvent('CAMP', 'LogOff', 'OK', 'session closed');
+    }
+  }
+
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder };
 }

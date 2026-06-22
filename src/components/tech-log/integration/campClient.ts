@@ -72,10 +72,153 @@ export function getAircraftState(serial: string, color: 'Green' | 'Yellow' | 'Or
   return { ok: true, data: { serial, state: color } };
 }
 
+// ── WRK: work-order details (Phase 3 task-card pull) ──
+export type WoLineType = 'S' | 'T'; // S = squawk, T = task
+export interface CampWoDetailLine {
+  lineType: WoLineType;
+  ata: string;
+  description: string;
+  itemStatusCode: number; // WO_ITEM_STATUS ladder
+}
+export interface CampWoDetails {
+  woNumber: string;
+  serial: string;
+  title: string;
+  ata: string;
+  headerStatusCode: number; // WO_HEADER_STATUS ladder
+  scheduled: boolean;
+  riiRequired: boolean;
+  lines: CampWoDetailLine[];
+}
+
+// Faked catalog of "open" CAMP work orders, keyed loosely so the demo can pull a few per aircraft.
+const WO_CATALOG: Omit<CampWoDetails, 'serial' | 'headerStatusCode'>[] = [
+  {
+    woNumber: 'WO-32-0455', title: 'Main Landing Gear — 600-hr functional check', ata: '32', scheduled: true, riiRequired: true,
+    lines: [
+      { lineType: 'T', ata: '32', description: 'Perform MLG retraction test per AMM 32-30-00', itemStatusCode: 5 },
+      { lineType: 'T', ata: '32', description: 'Inspect MLG actuator and downlock for leakage/wear', itemStatusCode: 5 },
+      { lineType: 'T', ata: '32', description: 'Lubricate landing gear per CMM; record grease P/N', itemStatusCode: 5 },
+    ],
+  },
+  {
+    woNumber: 'WO-21-0231', title: 'Air conditioning pack valve replacement', ata: '21', scheduled: false, riiRequired: false,
+    lines: [
+      { lineType: 'S', ata: '21', description: 'PACK 1 FAULT CAS recurring — pack flow control valve suspect', itemStatusCode: 5 },
+      { lineType: 'T', ata: '21', description: 'Remove and replace flow control valve P/N 1159SCB... ', itemStatusCode: 5 },
+      { lineType: 'T', ata: '21', description: 'Operational test of pack 1 per AMM 21-50-00', itemStatusCode: 5 },
+    ],
+  },
+  {
+    woNumber: 'WO-24-0188', title: 'APU generator GCU inspection', ata: '24', scheduled: true, riiRequired: false,
+    lines: [
+      { lineType: 'T', ata: '24', description: 'Inspect APU GCU connectors and bonding', itemStatusCode: 5 },
+      { lineType: 'T', ata: '24', description: 'Megger APU generator feeders; record values', itemStatusCode: 5 },
+    ],
+  },
+  {
+    woNumber: 'WO-27-0512', title: 'Flight control rigging check (RII)', ata: '27', scheduled: true, riiRequired: true,
+    lines: [
+      { lineType: 'T', ata: '27', description: 'Verify aileron rig pins and cable tension per AMM 27-10-00', itemStatusCode: 5 },
+      { lineType: 'T', ata: '27', description: 'Independent inspection of control continuity (RII)', itemStatusCode: 5, },
+    ],
+  },
+];
+
+/** List the open CAMP work orders available to pull for a serial (faked). */
+export function listOpenWorkOrders(serial: string): CampResult<{ woNumber: string; title: string; ata: string; scheduled: boolean; riiRequired: boolean }[]> {
+  if (!_sessionKey) return sessionError();
+  return { ok: true, data: WO_CATALOG.map(w => ({ woNumber: w.woNumber, title: w.title, ata: w.ata, scheduled: w.scheduled, riiRequired: w.riiRequired })) };
+}
+
+/** GetWODetails (WRK). Mock returns the catalog entry with task/squawk detail lines. */
+export function getWODetails(serial: string, woNumber: string): CampResult<CampWoDetails> {
+  if (!_sessionKey) return sessionError();
+  const found = WO_CATALOG.find(w => w.woNumber === woNumber);
+  if (!found) return { ok: false, errorCode: CAMP_ERROR.NO_MATCHING_RECORD.code, errorMsg: CAMP_ERROR.NO_MATCHING_RECORD.msg };
+  return { ok: true, data: { ...found, serial, headerStatusCode: 1 } }; // 1 = Open
+}
+
 export const campMeta = { baseUrls: CAMP_BASE_URLS, env: CAMP_ENV, minutesToHours: campMinutesToHours };
 
 function hashStr(x: string): number {
   let h = 0;
   for (let i = 0; i < x.length; i++) h = (h * 31 + x.charCodeAt(i)) | 0;
   return h;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DEMO READ-VIEW DATA SOURCES (reskinning CAMP). These are deterministic MOCK
+// generators that stand in for what CAMP would return on a read, so myGFO can
+// present CAMP's data through a clean UI while CAMP remains the system of record.
+// `GetAircraftDueList` and `GetLatestAircraftTimes` are documented CAMP functions;
+// the AD/SB read below is NOT in the GEN/STA/WRK docs — it is flagged as an Open
+// Question and must be confirmed before any real implementation (no invented endpoint).
+// ──────────────────────────────────────────────────────────────────────────────
+const _D = 86400000;
+
+export type DueCategory = 'INSPECTION' | 'AD' | 'SB' | 'COMPONENT';
+export interface CampForecastItem {
+  category: DueCategory;
+  ata: string;
+  description: string;
+  dueDateUtc?: string;   // calendar due (≤ 3-month projection cap)
+  dueHours?: number;     // airframe-hours due
+  dueCycles?: number;    // airframe-cycles due
+}
+
+/** Mock GetAircraftDueList (≤3-month projection, calendar units). Deterministic per serial. */
+export function campForecast(serial: string, airframe: { hours: number; cycles: number }): CampForecastItem[] {
+  const now = Date.now();
+  const s = Math.abs(hashStr(serial));
+  const at = (days: number) => new Date(now + days * _D).toISOString();
+  return [
+    { category: 'INSPECTION', ata: '05', description: 'Phase A inspection', dueDateUtc: at(12 + (s % 6)), dueHours: Math.round(airframe.hours + 38) },
+    { category: 'AD', ata: '27', description: 'AD 2024-12-05 flight-control rigging (recurring)', dueDateUtc: at(5 + (s % 4)) },
+    { category: 'INSPECTION', ata: '24', description: 'Battery capacity check', dueDateUtc: at(21) },
+    { category: 'SB', ata: '21', description: 'SB 21-117 pack controller upgrade', dueDateUtc: at(45 + (s % 20)) },
+    { category: 'COMPONENT', ata: '32', description: 'MLG overhaul (life-limited)', dueDateUtc: at(80), dueHours: Math.round(airframe.hours + 620), dueCycles: airframe.cycles + 410 },
+  ];
+}
+
+export interface CampComponentTimes {
+  serial: string;
+  airframe: { hours: number; cycles: number };
+  eng1: { hours: number; cycles: number };
+  eng2: { hours: number; cycles: number };
+  apu: { hours: number };
+}
+/** Mock GetLatestAircraftTimes broken out by major component (CAMP stores minutes; ÷60 here). */
+export function campComponentTimes(serial: string, airframeHours: number, cycles: number): CampComponentTimes {
+  const s = Math.abs(hashStr(serial));
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  return {
+    serial,
+    airframe: { hours: airframeHours, cycles },
+    eng1: { hours: r1(airframeHours - 60 - (s % 30)), cycles: cycles - (20 + (s % 15)) },
+    eng2: { hours: r1(airframeHours - 48 - (s % 25)), cycles: cycles - (15 + (s % 12)) },
+    apu: { hours: r1(airframeHours * 0.48) },
+  };
+}
+
+export interface CampAdSbItem {
+  id: string;
+  kind: 'AD' | 'SB';
+  subject: string;
+  recurrence: 'ONE_TIME' | 'RECURRING';
+  status: 'OPEN' | 'COMPLIED';
+  ata: string;
+  nextDueUtc?: string;
+}
+/** Mock AD/SB status. ⚠ The real CAMP read function for this is NOT documented (Open Question). */
+export function campAdSb(serial: string): CampAdSbItem[] {
+  const now = Date.now();
+  const s = Math.abs(hashStr(serial));
+  const at = (days: number) => new Date(now + days * _D).toISOString();
+  return [
+    { id: 'AD-2024-12-05', kind: 'AD', subject: 'Flight-control rigging recurring inspection', recurrence: 'RECURRING', status: 'OPEN', ata: '27', nextDueUtc: at(5 + (s % 4)) },
+    { id: 'AD-2023-08-11', kind: 'AD', subject: 'Fuel boost-pump wiring inspection', recurrence: 'ONE_TIME', status: 'COMPLIED', ata: '28' },
+    { id: 'SB-650-32-117', kind: 'SB', subject: 'MLG actuator seal upgrade', recurrence: 'ONE_TIME', status: 'OPEN', ata: '32', nextDueUtc: at(40 + (s % 30)) },
+    { id: 'SB-650-21-090', kind: 'SB', subject: 'Pack controller software load', recurrence: 'ONE_TIME', status: 'COMPLIED', ata: '21' },
+  ];
 }

@@ -1,19 +1,22 @@
 import type { Serviceability, TechLogState, Deferral } from '../types';
 import { currentRows } from './supersede';
 import { isDeferralExpired } from './pl25';
+import { expiredChecksFor } from './recurringChecks';
 
 export interface ServiceabilityResult {
   status: Serviceability;
   governingRule: number;
   drivingDefectId?: string;
   drivingDeferralId?: string;
+  drivingCheckId?: string;
   computedAtUtc: string;
 }
 
 /** Derived serviceability projection — design §14.2, first-match-wins precedence. */
 export function deriveServiceability(
   aircraftId: string,
-  state: Pick<TechLogState, 'aircraft' | 'defects' | 'deferrals'>,
+  state: Pick<TechLogState, 'aircraft' | 'defects' | 'deferrals'> &
+    Partial<Pick<TechLogState, 'recurringChecks' | 'recurringAccomplishments'>>,
   asOfUtc: string,
 ): ServiceabilityResult {
   const ac = state.aircraft.find(a => a.id === aircraftId);
@@ -43,12 +46,13 @@ export function deriveServiceability(
   const result = (
     status: Serviceability,
     governingRule: number,
-    ids: { defect?: string; deferral?: string } = {},
+    ids: { defect?: string; deferral?: string; check?: string } = {},
   ): ServiceabilityResult => ({
     status,
     governingRule,
     drivingDefectId: ids.defect,
     drivingDeferralId: ids.deferral,
+    drivingCheckId: ids.check,
     computedAtUtc: asOfUtc,
   });
 
@@ -59,7 +63,9 @@ export function deriveServiceability(
   // Rule 2: any deferral expired/overdue -> RED
   const expired = deferrals.find(df => effectiveStatus(df) === 'EXPIRED');
   if (expired) return result('RED', 2, { deferral: expired.id });
-  // Rule 3 (recurring dispatch-gating checks) — not in Slice 0; inert.
+  // Rule 3: an expired (or never-accomplished) recurring dispatch-gating check -> RED (§17.4)
+  const expiredCheck = expiredChecksFor(aircraftId, state, asOfUtc)[0];
+  if (expiredCheck) return result('RED', 3, { check: expiredCheck.id });
   // Rule 4: any ACTIVE deferral -> AMBER
   const active = deferrals.find(df => effectiveStatus(df) === 'ACTIVE');
   if (active) return result('AMBER', 4, { deferral: active.id });

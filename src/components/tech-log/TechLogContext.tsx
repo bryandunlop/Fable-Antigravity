@@ -6,7 +6,7 @@ import { SYSTEM_USERS } from '../../lib/mockUsers';
 
 const STORAGE_KEY = 'tech-log-state';
 const VERSION_KEY = 'tech-log-data-version';
-const DATA_VERSION = '2026-06-21-v2';
+const DATA_VERSION = '2026-06-21-v4';
 
 function loadInitialState(): TechLogState {
   try {
@@ -33,11 +33,48 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
     case 'ADD_RELEASE':
       return { ...state, releases: [...state.releases, action.payload] };
     case 'ADD_FLIGHTLOG':
+    case 'SUPERSEDE_FLIGHTLOG':
       return { ...state, flightLogs: [...state.flightLogs, action.payload] };
     case 'ADD_SIGNATURE':
       return { ...state, signatures: [...state.signatures, action.payload] };
     case 'ADD_AUDIT':
       return { ...state, audit: [action.payload, ...state.audit].slice(0, 500) };
+    case 'ADD_WORK_CARD':
+      return { ...state, workCards: [...state.workCards, action.payload] };
+    case 'EDIT_WORK_CARD':
+      return { ...state, workCards: state.workCards.map(w => (w.id === action.payload.id ? action.payload : w)) };
+    case 'ADD_PART_USAGE':
+      return { ...state, partUsages: [...state.partUsages, action.payload] };
+    case 'DELETE_PART_USAGE':
+      return { ...state, partUsages: state.partUsages.filter(p => p.id !== action.payload) };
+    case 'ADD_LABOR_ENTRY':
+      return { ...state, laborEntries: [...state.laborEntries, action.payload] };
+    case 'DELETE_LABOR_ENTRY':
+      return { ...state, laborEntries: state.laborEntries.filter(l => l.id !== action.payload) };
+    case 'ADD_RECURRING_CHECK':
+      return { ...state, recurringChecks: [...state.recurringChecks, action.payload] };
+    case 'EDIT_RECURRING_CHECK':
+      return { ...state, recurringChecks: state.recurringChecks.map(c => (c.id === action.payload.id ? action.payload : c)) };
+    case 'ADD_RECURRING_ACCOMPLISHMENT':
+      return { ...state, recurringAccomplishments: [...state.recurringAccomplishments, action.payload] };
+    case 'ADD_INTERMITTENT_FAULT':
+      return { ...state, intermittentFaults: [...state.intermittentFaults, action.payload] };
+    case 'EDIT_INTERMITTENT_FAULT':
+      return { ...state, intermittentFaults: state.intermittentFaults.map(f => (f.id === action.payload.id ? action.payload : f)) };
+    case 'ADD_INTERMITTENT_OCCURRENCE':
+      return { ...state, intermittentOccurrences: [...state.intermittentOccurrences, action.payload] };
+    case 'ADD_TRIP':
+      return { ...state, trips: [...state.trips, action.payload] };
+    case 'EDIT_TRIP':
+      return { ...state, trips: state.trips.map(t => (t.id === action.payload.id ? action.payload : t)) };
+    case 'ADD_BRIEFING':
+      return { ...state, briefings: [...state.briefings, action.payload] };
+    case 'EDIT_BRIEFING':
+      return { ...state, briefings: state.briefings.map(b => (b.id === action.payload.id ? action.payload : b)) };
+    case 'DISMISS_NOTIFICATION':
+      return state.dismissedNotifications.includes(action.payload)
+        ? state
+        : { ...state, dismissedNotifications: [...state.dismissedNotifications, action.payload] };
     case 'SET_PERSONA':
       return { ...state, currentUserOid: action.payload };
     case 'EDIT_AIRCRAFT':
@@ -60,7 +97,11 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
     case 'ADD_INTEGRATION_EVENT':
       return { ...state, integrationEvents: [action.payload, ...state.integrationEvents].slice(0, 200) };
     case 'RESET_STATE':
-      return action.payload;
+      // Reseed everything but keep whoever is currently signed in (don't snap back to the seed pilot),
+      // as long as that person still exists in the reseeded personnel.
+      return action.payload.personnel.some(p => p.oid === state.currentUserOid)
+        ? { ...action.payload, currentUserOid: state.currentUserOid }
+        : action.payload;
     default:
       return state;
   }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plane, ChevronRight, Clock, AlertTriangle, Wrench } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
@@ -10,6 +10,8 @@ import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { cn } from '../../ui/utils';
 import type { Serviceability } from '../types';
+
+type Filter = 'ALL' | 'RED' | 'AMBER' | 'GREEN' | 'PROV';
 
 function countdown(dueIso?: string): { label: string; urgent: boolean } | null {
   if (!dueIso) return null;
@@ -30,6 +32,7 @@ export default function FleetStatus() {
   const { state } = useTechLog();
   const navigate = useNavigate();
   const now = new Date();
+  const [filter, setFilter] = useState<Filter>('ALL');
 
   const rows = useMemo(() => {
     const asOf = now.toISOString();
@@ -43,7 +46,11 @@ export default function FleetStatus() {
       );
       const dueDates = activeDeferrals.map(d => d.repairDueDateUtc).filter(Boolean) as string[];
       const nearestDue = dueDates.sort()[0];
-      return { ac, sv, openDefects, activeDeferrals, nearestDue };
+      // AOG escalation (folded in from the former AOG tab): downtime since the oldest open defect.
+      const since = openDefects.map(d => d.reportedAtUtc).sort()[0];
+      const downHours = since ? Math.floor((Date.now() - new Date(since).getTime()) / 3600000) : 0;
+      const esc = downHours >= 24 ? 'CRITICAL' : downHours >= 4 ? 'ELEVATED' : 'MONITOR';
+      return { ac, sv, openDefects, activeDeferrals, nearestDue, since, downHours, esc };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
@@ -57,16 +64,24 @@ export default function FleetStatus() {
     { RED: 0, AMBER: 0, GREEN: 0, prov: 0 } as Record<string, number>,
   );
 
-  const stat = (label: string, value: number, cls: string) => (
-    <Card>
-      <CardContent className="flex items-center justify-between p-4">
-        <div>
-          <div className="text-sm text-muted-foreground">{label}</div>
-          <div className="text-3xl font-semibold tabular-nums">{value}</div>
-        </div>
-        <span className={cn('h-10 w-10 rounded-full', cls)} />
-      </CardContent>
-    </Card>
+  const visible = rows.filter(r => {
+    if (filter === 'ALL') return true;
+    if (filter === 'PROV') return r.ac.isProvisional;
+    return !r.ac.isProvisional && r.sv === filter;
+  });
+
+  const stat = (label: string, value: number, cls: string, f: Filter) => (
+    <button onClick={() => setFilter(filter === f ? 'ALL' : f)} className="text-left">
+      <Card className={cn('transition-colors hover:bg-accent/40', filter === f && 'ring-2 ring-primary')}>
+        <CardContent className="flex items-center justify-between p-4">
+          <div>
+            <div className="text-sm text-muted-foreground">{label}</div>
+            <div className="text-3xl font-semibold tabular-nums">{value}</div>
+          </div>
+          <span className={cn('h-10 w-10 rounded-full', cls)} />
+        </CardContent>
+      </Card>
+    </button>
   );
 
   return (
@@ -74,20 +89,35 @@ export default function FleetStatus() {
       title="Fleet Status"
       subtitle={`Airworthiness picture as of ${now.toLocaleString()} · refreshes on sync`}
     >
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        {stat('Grounded', counts.RED, 'bg-[var(--gfo-error,#EF3340)]')}
-        {stat('MEL / restricted', counts.AMBER, 'bg-[var(--gfo-warning,#F1B434)]')}
-        {stat('Serviceable', counts.GREEN, 'bg-[var(--gfo-success,#00B140)]')}
-        {stat('Provisional', counts.prov, 'bg-muted-foreground/40')}
+      <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+        {stat('Grounded', counts.RED, 'bg-[var(--gfo-error,#EF3340)]', 'RED')}
+        {stat('MEL / restricted', counts.AMBER, 'bg-[var(--gfo-warning,#F1B434)]', 'AMBER')}
+        {stat('Serviceable', counts.GREEN, 'bg-[var(--gfo-success,#00B140)]', 'GREEN')}
+        {stat('Provisional', counts.prov, 'bg-muted-foreground/40', 'PROV')}
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {(['ALL', 'RED', 'AMBER', 'GREEN', 'PROV'] as Filter[]).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={cn('rounded-full border px-3 py-1 text-xs transition-colors', filter === f ? 'border-primary bg-accent font-medium' : 'text-muted-foreground hover:bg-accent/50')}>
+            {f === 'ALL' ? 'All' : f === 'RED' ? 'Grounded' : f === 'AMBER' ? 'MEL' : f === 'GREEN' ? 'Serviceable' : 'Provisional'}
+          </button>
+        ))}
+        {filter === 'RED' && <span className="text-xs text-muted-foreground">AOG view — grounded aircraft with downtime &amp; escalation.</span>}
       </div>
 
       <p className="mb-3 text-xs text-muted-foreground">
         Note: work performed by outside MROs is recorded in CAMP and may not appear here — this board reflects myGFO-signed records only.
       </p>
 
+      {visible.length === 0 && (
+        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No aircraft match this filter.</CardContent></Card>
+      )}
+
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {rows.map(({ ac, sv, openDefects, activeDeferrals, nearestDue }) => {
+        {visible.map(({ ac, sv, openDefects, activeDeferrals, nearestDue, since, downHours, esc }) => {
           const cd = countdown(nearestDue);
+          const showAog = filter === 'RED' && !ac.isProvisional && sv === 'RED';
           return (
             <button
               key={ac.id}
@@ -102,31 +132,25 @@ export default function FleetStatus() {
                   <Plane className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <div className="text-lg font-semibold leading-none">{ac.tailNumber}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {ac.type} · S/N {ac.serialNumber}
-                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">{ac.type} · S/N {ac.serialNumber}</div>
                   </div>
                 </div>
-                {ac.isProvisional ? (
-                  <Badge variant="outline">Provisional</Badge>
-                ) : (
-                  <ServiceabilityChip status={sv} />
-                )}
+                {ac.isProvisional ? <Badge variant="outline">Provisional</Badge> : <ServiceabilityChip status={sv} />}
               </div>
 
+              {showAog && (
+                <div className="mt-3 flex items-center gap-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error,#EF3340)]">
+                  <Badge variant="destructive">{esc}</Badge>
+                  down {downHours}h{since ? ` · since ${new Date(since).toLocaleString()}` : ''}
+                </div>
+              )}
+
               <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  {openDefects.length} open
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Wrench className="h-3.5 w-3.5" />
-                  {activeDeferrals.length} MEL
-                </span>
+                <span className="inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" />{openDefects.length} open</span>
+                <span className="inline-flex items-center gap-1"><Wrench className="h-3.5 w-3.5" />{activeDeferrals.length} MEL</span>
                 {cd && (
                   <span className={cn('ml-auto inline-flex items-center gap-1', cd.urgent && 'text-[var(--gfo-error,#EF3340)]')}>
-                    <Clock className="h-3.5 w-3.5" />
-                    {cd.label}
+                    <Clock className="h-3.5 w-3.5" />{cd.label}
                   </span>
                 )}
                 <ChevronRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />

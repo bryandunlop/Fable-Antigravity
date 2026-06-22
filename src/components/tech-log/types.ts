@@ -20,6 +20,20 @@ export type DefectSource = 'PIREP' | 'MAREP' | 'CABIN' | 'STRUCTURAL' | 'NEF';
 export type DefectStatus = 'OPEN' | 'DEFERRED' | 'RECTIFIED' | 'CLOSED';
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
+/** An attachment is part of the signed payload — its SHA-256 is folded into the content hash (AC 120-78B). */
+export interface Attachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  bytes: number;
+  sha256: string;        // mock digest (display-only) — folded into the signed payload
+  uri: string;           // mock object-store/data URI
+  capturedAtUtc: string;
+}
+
+/** Where on the airframe a defect was found (§17.2 structured location; drag-drop schematic is later). */
+export type DefectLocationKind = 'CABIN' | 'STRUCTURAL' | 'OTHER';
+
 export interface Defect {
   id: string;
   aircraftId: string;
@@ -30,12 +44,18 @@ export interface Defect {
   description: string;
   symptom?: string;
   eicasMessage?: string;
+  // ── structured location (§17.2) ──
+  locationKind?: DefectLocationKind;
+  cabinSeat?: string;          // LOPA seat, e.g. '12A'
+  zoneCode?: string;           // structural zone, e.g. 'WING-L-STA-340'
   locationFreetext?: string;
   severity: Severity;
   airworthinessAffecting: boolean | null; // null => treated as grounding
   status: DefectStatus;
   reportedByOid: string;
   reportedAtUtc: string;
+  attachments?: Attachment[];  // each attachment's SHA-256 is covered by the signature
+  repetitiveDefectGroupId?: string; // §3.1 — set by the repetitive-defect detector
   rectificationText?: string;
   clearedByOid?: string;
   clearedTsUtc?: string;
@@ -120,11 +140,186 @@ export interface MaintenanceRelease {
   riiRequired: boolean;
   riiInspectorOid?: string;
   riiSignatureId?: string;
+  linkedWorkCardId?: string;   // when the release certifies a completed work card (Phase 3)
+  pdfBlobUri?: string;         // WORM PDF rendering (mock)
   signatureId: string;
   supersedesId?: string;
 }
 
-export type SignedEntity = 'FLIGHT_LOG' | 'DEFECT' | 'DEFERRAL' | 'CRS' | 'ACCEPTANCE';
+export type SignedEntity =
+  | 'FLIGHT_LOG'
+  | 'DEFECT'
+  | 'DEFERRAL'
+  | 'CRS'
+  | 'ACCEPTANCE'
+  | 'RECURRING_CHECK'
+  | 'WORK_CARD'
+  | 'BRIEFING';
+
+// ── Phase 3: work-card execution + parts/labor (D10) ──
+export type WorkCardStatus = 'OPEN' | 'IN_WORK' | 'COMPLETED';
+export type WorkCardSource = 'CAMP' | 'MANUAL';
+
+export interface WorkStep {
+  id: string;
+  seq: number;
+  text: string;
+  done: boolean;
+  riiRequired?: boolean;
+}
+
+/** A pulled CAMP work order / task card under execution. Updatable WIP until the completion sign-off. */
+export interface WorkCard {
+  id: string;
+  cardNumber: string;          // myGFO card id, e.g. WC-1042
+  woNumber?: string;           // CAMP work-order number (GetWODetails)
+  aircraftId: string;
+  title: string;
+  ataChapter: string;
+  description: string;
+  steps: WorkStep[];
+  status: WorkCardStatus;
+  source: WorkCardSource;
+  headerStatusCode: number;    // CAMP WO header status ladder (0=Complied With … 6=Planned)
+  scheduled: boolean;          // scheduled task vs corrective (defect-driven)
+  linkedDefectId?: string;
+  riiRequired: boolean;
+  createdAtUtc: string;
+  completedReleaseId?: string; // MaintenanceRelease produced on completion
+  completedAtUtc?: string;
+}
+
+/** A part installed/removed under a work card. Removals feed MTBUR (§Phase 4). */
+export interface PartUsage {
+  id: string;
+  workCardId: string;
+  aircraftId: string;
+  ataChapter: string;
+  partNumber: string;
+  description: string;
+  serialNumber?: string;
+  qty: number;
+  isRotable?: boolean;
+  removedPartNumber?: string;     // the part this one replaced (unscheduled removal → MTBUR event)
+  removedSerialNumber?: string;
+  removedReason?: string;
+  installedAtUtc: string;
+  addedByOid: string;
+}
+
+export interface LaborEntry {
+  id: string;
+  workCardId: string;
+  techOid: string;
+  hours: number;
+  dateUtc: string;
+  description: string;
+}
+
+// ── §17.4: recurring dispatch-gating checks (Part-91 / IS-BAO). Expiry GROUNDS the aircraft. ──
+export type RecurringIntervalUnit = 'CALENDAR_DAY' | 'MONTH' | 'FLIGHT_HOUR' | 'CYCLE';
+
+/** Definition of a recurring check (updatable reference data). Last-accomplishment is DERIVED from the ledger. */
+export interface RecurringCheck {
+  id: string;
+  aircraftId: string;
+  name: string;
+  description?: string;
+  intervalUnit: RecurringIntervalUnit;
+  intervalValue: number;
+  ataChapter?: string;
+  active: boolean;
+  createdAtUtc: string;
+}
+
+/** A signed accomplishment of a recurring check (append-only ledger). */
+export interface RecurringCheckAccomplishment {
+  id: string;
+  checkId: string;
+  aircraftId: string;
+  accomplishedAtUtc: string;
+  accomplishedByOid: string;
+  airframeHours: number;
+  airframeCycles: number;
+  note?: string;
+  signatureId: string;
+  supersedesId?: string;
+}
+
+// ── §17.1: intermittent faults (occurrence counter; NEVER affects serviceability). ──
+export type IntermittentFaultStatus = 'MONITORING' | 'RESOLVED';
+
+/** Updatable monitoring record; occurrenceCount is derived from the append-only occurrences. */
+export interface IntermittentFault {
+  id: string;
+  aircraftId: string;
+  ataChapter: string;
+  title: string;
+  description?: string;
+  status: IntermittentFaultStatus;
+  firstObservedUtc: string;
+  createdByOid: string;
+}
+
+export interface IntermittentFaultOccurrence {
+  id: string;
+  faultId: string;
+  aircraftId: string;
+  observedAtUtc: string;
+  observedByOid: string;
+  note?: string;
+  flightLogId?: string;
+}
+
+// ── §17.5: optional multi-leg trip aggregate over per-sector journey logs. ──
+export type TripStatus = 'OPEN' | 'CLOSED';
+
+export interface Trip {
+  id: string;
+  tripNumber: string;
+  aircraftId: string;
+  name: string;
+  status: TripStatus;
+  flightLogIds: string[];   // per-sector logs remain authoritative
+  createdByOid: string;
+  createdAtUtc: string;
+}
+
+// ── Preflight checklist → Flight Briefing (maintenance → pilot handoff) ──
+export type BriefingStatus = 'DRAFT' | 'RELEASED' | 'ACKNOWLEDGED';
+
+export interface BriefingChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+  mandatory?: boolean;
+  source?: 'TEMPLATE' | 'CAMP'; // pulled from a CAMP task vs a standing template item
+}
+
+/**
+ * A maintenance "release for flight" briefing sent to the crew. The checklist + fuel + notes are
+ * captured here; the airworthiness content (serviceability, MELs, defects, coming-due) is derived
+ * live for display, with the headline serviceability snapshotted at release. Release + acknowledge
+ * are e-signed events (not a CRS — this is a dispatch briefing).
+ */
+export interface FlightBriefing {
+  id: string;
+  aircraftId: string;
+  preparedByOid: string;
+  createdAtUtc: string;
+  status: BriefingStatus;
+  checklist: BriefingChecklistItem[];
+  fuelPlannedLb?: number;
+  notes?: string;
+  // snapshot at release
+  serviceabilityAtRelease?: Serviceability;
+  releasedAtUtc?: string;
+  releaseSignatureId?: string;
+  // acknowledgement
+  acknowledgedByOid?: string;
+  acknowledgedAtUtc?: string;
+  ackSignatureId?: string;
+}
 
 export interface Signature {
   id: string;
@@ -141,9 +336,24 @@ export interface Signature {
   mockContentHash: string;  // display-only
 }
 
+/** Oil uplift in quarts, per engine + APU (§3.1). */
+export interface OilUplift {
+  eng1?: number;
+  eng2?: number;
+  apu?: number;
+}
+
+/** Ground de-/anti-ice application (§3.1): ISO 11075 fluid type + product + completion time. */
+export interface DeIceRecord {
+  fluidType: 'I' | 'II' | 'III' | 'IV';
+  fluidName?: string;          // e.g. 'Type IV 100/0'
+  startUtc?: string;           // holdover clock start (advisory)
+}
+
 export interface FlightLog {
   id: string;
   aircraftId: string;
+  tripId?: string;             // optional multi-leg trip parent (§17.5)
   sectorSequence: number;
   flightDateUtc: string;
   outUtc: string; offUtc: string; onUtc: string; inUtc: string;
@@ -151,7 +361,13 @@ export interface FlightLog {
   landings: number; cycles: number;
   picOid: string; sicOid: string;
   fuelUplift?: number;
+  oilUplift?: OilUplift;
+  deIce?: DeIceRecord;
+  delayCode?: string;          // IATA/ATA-style delay code
+  delayMinutes?: number;
+  delayAtaChapter?: string;    // chargeable system, if technical
   airframeTotalHours: number; airframeTotalCycles: number;
+  pdfBlobUri?: string;         // WORM PDF rendering (mock)
   signatureId: string;
   supersedesId?: string;
 }
@@ -163,6 +379,7 @@ export interface Personnel {
   apCertificateNumber?: string;
   riiAuthorized: boolean;
   riiAuthorizedAta: string[];
+  isSupervisor?: boolean;  // Chief Pilot / DOM / Chief Inspector — may file third-party corrections (SE-1)
   active: boolean;
 }
 
@@ -205,6 +422,16 @@ export interface TechLogState {
   releases: MaintenanceRelease[];
   signatures: Signature[];
   audit: AuditEntry[];
+  workCards: WorkCard[];
+  partUsages: PartUsage[];
+  laborEntries: LaborEntry[];
+  recurringChecks: RecurringCheck[];
+  recurringAccomplishments: RecurringCheckAccomplishment[];
+  intermittentFaults: IntermittentFault[];
+  intermittentOccurrences: IntermittentFaultOccurrence[];
+  trips: Trip[];
+  briefings: FlightBriefing[];
+  dismissedNotifications: string[];     // notification keys the user has cleared
   campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
   integrationEvents: IntegrationEvent[];
   currentUserOid: string;
@@ -218,8 +445,26 @@ export type TechLogAction =
   | { type: 'SUPERSEDE_DEFERRAL'; payload: Deferral }
   | { type: 'ADD_RELEASE'; payload: MaintenanceRelease }
   | { type: 'ADD_FLIGHTLOG'; payload: FlightLog }
+  | { type: 'SUPERSEDE_FLIGHTLOG'; payload: FlightLog }
   | { type: 'ADD_SIGNATURE'; payload: Signature }
   | { type: 'ADD_AUDIT'; payload: AuditEntry }
+  | { type: 'ADD_WORK_CARD'; payload: WorkCard }
+  | { type: 'EDIT_WORK_CARD'; payload: WorkCard }
+  | { type: 'ADD_PART_USAGE'; payload: PartUsage }
+  | { type: 'DELETE_PART_USAGE'; payload: string }
+  | { type: 'ADD_LABOR_ENTRY'; payload: LaborEntry }
+  | { type: 'DELETE_LABOR_ENTRY'; payload: string }
+  | { type: 'ADD_RECURRING_CHECK'; payload: RecurringCheck }
+  | { type: 'EDIT_RECURRING_CHECK'; payload: RecurringCheck }
+  | { type: 'ADD_RECURRING_ACCOMPLISHMENT'; payload: RecurringCheckAccomplishment }
+  | { type: 'ADD_INTERMITTENT_FAULT'; payload: IntermittentFault }
+  | { type: 'EDIT_INTERMITTENT_FAULT'; payload: IntermittentFault }
+  | { type: 'ADD_INTERMITTENT_OCCURRENCE'; payload: IntermittentFaultOccurrence }
+  | { type: 'ADD_TRIP'; payload: Trip }
+  | { type: 'EDIT_TRIP'; payload: Trip }
+  | { type: 'ADD_BRIEFING'; payload: FlightBriefing }
+  | { type: 'EDIT_BRIEFING'; payload: FlightBriefing }
+  | { type: 'DISMISS_NOTIFICATION'; payload: string }
   | { type: 'SET_PERSONA'; payload: string }
   | { type: 'EDIT_AIRCRAFT'; payload: Aircraft }
   | { type: 'EDIT_PERSONNEL'; payload: Personnel }

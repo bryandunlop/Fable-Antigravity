@@ -25,7 +25,26 @@ export const INTENT = {
     'I have independently inspected the required item and find it correctly accomplished.',
   ACCEPTANCE:
     'I, as PIC, accept this aircraft for the intended flight, having reviewed its airworthiness status and any active MEL deferrals/restrictions.',
+  CORRECTION:
+    'I certify this entry corrects and supersedes the original signed record, which is retained unaltered. The corrected entry above is accurate to the best of my knowledge.',
+  RECURRING_CHECK:
+    'I certify the recurring inspection/check identified above was accomplished and the aircraft meets its requirements as of this signature.',
+  BRIEFING_RELEASE:
+    'I release this aircraft for flight: the preflight maintenance items below are complete and the airworthiness status summarized in this briefing is accurate as of this signature.',
+  BRIEFING_ACK:
+    'I, as PIC, have reviewed this flight briefing — airworthiness status, active MEL deferrals and restrictions, open items, and fuel — and accept the aircraft for the intended flight.',
 } as const;
+
+// Standing maintenance preflight checklist (maintenance ticks these, then releases the briefing).
+export const DEFAULT_PREFLIGHT_CHECKLIST: { text: string; mandatory?: boolean }[] = [
+  { text: 'Walk-around / general external condition', mandatory: true },
+  { text: 'Tires, brakes & landing gear condition', mandatory: true },
+  { text: 'Engine & APU oil levels serviced', mandatory: true },
+  { text: 'Hydraulic & fluid levels serviced' },
+  { text: 'No new leaks or damage noted', mandatory: true },
+  { text: 'Required placards in place (active MEL items)', mandatory: true },
+  { text: 'Cabin & galley serviceable' },
+];
 
 // Function -> regulation traceability (mirrors docs/COMPLIANCE_TRACEABILITY.md §1) for the Audit > Compliance view.
 export const CFR_MATRIX: { capability: string; reg: string }[] = [
