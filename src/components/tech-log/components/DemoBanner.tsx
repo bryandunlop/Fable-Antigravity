@@ -1,6 +1,17 @@
 import { FlaskConical } from 'lucide-react';
 
-export function DemoBanner() {
+export function DemoBanner({ variant = 'banner' }: { variant?: 'banner' | 'chip' }) {
+  if (variant === 'chip') {
+    return (
+      <span
+        className="hidden items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 sm:inline-flex dark:text-amber-300"
+        title="Demo — mock data, not live airworthiness information"
+      >
+        Demo
+      </span>
+    );
+  }
+
   return (
     <div className="mb-4 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
       <FlaskConical className="h-4 w-4 shrink-0" />

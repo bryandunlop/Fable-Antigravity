@@ -7,67 +7,9 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { deriveServiceability } from '../engine/serviceability';
 import { buildWorkQueue } from '../engine/workqueue';
 import { buildNotifications, type Notification } from '../engine/notifications';
+import { resolveNav, type NavGroup, type SubItem } from '../engine/nav';
 import { Popover, PopoverTrigger, PopoverContent } from '../../ui/popover';
 import { cn } from '../../ui/utils';
-
-type SubItem = { label: string; to: string; match?: (p: string) => boolean };
-type Group = { key: string; label: string; to: string; match: (p: string) => boolean; sub?: SubItem[]; badge?: 'red' | 'urgent' };
-
-const sw = (prefix: string) => (p: string) => p.startsWith(prefix);
-const fleetMatch = (p: string) => p === '/tech-log' || p.startsWith('/tech-log/aircraft');
-const melReadMatch = (p: string) => p.startsWith('/tech-log/mel') && !p.startsWith('/tech-log/admin');
-
-// Role-adaptive top-level nav. The aircraft (tail) workspace lives under Fleet; the cross-fleet
-// "what needs a human" lives under Work Queue. Records = read/look-up; Admin = governed config.
-const GROUPS_PILOT: Group[] = [
-  { key: 'fleet', label: 'Fleet', to: '/tech-log', match: fleetMatch, badge: 'red' },
-  {
-    key: 'journey', label: 'Journey', to: '/tech-log/journey',
-    match: (p) => p.startsWith('/tech-log/journey') || p.startsWith('/tech-log/trips'),
-    sub: [
-      { label: 'Journey Log', to: '/tech-log/journey' },
-      { label: 'Trips', to: '/tech-log/trips' },
-    ],
-  },
-  { key: 'workqueue', label: 'Work Queue', to: '/tech-log/work-queue', match: sw('/tech-log/work-queue'), badge: 'urgent' },
-];
-
-const GROUPS_MAINT: Group[] = [
-  { key: 'fleet', label: 'Fleet', to: '/tech-log', match: fleetMatch, badge: 'red' },
-  { key: 'workqueue', label: 'Work Queue', to: '/tech-log/work-queue', match: (p) => p.startsWith('/tech-log/work-queue') || p.startsWith('/tech-log/work-cards'), badge: 'urgent' },
-  {
-    key: 'airworthiness', label: 'Airworthiness', to: '/tech-log/airworthiness/forecast',
-    match: (p) => p.startsWith('/tech-log/airworthiness'),
-    sub: [
-      { label: 'Forecast', to: '/tech-log/airworthiness/forecast' },
-      { label: 'Times', to: '/tech-log/airworthiness/times' },
-      { label: 'AD / SB', to: '/tech-log/airworthiness/adsb' },
-      { label: 'Work Orders', to: '/tech-log/airworthiness/workorders' },
-    ],
-  },
-  {
-    key: 'records', label: 'Records', to: '/tech-log/mel',
-    match: (p) => melReadMatch(p) || ['/tech-log/releases', '/tech-log/analytics', '/tech-log/audit', '/tech-log/trips', '/tech-log/intermittent', '/tech-log/defects', '/tech-log/deferrals'].some(r => p.startsWith(r)),
-    sub: [
-      { label: 'MEL', to: '/tech-log/mel', match: melReadMatch },
-      { label: 'Releases', to: '/tech-log/releases' },
-      { label: 'Audit', to: '/tech-log/audit' },
-      { label: 'Analytics', to: '/tech-log/analytics' },
-      { label: 'Trips', to: '/tech-log/trips' },
-      { label: 'Intermittent', to: '/tech-log/intermittent' },
-    ],
-  },
-  {
-    key: 'admin', label: 'Admin', to: '/tech-log/admin/fleet',
-    match: (p) => p.startsWith('/tech-log/admin') || p.startsWith('/tech-log/integration'),
-    sub: [
-      { label: 'Fleet admin', to: '/tech-log/admin/fleet' },
-      { label: 'Personnel', to: '/tech-log/admin/personnel' },
-      { label: 'MEL admin', to: '/tech-log/admin/mel' },
-      { label: 'Integration', to: '/tech-log/integration' },
-    ],
-  },
-];
 
 export function TechLogShell({
   title,
@@ -91,12 +33,10 @@ export function TechLogShell({
   const notifications = buildNotifications(state, user, now);
   const badgeValue = (b?: 'red' | 'urgent') => (b === 'red' ? redCount : b === 'urgent' ? urgent : 0);
 
-  const groups = user.role === 'MAINTENANCE' ? GROUPS_MAINT : GROUPS_PILOT;
-  const activeGroup = groups.find(g => g.match(pathname)) ?? groups[0];
+  const { groups, activeGroup, activeSub } = resolveNav(user.role === 'MAINTENANCE' ? 'MAINTENANCE' : 'PILOT', pathname);
 
   return (
     <div className="mx-auto max-w-7xl p-6">
-      <DemoBanner />
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
@@ -104,6 +44,7 @@ export function TechLogShell({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {actions}
+          <DemoBanner variant="chip" />
           <NotificationsBell
             notifications={notifications}
             onOpen={(link) => navigate(link)}
@@ -127,7 +68,7 @@ export function TechLogShell({
 
       {/* Primary (role-adaptive) nav */}
       <div className="mb-2 flex flex-wrap gap-1 border-b">
-        {groups.map(g => {
+        {groups.map((g: NavGroup) => {
           const active = g.match(pathname);
           const badge = badgeValue(g.badge);
           return (
@@ -153,8 +94,8 @@ export function TechLogShell({
       {/* Contextual sub-nav for the active group */}
       {activeGroup.sub && (
         <div className="mb-6 flex flex-wrap gap-1">
-          {activeGroup.sub.map(s => {
-            const active = s.match ? s.match(pathname) : pathname.startsWith(s.to);
+          {activeGroup.sub.map((s: SubItem) => {
+            const active = activeSub?.to === s.to;
             return (
               <button
                 key={s.to}
