@@ -190,6 +190,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
       )}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="ghost" onClick={() => printBriefing(briefing)}><Printer className="mr-1.5 h-4 w-4" /> View / Print</Button>
+        {isMaint && <span className="self-center text-xs text-muted-foreground">Released — awaiting crew acknowledgement.</span>}
         {!isMaint && (
           <Button size="sm" disabled={!acceptGate.ok || !allAcked} onClick={beginAck}>
             <CheckCircle2 className="mr-1.5 h-4 w-4" /> Acknowledge &amp; accept (PIC)
@@ -198,7 +199,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
       </div>
       {!isMaint && !acceptGate.ok && <p className="text-xs text-[var(--gfo-error,#EF3340)]">{acceptGate.reason}</p>}
       <SignCeremonyDialog open={ackOpen} onOpenChange={setAckOpen} signer={user} signedEntity="BRIEFING" signedEntityId={pendingSigId}
-        intentStatement={INTENT.BRIEFING_ACK} validate={() => ({ ok: acceptGate.ok, error: acceptGate.reason })}
+        intentStatement={INTENT.BRIEFING_ACK} validate={() => ({ ok: acceptGate.ok && allAcked, error: !acceptGate.ok ? acceptGate.reason : !allAcked ? 'Acknowledge each active MEL item before accepting.' : undefined })}
         payloadExtra={ackDeferrals.map(d => d.id).join(',')}
         payloadSummary={`${aircraft.tailNumber} briefing — serviceability ${briefing.serviceabilityAtRelease ?? sv.status}, ${ackDeferrals.length} MEL item(s) acknowledged.`}
         onSigned={onAcked(briefing)} title="Acknowledge flight briefing (PIC)" />
