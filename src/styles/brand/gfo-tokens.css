@@ -1,0 +1,59 @@
+/* ============================================================
+   GFO — Global Flight Operations Sub-Brand Tokens
+   Extends: colors_and_type.css (P&G Corporate VIS ID)
+   Source: 2026 GFO Brand Identity, last modified 2026-02-24
+   ============================================================ */
+
+:root {
+  /* ---- GFO Standard Colors (proprietary GFO palette) ------
+   * These three colors are GFO's own identity, used in
+   * Office apps, signage, uniforms, and digital work.
+   * They work alongside P&G corporate blue but are NOT
+   * P&G corporate secondary colors — they are GFO-specific.
+   * --------------------------------------------------------- */
+  --gfo-midnight:       #142D7E;   /* Midnight — deep GFO navy, primary BG */
+  --gfo-daylight:       #0096FC;   /* Daylight — bright GFO blue, accent */
+  --gfo-sunrise:        #D1AC6B;   /* Sunrise  — warm gold, secondary accent */
+
+  /* ---- Derived tints / depth ----------------------------- */
+  --gfo-midnight-deep:  #0D1F5C;   /* darkened Midnight — hover / depth */
+  --gfo-midnight-light: #2A3F96;   /* lightened Midnight — subtle bg tint */
+  --gfo-daylight-deep:  #0077CC;   /* darkened Daylight — hover state */
+  --gfo-daylight-light: #7FCCFE;   /* light tint of Daylight — bg wash */
+  --gfo-sunrise-deep:   #B8913D;   /* darkened Sunrise — hover state */
+  --gfo-sunrise-light:  #EDD9A9;   /* light tint of Sunrise — bg wash */
+
+  /* ---- Semantic roles ------------------------------------ */
+  --gfo-bg:             var(--gfo-midnight);    /* primary GFO background */
+  --gfo-bg-alt:         var(--pg-white);        /* alternate white background */
+  --gfo-bg-accent:      var(--gfo-daylight);    /* highlight / PE circle fill */
+  --gfo-bg-gold:        var(--gfo-sunrise);     /* Sunrise accent panels */
+
+  --gfo-fg:             var(--pg-white);        /* type on dark GFO backgrounds */
+  --gfo-fg-alt:         var(--pg-black);        /* type on white backgrounds */
+  --gfo-fg-gold:        var(--gfo-sunrise);     /* Sunrise accent copy (callouts) */
+
+  /* ---- Logo contexts (from brand doc) --------------------
+   * Three logo variants are specified:
+   *   1. myGFO logo       — myGFO platform only
+   *   2. GFO Circles + P&G logo — email, PPT, Word, uniforms
+   *   3. Single Globe     — casual / in-house / swag
+   * --------------------------------------------------------- */
+
+  /* ---- PE Circle (Circles + P&G Logo variant) ------------
+   * Daylight blue circle, white icon.
+   * PE circle placed LEFT of P&G logo per VIS ID p.12–13.  */
+  --gfo-pe-bg:          var(--gfo-daylight);    /* Daylight circle fill */
+  --gfo-pe-fg:          var(--pg-white);        /* white icon on Daylight */
+
+  /* ---- GFO Type (follows P&G corporate spec) -------------
+   * Standard font: Montserrat.
+   * Alternates (MS Office only): Aptos, Arial, Calibri.
+   * PE name: Montserrat Medium, tracking −20 (−0.02em).    */
+  --gfo-pe-name-weight:   500;
+  --gfo-pe-name-tracking: -0.02em;
+  --gfo-pe-tag-weight:    400;
+
+  /* ---- Spacing ------------------------------------------- */
+  --gfo-pe-gap:  12px;   /* gap between PE circle and P&G logo */
+}

@@ -1,0 +1,393 @@
+/* ============================================================
+   P&G Corporate Visual Identity — Design Tokens
+   Source: P&G Corporate VIS ID Guidelines, October 2024
+   ============================================================ */
+
+/* ---- Fonts ----
+   Primary: Montserrat (P&G corporate typeface) — served from local files.
+   Fallback: Arial (substitute Montserrat Light/Regular/Medium with
+   Arial Regular; substitute Montserrat Semibold/Bold/Black with Arial Bold).
+   ----------------------------------------------------------- */
+
+/* Thin 100 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Thin.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-ThinItalic.ttf') format('truetype');
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Extra Light 200 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-ExtraLight.ttf') format('truetype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-ExtraLightItalic.ttf') format('truetype');
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Light 300 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-LightItalic.ttf') format('truetype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Regular 400 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Medium 500 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-MediumItalic.ttf') format('truetype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* SemiBold 600 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-SemiBoldItalic.ttf') format('truetype');
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Bold 700 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-BoldItalic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ExtraBold 800 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-ExtraBoldItalic.ttf') format('truetype');
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Black 900 */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-BlackItalic.ttf') format('truetype');
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* ---- Primary Palette ---------------------------------- */
+  --pg-blue:           #003DA5;   /* PMS 293 C — corporate blue */
+  --pg-cyan:           #00A3E0;   /* PMS 299 C — secondary blue */
+  --pg-yellow:         #FEDB00;   /* PMS 108 C — optimism / energy */
+  --pg-white:          #FFFFFF;
+  --pg-black:          #000000;
+
+  /* ---- Secondary Palette -------------------------------- */
+  --pg-navy:           #012169;   /* PMS 280 C */
+  --pg-magenta:        #AF1685;   /* PMS 241 C — also Recruiting */
+  --pg-pink:           #F277C6;   /* PMS 231 C */
+  --pg-light-blue:     #9ADBE8;   /* PMS 304 C — Citizenship accent */
+  --pg-red:            #EF3340;   /* PMS 032 C */
+  --pg-orange:         #E87722;   /* PMS 158 C */
+  --pg-amber:          #F1B434;   /* PMS 143 C */
+  --pg-green:          #00B140;   /* PMS 354 C */
+  --pg-lime:           #97D700;   /* PMS 375 C */
+
+  /* ---- Semantic Colors ---------------------------------- *
+   * Corporate text rule: PMS 293, black, and white only for
+   * type. Body copy is BLACK or WHITE only. Headlines may add
+   * PMS 293. Secondary palette is NEVER used as a background
+   * or type color in master corporate work.                 */
+  --pg-bg:             var(--pg-white);
+  --pg-bg-brand:       var(--pg-blue);
+  --pg-bg-accent:      var(--pg-yellow);
+  --pg-bg-cyan:        var(--pg-cyan);
+
+  --pg-fg:             var(--pg-black);          /* body on light */
+  --pg-fg-on-brand:    var(--pg-white);          /* body on PMS293 */
+  --pg-fg-muted:       #4A4A4A;                  /* secondary copy */
+  --pg-fg-accent:      var(--pg-blue);           /* link / headline accent */
+
+  --pg-rule:           #E5E7EB;                  /* hairline divider on white */
+  --pg-rule-on-brand:  rgba(255,255,255,0.18);   /* divider on PMS293 */
+
+  /* ---- Geometry & Spacing ------------------------------- */
+  --pg-radius-pill:    9999px;
+  --pg-radius-card:    0;          /* P&G prefers crisp rectangles & circles, not rounded cards */
+  --pg-radius-circle:  50%;
+
+  --pg-space-1:        4px;
+  --pg-space-2:        8px;
+  --pg-space-3:        12px;
+  --pg-space-4:        16px;
+  --pg-space-5:        24px;
+  --pg-space-6:        32px;
+  --pg-space-8:        48px;
+  --pg-space-10:       64px;
+  --pg-space-12:       96px;
+
+  /* P&G logo unit "x" — used as the basis for all logo-relative spacing.
+     Clear space is .5x on every side. Body type sits 8x from the logo
+     when used as a tagline. Macro circles are 4–6x; full circles are
+     3–4x. Use --pg-x in slide / hero scale tooling. */
+  --pg-x:              24px;
+
+  /* ---- Elevation ----------------------------------------
+   * P&G corporate work is FLAT — shadows are not part of the
+   * system. The "lift" on the logo comes from the gradient
+   * sphere itself. Tokens here exist for internal-tool UI
+   * (dashboards) only and should not be used on marketing /
+   * slide work.                                              */
+  --pg-shadow-flat:    0 1px 0 rgba(0, 61, 165, 0.06);
+  --pg-shadow-soft:    0 4px 12px rgba(0, 61, 165, 0.08);
+  --pg-shadow-strong:  0 12px 32px rgba(0, 61, 165, 0.14);
+
+  /* ---- Type Scale --------------------------------------- *
+   * Per guidelines:                                          *
+   * Headline   — Montserrat Semibold, Title Case, 0 track,   *
+   *              negative leading (e.g. 30/28)               *
+   * Subhead    — Montserrat Semibold, Title Case, 0 track,   *
+   *              positive leading (e.g. 15/17+)              *
+   * Title      — Montserrat Bold, ALL CAPS, 10–20 track,     *
+   *              positive leading (e.g. 15/15-17)            *
+   * Numerical  — Montserrat Light, -10 track, match leading  *
+   * Body       — Montserrat Regular, 0 track, positive       *
+   *              leading (e.g. 12/14-16) — black or white    */
+
+  --pg-font:           'Montserrat', Arial, system-ui, sans-serif;
+  --pg-font-display:   'Montserrat', Arial, sans-serif;
+
+  --pg-fs-display:     72px;       /* hero headline (1920 canvas) */
+  --pg-fs-h1:          48px;
+  --pg-fs-h2:          36px;
+  --pg-fs-h3:          24px;
+  --pg-fs-subhead:     20px;
+  --pg-fs-title:       14px;       /* ALL CAPS eyebrow */
+  --pg-fs-body:        16px;
+  --pg-fs-body-sm:     14px;
+  --pg-fs-caption:     12px;
+  --pg-fs-numeric:     96px;       /* big numerical callouts */
+
+  --pg-lh-display:     0.95;       /* negative leading */ /* @kind font */
+  --pg-lh-headline:    0.97; /* @kind font */
+  --pg-lh-subhead:     1.20; /* @kind font */
+  --pg-lh-body:        1.45; /* @kind font */
+  --pg-lh-tight:       1.00; /* @kind font */
+}
+
+/* ---- Base ---- */
+html, body {
+  font-family: var(--pg-font);
+  color: var(--pg-fg);
+  background: var(--pg-bg);
+  font-size: var(--pg-fs-body);
+  line-height: var(--pg-lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- Semantic type classes ---------------------------- */
+
+.pg-display {
+  font-family: var(--pg-font-display);
+  font-weight: 600;             /* Semibold */
+  font-size: var(--pg-fs-display);
+  line-height: var(--pg-lh-display);
+  letter-spacing: 0;            /* tracking 0 */
+  text-transform: none;         /* Title Case */
+  color: var(--pg-blue);
+}
+
+.pg-h1, h1 {
+  font-family: var(--pg-font-display);
+  font-weight: 600;
+  font-size: var(--pg-fs-h1);
+  line-height: var(--pg-lh-headline);
+  letter-spacing: 0;
+  color: var(--pg-blue);
+  margin: 0;
+}
+
+.pg-h2, h2 {
+  font-family: var(--pg-font-display);
+  font-weight: 600;
+  font-size: var(--pg-fs-h2);
+  line-height: var(--pg-lh-headline);
+  letter-spacing: 0;
+  color: var(--pg-blue);
+  margin: 0;
+}
+
+.pg-h3, h3 {
+  font-family: var(--pg-font);
+  font-weight: 600;
+  font-size: var(--pg-fs-h3);
+  line-height: var(--pg-lh-subhead);
+  letter-spacing: 0;
+  color: var(--pg-fg);
+  margin: 0;
+}
+
+.pg-subhead {
+  font-family: var(--pg-font);
+  font-weight: 600;
+  font-size: var(--pg-fs-subhead);
+  line-height: var(--pg-lh-subhead);
+  letter-spacing: 0;
+  color: var(--pg-fg);
+}
+
+/* ALL CAPS title / eyebrow — Montserrat Bold, 10–20 tracking */
+.pg-title {
+  font-family: var(--pg-font);
+  font-weight: 700;
+  font-size: var(--pg-fs-title);
+  line-height: 1.15;
+  letter-spacing: 0.14em;   /* ≈ 14/1000 */
+  text-transform: uppercase;
+  color: var(--pg-blue);
+}
+
+/* Large numerical call-outs — Montserrat Light, -10 tracking */
+.pg-numeric {
+  font-family: var(--pg-font);
+  font-weight: 300;
+  font-size: var(--pg-fs-numeric);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--pg-blue);
+}
+
+.pg-body, p {
+  font-family: var(--pg-font);
+  font-weight: 400;
+  font-size: var(--pg-fs-body);
+  line-height: var(--pg-lh-body);
+  letter-spacing: 0;
+  color: var(--pg-fg);
+  margin: 0;
+}
+
+.pg-body-sm {
+  font-size: var(--pg-fs-body-sm);
+  line-height: 1.5;
+}
+
+.pg-caption {
+  font-family: var(--pg-font);
+  font-weight: 500;
+  font-size: var(--pg-fs-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pg-fg-muted);
+}
+
+/* ---- Reverse (on brand blue) ---- */
+.pg-on-brand,
+.pg-on-brand .pg-display,
+.pg-on-brand .pg-h1,
+.pg-on-brand .pg-h2,
+.pg-on-brand .pg-h3,
+.pg-on-brand .pg-subhead,
+.pg-on-brand .pg-title,
+.pg-on-brand .pg-numeric,
+.pg-on-brand p,
+.pg-on-brand .pg-body {
+  color: var(--pg-white);
+}
+
+/* ---- Brand circle utility ---- */
+.pg-circle {
+  border-radius: 50%;
+  aspect-ratio: 1 / 1;
+  background: var(--pg-blue);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* The signature P&G "sphere" gradient — derived from the logo orb */
+.pg-sphere {
+  background:
+    radial-gradient(circle at 30% 30%, #4FAEE5 0%, #1F66C2 38%, var(--pg-blue) 70%, var(--pg-navy) 100%);
+}
