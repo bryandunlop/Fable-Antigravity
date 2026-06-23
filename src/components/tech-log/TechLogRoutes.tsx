@@ -16,6 +16,7 @@ import Airworthiness from './pages/Airworthiness';
 import IntermittentFaults from './pages/IntermittentFaults';
 import Trips from './pages/Trips';
 import TripWorkspace from './pages/TripWorkspace';
+import LegDetail from './pages/LegDetail';
 import AdminFleet from './pages/AdminFleet';
 import AdminPersonnel from './pages/AdminPersonnel';
 import AdminMel from './pages/AdminMel';
@@ -50,6 +51,7 @@ export default function TechLogRoutes({ userRole }: { userRole?: string }) {
         <Route path="intermittent" element={<IntermittentFaults />} />
         <Route path="trips" element={<Trips />} />
         <Route path="trips/:tripId" element={<TripWorkspace />} />
+        <Route path="trips/:tripId/legs/:legId" element={<LegDetail />} />
         <Route path="aog" element={<Aog />} />
         <Route path="audit" element={<AuditTrail />} />
         <Route path="integration" element={<Integration />} />

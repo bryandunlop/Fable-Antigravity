@@ -107,7 +107,7 @@ export default function TripWorkspace() {
             const frat = fratText(l);
             const fuelDue = ac ? requiresFuelFarmSubmission(l, ac) && !l.fuelRequestId : false;
             return (
-              <div key={l.id} className="flex items-center justify-between gap-3 border-t px-4 py-3">
+              <div key={l.id} onClick={() => navigate(`/tech-log/trips/${trip.id}/legs/${l.id}`)} className="flex cursor-pointer items-center justify-between gap-3 border-t px-4 py-3 hover:bg-muted/30">
                 <div className="min-w-0">
                   <div className="font-mono text-sm">{l.departureIcao} → {l.arrivalIcao}</div>
                   <div className="text-xs text-muted-foreground">{zulu(l.departureTimeUtc)}</div>
