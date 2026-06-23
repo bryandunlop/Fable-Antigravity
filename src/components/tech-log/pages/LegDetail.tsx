@@ -23,7 +23,7 @@ function AirportCard({ role, info, icao }: { role: string; info?: AirportInfo; i
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{role}</div>
       <div className="mt-1 flex items-center gap-2">
         <span className="font-mono text-sm font-medium">{icao}</span>
-        {info?.mountainous && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-900">mountainous</span>}
+        {info?.mountainous && <span className="status-warning rounded-md px-1.5 py-0.5 text-[11px]">mountainous</span>}
       </div>
       {!info && <div className="mt-2 text-sm text-muted-foreground">No airport data on file.</div>}
       {info && (
@@ -32,7 +32,7 @@ function AirportCard({ role, info, icao }: { role: string; info?: AirportInfo; i
           {info.runways.map(r => <div key={r.id}>RWY <span className="font-mono">{r.id}</span> · LDA <span className="font-mono">{r.ldaFt.toLocaleString()}′</span></div>)}
           {info.approaches.map((a, i) => <div key={i}>{a.type} {a.runway} · <span className="font-mono">{a.glidepath}°</span></div>)}
           <div>{info.fbo} · {info.jetA ? 'Jet A' : 'no Jet A'} · {info.deice ? 'deice' : 'no deice'}</div>
-          {info.limitations && <div className="text-amber-700">{info.limitations}</div>}
+          {info.limitations && <div className="text-[var(--gfo-sunrise-deep)] dark:text-[var(--gfo-sunrise-light)]">{info.limitations}</div>}
         </div>
       )}
     </div>

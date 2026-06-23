@@ -10,10 +10,10 @@ import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 
-const KIND_META: Record<FeedItem['kind'], { label: string; cls: string; Icon: typeof MessageSquare }> = {
-  EVENT: { label: 'SIGNED', cls: 'bg-blue-100 text-blue-900', Icon: FileSignature },
-  RECORD: { label: 'RECORD', cls: 'bg-amber-100 text-amber-900', Icon: StickyNote },
-  CHAT: { label: 'CHAT', cls: 'bg-muted text-muted-foreground', Icon: MessageSquare },
+const KIND_META: Record<FeedItem['kind'], { label: string; color: string; Icon: typeof MessageSquare }> = {
+  EVENT: { label: 'SIGNED', color: 'text-[var(--gfo-daylight)]', Icon: FileSignature },
+  RECORD: { label: 'RECORD', color: 'text-[var(--gfo-sunrise-deep)]', Icon: StickyNote },
+  CHAT: { label: 'CHAT', color: 'text-muted-foreground', Icon: MessageSquare },
 };
 
 export function ActivityFeed({ aircraft, auditIds }: { aircraft: Aircraft; auditIds: Set<string> }) {
@@ -65,7 +65,7 @@ export function ActivityFeed({ aircraft, auditIds }: { aircraft: Aircraft; audit
           const meta = KIND_META[item.kind];
           return (
             <div key={`${item.kind}-${item.id}`} className="flex items-start gap-2 rounded-md border p-2.5 text-sm">
-              <span className={`mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${meta.cls}`}><meta.Icon className="h-3 w-3" />{meta.label}</span>
+              <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-foreground"><meta.Icon className={`h-3 w-3 ${meta.color}`} />{meta.label}</span>
               <div className="min-w-0 flex-1">
                 <p>{item.text}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{nameOf(item.actorOid)} · {new Date(item.atUtc).toLocaleString()}</p>

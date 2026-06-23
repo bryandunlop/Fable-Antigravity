@@ -72,11 +72,11 @@ export default function FleetStatus() {
 
   const stat = (label: string, value: number, cls: string, f: Filter) => (
     <button onClick={() => setFilter(filter === f ? 'ALL' : f)} className="text-left">
-      <Card className={cn('transition-colors hover:bg-accent/40', filter === f && 'ring-2 ring-primary')}>
+      <Card className={cn('gfo-stat-rule transition-colors hover:bg-accent/40', filter === f && 'ring-2 ring-primary')}>
         <CardContent className="flex items-center justify-between p-4">
           <div>
-            <div className="text-sm text-muted-foreground">{label}</div>
-            <div className="text-3xl font-semibold tabular-nums">{value}</div>
+            <div className="gfo-eyebrow">{label}</div>
+            <div className="gfo-numeric mt-1 text-3xl text-primary">{value}</div>
           </div>
           <span className={cn('h-10 w-10 rounded-full', cls)} />
         </CardContent>

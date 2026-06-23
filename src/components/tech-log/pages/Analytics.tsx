@@ -9,10 +9,11 @@ import { ATA_CHAPTERS } from '../constants';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 
+// GFO tokens — keep in sync with src/index.css --gfo-*
 const SUCCESS = '#00B140';
 const WARNING = '#F1B434';
 const ERROR = '#EF3340';
-const NAVY = '#00205B';
+const NAVY = '#142D7E';
 const ataTitle = (code: string) => ATA_CHAPTERS.find(c => c.code === code)?.title ?? `ATA ${code}`;
 
 export default function Analytics() {
@@ -31,10 +32,10 @@ export default function Analytics() {
   ];
 
   const Kpi = ({ icon, label, value, sub, tone }: { icon: React.ReactNode; label: string; value: string; sub?: string; tone?: string }) => (
-    <Card>
+    <Card className="gfo-stat-rule">
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon} {label}</div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums" style={tone ? { color: tone } : undefined}>{value}</div>
+        <div className="gfo-eyebrow flex items-center gap-2">{icon} {label}</div>
+        <div className="gfo-numeric mt-1 text-2xl" style={tone ? { color: tone } : undefined}>{value}</div>
         {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
       </CardContent>
     </Card>

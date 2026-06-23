@@ -32,9 +32,9 @@ export function LifecycleStepper({ aircraft, onSelect }: { aircraft: Aircraft; o
               disabled={!reached}
               className={[
                 'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-                isCurrent ? 'bg-blue-100 font-medium text-blue-900' : reached ? 'text-foreground hover:bg-background' : 'text-muted-foreground/50',
+                isCurrent ? 'bg-secondary font-medium text-foreground' : reached ? 'text-foreground hover:bg-background' : 'text-muted-foreground/50',
               ].join(' ')}>
-              <span className={['inline-block h-2 w-2 rounded-full', isCurrent ? 'bg-blue-600' : reached ? 'bg-blue-400' : 'bg-muted-foreground/40'].join(' ')} />
+              <span className={['inline-block h-2 w-2 rounded-full', isCurrent ? 'bg-primary' : reached ? 'bg-[var(--gfo-daylight)]' : 'bg-muted-foreground/40'].join(' ')} />
               {s.label}
             </button>
             {i < STEPS.length - 1 && <span className="px-1 text-muted-foreground/40">›</span>}

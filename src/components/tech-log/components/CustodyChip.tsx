@@ -6,16 +6,17 @@ const LABEL: Record<CustodyState, string> = {
   WITH_CREW: 'With crew',
 };
 
-// Amber = maintenance holds, blue = crew holds (matches design §E).
-const CLASS: Record<CustodyState, string> = {
-  IN_MAINTENANCE: 'border-amber-300 bg-amber-100 text-amber-900',
-  OFFERED: 'border-amber-200 bg-amber-50 text-amber-800',
-  WITH_CREW: 'border-blue-300 bg-blue-100 text-blue-900',
+// Custody axis (distinct from airworthiness R/A/G): gold = maintenance holds, daylight = crew holds.
+const DOT: Record<CustodyState, string> = {
+  IN_MAINTENANCE: 'gfo-dot-maint',
+  OFFERED: 'gfo-dot-maint-offered',
+  WITH_CREW: 'gfo-dot-crew',
 };
 
 export function CustodyChip({ state }: { state: CustodyState }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${CLASS[state]}`}>
+    <span className="gfo-chip">
+      <span className={`gfo-chip-dot ${DOT[state]}`} />
       {LABEL[state]}
     </span>
   );
