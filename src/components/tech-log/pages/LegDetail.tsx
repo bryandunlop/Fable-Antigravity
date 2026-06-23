@@ -10,7 +10,9 @@ import { TripReadinessChip } from '../components/TripReadinessChip';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 import { newId } from '../util/id';
+import { toast } from 'sonner';
 import type { TripLeg, Trip } from '../types';
 
 const zulu = (utc?: string) => (utc ? `${utc.slice(11, 16)}Z` : '—');
@@ -59,6 +61,7 @@ export default function LegDetail() {
   const readiness = deriveTripReadiness(trip, state, now);
 
   const [fratOpen, setFratOpen] = useState(false);
+  const [fuelLbs, setFuelLbs] = useState('14500');
 
   const patchLeg = (patch: Partial<TripLeg>, auditAction: string, summary: string) => {
     const updated: Trip = { ...trip, legs: (trip.legs ?? []).map(l => (l.id === leg.id ? { ...l, ...patch } : l)) };
@@ -73,6 +76,16 @@ export default function LegDetail() {
 
   const markAirportReviewed = () =>
     patchLeg({ airportReviewed: true }, 'LEG_AIRPORT_REVIEWED', `${trip.tripNumber} leg ${leg.sequence} (${leg.departureIcao}→${leg.arrivalIcao}) airport reviewed`);
+
+  const submitFuel = () => {
+    const hoursUntil = (new Date(leg.departureTimeUtc).getTime() - Date.now()) / 3_600_000;
+    if (hoursUntil <= 4) { toast.error('Locked — less than 4 hours to departure'); return; }
+    const lbs = Number(fuelLbs);
+    if (!Number.isFinite(lbs) || lbs <= 0) { toast.error('Enter a valid fuel quantity'); return; }
+    const id = newId('fr');
+    patchLeg({ fuelRequestId: id }, 'LEG_FUEL_SUBMITTED', `${trip.tripNumber} leg ${leg.sequence} fuel ${lbs} lb submitted to ${leg.departureIcao} fuel farm`);
+    toast.success(`Fuel submitted to ${leg.departureIcao} fuel farm`);
+  };
 
   return (
     <TechLogShell
@@ -128,14 +141,20 @@ export default function LegDetail() {
         </CardContent>
       </Card>
 
-      {/* Fuel (submission added in a later task) */}
+      {/* Fuel */}
       {ac && requiresFuelFarmSubmission(leg, ac) && (
         <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Fuel — {leg.departureIcao} fuel farm</div>
-              <div className="mt-1 text-sm">{leg.fuelRequestId ? <>Submitted · <span className="font-mono">{leg.fuelRequestId}</span></> : 'Not submitted'}</div>
-            </div>
+          <CardContent className="p-4">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Fuel — {leg.departureIcao} fuel farm</div>
+            {leg.fuelRequestId ? (
+              <div className="mt-1 text-sm">Submitted · <span className="font-mono">{leg.fuelRequestId}</span></div>
+            ) : (
+              <div className="mt-2 flex items-center gap-2">
+                <Input value={fuelLbs} onChange={e => setFuelLbs(e.target.value)} className="w-32" inputMode="numeric" aria-label="Fuel pounds" />
+                <span className="text-sm text-muted-foreground">lb</span>
+                <Button size="sm" onClick={submitFuel}>Submit to fuel farm</Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
