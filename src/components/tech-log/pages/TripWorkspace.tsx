@@ -10,6 +10,7 @@ import { LifecycleStepper } from '../components/LifecycleStepper';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
 import { CustodyChip } from '../components/CustodyChip';
 import { TripReadinessChip } from '../components/TripReadinessChip';
+import { ActivityFeed } from '../components/ActivityFeed';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -47,6 +48,20 @@ export default function TripWorkspace() {
   const readiness = deriveTripReadiness(trip, state, now);
   const sv = ac ? deriveServiceability(ac.id, state, now) : undefined;
   const custody = ac ? deriveCustody(ac.id, state, now) : undefined;
+
+  const acEntityIds = ac
+    ? new Set<string>([
+        ac.id,
+        ...state.defects.filter(d => d.aircraftId === ac.id).map(d => d.id),
+        ...state.deferrals.filter(d => d.aircraftId === ac.id).map(d => d.id),
+        ...state.releases.filter(r => r.aircraftId === ac.id).map(r => r.id),
+        ...state.workCards.filter(w => w.aircraftId === ac.id).map(w => w.id),
+        ...state.flightLogs.filter(f => f.aircraftId === ac.id).map(f => f.id),
+        ...state.recurringChecks.filter(c => c.aircraftId === ac.id).map(c => c.id),
+        ...state.briefings.filter(b => b.aircraftId === ac.id).map(b => b.id),
+        ...state.postflights.filter(p => p.aircraftId === ac.id).map(p => p.id),
+      ])
+    : new Set<string>();
   const route = legs.length ? `${legs[0].departureIcao} → ${legs.map(l => l.arrivalIcao).join(' → ')}` : '—';
 
   return (
@@ -124,6 +139,13 @@ export default function TripWorkspace() {
           })}
         </CardContent>
       </Card>
+
+      {ac && (
+        <div className="mt-4">
+          <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">Messages &amp; activity</div>
+          <ActivityFeed aircraft={ac} auditIds={acEntityIds} />
+        </div>
+      )}
     </TechLogShell>
   );
 }
