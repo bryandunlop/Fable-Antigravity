@@ -11,6 +11,7 @@ import { ServiceabilityChip } from '../components/ServiceabilityChip';
 import { CustodyChip } from '../components/CustodyChip';
 import { TripReadinessChip } from '../components/TripReadinessChip';
 import { ActivityFeed } from '../components/ActivityFeed';
+import { BriefingPanel } from '../components/BriefingPanel';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -112,6 +113,14 @@ export default function TripWorkspace() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Handoff & acceptance */}
+      {ac && (
+        <div className="mb-4">
+          <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">Handoff &amp; acceptance</div>
+          <BriefingPanel aircraft={ac} />
+        </div>
+      )}
 
       {/* Legs */}
       <Card>
