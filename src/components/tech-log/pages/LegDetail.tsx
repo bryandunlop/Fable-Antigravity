@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import StandaloneFRATForm from '../../StandaloneFRATForm';
 import { ArrowLeft } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { deriveTripReadiness } from '../engine/readiness';
@@ -56,10 +58,17 @@ export default function LegDetail() {
   const ac = state.aircraft.find(a => a.id === trip.aircraftId);
   const readiness = deriveTripReadiness(trip, state, now);
 
+  const [fratOpen, setFratOpen] = useState(false);
+
   const patchLeg = (patch: Partial<TripLeg>, auditAction: string, summary: string) => {
     const updated: Trip = { ...trip, legs: (trip.legs ?? []).map(l => (l.id === leg.id ? { ...l, ...patch } : l)) };
     dispatch({ type: 'EDIT_TRIP', payload: updated });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: auditAction, entityType: 'TripLeg', entityId: leg.id, atUtc: new Date().toISOString(), summary } });
+  };
+
+  const completeFrat = (data: { totalScore?: number }) => {
+    patchLeg({ fratStatus: 'COMPLETED', fratScore: data.totalScore }, 'LEG_FRAT_COMPLETED', `${trip.tripNumber} leg ${leg.sequence} FRAT score ${data.totalScore ?? '—'}`);
+    setFratOpen(false);
   };
 
   const markAirportReviewed = () =>
@@ -88,13 +97,34 @@ export default function LegDetail() {
         </CardContent>
       </Card>
 
-      {/* FRAT (interactive form added in the next task) */}
+      {/* FRAT */}
       <Card className="mb-4">
-        <CardContent className="flex items-center justify-between p-4">
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Flight risk assessment</div>
-            <div className="mt-1 text-sm">{leg.fratStatus === 'COMPLETED' ? <>Complete · score <span className="font-mono">{leg.fratScore ?? '—'}</span></> : 'Not complete'}</div>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Flight risk assessment</div>
+              <div className="mt-1 text-sm">{leg.fratStatus === 'COMPLETED' ? <>Complete · score <span className="font-mono">{leg.fratScore ?? '—'}</span></> : 'Not complete'}</div>
+            </div>
+            {!fratOpen && <Button size="sm" variant="outline" onClick={() => setFratOpen(true)}>{leg.fratStatus === 'COMPLETED' ? 'Redo FRAT' : 'Start FRAT'}</Button>}
           </div>
+          {fratOpen && (
+            <div className="mt-3 border-t pt-3">
+              <StandaloneFRATForm
+                userRole={user.role}
+                initialData={{
+                  flightNumber: trip.tripNumber,
+                  aircraft: ac?.tailNumber,
+                  departure: leg.departureIcao,
+                  destination: leg.arrivalIcao,
+                  date: leg.departureTimeUtc.slice(0, 10),
+                  time: leg.departureTimeUtc.slice(11, 16),
+                  pic: user.displayName,
+                }}
+                onClose={() => setFratOpen(false)}
+                onSave={(data: any) => { if (data.status === 'submitted') completeFrat(data); }}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
