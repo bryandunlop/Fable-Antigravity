@@ -250,6 +250,14 @@ export function getDefaultState(): TechLogState {
       ],
       createdByOid: pilot.oid, createdAtUtc: iso(2 * D),
     },
+    {
+      id: 'trip-4', tripNumber: 'TRIP-2060', aircraftId: 'ac-n5pg', name: 'KASE–KLUK positioning (fresh)', status: 'OPEN',
+      flightLogIds: [],
+      legs: [
+        { id: 'leg-4a', sequence: 1, departureIcao: 'KASE', arrivalIcao: 'KLUK', departureTimeUtc: '2026-06-25T15:00:00Z', arrivalTimeUtc: '2026-06-25T17:05:00Z', fratStatus: 'NOT_STARTED', airportReviewed: false },
+      ],
+      createdByOid: pilot.oid, createdAtUtc: iso(0),
+    },
   ];
 
   // ── A maintenance flight briefing on N2PG (GREEN), RELEASED and awaiting PIC acknowledgement —

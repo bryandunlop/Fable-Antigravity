@@ -18,4 +18,9 @@ describe('seeded trips derive the intended readiness', () => {
   it('TRIP-2055 is READY — outstation origin, all FRATs complete, airports reviewed', () => {
     expect(readinessOf('TRIP-2055').state).toBe('READY');
   });
+  it('TRIP-2060 is NOT_READY — its FRAT is not yet complete', () => {
+    const r = readinessOf('TRIP-2060');
+    expect(r.state).toBe('NOT_READY');
+    expect(r.blocker).toMatch(/frat/i);
+  });
 });
