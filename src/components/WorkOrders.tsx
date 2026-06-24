@@ -168,9 +168,9 @@ export default function WorkOrders() {
   };
 
   const handleUpdateWorkOrder = (updatedWorkOrder: WorkOrder) => {
-    setWorkOrders(workOrders.map(wo => 
-      wo.id === updatedWorkOrder.id ? updatedWorkOrder : wo
-    ));
+    // workOrders is now derived from MaintenanceContext (see above), so persist the
+    // edit through the context updater rather than a non-existent local state setter.
+    contextUpdateWorkOrder(updatedWorkOrder.id, updatedWorkOrder);
   };
 
   const toggleSort = (field: 'dueDate' | 'priority' | 'status') => {

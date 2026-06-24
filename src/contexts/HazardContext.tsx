@@ -17,7 +17,11 @@ export const WORKFLOW_STAGES = {
     SM_POST_MANAGER: 'Post-Manager Review', // NEW: SM intercept
     EXEC_APPROVAL: 'Accountable Executive Approval',
     SM_POST_EXEC: 'Post-Executive Review', // NEW: SM intercept
-    FINAL_REPORT: 'Final Report & Publication', 
+    // Execution Phase — corrective actions implemented after approvals, before final report.
+    // Referenced by HazardWorkflow/HazardReporting/UnifiedTasks; sits here so Object.values()
+    // index ordering stays EXEC_APPROVAL -> IMPLEMENTATION -> FINAL_REPORT.
+    IMPLEMENTATION: 'Implementation',
+    FINAL_REPORT: 'Final Report & Publication',
     // Effectiveness Phase
     EFFECTIVENESS_REVIEW: 'Review for Effectiveness', 
     PUBLISHED: 'Published',

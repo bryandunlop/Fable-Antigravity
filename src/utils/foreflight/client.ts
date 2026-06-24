@@ -13,6 +13,7 @@ import {
   AirportEvaluation
 } from './types';
 import { RealForeFlightAPIClient } from './realClient';
+import { logger } from '../logger';
 
 const FOREFLIGHT_API_BASE = 'https://public-api.foreflight.com';
 

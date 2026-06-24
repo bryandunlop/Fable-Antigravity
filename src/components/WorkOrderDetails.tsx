@@ -124,7 +124,7 @@ export default function WorkOrderDetails({ workOrder, onUpdate, onClose }: WorkO
       ...editedWorkOrder,
       subTasks: editedWorkOrder.subTasks.map(st => {
         if (st.id === subTaskId) {
-          const newStatus = st.status === 'completed' ? 'pending' : 'completed';
+          const newStatus: SubTask['status'] = st.status === 'completed' ? 'pending' : 'completed';
           return {
             ...st,
             status: newStatus,

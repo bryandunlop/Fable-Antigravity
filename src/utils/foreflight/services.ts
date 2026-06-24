@@ -396,7 +396,7 @@ function calculateCeilingScore(ceiling?: number): number {
   return 80;
 }
 
-function calculateIcingRisk(icing: any[]): number {
+function calculateIcingRisk(icing?: any[]): number {
   if (!icing || icing.length === 0) return 0;
   const maxSeverity = Math.max(...icing.map(i => {
     switch (i.severity) {
@@ -409,7 +409,7 @@ function calculateIcingRisk(icing: any[]): number {
   return maxSeverity;
 }
 
-function calculateTurbulenceRisk(turbulence: any[]): number {
+function calculateTurbulenceRisk(turbulence?: any[]): number {
   if (!turbulence || turbulence.length === 0) return 0;
   const maxSeverity = Math.max(...turbulence.map(t => {
     switch (t.severity) {
@@ -423,7 +423,7 @@ function calculateTurbulenceRisk(turbulence: any[]): number {
   return maxSeverity;
 }
 
-function calculateConvectionRisk(convection: any[]): number {
+function calculateConvectionRisk(convection?: any[]): number {
   if (!convection || convection.length === 0) return 0;
   return convection.length > 0 ? 50 : 0;
 }
