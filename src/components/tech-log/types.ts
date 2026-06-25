@@ -451,6 +451,16 @@ export interface IntegrationEvent {
   atUtc: string;
 }
 
+// OFF-ledger AOG acknowledgement — escalation/notification log, not a signed ledger record.
+export interface AogAck {
+  aircraftId: string;
+  escalationAtAck: 'MONITOR' | 'ELEVATED' | 'CRITICAL';
+  acknowledgedByOid: string;
+  acknowledgedByName: string;
+  atUtc: string;
+  note?: string;
+}
+
 export interface TechLogState {
   aircraft: Aircraft[];
   melItems: MelItem[];
@@ -476,6 +486,7 @@ export interface TechLogState {
   dismissedNotifications: string[];     // notification keys the user has cleared
   campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
   integrationEvents: IntegrationEvent[];
+  aogAcks?: AogAck[];                    // OFF-ledger AOG acknowledgement / escalation log
   currentUserOid: string;
   nowOverrideUtc?: string; // optional demo clock
 }
@@ -521,4 +532,5 @@ export type TechLogAction =
   | { type: 'EDIT_MEL_ITEM'; payload: MelItem }
   | { type: 'UPSERT_CAMP_CORRELATION'; payload: CampCorrelation }
   | { type: 'ADD_INTEGRATION_EVENT'; payload: IntegrationEvent }
+  | { type: 'ACK_AOG'; payload: AogAck }
   | { type: 'RESET_STATE'; payload: TechLogState };

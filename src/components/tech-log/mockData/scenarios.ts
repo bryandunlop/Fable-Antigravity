@@ -309,6 +309,7 @@ export function getDefaultState(): TechLogState {
     dismissedNotifications: [],
     campCorrelation: [],
     integrationEvents: [],
+    aogAcks: [],
     currentUserOid: 'USR001',
   };
 }

@@ -108,6 +108,8 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       };
     case 'ADD_INTEGRATION_EVENT':
       return { ...state, integrationEvents: [action.payload, ...state.integrationEvents].slice(0, 200) };
+    case 'ACK_AOG':
+      return { ...state, aogAcks: [action.payload, ...(state.aogAcks ?? [])].slice(0, 200) };
     case 'RESET_STATE':
       // Reseed everything but keep whoever is currently signed in (don't snap back to the seed pilot),
       // as long as that person still exists in the reseeded personnel.
