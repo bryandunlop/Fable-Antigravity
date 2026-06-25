@@ -2,7 +2,7 @@ import { useTechLog } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { CAMP_BASE_URLS, CAMP_ERROR, DUE_LIST_CAP_MONTHS } from '../integration/campTaxonomy';
 import { PROMOTION_CONFIRM_PHRASE } from '../integration/campClient';
-import { MYAIROPS_EVENT_TYPES, webhookVerificationSpec } from '../integration/myairopsClient';
+import { MYAIROPS_EVENT_TYPES, webhookVerificationSpec, type WebhookEnvelope } from '../integration/myairopsClient';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -26,9 +26,10 @@ function ReconCol({ title, tone, items }: { title: string; tone: 'ok' | 'warn' |
 
 export default function Integration() {
   const { state } = useTechLog();
-  const { refreshCampReads, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox } = useIntegration();
+  const { refreshCampReads, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook } = useIntegration();
   const [recon, setRecon] = useState<Record<string, (ReconcileResult & { tail: string }) | undefined>>({});
   const [promoteText, setPromoteText] = useState('');
+  const [inbox, setInbox] = useState<WebhookEnvelope[]>([]);
   const firstAc = state.aircraft.find(a => !a.isProvisional);
 
   return (
@@ -112,6 +113,34 @@ export default function Integration() {
           ) : (
             <Button size="sm" variant="outline" onClick={() => revertToSandbox()}>Revert to sandbox</Button>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Webhook className="h-4 w-4" /> myairops webhook inbox (simulated, pull-only)</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-xs text-muted-foreground">CloudEvents 1.0 + HMAC verification (raw bytes, 5-min replay window, CloudEvents-id idempotency). Inbound only — myGFO never writes back to myairops.</p>
+          <div className="flex flex-wrap gap-2">
+            {MYAIROPS_EVENT_TYPES.map(t => (
+              <Button key={t} size="sm" variant="outline" onClick={() => setInbox(i => [receiveWebhook(t), ...i].slice(0, 12))}>{t.split('.').slice(-2).join('.')}</Button>
+            ))}
+            <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => setInbox(i => [receiveWebhook(MYAIROPS_EVENT_TYPES[0], { tamper: true }), ...i].slice(0, 12))}>tampered → reject</Button>
+            {inbox[0] && <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setInbox(i => [receiveWebhook(inbox[0].event.type as typeof MYAIROPS_EVENT_TYPES[number], { duplicateId: inbox[0].event.id }), ...i].slice(0, 12))}>replay last → dedup</Button>}
+          </div>
+          <div>
+            {inbox.length === 0 && <p className="text-xs text-muted-foreground">No webhooks yet.</p>}
+            {inbox.map((e, idx) => {
+              const v = e.verification;
+              const status = !v.signatureValid ? 'bad-signature' : !v.timestampWithinWindow ? 'replay-window' : v.duplicate ? 'duplicate (skipped)' : 'applied';
+              const variant: 'secondary' | 'outline' | 'destructive' = status === 'applied' ? 'secondary' : status.startsWith('duplicate') ? 'outline' : 'destructive';
+              return (
+                <div key={idx} className="flex items-center justify-between gap-2 border-b py-1 text-xs last:border-0">
+                  <span className="font-mono text-muted-foreground">{e.event.type.split('.').slice(-2).join('.')} · {e.event.id}</span>
+                  <Badge variant={variant}>{status}</Badge>
+                </div>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 

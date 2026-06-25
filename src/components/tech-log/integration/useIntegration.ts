@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 import { useTechLog } from '../TechLogContext';
 import { newId } from '../util/id';
 import * as camp from './campClient';
-import { odataPullLatestFlight } from './myairopsClient';
+import { odataPullLatestFlight, simulateWebhook, type WebhookEnvelope } from './myairopsClient';
 import type { IntegrationEvent, CampCorrelation } from '../types';
 import { CAMP_ERROR } from './campTaxonomy';
 import type { DiscrepancyType, MelFlag } from './campTaxonomy';
@@ -231,5 +231,16 @@ export function useIntegration() {
   }
   function revertToSandbox() { camp.revertToSandbox(); logEvent('CAMP', 'RevertToSandbox', 'OK', 'env → sandbox'); toast.success('Reverted to CAMP sandbox.'); }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox };
+  /** Receive a (simulated) myairops webhook: verify HMAC / replay window / idempotency, then apply pull-only. Never writes back. */
+  function receiveWebhook(eventType: Parameters<typeof simulateWebhook>[0], opts?: Parameters<typeof simulateWebhook>[1]): WebhookEnvelope {
+    const env = simulateWebhook(eventType, opts);
+    const v = env.verification;
+    if (!v.signatureValid) { logEvent('MYAIROPS', 'Webhook', 'ERROR', `${eventType} ${env.event.id}: HMAC signature INVALID — rejected`); toast.error('Webhook rejected — bad HMAC signature.'); }
+    else if (!v.timestampWithinWindow) { logEvent('MYAIROPS', 'Webhook', 'ERROR', `${eventType} ${env.event.id}: timestamp outside replay window — rejected`); toast.error('Webhook rejected — replay window exceeded.'); }
+    else if (v.duplicate) { logEvent('MYAIROPS', 'Webhook', 'EMPTY', `${eventType} ${env.event.id}: duplicate CloudEvents id — idempotently skipped`); toast.info('Duplicate webhook — idempotently skipped.'); }
+    else { logEvent('MYAIROPS', 'Webhook', 'OK', `${eventType} ${env.event.id}: verified + applied (pull-only)`); toast.success(`Webhook applied — ${String(eventType).split('.').pop()}`); }
+    return env;
+  }
+
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook };
 }
