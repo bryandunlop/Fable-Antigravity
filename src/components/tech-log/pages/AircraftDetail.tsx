@@ -133,6 +133,12 @@ export default function AircraftDetail() {
   const custody = deriveCustody(ac.id, state, now);
   const shownStep: StepKey = activeStep;
 
+  // P3-1: out-of-service → run cards → return-to-service spine (derived; reuses serviceability + work cards, no new state machine).
+  const spineOpenDefects = currentRows(state.defects).filter(d => d.aircraftId === ac.id && d.status === 'OPEN');
+  const spineOpenCards = state.workCards.filter(w => w.aircraftId === ac.id && w.status !== 'COMPLETED');
+  const spineStage: 'OUT_OF_SERVICE' | 'RESTRICTED' | 'IN_SERVICE' = sv.status === 'RED' ? 'OUT_OF_SERVICE' : sv.status === 'AMBER' ? 'RESTRICTED' : 'IN_SERVICE';
+  const spineDriverDefect = sv.drivingDefectId ? currentRows(state.defects).find(d => d.id === sv.drivingDefectId) : undefined;
+
   const acceptedBriefing = currentRows(state.briefings).filter(b => b.aircraftId === ac.id && b.status === 'ACKNOWLEDGED').sort((a, b) => (b.acknowledgedAtUtc ?? '').localeCompare(a.acknowledgedAtUtc ?? ''))[0];
 
   const allDefects = currentRows(state.defects).filter(d => d.aircraftId === ac.id).sort((a, b) => b.reportedAtUtc.localeCompare(a.reportedAtUtc));
@@ -302,6 +308,53 @@ export default function AircraftDetail() {
       {/* ===== WORKSPACE (stepper-driven active panel + unified feed) ===== */}
       {tab === 'workspace' && (
         <div className="space-y-4">
+          {/* ===== Maintenance spine: out-of-service → run cards → return-to-service (P3-1) ===== */}
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4" /> Return-to-service spine</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <div className={cn('flex-1 rounded-md border p-2 text-sm', spineStage === 'OUT_OF_SERVICE' ? 'border-[var(--gfo-error,#EF3340)] bg-[var(--gfo-error,#EF3340)]/5' : 'opacity-60')}>
+                  <div className="font-medium">1 · Out of service</div>
+                  <div className="text-xs text-muted-foreground">{sv.status === 'RED' ? (spineDriverDefect ? `ATA ${spineDriverDefect.ataChapter} — ${spineDriverDefect.description}` : 'grounded — see open items') : 'cleared'}</div>
+                </div>
+                <div className="hidden items-center text-muted-foreground sm:flex">→</div>
+                <div className={cn('flex-1 rounded-md border p-2 text-sm', (spineOpenDefects.length || spineOpenCards.length) ? 'border-[var(--gfo-warning,#F1B434)] bg-[var(--gfo-warning,#F1B434)]/5' : 'opacity-60')}>
+                  <div className="font-medium">2 · Work it</div>
+                  <div className="text-xs text-muted-foreground">{spineOpenCards.length} work card(s) · {spineOpenDefects.length} open defect(s)</div>
+                </div>
+                <div className="hidden items-center text-muted-foreground sm:flex">→</div>
+                <div className={cn('flex-1 rounded-md border p-2 text-sm', sv.status === 'GREEN' ? 'border-[var(--gfo-success,#00B140)] bg-[var(--gfo-success,#00B140)]/5' : 'opacity-60')}>
+                  <div className="font-medium">3 · Returned to service</div>
+                  <div className="text-xs text-muted-foreground">{sv.status === 'GREEN' ? 'dispatchable (GREEN)' : 'sign the release(s) to clear'}</div>
+                </div>
+              </div>
+              {(spineOpenDefects.length > 0 || spineOpenCards.length > 0) ? (
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-muted-foreground">Stands between {ac.tailNumber} and return-to-service:</div>
+                  {spineOpenDefects.map(d => (
+                    <div key={d.id} className="flex items-center justify-between gap-2 rounded border p-2 text-sm">
+                      <span className="text-muted-foreground">Open defect · ATA {d.ataChapter} — {d.description}</span>
+                      {isMaint && <Button size="sm" variant="outline" onClick={() => startTriage(d.id, 'rectify')}>Rectify / defer</Button>}
+                    </div>
+                  ))}
+                  {spineOpenCards.map(w => (
+                    <div key={w.id} className="flex items-center justify-between gap-2 rounded border p-2 text-sm">
+                      <span className="text-muted-foreground">Work card {w.cardNumber ?? w.woNumber ?? w.id} — {w.title}</span>
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/tech-log/work-cards/${w.id}`)}>Open card</Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={cn('flex items-center gap-1.5 text-sm', sv.status === 'GREEN' ? 'text-[var(--gfo-success,#00B140)]' : sv.status === 'AMBER' ? 'text-[var(--gfo-warning,#F1B434)]' : 'text-[var(--gfo-error,#EF3340)]')}>
+                  <CheckCircle2 className="h-4 w-4" />
+                  {sv.status === 'GREEN' ? `No open maintenance — ${ac.tailNumber} is dispatchable.`
+                    : sv.status === 'AMBER' ? 'Dispatchable under restriction — active deferral(s) in force.'
+                    : 'Grounded — see Deferrals / Recurring checks for the driving condition.'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {(shownStep === 'PREFLIGHT' || shownStep === 'RELEASED' || shownStep === 'ACCEPTED') && <BriefingPanel aircraft={ac} />}
           {shownStep === 'IN_SERVICE' && (
             <Card><CardContent className="p-4 text-sm text-muted-foreground">Aircraft in service with the crew. Squawks raised in flight appear in the feed below; run the Postflight step on return.</CardContent></Card>
