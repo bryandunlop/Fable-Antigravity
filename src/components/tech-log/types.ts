@@ -167,6 +167,8 @@ export interface WorkStep {
   text: string;
   done: boolean;
   riiRequired?: boolean;
+  riiInspectorOid?: string;   // independent inspector who signed THIS step (per-step RII)
+  riiSignatureId?: string;    // the inspector's signature on this step
 }
 
 /** A pulled CAMP work order / task card under execution. Updatable WIP until the completion sign-off. */

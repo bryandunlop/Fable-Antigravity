@@ -35,6 +35,8 @@ export function useIntegration() {
     technician?: string;
     intent?: PushIntent;          // CREATE (default) | CORRECT | CLOSE
     supersedesEntityId?: string;  // parent entity whose CAMP ref is carried forward (CORRECT/CLOSE)
+    riiItem?: boolean;            // RIIitem=Y on the CAMP discrepancy
+    inspector?: string;           // RII inspector name carried to CAMP
   }): camp.CampResult<{ discrepancyId: string }> | undefined {
     const ac = state.aircraft.find(a => a.id === input.aircraftId);
     if (!ac) return;
@@ -60,7 +62,8 @@ export function useIntegration() {
           description: input.description,
           restriction: input.restriction,
           nextDue: input.nextDue,
-          riiItem: false,
+          riiItem: input.riiItem ?? false,
+          inspector: input.inspector,
           technician: input.technician,
           existingDiscrepancyId: decision.existingDiscrepancyId,
         },

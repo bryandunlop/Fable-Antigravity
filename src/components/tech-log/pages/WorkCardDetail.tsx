@@ -6,6 +6,7 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { currentRows } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
+import { riiStepsComplete, pendingRiiSteps } from '../engine/rii';
 import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
@@ -51,6 +52,8 @@ export default function WorkCardDetail() {
   const [riiOpen, setRiiOpen] = useState(false);
   const [pendingReleaseId, setPendingReleaseId] = useState('');
   const [perfSig, setPerfSig] = useState<Signature | null>(null);
+  const [riiStepOpen, setRiiStepOpen] = useState(false);
+  const [riiStepId, setRiiStepId] = useState<string | null>(null);
 
   if (!card || !ac) {
     return (
@@ -71,6 +74,9 @@ export default function WorkCardDetail() {
   const allStepsDone = card.steps.length > 0 && stepsDone === card.steps.length;
   const totalLabor = Math.round(labor.reduce((s, l) => s + l.hours, 0) * 10) / 10;
   const release = card.completedReleaseId ? state.releases.find(r => r.id === card.completedReleaseId) : undefined;
+  const hasRiiSteps = card.steps.some(s => s.riiRequired);
+  const needsRii = card.riiRequired || hasRiiSteps;
+  const riiStepsDone = riiStepsComplete(card.steps);
 
   const toggleStep = (stepId: string) => {
     if (completed || !isMaint) return;
@@ -100,12 +106,25 @@ export default function WorkCardDetail() {
     setLhours(''); setLdesc('');
   };
 
+  const beginStepRii = (stepId: string) => {
+    if (!inspector) return toast.error('Select an RII inspector authorized for this ATA.');
+    setRiiStepId(stepId);
+    setRiiStepOpen(true);
+  };
+  const onStepRiiSigned = (stepId: string, rSig: Signature) => {
+    dispatch({ type: 'ADD_SIGNATURE', payload: rSig });
+    const steps = card.steps.map(s => (s.id === stepId ? { ...s, riiSignatureId: rSig.id, riiInspectorOid: inspector?.oid } : s));
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, steps } });
+    toast.success('RII step inspected and signed.');
+  };
+
   const beginComplete = () => {
     if (!isMaint) return toast.error('Only maintenance can sign work-card completion.');
     if (!allStepsDone) return toast.error('Mark all steps complete before signing.');
     const crs = validateCrs(user);
     if (!crs.ok) return toast.error(crs.error);
-    if (card.riiRequired && !inspector) return toast.error('Select an RII inspector authorized for this ATA.');
+    if (needsRii && !inspector) return toast.error('Select an RII inspector authorized for this ATA.');
+    if (hasRiiSteps && !riiStepsDone) return toast.error(`Every RII step must be independently inspector-signed first (${pendingRiiSteps(card.steps).length} pending).`);
     setPendingReleaseId(newId('rel'));
     setCrsOpen(true);
   };
@@ -120,7 +139,9 @@ export default function WorkCardDetail() {
       completionDateUtc: now,
       returnToServiceStatement: 'Work card complied with; the aircraft is approved for return to service (14 CFR 91.417).',
       certifyingTechOid: user.oid, apCertificateNumber: user.apCertificateNumber ?? '',
-      riiRequired: card.riiRequired, riiInspectorOid: rSig ? inspector?.oid : undefined, riiSignatureId: rSig?.id,
+      riiRequired: needsRii,
+      riiInspectorOid: rSig ? inspector?.oid : card.steps.find(s => s.riiRequired && s.riiSignatureId)?.riiInspectorOid,
+      riiSignatureId: rSig?.id ?? card.steps.find(s => s.riiRequired && s.riiSignatureId)?.riiSignatureId,
       pdfBlobUri: mockPdfBlobUri('crs', pendingReleaseId), signatureId: pSig.id,
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: pSig });
@@ -139,6 +160,7 @@ export default function WorkCardDetail() {
           entityType: 'DEFECT', entityId: rectified.id, aircraftId: def.aircraftId,
           ata: def.ataChapter, description: def.description, technician: user.displayName,
           intent: 'CLOSE', supersedesEntityId: def.id,
+          riiItem: needsRii, inspector: inspector?.displayName,
         });
         const linkedDef = currentRows(state.deferrals).find(d => d.defectId === def.id && d.status !== 'CLEARED');
         if (linkedDef) {
@@ -158,7 +180,8 @@ export default function WorkCardDetail() {
 
   const onCrsSigned = (sig: Signature) => {
     setPerfSig(sig);
-    if (card.riiRequired) { setRiiOpen(true); return; }
+    // Per-step RII (if any) is already signed before completion; only the legacy card-level RII opens here.
+    if (card.riiRequired && !hasRiiSteps) { setRiiOpen(true); return; }
     finalize(sig);
   };
 
@@ -213,13 +236,20 @@ export default function WorkCardDetail() {
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4" /> Task steps</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {card.steps.map(s => (
-              <label key={s.id} className={`flex items-start gap-2 rounded-md border p-2 text-sm ${s.done ? 'bg-[var(--gfo-success,#00B140)]/5' : ''} ${completed || !isMaint ? '' : 'cursor-pointer'}`}>
+              <div key={s.id} className={`flex items-start gap-2 rounded-md border p-2 text-sm ${s.done ? 'bg-[var(--gfo-success,#00B140)]/5' : ''}`}>
                 <input type="checkbox" className="mt-0.5" checked={s.done} disabled={completed || !isMaint} onChange={() => toggleStep(s.id)} />
-                <span>
+                <span className="flex-1">
                   <span className="text-xs text-muted-foreground">#{s.seq}</span> {s.text}
                   {s.riiRequired && <Badge variant="outline" className="ml-2"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}
                 </span>
-              </label>
+                {s.riiRequired && (
+                  s.riiSignatureId
+                    ? <Badge variant="secondary" className="shrink-0 self-center text-[10px]"><CheckCircle2 className="mr-1 h-3 w-3" />RII {nameOf(s.riiInspectorOid ?? '')}</Badge>
+                    : !completed && (s.done
+                        ? <Button size="sm" variant="outline" className="h-7 shrink-0" disabled={!isMaint || !inspector} onClick={() => beginStepRii(s.id)}>RII sign</Button>
+                        : <span className="shrink-0 self-center text-[10px] text-muted-foreground">complete step</span>)
+                )}
+              </div>
             ))}
             {card.steps.length === 0 && <p className="text-sm text-muted-foreground">No task steps on this card.</p>}
           </CardContent>
@@ -304,20 +334,21 @@ export default function WorkCardDetail() {
             </div>
           ) : (
             <>
-              {card.riiRequired && (
+              {needsRii && (
                 <div>
-                  <Label className="text-xs">RII inspector (authorized for ATA {card.ataChapter}, not the performer)</Label>
+                  <Label className="text-xs">RII inspector (authorized for ATA {card.ataChapter}, not the performer){hasRiiSteps ? ' — signs each RII step independently' : ''}</Label>
                   <Select value={inspectorOid} onValueChange={(v: string) => setInspectorOid(v)}>
                     <SelectTrigger className="mt-1"><SelectValue placeholder={inspectors.length ? 'Select inspector' : 'No authorized inspector for this ATA'} /></SelectTrigger>
                     <SelectContent>{inspectors.map(p => <SelectItem key={p.oid} value={p.oid}>{p.displayName}</SelectItem>)}</SelectContent>
                   </Select>
                   {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error,#EF3340)]">No RII-authorized inspector for ATA {card.ataChapter} — completion cannot proceed.</p>}
+                  {hasRiiSteps && !riiStepsDone && <p className="mt-1 text-xs text-[var(--gfo-warning,#F1B434)]">{pendingRiiSteps(card.steps).length} RII step(s) still need an independent inspector signature.</p>}
                 </div>
               )}
               <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">
                 CRS requires an A&P certificate ({user.apCertificateNumber ? `you: ${user.apCertificateNumber}` : 'you have none — sign will be rejected'}). All steps must be complete{card.riiRequired ? ' and an RII inspector must independently sign' : ''}. Step-up re-auth required.
               </div>
-              <Button onClick={beginComplete} disabled={!isMaint || !allStepsDone || (card.riiRequired && !inspector)}>
+              <Button onClick={beginComplete} disabled={!isMaint || !allStepsDone || (needsRii && !inspector) || (hasRiiSteps && !riiStepsDone)}>
                 <ShieldCheck className="mr-1.5 h-4 w-4" /> Sign completion (RTS)
               </Button>
               {!allStepsDone && <p className="text-xs text-muted-foreground">Mark all {card.steps.length} steps complete to enable signing.</p>}
@@ -334,6 +365,11 @@ export default function WorkCardDetail() {
         <SignCeremonyDialog open={riiOpen} onOpenChange={setRiiOpen} signer={inspector} signedEntity="WORK_CARD" signedEntityId={pendingReleaseId}
           intentStatement={INTENT.RII} requireStepUp validate={() => validateRii(user.oid, inspector, card.ataChapter)}
           onSigned={(rSig) => { if (perfSig) finalize(perfSig, rSig); }} title="RII independent inspection" />
+      )}
+      {inspector && riiStepId && (
+        <SignCeremonyDialog open={riiStepOpen} onOpenChange={setRiiStepOpen} signer={inspector} signedEntity="WORK_CARD" signedEntityId={riiStepId}
+          intentStatement={INTENT.RII} requireStepUp validate={() => validateRii(user.oid, inspector, card.ataChapter)}
+          onSigned={(rSig) => onStepRiiSigned(riiStepId, rSig)} title="RII step — independent inspection" />
       )}
     </TechLogShell>
   );
