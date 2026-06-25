@@ -242,5 +242,21 @@ export function useIntegration() {
     return env;
   }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook };
+  // Airworthiness read-views (documented CAMP fns GetAircraftDueList / GetLatestAircraftTimes per-profile;
+  // the AD/SB read is UNDOCUMENTED — Open Question). Delegated here so pages don't import campClient directly,
+  // keeping the live-client swap boundary + OQ labelling centralized in this hook.
+  function readForecast(aircraftId: string) {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    return ac ? camp.campForecast(ac.serialNumber, { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles }) : [];
+  }
+  function readComponentTimes(aircraftId: string) {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    return ac ? camp.campComponentTimes(ac.serialNumber, ac.airframeTotalHours, ac.airframeTotalCycles) : null;
+  }
+  function readAdSb(aircraftId: string) {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    return { items: ac ? camp.campAdSb(ac.serialNumber) : [], unconfirmed: true, openQuestion: camp.CAMP_ADSB_OPEN_QUESTION };
+  }
+
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook, readForecast, readComponentTimes, readAdSb };
 }

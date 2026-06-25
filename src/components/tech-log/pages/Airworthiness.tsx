@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Gauge, ClipboardList, RefreshCw, Cloud, Info } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
-import { campForecast, campComponentTimes, campAdSb } from '../integration/campClient';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -32,9 +31,9 @@ export default function Airworthiness({ view }: { view: View }) {
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
   const now = Date.now();
 
-  const forecast = useMemo(() => (ac ? campForecast(ac.serialNumber, { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles }) : []), [ac]);
-  const times = useMemo(() => (ac ? campComponentTimes(ac.serialNumber, ac.airframeTotalHours, ac.airframeTotalCycles) : null), [ac]);
-  const adsb = useMemo(() => (ac ? campAdSb(ac.serialNumber) : []), [ac]);
+  const forecast = useMemo(() => (ac ? integration.readForecast(ac.id) : []), [ac]);
+  const times = useMemo(() => (ac ? integration.readComponentTimes(ac.id) : null), [ac]);
+  const adsb = useMemo(() => (ac ? integration.readAdSb(ac.id) : { items: [], unconfirmed: true, openQuestion: '' }), [ac]);
   const workOrders = useMemo(() => state.workCards.slice().sort((a, b) => a.headerStatusCode - b.headerStatusCode), [state.workCards]);
 
   const perAircraft = view !== 'workorders';
@@ -117,10 +116,14 @@ export default function Airworthiness({ view }: { view: View }) {
         <div className="space-y-2">
           <Card className="border-[var(--gfo-warning,#F1B434)]/40">
             <CardContent className="flex items-start gap-2 p-3 text-xs text-muted-foreground">
-              <Info className="mt-0.5 h-4 w-4" /> The CAMP read function for AD/SB status is not in the GEN/STA/WRK integration docs — treat as an <strong>Open Question</strong> to confirm before wiring the real read. Data below is mock.
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="space-y-1">
+                {adsb.unconfirmed && <Badge variant="outline" className="border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]">OQ: CAMP read function unconfirmed</Badge>}
+                <div>The CAMP read function for AD/SB status is not in the GEN/STA/WRK integration docs — treat as an <strong>Open Question</strong> to confirm before wiring the real read. Data below is mock.</div>
+              </div>
             </CardContent>
           </Card>
-          {adsb.map(it => {
+          {adsb.items.map(it => {
             const days = it.nextDueUtc ? Math.floor((new Date(it.nextDueUtc).getTime() - now) / DAY) : null;
             return (
               <Card key={it.id}>
