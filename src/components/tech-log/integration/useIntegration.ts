@@ -260,6 +260,10 @@ export function useIntegration() {
     const ac = state.aircraft.find(a => a.id === aircraftId);
     return { items: ac ? camp.campAdSb(ac.serialNumber) : [], unconfirmed: true, openQuestion: camp.CAMP_ADSB_OPEN_QUESTION };
   }
+  function readClosedWorkOrders(aircraftId: string) {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    return ac ? (camp.getClosedWorkOrders(ac.serialNumber).data ?? []) : [];
+  }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook, readForecast, readComponentTimes, readAdSb };
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook, readForecast, readComponentTimes, readAdSb, readClosedWorkOrders };
 }

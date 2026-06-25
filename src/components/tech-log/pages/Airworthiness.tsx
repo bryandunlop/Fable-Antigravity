@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gauge, ClipboardList, RefreshCw, Cloud, Info } from 'lucide-react';
+import { Gauge, ClipboardList, RefreshCw, Cloud, Info, History } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
@@ -35,6 +35,7 @@ export default function Airworthiness({ view }: { view: View }) {
   const times = useMemo(() => (ac ? integration.readComponentTimes(ac.id) : null), [ac]);
   const adsb = useMemo(() => (ac ? integration.readAdSb(ac.id) : { items: [], unconfirmed: true, openQuestion: '' }), [ac]);
   const workOrders = useMemo(() => state.workCards.slice().sort((a, b) => a.headerStatusCode - b.headerStatusCode), [state.workCards]);
+  const closedWos = useMemo(() => view === 'workorders' ? dispatchable.flatMap(a => integration.readClosedWorkOrders(a.id).map(w => ({ ...w, tail: a.tailNumber }))) : [], [view]);
 
   const perAircraft = view !== 'workorders';
 
@@ -164,6 +165,19 @@ export default function Airworthiness({ view }: { view: View }) {
               </CardContent>
             </Card>
           ))}
+          {closedWos.length > 0 && (
+            <Card className="mt-2">
+              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4" /> Closed work orders (CAMP history)</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                {closedWos.map((w, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 border-b py-1 text-xs last:border-0">
+                    <span><span className="font-mono">{w.woNumber}</span> · {w.tail} · ATA {w.ata} — {w.title}</span>
+                    <span className="text-muted-foreground">{new Date(w.closedDateUtc).toLocaleDateString()} · {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </TechLogShell>

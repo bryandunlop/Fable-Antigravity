@@ -242,7 +242,10 @@ const WO_CATALOG: Omit<CampWoDetails, 'serial' | 'headerStatusCode'>[] = [
 /** List the open CAMP work orders available to pull for a serial (faked). */
 export function listOpenWorkOrders(serial: string): CampResult<{ woNumber: string; title: string; ata: string; scheduled: boolean; riiRequired: boolean }[]> {
   if (!_sessionKey) return sessionError();
-  return { ok: true, data: WO_CATALOG.map(w => ({ woNumber: w.woNumber, title: w.title, ata: w.ata, scheduled: w.scheduled, riiRequired: w.riiRequired })) };
+  // Serial-key the catalog so different tails surface a different open-WO ordering (rotation keeps every WO findable by getWODetails).
+  const off = Math.abs(hashStr(serial)) % WO_CATALOG.length;
+  const rotated = [...WO_CATALOG.slice(off), ...WO_CATALOG.slice(0, off)];
+  return { ok: true, data: rotated.map(w => ({ woNumber: w.woNumber, title: w.title, ata: w.ata, scheduled: w.scheduled, riiRequired: w.riiRequired })) };
 }
 
 /** GetWODetails (WRK). Mock returns the catalog entry with task/squawk detail lines. */
@@ -251,6 +254,29 @@ export function getWODetails(serial: string, woNumber: string): CampResult<CampW
   const found = WO_CATALOG.find(w => w.woNumber === woNumber);
   if (!found) return { ok: false, errorCode: CAMP_ERROR.NO_MATCHING_RECORD.code, errorMsg: CAMP_ERROR.NO_MATCHING_RECORD.msg };
   return { ok: true, data: { ...found, serial, headerStatusCode: 1 } }; // 1 = Open
+}
+
+export interface CampClosedWo {
+  woNumber: string;
+  serial: string;
+  title: string;
+  ata: string;
+  closedDateUtc: string;
+  headerStatusCode: number; // 0 = Complied With
+}
+
+/** GetClosedWorkOrders (WRK, read) — WO compliance history for a serial. Deterministic per serial. */
+export function getClosedWorkOrders(serial: string): CampResult<CampClosedWo[]> {
+  const s = Math.abs(hashStr(serial));
+  const at = (days: number) => new Date(Date.now() - days * 86400000).toISOString();
+  return {
+    ok: true,
+    data: [
+      { woNumber: `WO-05-0${100 + (s % 90)}`, serial, title: 'Phase A inspection — complied', ata: '05', closedDateUtc: at(14 + (s % 10)), headerStatusCode: 0 },
+      { woNumber: `WO-49-0${100 + (s % 80)}`, serial, title: 'APU 200-hr inspection — complied', ata: '49', closedDateUtc: at(45 + (s % 20)), headerStatusCode: 0 },
+      { woNumber: `WO-32-0${100 + (s % 70)}`, serial, title: 'MLG functional check — complied', ata: '32', closedDateUtc: at(90 + (s % 30)), headerStatusCode: 0 },
+    ],
+  };
 }
 
 export const campMeta = { baseUrls: CAMP_BASE_URLS, get env() { return _env; }, minutesToHours: campMinutesToHours };
