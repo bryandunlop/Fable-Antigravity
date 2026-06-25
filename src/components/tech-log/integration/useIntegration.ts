@@ -4,9 +4,11 @@ import { newId } from '../util/id';
 import * as camp from './campClient';
 import { odataPullLatestFlight } from './myairopsClient';
 import type { IntegrationEvent, CampCorrelation } from '../types';
+import { CAMP_ERROR } from './campTaxonomy';
 import type { DiscrepancyType, MelFlag } from './campTaxonomy';
 import { reconcileDiscrepancies, type ReconcileResult } from './reconcile';
 import { decidePushMode, type PushIntent } from './pushMapping';
+import { runWithSession } from './campSession';
 
 export function useIntegration() {
   const { state, dispatch } = useTechLog();
@@ -199,5 +201,25 @@ export function useIntegration() {
     return res;
   }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile };
+  /** Run a CAMP call under the documented session discipline (re-login once on SESSION_NOT_VALID; stop on L100/L102). */
+  function callWithSession<T>(call: () => camp.CampResult<T>, opLabel: string): camp.CampResult<T> | undefined {
+    const outcome = runWithSession({ login: camp.campLogin, call, logoff: camp.campLogoff });
+    if (outcome.kind === 'FATAL') { logEvent('CAMP', opLabel, 'ERROR', `${outcome.errorCode} — ${outcome.alert}`); toast.error(outcome.alert); return undefined; }
+    if (outcome.kind === 'TRANSIENT') { logEvent('CAMP', opLabel, 'ERROR', `${outcome.errorCode} — ${outcome.alert}`); toast.warning(outcome.alert); return undefined; }
+    if (outcome.reLoggedIn) logEvent('CAMP', 'LogIn (retry)', 'OK', 'session re-established after SESSION_NOT_VALID; call retried');
+    return outcome.data;
+  }
+
+  /** Demo: inject a CAMP error and exercise the taxonomy handling via callWithSession. Watch the Integration log. */
+  function demoErrorHandling(aircraftId: string, kind: 'session' | 'lockout' | 'maintenance') {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    if (!ac) return;
+    if (kind === 'session') camp.injectNextCallError(CAMP_ERROR.SESSION_NOT_VALID.code, CAMP_ERROR.SESSION_NOT_VALID.msg);
+    else if (kind === 'lockout') camp.injectNextLoginError(CAMP_ERROR.LOGIN_INVALID.code, CAMP_ERROR.LOGIN_INVALID.msg);
+    else camp.injectNextLoginError(CAMP_ERROR.APP_MAINTENANCE.code, CAMP_ERROR.APP_MAINTENANCE.msg);
+    const res = callWithSession(() => camp.getAircraftState(ac.serialNumber, 'Green'), `GetAircraftState [demo:${kind}]`);
+    if (res?.ok) toast.success(`${ac.tailNumber}: recovered — CAMP read succeeded after one re-login`);
+  }
+
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling };
 }

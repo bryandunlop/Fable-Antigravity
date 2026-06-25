@@ -24,8 +24,9 @@ function ReconCol({ title, tone, items }: { title: string; tone: 'ok' | 'warn' |
 
 export default function Integration() {
   const { state } = useTechLog();
-  const { refreshCampReads, pushUtilization, reconcile } = useIntegration();
+  const { refreshCampReads, pushUtilization, reconcile, demoErrorHandling } = useIntegration();
   const [recon, setRecon] = useState<Record<string, (ReconcileResult & { tail: string }) | undefined>>({});
+  const firstAc = state.aircraft.find(a => !a.isProvisional);
 
   return (
     <TechLogShell
@@ -147,6 +148,20 @@ export default function Integration() {
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader><CardTitle className="text-base">Session resilience (error taxonomy in action)</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-xs text-muted-foreground">Inject a CAMP error and watch the documented handling: <strong>SESSION_NOT_VALID</strong> re-logs in once and retries; <strong>L100/L102</strong> stop immediately (lockout risk — never a retry loop); <strong>L103</strong> backs off. Results land in the Integration log above.</p>
+          {firstAc && (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => demoErrorHandling(firstAc.id, 'session')}>Stale session → recovers</Button>
+              <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => demoErrorHandling(firstAc.id, 'lockout')}>L100 lockout → stops</Button>
+              <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => demoErrorHandling(firstAc.id, 'maintenance')}>L103 maintenance → backs off</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

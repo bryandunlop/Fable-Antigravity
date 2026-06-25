@@ -11,12 +11,19 @@ export interface CampResult<T> { ok: boolean; data?: T; errorCode?: number | str
 let _sessionKey: string | null = null;
 let _runCounter = 0;
 
+// Demo error-injection — exercises the CAMP error taxonomy in the UI. One-shot: consumed by the next call.
+let _injectLoginError: { code: number | string; msg: string } | null = null;
+let _injectCallError: { code: number | string; msg: string } | null = null;
+export function injectNextLoginError(code: number | string, msg: string) { _injectLoginError = { code, msg }; }
+export function injectNextCallError(code: number | string, msg: string) { _injectCallError = { code, msg }; }
+
 function sessionError<T>(): CampResult<T> {
   return { ok: false, errorCode: CAMP_ERROR.SESSION_NOT_VALID.code, errorMsg: CAMP_ERROR.SESSION_NOT_VALID.msg };
 }
 
 /** GEN LogIn -> encrypted security key (cached in memory for one run only). */
 export function campLogin(): CampResult<{ key: string }> {
+  if (_injectLoginError) { const e = _injectLoginError; _injectLoginError = null; return { ok: false, errorCode: e.code, errorMsg: e.msg }; }
   _sessionKey = `mock-key-${++_runCounter}`;
   return { ok: true, data: { key: _sessionKey } };
 }
@@ -121,6 +128,7 @@ export function getAircraftDueList(serial: string, items: CampDueItem[]): CampRe
 
 /** GetAircraftState (cached Green/Yellow/Orange/Red read). */
 export function getAircraftState(serial: string, color: 'Green' | 'Yellow' | 'Orange' | 'Red'): CampResult<{ serial: string; state: string }> {
+  if (_injectCallError) { const e = _injectCallError; _injectCallError = null; return { ok: false, errorCode: e.code, errorMsg: e.msg }; }
   if (!_sessionKey) return sessionError();
   return { ok: true, data: { serial, state: color } };
 }
