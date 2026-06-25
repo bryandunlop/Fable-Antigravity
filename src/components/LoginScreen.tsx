@@ -82,12 +82,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase bg-muted/30">
                     System Views
                   </div>
-                  <SelectItem value="maintenance-workflow" className="py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 bg-teal-500 rounded-full"></div>
-                      <span className="font-medium">Maintenance Workflow (AviaSync)</span>
-                    </div>
-                  </SelectItem>
+                  {/* 'Maintenance Workflow (AviaSync)' persona removed — duplicate eTechLog; canonical surface is the Tech Log module. See docs/CANONICAL_MAINTENANCE_SURFACE.md */}
                   <SelectItem value="passenger" className="py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-2.5 h-2.5 bg-sky-500 rounded-full"></div>
