@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { currentRows } from '../engine/supersede';
@@ -54,6 +54,13 @@ export default function WorkCardDetail() {
   const [perfSig, setPerfSig] = useState<Signature | null>(null);
   const [riiStepOpen, setRiiStepOpen] = useState(false);
   const [riiStepId, setRiiStepId] = useState<string | null>(null);
+  const [addWo, setAddWo] = useState('');
+  const [woOpts, setWoOpts] = useState<{ woNumber: string; title: string; ata: string; scheduled: boolean; riiRequired: boolean }[]>([]);
+
+  useEffect(() => {
+    if (card && isMaint && card.status !== 'COMPLETED') setWoOpts(integration.listWorkOrders(card.aircraftId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!card || !ac) {
     return (
@@ -104,6 +111,19 @@ export default function WorkCardDetail() {
     const entry: LaborEntry = { id: newId('lb'), workCardId: card.id, techOid: ltech, hours: Number(lhours) || 0, dateUtc: new Date().toISOString(), description: ldesc.trim() };
     dispatch({ type: 'ADD_LABOR_ENTRY', payload: entry });
     setLhours(''); setLdesc('');
+  };
+
+  const addStepsFromCamp = () => {
+    if (!addWo) return;
+    const wo = integration.pullWorkOrder(card.aircraftId, addWo);
+    if (!wo) return toast.error('CAMP returned no detail for that work order.');
+    const newSteps = wo.lines.filter(l => l.lineType === 'T').map((l, i) => ({
+      id: newId('st'), seq: card.steps.length + i + 1, text: l.description, done: false,
+      riiRequired: wo.riiRequired && /independent inspection|\bRII\b/i.test(l.description),
+    }));
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, steps: [...card.steps, ...newSteps], woNumber: card.woNumber ?? wo.woNumber } });
+    setAddWo('');
+    toast.success(`Added ${newSteps.length} step(s) from CAMP ${wo.woNumber}.`);
   };
 
   const beginStepRii = (stepId: string) => {
@@ -252,6 +272,15 @@ export default function WorkCardDetail() {
               </div>
             ))}
             {card.steps.length === 0 && <p className="text-sm text-muted-foreground">No task steps on this card.</p>}
+            {isMaint && !completed && woOpts.length > 0 && (
+              <div className="mt-2 flex items-center gap-2 border-t pt-2">
+                <Select value={addWo} onValueChange={(v: string) => setAddWo(v)}>
+                  <SelectTrigger className="h-8 flex-1"><SelectValue placeholder="Add steps from a CAMP work order…" /></SelectTrigger>
+                  <SelectContent>{woOpts.map(w => <SelectItem key={w.woNumber} value={w.woNumber}>{w.woNumber} · {w.title}{w.riiRequired ? ' (RII)' : ''}</SelectItem>)}</SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" className="h-8 shrink-0" disabled={!addWo} onClick={addStepsFromCamp}><CloudDownload className="mr-1.5 h-3.5 w-3.5" /> Add</Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

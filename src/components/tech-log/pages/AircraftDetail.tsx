@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
+import { useRectifyToWorkCard } from '../useRectify';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
 import { isDeferralExpired, computeRepairDue } from '../engine/pl25';
@@ -72,6 +73,7 @@ export default function AircraftDetail() {
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
   const integration = useIntegration();
+  const rectifyToWorkCard = useRectifyToWorkCard();
   const isMaint = user.role === 'MAINTENANCE';
 
   const tab = (params.get('tab') as WorkspaceTab) || 'workspace';
@@ -334,7 +336,7 @@ export default function AircraftDetail() {
                   {spineOpenDefects.map(d => (
                     <div key={d.id} className="flex items-center justify-between gap-2 rounded border p-2 text-sm">
                       <span className="text-muted-foreground">Open defect · ATA {d.ataChapter} — {d.description}</span>
-                      {isMaint && <Button size="sm" variant="outline" onClick={() => startTriage(d.id, 'rectify')}>Rectify / defer</Button>}
+                      {isMaint && <Button size="sm" variant="outline" onClick={() => rectifyToWorkCard(d)}>Rectify</Button>}
                     </div>
                   ))}
                   {spineOpenCards.map(w => (
@@ -447,7 +449,8 @@ export default function AircraftDetail() {
                   {(isMaint || user.crewDeferralAuthorized) && isOpen && d.status === 'OPEN' && (
                     <div className="flex shrink-0 flex-wrap gap-2">
                       <Button size="sm" variant="secondary" onClick={() => startTriage(d.id, 'defer')}><Wrench className="mr-1.5 h-4 w-4" /> Defer (MEL)</Button>
-                      {isMaint && <Button size="sm" onClick={() => startTriage(d.id, 'rectify')}><CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify (CRS)</Button>}
+                      {isMaint && <Button size="sm" onClick={() => rectifyToWorkCard(d)}><CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify</Button>}
+                      {isMaint && <Button size="sm" variant="outline" onClick={() => startTriage(d.id, 'rectify')}>Quick CRS</Button>}
                     </div>
                   )}
                 </CardContent>

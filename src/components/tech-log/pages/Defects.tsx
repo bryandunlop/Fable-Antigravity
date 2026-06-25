@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { FilePlus, AlertTriangle, Wrench, CheckCircle2, Paperclip, Camera, MapPin, X, Repeat, Pencil } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
+import { useRectifyToWorkCard } from '../useRectify';
 import { currentRows } from '../engine/supersede';
 import { canSupersede } from '../engine/authz';
 import { mockSha256 } from '../engine/signing';
@@ -33,6 +34,7 @@ export default function Defects() {
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
   const integration = useIntegration();
+  const rectifyToWorkCard = useRectifyToWorkCard();
   const tailFilter = params.get('tail') ?? undefined;
 
   const [formOpen, setFormOpen] = useState(params.get('new') === '1');
@@ -276,9 +278,10 @@ export default function Defects() {
                     <Button size="sm" variant="secondary" onClick={() => navigate(`/tech-log/deferrals?defect=${d.id}`)}>
                       <Wrench className="mr-1.5 h-4 w-4" /> Defer (MEL)
                     </Button>
-                    <Button size="sm" onClick={() => navigate(`/tech-log/releases?defect=${d.id}`)}>
-                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify (CRS)
+                    <Button size="sm" onClick={() => rectifyToWorkCard(d)}>
+                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify
                     </Button>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/tech-log/releases?defect=${d.id}`)}>Quick CRS</Button>
                   </>
                 )}
               </div>
