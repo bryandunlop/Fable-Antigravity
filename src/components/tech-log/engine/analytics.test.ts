@@ -40,4 +40,10 @@ describe('analytics engine (seeded world)', () => {
     expect(r.fleetHours).toBeGreaterThan(0);
     expect(r.mtburOverall).toBeGreaterThan(0);
   });
+
+  it('mtbur rolls up removals by ATA, and the per-ATA counts reconcile to the total', () => {
+    const r = mtbur(s);
+    expect(r.byAta.length).toBeGreaterThanOrEqual(1);
+    expect(r.byAta.reduce((sum, a) => sum + a.removals, 0)).toBe(r.removals);
+  });
 });

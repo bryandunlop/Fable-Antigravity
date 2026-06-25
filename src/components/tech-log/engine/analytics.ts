@@ -65,6 +65,7 @@ export function aogStats(state: Pick<TechLogState, 'defects'>, nowUtc: string): 
 export function mtbur(state: Slice): {
   fleetHours: number; removals: number; mtburOverall: number | null;
   byPart: { partNumber: string; removals: number; mtbur: number | null }[];
+  byAta: { ata: string; removals: number; mtbur: number | null }[];
 } {
   const fleetHours = round1(currentRows(state.flightLogs).reduce((s, f) => s + f.flightTime, 0));
   const unsched = state.partUsages.filter(p => p.removedPartNumber && /unsched/i.test(p.removedReason ?? ''));
@@ -74,5 +75,10 @@ export function mtbur(state: Slice): {
   const byPart = [...byPartMap.entries()].map(([partNumber, n]) => ({
     partNumber, removals: n, mtbur: n ? round1(fleetHours / n) : null,
   })).sort((a, b) => b.removals - a.removals);
-  return { fleetHours, removals, mtburOverall: removals ? round1(fleetHours / removals) : null, byPart };
+  const byAtaMap = new Map<string, number>();
+  for (const p of unsched) byAtaMap.set(p.ataChapter, (byAtaMap.get(p.ataChapter) ?? 0) + 1);
+  const byAta = [...byAtaMap.entries()].map(([ata, n]) => ({
+    ata, removals: n, mtbur: n ? round1(fleetHours / n) : null,
+  })).sort((a, b) => b.removals - a.removals);
+  return { fleetHours, removals, mtburOverall: removals ? round1(fleetHours / removals) : null, byPart, byAta };
 }
