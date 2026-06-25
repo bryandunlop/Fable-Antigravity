@@ -40,6 +40,7 @@ export interface DiscrepancyPush {
   technician?: string;
   inspector?: string;
   existingDiscrepancyId?: string; // EDIT/UPDATE of a previously-pushed discrepancy
+  status?: 'Open' | 'Closed';     // Open on INSERT/EDIT; Closed on UPDATE (rectification / clearance)
 }
 
 /** IntegrateDiscrepancies (STA). Mock returns a generated CAMP discrepancy id. */

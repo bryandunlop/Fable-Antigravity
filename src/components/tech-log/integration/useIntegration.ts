@@ -6,6 +6,7 @@ import { odataPullLatestFlight } from './myairopsClient';
 import type { IntegrationEvent, CampCorrelation } from '../types';
 import type { DiscrepancyType, MelFlag } from './campTaxonomy';
 import { reconcileDiscrepancies, type ReconcileResult } from './reconcile';
+import { decidePushMode, type PushIntent } from './pushMapping';
 
 export function useIntegration() {
   const { state, dispatch } = useTechLog();
@@ -14,7 +15,12 @@ export function useIntegration() {
     dispatch({ type: 'ADD_INTEGRATION_EVENT', payload: { id: newId('int'), system, op, outcome, summary, atUtc: new Date().toISOString() } });
   const setCorrelation = (c: CampCorrelation) => dispatch({ type: 'UPSERT_CAMP_CORRELATION', payload: c });
 
-  /** Push a defect/deferral to CAMP via IntegrateDiscrepancies (mock). Runs LogIn → call → LogOff. */
+  /**
+   * Push a defect/deferral to CAMP via IntegrateDiscrepancies (mock). Runs LogIn → call → LogOff.
+   * `intent` maps the myGFO mutation onto a CAMP mode (CREATE→INSERT, CORRECT→EDIT, CLOSE→UPDATE/Closed).
+   * For a superseding correction/closure, `supersedesEntityId` points at the parent whose CAMP ref is
+   * carried forward — the ref lives only on the off-ledger correlation table (OQ9), never on the signed row.
+   */
   function pushDiscrepancy(input: {
     entityType: 'DEFECT' | 'DEFERRAL';
     entityId: string;
@@ -25,10 +31,17 @@ export function useIntegration() {
     nextDue?: string;
     category?: MelFlag;
     technician?: string;
+    intent?: PushIntent;          // CREATE (default) | CORRECT | CLOSE
+    supersedesEntityId?: string;  // parent entity whose CAMP ref is carried forward (CORRECT/CLOSE)
   }): camp.CampResult<{ discrepancyId: string }> | undefined {
     const ac = state.aircraft.find(a => a.id === input.aircraftId);
     if (!ac) return;
-    const existing = state.campCorrelation.find(c => c.mygfoEntityId === input.entityId)?.campDiscrepancyRef;
+    const intent = input.intent ?? 'CREATE';
+    const parentRef = (input.supersedesEntityId
+      ? state.campCorrelation.find(c => c.mygfoEntityId === input.supersedesEntityId)
+      : state.campCorrelation.find(c => c.mygfoEntityId === input.entityId)
+    )?.campDiscrepancyRef;
+    const decision = decidePushMode(intent, parentRef);
 
     setCorrelation({ mygfoEntityId: input.entityId, entityType: input.entityType, pushState: 'PENDING' });
     camp.campLogin();
@@ -37,7 +50,8 @@ export function useIntegration() {
       const res = camp.integrateDiscrepancies(
         {
           serial: ac.serialNumber,
-          mode: existing ? 'EDIT' : 'INSERT',
+          mode: decision.mode,
+          status: decision.status,
           discrepancyType: (input.entityType === 'DEFERRAL' ? 'MEL' : 'NON-DEFERRED') as DiscrepancyType,
           melFlag: input.category,
           ata: input.ata,
@@ -46,14 +60,14 @@ export function useIntegration() {
           nextDue: input.nextDue,
           riiItem: false,
           technician: input.technician,
-          existingDiscrepancyId: existing,
+          existingDiscrepancyId: decision.existingDiscrepancyId,
         },
         ac.serialNumber,
       );
       if (res.ok && res.data) {
         setCorrelation({ mygfoEntityId: input.entityId, entityType: input.entityType, campDiscrepancyRef: res.data.discrepancyId, pushState: 'PUSHED', lastPushedUtc: new Date().toISOString() });
-        logEvent('CAMP', `IntegrateDiscrepancies (${existing ? 'EDIT' : 'INSERT'})`, 'OK', `${ac.tailNumber} ${input.entityType} → ${res.data.discrepancyId}`);
-        toast.success(`Pushed to CAMP (sandbox) — discrepancy ${res.data.discrepancyId}`);
+        logEvent('CAMP', `IntegrateDiscrepancies (${decision.mode})`, 'OK', `${ac.tailNumber} ${input.entityType} → ${res.data.discrepancyId} [${decision.status}]`);
+        toast.success(`Pushed to CAMP (sandbox) — ${decision.mode} discrepancy ${res.data.discrepancyId}`);
       } else {
         setCorrelation({ mygfoEntityId: input.entityId, entityType: input.entityType, pushState: 'FAILED', lastError: res.errorMsg });
         logEvent('CAMP', 'IntegrateDiscrepancies', 'ERROR', `${res.errorCode} — ${res.errorMsg}`);

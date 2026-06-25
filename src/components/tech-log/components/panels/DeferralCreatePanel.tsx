@@ -112,7 +112,7 @@ export function DeferralCreatePanel({
       entityType: 'DEFERRAL', entityId: deferral.id, aircraftId: aircraft.id,
       ata: selectedMel.ataReference, description: `MEL ${selectedMel.subItemNumber} — ${selectedMel.title}`,
       restriction: deferral.restrictionText, nextDue: deferral.repairDueDateUtc,
-      category: selectedMel.category, technician: user.displayName,
+      category: selectedMel.category, technician: user.displayName, intent: 'CREATE',
     });
 
     onDone(deferral);

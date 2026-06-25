@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useIntegration } from '../integration/useIntegration';
 import { currentRows } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
 import { INTENT } from '../constants';
@@ -25,6 +26,7 @@ export default function WorkCardDetail() {
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
+  const integration = useIntegration();
 
   const card = state.workCards.find(w => w.id === id);
   const ac = card ? state.aircraft.find(a => a.id === card.aircraftId) : undefined;
@@ -132,8 +134,22 @@ export default function WorkCardDetail() {
       if (def && def.status !== 'RECTIFIED' && def.status !== 'CLOSED') {
         const rectified: Defect = { ...def, id: newId('def'), supersedesId: def.id, status: 'RECTIFIED', rectificationText: release.workDescription, clearedByOid: user.oid, clearedTsUtc: now, signatureId: pSig.id };
         dispatch({ type: 'SUPERSEDE_DEFECT', payload: rectified });
+        // CAMP: rectification closes the discrepancy (UPDATE → Closed), carrying the parent ref forward (off-ledger, OQ9).
+        integration.pushDiscrepancy({
+          entityType: 'DEFECT', entityId: rectified.id, aircraftId: def.aircraftId,
+          ata: def.ataChapter, description: def.description, technician: user.displayName,
+          intent: 'CLOSE', supersedesEntityId: def.id,
+        });
         const linkedDef = currentRows(state.deferrals).find(d => d.defectId === def.id && d.status !== 'CLEARED');
-        if (linkedDef) dispatch({ type: 'SUPERSEDE_DEFERRAL', payload: { ...linkedDef, id: newId('df'), supersedesId: linkedDef.id, status: 'CLEARED' } as Deferral });
+        if (linkedDef) {
+          const cleared: Deferral = { ...linkedDef, id: newId('df'), supersedesId: linkedDef.id, status: 'CLEARED' } as Deferral;
+          dispatch({ type: 'SUPERSEDE_DEFERRAL', payload: cleared });
+          integration.pushDiscrepancy({
+            entityType: 'DEFERRAL', entityId: cleared.id, aircraftId: linkedDef.aircraftId,
+            ata: def.ataChapter, description: `MEL deferral cleared on rectification of ${def.id}`,
+            technician: user.displayName, intent: 'CLOSE', supersedesEntityId: linkedDef.id,
+          });
+        }
       }
     }
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'WORKCARD_COMPLETED', entityType: 'WorkCard', entityId: card.id, atUtc: now, summary: `${ac.tailNumber} ${card.cardNumber} complied with — RTS${card.riiRequired ? ' (RII dual sign-off)' : ''}` } });
