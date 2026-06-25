@@ -124,6 +124,38 @@ export function getAircraftState(serial: string, color: 'Green' | 'Yellow' | 'Or
   return { ok: true, data: { serial, state: color } };
 }
 
+export interface CampDiscrepancy {
+  discrepancyId: string;
+  ata: string;
+  description: string;
+  discrepancyType: DiscrepancyType;
+  status: 'Open' | 'Closed';
+  melFlag?: MelFlag;
+  restriction?: string;
+}
+
+/**
+ * GetAircraftDiscrepancies (STA, read). Mock returns everything CAMP holds for the tail:
+ * the discrepancies myGFO previously pushed (echoed via `knownRefs`) PLUS discrepancies
+ * entered directly in CAMP (e.g. at a contract service center) that myGFO has never seen.
+ * The caller reconciles these against its off-ledger correlation table.
+ */
+export function getAircraftDiscrepancies(serial: string, knownRefs: string[] = []): CampResult<CampDiscrepancy[]> {
+  if (!_sessionKey) return sessionError();
+  const echoed: CampDiscrepancy[] = knownRefs.map(ref => ({
+    discrepancyId: ref,
+    ata: ref.split('-')[2] ?? '00',
+    description: `Synced from myGFO (${ref})`,
+    discrepancyType: 'NON-DEFERRED',
+    status: 'Open',
+  }));
+  const s = Math.abs(hashStr(serial));
+  const campDirect: CampDiscrepancy[] = [
+    { discrepancyId: `CAMP-DISC-25-${s % 100000}`, ata: '25', description: 'Cabin seat 2L recline inoperative (entered at service center)', discrepancyType: 'DEFERRED-WATCHLIST', status: 'Open', melFlag: 'D' },
+  ];
+  return { ok: true, data: [...echoed, ...campDirect] };
+}
+
 // ── WRK: work-order details (Phase 3 task-card pull) ──
 export type WoLineType = 'S' | 'T'; // S = squawk, T = task
 export interface CampWoDetailLine {

@@ -7,10 +7,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { Cloud, Webhook, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import type { ReconcileResult } from '../integration/reconcile';
+
+function ReconCol({ title, tone, items }: { title: string; tone: 'ok' | 'warn' | 'err'; items: string[] }) {
+  const color = tone === 'ok' ? 'text-emerald-700' : tone === 'warn' ? 'text-amber-700' : 'text-red-700';
+  return (
+    <div>
+      <div className={`mb-0.5 font-medium ${color}`}>{title} ({items.length})</div>
+      {items.length === 0
+        ? <div className="text-xs text-muted-foreground">—</div>
+        : <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">{items.map((t, i) => <li key={i}>{t}</li>)}</ul>}
+    </div>
+  );
+}
 
 export default function Integration() {
   const { state } = useTechLog();
-  const { refreshCampReads, pushUtilization } = useIntegration();
+  const { refreshCampReads, pushUtilization, reconcile } = useIntegration();
+  const [recon, setRecon] = useState<Record<string, (ReconcileResult & { tail: string }) | undefined>>({});
 
   return (
     <TechLogShell
@@ -89,6 +104,30 @@ export default function Integration() {
               <div className="flex items-center gap-2">
                 <Badge variant={c.pushState === 'PUSHED' ? 'secondary' : c.pushState === 'FAILED' ? 'destructive' : 'outline'}>{c.pushState}</Badge>
                 {c.campDiscrepancyRef && <span className="font-mono text-xs text-muted-foreground">{c.campDiscrepancyRef}</span>}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader><CardTitle className="text-base">CAMP discrepancy reconciliation (GetAircraftDiscrepancies)</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-xs text-muted-foreground">Read CAMP's discrepancy list and diff it against the off-ledger correlation table — surfaces items entered directly in CAMP and pushes CAMP never acked.</p>
+          <div className="flex flex-wrap gap-2">
+            {state.aircraft.filter(a => !a.isProvisional).map(a => (
+              <Button key={a.id} size="sm" variant="outline" onClick={() => setRecon(r => ({ ...r, [a.id]: reconcile(a.id) }))}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Reconcile {a.tailNumber}
+              </Button>
+            ))}
+          </div>
+          {Object.entries(recon).filter(([, r]) => r).map(([id, r]) => r && (
+            <div key={id} className="rounded-md border p-2">
+              <div className="mb-1 font-medium">{r.tail}</div>
+              <div className="grid gap-2 md:grid-cols-3">
+                <ReconCol title="Matched" tone="ok" items={r.matched.map(d => `${d.ata} · ${d.description}`)} />
+                <ReconCol title="CAMP-only (triage)" tone="warn" items={r.campOnly.map(d => `${d.ata} · ${d.description}`)} />
+                <ReconCol title="myGFO-only (investigate)" tone="err" items={r.mygfoOnly.map(c => `${c.entityType} ${c.mygfoEntityId}${c.lastError ? ' — ' + c.lastError : ''}`)} />
               </div>
             </div>
           ))}

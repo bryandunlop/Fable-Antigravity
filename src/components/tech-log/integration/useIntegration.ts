@@ -5,6 +5,7 @@ import * as camp from './campClient';
 import { odataPullLatestFlight } from './myairopsClient';
 import type { IntegrationEvent, CampCorrelation } from '../types';
 import type { DiscrepancyType, MelFlag } from './campTaxonomy';
+import { reconcileDiscrepancies, type ReconcileResult } from './reconcile';
 
 export function useIntegration() {
   const { state, dispatch } = useTechLog();
@@ -143,6 +144,30 @@ export function useIntegration() {
     }
   }
 
+  /** Read CAMP's discrepancy list (GetAircraftDiscrepancies) and reconcile vs the off-ledger correlation table. */
+  function reconcile(aircraftId: string): (ReconcileResult & { tail: string }) | undefined {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    if (!ac) return;
+    const entityIds = new Set<string>([
+      ...state.defects.filter(d => d.aircraftId === aircraftId).map(d => d.id),
+      ...state.deferrals.filter(d => d.aircraftId === aircraftId).map(d => d.id),
+    ]);
+    const correlations = state.campCorrelation.filter(c => entityIds.has(c.mygfoEntityId));
+    const pushedRefs = correlations.filter(c => c.pushState === 'PUSHED' && c.campDiscrepancyRef).map(c => c.campDiscrepancyRef as string);
+    camp.campLogin();
+    logEvent('CAMP', 'LogIn', 'OK', `session opened (${camp.campMeta.env})`);
+    try {
+      const res = camp.getAircraftDiscrepancies(ac.serialNumber, pushedRefs);
+      const result = reconcileDiscrepancies(res.data ?? [], correlations);
+      logEvent('CAMP', 'GetAircraftDiscrepancies', res.ok ? 'OK' : 'ERROR',
+        `${ac.tailNumber}: ${result.matched.length} matched · ${result.campOnly.length} CAMP-only · ${result.mygfoOnly.length} myGFO-only`);
+      return { ...result, tail: ac.tailNumber };
+    } finally {
+      camp.campLogoff();
+      logEvent('CAMP', 'LogOff', 'OK', 'session closed');
+    }
+  }
+
   /**
    * Utilization push — intentionally BLOCKED (Open Question 1: CAMP op undocumented).
    * Validates the guards + prepares the minutes payload, logs a BLOCKED event, and NEVER transmits.
@@ -160,5 +185,5 @@ export function useIntegration() {
     return res;
   }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization };
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile };
 }
