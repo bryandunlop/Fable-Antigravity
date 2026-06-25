@@ -447,7 +447,7 @@ export interface IntegrationEvent {
   system: 'CAMP' | 'MYAIROPS';
   op: string;
   summary: string;               // identifiers + outcome only (no payloads/PII)
-  outcome: 'OK' | 'ERROR' | 'EMPTY';
+  outcome: 'OK' | 'ERROR' | 'EMPTY' | 'BLOCKED';
   atUtc: string;
 }
 

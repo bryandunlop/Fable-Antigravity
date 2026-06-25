@@ -143,5 +143,22 @@ export function useIntegration() {
     }
   }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder };
+  /**
+   * Utilization push — intentionally BLOCKED (Open Question 1: CAMP op undocumented).
+   * Validates the guards + prepares the minutes payload, logs a BLOCKED event, and NEVER transmits.
+   */
+  function pushUtilization(aircraftId: string): camp.CampResult<camp.UtilizationPushResult> | undefined {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    if (!ac) return;
+    const res = camp.pushUtilization_TODO_UNDOCUMENTED(
+      // landings are not yet tracked on Aircraft (Phase-2+); 0 is illustrative and never transmitted.
+      { serial: ac.serialNumber, airframeHours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles, landings: 0 },
+      ac.serialNumber,
+    );
+    logEvent('CAMP', 'PushUtilization (OQ1: fn undocumented)', 'BLOCKED', `${ac.tailNumber}: blocked — prepared ${res.data?.preparedPayload?.totalTimeMinutes ?? '—'} min, not transmitted`);
+    toast.warning(`Utilization push blocked — CAMP function undocumented (OQ1). Nothing transmitted for ${ac.tailNumber}.`);
+    return res;
+  }
+
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization };
 }

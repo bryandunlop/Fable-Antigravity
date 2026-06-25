@@ -10,7 +10,7 @@ import { Cloud, Webhook, RefreshCw, AlertTriangle } from 'lucide-react';
 
 export default function Integration() {
   const { state } = useTechLog();
-  const { refreshCampReads } = useIntegration();
+  const { refreshCampReads, pushUtilization } = useIntegration();
 
   return (
     <TechLogShell
@@ -41,6 +41,17 @@ export default function Integration() {
                 {state.aircraft.filter(a => !a.isProvisional).map(a => (
                   <Button key={a.id} size="sm" variant="outline" onClick={() => refreshCampReads(a.id)}>
                     <RefreshCw className="mr-1.5 h-3.5 w-3.5" />{a.tailNumber}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50/60 p-2">
+              <div className="flex items-center gap-1.5 font-medium text-amber-700"><AlertTriangle className="h-3.5 w-3.5" /> Utilization push — blocked (OQ1)</div>
+              <p className="mt-0.5 text-muted-foreground">The CAMP SOAP operation to push hours/cycles/landings is <strong>undocumented</strong> — not invented here. Validates exact-serial + increase-only and prepares the minutes payload, then refuses to transmit until confirmed under sandbox.</p>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {state.aircraft.filter(a => !a.isProvisional).map(a => (
+                  <Button key={a.id} size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100" onClick={() => pushUtilization(a.id)}>
+                    Push {a.tailNumber} (blocked)
                   </Button>
                 ))}
               </div>

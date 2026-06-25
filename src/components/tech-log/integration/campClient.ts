@@ -52,6 +52,58 @@ export function integrateDiscrepancies(p: DiscrepancyPush, expectedSerial: strin
   return { ok: true, data: { discrepancyId: id } };
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// UTILIZATION PUSH — OPEN QUESTION 1 (BLOCKED; do NOT implement a transport).
+// The CAMP SOAP operation to push utilization (airframe hours/cycles/landings) is
+// NOT in the GEN/STA/WRK WSDLs. Per CLAUDE.md hard rule we NEVER invent a function
+// name. This placeholder validates the documented guards (exact-serial, increase-only)
+// and prepares the minutes-converted payload, but REFUSES to transmit until the real
+// operation is confirmed under the CAMP **sandbox**. Dev: wire the confirmed op here.
+// ──────────────────────────────────────────────────────────────────────────────
+export const UTILIZATION_PUSH_OPEN_QUESTION =
+  'OQ1: CAMP utilization-push SOAP operation is undocumented — confirm under sandbox before implementing. Do not invent an endpoint.';
+
+export interface UtilizationPush {
+  serial: string;          // must match CAMP exactly (incl. hyphens/caps)
+  airframeHours: number;   // myGFO hours; ×60 → CAMP minutes at the boundary
+  cycles: number;
+  landings: number;
+}
+export interface UtilizationPushResult {
+  status: 'BLOCKED_UNDOCUMENTED';
+  openQuestion: string;
+  validation: { serialMatches: boolean; increaseOnly: boolean };
+  /** What WOULD be sent once the real op is confirmed (minutes-converted) — never transmitted. */
+  preparedPayload?: { serial: string; totalTimeMinutes: number; cycles: number; landings: number };
+}
+
+/**
+ * Utilization push — intentionally BLOCKED pending Open Question 1.
+ * Returns ok:false with the OQ message; validates exact-serial + increase-only and
+ * prepares the minutes-converted payload for inspection, but NEVER transmits and
+ * NEVER names a SOAP operation (CLAUDE.md: "NEVER invent a CAMP function name").
+ */
+export function pushUtilization_TODO_UNDOCUMENTED(
+  p: UtilizationPush,
+  expectedSerial: string,
+  lastSentTotals?: { airframeHours: number; cycles: number; landings: number },
+): CampResult<UtilizationPushResult> {
+  const serialMatches = p.serial === expectedSerial;
+  const increaseOnly = !lastSentTotals
+    || (p.airframeHours >= lastSentTotals.airframeHours
+      && p.cycles >= lastSentTotals.cycles
+      && p.landings >= lastSentTotals.landings);
+  const preparedPayload = serialMatches && increaseOnly
+    ? { serial: p.serial, totalTimeMinutes: hoursToCampMinutes(p.airframeHours), cycles: p.cycles, landings: p.landings }
+    : undefined;
+  return {
+    ok: false,
+    errorCode: 'OQ1_UNDOCUMENTED',
+    errorMsg: UTILIZATION_PUSH_OPEN_QUESTION,
+    data: { status: 'BLOCKED_UNDOCUMENTED', openQuestion: UTILIZATION_PUSH_OPEN_QUESTION, validation: { serialMatches, increaseOnly }, preparedPayload },
+  };
+}
+
 /** GetLatestAircraftTimes (read; CAMP returns MINUTES). */
 export function getLatestAircraftTimes(serial: string, airframeHours: number, cycles: number): CampResult<{ serial: string; totalTimeMinutes: number; cycles: number }> {
   if (!_sessionKey) return sessionError();
@@ -210,7 +262,10 @@ export interface CampAdSbItem {
   ata: string;
   nextDueUtc?: string;
 }
-/** Mock AD/SB status. ⚠ The real CAMP read function for this is NOT documented (Open Question). */
+export const CAMP_ADSB_OPEN_QUESTION =
+  'OQ: the CAMP read function for AD/SB status is NOT in the GEN/STA/WRK docs — confirm under sandbox; do not invent an endpoint.';
+
+/** Mock AD/SB status. ⚠ Undocumented CAMP read — see CAMP_ADSB_OPEN_QUESTION (Open Question; no invented endpoint). */
 export function campAdSb(serial: string): CampAdSbItem[] {
   const now = Date.now();
   const s = Math.abs(hashStr(serial));
