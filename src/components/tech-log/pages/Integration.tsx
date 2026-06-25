@@ -1,11 +1,13 @@
 import { useTechLog } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
-import { CAMP_BASE_URLS, CAMP_ENV, CAMP_ERROR, DUE_LIST_CAP_MONTHS } from '../integration/campTaxonomy';
+import { CAMP_BASE_URLS, CAMP_ERROR, DUE_LIST_CAP_MONTHS } from '../integration/campTaxonomy';
+import { PROMOTION_CONFIRM_PHRASE } from '../integration/campClient';
 import { MYAIROPS_EVENT_TYPES, webhookVerificationSpec } from '../integration/myairopsClient';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 import { Cloud, Webhook, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import type { ReconcileResult } from '../integration/reconcile';
@@ -24,8 +26,9 @@ function ReconCol({ title, tone, items }: { title: string; tone: 'ok' | 'warn' |
 
 export default function Integration() {
   const { state } = useTechLog();
-  const { refreshCampReads, pushUtilization, reconcile, demoErrorHandling } = useIntegration();
+  const { refreshCampReads, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox } = useIntegration();
   const [recon, setRecon] = useState<Record<string, (ReconcileResult & { tail: string }) | undefined>>({});
+  const [promoteText, setPromoteText] = useState('');
   const firstAc = state.aircraft.find(a => !a.isProvisional);
 
   return (
@@ -37,7 +40,7 @@ export default function Integration() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Cloud className="h-4 w-4" /> CAMP connector <Badge variant="destructive">{CAMP_ENV}</Badge>
+              <Cloud className="h-4 w-4" /> CAMP connector <Badge variant={campEnv() === 'production' ? 'destructive' : 'secondary'}>{campEnv()}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1.5 text-xs">
@@ -94,6 +97,23 @@ export default function Integration() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className={`mt-4 ${campEnv() === 'production' ? 'border-red-400' : ''}`}>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base">CAMP environment <Badge variant={campEnv() === 'production' ? 'destructive' : 'secondary'}>{campEnv()}</Badge></CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {campEnv() === 'production'
+            ? <div className="rounded-md border border-red-400 bg-red-50 p-2 text-red-700"><strong>PRODUCTION (simulated).</strong> In the real system a production push writes a real squawk into a live aircraft's airworthiness record — only ever via a deliberate, reviewed, human-gated promotion. Dev/test must always be sandbox.</div>
+            : <p className="text-xs text-muted-foreground">Dev/test is locked to <strong>sandbox</strong> (Sandbox rule). Promotion to production is a deliberate, typed-confirmation, human-gated step — never automatic; a production push is refused unless the gate is open.</p>}
+          {campEnv() === 'sandbox' ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Input value={promoteText} onChange={e => setPromoteText(e.target.value)} placeholder={`Type "${PROMOTION_CONFIRM_PHRASE}"`} className="h-8 max-w-xs" />
+              <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => { if (promoteToProduction(promoteText)) setPromoteText(''); }}>Promote to production</Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => revertToSandbox()}>Revert to sandbox</Button>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="mt-4">
         <CardHeader><CardTitle className="text-base">CAMP discrepancy correlation (off-ledger, §18.1)</CardTitle></CardHeader>

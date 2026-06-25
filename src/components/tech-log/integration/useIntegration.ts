@@ -221,5 +221,15 @@ export function useIntegration() {
     if (res?.ok) toast.success(`${ac.tailNumber}: recovered — CAMP read succeeded after one re-login`);
   }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling };
+  function campEnv() { return camp.getCampEnv(); }
+  /** Human-gated sandbox→production promotion (typed confirmation). Demo only — no real prod endpoint. */
+  function promoteToProduction(confirmText: string): boolean {
+    const okp = camp.promoteToProduction(confirmText);
+    if (okp) { logEvent('CAMP', 'PromoteToProduction', 'OK', 'env → PRODUCTION (human-gated; demo only — no real prod endpoint)'); toast.warning('CAMP promoted to PRODUCTION (simulated) — pushes now target the production contract.'); }
+    else toast.error(`Promotion refused — type "${camp.PROMOTION_CONFIRM_PHRASE}" exactly to confirm.`);
+    return okp;
+  }
+  function revertToSandbox() { camp.revertToSandbox(); logEvent('CAMP', 'RevertToSandbox', 'OK', 'env → sandbox'); toast.success('Reverted to CAMP sandbox.'); }
+
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox };
 }

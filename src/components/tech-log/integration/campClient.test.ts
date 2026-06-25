@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   campLogin, campLogoff, integrateDiscrepancies,
   pushUtilization_TODO_UNDOCUMENTED, UTILIZATION_PUSH_OPEN_QUESTION, CAMP_ADSB_OPEN_QUESTION,
+  getCampEnv, promoteToProduction, revertToSandbox, setEnvUnsafeForDemo, PROMOTION_CONFIRM_PHRASE,
 } from './campClient';
 import { hoursToCampMinutes } from './campTaxonomy';
 
@@ -60,5 +61,45 @@ describe('utilization push — BLOCKED guardrail (Open Question 1)', () => {
 describe('AD/SB read is OQ-labelled (undocumented CAMP function)', () => {
   it('exposes an Open-Question marker for the AD/SB read', () => {
     expect(CAMP_ADSB_OPEN_QUESTION).toMatch(/AD\/SB|undocumented|OQ/i);
+  });
+});
+
+describe('production promotion gate (Sandbox rule)', () => {
+  it('defaults to sandbox', () => {
+    revertToSandbox();
+    expect(getCampEnv()).toBe('sandbox');
+  });
+
+  it('refuses to promote without the exact typed confirmation', () => {
+    revertToSandbox();
+    expect(promoteToProduction('promote')).toBe(false);
+    expect(getCampEnv()).toBe('sandbox');
+  });
+
+  it('promotes only with the exact confirmation phrase', () => {
+    expect(promoteToProduction(PROMOTION_CONFIRM_PHRASE)).toBe(true);
+    expect(getCampEnv()).toBe('production');
+    revertToSandbox();
+    expect(getCampEnv()).toBe('sandbox');
+  });
+
+  it('refuses a production push when the gate is closed', () => {
+    setEnvUnsafeForDemo('production'); // production env, gate NOT open
+    campLogin();
+    const res = integrateDiscrepancies({ serial: '6051', mode: 'INSERT', discrepancyType: 'NON-DEFERRED', ata: '21', description: 'x' }, '6051');
+    campLogoff();
+    expect(res.ok).toBe(false);
+    expect(String(res.errorCode)).toBe('PROD_GATE_CLOSED');
+    revertToSandbox();
+  });
+
+  it('allows the push in sandbox and once promoted (gate open)', () => {
+    revertToSandbox();
+    campLogin();
+    expect(integrateDiscrepancies({ serial: '6051', mode: 'INSERT', discrepancyType: 'NON-DEFERRED', ata: '21', description: 'x' }, '6051').ok).toBe(true);
+    promoteToProduction(PROMOTION_CONFIRM_PHRASE);
+    expect(integrateDiscrepancies({ serial: '6051', mode: 'INSERT', discrepancyType: 'NON-DEFERRED', ata: '21', description: 'y' }, '6051').ok).toBe(true);
+    campLogoff();
+    revertToSandbox();
   });
 });

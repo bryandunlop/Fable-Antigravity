@@ -2,7 +2,7 @@
 // increase-only utilization, EXACT serial match, error taxonomy) but returns FAKED data.
 // Dev swaps this for a real `soap`/`strong-soap` client against the CAMP **sandbox** WSDL later.
 import {
-  CAMP_BASE_URLS, CAMP_ENV, CAMP_ERROR, hoursToCampMinutes, campMinutesToHours, DUE_LIST_CAP_MONTHS,
+  CAMP_BASE_URLS, CAMP_ERROR, hoursToCampMinutes, campMinutesToHours, DUE_LIST_CAP_MONTHS,
 } from './campTaxonomy';
 import type { IntegrateMode, DiscrepancyType, MelFlag } from './campTaxonomy';
 
@@ -16,6 +16,24 @@ let _injectLoginError: { code: number | string; msg: string } | null = null;
 let _injectCallError: { code: number | string; msg: string } | null = null;
 export function injectNextLoginError(code: number | string, msg: string) { _injectLoginError = { code, msg }; }
 export function injectNextCallError(code: number | string, msg: string) { _injectCallError = { code, msg }; }
+
+// ── Environment + production-promotion gate (CLAUDE.md Sandbox rule) ──
+// Dev/test is locked to sandbox. Promotion to production is a deliberate, typed-confirmation,
+// human-gated step — never automatic. A production push is REFUSED unless the gate is open.
+// The demo never carries a real production URL/credential — this models the GATE contract only.
+export type CampEnv = 'sandbox' | 'production';
+let _env: CampEnv = 'sandbox';
+let _prodGateOpen = false;
+export const PROMOTION_CONFIRM_PHRASE = 'PROMOTE TO PRODUCTION';
+export function getCampEnv(): CampEnv { return _env; }
+export function isProductionGateOpen(): boolean { return _prodGateOpen; }
+export function promoteToProduction(confirmText: string): boolean {
+  if (confirmText.trim().toUpperCase() !== PROMOTION_CONFIRM_PHRASE) return false;
+  _env = 'production'; _prodGateOpen = true; return true;
+}
+export function revertToSandbox(): void { _env = 'sandbox'; _prodGateOpen = false; }
+/** Demo aid: force an env without opening the gate, to exercise the production-push refusal. */
+export function setEnvUnsafeForDemo(env: CampEnv): void { _env = env; _prodGateOpen = false; }
 
 function sessionError<T>(): CampResult<T> {
   return { ok: false, errorCode: CAMP_ERROR.SESSION_NOT_VALID.code, errorMsg: CAMP_ERROR.SESSION_NOT_VALID.msg };
@@ -52,6 +70,9 @@ export interface DiscrepancyPush {
 
 /** IntegrateDiscrepancies (STA). Mock returns a generated CAMP discrepancy id. */
 export function integrateDiscrepancies(p: DiscrepancyPush, expectedSerial: string): CampResult<{ discrepancyId: string }> {
+  if (_env === 'production' && !_prodGateOpen) {
+    return { ok: false, errorCode: 'PROD_GATE_CLOSED', errorMsg: 'Refusing production CAMP push — promotion gate not open (deliberate human-gated step required).' };
+  }
   if (!_sessionKey) return sessionError();
   if (p.serial !== expectedSerial) {
     return { ok: false, errorCode: CAMP_ERROR.INVALID_OPERATION.code, errorMsg: `serial mismatch '${p.serial}' vs CAMP '${expectedSerial}' (the #1 CAMP integration failure mode)` };
@@ -232,7 +253,7 @@ export function getWODetails(serial: string, woNumber: string): CampResult<CampW
   return { ok: true, data: { ...found, serial, headerStatusCode: 1 } }; // 1 = Open
 }
 
-export const campMeta = { baseUrls: CAMP_BASE_URLS, env: CAMP_ENV, minutesToHours: campMinutesToHours };
+export const campMeta = { baseUrls: CAMP_BASE_URLS, get env() { return _env; }, minutesToHours: campMinutesToHours };
 
 function hashStr(x: string): number {
   let h = 0;
