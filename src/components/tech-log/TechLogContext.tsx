@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useEffect, useReducer, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useState, useCallback, ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { TechLogState, TechLogAction, Personnel } from './types';
+import type { SupersedeEntityType } from './types';
 import { getDefaultState } from './mockData/scenarios';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
+import { wouldFork, buildSupersedeConflict } from './engine/supersede';
 
 const STORAGE_KEY = 'tech-log-state';
 const VERSION_KEY = 'tech-log-data-version';
@@ -22,19 +24,43 @@ function loadInitialState(): TechLogState {
   }
 }
 
+/** Defense-in-depth: every SUPERSEDE_* action funnels through here before being applied. If the
+ * targeted parent already has a superseding row, the new row is rejected (not appended) and routed
+ * to state.supersedeConflicts for human reconciliation (CLAUDE.md DM-2) instead of silently creating
+ * a second "current" row for the same entity. Returns null when there is no fork (caller proceeds). */
+function maybeRejectSupersede(
+  state: TechLogState,
+  existingRows: { supersedesId?: string }[],
+  entityType: SupersedeEntityType,
+  payload: { id: string; supersedesId?: string },
+): TechLogState | null {
+  if (!payload.supersedesId || !wouldFork(existingRows, payload.supersedesId)) return null;
+  const { conflict, audit } = buildSupersedeConflict(entityType, payload.id, payload.supersedesId, state.currentUserOid, new Date().toISOString());
+  return { ...state, supersedeConflicts: [conflict, ...state.supersedeConflicts], audit: [audit, ...state.audit].slice(0, 500) };
+}
+
 function reducer(state: TechLogState, action: TechLogAction): TechLogState {
   switch (action.type) {
     case 'ADD_DEFECT':
-    case 'SUPERSEDE_DEFECT':
       return { ...state, defects: [...state.defects, action.payload] };
+    case 'SUPERSEDE_DEFECT': {
+      const rejected = maybeRejectSupersede(state, state.defects, 'Defect', action.payload);
+      return rejected ?? { ...state, defects: [...state.defects, action.payload] };
+    }
     case 'ADD_DEFERRAL':
-    case 'SUPERSEDE_DEFERRAL':
       return { ...state, deferrals: [...state.deferrals, action.payload] };
+    case 'SUPERSEDE_DEFERRAL': {
+      const rejected = maybeRejectSupersede(state, state.deferrals, 'Deferral', action.payload);
+      return rejected ?? { ...state, deferrals: [...state.deferrals, action.payload] };
+    }
     case 'ADD_RELEASE':
       return { ...state, releases: [...state.releases, action.payload] };
     case 'ADD_FLIGHTLOG':
-    case 'SUPERSEDE_FLIGHTLOG':
       return { ...state, flightLogs: [...state.flightLogs, action.payload] };
+    case 'SUPERSEDE_FLIGHTLOG': {
+      const rejected = maybeRejectSupersede(state, state.flightLogs, 'FlightLog', action.payload);
+      return rejected ?? { ...state, flightLogs: [...state.flightLogs, action.payload] };
+    }
     case 'ADD_SIGNATURE':
       return { ...state, signatures: [...state.signatures, action.payload] };
     case 'ADD_AUDIT':
@@ -72,8 +98,11 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
     case 'EDIT_BRIEFING':
       return { ...state, briefings: state.briefings.map(b => (b.id === action.payload.id ? action.payload : b)) };
     case 'ADD_POSTFLIGHT':
-    case 'SUPERSEDE_POSTFLIGHT':
       return { ...state, postflights: [...state.postflights, action.payload] };
+    case 'SUPERSEDE_POSTFLIGHT': {
+      const rejected = maybeRejectSupersede(state, state.postflights, 'Postflight', action.payload);
+      return rejected ?? { ...state, postflights: [...state.postflights, action.payload] };
+    }
     case 'ADD_COORDINATION_MESSAGE':
       return { ...state, coordinationMessages: [...state.coordinationMessages, action.payload] };
     case 'EDIT_COORDINATION_MESSAGE':
@@ -81,8 +110,11 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
     case 'DELETE_COORDINATION_MESSAGE':
       return { ...state, coordinationMessages: state.coordinationMessages.filter(m => m.id !== action.payload) };
     case 'ADD_RECORD_NOTE':
-    case 'SUPERSEDE_RECORD_NOTE':
       return { ...state, recordNotes: [...state.recordNotes, action.payload] };
+    case 'SUPERSEDE_RECORD_NOTE': {
+      const rejected = maybeRejectSupersede(state, state.recordNotes, 'RecordNote', action.payload);
+      return rejected ?? { ...state, recordNotes: [...state.recordNotes, action.payload] };
+    }
     case 'DISMISS_NOTIFICATION':
       return state.dismissedNotifications.includes(action.payload)
         ? state
@@ -153,6 +185,15 @@ export function TechLogProvider({ children, userRole }: { children: ReactNode; u
     dispatch({ type: 'SET_PERSONA', payload: oid });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole]);
+
+  const conflictCountRef = useRef(0);
+  useEffect(() => {
+    if (state.supersedeConflicts.length > conflictCountRef.current) {
+      const latest = state.supersedeConflicts[0];
+      toast.error(`Correction rejected: ${latest.entityType} ${latest.supersedesId} was already corrected by someone else. Routed to reconciliation — see Audit & Ledger → Conflicts.`);
+    }
+    conflictCountRef.current = state.supersedeConflicts.length;
+  }, [state.supersedeConflicts]);
 
   useEffect(() => {
     const t = setTimeout(() => {

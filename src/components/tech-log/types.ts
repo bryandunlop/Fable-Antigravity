@@ -498,6 +498,7 @@ export interface TechLogState {
   postflights: Postflight[];
   coordinationMessages: CoordinationMessage[];
   recordNotes: RecordNote[];
+  supersedeConflicts: SupersedeConflict[]; // rejected forked supersede attempts (DM-2) — human reconciliation
   dismissedNotifications: string[];     // notification keys the user has cleared
   campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
   integrationEvents: IntegrationEvent[];
