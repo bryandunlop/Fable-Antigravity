@@ -44,4 +44,13 @@ describe('applyApproval', () => {
     expect(result.melItems.find(m => m.id === 'mel1')?.approvalState).toBe('APPROVED');
     expect(result.melItems.find(m => m.id === 'mel2')?.approvalState).toBe('PENDING_FSDO'); // not in melItemIds — untouched
   });
+
+  it('MEL_ITEM_APPROVAL approves only the named MEL item, leaving siblings untouched', () => {
+    const pending: PendingApproval = { id: 'appr4', kind: 'MEL_ITEM_APPROVAL', melItemId: 'mel2', evidenceRef: 'FSDO-LOA-2026-05', summary: 's', proposedByOid: 'USR002', proposedAtUtc: 't', status: 'PENDING' };
+    const result = applyApproval(tables, pending);
+    expect(result.melItems.find(m => m.id === 'mel2')?.approvalState).toBe('APPROVED');
+    expect(result.melItems.find(m => m.id === 'mel1')?.approvalState).toBe('PENDING_FSDO'); // untouched sibling
+    expect(result.aircraft).toBe(tables.aircraft); // untouched table keeps reference identity
+    expect(result.personnel).toBe(tables.personnel);
+  });
 });

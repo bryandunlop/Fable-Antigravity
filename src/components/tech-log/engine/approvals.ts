@@ -32,5 +32,7 @@ export function applyApproval(tables: ReferenceTables, pending: PendingApproval)
         melItems: tables.melItems.map(m => (idSet.has(m.id) ? { ...m, approvalState: 'APPROVED' } : m)),
       };
     }
+    case 'MEL_ITEM_APPROVAL':
+      return { ...tables, melItems: tables.melItems.map(m => (m.id === pending.melItemId ? { ...m, approvalState: 'APPROVED' } : m)) };
   }
 }

@@ -468,6 +468,7 @@ export type PendingApproval = PendingApprovalBase &
     | { kind: 'AIRCRAFT_EDIT'; before: Aircraft; after: Aircraft }
     | { kind: 'PERSONNEL_EDIT'; before: Personnel; after: Personnel }
     | { kind: 'MEL_TYPE_ACTIVATION'; aircraftId: string; aircraftType: AircraftType; melItemIds: string[]; evidenceRef: string }
+    | { kind: 'MEL_ITEM_APPROVAL'; melItemId: string; evidenceRef: string }
   );
 
 // ── Phase-2 integration correlation (OFF-ledger, per spec §18.1) ──

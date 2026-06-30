@@ -153,6 +153,9 @@ export default function JourneyLog() {
       toast.success(`Correction signed — original retained, correction is now current.`);
     } else {
       dispatch({ type: 'ADD_FLIGHTLOG', payload: flight });
+      // Cumulative airframe totals are an operational byproduct of signing this flight leg, not a
+      // discretionary reference-data edit (CLAUDE.md SE-2 four-eyes applies to certs/RII/provisional
+      // status, not to this) — direct EDIT_AIRCRAFT here is intentional, see TechLogContext.tsx.
       dispatch({ type: 'EDIT_AIRCRAFT', payload: { ...ac, airframeTotalHours: flight.airframeTotalHours, airframeTotalCycles: flight.airframeTotalCycles } });
       dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'JOURNEY_SIGNED', entityType: 'FlightLog', entityId: flight.id, atUtc: new Date().toISOString(), summary: `${tail} sector ${seq}: ${flightTime}h flight, ${flight.landings} ldg` } });
       toast.success(`Journey log signed — ${tail} airframe now ${flight.airframeTotalHours}h / ${flight.airframeTotalCycles} cyc.`);

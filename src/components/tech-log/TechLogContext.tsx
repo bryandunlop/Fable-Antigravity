@@ -135,6 +135,12 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
         : { ...state, dismissedNotifications: [...state.dismissedNotifications, action.payload] };
     case 'SET_PERSONA':
       return { ...state, currentUserOid: action.payload };
+    // EDIT_AIRCRAFT / EDIT_PERSONNEL / EDIT_MEL_ITEM are the raw apply-mechanism applyApproval uses
+    // after DECIDE_APPROVAL clears the four-eyes gate (SE-2) — they stay reachable as reducer
+    // primitives, but any NEW external dispatch of these three actions for a discretionary
+    // cert/provisional-status/RII edit should route through PROPOSE_CHANGE instead. The one
+    // existing exception is JourneyLog.tsx's EDIT_AIRCRAFT, which updates cumulative airframe
+    // totals as a byproduct of signing a flight leg, not a deliberate reference-data edit.
     case 'EDIT_AIRCRAFT':
       return { ...state, aircraft: state.aircraft.map(a => (a.id === action.payload.id ? action.payload : a)) };
     case 'EDIT_PERSONNEL':
@@ -163,7 +169,14 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       const pending = state.pendingApprovals.find(p => p.id === id && p.status === 'PENDING');
       if (!pending || isSelfApproval(pending, decidedByOid)) return state; // self-approval is never valid, defense-in-depth
       const decided: PendingApproval = { ...pending, status: approve ? 'APPROVED' : 'REJECTED', decidedByOid, decidedAtUtc, rejectionReason };
-      const entityId = pending.kind === 'MEL_TYPE_ACTIVATION' ? pending.aircraftId : pending.kind === 'AIRCRAFT_EDIT' ? pending.after.id : pending.after.oid;
+      const entityId = (() => {
+        switch (pending.kind) {
+          case 'MEL_TYPE_ACTIVATION': return pending.aircraftId;
+          case 'AIRCRAFT_EDIT': return pending.after.id;
+          case 'PERSONNEL_EDIT': return pending.after.oid;
+          case 'MEL_ITEM_APPROVAL': return pending.melItemId;
+        }
+      })();
       const audit: AuditEntry = {
         id: newId('aud'),
         actorOid: decidedByOid,
