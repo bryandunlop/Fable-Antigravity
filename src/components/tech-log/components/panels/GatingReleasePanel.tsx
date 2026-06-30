@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Wrench, ShieldCheck } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { validateCrs } from '../../engine/signing';
-import { canSignPlacardDischarge } from '../../engine/disposition';
+import { canSignPlacardDischarge, canDischargeGating } from '../../engine/disposition';
 import { INTENT } from '../../constants';
 import { mockPdfBlobUri } from '../../util/printRecord';
 import { newId } from '../../util/id';
@@ -26,10 +26,13 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
 
   if (!aircraft) return null;
 
-  const canSign = canSignPlacardDischarge(user, deferral);
+  const now = new Date().toISOString();
+  const stillDischargeable = canDischargeGating(deferral, now, { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles });
+  const canSign = canSignPlacardDischarge(user, deferral) && stillDischargeable;
   const crewAttestation = !isMaint && canSign; // an *authorized* crew member signs a non-CRS placard attestation
 
   const begin = () => {
+    if (!stillDischargeable) return toast.error('This deferral already passed its repair-due condition (EXPIRED) — it cannot be discharged to ACTIVE. Route via extension or correction.');
     if (!canSign) return toast.error(isMaint ? 'Cannot sign this discharge.' : 'An (M) procedure requires maintenance — crew may only attest a placard-only item.');
     setPendingReleaseId(newId('rel'));
     setSignOpen(true);
@@ -69,7 +72,8 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
           <Button variant="outline" onClick={onCancel}>Later</Button>
           <Button onClick={begin} disabled={!canSign}><ShieldCheck className="mr-1.5 h-4 w-4" /> {crewAttestation ? 'Attest placard installed' : 'Sign discharge release'}</Button>
         </div>
-        {!canSign && !isMaint && <p className="text-xs text-[var(--gfo-error,#EF3340)]">This item needs an (M) procedure — maintenance must sign. The aircraft stays RED until then.</p>}
+        {!stillDischargeable && <p className="text-xs text-[var(--gfo-error,#EF3340)]">This deferral already passed its repair-due condition and reads EXPIRED — discharging it now would silently un-ground an overdue item. Use an extension or correction instead.</p>}
+        {stillDischargeable && !canSign && !isMaint && <p className="text-xs text-[var(--gfo-error,#EF3340)]">This item needs an (M) procedure — maintenance must sign. The aircraft stays RED until then.</p>}
         <p className="text-xs text-muted-foreground">On signing, the deferral flips PENDING_PLACARD → ACTIVE and the aircraft moves RED → AMBER.</p>
       </CardContent>
       <SignCeremonyDialog open={signOpen} onOpenChange={setSignOpen} signer={user}

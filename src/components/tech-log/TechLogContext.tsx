@@ -5,6 +5,7 @@ import type { SupersedeEntityType } from './types';
 import { getDefaultState } from './mockData/scenarios';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { wouldFork, buildSupersedeConflict } from './engine/supersede';
+import { canRecordPostflight } from './engine/custody';
 
 const STORAGE_KEY = 'tech-log-state';
 const VERSION_KEY = 'tech-log-data-version';
@@ -97,8 +98,20 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       return { ...state, briefings: [...state.briefings, action.payload] };
     case 'EDIT_BRIEFING':
       return { ...state, briefings: state.briefings.map(b => (b.id === action.payload.id ? action.payload : b)) };
-    case 'ADD_POSTFLIGHT':
+    case 'ADD_POSTFLIGHT': {
+      // Defense-in-depth: reject a reclaim recorded while custody isn't actually WITH_CREW (stale
+      // UI, retried dispatch, second device) instead of silently accepting an out-of-order reclaim.
+      const gate = canRecordPostflight(action.payload.aircraftId, state, action.payload.performedAtUtc);
+      if (!gate.ok) {
+        const audit = {
+          id: `aud-${action.payload.id}-rejected`, actorOid: action.payload.performedByOid, action: 'POSTFLIGHT_REJECTED_CUSTODY' as const,
+          entityType: 'Postflight' as const, entityId: action.payload.aircraftId, atUtc: action.payload.performedAtUtc,
+          summary: `Rejected postflight on ${action.payload.aircraftId}: ${gate.reason}`,
+        };
+        return { ...state, audit: [audit, ...state.audit].slice(0, 500) };
+      }
       return { ...state, postflights: [...state.postflights, action.payload] };
+    }
     case 'SUPERSEDE_POSTFLIGHT': {
       const rejected = maybeRejectSupersede(state, state.postflights, 'Postflight', action.payload);
       return rejected ?? { ...state, postflights: [...state.postflights, action.payload] };

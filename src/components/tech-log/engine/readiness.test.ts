@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { deriveTripReadiness } from './readiness';
-import type { Aircraft, Defect, Trip, TripLeg } from '../types';
+import type { Aircraft, Defect, Deferral, FlightBriefing, MelItem, Trip, TripLeg } from '../types';
 
 const ac: Aircraft = { id: 'ac1', tailNumber: 'N1PG', type: 'G650ER', serialNumber: '6260', status: 'ACTIVE', isProvisional: false, homeBase: 'KLUK', airframeTotalHours: 2450.5, airframeTotalCycles: 980 };
 const NOW = '2026-06-22T12:00:00Z';
@@ -13,6 +13,15 @@ function leg(p: Partial<TripLeg> = {}): TripLeg {
 }
 function trip(legs: TripLeg[]): Trip {
   return { id: 't1', tripNumber: 'TRIP-0001', aircraftId: 'ac1', name: 'demo', status: 'OPEN', flightLogIds: [], legs, createdByOid: 'u', createdAtUtc: NOW };
+}
+function mel(p: Partial<MelItem> = {}): MelItem {
+  return { id: 'm1', aircraftType: 'G650ER', mmelRevision: 'Rev 1', effectiveDate: NOW, approvalState: 'APPROVED', ataReference: '24', itemNumber: '24-01', subItemNumber: '24-01-01', title: 'x', category: 'C', numberInstalled: null, numberRequired: null, ...p };
+}
+function ackDeferral(p: Partial<Deferral> = {}): Deferral {
+  return { id: 'df1', defectId: 'd1', aircraftId: 'ac1', melItemId: 'm1', governingMmelRevision: 'Rev 1', governingEffectiveDate: NOW, category: 'C', dayOfDiscoveryUtc: NOW, clockStartDateUtc: NOW, repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10, restrictionText: 'Day VMC only', placardRequired: false, mProcedureRequired: false, extensionUsed: false, riiRequired: false, melReviewAcknowledged: true, signedByOid: 'u', signatureId: 's', status: 'ACTIVE', ...p };
+}
+function briefing(p: Partial<FlightBriefing> = {}): FlightBriefing {
+  return { id: 'brief1', aircraftId: 'ac1', preparedByOid: 'm', createdAtUtc: NOW, status: 'ACKNOWLEDGED', checklist: [], ...p };
 }
 const clean = { aircraft: [ac], defects: [], deferrals: [] };
 
@@ -59,5 +68,29 @@ describe('deriveTripReadiness §9', () => {
   });
   it('READY: an outstation departure needs no fuel submission', () => {
     expect(deriveTripReadiness(trip([leg({ departureIcao: 'KASE' })]), clean, NOW).state).toBe('READY');
+  });
+
+  it('NOT_READY: an ACTIVE deferral requiring PIC acknowledgement that has not been acknowledged', () => {
+    const r = deriveTripReadiness(trip([leg()]), { ...clean, deferrals: [ackDeferral()], melItems: [mel()], briefings: [] }, NOW);
+    expect(r.state).toBe('NOT_READY');
+    expect(r.blocker).toMatch(/acknowledg/i);
+  });
+
+  it('NOT_READY: the latest briefing acknowledged a different deferral set (this one was never ticked)', () => {
+    const b = briefing({ acknowledgedDeferralIds: ['some-other-deferral'] });
+    const r = deriveTripReadiness(trip([leg()]), { ...clean, deferrals: [ackDeferral()], melItems: [mel()], briefings: [b] }, NOW);
+    expect(r.state).toBe('NOT_READY');
+    expect(r.blocker).toMatch(/acknowledg/i);
+  });
+
+  it('READY: the active deferral requiring ack was acknowledged via the latest briefing', () => {
+    const b = briefing({ acknowledgedDeferralIds: ['df1'] });
+    const r = deriveTripReadiness(trip([leg()]), { ...clean, deferrals: [ackDeferral()], melItems: [mel()], briefings: [b] }, NOW);
+    expect(r.state).toBe('READY');
+  });
+
+  it('READY: an ACTIVE deferral with no restriction/placard/(O) procedure needs no acknowledgement', () => {
+    const r = deriveTripReadiness(trip([leg()]), { ...clean, deferrals: [ackDeferral({ restrictionText: undefined })], melItems: [mel()], briefings: [] }, NOW);
+    expect(r.state).toBe('READY');
   });
 });
