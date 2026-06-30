@@ -5,7 +5,7 @@ import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
-import { History, FileSignature, Database, Lock, Scale } from 'lucide-react';
+import { History, FileSignature, Database, Lock, Scale, ShieldAlert } from 'lucide-react';
 
 export default function AuditTrail() {
   const { state } = useTechLog();
@@ -35,6 +35,10 @@ export default function AuditTrail() {
           <TabsTrigger value="signatures"><FileSignature className="mr-1.5 h-4 w-4" /> Signatures</TabsTrigger>
           <TabsTrigger value="ledger"><Database className="mr-1.5 h-4 w-4" /> Ledger</TabsTrigger>
           <TabsTrigger value="compliance"><Scale className="mr-1.5 h-4 w-4" /> Compliance</TabsTrigger>
+          <TabsTrigger value="conflicts">
+            <ShieldAlert className="mr-1.5 h-4 w-4" /> Conflicts
+            {state.supersedeConflicts.length > 0 && <Badge variant="destructive" className="ml-1.5">{state.supersedeConflicts.length}</Badge>}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="activity">
@@ -81,6 +85,24 @@ export default function AuditTrail() {
               <div key={i} className="flex flex-col gap-0.5 border-b py-1.5 last:border-0 md:flex-row md:justify-between md:gap-3">
                 <span className="font-medium">{r.capability}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{r.reg}</span>
+              </div>
+            ))}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="conflicts">
+          <Card><CardContent className="space-y-1 p-4 text-sm">
+            <p className="mb-2 text-xs text-muted-foreground">
+              Rejected forked corrections — two superseding rows attempted against the same parent record. The append-only ledger never silently double-counts; these are held here for a human to reconcile (CLAUDE.md DM-2).
+            </p>
+            {state.supersedeConflicts.length === 0 && <p className="text-muted-foreground">No conflicts.</p>}
+            {state.supersedeConflicts.map(c => (
+              <div key={c.id} className="flex items-center justify-between gap-3 border-b py-1.5 last:border-0">
+                <div>
+                  <Badge variant="destructive" className="mr-2">{c.entityType}</Badge>
+                  Rejected correction <span className="font-mono text-xs">{c.attemptedRowId}</span> — parent <span className="font-mono text-xs">{c.supersedesId}</span> already superseded
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">{nameOf(c.rejectedActorOid)} · {new Date(c.rejectedAtUtc).toLocaleString()}</span>
               </div>
             ))}
           </CardContent></Card>
