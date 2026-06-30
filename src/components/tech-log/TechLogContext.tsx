@@ -31,7 +31,7 @@ function loadInitialState(): TechLogState {
  * a second "current" row for the same entity. Returns null when there is no fork (caller proceeds). */
 function maybeRejectSupersede(
   state: TechLogState,
-  existingRows: { supersedesId?: string }[],
+  existingRows: { id: string; supersedesId?: string }[],
   entityType: SupersedeEntityType,
   payload: { id: string; supersedesId?: string },
 ): TechLogState | null {

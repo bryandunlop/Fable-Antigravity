@@ -23,7 +23,7 @@ export function latestFor<T extends { id: string; supersedesId?: string }>(
 
 /** True once `supersedesId` already has a superseding row — inserting a second row pointing at the
  * same parent would fork the chain (DM-2): two rows would both read as "current" for one entity. */
-export function wouldFork<T extends { supersedesId?: string }>(rows: T[], supersedesId: string): boolean {
+export function wouldFork<T extends { id: string; supersedesId?: string }>(rows: T[], supersedesId: string): boolean {
   return rows.some(r => r.supersedesId === supersedesId);
 }
 
