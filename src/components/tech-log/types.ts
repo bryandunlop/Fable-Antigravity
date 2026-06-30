@@ -447,6 +447,29 @@ export interface SupersedeConflict {
   rejectedActorOid: string;
 }
 
+export type ReferenceChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+interface PendingApprovalBase {
+  id: string;
+  summary: string;
+  proposedByOid: string;
+  proposedAtUtc: string;
+  status: ReferenceChangeStatus;
+  decidedByOid?: string;
+  decidedAtUtc?: string;
+  rejectionReason?: string;
+}
+
+/** Four-eyes gate (CLAUDE.md SE-2) for updatable reference data — Aircraft, Personnel, MEL-type
+ * D195 activation. A proposed change never applies to live state until a SEPARATE maintenance user
+ * approves it (enforced in the reducer via engine/approvals.isSelfApproval, not just hidden in the UI). */
+export type PendingApproval = PendingApprovalBase &
+  (
+    | { kind: 'AIRCRAFT_EDIT'; before: Aircraft; after: Aircraft }
+    | { kind: 'PERSONNEL_EDIT'; before: Personnel; after: Personnel }
+    | { kind: 'MEL_TYPE_ACTIVATION'; aircraftId: string; aircraftType: AircraftType; melItemIds: string[]; evidenceRef: string }
+  );
+
 // ── Phase-2 integration correlation (OFF-ledger, per spec §18.1) ──
 export type CampPushState = 'PENDING' | 'PUSHED' | 'FAILED';
 export interface CampCorrelation {
@@ -499,6 +522,7 @@ export interface TechLogState {
   coordinationMessages: CoordinationMessage[];
   recordNotes: RecordNote[];
   supersedeConflicts: SupersedeConflict[]; // rejected forked supersede attempts (DM-2) — human reconciliation
+  pendingApprovals: PendingApproval[]; // four-eyes queue (SE-2) — Aircraft/Personnel/MEL-activation proposals
   dismissedNotifications: string[];     // notification keys the user has cleared
   campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
   integrationEvents: IntegrationEvent[];
@@ -549,4 +573,6 @@ export type TechLogAction =
   | { type: 'UPSERT_CAMP_CORRELATION'; payload: CampCorrelation }
   | { type: 'ADD_INTEGRATION_EVENT'; payload: IntegrationEvent }
   | { type: 'ACK_AOG'; payload: AogAck }
+  | { type: 'PROPOSE_CHANGE'; payload: PendingApproval }
+  | { type: 'DECIDE_APPROVAL'; payload: { id: string; approve: boolean; decidedByOid: string; decidedAtUtc: string; rejectionReason?: string } }
   | { type: 'RESET_STATE'; payload: TechLogState };

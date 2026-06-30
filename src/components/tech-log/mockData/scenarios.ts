@@ -307,6 +307,7 @@ export function getDefaultState(): TechLogState {
     ],
     recordNotes: [],
     supersedeConflicts: [],
+    pendingApprovals: [],
     dismissedNotifications: [],
     campCorrelation: [],
     integrationEvents: [],
