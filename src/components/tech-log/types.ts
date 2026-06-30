@@ -434,6 +434,19 @@ export interface AuditEntry {
   summary: string;
 }
 
+export type SupersedeEntityType = 'Defect' | 'Deferral' | 'FlightLog' | 'Postflight' | 'RecordNote';
+
+/** A rejected forked supersede attempt — DM-2: two superseding rows targeting the same parent.
+ * Recorded for human reconciliation instead of silently creating two "current" rows. */
+export interface SupersedeConflict {
+  id: string;
+  entityType: SupersedeEntityType;
+  attemptedRowId: string;
+  supersedesId: string;
+  rejectedAtUtc: string;
+  rejectedActorOid: string;
+}
+
 // ── Phase-2 integration correlation (OFF-ledger, per spec §18.1) ──
 export type CampPushState = 'PENDING' | 'PUSHED' | 'FAILED';
 export interface CampCorrelation {
