@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef, useState, useCallback, ReactNode } from 'react';
 import { toast } from 'sonner';
-import type { TechLogState, TechLogAction, Personnel } from './types';
-import type { SupersedeEntityType } from './types';
+import type { TechLogState, TechLogAction, Personnel, AuditEntry, PendingApproval, SupersedeEntityType } from './types';
 import { getDefaultState } from './mockData/scenarios';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { wouldFork, buildSupersedeConflict } from './engine/supersede';
 import { canRecordPostflight } from './engine/custody';
+import { isSelfApproval, applyApproval } from './engine/approvals';
+import { newId } from './util/id';
 
 const STORAGE_KEY = 'tech-log-state';
 const VERSION_KEY = 'tech-log-data-version';
@@ -155,6 +156,32 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       return { ...state, integrationEvents: [action.payload, ...state.integrationEvents].slice(0, 200) };
     case 'ACK_AOG':
       return { ...state, aogAcks: [action.payload, ...(state.aogAcks ?? [])].slice(0, 200) };
+    case 'PROPOSE_CHANGE':
+      return { ...state, pendingApprovals: [...state.pendingApprovals, action.payload] };
+    case 'DECIDE_APPROVAL': {
+      const { id, approve, decidedByOid, decidedAtUtc, rejectionReason } = action.payload;
+      const pending = state.pendingApprovals.find(p => p.id === id && p.status === 'PENDING');
+      if (!pending || isSelfApproval(pending, decidedByOid)) return state; // self-approval is never valid, defense-in-depth
+      const decided: PendingApproval = { ...pending, status: approve ? 'APPROVED' : 'REJECTED', decidedByOid, decidedAtUtc, rejectionReason };
+      const entityId = pending.kind === 'MEL_TYPE_ACTIVATION' ? pending.aircraftId : pending.kind === 'AIRCRAFT_EDIT' ? pending.after.id : pending.after.oid;
+      const audit: AuditEntry = {
+        id: newId('aud'),
+        actorOid: decidedByOid,
+        action: approve ? 'REFERENCE_CHANGE_APPROVED' : 'REFERENCE_CHANGE_REJECTED',
+        entityType: pending.kind,
+        entityId,
+        atUtc: decidedAtUtc,
+        summary: `${approve ? 'Approved' : 'Rejected'} (proposed by ${pending.proposedByOid}): ${pending.summary}`,
+      };
+      const next: TechLogState = {
+        ...state,
+        pendingApprovals: state.pendingApprovals.map(p => (p.id === id ? decided : p)),
+        audit: [audit, ...state.audit].slice(0, 500),
+      };
+      if (!approve) return next;
+      const applied = applyApproval({ aircraft: next.aircraft, personnel: next.personnel, melItems: next.melItems }, pending);
+      return { ...next, ...applied };
+    }
     case 'RESET_STATE':
       // Reseed everything but keep whoever is currently signed in (don't snap back to the seed pilot),
       // as long as that person still exists in the reseeded personnel.
