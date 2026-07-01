@@ -13,7 +13,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { newId } from '../util/id';
 import { toast } from 'sonner';
-import type { TripLeg, Trip } from '../types';
+import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg } from '../preflightActions';
 
 const zulu = (utc?: string) => (utc ? `${utc.slice(11, 16)}Z` : '—');
 
@@ -63,27 +63,17 @@ export default function LegDetail() {
   const [fratOpen, setFratOpen] = useState(false);
   const [fuelLbs, setFuelLbs] = useState('14500');
 
-  const patchLeg = (patch: Partial<TripLeg>, auditAction: string, summary: string) => {
-    const updated: Trip = { ...trip, legs: (trip.legs ?? []).map(l => (l.id === leg.id ? { ...l, ...patch } : l)) };
-    dispatch({ type: 'EDIT_TRIP', payload: updated });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: auditAction, entityType: 'TripLeg', entityId: leg.id, atUtc: new Date().toISOString(), summary } });
-  };
-
   const completeFrat = (data: { totalScore?: number }) => {
-    patchLeg({ fratStatus: 'COMPLETED', fratScore: data.totalScore }, 'LEG_FRAT_COMPLETED', `${trip.tripNumber} leg ${leg.sequence} FRAT score ${data.totalScore ?? '—'}`);
+    completeFratOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid, totalScore: data.totalScore });
     setFratOpen(false);
   };
 
   const markAirportReviewed = () =>
-    patchLeg({ airportReviewed: true }, 'LEG_AIRPORT_REVIEWED', `${trip.tripNumber} leg ${leg.sequence} (${leg.departureIcao}→${leg.arrivalIcao}) airport reviewed`);
+    markAirportReviewedOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid });
 
   const submitFuel = () => {
-    const hoursUntil = (new Date(leg.departureTimeUtc).getTime() - Date.now()) / 3_600_000;
-    if (hoursUntil <= 4) { toast.error('Locked — less than 4 hours to departure'); return; }
-    const lbs = Number(fuelLbs);
-    if (!Number.isFinite(lbs) || lbs <= 0) { toast.error('Enter a valid fuel quantity'); return; }
-    const id = newId('fr');
-    patchLeg({ fuelRequestId: id }, 'LEG_FUEL_SUBMITTED', `${trip.tripNumber} leg ${leg.sequence} fuel ${lbs} lb submitted to ${leg.departureIcao} fuel farm`);
+    const res = submitFuelOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid, lbs: Number(fuelLbs), nowMs: Date.now() });
+    if (!res.ok) { toast.error(res.error); return; }
     toast.success(`Fuel submitted to ${leg.departureIcao} fuel farm`);
   };
 
