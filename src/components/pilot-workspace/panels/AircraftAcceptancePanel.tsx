@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useTechLog } from '../../tech-log/TechLogContext';
 import { deriveServiceability } from '../../tech-log/engine/serviceability';
 import { deriveCustody } from '../../tech-log/engine/custody';
@@ -31,9 +32,9 @@ export default function AircraftAcceptancePanel({ trip }: { trip: TripRecord }) 
         <h2 className="font-semibold">
           Aircraft &amp; acceptance <span className="text-xs text-muted-foreground">from maintenance</span>
         </h2>
-        <a href={`/tech-log/aircraft/${ac.tailNumber}`} className="text-xs text-primary hover:underline">
+        <Link to={`/tech-log/aircraft/${ac.tailNumber}`} className="text-xs text-primary hover:underline">
           Open in tech-log ↗
-        </a>
+        </Link>
       </div>
       <div className="flex gap-4 text-sm">
         <span>
@@ -49,12 +50,12 @@ export default function AircraftAcceptancePanel({ trip }: { trip: TripRecord }) 
         </div>
       )}
       {tlTrip && (
-        <a
-          href={`/tech-log/trips/${tlTrip.id}`}
+        <Link
+          to={`/tech-log/trips/${tlTrip.id}`}
           className="inline-block text-xs rounded border px-2 py-1 hover:bg-accent"
         >
           Review &amp; accept aircraft in tech-log ↗
-        </a>
+        </Link>
       )}
     </section>
   );

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useSchedulingWorkspace } from '../../scheduling-workspace/SchedulingWorkspaceContext';
 import type { TripRecord } from '../../../scheduling/store/types';
@@ -31,7 +32,7 @@ export default function TripBriefPanel({ trip }: { trip: TripRecord }) {
     <section className="rounded-lg border p-4">
       <div className="flex items-center justify-between mb-2">
         <h2 className="font-semibold">Trip brief <span className="text-xs text-muted-foreground">from scheduling</span></h2>
-        <a href="/scheduling-workspace" className="text-xs text-primary hover:underline">Open in scheduling ↗</a>
+        <Link to="/scheduling-workspace" className="text-xs text-primary hover:underline">Open in scheduling ↗</Link>
       </div>
       {events.length === 0 && <p className="text-sm text-muted-foreground">No brief delivered yet.</p>}
       <ul className="space-y-2">

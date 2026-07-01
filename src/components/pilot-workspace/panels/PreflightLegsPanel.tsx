@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import StandaloneFRATForm from '../../StandaloneFRATForm';
@@ -30,7 +31,7 @@ export default function PreflightLegsPanel({ trip }: { trip: TripRecord; userRol
         <div key={leg.id} className="rounded border p-3 space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-medium text-sm">Leg {leg.sequence}: {leg.departureIcao} → {leg.arrivalIcao}</span>
-            <a href={`/tech-log/trips/${tlTrip.id}/legs/${leg.id}`} className="text-xs text-primary hover:underline">Leg detail ↗</a>
+            <Link to={`/tech-log/trips/${tlTrip.id}/legs/${leg.id}`} className="text-xs text-primary hover:underline">Leg detail ↗</Link>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="rounded bg-muted px-2 py-1">FRAT: {leg.fratStatus}{leg.fratScore != null ? ` (${leg.fratScore})` : ''}</span>
