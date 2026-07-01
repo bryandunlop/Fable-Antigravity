@@ -5,6 +5,7 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
+import { Checkbox } from '../ui/checkbox';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../ui/dialog';
@@ -188,12 +189,10 @@ export default function TemplatesPanel({ userRole, additionalRoles }: TemplatesP
               <Input id="draftTitle" value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} />
             </div>
             <div className="flex items-center gap-2">
-              <input
+              <Checkbox
                 id="draftRequiresAck"
-                type="checkbox"
                 checked={draftRequiresAck}
-                onChange={(e) => setDraftRequiresAck(e.target.checked)}
-                className="h-4 w-4"
+                onCheckedChange={(v: boolean | 'indeterminate') => setDraftRequiresAck(v === true)}
               />
               <Label htmlFor="draftRequiresAck">Requires acknowledgement</Label>
             </div>

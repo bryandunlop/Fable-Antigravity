@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -7,7 +8,7 @@ import { useSchedulingWorkspace } from './SchedulingWorkspaceContext';
 import { evaluateTriggers } from '../../scheduling/engine';
 import type { TaskInstance, TaskAction } from '../../scheduling/engine';
 import {
-  StatusBadge, AckBadge, TaskActionButtons, formatDueTime, urgencyTextClassName, type RowUrgency,
+  StatusBadge, AckBadge, TaskActionButtons, formatDueTime, urgencyTextClassName, groupByCategory, type RowUrgency,
 } from './taskRowHelpers';
 
 interface RunBoardPanelProps {
@@ -50,14 +51,20 @@ export default function RunBoardPanel({ userRole }: RunBoardPanelProps) {
       await service.generateRunBoard(nowUtc());
       setHasGenerated(true);
       bump();
+    } catch (err) {
+      toast.error(`Couldn't generate run-board: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       setGenerating(false);
     }
   }
 
   async function handleAction(instanceId: string, action: TaskAction) {
-    await service.applyAction(instanceId, action, userRole, nowUtc());
-    bump();
+    try {
+      await service.applyAction(instanceId, action, userRole, nowUtc());
+      bump();
+    } catch (err) {
+      toast.error(`Couldn't ${action.kind} task: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
   }
 
   const triggers = useMemo(() => evaluateTriggers(instances, nowUtc()), [instances, nowUtc]);
@@ -68,16 +75,7 @@ export default function RunBoardPanel({ userRole }: RunBoardPanelProps) {
     return 'upcoming';
   };
 
-  const grouped = useMemo(() => {
-    const byCategory = new Map<string, TaskInstance[]>();
-    for (const inst of instances) {
-      const list = byCategory.get(inst.category) ?? [];
-      list.push(inst);
-      byCategory.set(inst.category, list);
-    }
-    for (const list of byCategory.values()) list.sort((a, b) => a.order - b.order);
-    return Array.from(byCategory.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [instances]);
+  const grouped = useMemo(() => groupByCategory(instances), [instances]);
 
   return (
     <Card>
@@ -92,9 +90,13 @@ export default function RunBoardPanel({ userRole }: RunBoardPanelProps) {
         </Button>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Overdue</span>
-          <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-amber-500" /> Due soon (2h)</span>
+        <div className="flex items-center gap-4 text-xs">
+          <span className="flex items-center gap-1 status-error px-1.5 py-0.5 rounded">
+            <AlertTriangle className="h-3.5 w-3.5" /> Overdue
+          </span>
+          <span className="flex items-center gap-1 status-warning px-1.5 py-0.5 rounded">
+            <Clock className="h-3.5 w-3.5" /> Due soon (2h)
+          </span>
         </div>
 
         {loading ? (

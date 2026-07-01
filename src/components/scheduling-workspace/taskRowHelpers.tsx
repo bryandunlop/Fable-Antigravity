@@ -1,15 +1,20 @@
 import React from 'react';
-import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Play, Check, Ban, Unlock, ThumbsUp, MinusCircle } from 'lucide-react';
 import type { TaskInstance, TaskAction } from '../../scheduling/engine';
 
-// Status -> Badge classes (theme tokens only, no raw hex).
+// Status -> badge classes. Uses the app's semantic status-* tokens (see src/index.css) rather
+// than raw Tailwind palette colors, so dark mode + theming stay centralized. Rendered as a
+// plain <span className="status-badge ..."> rather than through the shadcn Badge component:
+// Badge's cva variants (e.g. bg-primary/text-foreground) live in Tailwind's utilities layer,
+// which beats status-*'s @layer base rules regardless of class order, so Badge would silently
+// override the token colors. This matches the existing status-* usage elsewhere in the app
+// (see src/components/inventory-v2/shared/ItemCard.tsx and friends).
 export function statusBadgeClassName(status: TaskInstance['status']): string {
   switch (status) {
-    case 'done': return 'bg-green-600 text-white border-transparent';
-    case 'in_progress': return 'bg-blue-600 text-white border-transparent';
-    case 'blocked': return 'bg-destructive text-white border-transparent';
+    case 'done': return 'status-success';
+    case 'in_progress': return 'status-info';
+    case 'blocked': return 'status-error';
     case 'n_a': return 'bg-muted text-muted-foreground border-transparent';
     case 'open':
     default: return 'bg-secondary text-secondary-foreground border-transparent';
@@ -28,15 +33,15 @@ export function statusLabel(status: TaskInstance['status']): string {
 }
 
 export function StatusBadge({ status }: { status: TaskInstance['status'] }) {
-  return <Badge className={statusBadgeClassName(status)}>{statusLabel(status)}</Badge>;
+  return <span className={`status-badge ${statusBadgeClassName(status)}`}>{statusLabel(status)}</span>;
 }
 
 export function AckBadge({ ackState }: { ackState: TaskInstance['ackState'] }) {
   if (ackState === 'n_a') return null;
   if (ackState === 'acked') {
-    return <Badge variant="outline" className="border-green-600 text-green-700 dark:text-green-400">Acked</Badge>;
+    return <span className="status-badge status-success">Acked</span>;
   }
-  return <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">Ack pending</Badge>;
+  return <span className="status-badge status-warning">Ack pending</span>;
 }
 
 export function formatDueTime(dueAtUtc: string): string {
@@ -52,10 +57,14 @@ export function formatDueTime(dueAtUtc: string): string {
 // Row urgency (matches evaluateTriggers buckets): overdue (red), dueSoon (amber), else neutral.
 export type RowUrgency = 'overdue' | 'dueSoon' | 'upcoming' | 'settled';
 
+// Note: overdue/dueSoon reuse the .status-error/.status-warning tokens (bg+text+border) even
+// though this is applied to a plain text line rather than a badge — there's no bare
+// text-only warning/error token in the design system today, and the instruction is to avoid
+// raw palette colors here. Rendered inline (px-1.5 rounded) it still reads as a subtle chip.
 export function urgencyTextClassName(urgency: RowUrgency): string {
   switch (urgency) {
-    case 'overdue': return 'text-destructive font-medium';
-    case 'dueSoon': return 'text-amber-600 dark:text-amber-400 font-medium';
+    case 'overdue': return 'status-error font-medium px-1.5 py-0.5 rounded inline-block';
+    case 'dueSoon': return 'status-warning font-medium px-1.5 py-0.5 rounded inline-block';
     default: return 'text-muted-foreground';
   }
 }
@@ -67,8 +76,12 @@ interface TaskActionButtonsProps {
 }
 
 // Shared action-button row for a TaskInstance. Buttons are contextual to status/ackState so
-// invalid actions (e.g. complete before ack, ack when not requiresAck) are never offered —
-// applyTaskAction() throws on those, so we gate here rather than surface a runtime error.
+// invalid actions (e.g. complete before ack, ack when not requiresAck) are never offered.
+// The engine (applyTaskAction()) only throws on two cases: (1) `complete` while an
+// ack-required task isn't yet acked, and (2) `ack` on a task that doesn't requireAck — it does
+// not validate every status transition. This button gating is therefore the primary guard for
+// all other transitions (e.g. blocking an already-done task), not a defense against an engine
+// that rejects everything invalid.
 export function TaskActionButtons({ instance, onAction, disabled }: TaskActionButtonsProps) {
   const settled = instance.status === 'done' || instance.status === 'n_a';
   if (settled) return null;
@@ -112,4 +125,18 @@ export function TaskActionButtons({ instance, onAction, disabled }: TaskActionBu
       </Button>
     </div>
   );
+}
+
+// Groups task instances by category, sorts each group's rows by `order`, and returns groups
+// sorted alphabetically by category name. Shared by RunBoardPanel and TripsPanel, which both
+// render a per-category checklist.
+export function groupByCategory(instances: TaskInstance[]): Array<[string, TaskInstance[]]> {
+  const byCategory = new Map<string, TaskInstance[]>();
+  for (const inst of instances) {
+    const list = byCategory.get(inst.category) ?? [];
+    list.push(inst);
+    byCategory.set(inst.category, list);
+  }
+  for (const list of byCategory.values()) list.sort((a, b) => a.order - b.order);
+  return Array.from(byCategory.entries()).sort(([a], [b]) => a.localeCompare(b));
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -14,7 +14,7 @@ import { Plus, Plane, ArrowLeft, Trash2 } from 'lucide-react';
 import { useSchedulingWorkspace } from './SchedulingWorkspaceContext';
 import type { TripRecord, TripLegRecord } from '../../scheduling/store';
 import type { TaskInstance, TaskAction, Readiness } from '../../scheduling/engine';
-import { StatusBadge, AckBadge, TaskActionButtons, formatDueTime } from './taskRowHelpers';
+import { StatusBadge, AckBadge, TaskActionButtons, formatDueTime, groupByCategory } from './taskRowHelpers';
 
 interface TripsPanelProps {
   userRole: string;
@@ -36,10 +36,10 @@ function emptyLeg(sequence: number): TripLegRecord {
 
 function readinessBadgeClassName(state: Readiness['state']): string {
   switch (state) {
-    case 'READY': return 'bg-green-600 text-white border-transparent';
-    case 'BLOCKED': return 'bg-destructive text-white border-transparent';
+    case 'READY': return 'status-success';
+    case 'BLOCKED': return 'status-error';
     case 'NOT_READY':
-    default: return 'bg-amber-500 text-white border-transparent';
+    default: return 'status-warning';
   }
 }
 
@@ -88,16 +88,7 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
   const selectedTrip = useMemo(() => trips.find((t) => t.id === selectedTripId) ?? null, [trips, selectedTripId]);
   const selectedReadiness = selectedTripId ? readinessByTrip[selectedTripId] : undefined;
 
-  const grouped = useMemo(() => {
-    const byCategory = new Map<string, TaskInstance[]>();
-    for (const inst of instances) {
-      const list = byCategory.get(inst.category) ?? [];
-      list.push(inst);
-      byCategory.set(inst.category, list);
-    }
-    for (const list of byCategory.values()) list.sort((a, b) => a.order - b.order);
-    return Array.from(byCategory.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [instances]);
+  const grouped = useMemo(() => groupByCategory(instances), [instances]);
 
   function resetForm() {
     setTripNumber(''); setSourceTripRef(''); setTail(''); setAircraftType('G650ER');
@@ -128,10 +119,15 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
       setFormError('Every leg needs a departure/arrival ICAO and a departure time.');
       return;
     }
+    const id = `trip-${tripNumber.trim()}`;
+    if (trips.some((t) => t.id === id)) {
+      toast.error('A trip with that number already exists');
+      return;
+    }
     setSubmitting(true);
     try {
       const trip: TripRecord = {
-        id: `trip-${tripNumber.trim()}`,
+        id,
         tripNumber: tripNumber.trim(),
         sourceSystem: 'manual',
         sourceTripRef: sourceTripRef.trim() || null,
@@ -151,14 +147,20 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
       setSelectedTripId(created.id);
       setDialogOpen(false);
       resetForm();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to create trip');
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleAction(instanceId: string, action: TaskAction) {
-    await service.applyAction(instanceId, action, userRole, nowUtc());
-    bump();
+    try {
+      await service.applyAction(instanceId, action, userRole, nowUtc());
+      bump();
+    } catch (err) {
+      toast.error(`Couldn't ${action.kind} task: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
   }
 
   if (selectedTrip) {
@@ -181,7 +183,7 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
             </div>
             {selectedReadiness && (
               <div className="text-right space-y-1">
-                <Badge className={readinessBadgeClassName(selectedReadiness.state)}>{selectedReadiness.state}</Badge>
+                <span className={`status-badge ${readinessBadgeClassName(selectedReadiness.state)}`}>{selectedReadiness.state}</span>
                 <div className="w-40">
                   <Progress value={selectedReadiness.completion * 100} />
                 </div>
@@ -410,7 +412,9 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
                       {trip.aircraftType} · {trip.tripType} · {trip.priority} · {trip.status}
                     </div>
                   </div>
-                  {readiness && <Badge className={readinessBadgeClassName(readiness.state)}>{readiness.state}</Badge>}
+                  {readiness && (
+                    <span className={`status-badge ${readinessBadgeClassName(readiness.state)}`}>{readiness.state}</span>
+                  )}
                 </button>
               );
             })}

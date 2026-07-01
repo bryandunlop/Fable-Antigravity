@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -21,8 +22,8 @@ const TARGET_ROLE_OPTIONS = [
 
 function ackBadgeClassName(ackState: SchedulingEvent['ackState']): string {
   switch (ackState) {
-    case 'acked': return 'bg-green-600 text-white border-transparent';
-    case 'pending': return 'bg-amber-500 text-white border-transparent';
+    case 'acked': return 'status-success';
+    case 'pending': return 'status-warning';
     case 'n_a':
     default: return 'bg-muted text-muted-foreground border-transparent';
   }
@@ -33,6 +34,7 @@ export default function InboxPanel({ defaultTargetRole = 'pilot' }: InboxPanelPr
   const [targetRole, setTargetRole] = useState(defaultTargetRole);
   const [events, setEvents] = useState<SchedulingEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [acking, setAcking] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -46,11 +48,21 @@ export default function InboxPanel({ defaultTargetRole = 'pilot' }: InboxPanelPr
   }, [store, targetRole, tick]);
 
   async function handleAcknowledge(event: SchedulingEvent) {
-    const actor = targetRole; // stand-in actor identity: the acking role itself
-    await store.updateEvent({
-      ...event, ackState: 'acked', ackedBy: actor, ackedAtUtc: nowUtc(),
-    });
-    bump();
+    setAcking((prev) => new Set(prev).add(event.id));
+    try {
+      const actor = targetRole; // stand-in actor identity: the acking role itself
+      await store.updateEvent({
+        ...event, ackState: 'acked', ackedBy: actor, ackedAtUtc: nowUtc(),
+      });
+      bump();
+    } catch (err) {
+      toast.error(`Couldn't acknowledge: ${err instanceof Error ? err.message : 'unknown error'}`);
+      setAcking((prev) => {
+        const next = new Set(prev);
+        next.delete(event.id);
+        return next;
+      });
+    }
   }
 
   return (
@@ -85,7 +97,7 @@ export default function InboxPanel({ defaultTargetRole = 'pilot' }: InboxPanelPr
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-foreground">{event.type}</span>
-                    <Badge className={ackBadgeClassName(event.ackState)}>{event.ackState}</Badge>
+                    <span className={`status-badge ${ackBadgeClassName(event.ackState)}`}>{event.ackState}</span>
                     <Badge variant="outline">{event.channel}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
@@ -98,8 +110,8 @@ export default function InboxPanel({ defaultTargetRole = 'pilot' }: InboxPanelPr
                   )}
                 </div>
                 {event.ackable && event.ackState === 'pending' && (
-                  <Button size="sm" onClick={() => handleAcknowledge(event)}>
-                    <Check className="h-3.5 w-3.5 mr-1" /> Acknowledge
+                  <Button size="sm" disabled={acking.has(event.id)} onClick={() => handleAcknowledge(event)}>
+                    <Check className="h-3.5 w-3.5 mr-1" /> {acking.has(event.id) ? 'Acknowledging...' : 'Acknowledge'}
                   </Button>
                 )}
               </div>
