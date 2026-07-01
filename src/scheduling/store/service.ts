@@ -65,7 +65,10 @@ export class SchedulingService {
     const out: SchedulingEvent[] = [];
     for (const f of firings) {
       const existing = await this.store.listEventsForTarget({ kind: 'role', value: f.notifyRole });
-      const already = existing.some((e) => e.type === 'escalation' && e.entityRef.id === f.taskInstanceId && e.ackState !== 'acked');
+      // Dedup on task identity only. (Whether an ACKED escalation should re-fire while the
+      // TASK is still pending is a deliberate Plan-3 lifecycle decision, not an accident of
+      // this clause — acking the event does not ack the task.)
+      const already = existing.some((e) => e.type === 'escalation' && e.entityRef.id === f.taskInstanceId);
       if (already) continue; // idempotent
       const ev: SchedulingEvent = {
         id: this.idFactory(`escalation:${f.taskInstanceId}`),

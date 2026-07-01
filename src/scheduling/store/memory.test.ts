@@ -55,6 +55,17 @@ describe('InMemorySchedulingStore trips/instances/events', () => {
     await s.updateInstance(inst({ id: 'i1', tripId: 'T1', status: 'done' }));
     expect((await s.getInstance('i1'))?.status).toBe('done');
   });
+  it('returns deep copies — mutating a returned instance does not affect the store', async () => {
+    const s = new InMemorySchedulingStore();
+    await s.saveInstances([inst({ id: 'i1', tripId: 'T1' })]);
+    const got = (await s.getInstance('i1'))!;
+    got.status = 'done';
+    got.auditTrail.push({ atUtc: 'x', actor: 'y', action: 'z' });
+    const again = (await s.getInstance('i1'))!;
+    expect(again.status).toBe('open');
+    expect(again.auditTrail).toHaveLength(0);
+  });
+
   it('saves events and lists by exact target', async () => {
     const s = new InMemorySchedulingStore();
     const ev: SchedulingEvent = {

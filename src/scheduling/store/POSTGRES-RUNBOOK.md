@@ -80,3 +80,8 @@ in the build environment it was written in. Before relying on this adapter:
   and mapped back to ISO strings via `.toISOString()` on read; verify this survives a real
   Postgres round trip (timezone-naive input, DST edge cases) before trusting it in the MEL/
   scheduling clock paths.
+
+**Validation note:** Any code that writes templates directly to `checklist_templates`
+(bypassing `SchedulingService`) MUST first run `parseTemplate` from `./validate`. The
+Postgres adapter's read-side JSONB casts are unchecked by design — validation happens on
+write-in, not read-out.
