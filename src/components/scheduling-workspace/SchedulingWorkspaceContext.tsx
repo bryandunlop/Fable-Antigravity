@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { InMemorySchedulingStore, SchedulingService, seedTemplates } from '../../scheduling/store';
+import { InMemorySchedulingStore, SchedulingService, seedTemplates, seedDemoTrips } from '../../scheduling/store';
 
 interface SchedulingWorkspaceContextValue {
   service: SchedulingService;
@@ -30,9 +30,16 @@ export function SchedulingWorkspaceProvider({ children }: { children: ReactNode 
 
   useEffect(() => {
     let cancelled = false;
-    seedTemplates(store).then(() => { if (!cancelled) setReady(true); });
+    (async () => {
+      await seedTemplates(store);
+      // Demo trips so every role lands on a populated Trips tab + ForeFlight push list.
+      // Stable trip ids make this idempotent across StrictMode remounts. Remove this
+      // one call for a clean/empty workspace.
+      await seedDemoTrips(service, new Date().toISOString());
+      if (!cancelled) setReady(true);
+    })();
     return () => { cancelled = true; };
-  }, [store]);
+  }, [store, service]);
 
   const nowUtc = useCallback(() => new Date().toISOString(), []);
 

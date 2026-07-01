@@ -38,6 +38,7 @@ const AIRPORT_LOOKUP: Record<string, { city: string; country: string }> = {
   KSEA: { city: 'Seattle, WA', country: 'United States' },
   KDEN: { city: 'Denver, CO', country: 'United States' },
   KIND: { city: 'Indianapolis, IN', country: 'United States' },
+  KDCA: { city: 'Washington, DC', country: 'United States' },
   EGLL: { city: 'London', country: 'United Kingdom' },
   LFPB: { city: 'Paris', country: 'France' },
 };
@@ -47,7 +48,7 @@ function lookupAirport(icao: string): { city: string; country: string } {
 
 // Coarse, demo-only UTC offsets — a real pull gets this (and DST handling) from myairops.
 const UTC_OFFSET_LOOKUP: Record<string, number> = {
-  KTEB: -4, KHOU: -5, KLUK: -4, KMVY: -4, KAUS: -5, KJFK: -4, KSEA: -7, KDEN: -6, KIND: -4, EGLL: 1, LFPB: 2,
+  KTEB: -4, KHOU: -5, KLUK: -4, KMVY: -4, KAUS: -5, KJFK: -4, KSEA: -7, KDEN: -6, KIND: -4, KDCA: -4, EGLL: 1, LFPB: 2,
 };
 function utcOffsetHoursFor(icao: string): number {
   return UTC_OFFSET_LOOKUP[icao] ?? 0;
