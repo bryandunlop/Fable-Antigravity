@@ -20,3 +20,26 @@ export interface DueContext {
   /** Scheduling office local offset in minutes vs UTC for the reference date (e.g. -240 for EDT). */
   officeTzOffsetMinutes: number;
 }
+
+export type TripType = 'domestic' | 'international' | 'dca_dassp';
+
+export interface TripContext {
+  tripId: string;
+  tripType: TripType;
+  tail: string;
+  aircraftType: string;
+  etdUtc: string;
+  maxPaxCount: number;
+  isWeekendDeparture: boolean;
+}
+
+export type Condition =
+  | { kind: 'always' }
+  | { kind: 'tripType'; equals: TripType }
+  | { kind: 'paxCountAtLeast'; value: number }
+  | { kind: 'tailEquals'; value: string }
+  | { kind: 'aircraftTypeEquals'; value: string }
+  | { kind: 'isWeekendDeparture' }
+  | { kind: 'allOf'; conditions: Condition[] }
+  | { kind: 'anyOf'; conditions: Condition[] }
+  | { kind: 'not'; condition: Condition };
