@@ -1,0 +1,169 @@
+// Scheduling -> tech-log preflight bridge.
+//
+// One-way projection: a scheduling trip is projected into tech-log's state so the
+// crew's existing per-leg FRAT/airport/fuel preflight flow runs on it. The coupling
+// to tech-log's state shape lives ONLY in this module.
+
+import type { Aircraft, AircraftType, Trip, TripLeg, TechLogState } from './types';
+import { getDefaultState } from './mockData/scenarios';
+import { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './TechLogContext';
+
+export interface PreflightTripInput {
+  tripNumber: string;
+  name: string;
+  tail: string;
+  aircraftType: string;
+  createdByOid: string;
+  nowUtc: string;
+  legs: {
+    sequence: number;
+    departureIcao: string;
+    arrivalIcao: string;
+    departureTimeUtc: string;
+    arrivalTimeUtc?: string;
+  }[];
+}
+
+export interface PreflightLegStatus {
+  sequence: number;
+  departureIcao: string;
+  arrivalIcao: string;
+  fratStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  fratScore?: number;
+  airportReviewed: boolean;
+  fuelSubmitted: boolean;
+}
+
+export interface PreflightSummary {
+  techLogTripId: string;
+  overall: 'READY' | 'NOT_READY';
+  legs: PreflightLegStatus[];
+}
+
+const AIRCRAFT_TYPES: AircraftType[] = ['G650ER', 'G500', 'G800'];
+
+/** PURE — testable without localStorage. */
+export function projectTripIntoTechLogState(
+  state: TechLogState,
+  input: PreflightTripInput,
+  newId: (p: string) => string
+): { state: TechLogState; techLogTripId: string; createdAircraft: boolean } {
+  const existing = state.trips.find(t => t.tripNumber === input.tripNumber);
+  if (existing) {
+    return { state, techLogTripId: existing.id, createdAircraft: false };
+  }
+
+  let aircraft = state.aircraft.find(a => a.tailNumber === input.tail);
+  let createdAircraft = false;
+  let nextAircraft = state.aircraft;
+  if (!aircraft) {
+    const type: AircraftType = AIRCRAFT_TYPES.includes(input.aircraftType as AircraftType)
+      ? (input.aircraftType as AircraftType)
+      : 'G650ER';
+    aircraft = {
+      id: newId('ac'),
+      tailNumber: input.tail,
+      type,
+      serialNumber: 'UNSPEC-' + input.tail,
+      status: 'ACTIVE',
+      isProvisional: false,
+      homeBase: input.legs[0]?.departureIcao ?? 'KLUK',
+      airframeTotalHours: 0,
+      airframeTotalCycles: 0,
+    };
+    nextAircraft = [...state.aircraft, aircraft];
+    createdAircraft = true;
+  }
+
+  const legs: TripLeg[] = input.legs.map(leg => ({
+    id: newId('leg'),
+    sequence: leg.sequence,
+    departureIcao: leg.departureIcao,
+    arrivalIcao: leg.arrivalIcao,
+    departureTimeUtc: leg.departureTimeUtc,
+    arrivalTimeUtc: leg.arrivalTimeUtc ?? leg.departureTimeUtc,
+    fratStatus: 'NOT_STARTED',
+    airportReviewed: false,
+  }));
+
+  const trip: Trip = {
+    id: newId('trip'),
+    tripNumber: input.tripNumber,
+    aircraftId: aircraft.id,
+    name: input.name,
+    status: 'OPEN',
+    flightLogIds: [],
+    legs,
+    createdByOid: input.createdByOid,
+    createdAtUtc: input.nowUtc,
+  };
+
+  const nextState: TechLogState = {
+    ...state,
+    aircraft: nextAircraft,
+    trips: [...state.trips, trip],
+  };
+
+  return { state: nextState, techLogTripId: trip.id, createdAircraft };
+}
+
+/** PURE — testable without localStorage. */
+export function summarizePreflight(state: TechLogState, tripNumber: string): PreflightSummary | null {
+  const trip = state.trips.find(t => t.tripNumber === tripNumber);
+  if (!trip) return null;
+
+  const legs: PreflightLegStatus[] = (trip.legs ?? []).map(leg => ({
+    sequence: leg.sequence,
+    departureIcao: leg.departureIcao,
+    arrivalIcao: leg.arrivalIcao,
+    fratStatus: leg.fratStatus,
+    fratScore: leg.fratScore,
+    airportReviewed: leg.airportReviewed,
+    fuelSubmitted: !!leg.fuelRequestId,
+  }));
+
+  const overall: 'READY' | 'NOT_READY' = legs.every(
+    leg => leg.fratStatus === 'COMPLETED' && leg.airportReviewed
+  )
+    ? 'READY'
+    : 'NOT_READY';
+
+  return { techLogTripId: trip.id, overall, legs };
+}
+
+const newLocalId = (p: string) => `${p}-${Math.random().toString(36).slice(2, 10)}`;
+
+function loadState(): TechLogState {
+  if (typeof localStorage === 'undefined') return getDefaultState();
+  try {
+    if (localStorage.getItem(VERSION_KEY) !== DATA_VERSION) {
+      return getDefaultState();
+    }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? { ...getDefaultState(), ...JSON.parse(raw) } : getDefaultState();
+  } catch {
+    return getDefaultState();
+  }
+}
+
+function saveState(state: TechLogState): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(VERSION_KEY, DATA_VERSION);
+}
+
+/** THIN localStorage wrapper — the only untested seam. */
+export function releaseSchedulingTripToPreflight(
+  input: PreflightTripInput
+): { techLogTripId: string; createdAircraft: boolean } {
+  const state = loadState();
+  const result = projectTripIntoTechLogState(state, input, newLocalId);
+  saveState(result.state);
+  return { techLogTripId: result.techLogTripId, createdAircraft: result.createdAircraft };
+}
+
+/** THIN localStorage wrapper — the only untested seam. */
+export function readPreflightSummary(tripNumber: string): PreflightSummary | null {
+  const state = loadState();
+  return summarizePreflight(state, tripNumber);
+}

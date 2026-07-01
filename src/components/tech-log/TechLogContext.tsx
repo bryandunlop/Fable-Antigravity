@@ -4,9 +4,9 @@ import type { TechLogState, TechLogAction, Personnel } from './types';
 import { getDefaultState } from './mockData/scenarios';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 
-const STORAGE_KEY = 'tech-log-state';
-const VERSION_KEY = 'tech-log-data-version';
-const DATA_VERSION = '2026-06-22-v7';
+export const STORAGE_KEY = 'tech-log-state';
+export const VERSION_KEY = 'tech-log-data-version';
+export const DATA_VERSION = '2026-06-22-v7';
 
 function loadInitialState(): TechLogState {
   try {
