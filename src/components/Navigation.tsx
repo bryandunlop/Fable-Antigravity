@@ -189,6 +189,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     {
       label: "Flight Operations",
       items: [
+        { name: 'Pilot Workspace', href: '/pilot-workspace', icon: CalendarCheck, roles: ['pilot', 'chief-pilot', 'admin'] },
         { name: 'Preflight Workflow', href: '/frat', icon: ClipboardList, roles: ['pilot', 'admin'] },
         { name: 'Standalone FRAT', href: '/frat/standalone', icon: Shield, roles: ['pilot', 'admin'] },
         { name: 'My FRAT Submissions', href: '/frat/my-submissions', icon: FileText, roles: ['pilot', 'admin'] },

@@ -110,6 +110,8 @@ import ElectronicLogbook from './components/ElectronicLogbook';
 import { MaintenanceWorkflowProvider } from './components/maintenance-workflow/context/MaintenanceWorkflowContext';
 import { SchedulingWorkspaceProvider } from './components/scheduling-workspace/SchedulingWorkspaceContext';
 import SchedulingWorkspace from './components/scheduling-workspace/SchedulingWorkspace';
+import { TechLogProvider } from './components/tech-log/TechLogContext';
+import PilotWorkspace from './components/pilot-workspace/PilotWorkspace';
 import AviaSyncDashboard from './components/maintenance-workflow/AviaSyncDashboard';
 import MWElectronicTechLog from './components/maintenance-workflow/ElectronicTechLog';
 import MWMELWorkflow from './components/maintenance-workflow/MELWorkflow';
@@ -210,7 +212,11 @@ export default function App() {
                           <Navigation userRole={userRole} additionalRoles={additionalRoles} onLogout={handleLogout}>
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out h-full">
                               <Routes>
-                                <Route path="/" element={userRole === 'maintenance-workflow' ? <Navigate to="/maintenance-workflow" replace /> : <Dashboard userRole={userRole} />} />
+                                <Route path="/" element={
+                                  userRole === 'maintenance-workflow' ? <Navigate to="/maintenance-workflow" replace />
+                                    : userRole === 'pilot' ? <Navigate to="/pilot-workspace" replace />
+                                    : <Dashboard userRole={userRole} />
+                                } />
                                 <Route path="/aircraft" element={<AircraftStatus />} />
                                 <Route path="/fleet-map" element={<LiveFleetMap />} />
                                 <Route path="/frat" element={
@@ -452,6 +458,18 @@ export default function App() {
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin']}>
                                       <SchedulingWorkspaceProvider>
                                         <SchedulingWorkspace userRole={userRole} additionalRoles={additionalRoles} />
+                                      </SchedulingWorkspaceProvider>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/pilot-workspace"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['pilot', 'chief-pilot', 'admin']}>
+                                      <SchedulingWorkspaceProvider>
+                                        <TechLogProvider userRole={userRole}>
+                                          <PilotWorkspace userRole={userRole} additionalRoles={additionalRoles} />
+                                        </TechLogProvider>
                                       </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }
