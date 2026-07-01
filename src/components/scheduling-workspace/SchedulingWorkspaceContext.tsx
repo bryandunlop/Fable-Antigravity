@@ -1,0 +1,52 @@
+import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { InMemorySchedulingStore, SchedulingService, seedTemplates } from '../../scheduling/store';
+
+interface SchedulingWorkspaceContextValue {
+  service: SchedulingService;
+  store: InMemorySchedulingStore;
+  ready: boolean;
+  tick: number; // bumped after every mutation so panels re-query the mutable store
+  bump: () => void;
+  nowUtc: () => string; // the UI is the outer clock; the engine stays pure
+  officeTzOffsetMinutes: number;
+}
+
+const SchedulingWorkspaceContext = createContext<SchedulingWorkspaceContextValue | undefined>(undefined);
+
+// Eastern (Lunken) office. TODO(dev): derive from a real DST-aware TZ source; fixed offset
+// carries the same caveat as the engine's date math (see the spec's productionize notes).
+const OFFICE_TZ_OFFSET_MINUTES = -240;
+
+export function SchedulingWorkspaceProvider({ children }: { children: ReactNode }) {
+  const [store] = useState(() => new InMemorySchedulingStore());
+  const [service] = useState(() => new SchedulingService({
+    store,
+    idFactory: (seed) => seed, // MUST be deterministic — generateRunBoard/escalation idempotency depends on stable ids per seed
+    officeTzOffsetMinutes: OFFICE_TZ_OFFSET_MINUTES,
+  }));
+  const [ready, setReady] = useState(false);
+  const [tick, setTick] = useState(0);
+  const bump = useCallback(() => setTick((t) => t + 1), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    seedTemplates(store).then(() => { if (!cancelled) setReady(true); });
+    return () => { cancelled = true; };
+  }, [store]);
+
+  const nowUtc = useCallback(() => new Date().toISOString(), []);
+
+  return (
+    <SchedulingWorkspaceContext.Provider
+      value={{ service, store, ready, tick, bump, nowUtc, officeTzOffsetMinutes: OFFICE_TZ_OFFSET_MINUTES }}
+    >
+      {children}
+    </SchedulingWorkspaceContext.Provider>
+  );
+}
+
+export function useSchedulingWorkspace() {
+  const ctx = useContext(SchedulingWorkspaceContext);
+  if (!ctx) throw new Error('useSchedulingWorkspace must be used within a SchedulingWorkspaceProvider');
+  return ctx;
+}
