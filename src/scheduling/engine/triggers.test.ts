@@ -3,7 +3,7 @@ import { evaluateTriggers, computeEscalations } from './triggers';
 import type { TaskInstance } from './types';
 
 const base = (over: Partial<TaskInstance>): TaskInstance => ({
-  id: 'i1', templateId: 'tpl', templateVersion: 1, taskDefId: 'd', tripId: null, runDate: '2026-06-30',
+  id: 'i1', templateId: 'tpl', templateVersion: 1, taskDefId: 'd', title: 'demo', category: 'ops', order: 1, tripId: null, runDate: '2026-06-30',
   status: 'open', ownerRole: 'scheduling', dueAtUtc: '2026-06-30T19:00:00.000Z',
   requiresAck: false, ackState: 'n_a', auditTrail: [], ...over,
 });

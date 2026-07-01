@@ -101,6 +101,12 @@ export interface TaskInstance {
   templateId: string;
   templateVersion: number; // PINNED at instantiation — never mutated on template change
   taskDefId: string;
+  // Point-in-time display snapshot, copied from the TaskDefinition at instantiation so a
+  // run-board / checklist / inbox renders without re-joining to the pinned template version.
+  title: string;
+  category: string;
+  order: number;
+  description?: string;
   tripId: string | null;   // null for recurring
   runDate: string | null;  // office-local YYYY-MM-DD for recurring; null for per-trip
   status: TaskStatus;

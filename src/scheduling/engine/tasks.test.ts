@@ -3,7 +3,7 @@ import { applyTaskAction } from './tasks';
 import type { TaskInstance } from './types';
 
 const t = (over: Partial<TaskInstance> = {}): TaskInstance => ({
-  id: 'i', templateId: 'tpl', templateVersion: 2, taskDefId: 'd', tripId: null, runDate: '2026-06-30',
+  id: 'i', templateId: 'tpl', templateVersion: 2, taskDefId: 'd', title: 'demo', category: 'ops', order: 1, tripId: null, runDate: '2026-06-30',
   status: 'open', ownerRole: 'scheduling', dueAtUtc: '2026-06-30T19:00:00.000Z',
   requiresAck: false, ackState: 'n_a', auditTrail: [{ atUtc: '2026-06-30T12:00:00.000Z', actor: 'system', action: 'created' }],
   ...over,

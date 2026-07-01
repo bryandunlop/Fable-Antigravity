@@ -3,7 +3,7 @@ import { deriveSchedulingReadiness } from './readiness';
 import type { TaskInstance } from './types';
 
 const t = (over: Partial<TaskInstance>): TaskInstance => ({
-  id: 'i', templateId: 'tpl', templateVersion: 1, taskDefId: 'd', tripId: 'T1', runDate: null,
+  id: 'i', templateId: 'tpl', templateVersion: 1, taskDefId: 'd', title: 'demo', category: 'ops', order: 1, tripId: 'T1', runDate: null,
   status: 'open', ownerRole: 'scheduling', dueAtUtc: '2026-07-01T00:00:00.000Z',
   requiresAck: false, ackState: 'n_a', auditTrail: [], ...over,
 });

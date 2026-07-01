@@ -46,6 +46,8 @@ describe('instantiateRecurring §7', () => {
       templateId: 'tpl-daily', templateVersion: 3, taskDefId: 'd-brief',
       tripId: null, status: 'open', ownerRole: 'scheduling', requiresAck: true, ackState: 'pending',
       dueAtUtc: '2026-06-30T19:00:00.000Z',
+      // point-in-time display snapshot copied from the task definition
+      title: 'Send crew brief', category: 'crew', order: 1,
     });
     expect(out[0].auditTrail).toHaveLength(1);
     expect(out[0].auditTrail[0].action).toBe('created');
