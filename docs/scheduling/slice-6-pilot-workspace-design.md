@@ -1,7 +1,7 @@
 # Slice 6 — Pilot Workspace ("Flight Hub") — Design Spec
 
 - **Date:** 2026-07-01
-- **Status:** Design — awaiting review before planning
+- **Status:** Built — browser-verified (executed via subagent-driven development; plan: `docs/scheduling/plans/plan-slice6-pilot-workspace.md`)
 - **Slice:** 6 of the department-workspaces roadmap (follows Slices 0–5; first *pilot-side* front door)
 - **Nature:** Prototype / developer-handoff, consistent with prior slices (dev role-switch, in-memory scheduling store, tech-log's localStorage state).
 
