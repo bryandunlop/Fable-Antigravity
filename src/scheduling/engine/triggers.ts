@@ -40,7 +40,7 @@ export function computeEscalations(
   for (const t of instances) {
     if (!t.requiresAck || t.ackState !== 'pending' || !t.escalation) continue;
     const deadline = parseISO(
-      computeDueAtUtc(t.escalation.deadline, { nowUtc, officeTzOffsetMinutes }),
+      computeDueAtUtc(t.escalation.deadline, { nowUtc, officeTzOffsetMinutes, etdUtc: t.etdUtc }),
     ).getTime();
     if (now >= deadline) {
       fired.push({ taskInstanceId: t.id, notifyRole: t.escalation.notifyRole, reason: t.escalation.reason ?? 'unacked_past_deadline' });

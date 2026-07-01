@@ -62,6 +62,11 @@ describe('instantiateRecurring §7', () => {
     expect(out[0].runDate).toBe('2026-06-30');
     expect(out[0].tripId).toBeNull();
   });
+
+  it('leaves etdUtc undefined for recurring instances', () => {
+    const out = instantiateRecurring(daily, ctx, idf);
+    expect(out[0].etdUtc).toBeUndefined();
+  });
 });
 
 describe('instantiatePerTrip §7', () => {
@@ -70,6 +75,8 @@ describe('instantiatePerTrip §7', () => {
     // maxPax 4 -> the 7-pax task is excluded
     expect(out.map((t) => t.taskDefId)).toEqual(['t-suit']);
     expect(out[0]).toMatchObject({ tripId: 'T1', templateVersion: 1, dueAtUtc: '2026-07-09T14:00:00.000Z', runDate: null });
+    // per-trip instance carries the ETD it was scheduled against
+    expect(out[0].etdUtc).toBe('2026-07-10T14:00:00.000Z');
   });
 
   it('includes conditional tasks when the trip matches', () => {

@@ -50,4 +50,14 @@ describe('computeEscalations §7', () => {
     const fired = computeEscalations([base2], '2026-06-30T21:30:00.000Z', -240);
     expect(fired).toEqual([{ taskInstanceId: 'br', notifyRole: 'scheduling', reason: 'crew_no_ack_call_required' }]);
   });
+
+  it('resolves an ETD-relative escalation deadline from the instance etdUtc', () => {
+    const brief = base({ id: 'brief-etd', etdUtc: '2026-07-10T14:00:00.000Z',
+      requiresAck: true, ackState: 'pending',
+      escalation: { deadline: { kind: 'hoursBeforeEtd', hours: 1 }, notifyRole: 'scheduling' } });
+    // T-1h deadline = 13:00Z; fires at 13:30Z (past), not at 12:00Z (before)
+    const fired = computeEscalations([brief], '2026-07-10T13:30:00.000Z', -240);
+    expect(fired).toEqual([{ taskInstanceId: 'brief-etd', notifyRole: 'scheduling', reason: 'unacked_past_deadline' }]);
+    expect(computeEscalations([brief], '2026-07-10T12:00:00.000Z', -240)).toEqual([]);
+  });
 });

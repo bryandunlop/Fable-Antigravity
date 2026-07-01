@@ -30,6 +30,7 @@ function buildInstance(
     description: def.description,
     tripId,
     runDate,
+    etdUtc: ctx.etdUtc,
     status: 'open',
     ownerRole: def.ownerRole,
     dueAtUtc: computeDueAtUtc(def.dueRule, ctx),

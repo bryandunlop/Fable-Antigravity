@@ -109,6 +109,7 @@ export interface TaskInstance {
   description?: string;
   tripId: string | null;   // null for recurring
   runDate: string | null;  // office-local YYYY-MM-DD for recurring; null for per-trip
+  etdUtc?: string; // the ETD this instance was scheduled against; set for per-trip instances, undefined for recurring
   status: TaskStatus;
   ownerRole: OwnerRole;
   dueAtUtc: string;
