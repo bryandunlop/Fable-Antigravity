@@ -1,0 +1,50 @@
+import { describe, it, expect } from 'vitest';
+import { applyTaskAction } from './tasks';
+import type { TaskInstance } from './types';
+
+const t = (over: Partial<TaskInstance> = {}): TaskInstance => ({
+  id: 'i', templateId: 'tpl', templateVersion: 2, taskDefId: 'd', tripId: null, runDate: '2026-06-30',
+  status: 'open', ownerRole: 'scheduling', dueAtUtc: '2026-06-30T19:00:00.000Z',
+  requiresAck: false, ackState: 'n_a', auditTrail: [{ atUtc: '2026-06-30T12:00:00.000Z', actor: 'system', action: 'created' }],
+  ...over,
+});
+const NOW = '2026-06-30T18:00:00.000Z';
+
+describe('applyTaskAction §7', () => {
+  it('does not mutate the input and appends an audit entry', () => {
+    const orig = t();
+    const next = applyTaskAction(orig, { kind: 'start' }, 'user:sched1', NOW);
+    expect(orig.status).toBe('open');            // input untouched
+    expect(next.status).toBe('in_progress');
+    expect(next.auditTrail).toHaveLength(2);
+    expect(next.auditTrail[1]).toMatchObject({ actor: 'user:sched1', action: 'status:in_progress', atUtc: NOW });
+    expect(next.templateVersion).toBe(2);        // pin never changes
+  });
+
+  it('ack sets ackState and requires requiresAck', () => {
+    const next = applyTaskAction(t({ requiresAck: true, ackState: 'pending' }), { kind: 'ack' }, 'pilot:1', NOW);
+    expect(next.ackState).toBe('acked');
+    expect(next.ackedBy).toBe('pilot:1');
+    expect(next.ackedAtUtc).toBe(NOW);
+    expect(() => applyTaskAction(t(), { kind: 'ack' }, 'x', NOW)).toThrow(/does not require ack/i);
+  });
+
+  it('complete is blocked until an ack-required task is acked', () => {
+    expect(() => applyTaskAction(t({ requiresAck: true, ackState: 'pending' }), { kind: 'complete' }, 'x', NOW))
+      .toThrow(/ack/i);
+    const acked = t({ requiresAck: true, ackState: 'acked' });
+    const done = applyTaskAction(acked, { kind: 'complete' }, 'x', NOW);
+    expect(done.status).toBe('done');
+    expect(done.completedBy).toBe('x');
+  });
+
+  it('block records the reason; unblock returns to open; note appends without status change', () => {
+    const blocked = applyTaskAction(t(), { kind: 'block', reason: 'awaiting slot' }, 'x', NOW);
+    expect(blocked.status).toBe('blocked');
+    expect(blocked.auditTrail[1].detail).toBe('awaiting slot');
+    expect(applyTaskAction(blocked, { kind: 'unblock' }, 'x', NOW).status).toBe('open');
+    const noted = applyTaskAction(t(), { kind: 'note', text: 'called FBO' }, 'x', NOW);
+    expect(noted.status).toBe('open');
+    expect(noted.notes).toBe('called FBO');
+  });
+});
