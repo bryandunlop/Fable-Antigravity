@@ -16,7 +16,7 @@ import { useSchedulingWorkspace } from './SchedulingWorkspaceContext';
 import type { TripRecord, TripLegRecord } from '../../scheduling/store';
 import type { TaskInstance, TaskAction, Readiness } from '../../scheduling/engine';
 import { StatusBadge, AckBadge, TaskActionButtons, formatDueTime, groupByCategory } from './taskRowHelpers';
-import { releaseSchedulingTripToPreflight, readPreflightSummary } from '../tech-log/bridge';
+import { releaseSchedulingTripToPreflight, readPreflightSummary, readTripLifecycleSummary } from '../tech-log/bridge';
 
 interface TripsPanelProps {
   userRole: string;
@@ -92,6 +92,10 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
   const selectedReadiness = selectedTripId ? readinessByTrip[selectedTripId] : undefined;
   const preflight = useMemo(
     () => (selectedTrip ? readPreflightSummary(selectedTrip.tripNumber) : null),
+    [selectedTrip, tick]
+  );
+  const lifecycle = useMemo(
+    () => (selectedTrip ? readTripLifecycleSummary(selectedTrip.tripNumber) : null),
     [selectedTrip, tick]
   );
 
@@ -288,6 +292,28 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+            {preflight !== null && (
+              <div className="mt-3">
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1.5">Downstream / maintenance</h4>
+                {lifecycle === null || (lifecycle.openSquawks === 0 && !lifecycle.flown && !lifecycle.postflightDone) ? (
+                  <p className="text-xs text-muted-foreground">No maintenance activity yet.</p>
+                ) : (
+                  <span
+                    className={`status-badge ${
+                      lifecycle.groundingSquawks > 0
+                        ? 'status-error'
+                        : lifecycle.openSquawks > 0
+                        ? 'status-warning'
+                        : 'status-success'
+                    }`}
+                  >
+                    Trip {lifecycle.tripStatus} · Flown {lifecycle.flown ? 'yes' : 'no'} ·{' '}
+                    {lifecycle.openSquawks} open squawks ({lifecycle.groundingSquawks} grounding) · Postflight{' '}
+                    {lifecycle.postflightDone ? 'done' : 'pending'}
+                  </span>
+                )}
               </div>
             )}
           </div>

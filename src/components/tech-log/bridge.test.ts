@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { getDefaultState } from './mockData/scenarios';
-import { projectTripIntoTechLogState, summarizePreflight } from './bridge';
+import { projectTripIntoTechLogState, summarizePreflight, summarizeTripLifecycle } from './bridge';
 import type { PreflightTripInput } from './bridge';
+import type { Defect, Postflight, Trip } from './types';
 
 // Deterministic id generator for tests. Prefixed with "test-" so generated ids
 // never collide with the fixture's seeded ids (e.g. 'trip-3').
@@ -182,5 +183,131 @@ describe('summarizePreflight', () => {
     const summary = summarizePreflight(withFuel, 'TRP-100');
     expect(summary!.legs[0].fuelSubmitted).toBe(true);
     expect(summary!.legs[1].fuelSubmitted).toBe(false);
+  });
+});
+
+describe('summarizeTripLifecycle', () => {
+  const lifecycleTrip: Trip = {
+    id: 'test-trip-1',
+    tripNumber: 'TRP-LC-1',
+    aircraftId: 'ac-n5pg', // seeded in getDefaultState()
+    name: 'KLUK-KTEB',
+    status: 'OPEN',
+    flightLogIds: [],
+    createdByOid: 'USR001',
+    createdAtUtc: '2026-06-30T12:00:00Z',
+  };
+
+  function makeDefect(overrides: Partial<Defect>): Defect {
+    return {
+      id: 'test-defect-' + Math.random().toString(36).slice(2, 8),
+      aircraftId: 'ac-n5pg',
+      source: 'PIREP',
+      ataChapter: '34',
+      description: 'test defect',
+      severity: 'LOW',
+      airworthinessAffecting: false,
+      status: 'OPEN',
+      reportedByOid: 'USR001',
+      reportedAtUtc: '2026-06-30T12:00:00Z',
+      signatureId: 'sig-1',
+      ...overrides,
+    } as Defect;
+  }
+
+  function makePostflight(overrides: Partial<Postflight>): Postflight {
+    return {
+      id: 'test-postflight-' + Math.random().toString(36).slice(2, 8),
+      aircraftId: 'ac-n5pg',
+      performedByOid: 'USR002',
+      performedAtUtc: '2026-06-30T12:00:00Z',
+      checklist: [],
+      gatheredDefectIds: [],
+      signatureId: 'sig-2',
+      ...overrides,
+    } as Postflight;
+  }
+
+  it('returns null for an unknown tripNumber', () => {
+    const state = getDefaultState();
+    expect(summarizeTripLifecycle(state, 'DOES-NOT-EXIST')).toBeNull();
+  });
+
+  it('counts open squawks per-aircraft, excluding CLOSED and other aircraft', () => {
+    const state = getDefaultState();
+    const stateWithTrip = { ...state, trips: [...state.trips, lifecycleTrip] };
+    const stateWithDefects = {
+      ...stateWithTrip,
+      defects: [
+        ...stateWithTrip.defects,
+        makeDefect({ id: 'd-1', aircraftId: 'ac-n5pg', status: 'OPEN' }),
+        makeDefect({ id: 'd-2', aircraftId: 'ac-n5pg', status: 'OPEN' }),
+        makeDefect({ id: 'd-3', aircraftId: 'ac-n5pg', status: 'CLOSED' }),
+        makeDefect({ id: 'd-4', aircraftId: 'ac-n2pg', status: 'OPEN' }), // different aircraft
+      ],
+    };
+
+    const summary = summarizeTripLifecycle(stateWithDefects, 'TRP-LC-1');
+    expect(summary).toBeTruthy();
+    expect(summary!.openSquawks).toBe(2);
+  });
+
+  it('counts groundingSquawks as OPEN defects with airworthinessAffecting null or true', () => {
+    const state = getDefaultState();
+    const stateWithTrip = { ...state, trips: [...state.trips, lifecycleTrip] };
+    const stateWithDefects = {
+      ...stateWithTrip,
+      defects: [
+        ...stateWithTrip.defects,
+        makeDefect({ id: 'd-1', status: 'OPEN', airworthinessAffecting: true }),
+        makeDefect({ id: 'd-2', status: 'OPEN', airworthinessAffecting: null }),
+        makeDefect({ id: 'd-3', status: 'OPEN', airworthinessAffecting: false }),
+      ],
+    };
+
+    const summary = summarizeTripLifecycle(stateWithDefects, 'TRP-LC-1');
+    expect(summary!.openSquawks).toBe(3);
+    expect(summary!.groundingSquawks).toBe(2); // true + null, not false
+  });
+
+  it('postflightDone is true only for a postflight at/after trip.createdAtUtc', () => {
+    const state = getDefaultState();
+    const stateWithTrip = { ...state, trips: [...state.trips, lifecycleTrip] };
+
+    const beforeState = {
+      ...stateWithTrip,
+      postflights: [...stateWithTrip.postflights, makePostflight({ performedAtUtc: '2026-06-29T00:00:00Z' })],
+    };
+    expect(summarizeTripLifecycle(beforeState, 'TRP-LC-1')!.postflightDone).toBe(false);
+
+    const afterState = {
+      ...stateWithTrip,
+      postflights: [...stateWithTrip.postflights, makePostflight({ performedAtUtc: '2026-07-01T00:00:00Z' })],
+    };
+    expect(summarizeTripLifecycle(afterState, 'TRP-LC-1')!.postflightDone).toBe(true);
+
+    const atState = {
+      ...stateWithTrip,
+      postflights: [...stateWithTrip.postflights, makePostflight({ performedAtUtc: lifecycleTrip.createdAtUtc })],
+    };
+    expect(summarizeTripLifecycle(atState, 'TRP-LC-1')!.postflightDone).toBe(true);
+  });
+
+  it('flown reflects flightLogIds presence', () => {
+    const state = getDefaultState();
+    const notFlown = { ...state, trips: [...state.trips, lifecycleTrip] };
+    expect(summarizeTripLifecycle(notFlown, 'TRP-LC-1')!.flown).toBe(false);
+
+    const flownTrip: Trip = { ...lifecycleTrip, flightLogIds: ['fl-1'] };
+    const flown = { ...state, trips: [...state.trips, flownTrip] };
+    expect(summarizeTripLifecycle(flown, 'TRP-LC-1')!.flown).toBe(true);
+  });
+
+  it('returns aircraftTail from matched aircraft and tripStatus from the trip', () => {
+    const state = getDefaultState();
+    const stateWithTrip = { ...state, trips: [...state.trips, lifecycleTrip] };
+    const summary = summarizeTripLifecycle(stateWithTrip, 'TRP-LC-1');
+    expect(summary!.aircraftTail).toBe('N5PG');
+    expect(summary!.tripStatus).toBe('OPEN');
   });
 });

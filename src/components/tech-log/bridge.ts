@@ -131,6 +131,41 @@ export function summarizePreflight(state: TechLogState, tripNumber: string): Pre
   return { techLogTripId: trip.id, overall, legs };
 }
 
+export interface TripLifecycleSummary {
+  aircraftTail: string;
+  tripStatus: 'OPEN' | 'CLOSED';
+  flown: boolean;
+  openSquawks: number;
+  groundingSquawks: number;
+  postflightDone: boolean;
+}
+
+/** PURE — testable without localStorage. */
+export function summarizeTripLifecycle(state: TechLogState, tripNumber: string): TripLifecycleSummary | null {
+  const trip = state.trips.find(t => t.tripNumber === tripNumber);
+  if (!trip) return null;
+
+  const aircraft = state.aircraft.find(a => a.id === trip.aircraftId);
+  const aircraftTail = aircraft ? aircraft.tailNumber : trip.aircraftId;
+
+  const openDefects = state.defects.filter(d => d.aircraftId === trip.aircraftId && d.status === 'OPEN');
+  const openSquawks = openDefects.length;
+  const groundingSquawks = openDefects.filter(d => d.airworthinessAffecting !== false).length;
+
+  const postflightDone = state.postflights.some(
+    p => p.aircraftId === trip.aircraftId && p.performedAtUtc >= trip.createdAtUtc
+  );
+
+  return {
+    aircraftTail,
+    tripStatus: trip.status,
+    flown: trip.flightLogIds.length > 0,
+    openSquawks,
+    groundingSquawks,
+    postflightDone,
+  };
+}
+
 const newLocalId = (p: string) => `${p}-${Math.random().toString(36).slice(2, 10)}`;
 
 function loadState(): TechLogState {
@@ -166,4 +201,10 @@ export function releaseSchedulingTripToPreflight(
 export function readPreflightSummary(tripNumber: string): PreflightSummary | null {
   const state = loadState();
   return summarizePreflight(state, tripNumber);
+}
+
+/** THIN localStorage wrapper — the only untested seam. */
+export function readTripLifecycleSummary(tripNumber: string): TripLifecycleSummary | null {
+  const state = loadState();
+  return summarizeTripLifecycle(state, tripNumber);
 }
