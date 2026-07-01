@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { useSchedulingWorkspace } from '../../scheduling-workspace/SchedulingWorkspaceContext';
 import type { TripRecord } from '../../../scheduling/store/types';
 import type { SchedulingEvent } from '../../../scheduling/store/types';
@@ -11,15 +12,19 @@ export default function TripBriefPanel({ trip }: { trip: TripRecord }) {
     let cancelled = false;
     (async () => {
       const all = await store.listEventsForTarget({ kind: 'role', value: 'pilot' });
-      const forTrip = all.filter((e) => (e.payload as { tripId?: string }).tripId === trip.id || e.type.startsWith('handoff:'));
+      const forTrip = all.filter((e) => (e.payload as { tripId?: string }).tripId === trip.id);
       if (!cancelled) setEvents(forTrip);
     })();
     return () => { cancelled = true; };
   }, [store, tick, trip]);
 
   async function ack(e: SchedulingEvent) {
-    await store.updateEvent({ ...e, ackState: 'acked', ackedBy: 'pilot', ackedAtUtc: nowUtc() });
-    bump();
+    try {
+      await store.updateEvent({ ...e, ackState: 'acked', ackedBy: 'pilot', ackedAtUtc: nowUtc() });
+      bump();
+    } catch {
+      toast.error('Could not acknowledge the brief');
+    }
   }
 
   return (
