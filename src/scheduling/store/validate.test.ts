@@ -24,6 +24,9 @@ describe('parseCondition', () => {
   it('throws when a nested condition is invalid', () => {
     expect(() => parseCondition({ kind: 'not', condition: { kind: 'nope' } })).toThrow(/condition/i);
   });
+  it('throws on an invalid tripType value', () => {
+    expect(() => parseCondition({ kind: 'tripType', equals: 'bogus' })).toThrow(/tripType/i);
+  });
 });
 
 describe('parseTemplate', () => {
@@ -44,5 +47,17 @@ describe('parseTemplate', () => {
   });
   it('rejects a task def whose dueRule is invalid', () => {
     expect(() => parseTemplate({ ...good, taskDefinitions: [{ ...good.taskDefinitions[0], dueRule: { kind: 'bogus' } }] })).toThrow(/dueRule/i);
+  });
+  it('rejects an invalid handoffTarget kind', () => {
+    const bad = { ...good.taskDefinitions[0], handoffTarget: { kind: 'bogus', value: 'x' } };
+    expect(() => parseTemplate({ ...good, taskDefinitions: [bad] })).toThrow(/handoffTarget/i);
+  });
+  it('rejects an invalid handoffTarget channel', () => {
+    const bad = { ...good.taskDefinitions[0], handoffTarget: { kind: 'role', value: 'x', channel: 42 } };
+    expect(() => parseTemplate({ ...good, taskDefinitions: [bad] })).toThrow(/channel/i);
+  });
+  it('rejects a non-boolean requiresAck', () => {
+    const bad = { ...good.taskDefinitions[0], requiresAck: 'yes' };
+    expect(() => parseTemplate({ ...good, taskDefinitions: [bad] })).toThrow(/requiresAck/i);
   });
 });

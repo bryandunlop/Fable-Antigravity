@@ -1,5 +1,6 @@
 import type {
   DueRule, Condition, ChecklistTemplate, TaskDefinition, RecurringScope, TripType,
+  HandoffTarget, HandoffChannel,
 } from '../engine';
 
 function isObj(x: unknown): x is Record<string, unknown> {
@@ -13,8 +14,16 @@ function reqStr(o: Record<string, unknown>, k: string, ctx: string): string {
   if (typeof o[k] !== 'string') throw new Error(`${ctx}: missing/invalid string '${k}'`);
   return o[k] as string;
 }
+function reqBool(o: Record<string, unknown>, k: string, ctx: string): boolean {
+  if (typeof o[k] !== 'boolean') throw new Error(`${ctx}: missing/invalid boolean '${k}'`);
+  return o[k] as boolean;
+}
 
 const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const RECURRING_SCOPES: RecurringScope[] = ['daily', 'monthly', 'quarterly'];
+const TRIP_TYPES: TripType[] = ['domestic', 'international', 'dca_dassp'];
+const HANDOFF_KINDS = ['role', 'dept', 'person'];
+const HANDOFF_CHANNELS = ['inbox', 'teams', 'email'];
 
 export function parseDueRule(raw: unknown): DueRule {
   if (!isObj(raw)) throw new Error('dueRule: not an object');
@@ -47,7 +56,11 @@ export function parseCondition(raw: unknown): Condition {
   const kind = raw.kind;
   switch (kind) {
     case 'always': return { kind };
-    case 'tripType': return { kind, equals: reqStr(raw, 'equals', 'condition.tripType') as TripType };
+    case 'tripType': {
+      const equals = reqStr(raw, 'equals', 'condition.tripType');
+      if (!TRIP_TYPES.includes(equals as TripType)) throw new Error(`condition.tripType: invalid tripType '${equals}'`);
+      return { kind, equals: equals as TripType };
+    }
     case 'paxCountAtLeast': return { kind, value: reqNum(raw, 'value', 'condition.paxCountAtLeast') };
     case 'tailEquals': return { kind, value: reqStr(raw, 'value', 'condition.tailEquals') };
     case 'aircraftTypeEquals': return { kind, value: reqStr(raw, 'value', 'condition.aircraftTypeEquals') };
@@ -61,9 +74,6 @@ export function parseCondition(raw: unknown): Condition {
   }
 }
 
-const RECURRING_SCOPES: RecurringScope[] = ['daily', 'monthly', 'quarterly'];
-const TRIP_TYPES: TripType[] = ['domestic', 'international', 'dca_dassp'];
-
 function parseTaskDef(raw: unknown): TaskDefinition {
   if (!isObj(raw)) throw new Error('taskDefinition: not an object');
   const def: TaskDefinition = {
@@ -73,7 +83,7 @@ function parseTaskDef(raw: unknown): TaskDefinition {
     category: reqStr(raw, 'category', 'taskDefinition'),
     order: reqNum(raw, 'order', 'taskDefinition'),
     dueRule: parseDueRule(raw.dueRule),
-    requiresAck: raw.requiresAck === true,
+    requiresAck: reqBool(raw, 'requiresAck', 'taskDefinition'),
   };
   if (typeof raw.description === 'string') def.description = raw.description;
   if (raw.condition !== undefined) def.condition = parseCondition(raw.condition);
@@ -88,8 +98,16 @@ function parseTaskDef(raw: unknown): TaskDefinition {
   if (raw.handoffTarget !== undefined) {
     const h = raw.handoffTarget;
     if (!isObj(h)) throw new Error('taskDefinition.handoffTarget: not an object');
-    def.handoffTarget = { kind: reqStr(h, 'kind', 'handoffTarget') as 'role', value: reqStr(h, 'value', 'handoffTarget'),
-      ...(h.channel ? { channel: h.channel as 'inbox' } : {}) };
+    const hkind = reqStr(h, 'kind', 'handoffTarget');
+    if (!HANDOFF_KINDS.includes(hkind)) throw new Error(`handoffTarget: invalid kind '${hkind}'`);
+    const target: HandoffTarget = { kind: hkind as HandoffTarget['kind'], value: reqStr(h, 'value', 'handoffTarget') };
+    if (h.channel !== undefined) {
+      if (typeof h.channel !== 'string' || !HANDOFF_CHANNELS.includes(h.channel)) {
+        throw new Error(`handoffTarget: invalid channel '${String(h.channel)}'`);
+      }
+      target.channel = h.channel as HandoffChannel;
+    }
+    def.handoffTarget = target;
   }
   if (typeof raw.dependsOn === 'string') def.dependsOn = raw.dependsOn;
   return def;
