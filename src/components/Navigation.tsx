@@ -278,6 +278,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Scheduling Dashboard', href: '/scheduling-dashboard', icon: Calendar, roles: ['scheduling', 'admin'] },
         { name: 'Trip Coordination', href: '/trip-coordination', icon: MapPin, roles: ['scheduling', 'admin'] },
         { name: 'Crew Workload & Travel', href: '/crew-scheduling-workload', icon: BarChart3, roles: ['scheduling', 'admin', 'lead'] },
+        { name: 'Scheduling Workspace', href: '/scheduling-workspace', icon: CalendarCheck, roles: ['scheduling', 'admin'] },
         // { name: 'Trip Management', href: '/booking-profile', icon: BookOpen, roles: ['admin-assistant', 'admin'] },
         // { name: 'Itinerary Builder', href: '/itinerary-builder', icon: FileText, roles: ['admin-assistant', 'admin'] },
         { name: 'Passenger Forms', href: '/passenger-forms', icon: FileText, roles: ['scheduling', 'admin'] },

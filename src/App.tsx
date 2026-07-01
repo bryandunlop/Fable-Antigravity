@@ -108,6 +108,8 @@ import TechnicianDashboard from './components/maintenance/TechnicianDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import ElectronicLogbook from './components/ElectronicLogbook';
 import { MaintenanceWorkflowProvider } from './components/maintenance-workflow/context/MaintenanceWorkflowContext';
+import { SchedulingWorkspaceProvider } from './components/scheduling-workspace/SchedulingWorkspaceContext';
+import SchedulingWorkspace from './components/scheduling-workspace/SchedulingWorkspace';
 import AviaSyncDashboard from './components/maintenance-workflow/AviaSyncDashboard';
 import MWElectronicTechLog from './components/maintenance-workflow/ElectronicTechLog';
 import MWMELWorkflow from './components/maintenance-workflow/MELWorkflow';
@@ -441,6 +443,16 @@ export default function App() {
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin', 'lead']}>
                                       <CrewSchedulingWorkload />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/scheduling-workspace"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin']}>
+                                      <SchedulingWorkspaceProvider>
+                                        <SchedulingWorkspace userRole={userRole} additionalRoles={additionalRoles} />
+                                      </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }
                                 />
