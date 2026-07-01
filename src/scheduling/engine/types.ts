@@ -43,3 +43,79 @@ export type Condition =
   | { kind: 'allOf'; conditions: Condition[] }
   | { kind: 'anyOf'; conditions: Condition[] }
   | { kind: 'not'; condition: Condition };
+
+export type RecurringScope = 'daily' | 'monthly' | 'quarterly';
+export type OwnerRole = string;
+export type HandoffChannel = 'inbox' | 'teams' | 'email';
+
+export interface HandoffTarget {
+  kind: 'role' | 'dept' | 'person';
+  value: string;
+  channel?: HandoffChannel; // prototype delivers to 'inbox'; teams/email are productionize (Graph)
+}
+
+export interface EscalationRule {
+  deadline: DueRule;      // when the unacked task escalates (e.g. 17:00 local)
+  notifyRole: OwnerRole;  // who gets notified (e.g. scheduling, who then phones crew)
+  reason?: string;
+}
+
+export interface TaskDefinition {
+  id: string;
+  title: string;
+  description?: string;
+  ownerRole: OwnerRole;
+  category: string;
+  order: number;
+  dueRule: DueRule;
+  requiresAck: boolean;
+  escalation?: EscalationRule;
+  condition?: Condition;      // undefined == always
+  handoffTarget?: HandoffTarget;
+  dependsOn?: string;         // task-def id
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  name: string;
+  triggerType: 'recurring' | 'per_trip';
+  scope: RecurringScope | TripType; // recurring uses RecurringScope; per_trip uses TripType
+  version: number;
+  status: 'draft' | 'published' | 'archived';
+  effectiveFrom: string; // ISO UTC
+  taskDefinitions: TaskDefinition[];
+}
+
+export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'n_a';
+export type AckState = 'n_a' | 'pending' | 'acked';
+
+export interface AuditEntry {
+  atUtc: string;
+  actor: string;   // person/role id; 'system' for engine-generated
+  action: string;  // 'created' | 'status:done' | 'ack' | ...
+  detail?: string;
+}
+
+export interface TaskInstance {
+  id: string;
+  templateId: string;
+  templateVersion: number; // PINNED at instantiation — never mutated on template change
+  taskDefId: string;
+  tripId: string | null;   // null for recurring
+  runDate: string | null;  // office-local YYYY-MM-DD for recurring; null for per-trip
+  status: TaskStatus;
+  ownerRole: OwnerRole;
+  dueAtUtc: string;
+  requiresAck: boolean;
+  ackState: AckState;
+  ackedBy?: string;
+  ackedAtUtc?: string;
+  completedBy?: string;
+  completedAtUtc?: string;
+  notes?: string;
+  handoffTarget?: HandoffTarget;
+  escalation?: EscalationRule;
+  auditTrail: AuditEntry[];
+}
+
+export type IdFactory = (seed: string) => string;
