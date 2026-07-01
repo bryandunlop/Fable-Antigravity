@@ -34,4 +34,17 @@ describe('toTripContext', () => {
     expect(ctx.etdUtc).toBe('2026-07-10T00:00:00.000Z');
     expect(ctx.maxPaxCount).toBe(0);
   });
+
+  it('derives routeIcaos as the deduped, upper-cased set of every leg dep+arr', () => {
+    const ctx = toTripContext(trip());
+    // legs: KASE<->KLUK (both legs), so the set should just be the two airports, deduped
+    expect(ctx.routeIcaos.slice().sort()).toEqual(['KASE', 'KLUK']);
+  });
+
+  it('upper-cases lower-case ICAOs when deriving routeIcaos', () => {
+    const ctx = toTripContext(trip({ legs: [
+      { id: 'l1', sequence: 1, departureIcao: 'kluk', arrivalIcao: 'zbaa', departureTimeUtc: '2026-07-10T14:00:00.000Z', paxCount: 2 },
+    ]}));
+    expect(ctx.routeIcaos.slice().sort()).toEqual(['KLUK', 'ZBAA']);
+  });
 });

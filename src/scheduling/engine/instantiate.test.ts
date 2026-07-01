@@ -35,7 +35,8 @@ const domesticPerTrip: ChecklistTemplate = {
 
 const trip = (over: Partial<TripContext> = {}): TripContext => ({
   tripId: 'T1', tripType: 'domestic', tail: 'N1PG', aircraftType: 'G650ER',
-  etdUtc: '2026-07-10T14:00:00.000Z', maxPaxCount: 4, isWeekendDeparture: false, ...over,
+  etdUtc: '2026-07-10T14:00:00.000Z', maxPaxCount: 4, isWeekendDeparture: false,
+  routeIcaos: [], ...over,
 });
 
 describe('instantiateRecurring §7', () => {

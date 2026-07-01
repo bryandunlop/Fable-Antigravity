@@ -31,6 +31,8 @@ export interface TripContext {
   etdUtc: string;
   maxPaxCount: number;
   isWeekendDeparture: boolean;
+  /** Every leg's departure + arrival ICAO, upper-cased and deduped. */
+  routeIcaos: string[];
 }
 
 export type Condition =
@@ -40,6 +42,8 @@ export type Condition =
   | { kind: 'tailEquals'; value: string }
   | { kind: 'aircraftTypeEquals'; value: string }
   | { kind: 'isWeekendDeparture' }
+  | { kind: 'routeTouchesCountry'; country: string }
+  | { kind: 'routeTouchesIcaoPrefix'; prefix: string }
   | { kind: 'allOf'; conditions: Condition[] }
   | { kind: 'anyOf'; conditions: Condition[] }
   | { kind: 'not'; condition: Condition };

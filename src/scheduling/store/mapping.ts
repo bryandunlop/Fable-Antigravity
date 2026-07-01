@@ -10,6 +10,9 @@ export function toTripContext(trip: TripRecord): TripContext {
   const etdUtc = earliest ? earliest.departureTimeUtc : trip.startDate;
   const maxPaxCount = legs.reduce((m, l) => Math.max(m, l.paxCount), 0);
   const dow = new Date(etdUtc).getUTCDay(); // 0=Sun..6=Sat (UTC — see spec DST caveat)
+  const routeIcaos = Array.from(
+    new Set(legs.flatMap((l) => [l.departureIcao, l.arrivalIcao]).map((i) => i.toUpperCase())),
+  );
   return {
     tripId: trip.id,
     tripType: trip.tripType,
@@ -18,5 +21,6 @@ export function toTripContext(trip: TripRecord): TripContext {
     etdUtc,
     maxPaxCount,
     isWeekendDeparture: dow === 0 || dow === 6,
+    routeIcaos,
   };
 }

@@ -1,4 +1,5 @@
 import type { Condition, TripContext } from './types';
+import { countryForIcao } from './geo';
 
 export function evaluateCondition(cond: Condition, trip: TripContext): boolean {
   switch (cond.kind) {
@@ -8,6 +9,8 @@ export function evaluateCondition(cond: Condition, trip: TripContext): boolean {
     case 'tailEquals': return trip.tail === cond.value;
     case 'aircraftTypeEquals': return trip.aircraftType === cond.value;
     case 'isWeekendDeparture': return trip.isWeekendDeparture;
+    case 'routeTouchesCountry': return trip.routeIcaos.some((i) => countryForIcao(i) === cond.country);
+    case 'routeTouchesIcaoPrefix': return trip.routeIcaos.some((i) => i.toUpperCase().startsWith(cond.prefix));
     case 'allOf': return cond.conditions.every((c) => evaluateCondition(c, trip));
     case 'anyOf': return cond.conditions.some((c) => evaluateCondition(c, trip));
     case 'not': return !evaluateCondition(cond.condition, trip);

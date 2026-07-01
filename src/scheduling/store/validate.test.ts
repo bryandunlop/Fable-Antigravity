@@ -27,6 +27,15 @@ describe('parseCondition', () => {
   it('throws on an invalid tripType value', () => {
     expect(() => parseCondition({ kind: 'tripType', equals: 'bogus' })).toThrow(/tripType/i);
   });
+  it('accepts a routeTouchesCountry condition', () => {
+    expect(parseCondition({ kind: 'routeTouchesCountry', country: 'CN' })).toEqual({ kind: 'routeTouchesCountry', country: 'CN' });
+  });
+  it('accepts a routeTouchesIcaoPrefix condition', () => {
+    expect(parseCondition({ kind: 'routeTouchesIcaoPrefix', prefix: 'EG' })).toEqual({ kind: 'routeTouchesIcaoPrefix', prefix: 'EG' });
+  });
+  it('still throws on an unknown kind', () => {
+    expect(() => parseCondition({ kind: 'stillBogus' })).toThrow(/condition/i);
+  });
 });
 
 describe('parseTemplate', () => {

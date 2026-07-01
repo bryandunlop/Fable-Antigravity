@@ -65,6 +65,8 @@ export function parseCondition(raw: unknown): Condition {
     case 'tailEquals': return { kind, value: reqStr(raw, 'value', 'condition.tailEquals') };
     case 'aircraftTypeEquals': return { kind, value: reqStr(raw, 'value', 'condition.aircraftTypeEquals') };
     case 'isWeekendDeparture': return { kind };
+    case 'routeTouchesCountry': return { kind, country: reqStr(raw, 'country', 'condition.routeTouchesCountry') };
+    case 'routeTouchesIcaoPrefix': return { kind, prefix: reqStr(raw, 'prefix', 'condition.routeTouchesIcaoPrefix') };
     case 'allOf': case 'anyOf': {
       if (!Array.isArray(raw.conditions)) throw new Error(`condition.${kind}: conditions not an array`);
       return { kind, conditions: raw.conditions.map(parseCondition) };
