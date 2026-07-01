@@ -114,7 +114,7 @@ describe('computeDueAtUtc §7', () => {
     expect(r).toBe('2026-07-09T14:00:00.000Z');
   });
 
-  it('businessDaysBeforeEtd 1, no weekend adjust -> previous weekday at 12:00 local', () => {
+  it('businessDaysBeforeEtd 1: weekday ETD -> previous weekday at 12:00 local', () => {
     // ETD Wed 2026-07-08; 1 business day before = Tue 2026-07-07; 12:00 EDT == 16:00 UTC
     const r = computeDueAtUtc(
       { kind: 'businessDaysBeforeEtd', days: 1 },
@@ -123,10 +123,10 @@ describe('computeDueAtUtc §7', () => {
     expect(r).toBe('2026-07-07T16:00:00.000Z');
   });
 
-  it('businessDaysBeforeEtd with weekendAdjust: Sunday ETD -> Friday', () => {
-    // ETD Sun 2026-07-12; weekendAdjust pulls the prep to the preceding Friday 2026-07-10, 12:00 local
+  it('businessDaysBeforeEtd 1: Sunday ETD naturally lands on Friday (weekends skipped)', () => {
+    // ETD Sun 2026-07-12; stepping back 1 business day skips Sat 07-11 -> Fri 2026-07-10, 12:00 local
     const r = computeDueAtUtc(
-      { kind: 'businessDaysBeforeEtd', days: 1, weekendAdjust: true },
+      { kind: 'businessDaysBeforeEtd', days: 1 },
       ctx({ etdUtc: '2026-07-12T14:00:00.000Z' }),
     );
     expect(r).toBe('2026-07-10T16:00:00.000Z');
@@ -168,7 +168,7 @@ export type DueRule =
   | { kind: 'quarterWeek'; week: number /* 1 = first week of the quarter */ }
   | { kind: 'annualDate'; month: number /* 1-12 */; day: number }
   | { kind: 'hoursBeforeEtd'; hours: number }
-  | { kind: 'businessDaysBeforeEtd'; days: number; weekendAdjust?: boolean }
+  | { kind: 'businessDaysBeforeEtd'; days: number }
   | { kind: 'monthsBeforeEtd'; months: number };
 
 export interface DueContext {
@@ -186,34 +186,30 @@ export interface DueContext {
 Create `src/scheduling/engine/dueDates.ts`:
 
 ```ts
-import {
-  parseISO, getDay, startOfWeek, addDays, subMonths, startOfQuarter,
-} from 'date-fns';
 import type { DueRule, DueContext, Weekday } from './types';
 
 const WEEKDAY_INDEX: Record<Weekday, number> = {
   SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6,
 };
+const DAY_MS = 86_400_000;
 
 /** Build an ISO-UTC string from an office-local wall clock (Y/M/D H:M) + offset. */
 function localWallClockToUtc(
   year: number, month1: number, day: number, hh: number, mm: number, offsetMinutes: number,
 ): string {
-  // Interpret the wall clock as if UTC, then remove the office offset to get true UTC.
+  // Interpret the wall clock as if it were UTC, then remove the office offset to get true UTC.
   const asIfUtcMs = Date.UTC(year, month1 - 1, day, hh, mm, 0, 0);
-  const trueUtcMs = asIfUtcMs - offsetMinutes * 60_000;
-  return new Date(trueUtcMs).toISOString();
+  return new Date(asIfUtcMs - offsetMinutes * 60_000).toISOString();
 }
 
-/** Office-local calendar parts of an instant. */
-function localParts(iso: string, offsetMinutes: number) {
-  const localMs = parseISO(iso).getTime() + offsetMinutes * 60_000;
-  const d = new Date(localMs);
-  return {
-    year: d.getUTCFullYear(), month1: d.getUTCMonth() + 1, day: d.getUTCDate(),
-    dow: d.getUTCDay(), // 0=Sun..6=Sat, in office-local terms
-    asUtcDate: d, // a Date whose UTC fields equal the office-local wall clock
-  };
+/**
+ * A Date whose UTC fields equal the office-local wall clock of `iso`.
+ * ALL calendar math below reads UTC fields only (getUTC*, Date.UTC, ms arithmetic),
+ * so results are independent of the machine/CI timezone. Do NOT introduce date-fns
+ * local-tz helpers (startOfWeek, getDay, startOfQuarter, subMonths) here.
+ */
+function localClock(iso: string, offsetMinutes: number): Date {
+  return new Date(new Date(iso).getTime() + offsetMinutes * 60_000);
 }
 
 function parseTime(t: string): { hh: number; mm: number } {
@@ -223,7 +219,10 @@ function parseTime(t: string): { hh: number; mm: number } {
 
 export function computeDueAtUtc(rule: DueRule, ctx: DueContext): string {
   const off = ctx.officeTzOffsetMinutes;
-  const ref = localParts(ctx.nowUtc, off);
+  const ref = localClock(ctx.nowUtc, off);
+  const y = ref.getUTCFullYear();
+  const m1 = ref.getUTCMonth() + 1;
+  const d = ref.getUTCDate();
 
   const requireEtd = (): string => {
     if (!ctx.etdUtc) throw new Error(`DueRule '${rule.kind}' requires ctx.etdUtc`);
@@ -233,54 +232,55 @@ export function computeDueAtUtc(rule: DueRule, ctx: DueContext): string {
   switch (rule.kind) {
     case 'dayOfTimeLocal': {
       const { hh, mm } = parseTime(rule.time);
-      return localWallClockToUtc(ref.year, ref.month1, ref.day, hh, mm, off);
+      return localWallClockToUtc(y, m1, d, hh, mm, off);
     }
     case 'weekday': {
       // Monday-based week containing the reference local date.
-      const weekStart = startOfWeek(ref.asUtcDate, { weekStartsOn: 1 });
-      const targetDow = WEEKDAY_INDEX[rule.day];
-      // Days from Monday(1) to target; Sunday(0) maps to +6.
-      const fromMonday = (targetDow + 6) % 7;
-      const target = addDays(weekStart, fromMonday);
-      const hh = rule.period === 'PM' ? 17 : rule.period === 'AM' ? 9 : 9;
+      const fromMonday = (ref.getUTCDay() + 6) % 7; // days since Monday
+      const monday = new Date(ref.getTime() - fromMonday * DAY_MS);
+      const offsetDays = (WEEKDAY_INDEX[rule.day] + 6) % 7; // Mon=0 .. Sun=6
+      const target = new Date(monday.getTime() + offsetDays * DAY_MS);
+      const hh = rule.period === 'PM' ? 17 : 9;
       return localWallClockToUtc(
         target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), hh, 0, off,
       );
     }
     case 'dayOfMonth': {
       const hh = rule.when === 'around' ? 12 : 17;
-      return localWallClockToUtc(ref.year, ref.month1, rule.day, hh, 0, off);
+      return localWallClockToUtc(y, m1, rule.day, hh, 0, off);
     }
     case 'quarterWeek': {
-      const qStart = startOfQuarter(ref.asUtcDate);
-      const target = addDays(qStart, (rule.week - 1) * 7);
+      const qStartMonth1 = Math.floor((m1 - 1) / 3) * 3 + 1; // 1,4,7,10
+      const qStart = new Date(Date.UTC(y, qStartMonth1 - 1, 1));
+      const target = new Date(qStart.getTime() + (rule.week - 1) * 7 * DAY_MS);
       return localWallClockToUtc(
         target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), 17, 0, off,
       );
     }
     case 'annualDate':
-      return localWallClockToUtc(ref.year, rule.month, rule.day, 17, 0, off);
+      return localWallClockToUtc(y, rule.month, rule.day, 17, 0, off);
     case 'hoursBeforeEtd':
-      return new Date(parseISO(requireEtd()).getTime() - rule.hours * 3_600_000).toISOString();
+      return new Date(new Date(requireEtd()).getTime() - rule.hours * 3_600_000).toISOString();
     case 'businessDaysBeforeEtd': {
-      const etd = localParts(requireEtd(), off);
-      let cursor = etd.asUtcDate;
-      // If ETD lands on a weekend and weekendAdjust is on, step back to Friday first.
-      if (rule.weekendAdjust && (getDay(cursor) === 0 || getDay(cursor) === 6)) {
-        while (getDay(cursor) === 0 || getDay(cursor) === 6) cursor = addDays(cursor, -1);
-      }
+      // Step back `days` business days from ETD, skipping Sat/Sun. A Sunday ETD
+      // naturally lands on the preceding Friday for days=1 (the "Fri-for-Sun" rule).
+      let cursor = localClock(requireEtd(), off);
       let remaining = rule.days;
       while (remaining > 0) {
-        cursor = addDays(cursor, -1);
-        if (getDay(cursor) !== 0 && getDay(cursor) !== 6) remaining -= 1;
+        cursor = new Date(cursor.getTime() - DAY_MS);
+        const dow = cursor.getUTCDay();
+        if (dow !== 0 && dow !== 6) remaining -= 1;
       }
       return localWallClockToUtc(
         cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, cursor.getUTCDate(), 12, 0, off,
       );
     }
     case 'monthsBeforeEtd': {
-      const etd = localParts(requireEtd(), off);
-      const target = subMonths(etd.asUtcDate, rule.months);
+      const etd = localClock(requireEtd(), off);
+      // Date.UTC normalizes a negative/overflowing month, so month subtraction is safe.
+      const target = new Date(Date.UTC(
+        etd.getUTCFullYear(), etd.getUTCMonth() - rule.months, etd.getUTCDate(),
+      ));
       return localWallClockToUtc(
         target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), 12, 0, off,
       );
@@ -292,7 +292,7 @@ export function computeDueAtUtc(rule: DueRule, ctx: DueContext): string {
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `npm test -- dueDates`
-Expected: PASS (11 tests). If the Sunday-weekend-adjust case is off, verify `weekendAdjust` steps ETD to Friday *before* counting business days.
+Expected: PASS (11 tests). All date math uses UTC fields + the caller's offset, so results are machine-timezone-independent.
 
 - [ ] **Step 6: Commit**
 
