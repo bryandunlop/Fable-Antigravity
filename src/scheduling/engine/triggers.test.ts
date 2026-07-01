@@ -43,4 +43,11 @@ describe('computeEscalations §7', () => {
     // now = 16:00 EDT == 20:00 UTC, before deadline
     expect(computeEscalations([acked, early], '2026-06-30T20:00:00.000Z', -240)).toEqual([]);
   });
+
+  it('honors an author-supplied escalation reason', () => {
+    const base2 = base({ id: 'br', requiresAck: true, ackState: 'pending',
+      escalation: { deadline: { kind: 'dayOfTimeLocal', time: '17:00' }, notifyRole: 'scheduling', reason: 'crew_no_ack_call_required' } });
+    const fired = computeEscalations([base2], '2026-06-30T21:30:00.000Z', -240);
+    expect(fired).toEqual([{ taskInstanceId: 'br', notifyRole: 'scheduling', reason: 'crew_no_ack_call_required' }]);
+  });
 });

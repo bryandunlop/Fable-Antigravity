@@ -97,5 +97,9 @@ export function computeDueAtUtc(rule: DueRule, ctx: DueContext): string {
         target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), 12, 0, off,
       );
     }
+    default: {
+      const _exhaustive: never = rule;
+      throw new Error(`Unknown DueRule kind: ${String((rule as { kind?: unknown }).kind)}`);
+    }
   }
 }

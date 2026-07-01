@@ -43,7 +43,7 @@ export function computeEscalations(
       computeDueAtUtc(t.escalation.deadline, { nowUtc, officeTzOffsetMinutes }),
     ).getTime();
     if (now >= deadline) {
-      fired.push({ taskInstanceId: t.id, notifyRole: t.escalation.notifyRole, reason: 'unacked_past_deadline' });
+      fired.push({ taskInstanceId: t.id, notifyRole: t.escalation.notifyRole, reason: t.escalation.reason ?? 'unacked_past_deadline' });
     }
   }
   return fired;

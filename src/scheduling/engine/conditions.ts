@@ -11,5 +11,9 @@ export function evaluateCondition(cond: Condition, trip: TripContext): boolean {
     case 'allOf': return cond.conditions.every((c) => evaluateCondition(c, trip));
     case 'anyOf': return cond.conditions.some((c) => evaluateCondition(c, trip));
     case 'not': return !evaluateCondition(cond.condition, trip);
+    default: {
+      const _exhaustive: never = cond;
+      throw new Error(`Unknown condition kind: ${String((cond as { kind?: unknown }).kind)}`);
+    }
   }
 }

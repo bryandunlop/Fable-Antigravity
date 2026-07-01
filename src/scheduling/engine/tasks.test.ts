@@ -47,4 +47,10 @@ describe('applyTaskAction §7', () => {
     expect(noted.status).toBe('open');
     expect(noted.notes).toBe('called FBO');
   });
+
+  it('markNa sets status to n_a and audits it', () => {
+    const next = applyTaskAction(t(), { kind: 'markNa' }, 'user:sched1', NOW);
+    expect(next.status).toBe('n_a');
+    expect(next.auditTrail[1]).toMatchObject({ actor: 'user:sched1', action: 'status:n_a', atUtc: NOW });
+  });
 });

@@ -72,7 +72,7 @@ export interface TaskDefinition {
   escalation?: EscalationRule;
   condition?: Condition;      // undefined == always
   handoffTarget?: HandoffTarget;
-  dependsOn?: string;         // task-def id
+  dependsOn?: string; // task-def id — NOTE: declared for future dependency gating; the engine does NOT enforce it (instantiate ignores it; readiness never derives BLOCKED from it). A later Plan 2/3 store/UI concern.
 }
 
 export interface ChecklistTemplate {

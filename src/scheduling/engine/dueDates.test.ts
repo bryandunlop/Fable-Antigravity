@@ -83,4 +83,26 @@ describe('computeDueAtUtc §7', () => {
   it('throws if an ETD-relative rule is given no etdUtc', () => {
     expect(() => computeDueAtUtc({ kind: 'hoursBeforeEtd', hours: 24 }, ctx())).toThrow(/etdUtc/);
   });
+
+  it('throws on an unknown dueRule kind (deserialized/invalid input)', () => {
+    expect(() => computeDueAtUtc({ kind: 'bogus' } as any, ctx())).toThrow(/Unknown/i);
+  });
+
+  it('monthsBeforeEtd 1 across a year boundary: Jan ETD -> prior December', () => {
+    // ETD 2026-01-10; minus 1 month -> 2025-12-10, 12:00 EDT-offset (-240) == 16:00 UTC
+    const r = computeDueAtUtc({ kind: 'monthsBeforeEtd', months: 1 }, ctx({ etdUtc: '2026-01-10T14:00:00.000Z' }));
+    expect(r).toBe('2025-12-10T16:00:00.000Z');
+  });
+
+  it('businessDaysBeforeEtd 6 spans two weekends', () => {
+    // ETD Wed 2026-07-15; 6 business days back skips 07-11/12 & 07-04/05 weekends -> Tue 2026-07-07
+    const r = computeDueAtUtc({ kind: 'businessDaysBeforeEtd', days: 6 }, ctx({ etdUtc: '2026-07-15T14:00:00.000Z' }));
+    expect(r).toBe('2026-07-07T16:00:00.000Z');
+  });
+
+  it('monthsBeforeEtd 1 from a 31st rolls forward through a short month (documents Date.UTC day-overflow)', () => {
+    // ETD 2026-03-31; Date.UTC(2026, Feb, 31) normalizes Feb-31 -> Mar 3 (2026 is not a leap year)
+    const r = computeDueAtUtc({ kind: 'monthsBeforeEtd', months: 1 }, ctx({ etdUtc: '2026-03-31T14:00:00.000Z' }));
+    expect(r).toBe('2026-03-03T16:00:00.000Z');
+  });
 });

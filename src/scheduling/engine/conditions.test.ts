@@ -33,4 +33,8 @@ describe('evaluateCondition §7', () => {
     ]}, trip({ isWeekendDeparture: true }))).toBe(true);
     expect(evaluateCondition({ kind: 'not', condition: { kind: 'isWeekendDeparture' } }, trip())).toBe(true);
   });
+
+  it('throws on an unknown condition kind (deserialized/invalid input)', () => {
+    expect(() => evaluateCondition({ kind: 'bogus' } as any, trip())).toThrow(/Unknown/i);
+  });
 });

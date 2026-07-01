@@ -43,5 +43,9 @@ export function applyTaskAction(
       return withAudit({ ...instance, status: 'n_a' }, audit('status:n_a'));
     case 'note':
       return withAudit({ ...instance, notes: action.text }, audit('note', action.text));
+    default: {
+      const _exhaustive: never = action;
+      throw new Error(`Unknown TaskAction kind: ${String((action as { kind?: unknown }).kind)}`);
+    }
   }
 }

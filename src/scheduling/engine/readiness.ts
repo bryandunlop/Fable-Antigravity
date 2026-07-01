@@ -1,4 +1,4 @@
-import type { TaskInstance } from './types';
+import type { TaskInstance, TaskStatus } from './types';
 
 export type ReadinessState = 'READY' | 'NOT_READY' | 'BLOCKED';
 export interface Readiness {
@@ -9,7 +9,7 @@ export interface Readiness {
 
 export function deriveSchedulingReadiness(tasks: TaskInstance[]): Readiness {
   if (tasks.length === 0) return { state: 'READY', completion: 1 };
-  const settled = (s: string) => s === 'done' || s === 'n_a';
+  const settled = (s: TaskStatus) => s === 'done' || s === 'n_a';
   const completion = tasks.filter((t) => settled(t.status)).length / tasks.length;
 
   const blocked = tasks.find((t) => t.status === 'blocked');
