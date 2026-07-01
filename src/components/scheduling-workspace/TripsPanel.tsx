@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -10,11 +11,12 @@ import {
 } from '../ui/dialog';
 import { Separator } from '../ui/separator';
 import { Progress } from '../ui/progress';
-import { Plus, Plane, ArrowLeft, Trash2 } from 'lucide-react';
+import { Plus, Plane, ArrowLeft, Trash2, Send, ExternalLink } from 'lucide-react';
 import { useSchedulingWorkspace } from './SchedulingWorkspaceContext';
 import type { TripRecord, TripLegRecord } from '../../scheduling/store';
 import type { TaskInstance, TaskAction, Readiness } from '../../scheduling/engine';
 import { StatusBadge, AckBadge, TaskActionButtons, formatDueTime, groupByCategory } from './taskRowHelpers';
+import { releaseSchedulingTripToPreflight, readPreflightSummary } from '../tech-log/bridge';
 
 interface TripsPanelProps {
   userRole: string;
@@ -45,6 +47,7 @@ function readinessBadgeClassName(state: Readiness['state']): string {
 
 export default function TripsPanel({ userRole }: TripsPanelProps) {
   const { service, store, tick, bump, nowUtc } = useSchedulingWorkspace();
+  const navigate = useNavigate();
   const [trips, setTrips] = useState<TripRecord[]>([]);
   const [readinessByTrip, setReadinessByTrip] = useState<Record<string, Readiness>>({});
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
@@ -87,6 +90,10 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
 
   const selectedTrip = useMemo(() => trips.find((t) => t.id === selectedTripId) ?? null, [trips, selectedTripId]);
   const selectedReadiness = selectedTripId ? readinessByTrip[selectedTripId] : undefined;
+  const preflight = useMemo(
+    () => (selectedTrip ? readPreflightSummary(selectedTrip.tripNumber) : null),
+    [selectedTrip, tick]
+  );
 
   const grouped = useMemo(() => groupByCategory(instances), [instances]);
 
@@ -163,6 +170,34 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
     }
   }
 
+  function handleReleaseToPreflight(trip: TripRecord) {
+    try {
+      const { createdAircraft } = releaseSchedulingTripToPreflight({
+        tripNumber: trip.tripNumber,
+        name: trip.tripNumber,
+        tail: trip.tail,
+        aircraftType: trip.aircraftType,
+        createdByOid: userRole ?? 'scheduling',
+        nowUtc: nowUtc(),
+        legs: trip.legs.map((l) => ({
+          sequence: l.sequence,
+          departureIcao: l.departureIcao,
+          arrivalIcao: l.arrivalIcao,
+          departureTimeUtc: l.departureTimeUtc,
+          arrivalTimeUtc: l.arrivalTimeUtc,
+        })),
+      });
+      toast[createdAircraft ? 'warning' : 'success'](
+        createdAircraft
+          ? `Released — no fleet aircraft for ${trip.tail}, created a demo placeholder`
+          : 'Released to preflight'
+      );
+      bump();
+    } catch (err) {
+      toast.error(`Couldn't release to preflight: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
+  }
+
   if (selectedTrip) {
     return (
       <Card>
@@ -180,6 +215,11 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
               <CardDescription>
                 {selectedTrip.aircraftType} · {selectedTrip.tripType} · {selectedTrip.priority} · {selectedTrip.status}
               </CardDescription>
+              {selectedReadiness && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Coordination: {selectedReadiness.state} · Preflight: {preflight ? preflight.overall : 'not released'}
+                </p>
+              )}
             </div>
             {selectedReadiness && (
               <div className="text-right space-y-1">
@@ -204,6 +244,52 @@ export default function TripsPanel({ userRole }: TripsPanelProps) {
                 </div>
               ))}
             </div>
+          </div>
+          <Separator />
+          <div>
+            <div className="flex items-center justify-between gap-4 flex-wrap mb-2">
+              <h3 className="text-sm font-semibold">Preflight</h3>
+              {preflight === null ? (
+                <Button size="sm" onClick={() => handleReleaseToPreflight(selectedTrip)}>
+                  <Send className="h-3.5 w-3.5 mr-1.5" /> Release to preflight
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => navigate('/tech-log/trips/' + preflight.techLogTripId)}>
+                  Open preflight <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                </Button>
+              )}
+            </div>
+            {preflight === null ? (
+              <p className="text-sm text-muted-foreground">
+                Not yet released. Releasing projects this trip into the crew's tech-log preflight flow (FRAT, airport review, fuel).
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <span className={`status-badge ${preflight.overall === 'READY' ? 'status-success' : 'status-warning'}`}>
+                  Preflight: {preflight.overall}
+                </span>
+                <div className="space-y-1.5">
+                  {preflight.legs.map((leg) => (
+                    <div key={leg.sequence} className="flex items-center justify-between gap-4 border rounded-md p-2.5 text-sm">
+                      <span className="text-foreground">
+                        Leg {leg.sequence}: {leg.departureIcao} → {leg.arrivalIcao}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`status-badge ${leg.fratStatus === 'COMPLETED' ? 'status-success' : leg.fratStatus === 'IN_PROGRESS' ? 'status-info' : 'status-warning'}`}>
+                          FRAT {leg.fratStatus === 'COMPLETED' ? (leg.fratScore ?? '✓') : leg.fratStatus.replace('_', ' ').toLowerCase()}
+                        </span>
+                        <span className={`status-badge ${leg.airportReviewed ? 'status-success' : 'status-warning'}`}>
+                          {leg.airportReviewed ? 'Airport reviewed' : 'Airport not reviewed'}
+                        </span>
+                        <span className={leg.fuelSubmitted ? 'status-badge status-success' : 'text-xs text-muted-foreground px-2'}>
+                          {leg.fuelSubmitted ? 'Fuel submitted' : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <Separator />
           <div className="space-y-6">
