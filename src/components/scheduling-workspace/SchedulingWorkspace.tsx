@@ -6,6 +6,7 @@ import RunBoardPanel from './RunBoardPanel';
 import TripsPanel from './TripsPanel';
 import TemplatesPanel from './TemplatesPanel';
 import InboxPanel from './InboxPanel';
+import ForeFlightPanel from './ForeFlightPanel';
 
 interface SchedulingWorkspaceProps {
   userRole: string;
@@ -34,11 +35,12 @@ export default function SchedulingWorkspace({ userRole, additionalRoles }: Sched
       </div>
 
       <Tabs defaultValue="run-board" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="run-board">Run-board</TabsTrigger>
           <TabsTrigger value="trips">Trips</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="inbox">Inbox</TabsTrigger>
+          <TabsTrigger value="foreflight">ForeFlight</TabsTrigger>
         </TabsList>
 
         <TabsContent value="run-board" className="space-y-4">
@@ -55,6 +57,10 @@ export default function SchedulingWorkspace({ userRole, additionalRoles }: Sched
 
         <TabsContent value="inbox" className="space-y-4">
           <InboxPanel defaultTargetRole="pilot" />
+        </TabsContent>
+
+        <TabsContent value="foreflight" className="space-y-4">
+          <ForeFlightPanel />
         </TabsContent>
       </Tabs>
     </div>
