@@ -20,6 +20,11 @@ describe('nav model', () => {
   it('maintenance root still resolves to Fleet (no regression)', () => {
     expect(resolveNav('MAINTENANCE', '/tech-log').activeGroup.key).toBe('fleet');
   });
+  it('pilot Trips group exposes Nuisance items and stays active on /tech-log/intermittent', () => {
+    const r = resolveNav('PILOT', '/tech-log/intermittent');
+    expect(r.activeGroup.key).toBe('trips');
+    expect(r.activeSub?.label).toBe('Nuisance items');
+  });
   it('an unknown path falls back to the role home group (first group)', () => {
     expect(resolveNav('PILOT', '/tech-log/zzz').activeGroup.key).toBe('trips');
     expect(resolveNav('MAINTENANCE', '/tech-log/zzz').activeGroup.key).toBe('fleet');

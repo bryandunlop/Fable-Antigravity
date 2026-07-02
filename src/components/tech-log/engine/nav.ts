@@ -6,7 +6,7 @@ const sw = (prefix: string) => (p: string) => p.startsWith(prefix);
 const melReadMatch = (p: string) => p.startsWith('/tech-log/mel') && !p.startsWith('/tech-log/admin');
 
 const tripsMatch = (p: string) =>
-  p === '/tech-log' || p.startsWith('/tech-log/trips') || p.startsWith('/tech-log/journey');
+  p === '/tech-log' || p.startsWith('/tech-log/trips') || p.startsWith('/tech-log/journey') || p.startsWith('/tech-log/intermittent');
 const pilotFleetMatch = (p: string) => p.startsWith('/tech-log/fleet') || p.startsWith('/tech-log/aircraft');
 const maintFleetMatch = (p: string) =>
   p === '/tech-log' || p.startsWith('/tech-log/fleet') || p.startsWith('/tech-log/aircraft');
@@ -17,6 +17,7 @@ export const GROUPS_PILOT: NavGroup[] = [
     sub: [
       { label: 'My trips', to: '/tech-log/trips', match: (p) => p === '/tech-log' || p.startsWith('/tech-log/trips') },
       { label: 'Journey log', to: '/tech-log/journey' },
+      { label: 'Nuisance items', to: '/tech-log/intermittent' },
     ],
   },
   { key: 'fleet', label: 'Fleet', to: '/tech-log/fleet', match: pilotFleetMatch, badge: 'red' },
