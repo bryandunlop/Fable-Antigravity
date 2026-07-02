@@ -9,6 +9,22 @@ import { parseTemplate } from './validate';
 
 const EFFECTIVE_FROM = '2026-01-01T00:00:00.000Z';
 
+// Every per-trip checklist delivers the crew brief in-system (2026-07-02 review, item 2).
+// Completing this task fires the handoff event the pilot Flight Hub's Trip-brief panel reads;
+// the human conversation stays — this is the digital delivery of what was covered.
+const SEND_CREW_BRIEF = {
+  id: 'send-crew-brief',
+  title: 'Send crew brief',
+  description:
+    'Deliver the trip brief to the crew in the system — schedule, pax, handling, and anything covered verbally.',
+  ownerRole: 'scheduling',
+  category: 'crew',
+  order: 99, // always sorts last within the checklist
+  dueRule: { kind: 'hoursBeforeEtd', hours: 48 },
+  requiresAck: false, // the PILOT acks the delivered event in the Flight Hub, not this task
+  handoffTarget: { kind: 'role', value: 'pilot', channel: 'teams' },
+} as const;
+
 const SCHEDULER_DAILY: ChecklistTemplate = {
   id: 'scheduler-daily',
   name: 'Scheduler Daily Checklist',
@@ -238,6 +254,7 @@ const DOMESTIC_PER_TRIP: ChecklistTemplate = {
       },
       handoffTarget: { kind: 'role', value: 'pilot', channel: 'teams' },
     },
+    SEND_CREW_BRIEF,
   ],
 };
 
@@ -391,6 +408,7 @@ const INTERNATIONAL_PER_TRIP: ChecklistTemplate = {
       condition: { kind: 'routeTouchesCountry', country: 'IN' },
       handoffTarget: { kind: 'dept', value: 'universal-aviation', channel: 'email' },
     },
+    SEND_CREW_BRIEF,
   ],
 };
 
@@ -484,6 +502,7 @@ const DASSP_PER_TRIP: ChecklistTemplate = {
       dueRule: { kind: 'hoursBeforeEtd', hours: 1 },
       requiresAck: true,
     },
+    SEND_CREW_BRIEF,
   ],
 };
 
