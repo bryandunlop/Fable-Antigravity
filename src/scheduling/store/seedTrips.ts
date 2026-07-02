@@ -4,12 +4,20 @@
 // Trips tab (and an empty ForeFlight push dropdown). These four trips give every
 // demo role something to look at immediately, and between them exercise every
 // per-trip checklist path:
-//   1. Domestic single-leg (baseline domestic checklist; shown partially worked)
+//   1. Domestic single-leg (baseline domestic checklist; shown partially worked) — N2PG
 //   2. Domestic 7-pax G650ER round-trip (triggers the 7-pax special-handling item;
-//      multi-leg, so the ForeFlight push delivers docs to two flights)
+//      multi-leg, so the ForeFlight push delivers docs to two flights) — N1PG
 //   3. International to London (international checklist + the UK-ETA country-conditional
-//      item, since EGLL resolves to GB)
-//   4. DCA/DASSP (the critical TSA/security checklist)
+//      item, since EGLL resolves to GB) — left on a non-fleet tail (N650GS)
+//   4. DCA/DASSP (the critical TSA/security checklist) — N6PG
+//
+// Tails match the tech-log seed fleet (src/components/tech-log/mockData/fleet.ts) so the
+// pilot Flight Hub's Aircraft & acceptance and preflight-by-leg panels populate on a
+// cold-open demo — before any scheduler "Release to preflight" — with each aircraft's
+// real serviceability/custody/deferral state: N2PG G650ER = GREEN, N1PG G650ER = RED
+// (open defect), N6PG G500 = AMBER (active deferral). The international trip is left on a
+// NON-fleet tail (N650GS) so the release -> placeholder-aircraft path (tech-log/bridge.ts)
+// stays demonstrable.
 //
 // Dates are computed RELATIVE TO now so the trips are always upcoming whenever the
 // demo runs. Seeding goes through service.createTripMirror (not store.saveTrip
@@ -59,7 +67,7 @@ export function buildDemoTrips(nowUtcIso: string): TripRecord[] {
       tripNumber: 'T-2026-0714',
       sourceSystem: 'myairops',
       sourceTripRef: 'MAO-4471',
-      tail: 'N650GS',
+      tail: 'N2PG',
       aircraftType: 'G650ER',
       tripType: 'domestic',
       priority: 'standard',
@@ -76,7 +84,7 @@ export function buildDemoTrips(nowUtcIso: string): TripRecord[] {
       tripNumber: 'T-2026-0718',
       sourceSystem: 'myairops',
       sourceTripRef: 'MAO-4488',
-      tail: 'N800PG',
+      tail: 'N1PG',
       aircraftType: 'G650ER',
       tripType: 'domestic',
       priority: 'vip',
@@ -111,7 +119,7 @@ export function buildDemoTrips(nowUtcIso: string): TripRecord[] {
       tripNumber: 'T-2026-0731',
       sourceSystem: 'myairops',
       sourceTripRef: 'MAO-4519',
-      tail: 'N500PG',
+      tail: 'N6PG',
       aircraftType: 'G500',
       tripType: 'dca_dassp',
       priority: 'urgent',
