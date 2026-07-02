@@ -10,6 +10,7 @@ import { PassengerFormProvider } from './components/contexts/PassengerFormContex
 import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
+import NotFound from './components/NotFound';
 import Navigation from './components/Navigation';
 import MobileBottomNav from './components/MobileBottomNav';
 import AircraftStatus from './components/AircraftStatus';
@@ -559,7 +560,8 @@ export default function App() {
                                 } />
                                 <Route path="/experimental/scheduling-command" element={<SchedulingCommandCenter />} />
                                 <Route path="/experimental/unified-trip" element={<UnifiedTripWorkspace />} />
-                                <Route path="*" element={<Navigate to="/" replace />} />
+                                {/* Real 404 — broken links are visible bugs, not silent redirects */}
+                                <Route path="*" element={<NotFound />} />
                               </Routes>
                             </div>
                           </Navigation>
