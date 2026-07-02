@@ -39,7 +39,7 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         <div className="text-sm text-muted-foreground">{trip.tripType} · {trip.legs?.length ?? 0} legs</div>
       </div>
       {readiness && <ReadinessBar readiness={readiness} />}
-      <TripBriefPanel trip={trip} />
+      <TripBriefPanel trip={trip} userRole={userRole} />
       <AircraftAcceptancePanel trip={trip} />
       {tlAc && (
         <section className="rounded-lg border p-4">

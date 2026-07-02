@@ -5,7 +5,7 @@ import { useSchedulingWorkspace } from '../../scheduling-workspace/SchedulingWor
 import type { TripRecord } from '../../../scheduling/store/types';
 import type { SchedulingEvent } from '../../../scheduling/store/types';
 
-export default function TripBriefPanel({ trip }: { trip: TripRecord }) {
+export default function TripBriefPanel({ trip, userRole }: { trip: TripRecord; userRole: string }) {
   const { store, tick, bump, nowUtc } = useSchedulingWorkspace();
   const [events, setEvents] = useState<SchedulingEvent[]>([]);
 
@@ -32,7 +32,10 @@ export default function TripBriefPanel({ trip }: { trip: TripRecord }) {
     <section className="rounded-lg border p-4">
       <div className="flex items-center justify-between mb-2">
         <h2 className="font-semibold">Trip brief <span className="text-xs text-muted-foreground">from scheduling</span></h2>
-        <Link to="/scheduling-workspace" className="text-xs text-primary hover:underline">Open in scheduling ↗</Link>
+        {/* /scheduling-workspace is role-gated to scheduling/admin — don't dead-end other roles */}
+        {['scheduling', 'admin'].includes(userRole) && (
+          <Link to="/scheduling-workspace" className="text-xs text-primary hover:underline">Open in scheduling ↗</Link>
+        )}
       </div>
       {events.length === 0 && <p className="text-sm text-muted-foreground">No brief delivered yet.</p>}
       <ul className="space-y-2">
