@@ -569,7 +569,7 @@ export default function App() {
                           </Navigation>
 
                           {/* Mobile Bottom Navigation */}
-                          <MobileBottomNav userRole={userRole} />
+                          <MobileBottomNav userRole={userRole} additionalRoles={additionalRoles} />
 
                           {/* Network Status Banner */}
                           <NetworkStatus />
