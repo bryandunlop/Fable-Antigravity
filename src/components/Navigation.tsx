@@ -117,11 +117,13 @@ const DraggableNavigationGroup = ({
       className={isCustomizing ? 'cursor-move' : ''}
     >
       <SidebarGroup>
-        <SidebarGroupLabel asChild>
+        {/* Typography lives on the Label's className (twMerge beats the base text color);
+            the child button only carries layout. */}
+        <SidebarGroupLabel asChild className="text-[10px] font-bold uppercase tracking-[0.16em] text-gfo-sunrise">
           <button
             type="button"
             onClick={() => onToggleCollapse(group.label)}
-            className="flex w-full items-center gap-2 cursor-pointer text-[10px] font-bold uppercase tracking-[0.16em] text-gfo-sunrise"
+            className="flex w-full items-center gap-2 cursor-pointer"
             aria-expanded={!isCollapsed}
           >
             {isCustomizing && <GripVertical className="w-4 h-4 text-gfo-sunrise/70" />}
