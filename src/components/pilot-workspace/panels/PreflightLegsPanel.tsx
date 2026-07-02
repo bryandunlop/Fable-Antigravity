@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import StandaloneFRATForm from '../../StandaloneFRATForm';
-import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg } from '../../tech-log/preflightActions';
+import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg, saveFratDraftOnLeg } from '../../tech-log/preflightActions';
+import { extractFratSelections } from '../../tech-log/util/fratDraft';
 import { newId } from '../../tech-log/util/id';
 import type { TripRecord } from '../../../scheduling/store/types';
 
@@ -41,7 +42,7 @@ export default function PreflightLegsPanel({ trip }: { trip: TripRecord; userRol
           <div className="flex flex-wrap items-center gap-2">
             {leg.fratStatus !== 'COMPLETED' && (
               <button className="text-xs rounded border px-2 py-1 hover:bg-accent" onClick={() => setFratOpenLegId(fratOpenLegId === leg.id ? null : leg.id)}>
-                {fratOpenLegId === leg.id ? 'Close FRAT' : 'Start FRAT'}
+                {fratOpenLegId === leg.id ? 'Close FRAT' : leg.fratStatus === 'IN_PROGRESS' ? 'Resume FRAT (draft)' : 'Start FRAT'}
               </button>
             )}
             {!leg.airportReviewed && (
@@ -66,12 +67,19 @@ export default function PreflightLegsPanel({ trip }: { trip: TripRecord; userRol
               <StandaloneFRATForm
                 userRole={user.role}
                 initialData={{ flightNumber: trip.tripNumber, aircraft: ac?.tailNumber, departure: leg.departureIcao,
-                  destination: leg.arrivalIcao, date: leg.departureTimeUtc.slice(0, 10), time: leg.departureTimeUtc.slice(11, 16), pic: user.displayName }}
+                  destination: leg.arrivalIcao, date: leg.departureTimeUtc.slice(0, 10), time: leg.departureTimeUtc.slice(11, 16), pic: user.displayName,
+                  selections: leg.fratDraft?.selections, mitigationNotes: leg.fratDraft?.mitigationNotes }}
                 onClose={() => setFratOpenLegId(null)}
-                onSave={(data: { status?: string; totalScore?: number }) => {
+                onSave={(data: { status?: string; totalScore?: number; mitigationNotes?: string; items?: { items: { selected: boolean }[] }[] }) => {
                   if (data.status === 'submitted') {
                     completeFratOnLeg({ dispatch, newId, trip: tlTrip, leg, actorOid: user.oid, totalScore: data.totalScore });
                     setFratOpenLegId(null);
+                  } else if (data.status === 'draft') {
+                    saveFratDraftOnLeg({ dispatch, newId, trip: tlTrip, leg, actorOid: user.oid,
+                      selections: extractFratSelections(data.items ?? []), mitigationNotes: data.mitigationNotes,
+                      nowUtc: new Date().toISOString() });
+                    setFratOpenLegId(null);
+                    toast.success('FRAT draft saved — resume any time before departure');
                   }
                 }}
               />

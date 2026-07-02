@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
+import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
 import { deriveTripReadiness, type TripReadiness } from '../engine/readiness';
 import { requiresFuelFarmSubmission } from '../engine/fuel';
 import { deriveServiceability } from '../engine/serviceability';
@@ -32,6 +34,7 @@ export default function TripWorkspace() {
   const { state } = useTechLog();
   const navigate = useNavigate();
   const now = new Date().toISOString();
+  const [squawkOpen, setSquawkOpen] = useState(false);
 
   const trip = state.trips.find(t => t.id === tripId);
   if (!trip) {
@@ -75,7 +78,16 @@ export default function TripWorkspace() {
           {custody && <CustodyChip state={custody.state} />}
         </span>
       }
-      actions={<Button variant="outline" size="sm" onClick={() => navigate('/tech-log/trips')}><ArrowLeft className="mr-1.5 h-4 w-4" /> My trips</Button>}
+      actions={
+        <span className="flex items-center gap-2">
+          {ac && (
+            <Button size="sm" onClick={() => setSquawkOpen(true)}>
+              <AlertTriangle className="mr-1.5 h-4 w-4" /> Report squawk
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => navigate('/tech-log/trips')}><ArrowLeft className="mr-1.5 h-4 w-4" /> My trips</Button>
+        </span>
+      }
     >
       {/* Readiness banner */}
       <Card className="mb-4">
@@ -155,6 +167,8 @@ export default function TripWorkspace() {
           <ActivityFeed aircraft={ac} auditIds={acEntityIds} />
         </div>
       )}
+
+      {ac && <ReportDefectDialog open={squawkOpen} onOpenChange={setSquawkOpen} lockTail={ac.tailNumber} />}
     </TechLogShell>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
 import { useTechLog } from '../tech-log/TechLogContext';
+import { ReportDefectDialog } from '../tech-log/components/panels/ReportDefectDialog';
 import { deriveTripReadiness } from '../tech-log/engine/readiness';
 import { deriveSchedulingReadiness } from '../../scheduling/engine/readiness';
 import { composePilotReadiness, type PilotReadiness } from './selectors';
@@ -15,6 +17,8 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   const { store, tick, nowUtc } = useSchedulingWorkspace();
   const { state } = useTechLog();
   const [readiness, setReadiness] = useState<PilotReadiness | null>(null);
+  const [squawkOpen, setSquawkOpen] = useState(false);
+  const tlAc = state.aircraft.find((a) => a.tailNumber === trip.tail);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,8 +39,24 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         <div className="text-sm text-muted-foreground">{trip.tripType} · {trip.legs?.length ?? 0} legs</div>
       </div>
       {readiness && <ReadinessBar readiness={readiness} />}
-      <TripBriefPanel trip={trip} />
+      <TripBriefPanel trip={trip} userRole={userRole} />
       <AircraftAcceptancePanel trip={trip} />
+      {tlAc && (
+        <section className="rounded-lg border p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Squawks <span className="text-xs text-muted-foreground">to maintenance</span></h2>
+            <div className="flex gap-2">
+              <button onClick={() => setSquawkOpen(true)} className="text-xs rounded border px-2 py-1 hover:bg-accent">Report squawk</button>
+              <Link to="/tech-log/intermittent" className="text-xs rounded border px-2 py-1 hover:bg-accent">Log nuisance item ↗</Link>
+            </div>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Anything wrong with {tlAc.tailNumber} — squawk it here and maintenance picks it up in their work queue.
+            Intermittent oddities (a nuisance CAS that self-clears) go on the nuisance watch-list instead.
+          </p>
+          <ReportDefectDialog open={squawkOpen} onOpenChange={setSquawkOpen} lockTail={tlAc.tailNumber} />
+        </section>
+      )}
       <PreflightLegsPanel trip={trip} userRole={userRole} />
       <MessagesPanel />
     </div>
