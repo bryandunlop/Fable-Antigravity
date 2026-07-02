@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plane, ChevronRight, Clock, AlertTriangle, Wrench } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
 import { deriveServiceability } from '../engine/serviceability';
@@ -31,8 +31,12 @@ const RING: Record<Serviceability, string> = {
 export default function FleetStatus() {
   const { state } = useTechLog();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const now = new Date();
-  const [filter, setFilter] = useState<Filter>('ALL');
+  const requested = params.get('filter');
+  const [filter, setFilter] = useState<Filter>(
+    requested && ['ALL', 'RED', 'AMBER', 'GREEN', 'PROV'].includes(requested) ? (requested as Filter) : 'ALL',
+  );
 
   const rows = useMemo(() => {
     const asOf = now.toISOString();
