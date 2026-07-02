@@ -9,55 +9,21 @@ import CommandPalette from './CommandPalette';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import {
-  Home,
   Plane,
-  ClipboardList,
-  Wrench,
-  Users,
   Settings,
-  Calendar,
   FileText,
-  BarChart3,
   LogOut,
-  Building2,
-  Clipboard,
-  CalendarCheck,
-  Fuel,
-  Shield,
-  AlertTriangle,
-  Target,
-  UserCheck,
-  Utensils,
-  Package,
-  ClipboardCheck,
-  MapPin,
-  AlertOctagon,
-  Archive,
-  User,
-  Menu,
   PanelLeft,
   Search,
-  Command,
-  BookOpen,
-  MessageSquare,
-  Send,
-  Clock,
-  Boxes,
-  Monitor,
-  Activity,
-  Sliders,
-  Upload,
-  Database,
-  Sparkles,
   GripVertical,
   RotateCcw,
-  HardHat,
-  ArrowRightLeft,
-  HardDrive,
-  Layers,
-  PackagePlus,
-  Warehouse
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
+import {
+  domainsForRole, entriesForRoles, matchEntry, DEFAULT_OPEN_DOMAINS,
+  type NavEntry,
+} from '../navigation/navConfig';
 
 
 interface NavigationProps {
@@ -67,26 +33,36 @@ interface NavigationProps {
   children: React.ReactNode;
 }
 
+// Sidebar model: one domain per group, derived from the route manifest.
 interface NavigationGroup {
   label: string;
-  items: any[];
+  items: NavEntry[];      // primary — always visible when the domain is open
+  moreItems: NavEntry[];  // behind the "More" expander
 }
 
-// Draggable navigation group component
+// Draggable navigation group component — one manifest domain per group.
 const DraggableNavigationGroup = ({
   group,
   index,
   moveGroup,
   isCustomizing,
-  location
+  location,
+  activePath,
+  isCollapsed,
+  onToggleCollapse,
 }: {
   group: NavigationGroup;
   index: number;
   moveGroup: (dragIndex: number, hoverIndex: number) => void;
   isCustomizing: boolean;
-  location: any;
+  location: { pathname: string; search: string };
+  activePath: string | undefined;
+  isCollapsed: boolean;
+  onToggleCollapse: (label: string) => void;
 }) => {
-  const [{ isDragging }, drag, preview] = useDrag({
+  const [moreOpen, setMoreOpen] = useState(false); // not persisted — menus start short each session
+
+  const [{ isDragging }, drag] = useDrag({
     type: 'navigation-group',
     item: { index },
     collect: (monitor) => ({
@@ -106,6 +82,29 @@ const DraggableNavigationGroup = ({
     canDrop: () => isCustomizing,
   });
 
+  const isActiveEntry = (e: NavEntry) => {
+    if (activePath !== e.path) return false;
+    // Query-link variants (e.g. My Safety Activity) are active only on their query.
+    if (e.href && e.href.includes('?')) return `${location.pathname}${location.search}` === e.href;
+    return true;
+  };
+
+  const renderEntry = (item: NavEntry) => {
+    const Icon = item.icon ?? FileText;
+    const isActive = isActiveEntry(item);
+    return (
+      <SidebarMenuItem key={`${item.domain}:${item.label}`}>
+        <SidebarMenuButton asChild isActive={isActive} className={`relative overflow-hidden group transition-all duration-300 ${isActive ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-muted-foreground bg-transparent'}`}>
+          <Link to={item.href ?? item.path} className="flex items-center gap-3 w-full relative">
+            {!isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-muted-foreground/50 rounded-r-full transition-all duration-200 group-hover:h-3/4" />}
+            <Icon className={`w-4 h-4 z-10 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
+            <span className={`z-10 transition-colors duration-300 relative ${isActive ? '' : 'group-hover:text-foreground'}`}>{item.label}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
+
   return (
     <div
       ref={(node) => {
@@ -117,31 +116,43 @@ const DraggableNavigationGroup = ({
       className={isCustomizing ? 'cursor-move' : ''}
     >
       <SidebarGroup>
-        <SidebarGroupLabel className="flex items-center gap-2">
-          {isCustomizing && <GripVertical className="w-4 h-4 text-muted-foreground" />}
-          {group.label}
+        <SidebarGroupLabel asChild>
+          <button
+            type="button"
+            onClick={() => onToggleCollapse(group.label)}
+            className="flex w-full items-center gap-2 cursor-pointer"
+            aria-expanded={!isCollapsed}
+          >
+            {isCustomizing && <GripVertical className="w-4 h-4 text-muted-foreground" />}
+            <span className="flex-1 text-left">{group.label}</span>
+            {isCollapsed
+              ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+              : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+          </button>
         </SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.href;
-
-              return (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={isActive} className={`relative overflow-hidden group transition-all duration-300 ${isActive ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-muted-foreground bg-transparent'}`}>
-                    <Link to={item.href} className="flex items-center gap-3 w-full relative">
-                      {/* Hover Slide Background replaced with left edge bar per user request */}
-                      {!isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-muted-foreground/50 rounded-r-full transition-all duration-200 group-hover:h-3/4" />}
-                      <Icon className={`w-4 h-4 z-10 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
-                      <span className={`z-10 transition-colors duration-300 relative ${isActive ? '' : 'group-hover:text-foreground'}`}>{item.name}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
-        </SidebarGroupContent>
+        {!isCollapsed && (
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {group.items.map(renderEntry)}
+              {group.moreItems.length > 0 && (
+                <>
+                  {moreOpen && group.moreItems.map(renderEntry)}
+                  <SidebarMenuItem key={`${group.label}:more`}>
+                    <SidebarMenuButton
+                      onClick={() => setMoreOpen((o) => !o)}
+                      className="text-muted-foreground bg-transparent"
+                    >
+                      {moreOpen
+                        ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                      <span>{moreOpen ? 'Less' : `More (${group.moreItems.length})`}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        )}
       </SidebarGroup>
     </div>
   );
@@ -171,159 +182,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isCommandPaletteOpen]);
 
-  // Default navigation groups organized by category
-  const defaultNavigationGroups = [
-    {
-      label: "Overview",
-      items: [
-        { name: 'Dashboard', href: '/', icon: Home, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
-        { name: 'Settings', href: '/settings', icon: Settings, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'admin-assistant'] },
-        // { name: 'Flight Family', href: '/flight-family', icon: MessageSquare, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'admin-assistant'] },
-        { name: 'Procedural Bulletins', href: '/procedural-bulletins', icon: BookOpen, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
-        // { name: 'Restaurant Database', href: '/restaurant-database', icon: Utensils, roles: ['pilot', 'inflight', 'maintenance', 'admin'] },
-        { name: 'Tasks & Action Items', href: '/tasks-action-items', icon: Target, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-        { name: 'AOG Management', href: '/aog-management', icon: AlertOctagon, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-        { name: 'Currency Dashboard', href: '/currency-dashboard', icon: UserCheck, roles: ['pilot', 'admin', 'lead', 'scheduling'] },
-      ]
-    },
-    {
-      label: "Flight Operations",
-      items: [
-        { name: 'Pilot Workspace', href: '/pilot-workspace', icon: CalendarCheck, roles: ['pilot', 'chief-pilot', 'admin'] },
-        { name: 'Preflight Workflow', href: '/frat', icon: ClipboardList, roles: ['pilot', 'admin'] },
-        { name: 'Standalone FRAT', href: '/frat/standalone', icon: Shield, roles: ['pilot', 'admin'] },
-        { name: 'My FRAT Submissions', href: '/frat/my-submissions', icon: FileText, roles: ['pilot', 'admin'] },
-        { name: 'Airport Information', href: '/airport-evaluations', icon: MapPin, roles: ['pilot', 'admin'] },
-        { name: 'Fuel Load Request', href: '/fuel-load-request', icon: Fuel, roles: ['pilot', 'admin'] },
-      ]
-    },
-    {
-      label: "ForeFlight Integration",
-      items: [
-        { name: 'ForeFlight Settings', href: '/foreflight-settings', icon: Settings, roles: ['admin'] },
-        { name: 'Test Upload', href: '/foreflight-test-upload', icon: Upload, roles: ['admin'] },
-        { name: 'Sync Diagnostics', href: '/foreflight-diagnostics', icon: Database, roles: ['admin'] },
-      ]
-    },
-    {
-      label: "Maintenance",
-      items: [
-        { name: 'Maintenance Hub', href: '/maintenance-hub', icon: Monitor, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'], description: 'Overview dashboard' },
-        { name: 'Tech Log', href: '/tech-log', icon: FileText, roles: ['pilot', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'eTechLog — squawks, deferrals, releases, work cards, fleet status (canonical maintenance surface)' },
-        // 'Work Orders' (/work-orders, legacy WorkOrders.tsx) removed — duplicate of Tech Log → Work Cards. See docs/CANONICAL_MAINTENANCE_SURFACE.md.
-        { name: 'My Maintenance', href: '/maintenance-dashboard', icon: Clipboard, roles: ['maintenance', 'maintenance-coordinator'], description: 'Personal dashboard' },
-        { name: 'Aircraft Cleaning', href: '/aircraft-cleaning', icon: Sparkles, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Track cleaning status' },
-      ]
-    },
-    {
-      label: "Maintenance Analytics",
-      items: [
-        { name: 'Work Analytics', href: '/tech-work-analytics', icon: BarChart3, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-        { name: 'MTTR Dashboard', href: '/mttr-dashboard', icon: Activity, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-      ]
-    },
-    {
-      label: "Maintenance Compliance",
-      items: [
-        { name: 'MEL/CDL Management', href: '/mel-cdl', icon: AlertTriangle, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-        // 'Maintenance Turnover' (/maintenance-turnover → AviaSync ShiftHandover) removed — duplicate of Tech Log handover (Briefing/Postflight). See docs/CANONICAL_MAINTENANCE_SURFACE.md.
-        { name: 'Turndown Reports', href: '/turndown-reports', icon: FileText, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
-        { name: 'Turndown Form', href: '/turndown-form', icon: ClipboardList, roles: ['maintenance', 'maintenance-coordinator'] },
-      ]
-    },
-    {
-      label: "Maintenance Resources",
-      items: [
-        { name: 'Parts Inventory', href: '/parts-inventory', icon: Boxes, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-        { name: 'Car Tracking', href: '/car-tracking', icon: Package, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-        { name: 'Airport Services', href: '/airport-services', icon: Building2, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-        { name: 'Fuel Farm Tracker', href: '/fuel-farm', icon: Fuel, roles: ['maintenance', 'maintenance-coordinator', 'dom'] },
-        // 'Maintenance Board' (/maintenance, legacy MaintenanceContext board) removed — duplicate of Tech Log fleet/board. See docs/CANONICAL_MAINTENANCE_SURFACE.md.
-        { name: 'Standalone GRAT', href: '/grat/standalone', icon: Shield, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-      ]
-    },
-    {
-      label: "Safety",
-      items: [
-        { name: 'Safety Center', href: '/safety', icon: Shield, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
-        { name: 'My Safety Activity', href: '/safety?tab=my-activity', icon: UserCheck, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
-      ]
-    },
-    {
-      label: "Inflight Services",
-      items: [
-        { name: 'Upcoming Trips', href: '/upcoming-flights', icon: Calendar, roles: ['inflight', 'admin'] },
-        { name: 'Flight Calendar', href: '/upcoming-flights', icon: Calendar, roles: ['pilot', 'admin'] },
-        { name: 'Passenger Database', href: '/passenger-database', icon: Users, roles: ['inflight', 'admin'] },
-        { name: 'Catering Tracker', href: '/catering-tracker', icon: Utensils, roles: ['inflight', 'admin'] },
-        { name: 'Aircraft Inventory', href: '/aircraft-inventory', icon: Package, roles: ['inflight', 'admin'] },
-        { name: 'Post-Flight Checklist', href: '/post-flight-checklist', icon: ClipboardCheck, roles: ['inflight', 'admin'] },
-        { name: 'Aircraft Cleaning', href: '/aircraft-cleaning', icon: Sparkles, roles: ['inflight', 'admin'] },
-      ]
-    },
-    {
-      label: "Inventory V2  ✦ NEW",
-      items: [
-        { name: 'Trips', href: '/inventory-v2/trips', icon: Plane, roles: ['inflight', 'admin', 'commissary-manager'] },
-        { name: 'Inspections', href: '/inventory-v2/inspections', icon: ClipboardCheck, roles: ['inflight', 'admin', 'commissary-manager'] },
-        { name: 'Commissary', href: '/inventory-v2/commissary', icon: Warehouse, roles: ['inflight', 'admin', 'commissary-manager'] },
-        { name: 'Replenish', href: '/inventory-v2/replenish', icon: PackagePlus, roles: ['inflight', 'admin'] },
-        { name: 'Unit Requests', href: '/inventory-v2/unit-requests', icon: Send, roles: ['inflight', 'admin'] },
-        { name: 'Settings', href: '/inventory-v2/settings', icon: Settings, roles: ['admin', 'commissary-manager'] },
-      ]
-    },
-    {
-      label: "Scheduling",
-      items: [
-        { name: 'Schedule Calendar', href: '/schedule', icon: Calendar, roles: ['pilot', 'admin'] },
-        { name: 'Scheduling Dashboard', href: '/scheduling-dashboard', icon: Calendar, roles: ['scheduling', 'admin'] },
-        { name: 'Trip Coordination', href: '/trip-coordination', icon: MapPin, roles: ['scheduling', 'admin'] },
-        { name: 'Crew Workload & Travel', href: '/crew-scheduling-workload', icon: BarChart3, roles: ['scheduling', 'admin', 'lead'] },
-        { name: 'Scheduling Workspace', href: '/scheduling-workspace', icon: CalendarCheck, roles: ['scheduling', 'admin'] },
-        // { name: 'Trip Management', href: '/booking-profile', icon: BookOpen, roles: ['admin-assistant', 'admin'] },
-        // { name: 'Itinerary Builder', href: '/itinerary-builder', icon: FileText, roles: ['admin-assistant', 'admin'] },
-        { name: 'Passenger Forms', href: '/passenger-forms', icon: FileText, roles: ['scheduling', 'admin'] },
-        { name: 'Vacation Request', href: '/vacation-request', icon: CalendarCheck, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },
-      ]
-    },
-    {
-      label: "Documents",
-      items: [
-        { name: 'Document Center', href: '/documents', icon: Archive, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
-        { name: 'Document Management', href: '/document-management', icon: FileText, roles: ['document-manager'] },
-        { name: 'Document Request', href: '/document-management', icon: Send, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-        { name: 'Offline Documents', href: '/dms/offline', icon: HardDrive, roles: ['dms-manager', 'admin'] },
-        { name: 'Document Library', href: '/documents', icon: Archive, roles: ['dms-manager'] },
-      ]
-    },
-    // 'AviaSync Workflow' nav group removed (duplicate eTechLog). Routes + files retained under
-    // src/components/maintenance-workflow/. See docs/CANONICAL_MAINTENANCE_SURFACE.md.
-    // {
-    //   label: "Tax Compliance",
-    //   items: [
-    //     { name: 'Tax Dashboard', href: '/tax-compliance', icon: Calculator, roles: ['tax', 'admin'] },
-    //   ]
-    // },
-    {
-      label: "Experimental Tools",
-      items: [
-        { name: 'Master Command Center', href: '/experimental/scheduling-command', icon: Activity, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-        { name: 'Trip Sandbox (Beta)', href: '/experimental/unified-trip', icon: Sparkles, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-      ]
-    },
-    {
-      label: "Management",
-      items: [
-        { name: 'Lead Dashboard', href: '/lead-dashboard', icon: BarChart3, roles: ['lead', 'admin'] },
-        { name: 'Manager Insights', href: '/manager-insights', icon: Layers, roles: ['lead', 'admin'] },
-        { name: 'Live Metrics', href: '/live-metrics', icon: Activity, roles: ['lead', 'admin'], description: 'Real-time operations KPIs' },
-        { name: 'Critical Functions', href: '/critical-functions', icon: Shield, roles: ['lead', 'admin'] },
-        { name: 'Airport Evaluation Officer', href: '/admin/airport-evaluation-officer', icon: MapPin, roles: ['airport-evaluator', 'admin'] },
-        { name: 'Admin Panel', href: '/admin', icon: Settings, roles: ['admin'] },
-      ]
-    }
-  ];
-
   // Load custom order from localStorage
   const loadCustomOrder = () => {
     const saved = localStorage.getItem(`nav-order-${userRole}`);
@@ -340,14 +198,30 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   // Initialize navigation groups with custom order if available
   const [customOrderKeys, setCustomOrderKeys] = useState<string[] | null>(loadCustomOrder);
 
+  // The role's visible manifest entries — drives the active trail.
+  const visibleEntries = React.useMemo(
+    () => entriesForRoles(userRole, additionalRoles),
+    [userRole, additionalRoles],
+  );
+  const activePath = matchEntry(location.pathname, visibleEntries)?.path;
+
+  // Collapsed domains, persisted per role; first visit opens the role's home domain(s).
+  const [collapsedOverride, setCollapsedOverride] = useState<string[] | null>(() => {
+    try {
+      const saved = localStorage.getItem(`nav-collapsed-${userRole}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const navigationGroups = React.useMemo(() => {
-    // Filter groups and items based on user role and additional roles
-    const filtered = defaultNavigationGroups.map(group => ({
-      ...group,
-      items: group.items.filter(item => 
-        item.roles.includes(userRole) || additionalRoles.some(role => item.roles.includes(role))
-      )
-    })).filter(group => group.items.length > 0);
+    // One group per manifest domain, filtered to the user's roles.
+    const filtered: NavigationGroup[] = domainsForRole(userRole, additionalRoles).map((d) => ({
+      label: d.label,
+      items: d.primary,
+      moreItems: d.more,
+    }));
 
     if (customOrderKeys) {
       // Reorder based on saved order
@@ -397,6 +271,21 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   const resetToDefault = () => {
     setCustomOrderKeys(null);
     localStorage.removeItem(`nav-order-${userRole}`);
+  };
+
+  // Collapse model: no saved state → everything but the role's home domain(s) starts collapsed.
+  const defaultOpen = DEFAULT_OPEN_DOMAINS[userRole] ?? ['home'];
+  const collapsedLabels = collapsedOverride
+    ?? domainsForRole(userRole, additionalRoles)
+      .filter((d) => !defaultOpen.includes(d.domain))
+      .map((d) => d.label);
+
+  const toggleCollapse = (label: string) => {
+    const next = collapsedLabels.includes(label)
+      ? collapsedLabels.filter((l) => l !== label)
+      : [...collapsedLabels, label];
+    setCollapsedOverride(next);
+    localStorage.setItem(`nav-collapsed-${userRole}`, JSON.stringify(next));
   };
 
   const getRoleDisplayName = (role: string) => {
@@ -488,6 +377,9 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
                 moveGroup={moveGroup}
                 isCustomizing={isCustomizing}
                 location={location}
+                activePath={activePath}
+                isCollapsed={collapsedLabels.includes(group.label) && !isCustomizing}
+                onToggleCollapse={toggleCollapse}
               />
             ))}
           </SidebarContent>
@@ -547,7 +439,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
           {/* Main content area */}
           <main className="flex-1 overflow-auto p-6 pb-20 md:pb-6">
-            <BreadcrumbNav />
+            <BreadcrumbNav userRole={userRole} additionalRoles={additionalRoles} />
             {children}
           </main>
         </div>

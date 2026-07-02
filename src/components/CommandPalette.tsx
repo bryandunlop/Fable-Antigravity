@@ -2,41 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import {
-  Search,
-  Plane,
-  Users,
-  FileText,
-  Wrench,
-  Calendar,
-  Shield,
-  Package,
-  Utensils,
-  ClipboardCheck,
-  UserCheck,
-  Target,
-  BarChart3,
-  AlertTriangle,
-  MessageSquare,
-  Clock,
-  Boxes,
-  MapPin,
-  Monitor,
-  Sliders,
-  Settings,
-  ArrowRightLeft
-} from 'lucide-react';
+import { Search, FileText, Clock, Package, Plane, ClipboardCheck, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { entriesForRoles, DOMAIN_LABELS } from '../navigation/navConfig';
+import type { NavEntry } from '../navigation/navConfig';
+import type { LucideIcon } from 'lucide-react';
+import { api } from './inventory-v2/api-client';
 
-interface SearchResult {
+type Section = 'recent' | 'pages' | 'inventory';
+
+interface PaletteResult {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   href: string;
   category: string;
-  icon: any;
-  keywords: string[];
-  roles?: string[];
+  icon: LucideIcon;
+  section: Section;
 }
 
 interface CommandPaletteProps {
@@ -46,326 +28,153 @@ interface CommandPaletteProps {
   additionalRoles?: string[];
 }
 
-const searchableItems: SearchResult[] = [
-  {
-    id: 'flight-operations-center',
-    title: 'Flight Operations Center',
-    description: 'Integrated flight management dashboard with real-time data',
-    href: '/flight-operations-center',
-    category: 'Flight Operations',
-    icon: Monitor,
-    keywords: ['flight operations', 'center', 'dashboard', 'integrated', 'real-time', 'flight management', 'ops center', 'foc']
-  },
-  // {
-  //   id: 'flight-family',
-  //   title: 'Flight Family',
-  //   description: 'Team messaging and communication platform',
-  //   href: '/flight-family',
-  //   category: 'Communication',
-  //   icon: MessageSquare,
-  //   keywords: ['message', 'chat', 'team', 'communication', 'flight family', 'crew', 'talk']
-  // },
-  {
-    id: 'aircraft-status',
-    title: 'Aircraft Status',
-    description: 'Monitor fleet status and locations',
-    href: '/aircraft',
-    category: 'Flight Operations',
-    icon: Plane,
-    keywords: ['aircraft', 'fleet', 'status', 'tracking', 'plane', 'tail number']
-  },
-  {
-    id: 'frat-form',
-    title: 'FRAT Forms',
-    description: 'Flight Risk Assessment Tool',
-    href: '/frat',
-    category: 'Safety',
-    icon: FileText,
-    keywords: ['frat', 'risk', 'assessment', 'safety', 'flight']
-  },
-  {
-    id: 'standalone-frat',
-    title: 'Standalone FRAT',
-    description: 'Manual Flight Risk Assessment for one-off flights',
-    href: '/frat/standalone',
-    category: 'Safety',
-    icon: Shield,
-    keywords: ['standalone frat', 'manual', 'risk assessment', 'one-off', 'independent']
-  },
-  {
-    id: 'frat-review',
-    title: 'FRAT Review',
-    description: 'Review and approve FRAT submissions',
-    href: '/frat/review',
-    category: 'Safety',
-    icon: FileText,
-    keywords: ['frat', 'review', 'approve', 'safety', 'pending']
-  },
-  {
-    id: 'passenger-database',
-    title: 'Passenger Database',
-    description: 'Manage passenger profiles and preferences',
-    href: '/passenger-database',
-    category: 'Service',
-    icon: Users,
-    keywords: ['passenger', 'guest', 'preferences', 'allergies', 'vip', 'database']
-  },
-  {
-    id: 'maintenance',
-    title: 'Tech Log',
-    description: 'eTechLog — squawks, deferrals, releases, work cards, fleet status',
-    href: '/tech-log',
-    category: 'Maintenance',
-    icon: Wrench,
-    keywords: ['maintenance', 'mx', 'repair', 'service', 'scheduled', 'tech log', 'squawk', 'deferral', 'work card'],
-    roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom']
-  },
-  {
-    id: 'schedule',
-    title: 'Schedule',
-    description: 'View and manage flight schedules',
-    href: '/schedule',
-    category: 'Operations',
-    icon: Calendar,
-    keywords: ['schedule', 'calendar', 'flights', 'crew', 'assignment']
-  },
-  {
-    id: 'currency-dashboard',
-    title: 'Currency Dashboard',
-    description: 'Track pilot and crew currency requirements and compliance',
-    href: '/currency-dashboard',
-    category: 'Operations',
-    icon: UserCheck,
-    keywords: ['currency', 'dashboard', 'pilot', 'crew', 'compliance', 'landings', 'night', 'instrument', '61.58'],
-    roles: ['pilot', 'admin', 'lead', 'scheduling']
-  },
-  {
-    id: 'safety-center',
-    title: 'Safety Center',
-    description: 'Access all safety reporting and management tools',
-    href: '/safety',
-    category: 'Safety',
-    icon: Shield,
-    keywords: ['safety', 'center', 'dashboard', 'compliance', 'sms', 'hazard', 'asap', 'waiver', 'audit', 'reporting']
-  },
-  {
-    id: 'user-safety',
-    title: 'User Safety',
-    description: 'Submit safety reports, caught working safely, waivers, and track compliance',
-    href: '/user-safety',
-    category: 'Safety',
-    icon: UserCheck,
-    keywords: ['user safety', 'caught working safely', 'cws', 'safety participation', 'waiver request', 'hazard report', 'audit', 'document compliance', 'safety submissions', 'recognize', 'safe work']
-  },
-  {
-    id: 'hazard-reporting',
-    title: 'Hazard Reporting',
-    description: 'Report and manage safety hazards',
-    href: '/safety/hazards',
-    category: 'Safety',
-    icon: AlertTriangle,
-    keywords: ['hazard', 'report', 'incident', 'safety', 'asias']
-  },
-  {
-    id: 'form-field-manager',
-    title: 'Form Field Manager',
-    description: 'Customize FRAT, GRAT, Hazard, ASAP, Waiver, and Audit forms',
-    href: '/safety/form-fields',
-    category: 'Safety',
-    icon: Settings,
-    keywords: ['form', 'field', 'manager', 'frat', 'grat', 'hazard', 'asap', 'waiver', 'audit', 'customize', 'configure', 'safety', 'scoring', 'assessment', 'template']
-  },
-  {
-    id: 'form-field-manager',
-    title: 'Form Field Manager',
-    description: 'Customize FRAT and GRAT form fields and scoring',
-    href: '/safety/form-fields',
-    category: 'Safety',
-    icon: Sliders,
-    keywords: ['form', 'field', 'manager', 'frat', 'grat', 'customize', 'configure', 'safety', 'scoring', 'assessment']
-  },
-  {
-    id: 'upcoming-flights',
-    title: 'Upcoming Flights',
-    description: 'Flight assignments with passenger manifests',
-    href: '/upcoming-flights',
-    category: 'Service',
-    icon: Calendar,
-    keywords: ['flights', 'upcoming', 'assignments', 'manifest', 'passengers', 'inflight']
-  },
-  {
-    id: 'catering-orders',
-    title: 'Catering Orders',
-    description: 'Manage flight catering orders with passenger preferences',
-    href: '/catering-orders',
-    category: 'Service',
-    icon: Utensils,
-    keywords: ['catering', 'orders', 'food', 'menu', 'passenger', 'allergies', 'flight']
-  },
-  {
-    id: 'catering-tracker',
-    title: 'Catering Tracker',
-    description: 'Track caterers and menu items by airport',
-    href: '/catering-tracker',
-    category: 'Service',
-    icon: Utensils,
-    keywords: ['catering', 'food', 'menu', 'caterer', 'airport', 'tracker']
-  },
-  {
-    id: 'aog-management',
-    title: 'AOG Management',
-    description: 'Aircraft on Ground emergency management',
-    href: '/aog-management',
-    category: 'Maintenance',
-    icon: AlertTriangle,
-    keywords: ['aog', 'emergency', 'aircraft on ground', 'critical', 'maintenance']
-  },
-  {
-    id: 'maintenance-turnover',
-    title: 'Maintenance Turnover',
-    description: 'Structured shift handover protocol to establish clear chain of custody',
-    href: '/maintenance-turnover',
-    category: 'Maintenance',
-    icon: ArrowRightLeft,
-    keywords: ['turnover', 'handover', 'shift', 'maintenance', '5/40', 'protocol', 'technician'],
-    roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom']
-  },
+const SECTION_HEADINGS: Record<Section, string> = {
+  recent: 'Recent',
+  pages: 'Pages',
+  inventory: 'Inventory',
+};
 
-  {
-    id: 'document-management',
-    title: 'Document Management',
-    description: 'Publish, manage, and distribute compliance documents',
-    href: '/document-management',
-    category: 'Documents',
-    icon: FileText,
-    keywords: ['document', 'management', 'compliance', 'publish', 'distribute', 'upload', 'doc', 'manual']
-  },
-  {
-    id: 'document-request',
-    title: 'Document Request',
-    description: 'Request new documents or changes to existing ones',
-    href: '/document-management',
-    category: 'Documents',
-    icon: MessageSquare,
-    keywords: ['document', 'request', 'change', 'new', 'update', 'submit', 'ask', 'proposal']
-  },
-  {
-    id: 'document-center',
-    title: 'Document Center',
-    description: 'Access manuals and compliance documents',
-    href: '/documents',
-    category: 'Documents',
-    icon: Package,
-    keywords: ['document', 'center', 'manual', 'compliance', 'library', 'access', 'read']
-  },
-  {
-    id: 'trip-coordination',
-    title: 'Trip Coordination',
-    description: 'Tile-based trip management with collaborative checklists and notifications',
-    href: '/trip-coordination',
-    category: 'Scheduling',
-    icon: MapPin,
-    keywords: ['trip', 'coordination', 'collaborative', 'workspace', 'schedulers', 'planning', 'requirements', 'catering', 'hotels', 'ground transport', 'fuel', 'permits', 'team work', 'checklist', 'tiles', 'notifications', 'deadlines'],
-    roles: ['scheduling', 'admin']
-  },
-  {
-    id: 'parts-inventory',
-    title: 'Parts & Inventory',
-    description: 'Track parts inventory and procurement with myCMP integration',
-    href: '/parts-inventory',
-    category: 'Maintenance',
-    icon: Boxes,
-    keywords: ['parts', 'inventory', 'stock', 'procurement', 'mycmp', 'camp', 'vendor', 'purchase', 'order', 'supplies', 'maintenance parts'],
-    roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom']
-  },
-  {
-    id: 'crew-scheduling-workload',
-    title: 'Crew Workload & Travel',
-    description: 'Workload planning, crew balance optimization, and travel tracking',
-    href: '/crew-scheduling-workload',
-    category: 'Scheduling',
-    icon: BarChart3,
-    keywords: ['crew', 'workload', 'planning', 'balance', 'scheduling', 'forward looking', 'trip days', 'ron', 'standby', 'utilization', 'crew scheduling', 'balance workload', 'historical', 'trends', 'monthly planning']
-  },
-  // --- Dynamic Mock Data Insertions ---
-  {
-    id: 'flight-fo004',
-    title: 'Flight FO004 (ORD → LGA)',
-    description: 'Scheduled Departure: 14:30 Z',
-    href: '/upcoming-flights', // In a real app, this would route to /flight/FO004
-    category: 'Flights',
-    icon: Plane,
-    keywords: ['fo004', 'ord', 'lga', 'chicago', 'new york', 'flight']
-  },
-  {
-    id: 'flight-fo089',
-    title: 'Flight FO089 (JFK → LHR)',
-    description: 'Scheduled Departure: 22:15 Z',
-    href: '/upcoming-flights',
-    category: 'Flights',
-    icon: Plane,
-    keywords: ['fo089', 'jfk', 'lhr', 'london', 'new york', 'flight']
-  },
-  {
-    id: 'pax-smith',
-    title: 'John Smith - VIP Passenger',
-    description: 'Preferences: Window Seat, Diet Coke',
-    href: '/passenger-database',
-    category: 'Passengers',
-    icon: Users,
-    keywords: ['john smith', 'vip', 'passenger', 'diet coke']
-  },
-  {
-    id: 'doc-gom',
-    title: 'General Operations Manual (GOM)',
-    description: 'Revision 14.2 - Effective Oct 2025',
-    href: '/documents',
-    category: 'Documents',
-    icon: FileText,
-    keywords: ['gom', 'manual', 'operations', 'revision']
-  },
-  {
-    id: 'ac-n650pr',
-    title: 'N650PR (G650)',
-    description: 'Status: AOG - Right Engine Bleed',
-    href: '/aircraft',
-    category: 'Aircraft',
-    icon: Plane,
-    keywords: ['n650pr', 'g650', 'gulfstream', 'aog', 'maintenance']
-  },
-  {
-    id: 'ac-n500ga',
-    title: 'N500GA (G500)',
-    description: 'Status: Airworthy - Next Inspection in 45hrs',
-    href: '/aircraft',
-    category: 'Aircraft',
-    icon: Plane,
-    keywords: ['n500ga', 'g500', 'gulfstream', 'airworthy']
+const INVENTORY_ROLES = ['inflight', 'admin', 'commissary-manager'];
+
+// Minimal shapes of the /api/state payload fields the palette searches.
+interface InventoryData {
+  items: { id: string; itemName: string; supplyCategory?: string }[];
+  trips: { id: string; tailNumber: string; tripName?: string; status: string }[];
+  inspections: { id: string; tailNumber: string; reportedBy?: string; date?: string }[];
+  unitItemRequests: { id: string; unitTailNumber: string; status: string }[];
+}
+
+// Session-level cache; one fetch per page load, shared across palette opens.
+// The payload is normalized at this seam so a missing or renamed field in
+// /api/state degrades to an empty section instead of throwing during render.
+let inventoryPromise: Promise<InventoryData | null> | null = null;
+let inventoryWarned = false;
+function loadInventoryData(): Promise<InventoryData | null> {
+  if (!inventoryPromise) {
+    inventoryPromise = api.state.load()
+      .then((d: any): InventoryData => ({
+        items: d?.items ?? [],
+        trips: d?.trips ?? [],
+        inspections: d?.inspections ?? [],
+        unitItemRequests: d?.unitItemRequests ?? [],
+      }))
+      .catch((err: unknown) => {
+        if (!inventoryWarned) {
+          console.warn('Command palette: inventory search unavailable', err);
+          inventoryWarned = true;
+        }
+        inventoryPromise = null;
+        return null;
+      });
   }
-];
+  return inventoryPromise;
+}
+
+function pageToResult(entry: NavEntry): PaletteResult {
+  return {
+    id: `page-${entry.path}-${entry.label}`,
+    title: entry.label,
+    href: entry.href ?? entry.path,
+    category: DOMAIN_LABELS[entry.domain],
+    icon: entry.icon ?? FileText,
+    section: 'pages',
+  };
+}
 
 export default function CommandPalette({ isOpen, onClose, userRole, additionalRoles = [] }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [inventory, setInventory] = useState<InventoryData | null>(null);
   const navigate = useNavigate();
 
-  const filteredResults = searchableItems.filter(item => {
-    // Role based filtering
-    if (item.roles) {
-      const hasAccess = item.roles.includes(userRole) || additionalRoles.some(role => item.roles?.includes(role));
-      if (!hasAccess) return false;
+  const hasInventoryAccess =
+    INVENTORY_ROLES.includes(userRole) || additionalRoles.some(r => INVENTORY_ROLES.includes(r));
+
+  // Lazy-load inventory data the first time the palette opens
+  useEffect(() => {
+    if (isOpen && hasInventoryAccess && !inventory) {
+      let cancelled = false;
+      loadInventoryData().then(data => {
+        if (!cancelled && data) setInventory(data);
+      });
+      return () => { cancelled = true; };
     }
+  }, [isOpen, hasInventoryAccess, inventory]);
 
-    if (!query) return true;
+  const visibleEntries = entriesForRoles(userRole, additionalRoles).filter(e => e.searchable !== false);
+  const searchTerm = query.toLowerCase().trim();
 
-    const searchTerm = query.toLowerCase();
-    return (
-      item.title.toLowerCase().includes(searchTerm) ||
-      item.description.toLowerCase().includes(searchTerm) ||
-      item.category.toLowerCase().includes(searchTerm) ||
-      item.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm))
-    );
-  }).slice(0, 8); // Limit to 8 results
+  // Recent sections — only when not searching. Stored paths are exact manifest
+  // section paths, so an exact match against the role-visible entries doubles
+  // as the access filter (prefix matching could mislabel after a role switch).
+  const recentResults: PaletteResult[] = [];
+  if (isOpen && !searchTerm) {
+    try {
+      const recents: string[] = JSON.parse(localStorage.getItem('nav-recents') ?? '[]');
+      for (const path of recents) {
+        const entry = visibleEntries.find(e => e.path === path);
+        if (entry) {
+          recentResults.push({
+            id: `recent-${path}`,
+            title: entry.label,
+            href: path,
+            category: DOMAIN_LABELS[entry.domain],
+            icon: Clock,
+            section: 'recent',
+          });
+        }
+      }
+    } catch {
+      // corrupted localStorage — show no recents
+    }
+  }
+
+  const pageResults: PaletteResult[] = visibleEntries
+    .filter(e => {
+      if (!searchTerm) return true;
+      return (
+        e.label.toLowerCase().includes(searchTerm) ||
+        DOMAIN_LABELS[e.domain].toLowerCase().includes(searchTerm) ||
+        (e.keywords ?? []).some(k => k.toLowerCase().includes(searchTerm))
+      );
+    })
+    .slice(0, 8)
+    .map(pageToResult);
+
+  const inventoryResults: PaletteResult[] = [];
+  if (inventory && searchTerm.length >= 2) {
+    inventory.items
+      .filter(i => i.itemName.toLowerCase().includes(searchTerm))
+      .slice(0, 3)
+      .forEach(i => inventoryResults.push({
+        id: `inv-item-${i.id}`, title: i.itemName, description: i.supplyCategory,
+        href: '/inventory-v2/commissary', category: 'Item', icon: Package, section: 'inventory',
+      }));
+    inventory.trips
+      .filter(t => `${t.tailNumber} ${t.tripName ?? ''}`.toLowerCase().includes(searchTerm))
+      .slice(0, 3)
+      .forEach(t => inventoryResults.push({
+        id: `inv-trip-${t.id}`, title: `${t.tailNumber}${t.tripName ? ` — ${t.tripName}` : ''}`,
+        description: t.status === 'active' ? 'Active trip' : 'Trip',
+        href: `/inventory-v2/trips/${t.id}`, category: 'Trip', icon: Plane, section: 'inventory',
+      }));
+    inventory.inspections
+      .filter(i => `${i.tailNumber} ${i.reportedBy ?? ''}`.toLowerCase().includes(searchTerm))
+      .slice(0, 3)
+      .forEach(i => inventoryResults.push({
+        id: `inv-insp-${i.id}`, title: `${i.tailNumber} inspection`, description: i.date,
+        href: `/inventory-v2/inspection/${i.id}/review`, category: 'Inspection', icon: ClipboardCheck, section: 'inventory',
+      }));
+    inventory.unitItemRequests
+      .filter(r => (r.status === 'open' || r.status === 'in_progress') && r.unitTailNumber.toLowerCase().includes(searchTerm))
+      .slice(0, 3)
+      .forEach(r => inventoryResults.push({
+        id: `inv-req-${r.id}`, title: `${r.unitTailNumber} request`, description: r.status,
+        href: '/inventory-v2/unit-requests', category: 'Request', icon: Send, section: 'inventory',
+      }));
+  }
+
+  const filteredResults: PaletteResult[] = [...recentResults, ...pageResults, ...inventoryResults];
 
   const handleSelect = (href: string) => {
     navigate(href);
@@ -376,9 +185,11 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      if (filteredResults.length === 0) return;
       setSelectedIndex((prev) => (prev + 1) % filteredResults.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (filteredResults.length === 0) return;
       setSelectedIndex((prev) => (prev - 1 + filteredResults.length) % filteredResults.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
@@ -388,12 +199,10 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
     }
   };
 
-  // Reset selection when query changes
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
 
-  // Reset query when dialog closes
   useEffect(() => {
     if (!isOpen) {
       setQuery('');
@@ -408,14 +217,14 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
           Global Search
         </DialogTitle>
         <DialogDescription id="command-palette-description" className="sr-only">
-          Search for modules, aircraft, passengers, and other flight operations resources. Use arrow keys to navigate and Enter to select.
+          Search pages and inventory records. Use arrow keys to navigate and Enter to select.
         </DialogDescription>
 
         <div className="border-b">
           <div className="flex items-center px-4 py-3">
             <Search className="w-4 h-4 text-muted-foreground mr-3" />
             <Input
-              placeholder="Search for modules, aircraft, passengers..."
+              placeholder="Search pages, items, trips, inspections..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -434,28 +243,37 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
             <div className="space-y-1 p-2">
               {filteredResults.map((result, index) => {
                 const Icon = result.icon;
+                const isFirstOfSection = index === 0 || filteredResults[index - 1].section !== result.section;
                 return (
-                  <div
-                    key={result.id}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${index === selectedIndex ? 'bg-accent' : 'hover:bg-accent/50'
-                      }`}
-                    onClick={() => handleSelect(result.href)}
-                  >
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Icon className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{result.title}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {result.category}
-                        </Badge>
+                  <React.Fragment key={result.id}>
+                    {isFirstOfSection && (
+                      <div className="px-3 pt-2 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        {SECTION_HEADINGS[result.section]}
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {result.description}
-                      </p>
+                    )}
+                    <div
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${index === selectedIndex ? 'bg-accent' : 'hover:bg-accent/50'
+                        }`}
+                      onClick={() => handleSelect(result.href)}
+                    >
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Icon className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{result.title}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {result.category}
+                          </Badge>
+                        </div>
+                        {result.description && (
+                          <p className="text-sm text-muted-foreground truncate">
+                            {result.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
