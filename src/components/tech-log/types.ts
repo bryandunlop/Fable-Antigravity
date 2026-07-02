@@ -286,8 +286,18 @@ export interface TripLeg {
   arrivalTimeUtc: string;
   fratStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
   fratScore?: number;               // cumulative FRAT points; >= 25 is a no-go
+  fratDraft?: FratDraft;            // saved-but-unsubmitted FRAT answers (mutable orchestration, not a signed record)
   airportReviewed: boolean;         // origin + destination airport info acknowledged
   fuelRequestId?: string;           // set when a home-base fuel-farm submission exists
+}
+
+// A FRAT saved mid-entry: just the selection matrix (by section/item index against the
+// current FRAT template) + mitigation notes. Scores stay in the template — a draft never
+// carries its own scoring.
+export interface FratDraft {
+  selections: boolean[][];
+  mitigationNotes?: string;
+  savedAtUtc: string;
 }
 
 export interface Trip {

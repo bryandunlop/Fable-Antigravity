@@ -23,8 +23,17 @@ function patchLeg(
 }
 
 export function completeFratOnLeg(args: Base & { totalScore?: number }): void {
-  patchLeg(args, { fratStatus: 'COMPLETED', fratScore: args.totalScore }, 'LEG_FRAT_COMPLETED',
+  patchLeg(args, { fratStatus: 'COMPLETED', fratScore: args.totalScore, fratDraft: undefined }, 'LEG_FRAT_COMPLETED',
     `${args.trip.tripNumber} leg ${args.leg.sequence} FRAT score ${args.totalScore ?? '—'}`);
+}
+
+export function saveFratDraftOnLeg(
+  args: Base & { selections: boolean[][]; mitigationNotes?: string; nowUtc: string },
+): void {
+  patchLeg(args, {
+    fratStatus: 'IN_PROGRESS',
+    fratDraft: { selections: args.selections, mitigationNotes: args.mitigationNotes, savedAtUtc: args.nowUtc },
+  }, 'LEG_FRAT_DRAFT_SAVED', `${args.trip.tripNumber} leg ${args.leg.sequence} FRAT draft saved`);
 }
 
 export function markAirportReviewedOnLeg(args: Base): void {
