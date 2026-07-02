@@ -13,7 +13,8 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { newId } from '../util/id';
 import { toast } from 'sonner';
-import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg } from '../preflightActions';
+import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg, saveFratDraftOnLeg } from '../preflightActions';
+import { extractFratSelections } from '../util/fratDraft';
 
 const zulu = (utc?: string) => (utc ? `${utc.slice(11, 16)}Z` : '—');
 
@@ -68,6 +69,17 @@ export default function LegDetail() {
     setFratOpen(false);
   };
 
+  const saveFratDraft = (data: { items?: { items: { selected: boolean }[] }[]; mitigationNotes?: string }) => {
+    saveFratDraftOnLeg({
+      dispatch, newId, trip, leg, actorOid: user.oid,
+      selections: extractFratSelections(data.items ?? []),
+      mitigationNotes: data.mitigationNotes,
+      nowUtc: new Date().toISOString(),
+    });
+    setFratOpen(false);
+    toast.success('FRAT draft saved — resume any time before departure');
+  };
+
   const markAirportReviewed = () =>
     markAirportReviewedOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid });
 
@@ -106,9 +118,15 @@ export default function LegDetail() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Flight risk assessment</div>
-              <div className="mt-1 text-sm">{leg.fratStatus === 'COMPLETED' ? <>Complete · score <span className="font-mono">{leg.fratScore ?? '—'}</span></> : 'Not complete'}</div>
+              <div className="mt-1 text-sm">
+                {leg.fratStatus === 'COMPLETED' ? <>Complete · score <span className="font-mono">{leg.fratScore ?? '—'}</span></>
+                  : leg.fratStatus === 'IN_PROGRESS' ? <>Draft saved {leg.fratDraft ? new Date(leg.fratDraft.savedAtUtc).toLocaleString() : ''} · resume below</>
+                  : 'Not complete'}
+              </div>
             </div>
-            {!fratOpen && <Button size="sm" variant="outline" onClick={() => setFratOpen(true)}>{leg.fratStatus === 'COMPLETED' ? 'Redo FRAT' : 'Start FRAT'}</Button>}
+            {!fratOpen && <Button size="sm" variant="outline" onClick={() => setFratOpen(true)}>
+              {leg.fratStatus === 'COMPLETED' ? 'Redo FRAT' : leg.fratStatus === 'IN_PROGRESS' ? 'Resume FRAT (draft)' : 'Start FRAT'}
+            </Button>}
           </div>
           {fratOpen && (
             <div className="mt-3 border-t pt-3">
@@ -122,9 +140,11 @@ export default function LegDetail() {
                   date: leg.departureTimeUtc.slice(0, 10),
                   time: leg.departureTimeUtc.slice(11, 16),
                   pic: user.displayName,
+                  selections: leg.fratDraft?.selections,
+                  mitigationNotes: leg.fratDraft?.mitigationNotes,
                 }}
                 onClose={() => setFratOpen(false)}
-                onSave={(data: any) => { if (data.status === 'submitted') completeFrat(data); }}
+                onSave={(data: any) => { if (data.status === 'submitted') completeFrat(data); else if (data.status === 'draft') saveFratDraft(data); }}
               />
             </div>
           )}
