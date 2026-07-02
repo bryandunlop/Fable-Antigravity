@@ -19,7 +19,6 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import gfoLockupWhite from '../assets/gfo/gfo-lockup-white-3line.png';
 import {
   domainsForRole, entriesForRoles, matchEntry, DEFAULT_OPEN_DOMAINS,
   type NavEntry,
@@ -322,8 +321,8 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         <Sidebar className="border-r border-sidebar-border">
           <SidebarHeader className="border-b border-white/5 p-4">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex flex-col gap-2">
-                <img src={gfoLockupWhite} alt="P&G Global Flight Operations" className="h-12 w-auto self-start" />
+              <div className="flex flex-col gap-1.5">
+                <h2 className="text-base font-bold tracking-tight text-white">Global Flight Operations</h2>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-gfo-sunrise font-bold">{getRoleDisplayName(userRole)}</p>
               </div>
               <div className="md:hidden">

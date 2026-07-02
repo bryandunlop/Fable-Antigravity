@@ -4,7 +4,6 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { User, Shield, Briefcase, Wrench, Users } from 'lucide-react';
-import gfoLockupWhite from '../assets/gfo/gfo-lockup-white-3line.png';
 
 import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES } from '../lib/mockUsers';
 
@@ -30,7 +29,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       {/* Brand circle motif — opaque, bleeding off the edges, non-overlapping */}
       <div aria-hidden="true" className="absolute -left-40 -bottom-48 h-[28rem] w-[28rem] rounded-full bg-gfo-daylight" />
       <div aria-hidden="true" className="absolute -right-28 -top-32 h-72 w-72 rounded-full bg-gfo-sunrise" />
-      <img src={gfoLockupWhite} alt="P&G Global Flight Operations" className="relative z-10 mb-8 h-16 w-auto" />
       <Card className="relative z-10 w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle>Global Flight Operations</CardTitle>
