@@ -306,9 +306,12 @@ export function getDefaultState(): TechLogState {
       { id: 'cm-seed-1', aircraftId: 'ac-n2pg', authorOid: tech.oid, text: 'Aircraft fueled and ready for the morning KLUK–KTEB leg.', atUtc: iso(3 * H) },
     ],
     recordNotes: [],
+    supersedeConflicts: [],
+    pendingApprovals: [],
     dismissedNotifications: [],
     campCorrelation: [],
     integrationEvents: [],
+    aogAcks: [],
     currentUserOid: 'USR001',
   };
 }

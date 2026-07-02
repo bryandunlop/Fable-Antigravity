@@ -112,12 +112,12 @@ const searchableItems: SearchResult[] = [
   },
   {
     id: 'maintenance',
-    title: 'Maintenance Board',
-    description: 'Track maintenance status and schedules',
-    href: '/maintenance',
+    title: 'Tech Log',
+    description: 'eTechLog — squawks, deferrals, releases, work cards, fleet status',
+    href: '/tech-log',
     category: 'Maintenance',
     icon: Wrench,
-    keywords: ['maintenance', 'mx', 'repair', 'service', 'scheduled'],
+    keywords: ['maintenance', 'mx', 'repair', 'service', 'scheduled', 'tech log', 'squawk', 'deferral', 'work card'],
     roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom']
   },
   {

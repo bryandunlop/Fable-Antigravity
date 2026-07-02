@@ -1,16 +1,36 @@
 import { useTechLog } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
-import { CAMP_BASE_URLS, CAMP_ENV, CAMP_ERROR, DUE_LIST_CAP_MONTHS } from '../integration/campTaxonomy';
-import { MYAIROPS_EVENT_TYPES, webhookVerificationSpec } from '../integration/myairopsClient';
+import { CAMP_BASE_URLS, CAMP_ERROR, DUE_LIST_CAP_MONTHS } from '../integration/campTaxonomy';
+import { PROMOTION_CONFIRM_PHRASE } from '../integration/campClient';
+import { MYAIROPS_EVENT_TYPES, webhookVerificationSpec, type WebhookEnvelope } from '../integration/myairopsClient';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 import { Cloud, Webhook, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import type { ReconcileResult } from '../integration/reconcile';
+
+function ReconCol({ title, tone, items }: { title: string; tone: 'ok' | 'warn' | 'err'; items: string[] }) {
+  const color = tone === 'ok' ? 'text-emerald-700' : tone === 'warn' ? 'text-amber-700' : 'text-red-700';
+  return (
+    <div>
+      <div className={`mb-0.5 font-medium ${color}`}>{title} ({items.length})</div>
+      {items.length === 0
+        ? <div className="text-xs text-muted-foreground">—</div>
+        : <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">{items.map((t, i) => <li key={i}>{t}</li>)}</ul>}
+    </div>
+  );
+}
 
 export default function Integration() {
   const { state } = useTechLog();
-  const { refreshCampReads } = useIntegration();
+  const { refreshCampReads, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook } = useIntegration();
+  const [recon, setRecon] = useState<Record<string, (ReconcileResult & { tail: string }) | undefined>>({});
+  const [promoteText, setPromoteText] = useState('');
+  const [inbox, setInbox] = useState<WebhookEnvelope[]>([]);
+  const firstAc = state.aircraft.find(a => !a.isProvisional);
 
   return (
     <TechLogShell
@@ -21,7 +41,7 @@ export default function Integration() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Cloud className="h-4 w-4" /> CAMP connector <Badge variant="destructive">{CAMP_ENV}</Badge>
+              <Cloud className="h-4 w-4" /> CAMP connector <Badge variant={campEnv() === 'production' ? 'destructive' : 'secondary'}>{campEnv()}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1.5 text-xs">
@@ -41,6 +61,17 @@ export default function Integration() {
                 {state.aircraft.filter(a => !a.isProvisional).map(a => (
                   <Button key={a.id} size="sm" variant="outline" onClick={() => refreshCampReads(a.id)}>
                     <RefreshCw className="mr-1.5 h-3.5 w-3.5" />{a.tailNumber}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50/60 p-2">
+              <div className="flex items-center gap-1.5 font-medium text-amber-700"><AlertTriangle className="h-3.5 w-3.5" /> Utilization push — blocked (OQ1)</div>
+              <p className="mt-0.5 text-muted-foreground">The CAMP SOAP operation to push hours/cycles/landings is <strong>undocumented</strong> — not invented here. Validates exact-serial + increase-only and prepares the minutes payload, then refuses to transmit until confirmed under sandbox.</p>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {state.aircraft.filter(a => !a.isProvisional).map(a => (
+                  <Button key={a.id} size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100" onClick={() => pushUtilization(a.id)}>
+                    Push {a.tailNumber} (blocked)
                   </Button>
                 ))}
               </div>
@@ -68,6 +99,51 @@ export default function Integration() {
         </Card>
       </div>
 
+      <Card className={`mt-4 ${campEnv() === 'production' ? 'border-red-400' : ''}`}>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base">CAMP environment <Badge variant={campEnv() === 'production' ? 'destructive' : 'secondary'}>{campEnv()}</Badge></CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {campEnv() === 'production'
+            ? <div className="rounded-md border border-red-400 bg-red-50 p-2 text-red-700"><strong>PRODUCTION (simulated).</strong> In the real system a production push writes a real squawk into a live aircraft's airworthiness record — only ever via a deliberate, reviewed, human-gated promotion. Dev/test must always be sandbox.</div>
+            : <p className="text-xs text-muted-foreground">Dev/test is locked to <strong>sandbox</strong> (Sandbox rule). Promotion to production is a deliberate, typed-confirmation, human-gated step — never automatic; a production push is refused unless the gate is open.</p>}
+          {campEnv() === 'sandbox' ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Input value={promoteText} onChange={e => setPromoteText(e.target.value)} placeholder={`Type "${PROMOTION_CONFIRM_PHRASE}"`} className="h-8 max-w-xs" />
+              <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => { if (promoteToProduction(promoteText)) setPromoteText(''); }}>Promote to production</Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => revertToSandbox()}>Revert to sandbox</Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Webhook className="h-4 w-4" /> myairops webhook inbox (simulated, pull-only)</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-xs text-muted-foreground">CloudEvents 1.0 + HMAC verification (raw bytes, 5-min replay window, CloudEvents-id idempotency). Inbound only — myGFO never writes back to myairops.</p>
+          <div className="flex flex-wrap gap-2">
+            {MYAIROPS_EVENT_TYPES.map(t => (
+              <Button key={t} size="sm" variant="outline" onClick={() => setInbox(i => [receiveWebhook(t), ...i].slice(0, 12))}>{t.split('.').slice(-2).join('.')}</Button>
+            ))}
+            <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => setInbox(i => [receiveWebhook(MYAIROPS_EVENT_TYPES[0], { tamper: true }), ...i].slice(0, 12))}>tampered → reject</Button>
+            {inbox[0] && <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setInbox(i => [receiveWebhook(inbox[0].event.type as typeof MYAIROPS_EVENT_TYPES[number], { duplicateId: inbox[0].event.id }), ...i].slice(0, 12))}>replay last → dedup</Button>}
+          </div>
+          <div>
+            {inbox.length === 0 && <p className="text-xs text-muted-foreground">No webhooks yet.</p>}
+            {inbox.map((e, idx) => {
+              const v = e.verification;
+              const status = !v.signatureValid ? 'bad-signature' : !v.timestampWithinWindow ? 'replay-window' : v.duplicate ? 'duplicate (skipped)' : 'applied';
+              const variant: 'secondary' | 'outline' | 'destructive' = status === 'applied' ? 'secondary' : status.startsWith('duplicate') ? 'outline' : 'destructive';
+              return (
+                <div key={idx} className="flex items-center justify-between gap-2 border-b py-1 text-xs last:border-0">
+                  <span className="font-mono text-muted-foreground">{e.event.type.split('.').slice(-2).join('.')} · {e.event.id}</span>
+                  <Badge variant={variant}>{status}</Badge>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="mt-4">
         <CardHeader><CardTitle className="text-base">CAMP discrepancy correlation (off-ledger, §18.1)</CardTitle></CardHeader>
         <CardContent className="space-y-1 text-sm">
@@ -78,6 +154,30 @@ export default function Integration() {
               <div className="flex items-center gap-2">
                 <Badge variant={c.pushState === 'PUSHED' ? 'secondary' : c.pushState === 'FAILED' ? 'destructive' : 'outline'}>{c.pushState}</Badge>
                 {c.campDiscrepancyRef && <span className="font-mono text-xs text-muted-foreground">{c.campDiscrepancyRef}</span>}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader><CardTitle className="text-base">CAMP discrepancy reconciliation (GetAircraftDiscrepancies)</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-xs text-muted-foreground">Read CAMP's discrepancy list and diff it against the off-ledger correlation table — surfaces items entered directly in CAMP and pushes CAMP never acked.</p>
+          <div className="flex flex-wrap gap-2">
+            {state.aircraft.filter(a => !a.isProvisional).map(a => (
+              <Button key={a.id} size="sm" variant="outline" onClick={() => setRecon(r => ({ ...r, [a.id]: reconcile(a.id) }))}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Reconcile {a.tailNumber}
+              </Button>
+            ))}
+          </div>
+          {Object.entries(recon).filter(([, r]) => r).map(([id, r]) => r && (
+            <div key={id} className="rounded-md border p-2">
+              <div className="mb-1 font-medium">{r.tail}</div>
+              <div className="grid gap-2 md:grid-cols-3">
+                <ReconCol title="Matched" tone="ok" items={r.matched.map(d => `${d.ata} · ${d.description}`)} />
+                <ReconCol title="CAMP-only (triage)" tone="warn" items={r.campOnly.map(d => `${d.ata} · ${d.description}`)} />
+                <ReconCol title="myGFO-only (investigate)" tone="err" items={r.mygfoOnly.map(c => `${c.entityType} ${c.mygfoEntityId}${c.lastError ? ' — ' + c.lastError : ''}`)} />
               </div>
             </div>
           ))}
@@ -97,6 +197,20 @@ export default function Integration() {
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader><CardTitle className="text-base">Session resilience (error taxonomy in action)</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-xs text-muted-foreground">Inject a CAMP error and watch the documented handling: <strong>SESSION_NOT_VALID</strong> re-logs in once and retries; <strong>L100/L102</strong> stop immediately (lockout risk — never a retry loop); <strong>L103</strong> backs off. Results land in the Integration log above.</p>
+          {firstAc && (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => demoErrorHandling(firstAc.id, 'session')}>Stale session → recovers</Button>
+              <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => demoErrorHandling(firstAc.id, 'lockout')}>L100 lockout → stops</Button>
+              <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => demoErrorHandling(firstAc.id, 'maintenance')}>L103 maintenance → backs off</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

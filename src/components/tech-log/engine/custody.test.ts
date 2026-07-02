@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveCustody } from './custody';
+import { deriveCustody, canRecordPostflight } from './custody';
 import type { FlightBriefing, Postflight } from '../types';
 
 const AC = 'ac1';
@@ -62,5 +62,33 @@ describe('deriveCustody §E', () => {
     expect(r.state).toBe('IN_MAINTENANCE');
     expect(r.drivingBriefingId).toBeUndefined();
     expect(r.drivingPostflightId).toBeUndefined();
+  });
+});
+
+describe('canRecordPostflight', () => {
+  it('rejects a reclaim while custody is still IN_MAINTENANCE (no briefing offered yet)', () => {
+    const r = canRecordPostflight(AC, { briefings: [], postflights: [] }, '2026-06-22T08:00:00Z');
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/with the crew/i);
+  });
+
+  it('rejects a reclaim while custody is only OFFERED (crew has not yet accepted)', () => {
+    const b = brief({ status: 'RELEASED', releasedAtUtc: '2026-06-21T08:00:00Z' });
+    const r = canRecordPostflight(AC, { briefings: [b], postflights: [] }, '2026-06-21T09:00:00Z');
+    expect(r.ok).toBe(false);
+  });
+
+  it('allows a reclaim once custody is WITH_CREW', () => {
+    const b = brief({ status: 'ACKNOWLEDGED', releasedAtUtc: '2026-06-21T08:00:00Z', acknowledgedAtUtc: '2026-06-21T09:00:00Z' });
+    const r = canRecordPostflight(AC, { briefings: [b], postflights: [] }, '2026-06-21T10:00:00Z');
+    expect(r.ok).toBe(true);
+    expect(r.reason).toBeUndefined();
+  });
+
+  it('rejects a second reclaim already back in maintenance custody', () => {
+    const b = brief({ status: 'ACKNOWLEDGED', releasedAtUtc: '2026-06-21T08:00:00Z', acknowledgedAtUtc: '2026-06-21T09:00:00Z' });
+    const p = postflight({ performedAtUtc: '2026-06-22T07:00:00Z', briefingId: 'brief1' });
+    const r = canRecordPostflight(AC, { briefings: [b], postflights: [p] }, '2026-06-22T08:00:00Z');
+    expect(r.ok).toBe(false);
   });
 });

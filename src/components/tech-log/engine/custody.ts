@@ -57,3 +57,19 @@ export function deriveCustody(
     computedAtUtc: asOfUtc,
   };
 }
+
+/** Precondition for recording a postflight reclaim: custody must currently be WITH_CREW. A postflight
+ * recorded while custody is still IN_MAINTENANCE/OFFERED (a stale UI, a retried dispatch, a second
+ * device) would reclaim an aircraft maintenance never actually handed over — reject it rather than
+ * silently accepting a second/out-of-order reclaim. */
+export function canRecordPostflight(
+  aircraftId: string,
+  state: Pick<TechLogState, 'briefings' | 'postflights'>,
+  asOfUtc: string,
+): { ok: boolean; reason?: string } {
+  const custody = deriveCustody(aircraftId, state, asOfUtc);
+  if (custody.state !== 'WITH_CREW') {
+    return { ok: false, reason: `Aircraft is not currently with the crew (custody: ${custody.state}) — nothing to reclaim.` };
+  }
+  return { ok: true };
+}

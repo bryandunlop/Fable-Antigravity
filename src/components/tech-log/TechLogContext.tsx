@@ -1,8 +1,12 @@
-import React, { createContext, useContext, useEffect, useReducer, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useState, useCallback, ReactNode } from 'react';
 import { toast } from 'sonner';
-import type { TechLogState, TechLogAction, Personnel } from './types';
+import type { TechLogState, TechLogAction, Personnel, AuditEntry, PendingApproval, SupersedeEntityType } from './types';
 import { getDefaultState } from './mockData/scenarios';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
+import { wouldFork, buildSupersedeConflict } from './engine/supersede';
+import { canRecordPostflight } from './engine/custody';
+import { isSelfApproval, applyApproval } from './engine/approvals';
+import { newId } from './util/id';
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
@@ -22,19 +26,43 @@ function loadInitialState(): TechLogState {
   }
 }
 
+/** Defense-in-depth: every SUPERSEDE_* action funnels through here before being applied. If the
+ * targeted parent already has a superseding row, the new row is rejected (not appended) and routed
+ * to state.supersedeConflicts for human reconciliation (CLAUDE.md DM-2) instead of silently creating
+ * a second "current" row for the same entity. Returns null when there is no fork (caller proceeds). */
+function maybeRejectSupersede(
+  state: TechLogState,
+  existingRows: { id: string; supersedesId?: string }[],
+  entityType: SupersedeEntityType,
+  payload: { id: string; supersedesId?: string },
+): TechLogState | null {
+  if (!payload.supersedesId || !wouldFork(existingRows, payload.supersedesId)) return null;
+  const { conflict, audit } = buildSupersedeConflict(entityType, payload.id, payload.supersedesId, state.currentUserOid, new Date().toISOString());
+  return { ...state, supersedeConflicts: [conflict, ...state.supersedeConflicts], audit: [audit, ...state.audit].slice(0, 500) };
+}
+
 function reducer(state: TechLogState, action: TechLogAction): TechLogState {
   switch (action.type) {
     case 'ADD_DEFECT':
-    case 'SUPERSEDE_DEFECT':
       return { ...state, defects: [...state.defects, action.payload] };
+    case 'SUPERSEDE_DEFECT': {
+      const rejected = maybeRejectSupersede(state, state.defects, 'Defect', action.payload);
+      return rejected ?? { ...state, defects: [...state.defects, action.payload] };
+    }
     case 'ADD_DEFERRAL':
-    case 'SUPERSEDE_DEFERRAL':
       return { ...state, deferrals: [...state.deferrals, action.payload] };
+    case 'SUPERSEDE_DEFERRAL': {
+      const rejected = maybeRejectSupersede(state, state.deferrals, 'Deferral', action.payload);
+      return rejected ?? { ...state, deferrals: [...state.deferrals, action.payload] };
+    }
     case 'ADD_RELEASE':
       return { ...state, releases: [...state.releases, action.payload] };
     case 'ADD_FLIGHTLOG':
-    case 'SUPERSEDE_FLIGHTLOG':
       return { ...state, flightLogs: [...state.flightLogs, action.payload] };
+    case 'SUPERSEDE_FLIGHTLOG': {
+      const rejected = maybeRejectSupersede(state, state.flightLogs, 'FlightLog', action.payload);
+      return rejected ?? { ...state, flightLogs: [...state.flightLogs, action.payload] };
+    }
     case 'ADD_SIGNATURE':
       return { ...state, signatures: [...state.signatures, action.payload] };
     case 'ADD_AUDIT':
@@ -71,9 +99,24 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       return { ...state, briefings: [...state.briefings, action.payload] };
     case 'EDIT_BRIEFING':
       return { ...state, briefings: state.briefings.map(b => (b.id === action.payload.id ? action.payload : b)) };
-    case 'ADD_POSTFLIGHT':
-    case 'SUPERSEDE_POSTFLIGHT':
+    case 'ADD_POSTFLIGHT': {
+      // Defense-in-depth: reject a reclaim recorded while custody isn't actually WITH_CREW (stale
+      // UI, retried dispatch, second device) instead of silently accepting an out-of-order reclaim.
+      const gate = canRecordPostflight(action.payload.aircraftId, state, action.payload.performedAtUtc);
+      if (!gate.ok) {
+        const audit = {
+          id: `aud-${action.payload.id}-rejected`, actorOid: action.payload.performedByOid, action: 'POSTFLIGHT_REJECTED_CUSTODY' as const,
+          entityType: 'Postflight' as const, entityId: action.payload.aircraftId, atUtc: action.payload.performedAtUtc,
+          summary: `Rejected postflight on ${action.payload.aircraftId}: ${gate.reason}`,
+        };
+        return { ...state, audit: [audit, ...state.audit].slice(0, 500) };
+      }
       return { ...state, postflights: [...state.postflights, action.payload] };
+    }
+    case 'SUPERSEDE_POSTFLIGHT': {
+      const rejected = maybeRejectSupersede(state, state.postflights, 'Postflight', action.payload);
+      return rejected ?? { ...state, postflights: [...state.postflights, action.payload] };
+    }
     case 'ADD_COORDINATION_MESSAGE':
       return { ...state, coordinationMessages: [...state.coordinationMessages, action.payload] };
     case 'EDIT_COORDINATION_MESSAGE':
@@ -81,14 +124,23 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
     case 'DELETE_COORDINATION_MESSAGE':
       return { ...state, coordinationMessages: state.coordinationMessages.filter(m => m.id !== action.payload) };
     case 'ADD_RECORD_NOTE':
-    case 'SUPERSEDE_RECORD_NOTE':
       return { ...state, recordNotes: [...state.recordNotes, action.payload] };
+    case 'SUPERSEDE_RECORD_NOTE': {
+      const rejected = maybeRejectSupersede(state, state.recordNotes, 'RecordNote', action.payload);
+      return rejected ?? { ...state, recordNotes: [...state.recordNotes, action.payload] };
+    }
     case 'DISMISS_NOTIFICATION':
       return state.dismissedNotifications.includes(action.payload)
         ? state
         : { ...state, dismissedNotifications: [...state.dismissedNotifications, action.payload] };
     case 'SET_PERSONA':
       return { ...state, currentUserOid: action.payload };
+    // EDIT_AIRCRAFT / EDIT_PERSONNEL / EDIT_MEL_ITEM are the raw apply-mechanism applyApproval uses
+    // after DECIDE_APPROVAL clears the four-eyes gate (SE-2) — they stay reachable as reducer
+    // primitives, but any NEW external dispatch of these three actions for a discretionary
+    // cert/provisional-status/RII edit should route through PROPOSE_CHANGE instead. The one
+    // existing exception is JourneyLog.tsx's EDIT_AIRCRAFT, which updates cumulative airframe
+    // totals as a byproduct of signing a flight leg, not a deliberate reference-data edit.
     case 'EDIT_AIRCRAFT':
       return { ...state, aircraft: state.aircraft.map(a => (a.id === action.payload.id ? action.payload : a)) };
     case 'EDIT_PERSONNEL':
@@ -108,6 +160,41 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       };
     case 'ADD_INTEGRATION_EVENT':
       return { ...state, integrationEvents: [action.payload, ...state.integrationEvents].slice(0, 200) };
+    case 'ACK_AOG':
+      return { ...state, aogAcks: [action.payload, ...(state.aogAcks ?? [])].slice(0, 200) };
+    case 'PROPOSE_CHANGE':
+      return { ...state, pendingApprovals: [...state.pendingApprovals, action.payload] };
+    case 'DECIDE_APPROVAL': {
+      const { id, approve, decidedByOid, decidedAtUtc, rejectionReason } = action.payload;
+      const pending = state.pendingApprovals.find(p => p.id === id && p.status === 'PENDING');
+      if (!pending || isSelfApproval(pending, decidedByOid)) return state; // self-approval is never valid, defense-in-depth
+      const decided: PendingApproval = { ...pending, status: approve ? 'APPROVED' : 'REJECTED', decidedByOid, decidedAtUtc, rejectionReason };
+      const entityId = (() => {
+        switch (pending.kind) {
+          case 'MEL_TYPE_ACTIVATION': return pending.aircraftId;
+          case 'AIRCRAFT_EDIT': return pending.after.id;
+          case 'PERSONNEL_EDIT': return pending.after.oid;
+          case 'MEL_ITEM_APPROVAL': return pending.melItemId;
+        }
+      })();
+      const audit: AuditEntry = {
+        id: newId('aud'),
+        actorOid: decidedByOid,
+        action: approve ? 'REFERENCE_CHANGE_APPROVED' : 'REFERENCE_CHANGE_REJECTED',
+        entityType: pending.kind,
+        entityId,
+        atUtc: decidedAtUtc,
+        summary: `${approve ? 'Approved' : 'Rejected'} (proposed by ${pending.proposedByOid}): ${pending.summary}`,
+      };
+      const next: TechLogState = {
+        ...state,
+        pendingApprovals: state.pendingApprovals.map(p => (p.id === id ? decided : p)),
+        audit: [audit, ...state.audit].slice(0, 500),
+      };
+      if (!approve) return next;
+      const applied = applyApproval({ aircraft: next.aircraft, personnel: next.personnel, melItems: next.melItems }, pending);
+      return { ...next, ...applied };
+    }
     case 'RESET_STATE':
       // Reseed everything but keep whoever is currently signed in (don't snap back to the seed pilot),
       // as long as that person still exists in the reseeded personnel.
@@ -151,6 +238,15 @@ export function TechLogProvider({ children, userRole }: { children: ReactNode; u
     dispatch({ type: 'SET_PERSONA', payload: oid });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole]);
+
+  const conflictCountRef = useRef(0);
+  useEffect(() => {
+    if (state.supersedeConflicts.length > conflictCountRef.current) {
+      const latest = state.supersedeConflicts[0];
+      toast.error(`Correction rejected: ${latest.entityType} ${latest.supersedesId} was already corrected by someone else. Routed to reconciliation — see Audit & Ledger → Conflicts.`);
+    }
+    conflictCountRef.current = state.supersedeConflicts.length;
+  }, [state.supersedeConflicts]);
 
   useEffect(() => {
     const t = setTimeout(() => {

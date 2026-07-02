@@ -167,6 +167,8 @@ export interface WorkStep {
   text: string;
   done: boolean;
   riiRequired?: boolean;
+  riiInspectorOid?: string;   // independent inspector who signed THIS step (per-step RII)
+  riiSignatureId?: string;    // the inspector's signature on this step
 }
 
 /** A pulled CAMP work order / task card under execution. Updatable WIP until the completion sign-off. */
@@ -432,6 +434,43 @@ export interface AuditEntry {
   summary: string;
 }
 
+export type SupersedeEntityType = 'Defect' | 'Deferral' | 'FlightLog' | 'Postflight' | 'RecordNote';
+
+/** A rejected forked supersede attempt — DM-2: two superseding rows targeting the same parent.
+ * Recorded for human reconciliation instead of silently creating two "current" rows. */
+export interface SupersedeConflict {
+  id: string;
+  entityType: SupersedeEntityType;
+  attemptedRowId: string;
+  supersedesId: string;
+  rejectedAtUtc: string;
+  rejectedActorOid: string;
+}
+
+export type ReferenceChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+interface PendingApprovalBase {
+  id: string;
+  summary: string;
+  proposedByOid: string;
+  proposedAtUtc: string;
+  status: ReferenceChangeStatus;
+  decidedByOid?: string;
+  decidedAtUtc?: string;
+  rejectionReason?: string;
+}
+
+/** Four-eyes gate (CLAUDE.md SE-2) for updatable reference data — Aircraft, Personnel, MEL-type
+ * D195 activation. A proposed change never applies to live state until a SEPARATE maintenance user
+ * approves it (enforced in the reducer via engine/approvals.isSelfApproval, not just hidden in the UI). */
+export type PendingApproval = PendingApprovalBase &
+  (
+    | { kind: 'AIRCRAFT_EDIT'; before: Aircraft; after: Aircraft }
+    | { kind: 'PERSONNEL_EDIT'; before: Personnel; after: Personnel }
+    | { kind: 'MEL_TYPE_ACTIVATION'; aircraftId: string; aircraftType: AircraftType; melItemIds: string[]; evidenceRef: string }
+    | { kind: 'MEL_ITEM_APPROVAL'; melItemId: string; evidenceRef: string }
+  );
+
 // ── Phase-2 integration correlation (OFF-ledger, per spec §18.1) ──
 export type CampPushState = 'PENDING' | 'PUSHED' | 'FAILED';
 export interface CampCorrelation {
@@ -447,8 +486,18 @@ export interface IntegrationEvent {
   system: 'CAMP' | 'MYAIROPS';
   op: string;
   summary: string;               // identifiers + outcome only (no payloads/PII)
-  outcome: 'OK' | 'ERROR' | 'EMPTY';
+  outcome: 'OK' | 'ERROR' | 'EMPTY' | 'BLOCKED';
   atUtc: string;
+}
+
+// OFF-ledger AOG acknowledgement — escalation/notification log, not a signed ledger record.
+export interface AogAck {
+  aircraftId: string;
+  escalationAtAck: 'MONITOR' | 'ELEVATED' | 'CRITICAL';
+  acknowledgedByOid: string;
+  acknowledgedByName: string;
+  atUtc: string;
+  note?: string;
 }
 
 export interface TechLogState {
@@ -473,9 +522,12 @@ export interface TechLogState {
   postflights: Postflight[];
   coordinationMessages: CoordinationMessage[];
   recordNotes: RecordNote[];
+  supersedeConflicts: SupersedeConflict[]; // rejected forked supersede attempts (DM-2) — human reconciliation
+  pendingApprovals: PendingApproval[]; // four-eyes queue (SE-2) — Aircraft/Personnel/MEL-activation proposals
   dismissedNotifications: string[];     // notification keys the user has cleared
   campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
   integrationEvents: IntegrationEvent[];
+  aogAcks?: AogAck[];                    // OFF-ledger AOG acknowledgement / escalation log
   currentUserOid: string;
   nowOverrideUtc?: string; // optional demo clock
 }
@@ -521,4 +573,7 @@ export type TechLogAction =
   | { type: 'EDIT_MEL_ITEM'; payload: MelItem }
   | { type: 'UPSERT_CAMP_CORRELATION'; payload: CampCorrelation }
   | { type: 'ADD_INTEGRATION_EVENT'; payload: IntegrationEvent }
+  | { type: 'ACK_AOG'; payload: AogAck }
+  | { type: 'PROPOSE_CHANGE'; payload: PendingApproval }
+  | { type: 'DECIDE_APPROVAL'; payload: { id: string; approve: boolean; decidedByOid: string; decidedAtUtc: string; rejectionReason?: string } }
   | { type: 'RESET_STATE'; payload: TechLogState };

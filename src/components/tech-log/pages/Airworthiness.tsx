@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gauge, ClipboardList, RefreshCw, Cloud, Info } from 'lucide-react';
+import { Gauge, ClipboardList, RefreshCw, Cloud, Info, History } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
-import { campForecast, campComponentTimes, campAdSb } from '../integration/campClient';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -32,10 +31,11 @@ export default function Airworthiness({ view }: { view: View }) {
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
   const now = Date.now();
 
-  const forecast = useMemo(() => (ac ? campForecast(ac.serialNumber, { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles }) : []), [ac]);
-  const times = useMemo(() => (ac ? campComponentTimes(ac.serialNumber, ac.airframeTotalHours, ac.airframeTotalCycles) : null), [ac]);
-  const adsb = useMemo(() => (ac ? campAdSb(ac.serialNumber) : []), [ac]);
+  const forecast = useMemo(() => (ac ? integration.readForecast(ac.id) : []), [ac]);
+  const times = useMemo(() => (ac ? integration.readComponentTimes(ac.id) : null), [ac]);
+  const adsb = useMemo(() => (ac ? integration.readAdSb(ac.id) : { items: [], unconfirmed: true, openQuestion: '' }), [ac]);
   const workOrders = useMemo(() => state.workCards.slice().sort((a, b) => a.headerStatusCode - b.headerStatusCode), [state.workCards]);
+  const closedWos = useMemo(() => view === 'workorders' ? dispatchable.flatMap(a => integration.readClosedWorkOrders(a.id).map(w => ({ ...w, tail: a.tailNumber }))) : [], [view]);
 
   const perAircraft = view !== 'workorders';
 
@@ -117,10 +117,14 @@ export default function Airworthiness({ view }: { view: View }) {
         <div className="space-y-2">
           <Card className="border-[var(--gfo-warning,#F1B434)]/40">
             <CardContent className="flex items-start gap-2 p-3 text-xs text-muted-foreground">
-              <Info className="mt-0.5 h-4 w-4" /> The CAMP read function for AD/SB status is not in the GEN/STA/WRK integration docs — treat as an <strong>Open Question</strong> to confirm before wiring the real read. Data below is mock.
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="space-y-1">
+                {adsb.unconfirmed && <Badge variant="outline" className="border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]">OQ: CAMP read function unconfirmed</Badge>}
+                <div>The CAMP read function for AD/SB status is not in the GEN/STA/WRK integration docs — treat as an <strong>Open Question</strong> to confirm before wiring the real read. Data below is mock.</div>
+              </div>
             </CardContent>
           </Card>
-          {adsb.map(it => {
+          {adsb.items.map(it => {
             const days = it.nextDueUtc ? Math.floor((new Date(it.nextDueUtc).getTime() - now) / DAY) : null;
             return (
               <Card key={it.id}>
@@ -161,6 +165,19 @@ export default function Airworthiness({ view }: { view: View }) {
               </CardContent>
             </Card>
           ))}
+          {closedWos.length > 0 && (
+            <Card className="mt-2">
+              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4" /> Closed work orders (CAMP history)</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                {closedWos.map((w, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 border-b py-1 text-xs last:border-0">
+                    <span><span className="font-mono">{w.woNumber}</span> · {w.tail} · ATA {w.ata} — {w.title}</span>
+                    <span className="text-muted-foreground">{new Date(w.closedDateUtc).toLocaleDateString()} · {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </TechLogShell>

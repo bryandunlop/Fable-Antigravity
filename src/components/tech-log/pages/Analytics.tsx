@@ -130,6 +130,19 @@ export default function Analytics() {
                 ))}
               </div>
             )}
+            {mt.byAta.length > 0 && (
+              <div className="mt-3">
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Removals by ATA chapter</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {mt.byAta.map(a => (
+                    <span key={a.ata} className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs">
+                      <span className="font-medium">ATA {a.ata}</span>
+                      <span className="text-muted-foreground">· {a.removals} removal{a.removals === 1 ? '' : 's'}{a.mtbur != null ? ` · ${a.mtbur} h` : ''}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FilePlus, AlertTriangle, Wrench, CheckCircle2, Paperclip, Camera, MapPin, X, Repeat, Pencil } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useIntegration } from '../integration/useIntegration';
+import { useRectifyToWorkCard } from '../useRectify';
 import { currentRows } from '../engine/supersede';
 import { canSupersede } from '../engine/authz';
 import { mockSha256 } from '../engine/signing';
@@ -31,6 +33,8 @@ export default function Defects() {
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
+  const integration = useIntegration();
+  const rectifyToWorkCard = useRectifyToWorkCard();
   const tailFilter = params.get('tail') ?? undefined;
 
   const [formOpen, setFormOpen] = useState(params.get('new') === '1');
@@ -172,6 +176,12 @@ export default function Defects() {
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig as any });
     dispatch({ type: 'SUPERSEDE_DEFECT', payload: corrected });
+    // CAMP: a correction re-pushes as EDIT, carrying the parent discrepancy ref forward (off-ledger, OQ9).
+    integration.pushDiscrepancy({
+      entityType: 'DEFECT', entityId: corrected.id, aircraftId: corrected.aircraftId,
+      ata: corrected.ataChapter, description: corrected.description,
+      technician: user.displayName, intent: 'CORRECT', supersedesEntityId: correctOrig.id,
+    });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFECT_CORRECTED', entityType: 'Defect', entityId: corrected.id, atUtc: new Date().toISOString(), summary: `${tailOf(corrected.aircraftId)} ATA ${corrected.ataChapter} defect corrected (supersedes ${correctOrig.id})${signerOfDefect(correctOrig) !== user.oid ? ' — third-party correction' : ''}` } });
     toast.success('Correction signed — original retained, correction is now current.');
     setCorrectOrig(null);
@@ -268,9 +278,10 @@ export default function Defects() {
                     <Button size="sm" variant="secondary" onClick={() => navigate(`/tech-log/deferrals?defect=${d.id}`)}>
                       <Wrench className="mr-1.5 h-4 w-4" /> Defer (MEL)
                     </Button>
-                    <Button size="sm" onClick={() => navigate(`/tech-log/releases?defect=${d.id}`)}>
-                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify (CRS)
+                    <Button size="sm" onClick={() => rectifyToWorkCard(d)}>
+                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify
                     </Button>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/tech-log/releases?defect=${d.id}`)}>Quick CRS</Button>
                   </>
                 )}
               </div>

@@ -209,8 +209,8 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
       label: "Maintenance",
       items: [
         { name: 'Maintenance Hub', href: '/maintenance-hub', icon: Monitor, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'], description: 'Overview dashboard' },
-        { name: 'Tech Log', href: '/tech-log', icon: FileText, roles: ['pilot', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Report squawks' },
-        { name: 'Work Orders', href: '/work-orders', icon: ClipboardCheck, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Manage work orders' },
+        { name: 'Tech Log', href: '/tech-log', icon: FileText, roles: ['pilot', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'eTechLog — squawks, deferrals, releases, work cards, fleet status (canonical maintenance surface)' },
+        // 'Work Orders' (/work-orders, legacy WorkOrders.tsx) removed — duplicate of Tech Log → Work Cards. See docs/CANONICAL_MAINTENANCE_SURFACE.md.
         { name: 'My Maintenance', href: '/maintenance-dashboard', icon: Clipboard, roles: ['maintenance', 'maintenance-coordinator'], description: 'Personal dashboard' },
         { name: 'Aircraft Cleaning', href: '/aircraft-cleaning', icon: Sparkles, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Track cleaning status' },
       ]
@@ -226,7 +226,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
       label: "Maintenance Compliance",
       items: [
         { name: 'MEL/CDL Management', href: '/mel-cdl', icon: AlertTriangle, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-        { name: 'Maintenance Turnover', href: '/maintenance-turnover', icon: ArrowRightLeft, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'], description: 'Shift handover protocol' },
+        // 'Maintenance Turnover' (/maintenance-turnover → AviaSync ShiftHandover) removed — duplicate of Tech Log handover (Briefing/Postflight). See docs/CANONICAL_MAINTENANCE_SURFACE.md.
         { name: 'Turndown Reports', href: '/turndown-reports', icon: FileText, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
         { name: 'Turndown Form', href: '/turndown-form', icon: ClipboardList, roles: ['maintenance', 'maintenance-coordinator'] },
       ]
@@ -238,7 +238,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Car Tracking', href: '/car-tracking', icon: Package, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
         { name: 'Airport Services', href: '/airport-services', icon: Building2, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
         { name: 'Fuel Farm Tracker', href: '/fuel-farm', icon: Fuel, roles: ['maintenance', 'maintenance-coordinator', 'dom'] },
-        { name: 'Maintenance Board', href: '/maintenance', icon: Wrench, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
+        // 'Maintenance Board' (/maintenance, legacy MaintenanceContext board) removed — duplicate of Tech Log fleet/board. See docs/CANONICAL_MAINTENANCE_SURFACE.md.
         { name: 'Standalone GRAT', href: '/grat/standalone', icon: Shield, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
       ]
     },
@@ -296,18 +296,8 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Document Library', href: '/documents', icon: Archive, roles: ['dms-manager'] },
       ]
     },
-    {
-      label: "AviaSync Workflow",
-      items: [
-        { name: 'AviaSync Dashboard', href: '/maintenance-workflow', icon: Monitor, roles: ['maintenance-workflow'] },
-        { name: 'Electronic Tech Log', href: '/maintenance-workflow/tech-log', icon: ClipboardList, roles: ['maintenance-workflow'] },
-        { name: 'MEL Management', href: '/maintenance-workflow/mel', icon: AlertTriangle, roles: ['maintenance-workflow'] },
-        { name: 'Work Order Board', href: '/maintenance-workflow/work-orders', icon: Wrench, roles: ['maintenance-workflow'] },
-        { name: 'Technician View', href: '/maintenance-workflow/technician', icon: HardHat, roles: ['maintenance-workflow'] },
-        { name: 'Shift Handover', href: '/maintenance-workflow/handover', icon: ArrowRightLeft, roles: ['maintenance-workflow'] },
-        { name: 'Predictive Analytics', href: '/maintenance-workflow/analytics', icon: BarChart3, roles: ['maintenance-workflow'] },
-      ]
-    },
+    // 'AviaSync Workflow' nav group removed (duplicate eTechLog). Routes + files retained under
+    // src/components/maintenance-workflow/. See docs/CANONICAL_MAINTENANCE_SURFACE.md.
     // {
     //   label: "Tax Compliance",
     //   items: [

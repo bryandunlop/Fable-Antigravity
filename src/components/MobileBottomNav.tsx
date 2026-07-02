@@ -52,7 +52,7 @@ export default function MobileBottomNav({ userRole }: MobileBottomNavProps) {
       case 'maintenance':
         return [
           ...baseItems,
-          { name: 'Maintenance', href: '/maintenance', icon: Wrench },
+          { name: 'Tech Log', href: '/tech-log', icon: Wrench },
           { name: 'Parts', href: '/parts-inventory', icon: Boxes }
         ];
       

@@ -1,6 +1,7 @@
 import type { TechLogState, Trip } from '../types';
 import { deriveServiceability } from './serviceability';
 import { requiresFuelFarmSubmission } from './fuel';
+import { deferralsRequiringAck } from './handover';
 
 export type TripReadiness = 'RED' | 'NOT_READY' | 'READY';
 
@@ -16,7 +17,7 @@ const FRAT_NO_GO = 25;
 export function deriveTripReadiness(
   trip: Trip,
   state: Pick<TechLogState, 'aircraft' | 'defects' | 'deferrals'> &
-    Partial<Pick<TechLogState, 'recurringChecks' | 'recurringAccomplishments'>>,
+    Partial<Pick<TechLogState, 'recurringChecks' | 'recurringAccomplishments' | 'melItems' | 'briefings'>>,
   asOfUtc: string,
 ): TripReadinessResult {
   const verdict = (s: TripReadiness, extra: Partial<TripReadinessResult> = {}): TripReadinessResult =>
@@ -33,6 +34,19 @@ export function deriveTripReadiness(
   // (2) A FRAT no-go (>= 25) grounds the trip independently of serviceability — evaluated only after the aircraft-RED check above.
   const noGo = legs.find(l => l.fratScore != null && l.fratScore >= FRAT_NO_GO);
   if (noGo) return verdict('RED', { blocker: 'FRAT no-go (>= 25)', drivingLegId: noGo.id });
+
+  // (3) An ACTIVE deferral requiring PIC acknowledgement (restriction/placard/(O) procedure) that
+  // hasn't actually been acknowledged via the latest briefing — must agree with the BriefingPanel
+  // acceptance gate (handover.ts) rather than being silently invisible to trip dispatch.
+  const ackRequired = deferralsRequiringAck(trip.aircraftId, { deferrals: state.deferrals, melItems: state.melItems ?? [] }, asOfUtc);
+  if (ackRequired.length) {
+    const latestBriefing = (state.briefings ?? [])
+      .filter(b => b.aircraftId === trip.aircraftId && b.status === 'ACKNOWLEDGED')
+      .sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0];
+    const acked = new Set(latestBriefing?.acknowledgedDeferralIds ?? []);
+    const unacked = ackRequired.find(d => !acked.has(d.id));
+    if (unacked) return verdict('NOT_READY', { blocker: 'Deferral acknowledgement pending' });
+  }
 
   // NOT_READY: outstanding pilot-owed preflight items.
   const fratPending = legs.find(l => l.fratStatus !== 'COMPLETED');

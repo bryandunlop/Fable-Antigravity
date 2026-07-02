@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Inbox, AlertTriangle, Wrench, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Inbox, AlertTriangle, Wrench, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
 import { buildWorkQueue } from '../engine/workqueue';
@@ -19,6 +19,8 @@ export default function WorkQueue() {
   const navigate = useNavigate();
   const isMaint = user.role === 'MAINTENANCE';
   const now = new Date().toISOString();
+  const [riiOnly, setRiiOnly] = useState(false);
+  const isRii = (w: { riiRequired: boolean; steps: { riiRequired?: boolean }[] }) => w.riiRequired || w.steps.some(s => s.riiRequired);
 
   const wq = useMemo(() => buildWorkQueue(state, now), [state, now]);
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
@@ -111,13 +113,21 @@ export default function WorkQueue() {
           ))}
         </Section>
 
-        <Section icon={<ClipboardList className="h-4 w-4" />} title="Open work cards" count={wq.counts.openWorkCards}>
-          {wq.openWorkCards.length === 0 ? empty : wq.openWorkCards.map(w => (
-            <Row key={w.id} onClick={() => navigate(`/tech-log/work-cards/${w.id}`)}>
-              <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{w.cardNumber}</span><span className="font-semibold">{tailOf(w.aircraftId)}</span><Badge variant="outline">ATA {w.ataChapter}</Badge><Badge variant={w.status === 'IN_WORK' ? 'secondary' : 'destructive'}>{w.status}</Badge></div>
-              <p className="mt-0.5 truncate text-muted-foreground">{w.title} · steps {w.steps.filter(s => s.done).length}/{w.steps.length}</p>
-            </Row>
-          ))}
+        <Section icon={<ClipboardList className="h-4 w-4" />} title="Open work cards" count={(riiOnly ? wq.openWorkCards.filter(isRii) : wq.openWorkCards).length}>
+          <div className="mb-1 flex justify-end">
+            <Button size="sm" variant={riiOnly ? 'default' : 'outline'} className="h-7" onClick={() => setRiiOnly(v => !v)}>
+              <UserCheck className="mr-1 h-3.5 w-3.5" /> RII only
+            </Button>
+          </div>
+          {(() => {
+            const cards = riiOnly ? wq.openWorkCards.filter(isRii) : wq.openWorkCards;
+            return cards.length === 0 ? empty : cards.map(w => (
+              <Row key={w.id} onClick={() => navigate(`/tech-log/work-cards/${w.id}`)}>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{w.cardNumber}</span><span className="font-semibold">{tailOf(w.aircraftId)}</span><Badge variant="outline">ATA {w.ataChapter}</Badge><Badge variant={w.status === 'IN_WORK' ? 'secondary' : 'destructive'}>{w.status}</Badge>{isRii(w) && <Badge variant="outline"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}</div>
+                <p className="mt-0.5 truncate text-muted-foreground">{w.title} · steps {w.steps.filter(s => s.done).length}/{w.steps.length}</p>
+              </Row>
+            ));
+          })()}
         </Section>
 
         {wq.counts.urgent === 0 && (

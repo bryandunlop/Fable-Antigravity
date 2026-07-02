@@ -2,7 +2,7 @@
 // increase-only utilization, EXACT serial match, error taxonomy) but returns FAKED data.
 // Dev swaps this for a real `soap`/`strong-soap` client against the CAMP **sandbox** WSDL later.
 import {
-  CAMP_BASE_URLS, CAMP_ENV, CAMP_ERROR, hoursToCampMinutes, campMinutesToHours, DUE_LIST_CAP_MONTHS,
+  CAMP_BASE_URLS, CAMP_ERROR, hoursToCampMinutes, campMinutesToHours, DUE_LIST_CAP_MONTHS,
 } from './campTaxonomy';
 import type { IntegrateMode, DiscrepancyType, MelFlag } from './campTaxonomy';
 
@@ -11,12 +11,37 @@ export interface CampResult<T> { ok: boolean; data?: T; errorCode?: number | str
 let _sessionKey: string | null = null;
 let _runCounter = 0;
 
+// Demo error-injection — exercises the CAMP error taxonomy in the UI. One-shot: consumed by the next call.
+let _injectLoginError: { code: number | string; msg: string } | null = null;
+let _injectCallError: { code: number | string; msg: string } | null = null;
+export function injectNextLoginError(code: number | string, msg: string) { _injectLoginError = { code, msg }; }
+export function injectNextCallError(code: number | string, msg: string) { _injectCallError = { code, msg }; }
+
+// ── Environment + production-promotion gate (CLAUDE.md Sandbox rule) ──
+// Dev/test is locked to sandbox. Promotion to production is a deliberate, typed-confirmation,
+// human-gated step — never automatic. A production push is REFUSED unless the gate is open.
+// The demo never carries a real production URL/credential — this models the GATE contract only.
+export type CampEnv = 'sandbox' | 'production';
+let _env: CampEnv = 'sandbox';
+let _prodGateOpen = false;
+export const PROMOTION_CONFIRM_PHRASE = 'PROMOTE TO PRODUCTION';
+export function getCampEnv(): CampEnv { return _env; }
+export function isProductionGateOpen(): boolean { return _prodGateOpen; }
+export function promoteToProduction(confirmText: string): boolean {
+  if (confirmText.trim().toUpperCase() !== PROMOTION_CONFIRM_PHRASE) return false;
+  _env = 'production'; _prodGateOpen = true; return true;
+}
+export function revertToSandbox(): void { _env = 'sandbox'; _prodGateOpen = false; }
+/** Demo aid: force an env without opening the gate, to exercise the production-push refusal. */
+export function setEnvUnsafeForDemo(env: CampEnv): void { _env = env; _prodGateOpen = false; }
+
 function sessionError<T>(): CampResult<T> {
   return { ok: false, errorCode: CAMP_ERROR.SESSION_NOT_VALID.code, errorMsg: CAMP_ERROR.SESSION_NOT_VALID.msg };
 }
 
 /** GEN LogIn -> encrypted security key (cached in memory for one run only). */
 export function campLogin(): CampResult<{ key: string }> {
+  if (_injectLoginError) { const e = _injectLoginError; _injectLoginError = null; return { ok: false, errorCode: e.code, errorMsg: e.msg }; }
   _sessionKey = `mock-key-${++_runCounter}`;
   return { ok: true, data: { key: _sessionKey } };
 }
@@ -40,16 +65,72 @@ export interface DiscrepancyPush {
   technician?: string;
   inspector?: string;
   existingDiscrepancyId?: string; // EDIT/UPDATE of a previously-pushed discrepancy
+  status?: 'Open' | 'Closed';     // Open on INSERT/EDIT; Closed on UPDATE (rectification / clearance)
 }
 
 /** IntegrateDiscrepancies (STA). Mock returns a generated CAMP discrepancy id. */
 export function integrateDiscrepancies(p: DiscrepancyPush, expectedSerial: string): CampResult<{ discrepancyId: string }> {
+  if (_env === 'production' && !_prodGateOpen) {
+    return { ok: false, errorCode: 'PROD_GATE_CLOSED', errorMsg: 'Refusing production CAMP push — promotion gate not open (deliberate human-gated step required).' };
+  }
   if (!_sessionKey) return sessionError();
   if (p.serial !== expectedSerial) {
     return { ok: false, errorCode: CAMP_ERROR.INVALID_OPERATION.code, errorMsg: `serial mismatch '${p.serial}' vs CAMP '${expectedSerial}' (the #1 CAMP integration failure mode)` };
   }
   const id = p.existingDiscrepancyId ?? `CAMP-DISC-${p.ata}-${Math.abs(hashStr(p.serial + p.description)) % 100000}`;
   return { ok: true, data: { discrepancyId: id } };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// UTILIZATION PUSH — OPEN QUESTION 1 (BLOCKED; do NOT implement a transport).
+// The CAMP SOAP operation to push utilization (airframe hours/cycles/landings) is
+// NOT in the GEN/STA/WRK WSDLs. Per CLAUDE.md hard rule we NEVER invent a function
+// name. This placeholder validates the documented guards (exact-serial, increase-only)
+// and prepares the minutes-converted payload, but REFUSES to transmit until the real
+// operation is confirmed under the CAMP **sandbox**. Dev: wire the confirmed op here.
+// ──────────────────────────────────────────────────────────────────────────────
+export const UTILIZATION_PUSH_OPEN_QUESTION =
+  'OQ1: CAMP utilization-push SOAP operation is undocumented — confirm under sandbox before implementing. Do not invent an endpoint.';
+
+export interface UtilizationPush {
+  serial: string;          // must match CAMP exactly (incl. hyphens/caps)
+  airframeHours: number;   // myGFO hours; ×60 → CAMP minutes at the boundary
+  cycles: number;
+  landings: number;
+}
+export interface UtilizationPushResult {
+  status: 'BLOCKED_UNDOCUMENTED';
+  openQuestion: string;
+  validation: { serialMatches: boolean; increaseOnly: boolean };
+  /** What WOULD be sent once the real op is confirmed (minutes-converted) — never transmitted. */
+  preparedPayload?: { serial: string; totalTimeMinutes: number; cycles: number; landings: number };
+}
+
+/**
+ * Utilization push — intentionally BLOCKED pending Open Question 1.
+ * Returns ok:false with the OQ message; validates exact-serial + increase-only and
+ * prepares the minutes-converted payload for inspection, but NEVER transmits and
+ * NEVER names a SOAP operation (CLAUDE.md: "NEVER invent a CAMP function name").
+ */
+export function pushUtilization_TODO_UNDOCUMENTED(
+  p: UtilizationPush,
+  expectedSerial: string,
+  lastSentTotals?: { airframeHours: number; cycles: number; landings: number },
+): CampResult<UtilizationPushResult> {
+  const serialMatches = p.serial === expectedSerial;
+  const increaseOnly = !lastSentTotals
+    || (p.airframeHours >= lastSentTotals.airframeHours
+      && p.cycles >= lastSentTotals.cycles
+      && p.landings >= lastSentTotals.landings);
+  const preparedPayload = serialMatches && increaseOnly
+    ? { serial: p.serial, totalTimeMinutes: hoursToCampMinutes(p.airframeHours), cycles: p.cycles, landings: p.landings }
+    : undefined;
+  return {
+    ok: false,
+    errorCode: 'OQ1_UNDOCUMENTED',
+    errorMsg: UTILIZATION_PUSH_OPEN_QUESTION,
+    data: { status: 'BLOCKED_UNDOCUMENTED', openQuestion: UTILIZATION_PUSH_OPEN_QUESTION, validation: { serialMatches, increaseOnly }, preparedPayload },
+  };
 }
 
 /** GetLatestAircraftTimes (read; CAMP returns MINUTES). */
@@ -68,8 +149,41 @@ export function getAircraftDueList(serial: string, items: CampDueItem[]): CampRe
 
 /** GetAircraftState (cached Green/Yellow/Orange/Red read). */
 export function getAircraftState(serial: string, color: 'Green' | 'Yellow' | 'Orange' | 'Red'): CampResult<{ serial: string; state: string }> {
+  if (_injectCallError) { const e = _injectCallError; _injectCallError = null; return { ok: false, errorCode: e.code, errorMsg: e.msg }; }
   if (!_sessionKey) return sessionError();
   return { ok: true, data: { serial, state: color } };
+}
+
+export interface CampDiscrepancy {
+  discrepancyId: string;
+  ata: string;
+  description: string;
+  discrepancyType: DiscrepancyType;
+  status: 'Open' | 'Closed';
+  melFlag?: MelFlag;
+  restriction?: string;
+}
+
+/**
+ * GetAircraftDiscrepancies (STA, read). Mock returns everything CAMP holds for the tail:
+ * the discrepancies myGFO previously pushed (echoed via `knownRefs`) PLUS discrepancies
+ * entered directly in CAMP (e.g. at a contract service center) that myGFO has never seen.
+ * The caller reconciles these against its off-ledger correlation table.
+ */
+export function getAircraftDiscrepancies(serial: string, knownRefs: string[] = []): CampResult<CampDiscrepancy[]> {
+  if (!_sessionKey) return sessionError();
+  const echoed: CampDiscrepancy[] = knownRefs.map(ref => ({
+    discrepancyId: ref,
+    ata: ref.split('-')[2] ?? '00',
+    description: `Synced from myGFO (${ref})`,
+    discrepancyType: 'NON-DEFERRED',
+    status: 'Open',
+  }));
+  const s = Math.abs(hashStr(serial));
+  const campDirect: CampDiscrepancy[] = [
+    { discrepancyId: `CAMP-DISC-25-${s % 100000}`, ata: '25', description: 'Cabin seat 2L recline inoperative (entered at service center)', discrepancyType: 'DEFERRED-WATCHLIST', status: 'Open', melFlag: 'D' },
+  ];
+  return { ok: true, data: [...echoed, ...campDirect] };
 }
 
 // ── WRK: work-order details (Phase 3 task-card pull) ──
@@ -128,7 +242,10 @@ const WO_CATALOG: Omit<CampWoDetails, 'serial' | 'headerStatusCode'>[] = [
 /** List the open CAMP work orders available to pull for a serial (faked). */
 export function listOpenWorkOrders(serial: string): CampResult<{ woNumber: string; title: string; ata: string; scheduled: boolean; riiRequired: boolean }[]> {
   if (!_sessionKey) return sessionError();
-  return { ok: true, data: WO_CATALOG.map(w => ({ woNumber: w.woNumber, title: w.title, ata: w.ata, scheduled: w.scheduled, riiRequired: w.riiRequired })) };
+  // Serial-key the catalog so different tails surface a different open-WO ordering (rotation keeps every WO findable by getWODetails).
+  const off = Math.abs(hashStr(serial)) % WO_CATALOG.length;
+  const rotated = [...WO_CATALOG.slice(off), ...WO_CATALOG.slice(0, off)];
+  return { ok: true, data: rotated.map(w => ({ woNumber: w.woNumber, title: w.title, ata: w.ata, scheduled: w.scheduled, riiRequired: w.riiRequired })) };
 }
 
 /** GetWODetails (WRK). Mock returns the catalog entry with task/squawk detail lines. */
@@ -139,7 +256,30 @@ export function getWODetails(serial: string, woNumber: string): CampResult<CampW
   return { ok: true, data: { ...found, serial, headerStatusCode: 1 } }; // 1 = Open
 }
 
-export const campMeta = { baseUrls: CAMP_BASE_URLS, env: CAMP_ENV, minutesToHours: campMinutesToHours };
+export interface CampClosedWo {
+  woNumber: string;
+  serial: string;
+  title: string;
+  ata: string;
+  closedDateUtc: string;
+  headerStatusCode: number; // 0 = Complied With
+}
+
+/** GetClosedWorkOrders (WRK, read) — WO compliance history for a serial. Deterministic per serial. */
+export function getClosedWorkOrders(serial: string): CampResult<CampClosedWo[]> {
+  const s = Math.abs(hashStr(serial));
+  const at = (days: number) => new Date(Date.now() - days * 86400000).toISOString();
+  return {
+    ok: true,
+    data: [
+      { woNumber: `WO-05-0${100 + (s % 90)}`, serial, title: 'Phase A inspection — complied', ata: '05', closedDateUtc: at(14 + (s % 10)), headerStatusCode: 0 },
+      { woNumber: `WO-49-0${100 + (s % 80)}`, serial, title: 'APU 200-hr inspection — complied', ata: '49', closedDateUtc: at(45 + (s % 20)), headerStatusCode: 0 },
+      { woNumber: `WO-32-0${100 + (s % 70)}`, serial, title: 'MLG functional check — complied', ata: '32', closedDateUtc: at(90 + (s % 30)), headerStatusCode: 0 },
+    ],
+  };
+}
+
+export const campMeta = { baseUrls: CAMP_BASE_URLS, get env() { return _env; }, minutesToHours: campMinutesToHours };
 
 function hashStr(x: string): number {
   let h = 0;
@@ -210,7 +350,10 @@ export interface CampAdSbItem {
   ata: string;
   nextDueUtc?: string;
 }
-/** Mock AD/SB status. ⚠ The real CAMP read function for this is NOT documented (Open Question). */
+export const CAMP_ADSB_OPEN_QUESTION =
+  'OQ: the CAMP read function for AD/SB status is NOT in the GEN/STA/WRK docs — confirm under sandbox; do not invent an endpoint.';
+
+/** Mock AD/SB status. ⚠ Undocumented CAMP read — see CAMP_ADSB_OPEN_QUESTION (Open Question; no invented endpoint). */
 export function campAdSb(serial: string): CampAdSbItem[] {
   const now = Date.now();
   const s = Math.abs(hashStr(serial));

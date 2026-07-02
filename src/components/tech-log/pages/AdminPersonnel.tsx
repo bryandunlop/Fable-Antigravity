@@ -5,6 +5,7 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { newId } from '../util/id';
 import type { Personnel } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
+import { PendingApprovalsPanel } from '../components/PendingApprovalsPanel';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -19,19 +20,32 @@ export default function AdminPersonnel() {
   const [draft, setDraft] = useState<Personnel | null>(null);
   const [ataText, setAtaText] = useState('');
 
+  const hasPendingEdit = (oid: string) =>
+    state.pendingApprovals.some(p => p.status === 'PENDING' && p.kind === 'PERSONNEL_EDIT' && p.after.oid === oid);
+
   const open = (p: Personnel) => { setDraft({ ...p }); setAtaText(p.riiAuthorizedAta.join(', ')); };
   const save = () => {
     if (!draft) return;
     const ata = ataText.split(',').map(s => s.trim()).filter(Boolean);
-    const updated: Personnel = { ...draft, riiAuthorizedAta: ata, riiAuthorized: draft.riiAuthorized && ata.length > 0 };
-    dispatch({ type: 'EDIT_PERSONNEL', payload: updated });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'PERSONNEL_EDITED', entityType: 'Personnel', entityId: updated.oid, atUtc: new Date().toISOString(), summary: `Edited ${updated.displayName} (A&P ${updated.apCertificateNumber || '—'}, RII ${updated.riiAuthorized ? ata.join('/') : 'none'})` } });
-    toast.success(`Saved ${updated.displayName}.`);
+    const after: Personnel = { ...draft, riiAuthorizedAta: ata, riiAuthorized: draft.riiAuthorized && ata.length > 0 };
+    const before = state.personnel.find(p => p.oid === draft.oid)!;
+    const now = new Date().toISOString();
+    dispatch({
+      type: 'PROPOSE_CHANGE',
+      payload: {
+        id: newId('appr'), kind: 'PERSONNEL_EDIT', before, after,
+        summary: `Edit ${after.displayName} (A&P ${after.apCertificateNumber || '—'}, RII ${after.riiAuthorized ? ata.join('/') : 'none'})`,
+        proposedByOid: user.oid, proposedAtUtc: now, status: 'PENDING',
+      },
+    });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'PERSONNEL_EDIT_PROPOSED', entityType: 'Personnel', entityId: after.oid, atUtc: now, summary: `Proposed edit to ${after.displayName} — awaiting a separate approver` } });
+    toast.success(`Edit to ${after.displayName} proposed — awaiting a separate approver.`);
     setDraft(null);
   };
 
   return (
-    <TechLogShell title="Admin · Personnel" subtitle="A&P certificates and RII authorization — controls the CRS and dual-sign-off gates.">
+    <TechLogShell title="Admin · Personnel" subtitle="A&P certificates and RII authorization — proposed edits require a separate maintenance approver (four-eyes, SE-2).">
+      <PendingApprovalsPanel kinds={['PERSONNEL_EDIT']} />
       <div className="space-y-3">
         {state.personnel.map(p => (
           <Card key={p.oid}>
@@ -48,7 +62,7 @@ export default function AdminPersonnel() {
                   </div>
                 </div>
               </div>
-              <Button size="sm" variant="outline" disabled={!canEdit} onClick={() => open(p)}><Pencil className="mr-1.5 h-4 w-4" /> Edit</Button>
+              <Button size="sm" variant="outline" disabled={!canEdit || hasPendingEdit(p.oid)} onClick={() => open(p)}><Pencil className="mr-1.5 h-4 w-4" /> {hasPendingEdit(p.oid) ? 'Edit pending' : 'Edit'}</Button>
             </CardContent>
           </Card>
         ))}
@@ -56,7 +70,7 @@ export default function AdminPersonnel() {
 
       <Dialog open={!!draft} onOpenChange={o => !o && setDraft(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit personnel</DialogTitle><DialogDescription>Four-eyes approval applies in production; simplified for the demo.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Propose personnel edit</DialogTitle><DialogDescription>Requires a separate maintenance approver before it takes effect.</DialogDescription></DialogHeader>
           {draft && (
             <div className="space-y-3 text-sm">
               <div><Label>Display name</Label><Input className="mt-1" value={draft.displayName} onChange={e => setDraft({ ...draft, displayName: e.target.value })} /></div>
@@ -67,7 +81,7 @@ export default function AdminPersonnel() {
               <label className="flex items-center gap-2"><input type="checkbox" checked={!!draft.placardAuthorized} onChange={e => setDraft({ ...draft, placardAuthorized: e.target.checked })} /><span className="text-xs">Placard authorized (may attest a placard-only discharge)</span></label>
             </div>
           )}
-          <DialogFooter><Button variant="outline" onClick={() => setDraft(null)}>Cancel</Button><Button onClick={save}>Save</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDraft(null)}>Cancel</Button><Button onClick={save}>Submit for approval</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </TechLogShell>

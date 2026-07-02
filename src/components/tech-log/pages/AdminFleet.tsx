@@ -5,6 +5,7 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { newId } from '../util/id';
 import type { Aircraft, AircraftType, AircraftStatus } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
+import { PendingApprovalsPanel } from '../components/PendingApprovalsPanel';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -18,27 +19,54 @@ export default function AdminFleet() {
   const user = useCurrentUser();
   const canEdit = user.role === 'MAINTENANCE';
   const [draft, setDraft] = useState<Aircraft | null>(null);
+  const [activateTarget, setActivateTarget] = useState<Aircraft | null>(null);
+  const [evidenceRef, setEvidenceRef] = useState('');
+
+  const hasPendingActivation = (acId: string) =>
+    state.pendingApprovals.some(p => p.status === 'PENDING' && p.kind === 'MEL_TYPE_ACTIVATION' && p.aircraftId === acId);
+  const hasPendingEdit = (acId: string) =>
+    state.pendingApprovals.some(p => p.status === 'PENDING' && p.kind === 'AIRCRAFT_EDIT' && p.after.id === acId);
 
   const save = () => {
     if (!draft) return;
     if (!draft.tailNumber.trim() || !draft.serialNumber.trim()) return toast.error('Tail and serial are required.');
-    dispatch({ type: 'EDIT_AIRCRAFT', payload: draft });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'AIRCRAFT_EDITED', entityType: 'Aircraft', entityId: draft.id, atUtc: new Date().toISOString(), summary: `Edited ${draft.tailNumber} (S/N ${draft.serialNumber})` } });
-    toast.success(`Saved ${draft.tailNumber}.`);
+    const now = new Date().toISOString();
+    dispatch({
+      type: 'PROPOSE_CHANGE',
+      payload: {
+        id: newId('appr'), kind: 'AIRCRAFT_EDIT', before: state.aircraft.find(a => a.id === draft.id)!, after: draft,
+        summary: `Edit ${draft.tailNumber} (S/N ${draft.serialNumber}, ${draft.type}, ${draft.status})`,
+        proposedByOid: user.oid, proposedAtUtc: now, status: 'PENDING',
+      },
+    });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'AIRCRAFT_EDIT_PROPOSED', entityType: 'Aircraft', entityId: draft.id, atUtc: now, summary: `Proposed edit to ${draft.tailNumber} (S/N ${draft.serialNumber}) — awaiting a separate approver` } });
+    toast.success(`Edit to ${draft.tailNumber} proposed — awaiting a separate approver.`);
     setDraft(null);
   };
 
-  const activate = (ac: Aircraft) => {
-    dispatch({ type: 'EDIT_AIRCRAFT', payload: { ...ac, isProvisional: false, status: 'ACTIVE' } });
-    state.melItems.filter(m => m.aircraftType === ac.type && m.approvalState !== 'APPROVED').forEach(m =>
-      dispatch({ type: 'EDIT_MEL_ITEM', payload: { ...m, approvalState: 'APPROVED' } }),
-    );
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'TYPE_ACTIVATED', entityType: 'Aircraft', entityId: ac.id, atUtc: new Date().toISOString(), summary: `${ac.type} D195 approved — ${ac.tailNumber} activated, deferrals enabled` } });
-    toast.success(`${ac.type} D195 approved — ${ac.tailNumber} is now in service. Deferrals enabled.`);
+  const proposeActivation = () => {
+    if (!activateTarget) return;
+    if (!evidenceRef.trim()) return toast.error('FSDO LOA evidence reference is required.');
+    const melItemIds = state.melItems.filter(m => m.aircraftType === activateTarget.type && m.approvalState !== 'APPROVED').map(m => m.id);
+    const now = new Date().toISOString();
+    dispatch({
+      type: 'PROPOSE_CHANGE',
+      payload: {
+        id: newId('appr'), kind: 'MEL_TYPE_ACTIVATION', aircraftId: activateTarget.id, aircraftType: activateTarget.type,
+        melItemIds, evidenceRef: evidenceRef.trim(),
+        summary: `${activateTarget.type} D195 approval — activate ${activateTarget.tailNumber}, approve ${melItemIds.length} MEL item(s)`,
+        proposedByOid: user.oid, proposedAtUtc: now, status: 'PENDING',
+      },
+    });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'TYPE_ACTIVATION_PROPOSED', entityType: 'Aircraft', entityId: activateTarget.id, atUtc: now, summary: `Proposed ${activateTarget.type} D195 activation for ${activateTarget.tailNumber} (FSDO LOA: ${evidenceRef.trim()}) — awaiting a separate approver` } });
+    toast.success('Activation proposed — awaiting a separate approver.');
+    setActivateTarget(null);
+    setEvidenceRef('');
   };
 
   return (
-    <TechLogShell title="Admin · Fleet" subtitle="Reference data — editable in-app (configurable, not locked-in).">
+    <TechLogShell title="Admin · Fleet" subtitle="Reference data — proposed edits require a separate maintenance approver (four-eyes, SE-2).">
+      <PendingApprovalsPanel kinds={['AIRCRAFT_EDIT', 'MEL_TYPE_ACTIVATION']} />
       <div className="space-y-3">
         {state.aircraft.map(ac => (
           <Card key={ac.id}>
@@ -55,9 +83,11 @@ export default function AdminFleet() {
               </div>
               <div className="flex gap-2">
                 {ac.isProvisional && canEdit && (
-                  <Button size="sm" onClick={() => activate(ac)}><BadgeCheck className="mr-1.5 h-4 w-4" /> Approve D195 &amp; activate</Button>
+                  <Button size="sm" disabled={hasPendingActivation(ac.id)} onClick={() => setActivateTarget(ac)}>
+                    <BadgeCheck className="mr-1.5 h-4 w-4" /> {hasPendingActivation(ac.id) ? 'Activation pending' : 'Propose D195 approval & activate'}
+                  </Button>
                 )}
-                <Button size="sm" variant="outline" disabled={!canEdit} onClick={() => setDraft({ ...ac })}><Pencil className="mr-1.5 h-4 w-4" /> Edit</Button>
+                <Button size="sm" variant="outline" disabled={!canEdit || hasPendingEdit(ac.id)} onClick={() => setDraft({ ...ac })}><Pencil className="mr-1.5 h-4 w-4" /> Edit</Button>
               </div>
             </CardContent>
           </Card>
@@ -66,7 +96,7 @@ export default function AdminFleet() {
 
       <Dialog open={!!draft} onOpenChange={o => !o && setDraft(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit aircraft</DialogTitle><DialogDescription>Updatable reference data (versioned in production).</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Propose aircraft edit</DialogTitle><DialogDescription>Updatable reference data — requires a separate maintenance approver before it takes effect.</DialogDescription></DialogHeader>
           {draft && (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
@@ -94,7 +124,23 @@ export default function AdminFleet() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
-            <Button onClick={save}>Save</Button>
+            <Button onClick={save}>Submit for approval</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!activateTarget} onOpenChange={o => { if (!o) { setActivateTarget(null); setEvidenceRef(''); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Propose D195 MEL approval</DialogTitle><DialogDescription>Requires an FSDO Letter of Authorization reference and a separate maintenance approver.</DialogDescription></DialogHeader>
+          {activateTarget && (
+            <div className="space-y-3 text-sm">
+              <p>{activateTarget.type} D195 — activates {activateTarget.tailNumber} and approves {state.melItems.filter(m => m.aircraftType === activateTarget.type && m.approvalState !== 'APPROVED').length} pending MEL item(s).</p>
+              <div><Label>FSDO LOA reference</Label><Input className="mt-1" value={evidenceRef} onChange={e => setEvidenceRef(e.target.value)} placeholder="e.g. FSDO-LOA-2026-04" /></div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setActivateTarget(null); setEvidenceRef(''); }}>Cancel</Button>
+            <Button onClick={proposeActivation}>Submit for approval</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
