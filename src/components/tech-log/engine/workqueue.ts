@@ -20,12 +20,14 @@ export interface WorkQueue {
   deferralsDue: DueDeferral[];   // ACTIVE deferrals expired or due within the soon-window
   expiredChecks: ExpiredCheck[]; // expired / never-done recurring dispatch-gating checks
   openWorkCards: WorkCard[];     // work cards not yet completed
+  watchItems: Defect[];          // WATCHLISTED non-airworthiness items under maintenance watch
   counts: {
     newSquawks: number;
     pendingPlacard: number;
     deferralsDue: number;
     expiredChecks: number;
     openWorkCards: number;
+    watchItems: number;
     urgent: number;              // things grounding or overdue right now (nav badge)
   };
 }
@@ -66,15 +68,21 @@ export function buildWorkQueue(state: Slice, asOfUtc: string, soonDays = 3): Wor
     .filter(w => w.status !== 'COMPLETED')
     .sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc));
 
+  const watchItems = defects
+    .filter(d => d.status === 'WATCHLISTED')
+    .sort((a, b) => b.reportedAtUtc.localeCompare(a.reportedAtUtc));
+
   const expiredDue = deferralsDue.filter(d => d.dueState === 'EXPIRED').length;
   return {
-    newSquawks, pendingPlacard, deferralsDue, expiredChecks, openWorkCards,
+    newSquawks, pendingPlacard, deferralsDue, expiredChecks, openWorkCards, watchItems,
     counts: {
       newSquawks: newSquawks.length,
       pendingPlacard: pendingPlacard.length,
       deferralsDue: deferralsDue.length,
       expiredChecks: expiredChecks.length,
       openWorkCards: openWorkCards.length,
+      watchItems: watchItems.length,
+      // watch items are deliberately excluded — they neither ground nor age out
       urgent: newSquawks.length + pendingPlacard.length + expiredChecks.length + expiredDue,
     },
   };

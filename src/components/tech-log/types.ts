@@ -17,7 +17,7 @@ export interface Aircraft {
 }
 
 export type DefectSource = 'PIREP' | 'MAREP' | 'CABIN' | 'STRUCTURAL' | 'NEF';
-export type DefectStatus = 'OPEN' | 'DEFERRED' | 'RECTIFIED' | 'CLOSED';
+export type DefectStatus = 'OPEN' | 'DEFERRED' | 'RECTIFIED' | 'CLOSED' | 'WATCHLISTED';
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
 /** An attachment is part of the signed payload — its SHA-256 is folded into the content hash (AC 120-78B). */

@@ -3,11 +3,11 @@ import { useTechLog } from '../TechLogContext';
 import { newId } from '../util/id';
 import * as camp from './campClient';
 import { odataPullLatestFlight, simulateWebhook, type WebhookEnvelope } from './myairopsClient';
-import type { IntegrationEvent, CampCorrelation } from '../types';
+import type { DefectStatus, IntegrationEvent, CampCorrelation } from '../types';
 import { CAMP_ERROR } from './campTaxonomy';
-import type { DiscrepancyType, MelFlag } from './campTaxonomy';
+import type { MelFlag } from './campTaxonomy';
 import { reconcileDiscrepancies, type ReconcileResult } from './reconcile';
-import { decidePushMode, type PushIntent } from './pushMapping';
+import { decidePushMode, discrepancyTypeFor, type PushIntent } from './pushMapping';
 import { runWithSession } from './campSession';
 
 export function useIntegration() {
@@ -34,6 +34,7 @@ export function useIntegration() {
     category?: MelFlag;
     technician?: string;
     intent?: PushIntent;          // CREATE (default) | CORRECT | CLOSE
+    defectStatus?: DefectStatus;  // WATCHLISTED → DEFERRED-WATCHLIST discrepancyType
     supersedesEntityId?: string;  // parent entity whose CAMP ref is carried forward (CORRECT/CLOSE)
     riiItem?: boolean;            // RIIitem=Y on the CAMP discrepancy
     inspector?: string;           // RII inspector name carried to CAMP
@@ -56,7 +57,7 @@ export function useIntegration() {
           serial: ac.serialNumber,
           mode: decision.mode,
           status: decision.status,
-          discrepancyType: (input.entityType === 'DEFERRAL' ? 'MEL' : 'NON-DEFERRED') as DiscrepancyType,
+          discrepancyType: discrepancyTypeFor(input.entityType, input.defectStatus),
           melFlag: input.category,
           ata: input.ata,
           description: input.description,

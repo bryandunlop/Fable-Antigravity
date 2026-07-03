@@ -33,10 +33,12 @@ export function deriveServiceability(
     return d.status;
   };
 
+  // WATCHLISTED is included so neutrality derives solely from airworthinessAffecting === false —
+  // a contract-violating watch row still marked affecting must ground (conservative default).
   const openAffecting = defects.filter(
     d =>
       (d.airworthinessAffecting === true || d.airworthinessAffecting === null) &&
-      (d.status === 'OPEN' || d.status === 'DEFERRED') &&
+      (d.status === 'OPEN' || d.status === 'DEFERRED' || d.status === 'WATCHLISTED') &&
       !d.clearedTsUtc,
   );
 
