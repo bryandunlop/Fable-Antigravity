@@ -1,17 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
-import { Checkbox } from '../ui/checkbox';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '../ui/dialog';
 import { FileText, Pencil, Lock } from 'lucide-react';
 import { useSchedulingWorkspace } from './SchedulingWorkspaceContext';
-import { parseTemplate } from '../../scheduling/store';
+import { TemplateEditorDialog } from './TemplateEditorDialog';
 import type { ChecklistTemplate, TaskDefinition, DueRule } from '../../scheduling/engine';
 
 interface TemplatesPanelProps {
@@ -19,13 +13,13 @@ interface TemplatesPanelProps {
   additionalRoles?: string[];
 }
 
-// TODO(dev): the real gate is a `checklist-admin` / `scheduling-lead` capability that does not
-// exist yet in the role model. 'admin'/'lead' are used here as the closest stand-in per Plan 3.
+// TODO(dev): the real gate is a `checklist-admin` capability that does not exist yet in the role
+// model. admin/lead plus the scheduling leadership roles are the closest stand-in per Plan 3 —
+// executors (plain 'scheduling') stay read-only by design.
+const TEMPLATE_EDIT_ROLES = ['admin', 'lead', 'scheduling-manager', 'lead-scheduler'];
 function canEditTemplates(userRole: string, additionalRoles?: string[]): boolean {
-  return (
-    userRole === 'admin' || userRole === 'lead'
-    || !!additionalRoles?.includes('admin') || !!additionalRoles?.includes('lead')
-  );
+  return TEMPLATE_EDIT_ROLES.includes(userRole)
+    || !!additionalRoles?.some(r => TEMPLATE_EDIT_ROLES.includes(r));
 }
 
 function summarizeDueRule(rule: DueRule): string {
@@ -52,13 +46,9 @@ function summarizeCondition(def: TaskDefinition): string | null {
 }
 
 export default function TemplatesPanel({ userRole, additionalRoles }: TemplatesPanelProps) {
-  const { store, tick, bump } = useSchedulingWorkspace();
+  const { store, tick } = useSchedulingWorkspace();
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
-  const [editing, setEditing] = useState<{ template: ChecklistTemplate; taskDefId: string } | null>(null);
-  const [draftTitle, setDraftTitle] = useState('');
-  const [draftRequiresAck, setDraftRequiresAck] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<ChecklistTemplate | null>(null);
 
   const canEdit = canEditTemplates(userRole, additionalRoles);
 
@@ -78,37 +68,6 @@ export default function TemplatesPanel({ userRole, additionalRoles }: TemplatesP
     }
     return Array.from(byGroup.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [templates]);
-
-  function openEdit(template: ChecklistTemplate, taskDef: TaskDefinition) {
-    setEditing({ template, taskDefId: taskDef.id });
-    setDraftTitle(taskDef.title);
-    setDraftRequiresAck(taskDef.requiresAck);
-    setSaveError(null);
-  }
-
-  async function handlePublish() {
-    if (!editing) return;
-    setSaveError(null);
-    setSaving(true);
-    try {
-      const { template, taskDefId } = editing;
-      const nextTaskDefinitions = template.taskDefinitions.map((d) => (
-        d.id === taskDefId ? { ...d, title: draftTitle, requiresAck: draftRequiresAck } : d
-      ));
-      const nextTemplate = parseTemplate({
-        ...template,
-        version: template.version + 1,
-        taskDefinitions: nextTaskDefinitions,
-      });
-      await store.saveTemplate(nextTemplate);
-      bump();
-      setEditing(null);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to publish new version');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   return (
     <Card>
@@ -138,7 +97,11 @@ export default function TemplatesPanel({ userRole, additionalRoles }: TemplatesP
                         {template.id} · v{template.version} · {template.status}
                       </div>
                     </div>
-                    {!canEdit && (
+                    {canEdit ? (
+                      <Button variant="outline" size="sm" onClick={() => setEditing(template)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit checklist
+                      </Button>
+                    ) : (
                       <Badge variant="outline" className="flex items-center gap-1">
                         <Lock className="h-3 w-3" /> Read-only
                       </Badge>
@@ -157,11 +120,6 @@ export default function TemplatesPanel({ userRole, additionalRoles }: TemplatesP
                             {summarizeCondition(def) && ` · condition: ${summarizeCondition(def)}`}
                           </div>
                         </div>
-                        {canEdit && (
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(template, def)}>
-                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                          </Button>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -172,40 +130,13 @@ export default function TemplatesPanel({ userRole, additionalRoles }: TemplatesP
         )}
       </CardContent>
 
-      <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit task (draft new version)</DialogTitle>
-            <DialogDescription>
-              Minimal editor for this slice: title + ack requirement only. Publishing saves
-              template version {editing ? editing.template.version + 1 : ''} via the same
-              validation (parseTemplate) the seed data goes through. A full no-code rule/condition
-              builder is a documented follow-up.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="draftTitle">Task title</Label>
-              <Input id="draftTitle" value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} />
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="draftRequiresAck"
-                checked={draftRequiresAck}
-                onCheckedChange={(v: boolean | 'indeterminate') => setDraftRequiresAck(v === true)}
-              />
-              <Label htmlFor="draftRequiresAck">Requires acknowledgement</Label>
-            </div>
-            {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={handlePublish} disabled={saving || !draftTitle.trim()}>
-              {saving ? 'Publishing...' : 'Publish new version'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {editing && (
+        <TemplateEditorDialog
+          template={editing}
+          open={!!editing}
+          onOpenChange={(open) => { if (!open) setEditing(null); }}
+        />
+      )}
     </Card>
   );
 }
