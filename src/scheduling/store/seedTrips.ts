@@ -150,3 +150,109 @@ export async function seedDemoTrips(service: SchedulingService, nowUtcIso: strin
     }
   }
 }
+
+// ─── Volume seeding (command-center scale) ─────────────────────────────────────────────────────
+// The four curated demo trips prove the checklist paths; the command center's plan/run boards
+// additionally need month-scale volume to be believable. These trips are generated
+// DETERMINISTICALLY (seeded PRNG, stable ids/dates relative to now) and created through
+// service.createTripMirror so every one carries a real instantiated checklist, then worked to a
+// proximity-correlated depth via real TaskActions — readiness on the boards is genuinely derived.
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const pick = <T,>(arr: T[], rng: () => number): T => arr[Math.floor(rng() * arr.length)];
+const int = (min: number, max: number, rng: () => number) => min + Math.floor(rng() * (max - min + 1));
+
+const VOLUME_FLEET = [
+  { tail: 'N2PG', aircraftType: 'G650ER' },
+  { tail: 'N1PG', aircraftType: 'G650ER' },
+  { tail: 'N650GS', aircraftType: 'G650ER' },
+  { tail: 'N6PG', aircraftType: 'G500' },
+] as const;
+const DOM_DESTS = ['KTEB', 'KPBI', 'KASE', 'KDAL', 'KMDW', 'KLAX', 'KMVY', 'KDEN'];
+const INTL_DESTS = ['EGLL', 'LFPG', 'LSGG', 'MYNN', 'EGGW'];
+const BLOCK_REASONS = ['FBO hangar waitlisted', 'Slot unconfirmed', 'Catering unconfirmed', 'Crew duty limit risk', 'Need pax passports'];
+
+export function buildVolumeTrips(nowUtcIso: string): TripRecord[] {
+  const rng = mulberry32(0x5eed_2026);
+  const base = new Date(nowUtcIso).getTime();
+  const trips: TripRecord[] = [];
+  let n = 0;
+
+  for (const ac of VOLUME_FLEET) {
+    let offsetDays = -10 + int(0, 3, rng);
+    let perTail = 0;
+    while (offsetDays < 65 && perTail++ < 8) {
+      n++;
+      const r = rng();
+      const tripType: TripRecord['tripType'] = r < 0.22 ? 'international' : r < 0.3 ? 'dca_dassp' : 'domestic';
+      const dest = tripType === 'international' ? pick(INTL_DESTS, rng) : tripType === 'dca_dassp' ? 'KDCA' : pick(DOM_DESTS, rng);
+      const durationDays = tripType === 'international' ? int(3, 6, rng) : int(1, 3, rng);
+      const pax = int(2, 8, rng);
+      const id = `vol-trip-${n}`;
+      const depMs = offsetDays * DAY_MS + int(12, 21, rng) * HOUR_MS; // 07:00–16:00 EDT-ish in UTC
+      const retMs = depMs + (durationDays * DAY_MS) - int(3, 6, rng) * HOUR_MS;
+      const legDur = tripType === 'international' ? 7 * HOUR_MS : 100 * MIN_MS;
+
+      trips.push({
+        id,
+        tripNumber: `T-2026-8${String(n).padStart(3, '0')}`,
+        sourceSystem: 'myairops',
+        sourceTripRef: `MAO-8${String(n).padStart(3, '0')}`,
+        tail: ac.tail,
+        aircraftType: ac.aircraftType,
+        tripType,
+        priority: rng() < 0.15 ? 'vip' : 'standard',
+        status: offsetDays < 0 ? 'completed' : offsetDays <= 2 ? 'confirmed' : 'planning',
+        startDate: iso(base, depMs),
+        endDate: iso(base, retMs + legDur),
+        legs: buildLegs(id, [
+          { from: 'KLUK', to: dest, depOffsetMs: depMs, durationMs: legDur, pax },
+          { from: dest, to: 'KLUK', depOffsetMs: retMs, durationMs: legDur, pax },
+        ], base),
+        createdBy: 'volume-seed',
+        createdAtUtc: nowUtcIso,
+      });
+      offsetDays += durationDays + int(2, 5, rng);
+    }
+  }
+  return trips;
+}
+
+/** Create the volume trips and work each checklist to a proximity-correlated depth (real actions). */
+export async function seedVolumeTrips(service: SchedulingService, nowUtcIso: string): Promise<void> {
+  const rng = mulberry32(0x770a2026);
+  const base = new Date(nowUtcIso).getTime();
+  let blockedCount = 0;
+
+  for (const trip of buildVolumeTrips(nowUtcIso)) {
+    const { instances } = await service.createTripMirror(trip, nowUtcIso);
+    if (instances.length === 0) continue;
+
+    const offsetDays = (new Date(trip.startDate).getTime() - base) / DAY_MS;
+    let workPct: number;
+    if (offsetDays < 0) workPct = 1;
+    else if (offsetDays <= 5) workPct = 0.85 + rng() * 0.15;
+    else if (offsetDays <= 14) workPct = 0.4 + rng() * 0.4;
+    else workPct = rng() < 0.5 ? 0 : rng() * 0.3;
+
+    const ordered = instances.slice().sort((a, b) => a.order - b.order);
+    const toComplete = Math.round(workPct * ordered.length);
+    for (const inst of ordered.slice(0, toComplete)) {
+      if (inst.requiresAck) await service.applyAction(inst.id, { kind: 'ack' }, 'volume-seed', nowUtcIso);
+      await service.applyAction(inst.id, { kind: 'complete' }, 'volume-seed', nowUtcIso);
+    }
+    // A few believable blockers on future, incompletely-worked trips.
+    if (offsetDays > 0 && workPct < 0.85 && toComplete < ordered.length && blockedCount < 4 && rng() < 0.3) {
+      blockedCount++;
+      await service.applyAction(ordered[toComplete].id, { kind: 'block', reason: pick(BLOCK_REASONS, rng) }, 'volume-seed', nowUtcIso);
+    }
+  }
+}

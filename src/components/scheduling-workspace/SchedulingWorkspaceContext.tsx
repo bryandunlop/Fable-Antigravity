@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { InMemorySchedulingStore, SchedulingService, seedTemplates, seedDemoTrips } from '../../scheduling/store';
+import { InMemorySchedulingStore, SchedulingService, seedTemplates, seedDemoTrips, seedVolumeTrips } from '../../scheduling/store';
 
 interface SchedulingWorkspaceContextValue {
   service: SchedulingService;
@@ -37,6 +37,9 @@ function ensureSeeded(): Promise<void> {
       // Stable trip ids make this idempotent across StrictMode remounts. Remove this
       // one call for a clean/empty workspace.
       await seedDemoTrips(service, new Date().toISOString());
+      // Month-scale deterministic volume (real checklists, proximity-worked) so the
+      // command-center plan/run boards demonstrate dozens-of-trips scale.
+      await seedVolumeTrips(service, new Date().toISOString());
     })();
   }
   return seedPromise;
