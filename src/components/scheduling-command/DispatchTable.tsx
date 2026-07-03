@@ -1,11 +1,13 @@
-import { AlertTriangle, Calendar, CheckCircle2, MapPin, Plane } from 'lucide-react';
-import { Badge } from '../ui/badge';
+import { AlertTriangle, CheckCircle2, Plane } from 'lucide-react';
+import { Card } from '../ui/card';
+import { Progress } from '../ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import type { BoardTrip } from './adapter';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
+import { TripIdentityLine } from './TripIdentity';
 
-/** The master dispatch grid (original table view), consuming the shared status derivation.
- *  Blocked trips sort to the top, then chronological. */
+/** List view of the Schedule surface. Blocked trips sort to the top, then chronological;
+ *  every row leads with the route+date+tail identity. */
 export function DispatchTable({
   trips,
   nowMs,
@@ -21,84 +23,67 @@ export function DispatchTable({
     return new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime();
   });
 
+  const badgeTone = (s: ReturnType<typeof deriveTripStatus>) =>
+    s === 'blocked' ? 'status-error'
+      : s === 'behind' || s === 'attention' ? 'status-warning'
+      : s === 'ready' || s === 'airborne' ? 'status-success'
+      : 'status-info';
+
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-      <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <h2 className="text-xl font-black tracking-tighter text-slate-900">Master Dispatch Grid</h2>
-        <div className="flex gap-2 text-sm font-bold text-slate-500">
-          <span className="bg-slate-200 px-3 py-1 rounded-full">{trips.length} Total Flights</span>
-          <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full">{trips.filter(t => t.criticalBlocker).length} Blocked</span>
+    <Card className="overflow-hidden flex flex-col">
+      <div className="px-5 py-3.5 border-b flex items-center justify-between">
+        <h2 className="text-base font-semibold">All trips</h2>
+        <div className="flex gap-2 text-xs text-muted-foreground">
+          <span>{trips.length} trips</span>
+          <span>·</span>
+          <span className="text-[var(--gfo-error,#EF3340)] font-medium">{trips.filter(t => t.criticalBlocker).length} blocked</span>
         </div>
       </div>
 
-      <div className="overflow-auto max-h-[600px]">
+      <div className="overflow-auto max-h-[640px]">
         <Table>
-          <TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+          <TableHeader className="bg-muted/50 sticky top-0 z-10">
             <TableRow>
-              <TableHead className="font-black text-xs uppercase tracking-widest text-slate-400">Flight</TableHead>
-              <TableHead className="font-black text-xs uppercase tracking-widest text-slate-400">Date</TableHead>
-              <TableHead className="font-black text-xs uppercase tracking-widest text-slate-400">Aircraft</TableHead>
-              <TableHead className="font-black text-xs uppercase tracking-widest text-slate-400">Route</TableHead>
-              <TableHead className="font-black text-xs uppercase tracking-widest text-slate-400 text-center">Status</TableHead>
-              <TableHead className="font-black text-xs uppercase tracking-widest text-slate-400">Readiness</TableHead>
+              <TableHead className="text-xs">Trip</TableHead>
+              <TableHead className="text-xs">Status</TableHead>
+              <TableHead className="text-xs">Readiness</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.map(trip => {
               const status = deriveTripStatus(trip, nowMs);
               const style = TRIP_STATUS_STYLES[status];
-              const amberish = status === 'behind' || status === 'attention';
               return (
                 <TableRow
                   key={trip.id}
-                  className={`cursor-pointer transition-colors group ${status === 'blocked' ? 'bg-rose-50/30' : 'hover:bg-slate-50'}`}
+                  className={`cursor-pointer transition-colors ${status === 'blocked' ? 'bg-[var(--gfo-error,#EF3340)]/5' : 'hover:bg-accent/50'}`}
                   onClick={() => onTripClick(trip)}
                 >
-                  <TableCell>
-                    <div className="font-black text-sm text-slate-900 group-hover:text-blue-600 transition-colors">{trip.tripNumber}</div>
-                    <div className="text-[10px] font-bold text-slate-500 truncate max-w-[150px]">{trip.client}</div>
+                  <TableCell className="py-3">
+                    <TripIdentityLine trip={trip} />
+                    <div className="text-xs text-muted-foreground mt-0.5">{trip.client}</div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                      <Calendar className="h-3 w-3 text-slate-400" />
-                      {new Date(trip.departureDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
+                  <TableCell className="py-3">
+                    <span className={`status-badge ${badgeTone(status)}`}>{style.label}</span>
                   </TableCell>
-                  <TableCell className="font-black text-slate-900 border-r border-slate-100">
-                    <div className="flex items-center gap-2">
-                      {trip.aircraft}
-                      {trip.isInternational && <Badge className="text-[8px] px-1 bg-fuchsia-100 text-fuchsia-700 font-bold tracking-widest border-fuchsia-200 uppercase">INTL</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700 max-w-[200px] truncate" title={trip.route}>
-                      <MapPin className="h-3 w-3 text-slate-400" />
-                      {trip.route}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge className={`${style.badge} px-3 py-1 font-black uppercase tracking-widest text-[9px]`}>{style.label}</Badge>
-                  </TableCell>
-                  <TableCell>
+                  <TableCell className="py-3">
                     {status === 'blocked' ? (
-                      <div className="flex items-center gap-2 text-rose-600 text-xs font-bold w-full max-w-[200px]">
+                      <div className="flex items-center gap-1.5 text-[var(--gfo-error,#EF3340)] text-xs font-medium max-w-[260px]">
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{trip.criticalBlocker}</span>
                       </div>
                     ) : status === 'airborne' ? (
-                      <div className="flex items-center gap-2 text-indigo-600 text-xs font-black">
-                        <Plane className="h-4 w-4" /> Airborne
+                      <div className="flex items-center gap-1.5 text-indigo-600 text-xs font-medium">
+                        <Plane className="h-3.5 w-3.5" /> Airborne
                       </div>
                     ) : status === 'ready' ? (
-                      <div className="flex items-center gap-2 text-emerald-600 text-xs font-black">
-                        <CheckCircle2 className="h-4 w-4" /> Cleared
+                      <div className="flex items-center gap-1.5 text-[var(--gfo-success,#00B140)] text-xs font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Cleared
                       </div>
                     ) : (
-                      <div className="flex items-center gap-3 w-full max-w-[150px]">
-                        <div className="h-1.5 flex-1 rounded-full overflow-hidden bg-slate-200">
-                          <div className={`h-full ${amberish ? 'bg-amber-400' : 'bg-blue-400'}`} style={{ width: `${trip.readinessScore}%` }} />
-                        </div>
-                        <span className={`text-[10px] font-black w-8 text-right ${amberish ? 'text-amber-500' : 'text-blue-500'}`}>{trip.readinessScore}%</span>
+                      <div className="flex items-center gap-2 max-w-[180px]">
+                        <Progress value={trip.readinessScore} className="h-1.5 flex-1" />
+                        <span className="text-[11px] font-medium text-muted-foreground w-8 text-right">{trip.readinessScore}%</span>
                       </div>
                     )}
                   </TableCell>
@@ -107,10 +92,10 @@ export function DispatchTable({
             })}
             {sorted.length === 0 && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="h-64 text-center text-slate-500 font-bold">
-                  <div className="flex flex-col items-center justify-center gap-3">
-                    <CheckCircle2 className="h-12 w-12 text-slate-300" />
-                    <p>No trips match this filter criteria.</p>
+                <TableCell colSpan={3} className="h-48 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <CheckCircle2 className="h-8 w-8 opacity-40" />
+                    <p className="text-sm">No trips match this filter.</p>
                   </div>
                 </TableCell>
               </TableRow>
@@ -118,6 +103,6 @@ export function DispatchTable({
           </TableBody>
         </Table>
       </div>
-    </div>
+    </Card>
   );
 }

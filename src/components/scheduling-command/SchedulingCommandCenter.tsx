@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Activity, Calendar, LayoutDashboard, List, Rows3, Plane, ClipboardList, Inbox as InboxIcon, Send, Loader2 } from 'lucide-react';
+import { CalendarDays, ClipboardList, Inbox as InboxIcon, LayoutList, ListChecks, Loader2, Plus, Rows3, Send } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
-import TripsPanel from '../scheduling-workspace/TripsPanel';
 import TemplatesPanel from '../scheduling-workspace/TemplatesPanel';
 import InboxPanel from '../scheduling-workspace/InboxPanel';
 import ForeFlightPanel from '../scheduling-workspace/ForeFlightPanel';
@@ -15,28 +16,25 @@ import { RunBoard, type FunnelFilter } from './RunBoard';
 import { CalendarView } from './CalendarView';
 import { DispatchTable } from './DispatchTable';
 import { FilterBar } from './FilterBar';
+import { TripDrawer } from './TripDrawer';
+import { NewTripDialog } from './NewTripDialog';
 import { buildRunBoard, type RunTask } from './runBoardSelectors';
 
-type ViewTab = 'plan' | 'run' | 'calendar' | 'table' | 'trips' | 'templates' | 'inbox' | 'foreflight';
+type Surface = 'schedule' | 'action' | 'templates' | 'inbox' | 'foreflight';
+type ScheduleView = 'board' | 'calendar' | 'list';
 
-const BOARD_TABS: { key: ViewTab; label: string; icon: React.ElementType }[] = [
-  { key: 'plan', label: 'Plan Board', icon: Rows3 },
-  { key: 'run', label: 'Run Board', icon: LayoutDashboard },
-  { key: 'calendar', label: 'Calendar', icon: Calendar },
-  { key: 'table', label: 'Table', icon: List },
-];
-const OPS_TABS: { key: ViewTab; label: string; icon: React.ElementType }[] = [
-  { key: 'trips', label: 'Trips', icon: Plane },
+const UTILITY_TABS: { key: Surface; label: string; icon: React.ElementType }[] = [
   { key: 'templates', label: 'Templates', icon: ClipboardList },
   { key: 'inbox', label: 'Inbox', icon: InboxIcon },
   { key: 'foreflight', label: 'ForeFlight', icon: Send },
 ];
 
 /**
- * THE scheduling hub — the scheduler's front door. Four board views + the operational panels
- * (Trips incl. create/mirror + preflight release, Templates no-code editor, cross-role Inbox,
- * ForeFlight push), all on the production scheduling store/engine: real TripRecords, real
- * TaskInstances, engine-derived readiness. Replaces the old /scheduling-workspace tab page.
+ * The scheduling hub, in the GFO design language. Two primary surfaces — Schedule (plan board /
+ * calendar / list views of the same trips: "where is everything") and Action Center (trip-clustered
+ * due work: "what needs me now") — plus quiet utility panels. Every trip reference opens the Trip
+ * Drawer over the current view, so the scheduler never loses their place and always sees exactly
+ * which trip's checklist they're working.
  */
 export default function SchedulingCommandCenter({
   userRole = 'scheduling',
@@ -47,13 +45,15 @@ export default function SchedulingCommandCenter({
 }) {
   const { service, store, ready, tick, bump, nowUtc, officeTzOffsetMinutes } = useSchedulingWorkspace();
 
-  const [tab, setTab] = useState<ViewTab>('plan');
+  const [surface, setSurface] = useState<Surface>('schedule');
+  const [scheduleView, setScheduleView] = useState<ScheduleView>('board');
   const [searchTerm, setSearchTerm] = useState('');
   const [tailFilter, setTailFilter] = useState<Set<string>>(new Set());
   const [actionRequiredOnly, setActionRequiredOnly] = useState(false);
   const [horizonDays, setHorizonDays] = useState(30);
   const [funnelFilters, setFunnelFilters] = useState<Set<FunnelFilter>>(new Set());
-  const [focusTrip, setFocusTrip] = useState<{ id: string; n: number } | null>(null);
+  const [drawer, setDrawer] = useState<{ tripId: string; taskId?: string } | null>(null);
+  const [newTripOpen, setNewTripOpen] = useState(false);
 
   const [trips, setTrips] = useState<BoardTrip[]>([]);
   const [officeTasks, setOfficeTasks] = useState<BoardTask[]>([]);
@@ -111,10 +111,7 @@ export default function SchedulingCommandCenter({
     [filteredTrips, officeTasks, horizonDays],
   );
 
-  const openTrip = (trip: BoardTrip) => { setFocusTrip(f => ({ id: trip.id, n: (f?.n ?? 0) + 1 })); setTab('trips'); };
-  const openTask = (task: RunTask) => {
-    if (task.tripId) { setFocusTrip(f => ({ id: task.tripId!, n: (f?.n ?? 0) + 1 })); setTab('trips'); }
-  };
+  const openTrip = (tripId: string, taskId?: string) => setDrawer({ tripId, taskId });
   const onTaskAction = async (task: RunTask, action: TaskAction) => {
     try {
       await service.applyAction(task.key, action, userRole, nowUtc());
@@ -128,52 +125,71 @@ export default function SchedulingCommandCenter({
   const toggleFunnel = (f: FunnelFilter) =>
     setFunnelFilters(prev => { const s = new Set(prev); s.has(f) ? s.delete(f) : s.add(f); return s; });
 
-  const isBoardTab = tab === 'plan' || tab === 'run' || tab === 'calendar' || tab === 'table';
-
-  const tabButton = ({ key, label, icon: Icon }: { key: ViewTab; label: string; icon: React.ElementType }) => (
-    <button
-      key={key}
-      onClick={() => setTab(key)}
-      className={`flex items-center gap-2 px-3.5 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${tab === key ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
-    >
-      <Icon className="h-4 w-4" /> {label}
-    </button>
-  );
-
   if (!ready) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-slate-50 -m-6">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
+  const showsFilterBar = surface === 'schedule' || surface === 'action';
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col bg-slate-50 -m-6 font-sans">
-      {/* Header */}
-      <header className="min-h-24 bg-slate-950 text-white flex flex-wrap items-center justify-between gap-4 px-10 py-4 shadow-lg relative z-20 shrink-0">
+    <div className="space-y-4">
+      {/* Page header — standard GFO chrome */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-black tracking-tighter flex items-center gap-4">
-            <Activity className="h-8 w-8 text-blue-500" />
-            MASTER SCHEDULING COMMAND
-          </h1>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mt-1 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {trips.length} trips · live task engine
+          <h1 className="text-2xl font-semibold tracking-tight">Scheduling</h1>
+          <p className="text-sm text-muted-foreground">
+            {trips.length} trips · readiness derived live from checklist state
           </p>
         </div>
+        <Button onClick={() => setNewTripOpen(true)}>
+          <Plus className="h-4 w-4 mr-1.5" /> New trip
+        </Button>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1">
-            {BOARD_TABS.map(tabButton)}
+      {/* Surfaces: two primary + quiet utilities */}
+      <div className="flex flex-wrap items-center gap-3 border-b pb-px">
+        <Tabs value={surface === 'schedule' || surface === 'action' ? surface : ''} className="w-auto">
+          <TabsList>
+            <TabsTrigger value="schedule" onClick={() => setSurface('schedule')}>
+              <Rows3 className="h-4 w-4 mr-1.5" /> Schedule
+            </TabsTrigger>
+            <TabsTrigger value="action" onClick={() => setSurface('action')}>
+              <ListChecks className="h-4 w-4 mr-1.5" /> Action Center
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {surface === 'schedule' && (
+          <div className="flex bg-muted rounded-lg p-0.5 gap-0.5">
+            {([['board', Rows3, 'Board'], ['calendar', CalendarDays, 'Calendar'], ['list', LayoutList, 'List']] as const).map(([v, Icon, label]) => (
+              <button key={v} onClick={() => setScheduleView(v)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${scheduleView === v ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </button>
+            ))}
           </div>
-          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1">
-            {OPS_TABS.map(tabButton)}
-          </div>
+        )}
+
+        <div className="flex items-center gap-1 ml-auto">
+          {UTILITY_TABS.map(({ key, label, icon: Icon }) => (
+            <Button
+              key={key}
+              variant={surface === key ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setSurface(key)}
+              className="text-muted-foreground data-[active]:text-foreground"
+            >
+              <Icon className="h-4 w-4 mr-1.5" /> {label}
+            </Button>
+          ))}
         </div>
-      </header>
+      </div>
 
-      {isBoardTab && (
+      {showsFilterBar && (
         <FilterBar
           fleet={fleetRowsFor(trips)}
           searchTerm={searchTerm} onSearch={setSearchTerm}
@@ -183,24 +199,42 @@ export default function SchedulingCommandCenter({
         />
       )}
 
-      <main className="flex-1 overflow-auto p-10 flex flex-col gap-10">
-        <div className="animate-in fade-in zoom-in-95 duration-300 flex flex-col gap-10">
-          {tab === 'plan' && <PlanBoard trips={filteredTrips} nowMs={nowMs} onTripClick={openTrip} />}
-          {tab === 'run' && (
-            <RunBoard
-              model={runModel} trips={filteredTrips}
-              funnelFilters={funnelFilters} onToggleFunnel={toggleFunnel}
-              onAction={onTaskAction} onRowClick={openTask}
-            />
-          )}
-          {tab === 'calendar' && <CalendarView trips={filteredTrips} nowMs={nowMs} onTripClick={openTrip} />}
-          {tab === 'table' && <DispatchTable trips={filteredTrips} nowMs={nowMs} onTripClick={openTrip} />}
-          {tab === 'trips' && <TripsPanel userRole={userRole} focusTrip={focusTrip} />}
-          {tab === 'templates' && <TemplatesPanel userRole={userRole} additionalRoles={additionalRoles} />}
-          {tab === 'inbox' && <InboxPanel defaultTargetRole="pilot" />}
-          {tab === 'foreflight' && <ForeFlightPanel />}
-        </div>
-      </main>
+      {/* Active surface */}
+      {surface === 'schedule' && scheduleView === 'board' && (
+        <PlanBoard trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
+      )}
+      {surface === 'schedule' && scheduleView === 'calendar' && (
+        <CalendarView trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
+      )}
+      {surface === 'schedule' && scheduleView === 'list' && (
+        <DispatchTable trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
+      )}
+      {surface === 'action' && (
+        <RunBoard
+          model={runModel} trips={filteredTrips}
+          funnelFilters={funnelFilters} onToggleFunnel={toggleFunnel}
+          onAction={onTaskAction} onOpenTrip={openTrip}
+        />
+      )}
+      {surface === 'templates' && <TemplatesPanel userRole={userRole} additionalRoles={additionalRoles} />}
+      {surface === 'inbox' && <InboxPanel defaultTargetRole="pilot" />}
+      {surface === 'foreflight' && <ForeFlightPanel />}
+
+      {/* The trip workspace, over whichever view you're in */}
+      <TripDrawer
+        tripId={drawer?.tripId ?? null}
+        focusTaskId={drawer?.taskId}
+        open={!!drawer}
+        onOpenChange={o => { if (!o) setDrawer(null); }}
+        userRole={userRole}
+      />
+
+      <NewTripDialog
+        open={newTripOpen}
+        onOpenChange={setNewTripOpen}
+        userRole={userRole}
+        onCreated={tripId => openTrip(tripId)}
+      />
     </div>
   );
 }

@@ -102,3 +102,42 @@ export function buildRunBoard(
   for (const g of Object.keys(groups) as RunGroup[]) groups[g].sort((a, b) => a.dueMs - b.dueMs);
   return { groups, funnel };
 }
+
+// ─── Trip clustering ───────────────────────────────────────────────────────────────────────────
+// At tens of trips a month, a flat task list interleaves trips until nothing is recognizable.
+// Cluster each urgency group's tasks under their trip (identity card in the UI), office tasks
+// under one separate cluster, ordered by each cluster's most urgent task.
+
+export interface RunCluster {
+  office: boolean;
+  tripId?: string;
+  tripNumber?: string;
+  route?: string;
+  tail?: string;
+  client?: string;
+  tasks: RunTask[]; // sorted by dueMs
+  earliestDueMs: number;
+}
+
+export function clusterRunTasks(tasks: RunTask[]): RunCluster[] {
+  const byKey = new Map<string, RunCluster>();
+  for (const t of tasks) {
+    const key = t.office ? '__office__' : t.tripId ?? '__office__';
+    let cluster = byKey.get(key);
+    if (!cluster) {
+      cluster = {
+        office: t.office, tripId: t.tripId, tripNumber: t.tripNumber,
+        route: t.route, tail: t.tail, client: t.client,
+        tasks: [], earliestDueMs: t.dueMs,
+      };
+      byKey.set(key, cluster);
+    }
+    cluster.tasks.push(t);
+    cluster.earliestDueMs = Math.min(cluster.earliestDueMs, t.dueMs);
+  }
+  const clusters = [...byKey.values()];
+  for (const c of clusters) c.tasks.sort((a, b) => a.dueMs - b.dueMs);
+  // Trips first (most urgent first); the office cluster always last.
+  return clusters.sort((a, b) =>
+    a.office === b.office ? a.earliestDueMs - b.earliestDueMs : a.office ? 1 : -1);
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildRunBoard } from './runBoardSelectors';
+import { buildRunBoard, clusterRunTasks } from './runBoardSelectors';
 import type { BoardTrip, BoardTask } from './adapter';
 
 const DAY = 86400000;
@@ -87,5 +87,22 @@ describe('buildRunBoard (production TaskInstance semantics)', () => {
     expect(row.dueLabel).toMatch(/today/i);
     expect(row.tripNumber).toBe(t.tripNumber);
     expect(row.tail).toBe('N2PG');
+  });
+});
+
+describe('clusterRunTasks', () => {
+  it('groups tasks under their trip, most-urgent cluster first, office always last', () => {
+    const a = trip(3, [task({ dueAtUtc: dueIn(2) }), task({ dueAtUtc: dueIn(1) })]);
+    const b = trip(5, [task({ dueAtUtc: dueIn(0.5) })]);
+    const m = buildRunBoard([a, b], [task({ dueAtUtc: dueIn(0.2), title: 'Office thing' })], NOW, 14);
+    const all = [...m.groups['due-today'], ...m.groups['next-48']];
+    const clusters = clusterRunTasks(all);
+    expect(clusters).toHaveLength(3);
+    expect(clusters[0].tripNumber).toBe(b.tripNumber); // earliest due
+    expect(clusters[1].tripNumber).toBe(a.tripNumber);
+    expect(clusters[2].office).toBe(true); // office last despite being urgent
+    for (const c of clusters) {
+      expect(c.tasks.map(x => x.dueMs)).toEqual([...c.tasks.map(x => x.dueMs)].sort((x, y) => x - y));
+    }
   });
 });
