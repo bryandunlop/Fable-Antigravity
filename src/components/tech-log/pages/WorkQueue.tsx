@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Inbox, AlertTriangle, Wrench, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck } from 'lucide-react';
+import { Inbox, AlertTriangle, Wrench, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck, Eye } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
 import { buildWorkQueue } from '../engine/workqueue';
@@ -11,7 +11,7 @@ import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 
 const STATUS_VARIANT: Record<string, 'destructive' | 'secondary' | 'outline'> = {
-  OPEN: 'destructive', DEFERRED: 'secondary', RECTIFIED: 'outline', CLOSED: 'outline',
+  OPEN: 'destructive', DEFERRED: 'secondary', RECTIFIED: 'outline', CLOSED: 'outline', WATCHLISTED: 'secondary',
 };
 
 export default function WorkQueue() {
@@ -135,6 +135,15 @@ export default function WorkQueue() {
             <Row key={check.id} onClick={() => open(tailOf(aircraftId), '?tab=overview')}>
               <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(aircraftId)}</span><Badge variant="destructive">EXPIRED</Badge></div>
               <p className="mt-0.5 truncate text-muted-foreground">{check.name} — accomplish &amp; sign to restore dispatch.</p>
+            </Row>
+          ))}
+        </Section>
+
+        <Section icon={<Eye className="h-4 w-4" />} title="Watch items — tracked, non-airworthiness" count={wq.counts.watchItems}>
+          {wq.watchItems.length === 0 ? empty : wq.watchItems.map(d => (
+            <Row key={d.id} onClick={() => open(tailOf(d.aircraftId), '?tab=defects')}>
+              <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><Badge variant="secondary"><Eye className="mr-1 h-3 w-3" />WATCH</Badge><span className="text-xs text-muted-foreground">{d.source}</span></div>
+              <p className="mt-0.5 truncate text-muted-foreground">{d.description} · reported {new Date(d.reportedAtUtc).toLocaleDateString()}</p>
             </Row>
           ))}
         </Section>

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FilePlus, AlertTriangle, Wrench, CheckCircle2, Paperclip, Camera, MapPin, X, Repeat, Pencil } from 'lucide-react';
+import { FilePlus, AlertTriangle, Wrench, CheckCircle2, Paperclip, Camera, MapPin, X, Repeat, Pencil, Eye, TriangleAlert } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
@@ -11,6 +11,7 @@ import { mockSha256 } from '../engine/signing';
 import { detectRepetitiveGroups } from '../engine/repetitive';
 import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
+import { WatchlistDialog, EscalateWatchDialog } from '../components/panels/WatchlistPanel';
 import { ATA_CHAPTERS, INTENT } from '../constants';
 import { newId } from '../util/id';
 import type { Defect, Severity, DefectSource, Attachment, DefectLocationKind } from '../types';
@@ -24,7 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 
 const STATUS_VARIANT: Record<string, 'destructive' | 'secondary' | 'outline' | 'default'> = {
-  OPEN: 'destructive', DEFERRED: 'secondary', RECTIFIED: 'outline', CLOSED: 'outline',
+  OPEN: 'destructive', DEFERRED: 'secondary', RECTIFIED: 'outline', CLOSED: 'outline', WATCHLISTED: 'secondary',
 };
 
 export default function Defects() {
@@ -45,6 +46,9 @@ export default function Defects() {
   const [cDraft, setCDraft] = useState<Defect | null>(null);
   const [correctSignOpen, setCorrectSignOpen] = useState(false);
   const [pendingCorrectionId, setPendingCorrectionId] = useState('');
+  // watch-list disposition state
+  const [watchTarget, setWatchTarget] = useState<Defect | null>(null);
+  const [escalateTarget, setEscalateTarget] = useState<Defect | null>(null);
 
   // form state
   const dispatchable = state.aircraft.filter(a => !a.isProvisional);
@@ -250,7 +254,7 @@ export default function Defects() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold">{tailOf(d.aircraftId)}</span>
                   <Badge variant="outline">ATA {d.ataChapter}</Badge>
-                  <Badge variant={STATUS_VARIANT[d.status]}>{d.status}</Badge>
+                  <Badge variant={STATUS_VARIANT[d.status]}>{d.status === 'WATCHLISTED' ? <><Eye className="mr-1 h-3 w-3" />WATCH</> : d.status}</Badge>
                   {rep && <Badge variant="destructive" title={`Repeat ${rep.index} of ${rep.count} — same ATA on this aircraft`}><Repeat className="mr-1 h-3 w-3" />repeat ×{rep.count}</Badge>}
                   {d.attachments?.length ? <Badge variant="outline"><Paperclip className="mr-1 h-3 w-3" />{d.attachments.length}</Badge> : null}
                   <span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span>
@@ -282,6 +286,19 @@ export default function Defects() {
                       <CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => navigate(`/tech-log/releases?defect=${d.id}`)}>Quick CRS</Button>
+                    <Button size="sm" variant="outline" onClick={() => setWatchTarget(d)}>
+                      <Eye className="mr-1.5 h-4 w-4" /> Watch
+                    </Button>
+                  </>
+                )}
+                {isMaint && d.status === 'WATCHLISTED' && (
+                  <>
+                    <Button size="sm" onClick={() => rectifyToWorkCard(d)}>
+                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => setEscalateTarget(d)}>
+                      <TriangleAlert className="mr-1.5 h-4 w-4" /> Escalate
+                    </Button>
                   </>
                 )}
               </div>
@@ -463,6 +480,13 @@ export default function Defects() {
         onSigned={onCorrectionSigned}
         title="Sign correction"
       />
+
+      {watchTarget && (
+        <WatchlistDialog defect={watchTarget} open={!!watchTarget} onOpenChange={o => { if (!o) setWatchTarget(null); }} />
+      )}
+      {escalateTarget && (
+        <EscalateWatchDialog defect={escalateTarget} open={!!escalateTarget} onOpenChange={o => { if (!o) setEscalateTarget(null); }} />
+      )}
     </TechLogShell>
   );
 }
