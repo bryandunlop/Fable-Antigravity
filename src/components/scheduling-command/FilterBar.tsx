@@ -1,11 +1,12 @@
 import { Search } from 'lucide-react';
-import { Switch } from '../../ui/switch';
-import { FLEET } from '../mockData';
+import { Switch } from '../ui/switch';
+import type { FleetAircraft } from './fleet';
 
 export const HORIZON_PRESETS = [14, 30, 60, 90] as const;
 
 /** Shared filter bar — one filter state applied to whichever view is active. */
 export function FilterBar({
+  fleet,
   searchTerm,
   onSearch,
   tailFilter,
@@ -15,6 +16,7 @@ export function FilterBar({
   horizonDays,
   onHorizon,
 }: {
+  fleet: FleetAircraft[];
   searchTerm: string;
   onSearch: (s: string) => void;
   tailFilter: Set<string>;
@@ -37,7 +39,7 @@ export function FilterBar({
       </div>
 
       <div className="flex gap-1.5">
-        {FLEET.map(ac => (
+        {fleet.map(ac => (
           <button key={ac.tail} onClick={() => onToggleTail(ac.tail)}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${tailFilter.has(ac.tail) ? 'bg-slate-900 text-white border-slate-900 shadow' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
             {ac.tail}

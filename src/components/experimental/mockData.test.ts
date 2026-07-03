@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateTrips, FLEET } from '../mockData';
+import { generateTrips, FLEET } from './mockData';
 
 const ANCHOR = new Date('2026-07-03T00:00:00Z');
 

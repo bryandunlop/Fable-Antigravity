@@ -17,10 +17,10 @@ describe('role filtering', () => {
   it('pilot sees the workspace but not scheduling-only pages', () => {
     const paths = entriesForRoles('pilot').map((e) => e.path);
     expect(paths).toContain('/pilot-workspace');
-    expect(paths).not.toContain('/scheduling-workspace');
+    expect(paths).not.toContain('/scheduling-command');
   });
   it('additionalRoles widen visibility', () => {
-    expect(entriesForRoles('pilot', ['scheduling']).map((e) => e.path)).toContain('/scheduling-workspace');
+    expect(entriesForRoles('pilot', ['scheduling']).map((e) => e.path)).toContain('/scheduling-command');
   });
 });
 

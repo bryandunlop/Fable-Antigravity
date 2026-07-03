@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, AlertTriangle, Globe, MapPin, Calendar } from 'lucide-react';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '../../ui/hover-card';
-import { Badge } from '../../ui/badge';
-import { FLEET, type MockTripData } from '../mockData';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card';
+import { Badge } from '../ui/badge';
+import type { BoardTrip } from './adapter';
+import { fleetRowsFor } from './fleet';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
 import { buildWindow, dayColumns, barGeometry, packLanes, ZOOM_DAYS, type ZoomPreset } from './planBoardMath';
 
@@ -24,9 +25,9 @@ export function PlanBoard({
   nowMs,
   onTripClick,
 }: {
-  trips: MockTripData[];
+  trips: BoardTrip[];
   nowMs: number;
-  onTripClick: (trip: MockTripData) => void;
+  onTripClick: (trip: BoardTrip) => void;
 }) {
   const [zoom, setZoom] = useState<ZoomPreset>('month');
   const [page, setPage] = useState(0);
@@ -36,7 +37,7 @@ export function PlanBoard({
   const colW = COL_W[zoom];
   const boardW = window_.days * colW;
 
-  const rows = useMemo(() => FLEET.map(ac => {
+  const rows = useMemo(() => fleetRowsFor(trips).map(ac => {
     const tailTrips = trips.filter(t => t.aircraft === ac.tail);
     const bars = tailTrips
       .map(t => {

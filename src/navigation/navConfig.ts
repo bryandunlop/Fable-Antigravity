@@ -56,7 +56,7 @@ export interface NavEntry {
 export const FRONT_DOORS: Record<string, string> = {
   'pilot': '/pilot-workspace',
   'chief-pilot': '/pilot-workspace',
-  'scheduling': '/scheduling-workspace',
+  'scheduling': '/scheduling-command',
   'maintenance': '/tech-log',
   'maintenance-coordinator': '/tech-log',
   'dom': '/tech-log',
@@ -85,7 +85,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/currency-dashboard', label: 'Currency Dashboard', domain: 'home', icon: UserCheck, primary: true, keywords: ['currency', 'compliance', 'landings', '61.58'], roles: ['pilot', 'admin', 'lead', 'scheduling'] },
   { path: '/aog-management', label: 'AOG Management', domain: 'home', icon: AlertOctagon, primary: true, keywords: ['aog', 'aircraft on ground', 'emergency'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   // Cross-role experimental tools live in the everyone-domain's More (spec deviation note).
-  { path: '/experimental/scheduling-command', label: 'Master Command Center', domain: 'home', icon: Activity, primary: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   { path: '/experimental/unified-trip', label: 'Trip Sandbox (Beta)', domain: 'home', icon: Sparkles, primary: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
 
   // ── Flight Ops — the Pilot Workspace is the front item; absorbed pages behind More ──
@@ -101,7 +100,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/fleet-map', label: 'Live Fleet Map', domain: 'flight-ops', icon: MapPin, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
 
   // ── Scheduling — the Scheduling Workspace leads ───────────────────────────
-  { path: '/scheduling-workspace', label: 'Scheduling Workspace', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['run board', 'checklist', 'handoff'], roles: ['scheduling', 'admin'] },
+  { path: '/scheduling-command', label: 'Master Command Center', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['run board', 'checklist', 'handoff', 'plan board', 'trips', 'templates'], roles: ['scheduling', 'admin'] },
   { path: '/schedule', label: 'Schedule Calendar', domain: 'scheduling', icon: Calendar, primary: true, roles: ['pilot', 'admin'] },
   { path: '/crew-scheduling-workload', label: 'Crew Workload & Travel', domain: 'scheduling', icon: BarChart3, primary: true, roles: ['scheduling', 'admin', 'lead'] },
   { path: '/vacation-request', label: 'Vacation Request', domain: 'scheduling', icon: CalendarCheck, primary: true, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },

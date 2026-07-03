@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Globe, MapPin } from 'lucide-react';
-import type { MockTripData } from '../mockData';
+import type { BoardTrip } from './adapter';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
 
 const MAX_PILLS_PER_DAY = 3;
@@ -12,9 +12,9 @@ export function CalendarView({
   nowMs,
   onTripClick,
 }: {
-  trips: MockTripData[];
+  trips: BoardTrip[];
   nowMs: number;
-  onTripClick: (trip: MockTripData) => void;
+  onTripClick: (trip: BoardTrip) => void;
 }) {
   const [currentDate, setCurrentDate] = useState(() => new Date(nowMs));
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());

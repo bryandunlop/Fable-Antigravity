@@ -1,7 +1,7 @@
 import { AlertTriangle, Calendar, CheckCircle2, MapPin, Plane } from 'lucide-react';
-import { Badge } from '../../ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/table';
-import type { MockTripData } from '../mockData';
+import { Badge } from '../ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import type { BoardTrip } from './adapter';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
 
 /** The master dispatch grid (original table view), consuming the shared status derivation.
@@ -11,9 +11,9 @@ export function DispatchTable({
   nowMs,
   onTripClick,
 }: {
-  trips: MockTripData[];
+  trips: BoardTrip[];
   nowMs: number;
-  onTripClick: (trip: MockTripData) => void;
+  onTripClick: (trip: BoardTrip) => void;
 }) {
   const sorted = [...trips].sort((a, b) => {
     if (a.criticalBlocker && !b.criticalBlocker) return -1;

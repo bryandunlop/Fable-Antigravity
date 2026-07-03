@@ -1,5 +1,3 @@
-import type { MockTripData } from '../mockData';
-
 // One derivation + one style map shared by the plan board, run board, calendar pills, and dispatch
 // table — previously triplicated inline in SchedulingCommandCenter. Rules are lifted verbatim from
 // the original calendar-pill logic; 'airborne' is additionally bounded by arrival (dep + duration)
@@ -9,10 +7,15 @@ export type TripDerivedStatus =
 
 const DAY_MS = 86400000;
 
-export function deriveTripStatus(
-  t: Pick<MockTripData, 'readinessScore' | 'criticalBlocker' | 'departureDate' | 'durationDays'>,
-  nowMs: number,
-): TripDerivedStatus {
+/** Structural input — satisfied by BoardTrip (the production-store adapter). */
+export interface TripStatusInput {
+  readinessScore: number;
+  criticalBlocker?: string;
+  departureDate: string;
+  durationDays: number;
+}
+
+export function deriveTripStatus(t: TripStatusInput, nowMs: number): TripDerivedStatus {
   if (t.criticalBlocker) return 'blocked';
 
   const depMs = new Date(t.departureDate).getTime();

@@ -1,20 +1,24 @@
-import type { MockTripData, MockChecklistItem } from '../mockData';
+import type { BoardTrip, BoardTask } from './adapter';
 import { deriveTripStatus } from './tripStatus';
 
 // Pure selectors for the run board ("what needs me now"): cross-trip task inbox grouped by due
-// horizon. All time inputs are explicit (nowMs) so midnight/timezone edges are unit-testable.
+// horizon, on real TaskInstances (dueAtUtc from the engine's DueRule computation). Recurring
+// office tasks fold into the same groups with an OFFICE tag. All time inputs are explicit (nowMs)
+// so midnight/timezone edges are unit-testable.
 
 const DAY_MS = 86400000;
 
 export type RunGroup = 'blocked' | 'overdue' | 'due-today' | 'next-48';
 
 export interface RunTask {
-  key: string; // `${tripNumber}:${item.id}` — stable across rebuilds for override maps
-  item: MockChecklistItem;
-  tripNumber: string;
-  route: string;
-  tail: string;
-  client: string;
+  key: string; // TaskInstance id — the applyAction key
+  task: BoardTask;
+  office: boolean; // recurring office task (no trip context)
+  tripId?: string;
+  tripNumber?: string;
+  route?: string;
+  tail?: string;
+  client?: string;
   dueMs: number;
   dueLabel: string; // 'Overdue 2d' | 'Due today' | 'Due in 31h' | 'Due in 4d'
   group: RunGroup;
@@ -24,6 +28,8 @@ export interface RunBoardModel {
   groups: Record<RunGroup, RunTask[]>; // each sorted by dueMs ascending
   funnel: { blocked: number; inWork: number; ready: number; uninteracted: number; total: number }; // TRIP counts in horizon
 }
+
+const settled = (t: BoardTask) => t.status === 'done' || t.status === 'n_a';
 
 function dueLabel(dueMs: number, nowMs: number, startOfTodayMs: number, endOfTodayMs: number): string {
   if (dueMs < startOfTodayMs) {
@@ -36,12 +42,16 @@ function dueLabel(dueMs: number, nowMs: number, startOfTodayMs: number, endOfTod
 }
 
 /**
- * Build the run-board model: BLOCKED always surfaces; everything else buckets by due date
- * (departure − dueOffsetDays) into OVERDUE / DUE TODAY / upcoming-within-horizon. Ready items and
- * already-departed trips are out of scope. The funnel counts trips (not items) departing within
- * the horizon, bucketed by derived trip status.
+ * BLOCKED always surfaces; everything else buckets by the instance's engine-computed dueAtUtc into
+ * OVERDUE / DUE TODAY / upcoming-within-horizon. Settled (done/n_a) tasks and departed trips are
+ * out of scope. The funnel counts trips (not tasks) departing within the horizon, by derived status.
  */
-export function buildRunBoard(trips: MockTripData[], nowMs: number, horizonDays: number): RunBoardModel {
+export function buildRunBoard(
+  trips: BoardTrip[],
+  officeTasks: BoardTask[],
+  nowMs: number,
+  horizonDays: number,
+): RunBoardModel {
   const startOfToday = new Date(nowMs);
   startOfToday.setHours(0, 0, 0, 0);
   const startOfTodayMs = startOfToday.getTime();
@@ -50,6 +60,20 @@ export function buildRunBoard(trips: MockTripData[], nowMs: number, horizonDays:
 
   const groups: Record<RunGroup, RunTask[]> = { blocked: [], overdue: [], 'due-today': [], 'next-48': [] };
   const funnel = { blocked: 0, inWork: 0, ready: 0, uninteracted: 0, total: 0 };
+
+  const push = (task: BoardTask, ctx: Partial<RunTask> & { office: boolean }) => {
+    if (settled(task)) return;
+    const dueMs = new Date(task.dueAtUtc).getTime();
+    const base: Omit<RunTask, 'group'> = {
+      key: task.id, task, dueMs,
+      dueLabel: dueLabel(dueMs, nowMs, startOfTodayMs, endOfTodayMs),
+      ...ctx,
+    };
+    if (task.status === 'blocked') { groups.blocked.push({ ...base, group: 'blocked' }); return; }
+    if (dueMs < startOfTodayMs) groups.overdue.push({ ...base, group: 'overdue' });
+    else if (dueMs <= endOfTodayMs) groups['due-today'].push({ ...base, group: 'due-today' });
+    else if (dueMs <= horizonEndMs) groups['next-48'].push({ ...base, group: 'next-48' });
+  };
 
   for (const trip of trips) {
     const depMs = new Date(trip.departureDate).getTime();
@@ -64,25 +88,16 @@ export function buildRunBoard(trips: MockTripData[], nowMs: number, horizonDays:
       else funnel.inWork++;
     }
 
-    for (const item of trip.checklist) {
-      if (item.status === 'ready') continue;
-      const dueMs = depMs - item.dueOffsetDays * DAY_MS;
-      const base: Omit<RunTask, 'group'> = {
-        key: `${trip.tripNumber}:${item.id}`,
-        item,
-        tripNumber: trip.tripNumber,
-        route: trip.route,
-        tail: trip.aircraft,
-        client: trip.client,
-        dueMs,
-        dueLabel: dueLabel(dueMs, nowMs, startOfTodayMs, endOfTodayMs),
-      };
-      if (item.status === 'blocked') { groups.blocked.push({ ...base, group: 'blocked' }); continue; }
-      if (dueMs < startOfTodayMs) groups.overdue.push({ ...base, group: 'overdue' });
-      else if (dueMs <= endOfTodayMs) groups['due-today'].push({ ...base, group: 'due-today' });
-      else if (dueMs <= horizonEndMs) groups['next-48'].push({ ...base, group: 'next-48' });
+    for (const task of trip.tasks) {
+      push(task, {
+        office: false,
+        tripId: trip.id, tripNumber: trip.tripNumber, route: trip.route,
+        tail: trip.aircraft, client: trip.client,
+      });
     }
   }
+
+  for (const task of officeTasks) push(task, { office: true });
 
   for (const g of Object.keys(groups) as RunGroup[]) groups[g].sort((a, b) => a.dueMs - b.dueMs);
   return { groups, funnel };
