@@ -194,7 +194,22 @@ export const MOCK_TRIPS: TripData[] = SHARED_MOCK_TRIPS.map(meta => {
 export default function UnifiedTripWorkspace() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTripId, setActiveTripId] = useState(location.state?.tripId || 'TRP-2025-001');
+  const [activeTripId, setActiveTripId] = useState(location.state?.tripId || MOCK_TRIPS[0]?.tripId);
+
+  // Deep-link anchor from the run board: scroll to + flash the named checklist item on arrival.
+  React.useEffect(() => {
+    const itemId: string | undefined = location.state?.itemId;
+    if (!itemId) return;
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(itemId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-4', 'ring-amber-500', 'ring-offset-2');
+        window.setTimeout(() => el.classList.remove('ring-4', 'ring-amber-500', 'ring-offset-2'), 2500);
+      }
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [location.state?.itemId]);
   const [activeRole, setActiveRole] = useState<'scheduling' | 'safety' | 'inflight' | 'pilot'>('scheduling');
   
   // Feature State
