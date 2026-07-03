@@ -6,7 +6,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { SHARED_MOCK_TRIPS } from './mockData';
+import { SHARED_MOCK_TRIPS, INTL_CHECKLIST_TEMPLATE } from './mockData';
 import {
   Dialog,
   DialogContent,
@@ -126,38 +126,6 @@ const CATEGORY_META: Record<MissionItemCategory, { label: string; icon: React.El
 const CATEGORY_ORDER: MissionItemCategory[] = ['dispatch', 'crew', 'comms', 'ground-ops', 'customs', 'permits'];
 
 
-const INTL_CHECKLIST_TEMPLATE: { title: string; category: MissionItemCategory }[] = [
-  // Dispatch
-  { title: 'Update flight times in MAO (UV plan/Foreflight)', category: 'dispatch' },
-  { title: 'Review airport status (NOTAMS, curfews, events)', category: 'dispatch' },
-  { title: 'Adjust trip type regulation in MAO as needed', category: 'dispatch' },
-  { title: 'Upload final Crew/Pax pdf to attachments', category: 'dispatch' },
-  { title: 'Check Region Tab for additional info', category: 'dispatch' },
-  // Crew
-  { title: 'Check duty day issues', category: 'crew' },
-  { title: 'Check fatigue and WOCL issues', category: 'crew' },
-  { title: 'Mark 18 hrs Pre-Rest Off in MAO if required', category: 'crew' },
-  { title: 'Mark 48 hrs Post-Rest Off in MAO if required', category: 'crew' },
-  { title: 'Confirm PIC is INTL Captain', category: 'crew' },
-  { title: 'Email/mark standby crew as TSB/OSB', category: 'crew' },
-  { title: 'Set Outlook reminder to "Release STBY Crew"', category: 'crew' },
-  // Comms
-  { title: 'Email trip sheet 1-2 months pre-ETD', category: 'comms' },
-  { title: 'Email Crew & Pax Info 2 weeks pre-ETD', category: 'comms' },
-  { title: 'Schedule INTL Trip Brief', category: 'comms' },
-  // Ground Ops
-  { title: 'Verify handler info in MAO', category: 'ground-ops' },
-  { title: 'Confirm sleeping arrangements for pax', category: 'ground-ops' },
-  // Customs
-  { title: 'Send passport check to admin(s)', category: 'customs' },
-  { title: 'Fill out Passport & Visas tab; check UVgo', category: 'customs' },
-  { title: 'Cross-Check Outbound Apis from UV email', category: 'customs' },
-  { title: 'CREW: Confirm Passports and Visas', category: 'customs' },
-  { title: 'PAX: Confirm Passports and Visas', category: 'customs' },
-  // Permits
-  { title: 'Is a waiver required for this trip?', category: 'permits' },
-];
-
 const COMMENT_PRESETS = [
   "Awaiting vendor response",
   "Confirmed via phone/email",
@@ -182,7 +150,7 @@ export interface TripData {
   daysUntilDeparture: number;
 }
 
-export const MOCK_TRIPS: TripData[] = SHARED_MOCK_TRIPS.map((meta, i) => {
+export const MOCK_TRIPS: TripData[] = SHARED_MOCK_TRIPS.map(meta => {
   const isMissionConfirmed = meta.status === 'dispatched';
   const displayDate = new Date(meta.departureDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const daysUntilDeparture = Math.floor((new Date(meta.departureDate).getTime() - new Date().getTime()) / 86400000);
@@ -201,44 +169,21 @@ export const MOCK_TRIPS: TripData[] = SHARED_MOCK_TRIPS.map((meta, i) => {
       { name: 'Flight Plan Package', status: 'Pending', type: 'Performance', lastUpdate: '-' },
       { name: 'Overflight Clearances', status: isMissionConfirmed ? 'Synced' : 'Pending', type: 'Performance', lastUpdate: '-' }
     ],
-    missionItems: INTL_CHECKLIST_TEMPLATE.map((item, index, arr) => {
-      let status: MissionItemStatus = 'requested';
-      let lastComment: string | undefined = undefined;
-      let nudged = false;
-      let history: any[] = [];
-
-      const totalItems = arr.length;
-      const targetReadyCount = Math.floor((meta.readinessScore / 100) * totalItems);
-
-      if (index < targetReadyCount) {
-        status = 'ready';
-      } else if (index === targetReadyCount && meta.readinessScore < 100 && meta.readinessScore > 0) {
-        status = 'in-work';
-      }
-
-      if (item.title.includes('Email Crew & Pax Info') && meta.daysUntilDeparture <= 14 && meta.daysUntilDeparture > 5 && meta.readinessScore < 80) {
-         if (status === 'requested') status = 'in-work';
-      }
-
-      // If the trip has a critical blocker, attach the blocker to the very next actionable item
-      if (meta.criticalBlocker && index === targetReadyCount) {
-        status = 'blocked';
-        lastComment = meta.criticalBlocker;
-        nudged = true;
-        history = [{ status: 'blocked', comment: meta.criticalBlocker, timestamp: '09:00 AM', user: 'System' }];
-      }
-
-      return {
-        id: `t${i}-m${index}`,
-        title: item.title,
-        category: item.category,
-        status,
-        assignedTo: index % 2 === 0 ? 'Sarah M.' : 'Mike D.',
-        lastComment,
-        nudged,
-        history
-      };
-    }),
+    // The checklist is generated once in mockData.ts (shared with the command center's run board)
+    // so item statuses, readiness %, and blockers agree everywhere. History is synthesized for
+    // blocked items only — the mock has no real event trail.
+    missionItems: meta.checklist.map(item => ({
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      status: item.status,
+      assignedTo: item.assignedTo,
+      lastComment: item.lastComment,
+      nudged: item.nudged,
+      history: item.status === 'blocked' && item.lastComment
+        ? [{ status: 'blocked' as MissionItemStatus, comment: item.lastComment, timestamp: '09:00 AM', user: 'System' }]
+        : [],
+    })),
     lateChanges: [],
     passengerAlerts: []
   };
