@@ -1,6 +1,33 @@
 import type { Defect, WorkCard } from '../types';
 
 /**
+ * CAMP push input for closing a defect's discrepancy on rectification (intent CLOSE → UPDATE/Closed,
+ * parent ref carried forward off-ledger). Built here — next to the card factory — so the close always
+ * carries the defect's pre-rectification status and a watch-lane discrepancy stays DEFERRED-WATCHLIST.
+ */
+export function rectificationClosePush(
+  defect: Defect,
+  rectifiedDefectId: string,
+  opts: { technician: string; riiItem?: boolean; inspector?: string },
+) {
+  return {
+    entityType: 'DEFECT' as const,
+    entityId: rectifiedDefectId,
+    aircraftId: defect.aircraftId,
+    ata: defect.ataChapter,
+    description: defect.description,
+    technician: opts.technician,
+    intent: 'CLOSE' as const,
+    supersedesEntityId: defect.id,
+    // Pre-rectification status keeps the CAMP lane: a WATCHLISTED defect closes as
+    // DEFERRED-WATCHLIST against its existing watch-lane discrepancy, never NON-DEFERRED.
+    defectStatus: defect.status,
+    riiItem: opts.riiItem,
+    inspector: opts.inspector,
+  };
+}
+
+/**
  * Build a corrective work card for a defect rectification — linked to the defect (`linkedDefectId`) so
  * completing the card in WorkCardDetail rectifies the defect, clears any linked deferral, and returns
  * the aircraft to service. Seeds exactly one step so the card is completable; the mechanic adds
