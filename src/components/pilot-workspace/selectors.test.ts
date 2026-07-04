@@ -40,6 +40,14 @@ describe('selectPilotFlights', () => {
     expect(got).toEqual(['A', 'D']);
   });
 
+  it('excludes volume-seed board filler — those are scheduler-scale demo trips, not the pilot\'s flights', () => {
+    const trips = [
+      trip({ tripNumber: 'VOL', createdBy: 'volume-seed' }),
+      trip({ tripNumber: 'REAL', createdBy: 'demo-seed' }),
+    ];
+    expect(selectPilotFlights(trips, NOW).map((t) => t.tripNumber)).toEqual(['REAL']);
+  });
+
   it('sorts by earliest leg departure, soonest first', () => {
     const late = trip({ tripNumber: 'LATE', legs: [
       { id: 'l', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'KTEB',
