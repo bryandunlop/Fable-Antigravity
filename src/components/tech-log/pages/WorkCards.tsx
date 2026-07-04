@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ClipboardList, Download, CheckCircle2, Clock, UserCheck, CloudDownload } from 'lucide-react';
+import { ClipboardList, Download, CheckCircle2, Clock, UserCheck, CloudDownload, CalendarClock, Plane } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
@@ -42,8 +42,19 @@ export default function WorkCards() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pullOpen, tail]);
 
-  const cards = state.workCards.slice().sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc));
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
+  // Grouped by tail, open work first — the list answers "what's on each aircraft" at a glance.
+  const grouped = state.aircraft
+    .map(a => ({
+      aircraft: a,
+      cards: state.workCards
+        .filter(w => w.aircraftId === a.id)
+        .sort((x, y) => (x.status === 'COMPLETED' ? 1 : 0) - (y.status === 'COMPLETED' ? 1 : 0) || y.createdAtUtc.localeCompare(x.createdAtUtc)),
+    }))
+    .filter(g => g.cards.length > 0)
+    .sort((a, b) => a.aircraft.tailNumber.localeCompare(b.aircraft.tailNumber));
+  const laborOf = (cardId: string) => Math.round(state.laborEntries.filter(l => l.workCardId === cardId).reduce((s, l) => s + l.hours, 0) * 10) / 10;
+  const dueOf = (w: WorkCard) => (w.forecastRef ? integration.readForecast(w.aircraftId).find(f => f.ref === w.forecastRef) : undefined);
 
   const pull = () => {
     const ac = aircraftByTail(tail);
@@ -80,39 +91,59 @@ export default function WorkCards() {
       subtitle="Pull a CAMP work order, perform it, capture parts & labor, and sign completion (RTS)."
       actions={isMaint ? <Button size="sm" onClick={() => setPullOpen(true)}><CloudDownload className="mr-1.5 h-4 w-4" /> Pull from CAMP</Button> : undefined}
     >
-      <div className="space-y-3">
-        {cards.length === 0 && (
+      <div className="space-y-5">
+        {state.workCards.length === 0 && (
           <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No work cards yet. {isMaint ? 'Pull a work order from CAMP to begin.' : 'Maintenance pulls work orders from CAMP.'}</CardContent></Card>
         )}
-        {cards.map(w => {
-          const done = w.steps.filter(s => s.done).length;
-          return (
-            <Card key={w.id} className="cursor-pointer transition-colors hover:bg-accent/40" onClick={() => navigate(`/tech-log/work-cards/${w.id}`)}>
-              <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold">{w.cardNumber}</span>
-                    <span className="font-semibold">{tailOf(w.aircraftId)}</span>
-                    <Badge variant="outline">ATA {w.ataChapter}</Badge>
-                    <Badge variant={STATUS_VARIANT[w.status]}>{w.status}</Badge>
-                    {w.scheduled ? <Badge variant="outline">scheduled</Badge> : <Badge variant="outline">corrective</Badge>}
-                    {w.riiRequired && <Badge variant="outline"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}
-                  </div>
-                  <p className="mt-1 text-sm">{w.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO status: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}
-                  </p>
-                </div>
-                <div className="shrink-0 text-xs text-muted-foreground">
-                  {w.status === 'COMPLETED'
-                    ? <span className="inline-flex items-center gap-1 text-[var(--gfo-success,#00B140)]"><CheckCircle2 className="h-3.5 w-3.5" /> Complied with</span>
-                    : <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> opened {new Date(w.createdAtUtc).toLocaleDateString()}</span>}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {grouped.map(({ aircraft, cards }) => (
+          <div key={aircraft.id} className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <Plane className="h-4 w-4 text-muted-foreground" />
+              <span className="font-semibold">{aircraft.tailNumber}</span>
+              <span className="text-muted-foreground">{aircraft.type}</span>
+              <Badge variant="outline">{cards.filter(w => w.status !== 'COMPLETED').length} open · {cards.length} total</Badge>
+            </div>
+            {cards.map(w => {
+              const done = w.steps.filter(s => s.done).length;
+              const labor = laborOf(w.id);
+              const due = dueOf(w);
+              const dueDays = due?.dueDateUtc ? Math.floor((new Date(due.dueDateUtc).getTime() - Date.now()) / 86400000) : null;
+              const dueSoon = dueDays != null && dueDays <= 7;
+              return (
+                <Card key={w.id} className="cursor-pointer transition-colors hover:bg-accent/40" onClick={() => navigate(`/tech-log/work-cards/${w.id}`)}>
+                  <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-semibold">{w.cardNumber}</span>
+                        <Badge variant="outline">ATA {w.ataChapter}</Badge>
+                        <Badge variant={STATUS_VARIANT[w.status]}>{w.status}</Badge>
+                        {w.scheduled ? <Badge variant="outline">scheduled</Badge> : <Badge variant="outline">corrective</Badge>}
+                        {w.riiRequired && <Badge variant="outline"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}
+                        {due && w.status !== 'COMPLETED' && (
+                          <Badge variant="outline" className={dueSoon ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]' : ''}>
+                            <CalendarClock className="mr-1 h-3 w-3" />
+                            {due.dueDateUtc ? `due ${new Date(due.dueDateUtc).toLocaleDateString()}${dueDays != null ? ` · ${dueDays < 0 ? `overdue ${Math.abs(dueDays)}d` : `${dueDays}d`}` : ''}` : 'CAMP due list'}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm">{w.title}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO status: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}
+                        {labor > 0 ? ` · ${labor} h logged` : ''}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-xs text-muted-foreground">
+                      {w.status === 'COMPLETED'
+                        ? <span className="inline-flex items-center gap-1 text-[var(--gfo-success,#00B140)]"><CheckCircle2 className="h-3.5 w-3.5" /> Complied with</span>
+                        : <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> opened {new Date(w.createdAtUtc).toLocaleDateString()}</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       <Dialog open={pullOpen} onOpenChange={setPullOpen}>
