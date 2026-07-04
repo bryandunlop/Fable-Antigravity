@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   conditionToBuilder, builderToCondition, defaultDueRule, slugifyTaskId, bumpedTemplatePayload,
+  publishTaskIds,
 } from './templateEditor';
 import { parseDueRule, parseTemplate } from '../../scheduling/store';
 import type { ChecklistTemplate, Condition, DueRule } from '../../scheduling/engine';
@@ -74,6 +75,25 @@ describe('slugifyTaskId', () => {
     const existing = new Set(['send-crew-brief']);
     expect(slugifyTaskId('Send Crew Brief!', existing)).toBe('send-crew-brief-2');
     expect(slugifyTaskId('Confirm PIC (INTL)', existing)).toBe('confirm-pic-intl');
+  });
+});
+
+describe('publishTaskIds', () => {
+  it('keeps stable ids and slugs new tasks from their titles', () => {
+    expect(publishTaskIds([
+      { id: 'confirm-crew', title: 'Confirm Crew' },
+      { id: 'new-task', title: 'Order Catering' },
+    ])).toEqual(['confirm-crew', 'order-catering']);
+  });
+
+  it('a new task reordered above an existing task with the same slug cannot steal its id', () => {
+    const ids = publishTaskIds([
+      { id: 'new-task', title: 'Confirm Crew' },      // new item, moved to the top
+      { id: 'confirm-crew', title: 'Confirm Crew' },  // existing item with its stable id
+    ]);
+    expect(ids[1]).toBe('confirm-crew');           // the stable id is untouched
+    expect(new Set(ids).size).toBe(ids.length);    // publish never emits duplicate ids
+    expect(ids[0]).toBe('confirm-crew-2');         // the new item dedupes against ALL stable ids
   });
 });
 

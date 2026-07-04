@@ -118,6 +118,21 @@ export function slugifyTaskId(title: string, existing: Set<string>): string {
   return `${base}-${n}`;
 }
 
+/** Ids for the publish payload: existing tasks keep their stable id across versions; new tasks
+ *  (draft `new-task*` placeholders) are slugified from their final title. Stable ids are reserved
+ *  up front so a new task can never collide with an existing id regardless of list order — a
+ *  duplicate id would collide instance ids downstream and silently drop a checklist item. */
+export function publishTaskIds(tasks: { id: string; title: string }[]): string[] {
+  const isNew = (t: { id: string }) => !t.id || t.id.startsWith('new-task');
+  const usedIds = new Set(tasks.filter(t => !isNew(t)).map(t => t.id));
+  return tasks.map(t => {
+    if (!isNew(t)) return t.id;
+    const id = slugifyTaskId(t.title, usedIds);
+    usedIds.add(id);
+    return id;
+  });
+}
+
 /** New published version: same id/name/trigger/scope, version+1, re-sequenced order. The result
  *  goes through parseTemplate before saving — the same validation gate the seed data passes. */
 export function bumpedTemplatePayload(template: ChecklistTemplate, taskDefinitions: TaskDefinition[]): ChecklistTemplate {
