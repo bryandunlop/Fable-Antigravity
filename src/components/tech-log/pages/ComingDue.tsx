@@ -107,12 +107,16 @@ export default function ComingDue() {
         </div>
       </>
     );
-    return nav ? (
-      <button key={it.key} onClick={nav} className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left text-sm hover:bg-accent/40">
-        {body}
-      </button>
-    ) : (
-      <div key={it.key} className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left text-sm">
+    // div, not <button>: rows can contain their own action Button and nested buttons are invalid DOM
+    return (
+      <div
+        key={it.key}
+        onClick={nav ?? undefined}
+        role={nav ? 'button' : undefined}
+        tabIndex={nav ? 0 : undefined}
+        onKeyDown={nav ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nav(); } } : undefined}
+        className={`flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left text-sm ${nav ? 'cursor-pointer hover:bg-accent/40' : ''}`}
+      >
         {body}
       </div>
     );
