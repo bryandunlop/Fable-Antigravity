@@ -181,7 +181,7 @@ export function getDefaultState(): TechLogState {
   workCards.push({
     id: 'wc-2', cardNumber: 'WC-1012', woNumber: 'WO-32-0455', aircraftId: 'ac-n2pg', title: 'Main Landing Gear — 600-hr functional check',
     ataChapter: '32', description: 'Scheduled MLG retraction test, inspection, and lubrication.', source: 'CAMP', headerStatusCode: 1,
-    scheduled: true, riiRequired: true, createdAtUtc: iso(1 * D), status: 'OPEN',
+    forecastRef: 'FC-32-MLG', scheduled: true, riiRequired: true, createdAtUtc: iso(1 * D), status: 'OPEN',
     steps: [
       { id: 'wc2-s1', seq: 1, text: 'Perform MLG retraction test per AMM 32-30-00', done: false },
       { id: 'wc2-s2', seq: 2, text: 'Inspect MLG actuator and downlock for leakage/wear', done: false },

@@ -186,6 +186,7 @@ export interface WorkCard {
   headerStatusCode: number;    // CAMP WO header status ladder (0=Complied With … 6=Planned)
   scheduled: boolean;          // scheduled task vs corrective (defect-driven)
   linkedDefectId?: string;
+  forecastRef?: string;        // CAMP due-list item this card complies with (CampForecastItem.ref)
   riiRequired: boolean;
   createdAtUtc: string;
   completedReleaseId?: string; // MaintenanceRelease produced on completion
