@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getDefaultState } from './mockData/scenarios';
-import { projectTripIntoTechLogState, summarizePreflight, summarizeTripLifecycle } from './bridge';
+import { projectTripIntoTechLogState, summarizePreflight, summarizeTripLifecycle, summarizeFleetServiceability } from './bridge';
 import type { PreflightTripInput } from './bridge';
 import type { Defect, Postflight, Trip } from './types';
 
@@ -309,5 +309,20 @@ describe('summarizeTripLifecycle', () => {
     const summary = summarizeTripLifecycle(stateWithTrip, 'TRP-LC-1');
     expect(summary!.aircraftTail).toBe('N5PG');
     expect(summary!.tripStatus).toBe('OPEN');
+  });
+});
+
+describe('summarizeFleetServiceability', () => {
+  it('derives per-tail RAG from tech-log state — N1PG RED (open defect), N6PG AMBER (active deferral), N2PG GREEN', () => {
+    const svc = summarizeFleetServiceability(getDefaultState(), new Date().toISOString());
+    expect(svc['N1PG']).toBe('RED');
+    expect(svc['N6PG']).toBe('AMBER');
+    expect(svc['N2PG']).toBe('GREEN');
+  });
+
+  it('covers every aircraft in the fleet', () => {
+    const state = getDefaultState();
+    const svc = summarizeFleetServiceability(state, new Date().toISOString());
+    for (const ac of state.aircraft) expect(svc[ac.tailNumber]).toMatch(/^(GREEN|AMBER|RED)$/);
   });
 });

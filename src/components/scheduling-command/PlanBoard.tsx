@@ -4,6 +4,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card'
 import { Card } from '../ui/card';
 import { Progress } from '../ui/progress';
 import type { BoardTrip } from './adapter';
+import type { FleetServiceability } from '../tech-log/bridge';
 import { fleetRowsFor } from './fleet';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
 import { TripIdentityLine } from './TripIdentity';
@@ -26,10 +27,13 @@ const COL_W: Record<ZoomPreset, number> = { '2w': 88, month: 44, quarter: 18 };
 export function PlanBoard({
   trips,
   nowMs,
+  serviceability,
   onTripClick,
 }: {
   trips: BoardTrip[];
   nowMs: number;
+  /** tail → tech-log derived GREEN/AMBER/RED; tails without a tech-log record get a hollow dot. */
+  serviceability?: FleetServiceability;
   onTripClick: (trip: BoardTrip) => void;
 }) {
   const [zoom, setZoom] = useState<ZoomPreset>('month');
@@ -114,11 +118,25 @@ export function PlanBoard({
           {/* Tail rows */}
           {rows.map(({ ac, bars, lanes }) => {
             const rowH = ROW_PAD * 2 + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP;
+            const svc = serviceability?.[ac.tail];
             return (
               <div key={ac.tail} className="flex border-b border-border/50">
                 <div className="w-44 shrink-0 sticky left-0 z-10 bg-card border-r px-4 flex flex-col justify-center" style={{ height: rowH }}>
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${ac.serviceable ? 'bg-[var(--gfo-success,#00B140)]' : 'bg-[var(--gfo-warning,#F1B434)]'}`} title={ac.serviceable ? 'Serviceable' : 'Restricted (MEL)'} />
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        svc === 'GREEN' ? 'bg-[var(--gfo-success,#00B140)]'
+                        : svc === 'AMBER' ? 'bg-[var(--gfo-warning,#F1B434)]'
+                        : svc === 'RED' ? 'bg-[var(--gfo-error,#EF3340)]'
+                        : 'bg-transparent border border-muted-foreground/40'
+                      }`}
+                      title={
+                        svc === 'GREEN' ? 'Serviceable'
+                        : svc === 'AMBER' ? 'Restricted (active MEL deferral)'
+                        : svc === 'RED' ? 'Grounded'
+                        : 'No tech-log record'
+                      }
+                    />
                     <span className="font-semibold text-foreground">{ac.tail}</span>
                   </div>
                   <span className="text-[11px] text-muted-foreground ml-4">{ac.type}</span>

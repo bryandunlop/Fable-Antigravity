@@ -4,8 +4,9 @@
 // crew's existing per-leg FRAT/airport/fuel preflight flow runs on it. The coupling
 // to tech-log's state shape lives ONLY in this module.
 
-import type { Aircraft, AircraftType, Trip, TripLeg, TechLogState } from './types';
+import type { Aircraft, AircraftType, Serviceability, Trip, TripLeg, TechLogState } from './types';
 import { getDefaultState } from './mockData/scenarios';
+import { deriveServiceability } from './engine/serviceability';
 import { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './TechLogContext';
 
 export interface PreflightTripInput {
@@ -164,6 +165,23 @@ export function summarizeTripLifecycle(state: TechLogState, tripNumber: string):
     groundingSquawks,
     postflightDone,
   };
+}
+
+/** tail → derived GREEN/AMBER/RED for every aircraft in the tech-log fleet. */
+export type FleetServiceability = Record<string, Serviceability>;
+
+/** PURE — testable without localStorage. The §14.2 projection, never a stored flag. */
+export function summarizeFleetServiceability(state: TechLogState, asOfUtc: string): FleetServiceability {
+  const out: FleetServiceability = {};
+  for (const ac of state.aircraft) {
+    out[ac.tailNumber] = deriveServiceability(ac.id, state, asOfUtc).status;
+  }
+  return out;
+}
+
+/** THIN localStorage wrapper — the only untested seam. */
+export function readFleetServiceability(asOfUtc: string): FleetServiceability {
+  return summarizeFleetServiceability(loadState(), asOfUtc);
 }
 
 const newLocalId = (p: string) => `${p}-${Math.random().toString(36).slice(2, 10)}`;

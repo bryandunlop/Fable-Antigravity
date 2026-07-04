@@ -9,6 +9,7 @@ import InboxPanel from '../scheduling-workspace/InboxPanel';
 import ForeFlightPanel from '../scheduling-workspace/ForeFlightPanel';
 import type { TaskAction } from '../../scheduling/engine/tasks';
 import { boardTripOf, toBoardTask, type BoardTrip, type BoardTask } from './adapter';
+import { readFleetServiceability } from '../tech-log/bridge';
 import { fleetRowsFor } from './fleet';
 import { deriveTripStatus } from './tripStatus';
 import { PlanBoard } from './PlanBoard';
@@ -89,6 +90,10 @@ export default function SchedulingCommandCenter({
     })();
     return () => { cancelled = true; };
   }, [service, store, ready, tick, nowUtc, officeTzOffsetMinutes]);
+
+  // Tail-row status dots: the tech-log DERIVED serviceability projection (§14.2), never a stored
+  // flag — re-read per tick in case a release or rectification touched tech-log state.
+  const fleetServiceability = useMemo(() => readFleetServiceability(nowUtc()), [nowUtc, tick]);
 
   const filteredTrips = useMemo(() => trips.filter(t => {
     if (tailFilter.size > 0 && !tailFilter.has(t.aircraft)) return false;
@@ -201,7 +206,7 @@ export default function SchedulingCommandCenter({
 
       {/* Active surface */}
       {surface === 'schedule' && scheduleView === 'board' && (
-        <PlanBoard trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
+        <PlanBoard trips={filteredTrips} nowMs={nowMs} serviceability={fleetServiceability} onTripClick={t => openTrip(t.id)} />
       )}
       {surface === 'schedule' && scheduleView === 'calendar' && (
         <CalendarView trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
