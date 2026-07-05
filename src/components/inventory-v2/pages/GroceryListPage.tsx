@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Search, X, CheckCircle2, Circle, Plus, Share2, Camera, Users, Package, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Search, X, CheckCircle2, Circle, Plus, Share2, Camera, Users, Package, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Textarea } from '../../ui/textarea';
 import { Badge } from '../../ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../ui/alert-dialog';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { LEG_PHASE_COLORS, GROCERY_STATUS_COLORS } from '../constants';
@@ -204,6 +205,7 @@ function GroceryListInner({
   const [addSearch, setAddSearch] = useState('');
   const [freeFormText, setFreeFormText] = useState('');
   const [shoppingMode, setShoppingMode] = useState(false);
+  const [showReopenConfirm, setShowReopenConfirm] = useState(false);
 
   const phase = activeLeg.phase;
   const phaseColors = LEG_PHASE_COLORS[phase];
@@ -382,6 +384,16 @@ function GroceryListInner({
     if (!groceryList) return;
     dispatch({ type: 'FULFILL_GROCERY_LIST', payload: groceryList.id });
     setGroceryList({ ...groceryList, status: 'fulfilled' });
+  }
+
+  // ─── Reopen list ──────────────────────────────────────────────────────────
+
+  function handleReopenList() {
+    if (!groceryList) return;
+    // Revert to draft so Start Shopping re-enables; items (and their
+    // qtyFulfilled purchased flags) are untouched.
+    updateGroceryList({ ...groceryList, status: 'draft' });
+    setShowReopenConfirm(false);
   }
 
   // ─── Share ────────────────────────────────────────────────────────────────
@@ -680,8 +692,34 @@ function GroceryListInner({
           >
             {isComplete ? 'Shopping Complete ✓' : 'Start Shopping'}
           </Button>
+          {isComplete && (
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowReopenConfirm(true)}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reopen List
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* ── Reopen confirm dialog ── */}
+      <AlertDialog open={showReopenConfirm} onOpenChange={setShowReopenConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reopen this list?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Items already marked purchased stay checked.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReopenList}>Reopen List</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Add Item dialog ── */}
       <Dialog open={showAddDialog} onOpenChange={open => { setShowAddDialog(open); if (!open) setAddSearch(''); }}>

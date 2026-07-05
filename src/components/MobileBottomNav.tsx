@@ -55,7 +55,7 @@ export default function MobileBottomNav({ userRole }: MobileBottomNavProps) {
           { name: 'Home', href: '/', icon: Home },
           { name: 'Commissary', href: '/inventory-v2/commissary', icon: Warehouse },
           { name: 'Inspections', href: '/inventory-v2/inspections', icon: ClipboardCheck },
-          { name: 'Alerts', href: '/inventory-v2/alerts', icon: AlertTriangle }
+          { name: 'Trips', href: '/inventory-v2/trips', icon: Plane }
         ];
       
       case 'maintenance':
