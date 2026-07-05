@@ -7,7 +7,7 @@ interface StoredInventoryState {
   items?: { id: string; itemName: string }[];
   stockroomItems?: { itemId: string; stockroomId: string; qtyOnHand: number; minimumLevel: number; parLevel: number }[];
   inspections?: { id: string; tailNumber: string; status: string }[];
-  groceryLists?: { id: string; tailNumber?: string; generatedBy?: string; status: string; items: unknown[] }[];
+  groceryLists?: { id: string; tailNumber?: string; generatedBy?: string; status: string; items?: unknown[] }[];
 }
 
 export function buildInventoryFeed(
@@ -62,12 +62,13 @@ export function buildInventoryFeed(
   }
 
   for (const gl of state.groceryLists ?? []) {
-    if (gl.status !== 'sent') continue;
+    if (!gl || gl.status !== 'sent') continue;
+    const itemCount = gl.items?.length ?? 0;
     out.push({
       id: `inv-grocery:${gl.id}`,
       severity: 'info',
       title: `Grocery list from ${gl.generatedBy ?? 'FA'}${gl.tailNumber ? ` for ${gl.tailNumber}` : ''}`,
-      detail: `${gl.items.length} item${gl.items.length !== 1 ? 's' : ''} requested`,
+      detail: `${itemCount} item${itemCount !== 1 ? 's' : ''} requested`,
       module: 'Inventory',
       link: '/inventory-v2/commissary',
     });

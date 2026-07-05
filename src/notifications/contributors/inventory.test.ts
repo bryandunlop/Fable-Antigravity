@@ -70,4 +70,15 @@ describe('buildInventoryFeed', () => {
     s.setItem('inv-v2-state', 'nope');
     expect(buildInventoryFeed('fa', NOW, s)).toEqual([]);
   });
+
+  it('tolerates grocery lists missing the items array', () => {
+    const s = memoryStorage();
+    s.setItem('inv-v2-state', JSON.stringify({
+      items: [], stockroomItems: [], inspections: [],
+      groceryLists: [{ id: 'GL9', status: 'sent' }],
+    }));
+    expect(buildInventoryFeed('fa', NOW, s).map(i => [i.id, i.detail])).toEqual([
+      ['inv-grocery:GL9', '0 items requested'],
+    ]);
+  });
 });
