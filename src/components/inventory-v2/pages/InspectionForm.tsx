@@ -319,7 +319,7 @@ export default function InspectionForm() {
     };
 
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(draft));
-    navigate('/inventory-v2/inspection/new/review');
+    navigate('/inventory-v2/inspection/review');
   }, [selectedTailNumber, aircraftType, checkedItems, selectedUser, navigate]);
 
   // ── Readiness stats per compartment ──

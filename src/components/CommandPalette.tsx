@@ -163,7 +163,9 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
       .slice(0, 3)
       .forEach(i => inventoryResults.push({
         id: `inv-insp-${i.id}`, title: `${i.tailNumber} inspection`, description: i.date,
-        href: `/inventory-v2/inspection/${i.id}/review`, category: 'Inspection', icon: ClipboardCheck, section: 'inventory',
+        // Inspection history lives inline on the inspections landing page; the
+        // review route only renders the in-session draft, never a stored record.
+        href: '/inventory-v2/inspections', category: 'Inspection', icon: ClipboardCheck, section: 'inventory',
       }));
     inventory.unitItemRequests
       .filter(r => (r.status === 'open' || r.status === 'in_progress') && r.unitTailNumber.toLowerCase().includes(searchTerm))
