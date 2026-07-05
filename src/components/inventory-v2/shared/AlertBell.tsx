@@ -2,16 +2,18 @@ import React from 'react';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useInventoryV2 } from '../InventoryV2Context';
-import { useNotificationContext } from '../../contexts/NotificationContext';
+import { useNotificationFeed } from '../../../notifications/useNotificationFeed';
 
 export function AlertBell() {
   const { state } = useInventoryV2();
-  const { notifications } = useNotificationContext();
+  const { entries } = useNotificationFeed(state.currentUser.role);
   const navigate = useNavigate();
 
   if (state.currentUser.role !== 'commissary-manager') return null;
 
-  const count = notifications.filter(n => n.module === 'Inventory' && !n.isRead).length;
+  const count = entries.filter(
+    e => e.module === 'Inventory' && (e.kind === 'derived' || !e.isRead),
+  ).length;
 
   return (
     <button

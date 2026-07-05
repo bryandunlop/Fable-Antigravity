@@ -148,9 +148,8 @@ import ActivityLog from './components/inventory-v2/pages/ActivityLog';
 // here because it needs to be inside the module scope where InventoryV2Provider
 // is imported. It reads from NotificationProvider (which wraps all routes).
 function InventoryRouteWrapper({ children, userRole }: { children: React.ReactNode; userRole: string }) {
-  const { addNotification } = useNotificationContext();
   return (
-    <InventoryV2Provider userRole={userRole} addNotification={addNotification}>
+    <InventoryV2Provider userRole={userRole}>
       {children}
     </InventoryV2Provider>
   );

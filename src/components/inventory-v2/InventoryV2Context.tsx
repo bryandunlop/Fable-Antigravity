@@ -1,8 +1,7 @@
 // ─── Inventory V2 — React Context ───────────────────────────────────────────
 
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { InventoryV2State, InventoryV2Action, StockroomItem, ActivityLogEntry, StorageLocation } from './types';
-import type { Notification } from '../contexts/NotificationContext';
+import type { InventoryV2State, InventoryV2Action, ActivityLogEntry, StorageLocation } from './types';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { ITEMS_V2, MOCK_INSPECTIONS, STOCKROOMS, STOCKROOM_ITEMS, MOCK_PICK_LIST, MOCK_RESTOCK_LIST, MOCK_UNIT_REQUESTS, MOCK_PURCHASE_ORDERS, STOCK_BATCHES, STORAGE_LOCATIONS } from './mockData';
 import { MOCK_TRIPS, MOCK_GROCERY_LISTS } from './mockTrips';
@@ -11,6 +10,7 @@ import { loadCompartmentConfigs } from './compartmentConfig';
 import { deductFromBatches } from './shared/batchUtils';
 import { useApiSync } from './useApiSync';
 import { api } from './api-client';
+import { eventStore } from '../../notifications/events';
 
 // ─── Storage Keys ───────────────────────────────────────────────────────────
 
@@ -703,10 +703,9 @@ const InventoryV2Context = createContext<InventoryV2ContextValue | undefined>(un
 interface InventoryV2ProviderProps {
   children: ReactNode;
   userRole?: string;
-  addNotification?: (notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => void;
 }
 
-export function InventoryV2Provider({ children, userRole, addNotification }: InventoryV2ProviderProps) {
+export function InventoryV2Provider({ children, userRole }: InventoryV2ProviderProps) {
   const [state, rawDispatch] = useReducer(inventoryReducer, undefined, loadInitialState);
   const [loading, setLoading] = useState(true);
 
@@ -744,10 +743,6 @@ export function InventoryV2Provider({ children, userRole, addNotification }: Inv
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount only
 
-  // Keep addNotification ref stable so useEffect deps don't change on every render
-  const addNotifRef = useRef(addNotification);
-  addNotifRef.current = addNotification;
-
   // Bridge app-level login role into context on mount
   useEffect(() => {
     if (!userRole) return;
@@ -781,98 +776,29 @@ export function InventoryV2Provider({ children, userRole, addNotification }: Inv
     return () => clearTimeout(timeout);
   }, [state]);
 
-  // Fire global notifications when stockroom qty drops below thresholds
-  const prevStockroomItemsRef = useRef<StockroomItem[]>(state.stockroomItems);
-
-  useEffect(() => {
-    const prev = prevStockroomItemsRef.current;
-    prevStockroomItemsRef.current = state.stockroomItems;
-    if (!addNotifRef.current) return;
-    const addNotif = addNotifRef.current;
-
-    for (const si of state.stockroomItems) {
-      const prevSi = prev.find(p => p.itemId === si.itemId && p.stockroomId === si.stockroomId);
-      if (!prevSi || si.qtyOnHand >= prevSi.qtyOnHand) continue; // only fire on qty decrease
-      const item = state.items.find(i => i.id === si.itemId);
-      if (!item) continue;
-      if (si.qtyOnHand <= si.minimumLevel) {
-        addNotif({
-          type: 'inventory',
-          priority: 'critical',
-          title: `${item.itemName} critically low`,
-          message: `${si.qtyOnHand} on hand (minimum: ${si.minimumLevel})`,
-          module: 'Inventory',
-          actionUrl: '/inventory-v2/commissary',
-        });
-      } else if (si.qtyOnHand < si.parLevel) {
-        addNotif({
-          type: 'inventory',
-          priority: 'medium',
-          title: `${item.itemName} below par`,
-          message: `${si.qtyOnHand} on hand (par: ${si.parLevel})`,
-          module: 'Inventory',
-          actionUrl: '/inventory-v2/commissary',
-        });
-      }
-    }
-  }, [state.stockroomItems]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fire global notifications on inspection/grocery/trip state transitions
+  // Fire global notifications on trip state transitions
   const prevStateRef = useRef(state);
 
   useEffect(() => {
     const prev = prevStateRef.current;
     prevStateRef.current = state;
-    if (!addNotifRef.current) return;
-    const addNotif = addNotifRef.current;
-
-    // Inspection submitted with shortages
-    for (const insp of state.inspections) {
-      const prevInsp = prev.inspections.find(i => i.id === insp.id);
-      if (insp.status === 'restocking_needed' && prevInsp?.status !== 'restocking_needed') {
-        const shortages = insp.checkedItems?.filter(ci => ci.qtyInUnit < ci.requiredQty).length ?? 0;
-        addNotif({
-          type: 'inventory',
-          priority: 'high',
-          title: `Inspection shortages on ${insp.tailNumber}`,
-          message: `${shortages} item${shortages !== 1 ? 's' : ''} below par on ${insp.tailNumber}. Restocking needed.`,
-          module: 'Inventory',
-          actionUrl: '/inventory-v2/replenish',
-        });
-      }
-    }
-
-    // Grocery list sent
-    for (const gl of state.groceryLists) {
-      const prevGl = prev.groceryLists?.find(g => g.id === gl.id);
-      if (gl.status === 'sent' && prevGl?.status !== 'sent') {
-        const trip = state.trips.find(t => t.id === gl.tripId);
-        addNotif({
-          type: 'inventory',
-          priority: 'medium',
-          title: `Grocery list from ${gl.generatedBy ?? 'FA'} for ${gl.tailNumber ?? trip?.tailNumber ?? ''}`,
-          message: `${gl.items.length} item${gl.items.length !== 1 ? 's' : ''} requested for ${trip?.tripName ?? gl.tailNumber ?? ''}`,
-          module: 'Inventory',
-          actionUrl: '/inventory-v2/commissary',
-        });
-      }
-    }
 
     // Trip completed
     for (const trip of state.trips) {
       const prevTrip = prev.trips.find(t => t.id === trip.id);
       if (trip.status === 'completed' && prevTrip?.status !== 'completed') {
-        addNotif({
-          type: 'inventory',
-          priority: 'medium',
+        eventStore.publish({
+          id: `inv-trip-completed:${trip.id}`,
+          severity: 'info',
           title: `Trip complete — ${trip.tailNumber} ready for inspection`,
-          message: `${trip.tripName ?? trip.tailNumber} has been completed. Post-trip inspection recommended.`,
+          detail: `${trip.tripName ?? trip.tailNumber} has been completed. Post-trip inspection recommended.`,
           module: 'Inventory',
-          actionUrl: '/inventory-v2/inspection',
+          link: '/inventory-v2/inspection',
+          audienceRoles: ['inflight', 'fa', 'lead-fa', 'commissary-manager', 'admin', 'lead'],
         });
       }
     }
-  }, [state.inspections, state.groceryLists, state.trips]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.trips]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <InventoryV2Context.Provider value={{ state, dispatch, loading }}>
