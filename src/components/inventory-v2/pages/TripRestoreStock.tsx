@@ -18,7 +18,6 @@ export function TripRestoreStock({ trip, leg, onBack }: TripRestoreStockProps) {
 
 function TripRestoreStockInner({ trip, leg, onBack }: TripRestoreStockProps) {
   const { state, dispatch } = useInventoryV2();
-  const [selectedCategory, setSelectedCategory] = useState<SupplyCategory>('beverages');
 
   // Usage on this leg, keyed by itemId — used both to pre-fill and to label cards.
   const usedThisLeg = useMemo(() => {
@@ -26,6 +25,18 @@ function TripRestoreStockInner({ trip, leg, onBack }: TripRestoreStockProps) {
     leg.usageLog.forEach(e => m.set(e.itemId, (m.get(e.itemId) ?? 0) + e.qtyUsed));
     return m;
   }, [leg.usageLog]);
+
+  // Open on the first category (in existing SUPPLY_CATEGORIES order) that has an
+  // item used this leg — that's where the FA's attention is. Fall back to the
+  // first category when nothing was used. Computed once at mount.
+  const [selectedCategory, setSelectedCategory] = useState<SupplyCategory>(() => {
+    const usedItemIds = new Set(leg.usageLog.map(e => e.itemId));
+    const usedCategories = new Set(
+      state.items.filter(i => usedItemIds.has(i.id)).map(i => i.supplyCategory)
+    );
+    const firstUsed = SUPPLY_CATEGORIES.find(c => usedCategories.has(c.id));
+    return firstUsed?.id ?? SUPPLY_CATEGORIES[0].id;
+  });
 
   // Pre-fill quantities from this leg's usage — FA adjusts to what was actually loaded.
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {

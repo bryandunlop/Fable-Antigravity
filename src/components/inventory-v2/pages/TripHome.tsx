@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, Search, ShoppingCart, Plane, CheckCircle2,
   Users, Package, Plus, X, ChevronDown, ClipboardCheck, FileText,
-  AlertTriangle, Star,
+  AlertTriangle, Star, Pencil,
 } from 'lucide-react';
 import { Card } from '../../ui/card';
 import { Button } from '../../ui/button';
@@ -21,6 +21,7 @@ import { getCompartmentsForAircraft, getCompartmentLabel } from '../compartmentC
 import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
 import QuickTapView from '../shared/QuickTapView';
+import ManageQuickAddDialog from '../shared/ManageQuickAddDialog';
 import { getOnBoardQty } from '../tripMath';
 import { TripLoadExtras } from './TripLoadExtras';
 import { TripRestoreStock } from './TripRestoreStock';
@@ -98,17 +99,32 @@ function NextLegDialog({
   onSubmit,
   onSkip,
   lastDestination,
+  editLeg,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: { origin: string; destination: string; date: string; paxCount: number }) => void;
   onSkip: () => void;
   lastDestination: string;
+  // When advancing into a pre-planned leg, pass it here to pre-fill the form.
+  // Fields stay editable; confirming applies the edits then advances.
+  editLeg?: TripLeg;
 }) {
-  const [origin, setOrigin] = useState(lastDestination);
-  const [destination, setDestination] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paxCount, setPaxCount] = useState(0);
+  const isEdit = Boolean(editLeg);
+  const [origin, setOrigin] = useState(editLeg?.origin ?? lastDestination);
+  const [destination, setDestination] = useState(editLeg?.destination ?? '');
+  const [date, setDate] = useState(editLeg?.date ?? new Date().toISOString().split('T')[0]);
+  const [paxCount, setPaxCount] = useState(editLeg?.paxCount ?? 0);
+
+  // Re-seed the form each time the dialog opens (or the target leg changes),
+  // since this component stays mounted between openings.
+  useEffect(() => {
+    if (!open) return;
+    setOrigin(editLeg?.origin ?? lastDestination);
+    setDestination(editLeg?.destination ?? '');
+    setDate(editLeg?.date ?? new Date().toISOString().split('T')[0]);
+    setPaxCount(editLeg?.paxCount ?? 0);
+  }, [open, editLeg, lastDestination]);
 
   function handleSubmit() {
     if (!origin.trim() || !destination.trim()) return;
@@ -118,14 +134,14 @@ function NextLegDialog({
       date,
       paxCount,
     });
-    setDestination('');
+    if (!isEdit) setDestination('');
   }
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Next Leg</DialogTitle>
+          <DialogTitle>{isEdit ? 'Confirm Next Leg' : 'Next Leg'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div className="grid grid-cols-2 gap-3">
@@ -165,10 +181,10 @@ function NextLegDialog({
         </div>
         <DialogFooter className="flex gap-2">
           <Button variant="outline" onClick={onSkip} className="flex-1">
-            Skip for Now
+            {isEdit ? 'Cancel' : 'Skip for Now'}
           </Button>
           <Button onClick={handleSubmit} disabled={!origin.trim() || !destination.trim()} className="flex-1">
-            Add & Go
+            {isEdit ? 'Confirm & Go' : 'Add & Go'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -347,6 +363,7 @@ function TripViewInner({
   const [showTripComplete, setShowTripComplete] = useState(false);
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [showManageQuickAdd, setShowManageQuickAdd] = useState(false);
   const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -372,6 +389,9 @@ function TripViewInner({
   const activeLeg = trip.legs.find(l => l.status === 'active') ?? null;
   const activeLegIndex = trip.legs.findIndex(l => l.status === 'active');
   const isLastLeg = activeLegIndex === trip.legs.length - 1;
+  // The pre-planned leg immediately after the active one, if the trip was booked
+  // with more legs. Drives the "Next Leg: X→Y" fork disclosure on the ground.
+  const plannedNextLeg = !isLastLeg && activeLegIndex >= 0 ? trip.legs[activeLegIndex + 1] : null;
   const aircraftType = trip.aircraftType;
   const phase: LegPhase = activeLeg?.phase ?? 'complete';
 
@@ -573,20 +593,27 @@ function TripViewInner({
     });
   }
 
-  function handleNextLeg() {
-    if (!activeLeg) return;
-    dispatch({ type: 'ADVANCE_TO_NEXT_LEG', payload: trip.id });
+  // "Add Another Leg" — always available on the ground. Whether the trip already
+  // has a pre-planned next leg or not, we now open NextLegDialog so the FA sees
+  // (and can edit) the leg before advancing. Pre-planned legs pre-fill the form;
+  // brand-new legs start blank. No more silent auto-advance.
+  function handleAddOrAdvanceLeg() {
+    setShowNextLeg(true);
   }
 
-  // "Add Another Leg" — always available on the ground. If the trip was planned
-  // with a subsequent leg, advance into it; otherwise open the dialog to create
-  // a brand-new leg and keep the trip going.
-  function handleAddOrAdvanceLeg() {
-    if (!isLastLeg) {
-      handleNextLeg();
-    } else {
-      setShowNextLeg(true);
-    }
+  // Advance into an existing pre-planned leg, applying any edits the FA made in
+  // the dialog first, then completing the current leg and activating the next.
+  function handleConfirmPlannedLeg(data: { origin: string; destination: string; date: string; paxCount: number }) {
+    if (!activeLeg || !plannedNextLeg) return;
+    dispatch({
+      type: 'UPDATE_LEG',
+      payload: {
+        tripId: trip.id,
+        leg: { ...plannedNextLeg, ...data },
+      },
+    });
+    dispatch({ type: 'ADVANCE_TO_NEXT_LEG', payload: trip.id });
+    setShowNextLeg(false);
   }
 
   function handleAddNextLeg(data: { origin: string; destination: string; date: string; paxCount: number }) {
@@ -688,7 +715,9 @@ function TripViewInner({
             <ChevronLeft size={16} /> Fleet
           </button>
           <div className="flex items-center gap-2">
-            {activeLeg && (
+            {/* Load Extras lives in the pre_flight footer already — only surface it
+                here for in_flight/on_ground so it isn't duplicated on the ground. */}
+            {activeLeg && phase !== 'pre_flight' && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -804,6 +833,17 @@ function TripViewInner({
                     />
                   </div>
                 )}
+                {view === 'quick-tap' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground ml-auto"
+                    onClick={() => setShowManageQuickAdd(true)}
+                  >
+                    <Pencil size={13} />
+                    Edit
+                  </Button>
+                )}
               </div>
 
               {/* ── Quick Tap view ── */}
@@ -817,6 +857,8 @@ function TripViewInner({
                   onDecrement={handleDecrement}
                   getLegUsage={getLegUsage}
                   getOnBoard={getOnBoard}
+                  isFavorite={isFavorite}
+                  onToggleFavorite={toggleFavorite}
                 />
               )}
 
@@ -1033,28 +1075,31 @@ function TripViewInner({
       {activeLeg && (
         <div className="bg-background border-t-2 border-border px-4 py-3 shrink-0">
           <div className="max-w-5xl mx-auto space-y-2">
-            {/* on_ground: Grocery List + Restore Stock (mid-trip road-sourced loads) */}
+            {/* on_ground secondary row: Grocery List + Restore Stock — visually
+                subordinate to the primary decision row below (smaller, ghost, muted). */}
             {phase === 'on_ground' && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
-                  className="flex-1 relative"
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 h-10 relative text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => navigate('grocery-list')}
                 >
-                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  <ShoppingCart className="mr-1.5 h-3.5 w-3.5" />
                   Grocery List
                   {groceryItemCount > 0 && (
-                    <span className="ml-2 bg-amber-500 text-background text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="ml-1.5 bg-amber-500 text-background text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                       {groceryItemCount}
                     </span>
                   )}
                 </Button>
                 <Button
-                  variant="outline"
-                  className="flex-1"
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 h-10 text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => setScreen('restore-stock')}
                 >
-                  <Package className="mr-2 h-4 w-4" />
+                  <Package className="mr-1.5 h-3.5 w-3.5" />
                   Restore Stock
                 </Button>
               </div>
@@ -1125,7 +1170,9 @@ function TripViewInner({
                     onClick={handleAddOrAdvanceLeg}
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Another Leg
+                    {plannedNextLeg
+                      ? `Next Leg: ${plannedNextLeg.origin || '—'}→${plannedNextLeg.destination || '—'}`
+                      : 'Add Another Leg'}
                   </Button>
                   <Button
                     className="flex-1 bg-emerald-600 hover:bg-emerald-500"
@@ -1145,9 +1192,10 @@ function TripViewInner({
         <NextLegDialog
           open={showNextLeg}
           onClose={() => setShowNextLeg(false)}
-          onSubmit={handleAddNextLeg}
+          onSubmit={plannedNextLeg ? handleConfirmPlannedLeg : handleAddNextLeg}
           onSkip={handleSkipNextLeg}
           lastDestination={activeLeg.destination}
+          editLeg={plannedNextLeg ?? undefined}
         />
       )}
 
@@ -1167,6 +1215,11 @@ function TripViewInner({
         trip={trip}
         onStartReplenish={handleStartReplenish}
         onStartInspection={handleStartInspection}
+      />
+
+      <ManageQuickAddDialog
+        open={showManageQuickAdd}
+        onOpenChange={setShowManageQuickAdd}
       />
     </div>
   );
