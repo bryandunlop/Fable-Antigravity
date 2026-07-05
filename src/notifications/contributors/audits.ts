@@ -19,7 +19,9 @@ export function buildAuditFeed(
   if (!AUDIENCE.includes(userRole) || !storage) return [];
   let audits: StoredAudit[];
   try {
-    audits = JSON.parse(storage.getItem('antigravity_audits') ?? '[]');
+    const parsed = JSON.parse(storage.getItem('antigravity_audits') ?? '[]');
+    if (!Array.isArray(parsed)) return [];
+    audits = parsed;
   } catch {
     return [];
   }

@@ -45,6 +45,9 @@ describe('buildAuditFeed', () => {
     const s = memoryStorage();
     s.setItem('antigravity_audits', '{not json');
     expect(buildAuditFeed('safety', NOW, s)).toEqual([]);
+    const s2 = memoryStorage();
+    s2.setItem('antigravity_audits', '{}');
+    expect(buildAuditFeed('safety', NOW, s2)).toEqual([]);
     expect(buildAuditFeed('safety', NOW, null)).toEqual([]);
   });
 });
