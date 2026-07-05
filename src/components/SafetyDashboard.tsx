@@ -49,7 +49,7 @@ import {
   ChevronRight,
   X
 } from 'lucide-react';
-import { useNotificationContext } from './contexts/NotificationContext';
+import { eventStore } from '../notifications/events';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from './ui/dropdown-menu';
 import { useHazards, WORKFLOW_STAGES, HAZARD_CATEGORIES, SEVERITY_LEVELS } from '../contexts/HazardContext';
@@ -62,7 +62,6 @@ interface SafetyDashboardProps {
 
 export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardProps) {
   const navigate = useNavigate();
-  const { addNotification } = useNotificationContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
@@ -216,14 +215,14 @@ export default function SafetyDashboard({ userRole = 'pilot' }: SafetyDashboardP
          isCustom: true
       });
 
-      addNotification({
+      eventStore.publish({
+        id: `newsletter:${title}`,
+        severity: 'info',
         title: 'New Safety Newsletter Published',
-        message: `${title} is now available for review.`,
-        type: 'safety',
-        priority: 'medium',
+        detail: `${title} is now available for review.`,
         module: 'Safety Systems',
-        actionUrl: '/safety',
-        actionText: 'Read Now'
+        link: '/safety',
+        audienceRoles: ['pilot', 'safety', 'admin', 'lead'],
       });
     }
   };

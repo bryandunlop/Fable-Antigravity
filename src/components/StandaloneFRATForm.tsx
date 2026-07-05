@@ -12,7 +12,7 @@ import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
 import { toast } from 'sonner';
 import JSConfetti from 'js-confetti';
-import { useNotificationContext } from './contexts/NotificationContext';
+import { eventStore } from '../notifications/events';
 import {
   Shield,
   AlertTriangle,
@@ -214,7 +214,6 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
 
   // Success Animation State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const { addNotification } = useNotificationContext();
 
   // Handle form submission
   const handleSubmit = (newStatus: string) => {
@@ -230,15 +229,14 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
         newStatus = 'Requires Review';
         
         // Dispatched Notification
-        addNotification({
-          title: 'Submitted FRAT Needs Approval',
-          message: `Flight ${flightNumber} has a FRAT score of ${totalScore}. Approval required from Scheduling Manager and Chief Pilot or Assistant Chief Pilot.`,
-          type: 'safety',
-          priority: 'high',
+        eventStore.publish({
+          id: `frat-review:${flightNumber}`,
+          severity: 'warn',
+          title: 'Submitted FRAT needs approval',
+          detail: `Flight ${flightNumber} has a FRAT score of ${totalScore}. Approval required from Scheduling Manager and Chief Pilot or Assistant Chief Pilot.`,
           module: 'Safety Systems',
-          relatedId: flightNumber,
-          actionUrl: '/frat/review',
-          actionText: 'Review FRAT'
+          link: '/frat/review',
+          audienceRoles: ['scheduling', 'safety', 'admin', 'lead'],
         });
       }
     }

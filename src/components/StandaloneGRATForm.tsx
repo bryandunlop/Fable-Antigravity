@@ -10,7 +10,7 @@ import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Progress } from './ui/progress';
 import { toast } from 'sonner';
-import { useNotificationContext } from './contexts/NotificationContext';
+import { eventStore } from '../notifications/events';
 import {
   Shield,
   AlertTriangle,
@@ -206,8 +206,6 @@ export default function StandaloneGRATForm({ userRole, userName = 'Current User'
     });
   };
 
-  const { addNotification } = useNotificationContext();
-
   // Handle form submission
   const handleSubmit = (status: 'draft' | 'submitted') => {
     if (!taskDate || !startTime || !technicianName) {
@@ -215,12 +213,14 @@ export default function StandaloneGRATForm({ userRole, userName = 'Current User'
       return;
     }
 
-    const flaggedItems = gratSections.flatMap(section => 
+    const flaggedItems = gratSections.flatMap(section =>
       section.items.filter(item => item.selected).map(item => item.label)
     );
 
+    const submissionId = `GRAT_${Date.now()}`;
+
     let finalStatus: GRATSubmission['status'] = status === 'draft' ? 'Draft' : 'Pending';
-    
+
     if (status === 'submitted') {
       if (totalScore >= 25) {
         toast.error('NO GO: Ground risk score is 25 or above. Task rejected automatically.');
@@ -233,15 +233,14 @@ export default function StandaloneGRATForm({ userRole, userName = 'Current User'
         finalStatus = 'Requires Review';
         
         // Dispatched Notification
-        addNotification({
-          title: 'Submitted GRAT Needs Approval',
-          message: `Task by ${technicianName} has a GRAT score of ${totalScore}. Approval required from Scheduling Manager and Director of Maintenance or Chief Inspector.`,
-          type: 'safety',
-          priority: 'high',
+        eventStore.publish({
+          id: `grat-review:${submissionId}`,
+          severity: 'warn',
+          title: 'Submitted GRAT needs approval',
+          detail: `Task by ${technicianName} has a GRAT score of ${totalScore}. Approval required from Scheduling Manager and Director of Maintenance or Chief Inspector.`,
           module: 'Safety Systems',
-          relatedId: `GRAT_${Date.now()}`,
-          actionUrl: '/grat/review',
-          actionText: 'Review GRAT'
+          link: '/grat/review',
+          audienceRoles: ['maintenance', 'safety', 'admin', 'lead'],
         });
       } else if (totalScore >= 11) {
         finalStatus = 'Requires Review';
@@ -251,7 +250,7 @@ export default function StandaloneGRATForm({ userRole, userName = 'Current User'
     }
 
     const submission: GRATSubmission = {
-      id: `GRAT_${Date.now()}`,
+      id: submissionId,
       technicianName,
       taskDate,
       startTime,
