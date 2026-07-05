@@ -25,6 +25,7 @@ import type { FeedEntry, FeedSeverity } from '../notifications/types';
 
 interface NotificationCenterProps {
   userRole: string;
+  additionalRoles?: string[];
 }
 
 const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -64,14 +65,14 @@ function timeAgo(atUtc?: string): string | null {
   return `${Math.floor(diffH / 24)}d ago`;
 }
 
-export default function NotificationCenter({ userRole }: NotificationCenterProps) {
+export default function NotificationCenter({ userRole, additionalRoles }: NotificationCenterProps) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread' | 'critical'>('all');
   const [showDismissed, setShowDismissed] = useState(false);
 
   const { entries, dismissed, counts, refresh, markRead, markUnread, markAllRead, dismiss, restore } =
-    useNotificationFeed(userRole);
+    useNotificationFeed(userRole, additionalRoles);
 
   const visible = entries.filter(e => {
     if (filter === 'unread') return e.kind === 'event' && !e.isRead;

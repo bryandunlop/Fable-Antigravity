@@ -61,4 +61,37 @@ describe('buildFeed', () => {
     d.contributors = [() => { throw new Error('boom'); }, () => derived];
     expect(buildFeed('pilot', NOW, d).entries).toHaveLength(3);
   });
+
+  it('unions contributor output and events across a multi-role user, deduped by id', () => {
+    const byRole: Record<string, FeedItem[]> = {
+      pilot: [
+        { id: 'shared', severity: 'warn', title: 'shared', module: 'M', link: '/x' },
+        { id: 'pilot-only', severity: 'info', title: 'pilot', module: 'M', link: '/x' },
+      ],
+      'chief-pilot': [
+        { id: 'shared', severity: 'warn', title: 'shared', module: 'M', link: '/x' }, // same id → deduped
+        { id: 'chief-only', severity: 'critical', title: 'chief', module: 'M', link: '/x' },
+      ],
+    };
+    const storage = memoryStorage();
+    const d = {
+      contributors: [(role: string) => byRole[role] ?? []],
+      events: createEventStore(storage),
+      dismissals: createDismissalStore(storage),
+    };
+    d.events.publish({ id: 'ev-chief', severity: 'info', title: 'chief event', module: 'M', link: '/y', audienceRoles: ['chief-pilot'] });
+
+    // Primary role alone: only pilot items, and NOT the chief-audienced event.
+    const single = buildFeed('pilot', NOW, d);
+    expect(single.entries.map(e => e.id).sort()).toEqual(['pilot-only', 'shared']);
+
+    // Full role set: union of both roles' derived items + the chief-audienced event,
+    // with the shared item collapsed to one entry.
+    const multi = buildFeed('pilot', NOW, d, ['pilot', 'chief-pilot']);
+    expect(multi.entries.map(e => e.id).sort()).toEqual(['chief-only', 'ev-chief', 'pilot-only', 'shared']);
+    expect(multi.entries.filter(e => e.id === 'shared')).toHaveLength(1);
+    // Identity/counts still anchored on the one person: one critical (chief-only), one unread event.
+    expect(multi.counts.critical).toBe(1);
+    expect(multi.counts.unread).toBe(1);
+  });
 });

@@ -8,7 +8,7 @@ import { resolveUserId } from './identity';
  * stores change, on cross-tab storage events, on window focus, every 30s
  * (module stores like tech-log write localStorage directly and emit nothing),
  * and on demand via refresh(). */
-export function useNotificationFeed(userRole: string) {
+export function useNotificationFeed(userRole: string, additionalRoles: string[] = []) {
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -25,11 +25,20 @@ export function useNotificationFeed(userRole: string) {
     };
   }, []);
 
+  // Identity stays anchored on the primary role; the full role set widens the
+  // lens. rolesKey is a stable string so the memo/callbacks don't rebuild on
+  // every render from a fresh additionalRoles array literal.
   const userId = resolveUserId(userRole);
-  const feed = useMemo(
-    () => buildFeed(userRole, new Date().toISOString()),
+  const rolesKey = [userRole, ...additionalRoles].join(',');
+  const roles = useMemo(
+    () => [...new Set([userRole, ...additionalRoles])],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userRole, version],
+    [rolesKey],
+  );
+  const feed = useMemo(
+    () => buildFeed(userRole, new Date().toISOString(), undefined, roles),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rolesKey, version],
   );
 
   return {
@@ -38,7 +47,7 @@ export function useNotificationFeed(userRole: string) {
     refresh: () => setVersion(v => v + 1),
     markRead: (id: string) => eventStore.markRead(userId, id),
     markUnread: (id: string) => eventStore.markUnread(userId, id),
-    markAllRead: () => eventStore.markAllRead(userId, userRole),
+    markAllRead: () => roles.forEach(r => eventStore.markAllRead(userId, r)),
     dismiss: (id: string) => dismissalStore.dismiss(userId, id),
     restore: (id: string) => dismissalStore.restore(userId, id),
   };

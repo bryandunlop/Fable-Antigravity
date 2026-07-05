@@ -529,7 +529,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               </Button>
 
               {/* Notification Center */}
-              <NotificationCenter userRole={userRole} />
+              <NotificationCenter userRole={userRole} additionalRoles={additionalRoles} />
 
               <ThemeToggle />
 
