@@ -1,9 +1,12 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { CheckCircle2, LogOut, Star } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { CheckCircle2, LogOut, Star, Search, X, Undo2 } from 'lucide-react';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES } from '../constants';
-import type { SupplyCategory } from '../types';
+import type { SupplyCategory, StockroomItem } from '../types';
 import { cn } from '../../ui/utils';
+
+// Undo window (ms) — how long the "Undo" button stays live after Confirm
+const UNDO_WINDOW_MS = 5000;
 
 function exitKiosk() {
   // If opened as a new tab from the app, close the tab.
@@ -22,6 +25,15 @@ export default function CommissaryKiosk() {
   const [selectedCategory, setSelectedCategory] = useState<SupplyCategory>('beverages');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [confirmed, setConfirmed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Undo window state: true while the "Undo" button is live in the flash overlay.
+  const [canUndo, setCanUndo] = useState(false);
+  // Snapshot of the exact deltas applied on Confirm, so Undo can dispatch the inverse.
+  // { stockroomItems: pre-confirm rows (for the inverse update), quantities: staged qtys to restore }
+  const undoSnapshotRef = useRef<{ stockroomItems: StockroomItem[]; quantities: Record<string, number> } | null>(null);
+  // Ref to the search input so we can detect focus for keyboard-shortcut gating.
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Kiosk has no user — use a shared "kiosk" key for favorites
   const KIOSK_USER_ID = 'kiosk';
@@ -43,18 +55,28 @@ export default function CommissaryKiosk() {
     [state.stockroomItems]
   );
 
-  // Items in selected category that exist in the stockroom, favorites first
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const isSearching = trimmedQuery.length > 0;
+
+  // Items to show. A non-empty search overrides the category filter and matches
+  // item name + alternateNames across ALL categories. Otherwise: selected category.
   const visibleItems = useMemo(() => {
     return state.items
-      .filter(item => item.supplyCategory === selectedCategory)
       .filter(item => stockroomMap.has(item.id))
+      .filter(item => {
+        if (isSearching) {
+          if (item.itemName.toLowerCase().includes(trimmedQuery)) return true;
+          return (item.alternateNames ?? []).some(alt => alt.toLowerCase().includes(trimmedQuery));
+        }
+        return item.supplyCategory === selectedCategory;
+      })
       .sort((a, b) => {
         const aFav = kioskFavorites.includes(a.id) ? 0 : 1;
         const bFav = kioskFavorites.includes(b.id) ? 0 : 1;
         if (aFav !== bFav) return aFav - bFav;
         return a.itemName.localeCompare(b.itemName);
       });
-  }, [state.items, stockroomMap, selectedCategory, kioskFavorites]);
+  }, [state.items, stockroomMap, selectedCategory, kioskFavorites, isSearching, trimmedQuery]);
 
   const handleIncrement = (itemId: string) => {
     const onHand = stockroomMap.get(itemId) ?? 0;
@@ -74,42 +96,82 @@ export default function CommissaryKiosk() {
     const removals = Object.entries(quantities).filter(([, qty]) => qty > 0);
     if (removals.length === 0) return;
 
-    const updatedStockroomItems = state.stockroomItems
-      .filter(si => (quantities[si.itemId] ?? 0) > 0)
+    // Pre-confirm rows for the affected items — these are the exact quantities
+    // to restore on Undo (inverse BULK_UPDATE_STOCKROOM).
+    const affectedRows = state.stockroomItems.filter(si => (quantities[si.itemId] ?? 0) > 0);
+
+    const updatedStockroomItems = affectedRows
       .map(si => ({ ...si, qtyOnHand: Math.max(0, si.qtyOnHand - quantities[si.itemId]) }));
 
+    // Snapshot BEFORE clearing staged qtys, so Undo can restore both stock and steppers.
+    undoSnapshotRef.current = {
+      stockroomItems: affectedRows.map(si => ({ ...si })),
+      quantities: { ...quantities },
+    };
+
     dispatch({ type: 'BULK_UPDATE_STOCKROOM', payload: updatedStockroomItems });
+    setSearchQuery('');
     setConfirmed(true);
+    setCanUndo(true);
   }, [confirmed, quantities, state.stockroomItems, dispatch]);
 
-  // Auto-reset after 2 seconds
+  // Undo: dispatch the inverse update (restore deducted qtys), cancel the auto-reset,
+  // and restore the staged quantities so the crew member can correct and re-confirm.
+  const handleUndo = useCallback(() => {
+    if (!canUndo) return; // guard against double-undo
+    const snapshot = undoSnapshotRef.current;
+    setCanUndo(false);
+    undoSnapshotRef.current = null;
+    if (snapshot) {
+      dispatch({ type: 'BULK_UPDATE_STOCKROOM', payload: snapshot.stockroomItems });
+      setQuantities(snapshot.quantities);
+    }
+    setConfirmed(false);
+  }, [canUndo, dispatch]);
+
+  // Auto-reset after the undo window elapses (unchanged 2s flash → extended to the
+  // undo window). If the crew member taps Undo, that path clears `confirmed` first
+  // and this timer is torn down.
   useEffect(() => {
     if (!confirmed) return;
     const timer = setTimeout(() => {
+      setCanUndo(false);
+      undoSnapshotRef.current = null;
       setQuantities({});
       setSelectedCategory('beverages');
+      setSearchQuery('');
       setConfirmed(false);
-    }, 2000);
+    }, UNDO_WINDOW_MS);
     return () => clearTimeout(timer);
   }, [confirmed]);
 
-  // Keyboard shortcuts: 1-9 → category, Enter → confirm, Escape → reset
+  // Keyboard shortcuts: 1-9 → category (only when search is NOT focused),
+  // Enter → confirm, Escape → clear search first, then staged quantities.
   useEffect(() => {
     const catIds = SUPPLY_CATEGORIES.map(c => c.id);
     function onKey(e: KeyboardEvent) {
       if (confirmed) return;
+      const searchFocused = document.activeElement === searchInputRef.current;
+      if (e.key === 'Escape') {
+        if (searchQuery) {
+          setSearchQuery('');
+          searchInputRef.current?.blur();
+        } else {
+          setQuantities({});
+        }
+        return;
+      }
+      if (searchFocused) return; // don't hijack typing in the search box
       const num = parseInt(e.key);
       if (!isNaN(num) && num >= 1 && num <= catIds.length) {
         setSelectedCategory(catIds[num - 1] as typeof selectedCategory);
       } else if (e.key === 'Enter') {
         handleConfirm();
-      } else if (e.key === 'Escape') {
-        setQuantities({});
       }
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [confirmed, handleConfirm]);
+  }, [confirmed, handleConfirm, searchQuery]);
 
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-white overflow-hidden relative animate-in fade-in duration-200">
@@ -118,6 +180,15 @@ export default function CommissaryKiosk() {
         <div className="absolute inset-0 z-50 bg-emerald-600 flex flex-col items-center justify-center">
           <CheckCircle2 className="w-24 h-24 text-white mb-4" />
           <div className="text-4xl font-bold text-white">Logged</div>
+          {canUndo && (
+            <button
+              onClick={handleUndo}
+              className="mt-8 flex items-center gap-2 px-8 py-4 rounded-xl text-lg font-bold bg-white/15 hover:bg-white/25 text-white ring-2 ring-white/60 transition-colors"
+            >
+              <Undo2 className="w-6 h-6" />
+              Undo
+            </button>
+          )}
         </div>
       )}
 
@@ -143,8 +214,37 @@ export default function CommissaryKiosk() {
         </div>
       </div>
 
+      {/* ── SEARCH ── */}
+      <div className="shrink-0 px-4 pt-3">
+        <div className="relative max-w-2xl mx-auto">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            inputMode="search"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search all items…"
+            aria-label="Search all items"
+            className="w-full h-14 pl-12 pr-12 rounded-xl text-base bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 border border-transparent focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* ── CATEGORY PILLS ── */}
-      <div className="shrink-0 px-4 py-3 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
+      <div className={cn(
+        'shrink-0 px-4 py-3 border-b border-slate-200 dark:border-slate-800 overflow-x-auto',
+        isSearching && 'opacity-40 pointer-events-none'
+      )}>
         <div className="flex gap-2 min-w-max">
           {SUPPLY_CATEGORIES.map(cat => (
             <button
@@ -166,7 +266,9 @@ export default function CommissaryKiosk() {
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {visibleItems.length === 0 ? (
           <div className="text-center text-slate-400 dark:text-slate-500 mt-16 text-lg">
-            No items in this category
+            {isSearching
+              ? `No matches for "${searchQuery.trim()}"`
+              : 'No items in this category'}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto">
