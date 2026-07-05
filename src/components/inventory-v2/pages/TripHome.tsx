@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, Search, ShoppingCart, Plane, CheckCircle2,
   Users, Package, Plus, X, ChevronDown, ClipboardCheck, FileText,
@@ -21,6 +21,7 @@ import { getCompartmentsForAircraft, getCompartmentLabel } from '../compartmentC
 import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
 import QuickTapView from '../shared/QuickTapView';
+import { getOnBoardQty } from '../tripMath';
 import { TripLoadExtras } from './TripLoadExtras';
 import { TripRestoreStock } from './TripRestoreStock';
 
@@ -348,12 +349,25 @@ function TripViewInner({
   const [showTimeline, setShowTimeline] = useState(false);
   const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const undoToastRef = useRef<string | number | undefined>(undefined);
 
   // Persist view mode preference
   useEffect(() => {
     localStorage.setItem('inv2-trip-view-mode', view);
   }, [view]);
+
+  // Entry point from LegReconciliation's last-leg handoff (?confirmComplete=1):
+  // open the same confirm dialog the footer button uses, then strip the param
+  // so refresh/back doesn't re-trigger it.
+  useEffect(() => {
+    if (searchParams.get('confirmComplete') === '1' && trip.status === 'active') {
+      setShowConfirmComplete(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('confirmComplete');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams, trip.status]);
 
   const activeLeg = trip.legs.find(l => l.status === 'active') ?? null;
   const activeLegIndex = trip.legs.findIndex(l => l.status === 'active');
@@ -425,15 +439,7 @@ function TripViewInner({
   }
 
   function getOnBoard(item: InventoryItemV2): number {
-    const par = item.defaultQuantities[aircraftType] ?? 0;
-    const allLegsUsage = trip.legs
-      .flatMap((l: TripLeg) => l.usageLog)
-      .filter(e => e.itemId === item.id)
-      .reduce((sum, e) => sum + e.qtyUsed, 0);
-    const loadTotal = (trip.loadItems ?? [])
-      .filter(li => li.itemId === item.id)
-      .reduce((sum, li) => sum + li.qty, 0);
-    return par + loadTotal - allLegsUsage;
+    return getOnBoardQty(trip, item.id, item.defaultQuantities[aircraftType] ?? 0);
   }
 
   function handleIncrement(item: InventoryItemV2) {
@@ -510,10 +516,12 @@ function TripViewInner({
   // ─── Grocery list item count ──────────────────────────────────────────────
 
   const groceryItemCount = useMemo(() => {
-    const gl = state.groceryLists.find(
-      g => g.tripId === trip.id && g.status !== 'fulfilled'
-    );
-    return gl?.items.length ?? 0;
+    return state.groceryLists
+      .filter(g => g.tripId === trip.id && g.status !== 'fulfilled')
+      .reduce(
+        (sum, g) => sum + g.items.filter(i => i.qtyFulfilled < i.qtyNeeded).length,
+        0
+      );
   }, [state.groceryLists, trip.id]);
 
   // If trip is completed, show the complete state.
@@ -625,6 +633,9 @@ function TripViewInner({
       type: 'SET_LEG_PHASE',
       payload: { tripId: trip.id, legId: activeLeg.id, phase: 'complete' },
     });
+    // Mark the final leg's status completed too — keeps leg state identical to
+    // the LegReconciliation entry point and lets REOPEN_TRIP (undo) find it.
+    dispatch({ type: 'COMPLETE_LEG', payload: { tripId: trip.id, legId: activeLeg.id } });
     dispatch({ type: 'COMPLETE_TRIP', payload: trip.id });
 
     const tripId = trip.id;
