@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
 import NetworkStatus from './components/NetworkStatus';
@@ -11,6 +11,7 @@ import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
+import NotFound from './components/NotFound';
 import MobileBottomNav from './components/MobileBottomNav';
 import AircraftStatus from './components/AircraftStatus';
 import FRATForm from './components/FRATForm';
@@ -123,7 +124,6 @@ import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Contex
 import InspectionFormV2 from './components/inventory-v2/pages/InspectionForm';
 import InspectionReviewV2 from './components/inventory-v2/pages/InspectionReview';
 import AircraftInspectionsV2 from './components/inventory-v2/pages/AircraftInspections';
-import RecentlyCompletedV2 from './components/inventory-v2/pages/RecentlyCompleted';
 import ReplenishV2 from './components/inventory-v2/pages/Replenish';
 import UnitItemRequestV2 from './components/inventory-v2/pages/UnitItemRequest';
 import UnitItemRequestListV2 from './components/inventory-v2/pages/UnitItemRequestList';
@@ -131,7 +131,6 @@ import SettingsV2 from './components/inventory-v2/pages/Settings';
 import CommissaryHome from './components/inventory-v2/pages/CommissaryHome';
 import CommissaryLocation from './components/inventory-v2/pages/CommissaryLocation';
 import CommissaryItemDetail from './components/inventory-v2/pages/CommissaryItemDetail';
-import AlertsPage from './components/inventory-v2/pages/AlertsPage';
 import TripListV2 from './components/inventory-v2/pages/TripList';
 import TripHomeV2 from './components/inventory-v2/pages/TripHome';
 import GroceryListPageV2 from './components/inventory-v2/pages/GroceryListPage';
@@ -413,24 +412,27 @@ export default function App() {
                                 <Route path="/aircraft-inventory" element={<AircraftInventory />} />
 
                                 {/* ─── Inventory V2 Routes ─── */}
-                                <Route path="/inventory-v2" element={<Navigate to="/inventory-v2/inspections" replace />} />
-                                <Route path="/inventory-v2/inspection" element={<InventoryRouteWrapper userRole={userRole}><InspectionFormV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/inspection/:id/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/inspections" element={<InventoryRouteWrapper userRole={userRole}><AircraftInspectionsV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/recently-completed" element={<InventoryRouteWrapper userRole={userRole}><RecentlyCompletedV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/replenish" element={<InventoryRouteWrapper userRole={userRole}><ReplenishV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/unit-request" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/unit-requests" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestListV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/settings" element={<InventoryRouteWrapper userRole={userRole}><SettingsV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/commissary" element={<InventoryRouteWrapper userRole={userRole}><CommissaryHome /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/commissary/location/:locationId" element={<InventoryRouteWrapper userRole={userRole}><CommissaryLocation /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/commissary/item/:itemId" element={<InventoryRouteWrapper userRole={userRole}><CommissaryItemDetail /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/alerts" element={<InventoryRouteWrapper userRole={userRole}><AlertsPage /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/trips" element={<InventoryRouteWrapper userRole={userRole}><TripListV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/trips/:tripId" element={<InventoryRouteWrapper userRole={userRole}><TripHomeV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryRouteWrapper userRole={userRole}><GroceryListPageV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/trips/:tripId/reconcile" element={<InventoryRouteWrapper userRole={userRole}><LegReconciliationV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/activity-log" element={<InventoryRouteWrapper userRole={userRole}><ActivityLog /></InventoryRouteWrapper>} />
+                                {/* One shared provider for the whole section: navigating between
+                                    inventory pages must NOT remount context (spinner + /api/state
+                                    refetch). Kiosk keeps its own anonymous provider above. */}
+                                <Route element={<InventoryRouteWrapper userRole={userRole}><Outlet /></InventoryRouteWrapper>}>
+                                  <Route path="/inventory-v2" element={<Navigate to="/inventory-v2/inspections" replace />} />
+                                  <Route path="/inventory-v2/inspection" element={<InspectionFormV2 />} />
+                                  <Route path="/inventory-v2/inspection/review" element={<InspectionReviewV2 />} />
+                                  <Route path="/inventory-v2/inspections" element={<AircraftInspectionsV2 />} />
+                                  <Route path="/inventory-v2/replenish" element={<ReplenishV2 />} />
+                                  <Route path="/inventory-v2/unit-request" element={<UnitItemRequestV2 />} />
+                                  <Route path="/inventory-v2/unit-requests" element={<UnitItemRequestListV2 />} />
+                                  <Route path="/inventory-v2/settings" element={<SettingsV2 />} />
+                                  <Route path="/inventory-v2/commissary" element={<CommissaryHome />} />
+                                  <Route path="/inventory-v2/commissary/location/:locationId" element={<CommissaryLocation />} />
+                                  <Route path="/inventory-v2/commissary/item/:itemId" element={<CommissaryItemDetail />} />
+                                  <Route path="/inventory-v2/trips" element={<TripListV2 />} />
+                                  <Route path="/inventory-v2/trips/:tripId" element={<TripHomeV2 />} />
+                                  <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<GroceryListPageV2 />} />
+                                  <Route path="/inventory-v2/trips/:tripId/reconcile" element={<LegReconciliationV2 />} />
+                                  <Route path="/inventory-v2/activity-log" element={<ActivityLog />} />
+                                </Route>
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />
@@ -529,7 +531,7 @@ export default function App() {
                                 } />
                                 <Route path="/experimental/scheduling-command" element={<SchedulingCommandCenter />} />
                                 <Route path="/experimental/unified-trip" element={<UnifiedTripWorkspace />} />
-                                <Route path="*" element={<Navigate to="/" replace />} />
+                                <Route path="*" element={<NotFound />} />
                               </Routes>
                             </div>
                           </Navigation>

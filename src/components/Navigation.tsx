@@ -6,6 +6,7 @@ import NotificationCenter from './NotificationCenter';
 import { ThemeToggle } from './ThemeToggle';
 import BreadcrumbNav from './BreadcrumbNav';
 import CommandPalette from './CommandPalette';
+import { matchEntry } from '../navigation/navConfig';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import {
@@ -171,13 +172,28 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isCommandPaletteOpen]);
 
+  // Record visited sections for the command palette's "Recent" section.
+  // The matched manifest path (not the raw pathname) is stored so detail
+  // pages collapse into their section — labels always match destinations.
+  useEffect(() => {
+    const sectionPath = matchEntry(location.pathname)?.path;
+    if (!sectionPath || sectionPath === '/') return;
+    try {
+      const prev: string[] = JSON.parse(localStorage.getItem('nav-recents') ?? '[]');
+      const next = [sectionPath, ...prev.filter(p => p !== sectionPath)].slice(0, 5);
+      localStorage.setItem('nav-recents', JSON.stringify(next));
+    } catch {
+      // corrupted localStorage — drop it
+      localStorage.removeItem('nav-recents');
+    }
+  }, [location.pathname]);
+
   // Default navigation groups organized by category
   const defaultNavigationGroups = [
     {
       label: "Overview",
       items: [
         { name: 'Dashboard', href: '/', icon: Home, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
-        { name: 'Settings', href: '/settings', icon: Settings, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'admin-assistant'] },
         // { name: 'Flight Family', href: '/flight-family', icon: MessageSquare, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'admin-assistant'] },
         { name: 'Procedural Bulletins', href: '/procedural-bulletins', icon: BookOpen, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
         // { name: 'Restaurant Database', href: '/restaurant-database', icon: Utensils, roles: ['pilot', 'inflight', 'maintenance', 'admin'] },
@@ -194,14 +210,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'My FRAT Submissions', href: '/frat/my-submissions', icon: FileText, roles: ['pilot', 'admin'] },
         { name: 'Airport Information', href: '/airport-evaluations', icon: MapPin, roles: ['pilot', 'admin'] },
         { name: 'Fuel Load Request', href: '/fuel-load-request', icon: Fuel, roles: ['pilot', 'admin'] },
-      ]
-    },
-    {
-      label: "ForeFlight Integration",
-      items: [
-        { name: 'ForeFlight Settings', href: '/foreflight-settings', icon: Settings, roles: ['admin'] },
-        { name: 'Test Upload', href: '/foreflight-test-upload', icon: Upload, roles: ['admin'] },
-        { name: 'Sync Diagnostics', href: '/foreflight-diagnostics', icon: Database, roles: ['admin'] },
       ]
     },
     {
@@ -261,13 +269,14 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
       ]
     },
     {
-      label: "Inventory V2  ✦ NEW",
+      label: "Inventory V2",
       items: [
         { name: 'Trips', href: '/inventory-v2/trips', icon: Plane, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Inspections', href: '/inventory-v2/inspections', icon: ClipboardCheck, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Commissary', href: '/inventory-v2/commissary', icon: Warehouse, roles: ['inflight', 'admin', 'commissary-manager'] },
         { name: 'Replenish', href: '/inventory-v2/replenish', icon: PackagePlus, roles: ['inflight', 'admin'] },
         { name: 'Unit Requests', href: '/inventory-v2/unit-requests', icon: Send, roles: ['inflight', 'admin'] },
+        { name: 'Activity Log', href: '/inventory-v2/activity-log', icon: Activity, roles: ['inflight', 'admin'] },
         { name: 'Settings', href: '/inventory-v2/settings', icon: Settings, roles: ['admin', 'commissary-manager'] },
       ]
     },
@@ -313,13 +322,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     //   ]
     // },
     {
-      label: "Experimental Tools",
-      items: [
-        { name: 'Master Command Center', href: '/experimental/scheduling-command', icon: Activity, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-        { name: 'Trip Sandbox (Beta)', href: '/experimental/unified-trip', icon: Sparkles, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-      ]
-    },
-    {
       label: "Management",
       items: [
         { name: 'Lead Dashboard', href: '/lead-dashboard', icon: BarChart3, roles: ['lead', 'admin'] },
@@ -327,6 +329,10 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
         { name: 'Live Metrics', href: '/live-metrics', icon: Activity, roles: ['lead', 'admin'], description: 'Real-time operations KPIs' },
         { name: 'Critical Functions', href: '/critical-functions', icon: Shield, roles: ['lead', 'admin'] },
         { name: 'Airport Evaluation Officer', href: '/admin/airport-evaluation-officer', icon: MapPin, roles: ['airport-evaluator', 'admin'] },
+        { name: 'ForeFlight Test Upload', href: '/foreflight-test-upload', icon: Upload, roles: ['admin'] },
+        { name: 'ForeFlight Sync Diagnostics', href: '/foreflight-diagnostics', icon: Database, roles: ['admin'] },
+        { name: 'Master Command Center', href: '/experimental/scheduling-command', icon: Activity, roles: ['admin'] },
+        { name: 'Trip Sandbox (Beta)', href: '/experimental/unified-trip', icon: Sparkles, roles: ['admin'] },
         { name: 'Admin Panel', href: '/admin', icon: Settings, roles: ['admin'] },
       ]
     }
@@ -555,7 +561,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
           {/* Main content area */}
           <main className="flex-1 overflow-auto p-6 pb-20 md:pb-6">
-            <BreadcrumbNav />
+            <BreadcrumbNav userRole={userRole} additionalRoles={additionalRoles} />
             {children}
           </main>
         </div>

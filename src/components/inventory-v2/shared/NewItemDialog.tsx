@@ -21,9 +21,19 @@ interface NewItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultLocationId?: string;
+  /** When true, skip the post-create navigation to the item detail page. */
+  suppressNavigate?: boolean;
+  /** Called with the new item's id after a successful create. */
+  onCreated?: (itemId: string) => void;
 }
 
-export default function NewItemDialog({ open, onOpenChange, defaultLocationId }: NewItemDialogProps) {
+export default function NewItemDialog({
+  open,
+  onOpenChange,
+  defaultLocationId,
+  suppressNavigate,
+  onCreated,
+}: NewItemDialogProps) {
   const { state, dispatch } = useInventoryV2();
   const navigate = useNavigate();
   const [name, setName] = useState('');
@@ -79,7 +89,10 @@ export default function NewItemDialog({ open, onOpenChange, defaultLocationId }:
       },
     });
     onOpenChange(false);
-    navigate(`/inventory-v2/commissary/item/${id}`);
+    onCreated?.(id);
+    if (!suppressNavigate) {
+      navigate(`/inventory-v2/commissary/item/${id}`);
+    }
   };
 
   const sortedLocations = [...state.storageLocations].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -156,7 +169,7 @@ export default function NewItemDialog({ open, onOpenChange, defaultLocationId }:
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={create} disabled={!name.trim()}>Create &amp; open</Button>
+          <Button onClick={create} disabled={!name.trim()}>{suppressNavigate ? 'Create' : 'Create & open'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

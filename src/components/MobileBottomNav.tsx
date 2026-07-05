@@ -14,8 +14,9 @@ import {
   Utensils,
   BookOpen,
   Target,
-  MessageSquare,
   Clock,
+  ClipboardCheck,
+  Warehouse,
   Boxes,
   MapPin
 } from 'lucide-react';
@@ -30,7 +31,6 @@ export default function MobileBottomNav({ userRole }: MobileBottomNavProps) {
   const getNavItems = () => {
     const baseItems = [
       { name: 'Home', href: '/', icon: Home },
-      { name: 'Messages', href: '/flight-family', icon: MessageSquare },
       { name: 'Tasks', href: '/tasks-action-items', icon: Target },
     ];
 
@@ -44,9 +44,18 @@ export default function MobileBottomNav({ userRole }: MobileBottomNavProps) {
       
       case 'inflight':
         return [
-          ...baseItems,
-          { name: 'Calendar', href: '/upcoming-flights', icon: Calendar },
-          { name: 'Passengers', href: '/passenger-database', icon: Users }
+          { name: 'Home', href: '/', icon: Home },
+          { name: 'Trips', href: '/inventory-v2/trips', icon: Plane },
+          { name: 'Commissary', href: '/inventory-v2/commissary', icon: Warehouse },
+          { name: 'Inspections', href: '/inventory-v2/inspections', icon: ClipboardCheck }
+        ];
+
+      case 'commissary-manager':
+        return [
+          { name: 'Home', href: '/', icon: Home },
+          { name: 'Commissary', href: '/inventory-v2/commissary', icon: Warehouse },
+          { name: 'Inspections', href: '/inventory-v2/inspections', icon: ClipboardCheck },
+          { name: 'Trips', href: '/inventory-v2/trips', icon: Plane }
         ];
       
       case 'maintenance':

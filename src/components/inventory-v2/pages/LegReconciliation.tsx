@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { useInventoryV2 } from '../InventoryV2Context';
+import { getOnBoardQty } from '../tripMath';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { V2Badge } from '../shared/V2Badge';
 import { cn } from '../../ui/utils';
@@ -94,30 +95,27 @@ function LegReconciliationInner({
   // ─── Compute usage rows ────────────────────────────────────────────────────
 
   const usageRows = useMemo<UsageRow[]>(() => {
+    // On board when this leg began = par + loads − usage through the previous
+    // leg (shared math with TripHome, so the numbers always agree).
+    const prevLeg = activeLegIndex > 0 ? trip.legs[activeLegIndex - 1] : null;
     return activeLeg.usageLog.map(entry => {
       const itemDef = state.items.find(i => i.id === entry.itemId);
       const par = itemDef?.defaultQuantities[aircraftType] ?? 0;
 
-      // Usage from completed legs only (not active leg)
-      const priorUsage = trip.legs
-        .filter(l => l.status === 'completed')
-        .flatMap(l => l.usageLog)
-        .filter(e => e.itemId === entry.itemId)
-        .reduce((sum, e) => sum + e.qtyUsed, 0);
-
-      const startedWith = par - priorUsage;
+      const startedWith = getOnBoardQty(trip, entry.itemId, par, {
+        upToLegId: prevLeg ? prevLeg.id : null,
+      });
       const usedThisLeg = entry.qtyUsed;
-      const remaining = startedWith - usedThisLeg;
 
       return {
         itemId: entry.itemId,
         itemName: itemDef?.itemName ?? entry.itemId,
         startedWith,
         usedThisLeg,
-        remaining,
+        remaining: startedWith - usedThisLeg,
       };
     });
-  }, [activeLeg.usageLog, state.items, trip.legs, aircraftType]);
+  }, [activeLeg.usageLog, state.items, trip, activeLegIndex, aircraftType]);
 
   const totalItemsUsed = usageRows.reduce((sum, r) => sum + r.usedThisLeg, 0);
 
@@ -136,18 +134,30 @@ function LegReconciliationInner({
       dispatch({ type: 'ADD_TRIP_NOTE', payload: { tripId: trip.id, note } });
     }
 
-    dispatch({ type: 'COMPLETE_LEG', payload: { tripId: trip.id, legId: activeLeg.id } });
-
     if (isLastLeg) {
-      dispatch({ type: 'COMPLETE_TRIP', payload: trip.id });
-      navigate('/inventory-v2/trips');
+      // Hand off to TripHome's single Complete Trip flow (confirm dialog, undo
+      // toast, What's-Next) — leg completion happens there, not here.
+      navigate(`/inventory-v2/trips/${trip.id}?confirmComplete=1`);
     } else {
+      // ADVANCE_TO_NEXT_LEG completes the active leg itself; dispatching
+      // COMPLETE_LEG first left no active leg for its reducer to find, so the
+      // next leg was never activated.
       dispatch({ type: 'ADVANCE_TO_NEXT_LEG', payload: trip.id });
       navigate(`/inventory-v2/trips/${trip.id}`);
     }
   }
 
   function handleGenerateGroceryList() {
+    // A list for this leg may already exist (e.g. created from TripHome's
+    // Grocery List button) — reuse it instead of creating a duplicate.
+    const existing = state.groceryLists.find(
+      g => g.tripId === trip.id && g.legId === activeLeg.id
+    );
+    if (existing) {
+      navigate(`/inventory-v2/trips/${trip.id}/grocery-list`);
+      return;
+    }
+
     const newList: GroceryList = {
       id: `gl-${crypto.randomUUID()}`,
       tripId: trip.id,
@@ -279,7 +289,7 @@ function LegReconciliationInner({
             className="w-full bg-emerald-600 hover:bg-emerald-500 text-white"
             onClick={handleCompleteLeg}
           >
-            ✈️ Complete Trip
+            ✈️ Continue to Complete Trip
           </Button>
         ) : (
           <Button

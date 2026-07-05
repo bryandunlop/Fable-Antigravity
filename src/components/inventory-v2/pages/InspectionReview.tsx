@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Camera, Check, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Camera, Check, ArrowLeft, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -316,12 +316,12 @@ export default function InspectionReview() {
 
   return (
     <div className="min-h-screen p-4 md:p-6 space-y-6 animate-in fade-in duration-200">
-      {/* ── Back Button ── */}
+      {/* ── Back Button (preserve entered work via ?fromReview=1) ── */}
       <Button
         variant="ghost"
         size="sm"
         className="mb-4 gap-2"
-        onClick={() => navigate('/inventory-v2/inspection')}
+        onClick={() => navigate('/inventory-v2/inspection?fromReview=1')}
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Inspection
@@ -503,9 +503,21 @@ export default function InspectionReview() {
       {missingItems.length > 0 && (
         <Card className="bg-card/60 backdrop-blur-md border-border/40">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-              Missing Items ({missingItems.length})
-            </CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                Missing Items ({missingItems.length})
+              </CardTitle>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(`/inventory-v2/unit-request?tail=${draft.tailNumber}`)
+                }
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+              >
+                <Send className="h-3.5 w-3.5" />
+                Request item
+              </button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border border-border/40 overflow-x-auto">

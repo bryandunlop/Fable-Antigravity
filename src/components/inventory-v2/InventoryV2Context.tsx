@@ -307,6 +307,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     case 'SET_CURRENT_USER':
       return { ...state, currentUser: action.payload };
 
+    // Retained for future server-side threshold evaluation; no UI sets these since the My Alerts tab was removed (2026-07-04).
     case 'ADD_ALERT_THRESHOLD': {
       const existing = state.alertThresholds.findIndex(
         t => t.userId === action.payload.userId && t.itemId === action.payload.itemId
@@ -710,8 +711,14 @@ export function InventoryV2Provider({ children, userRole, addNotification }: Inv
   const [state, rawDispatch] = useReducer(inventoryReducer, undefined, loadInitialState);
   const [loading, setLoading] = useState(true);
 
+  // Mirror the latest committed state into a ref so useApiSync can read the
+  // pre-dispatch snapshot synchronously (needed by multi-entity actions like
+  // ADVANCE_TO_NEXT_LEG / DISPOSE_EXPIRED_BATCH to derive their API calls).
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
+
   // Wrap dispatch: optimistic local update + background API persistence
-  const dispatch = useApiSync(rawDispatch);
+  const dispatch = useApiSync(rawDispatch, latestStateRef);
 
   // Load full state from /api/state on mount. The cached localStorage state shown
   // during the fetch keeps the UI from flashing empty, then RESET_STATE replaces it.

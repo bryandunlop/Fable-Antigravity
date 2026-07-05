@@ -93,19 +93,6 @@ const SEED_NOTIFICATIONS: Notification[] = [
         assignedBy: 'Chief Maintenance Officer'
     },
     {
-        id: 'INV001',
-        title: 'Critical Inventory Shortage',
-        message: 'Diet Coke has fallen below acceptable thresholds on N500GA. Restock needed prior to next flight.',
-        type: 'passenger',
-        priority: 'high',
-        timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-        isRead: false,
-        actionUrl: '/inventory',
-        actionText: 'View Inventory',
-        module: 'Inventory Operations',
-        relatedId: 'INV-DC'
-    },
-    {
         id: 'SQUAWK001',
         title: 'New AOG Squawk Reported',
         message: 'N650PR reported Right Engine Bleed Air fault resulting in AOG status.',

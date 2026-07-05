@@ -9,7 +9,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../ui/alert-dialog';
 import { ScrollArea } from '../../ui/scroll-area';
-import { Switch } from '../../ui/switch';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES, UOM_OPTIONS } from '../constants';
 import { V2Badge } from '../shared/V2Badge';
@@ -778,146 +777,9 @@ function ParLevelsTab() {
   );
 }
 
-// ─── My Alerts Tab ───────────────────────────────────────────────────────────
-
-function MyAlertsTab() {
-  const { state, dispatch } = useInventoryV2();
-  const [search, setSearch] = useState('');
-
-  const userId = state.currentUser.id;
-
-  const filteredItems = state.items.filter(item =>
-    item.itemName.toLowerCase().includes(search.toLowerCase())
-  );
-
-  function getThreshold(itemId: string) {
-    return state.alertThresholds.find(t => t.userId === userId && t.itemId === itemId);
-  }
-
-  function setThresholdValue(itemId: string, value: number) {
-    if (!Number.isFinite(value) || value < 0) return;
-    const existing = getThreshold(itemId);
-    dispatch({
-      type: 'ADD_ALERT_THRESHOLD',
-      payload: {
-        id: existing?.id ?? `thr-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        userId,
-        itemId,
-        threshold: value,
-        enabled: existing?.enabled ?? true,
-      },
-    });
-  }
-
-  function toggleEnabled(itemId: string, enabled: boolean) {
-    const existing = getThreshold(itemId);
-    if (!existing) return;
-    dispatch({
-      type: 'ADD_ALERT_THRESHOLD',
-      payload: { ...existing, enabled },
-    });
-  }
-
-  function removeThreshold(itemId: string) {
-    const existing = getThreshold(itemId);
-    if (!existing) return;
-    dispatch({ type: 'REMOVE_ALERT_THRESHOLD', payload: existing.id });
-  }
-
-  const itemsWithThresholds = filteredItems.filter(i => getThreshold(i.id));
-  const itemsWithout = filteredItems.filter(i => !getThreshold(i.id));
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-slate-200 mb-1">Alert Thresholds</h3>
-        <p className="text-xs text-slate-400">You'll be alerted when stockroom quantity drops below your threshold.</p>
-      </div>
-
-      <Input
-        placeholder="Search items…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        className="max-w-xs"
-      />
-
-      {itemsWithThresholds.length === 0 && itemsWithout.length === 0 && (
-        <p className="py-6 text-center text-sm text-slate-500">No items match your search.</p>
-      )}
-
-      {itemsWithThresholds.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Your Thresholds</p>
-          {itemsWithThresholds.map(item => {
-            const t = getThreshold(item.id)!;
-            return (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-200 truncate">{item.itemName}</p>
-                  <p className="text-xs text-slate-500">{item.uom}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Label className="text-xs text-slate-400 whitespace-nowrap">Alert below:</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={t.threshold}
-                    onChange={e => setThresholdValue(item.id, Number(e.target.value))}
-                    className="w-16 h-7 text-xs text-center"
-                  />
-                  <Switch
-                    checked={t.enabled}
-                    onCheckedChange={(enabled: boolean) => toggleEnabled(item.id, enabled)}
-                  />
-                  <button
-                    onClick={() => removeThreshold(item.id)}
-                    className="ml-1 text-xs text-slate-500 hover:text-red-400"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {itemsWithout.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-            {itemsWithThresholds.length > 0 ? 'Add a Threshold' : 'Items — click to set a threshold'}
-          </p>
-          {itemsWithout.map(item => {
-            const si = state.stockroomItems.find(
-              s => s.itemId === item.id && s.stockroomId === 'sr-1'
-            );
-            return (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-white/[0.05] px-3 py-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-300 truncate">{item.itemName}</p>
-                  <p className="text-xs text-slate-500">{item.uom} · {si?.qtyOnHand ?? 0} on hand</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs"
-                  onClick={() => setThresholdValue(item.id, si?.parLevel ?? 10)}
-                >
-                  + Set threshold
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 
 export default function Settings() {
-  const { state } = useInventoryV2();
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6 animate-in fade-in duration-200">
       {/* Header */}
@@ -928,7 +790,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="fleet">
-        <TabsList className={`grid w-full max-w-lg ${state.currentUser.role === 'commissary-manager' ? 'grid-cols-5' : 'grid-cols-4'}`}>
+        <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="fleet" className="flex items-center gap-1.5">
             <Plane className="w-3.5 h-3.5" /> Fleet
           </TabsTrigger>
@@ -941,9 +803,6 @@ export default function Settings() {
           <TabsTrigger value="par" className="flex items-center gap-1.5">
             <SlidersHorizontal className="w-3.5 h-3.5" /> Par Levels
           </TabsTrigger>
-          {state.currentUser.role === 'commissary-manager' && (
-            <TabsTrigger value="my-alerts">My Alerts</TabsTrigger>
-          )}
         </TabsList>
 
         <Card className="mt-4">
@@ -960,11 +819,6 @@ export default function Settings() {
             <TabsContent value="par">
               <ParLevelsTab />
             </TabsContent>
-            {state.currentUser.role === 'commissary-manager' && (
-              <TabsContent value="my-alerts">
-                <MyAlertsTab />
-              </TabsContent>
-            )}
           </CardContent>
         </Card>
       </Tabs>
