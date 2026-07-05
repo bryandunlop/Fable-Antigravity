@@ -443,7 +443,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
                   <Plane className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-foreground tracking-wide text-sm">P&G Flight Ops</h2>
+                  <h2 className="font-bold text-foreground tracking-wide text-sm">Flight Ops</h2>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{getRoleDisplayName(userRole)}</p>
                 </div>
               </div>

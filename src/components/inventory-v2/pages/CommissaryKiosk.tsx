@@ -129,7 +129,7 @@ export default function CommissaryKiosk() {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">P&G Flight Ops</p>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Flight Operations</p>
             <p className="text-xs text-slate-400 dark:text-slate-500">GFO Commissary</p>
           </div>
           <button
