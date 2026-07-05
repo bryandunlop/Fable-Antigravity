@@ -715,16 +715,18 @@ function TripViewInner({
             <ChevronLeft size={16} /> Fleet
           </button>
           <div className="flex items-center gap-2">
-            {/* Load Extras lives in the pre_flight footer already — only surface it
-                here for in_flight/on_ground so it isn't duplicated on the ground. */}
+            {/* Pull from Commissary has its prominent CTA in the pre_flight footer;
+                keep a persistent, plainly-labeled entry here for the other phases. */}
             {activeLeg && phase !== 'pre_flight' && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="h-7 gap-1 text-xs text-muted-foreground"
+                className="h-8 gap-1.5"
                 onClick={() => setScreen('load-extras')}
               >
-                <Package size={14} /> Load Extras
+                <Package size={14} />
+                <span className="hidden sm:inline">Pull from Commissary</span>
+                <span className="sm:hidden">Pull</span>
               </Button>
             )}
             <span className="text-lg font-bold font-mono">{trip.tailNumber}</span>
@@ -1107,24 +1109,25 @@ function TripViewInner({
 
             {/* Primary action row */}
             <div className="flex items-center gap-3">
-              {/* pre_flight: Load Extras + Start Flight */}
+              {/* pre_flight: Pull from Commissary (the moment to load up) + Start Flight */}
               {phase === 'pre_flight' && (
-                <>
+                <div className="flex flex-col gap-2 w-full">
                   <Button
                     variant="outline"
-                    className="flex-1"
+                    className="w-full"
                     onClick={() => setScreen('load-extras')}
                   >
-                    Load Extras
+                    <Package className="mr-2 h-4 w-4" />
+                    Pull from Commissary
                   </Button>
                   <Button
-                    className="flex-1"
+                    className="w-full"
                     onClick={handleStartFlight}
                   >
                     <Plane className="mr-2 h-4 w-4" />
                     Start Flight
                   </Button>
-                </>
+                </div>
               )}
 
               {/* in_flight: Grocery List + Landed */}

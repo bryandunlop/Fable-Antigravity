@@ -524,7 +524,7 @@ export default function Replenish() {
         {restockMode === 'usage' ? (
           <>
             <p className="text-xs text-muted-foreground">
-              Items used this trip that are now below par. Tap ✓ as you physically move each one.
+              Pull what you used below par from the commissary, and return any extras you pulled but didn't use. Tap ✓ as you physically move each one.
             </p>
 
             {/* Pull from Commissary */}
@@ -577,7 +577,7 @@ export default function Replenish() {
               <div className="rounded-xl border border-border overflow-hidden">
                 <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/30 border-b border-border">
                   <ArrowUp className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Return Surplus</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Return Extras to Commissary</span>
                   <span className="ml-auto text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2 py-0.5">
                     {returnRows.length} {returnRows.length === 1 ? 'item' : 'items'}
                   </span>
