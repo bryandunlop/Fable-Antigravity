@@ -6,209 +6,166 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { useNotifications } from './hooks/useNotifications';
-import { useNotificationContext } from './contexts/NotificationContext';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import {
   Bell,
   AlertTriangle,
-  Clock,
   CheckCircle,
-  AlertCircle,
-  Plane,
-  Wrench,
   Shield,
-  Users,
-  Fuel,
-  Calendar,
+  Wrench,
+  Package,
+  MapPin,
   FileText,
-  MessageSquare,
-  TrendingUp,
-  X,
-  Eye,
-  ExternalLink,
-  Archive,
-  Filter,
-  MoreHorizontal,
-  Zap,
-  Target,
-  Building2,
-  Star,
-  Coffee,
-  BookOpen,
-  RefreshCw,
-  Loader2,
   RotateCcw,
-  EllipsisVertical,
-  Globe,
-  Navigation,
-  MapPin
+  X,
 } from 'lucide-react';
 import { ClearSkiesSVG } from './ui/EmptyStateSVGs';
+import { useNotificationFeed } from '../notifications/useNotificationFeed';
+import type { FeedEntry, FeedSeverity } from '../notifications/types';
 
 interface NotificationCenterProps {
   userRole: string;
 }
 
+const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  'Tech Log': Wrench,
+  'Audit Management': Shield,
+  'Safety Systems': AlertTriangle,
+  'Inventory': Package,
+  'Trip Coordination': MapPin,
+  'Waiver Approval': FileText,
+};
+
+const SEVERITY_TEXT: Record<FeedSeverity, string> = {
+  critical: 'text-red-500',
+  warn: 'text-amber-500',
+  info: 'text-blue-500',
+};
+
+const SEVERITY_BORDER: Record<FeedSeverity, string> = {
+  critical: 'border-l-4 border-l-red-500',
+  warn: 'border-l-4 border-l-amber-400',
+  info: '',
+};
+
+const SEVERITY_BADGE: Record<FeedSeverity, string> = {
+  critical: 'bg-red-500 text-white',
+  warn: 'bg-amber-500 text-white',
+  info: 'bg-blue-500 text-white',
+};
+
+function timeAgo(atUtc?: string): string | null {
+  if (!atUtc) return null;
+  const diffMin = Math.floor((Date.now() - new Date(atUtc).getTime()) / 60000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  return `${Math.floor(diffH / 24)}d ago`;
+}
+
 export default function NotificationCenter({ userRole }: NotificationCenterProps) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'high'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'critical'>('all');
+  const [showDismissed, setShowDismissed] = useState(false);
 
-  const {
-    notifications,
-    loading,
-    error,
-    markAsRead,
-    markAsUnread,
-    markAllAsRead,
-    deleteNotification,
-    refetch,
-    counts
-  } = useNotifications({ userRole });
+  const { entries, dismissed, counts, refresh, markRead, markUnread, markAllRead, dismiss, restore } =
+    useNotificationFeed(userRole);
 
-  const { permission, requestPermission } = useNotificationContext();
-
-  const handleEnableNotifications = async () => {
-    const result = await requestPermission();
-    if (result === 'granted') {
-      // Show a confirmation via sonner or just rely on native notification
-      const { toast } = await import('sonner');
-      toast.success('Push notifications enabled! You will now receive alerts for audits, safety events, and more.');
-    }
-  };
-
-  const getNotificationIcon = (type: string, priority: string) => {
-    const iconClass = priority === 'critical' ? 'text-red-500' :
-      priority === 'high' ? 'text-orange-500' :
-        priority === 'medium' ? 'text-yellow-500' : 'text-blue-500';
-
-    switch (type) {
-      case 'task':
-        return <Target className={`w-4 h-4 ${iconClass}`} />;
-      case 'audit':
-        return <Shield className={`w-4 h-4 ${iconClass}`} />;
-      case 'fuel':
-        return <Fuel className={`w-4 h-4 ${iconClass}`} />;
-      case 'maintenance':
-        return <Wrench className={`w-4 h-4 ${iconClass}`} />;
-      case 'safety':
-        return <AlertTriangle className={`w-4 h-4 ${iconClass}`} />;
-      case 'passenger':
-        return <Users className={`w-4 h-4 ${iconClass}`} />;
-      case 'schedule':
-        return <Calendar className={`w-4 h-4 ${iconClass}`} />;
-      case 'document':
-        return <FileText className={`w-4 h-4 ${iconClass}`} />;
-      case 'system':
-        return <Zap className={`w-4 h-4 ${iconClass}`} />;
-      case 'nas_impact':
-        return <Globe className={`w-4 h-4 ${iconClass}`} />;
-      case 'trip':
-        return <MapPin className={`w-4 h-4 ${iconClass}`} />;
-      default:
-        return <Bell className={`w-4 h-4 ${iconClass}`} />;
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'bg-red-500 text-white';
-      case 'high': return 'bg-orange-500 text-white';
-      case 'medium': return 'bg-yellow-500 text-white';
-      case 'low': return 'bg-blue-500 text-white';
-      default: return 'bg-gray-500 text-white';
-    }
-  };
-
-  const getTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
-
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}d ago`;
-  };
-
-  const filteredNotifications = notifications.filter(notification => {
-    switch (filter) {
-      case 'unread':
-        return !notification.isRead;
-      case 'high':
-        return notification.priority === 'high' || notification.priority === 'critical';
-      default:
-        return true;
-    }
-  }).sort((a, b) => {
-    // Sort by: unread first, then by priority, then by timestamp
-    if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
-
-    const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
-    const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder];
-    const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder];
-
-    if (aPriority !== bPriority) return bPriority - aPriority;
-
-    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  const visible = entries.filter(e => {
+    if (filter === 'unread') return e.kind === 'event' && !e.isRead;
+    if (filter === 'critical') return e.severity === 'critical';
+    return true;
   });
 
-  const handleNotificationClick = (notification: any) => {
-    if (!notification.isRead) {
-      markAsRead(notification.id);
-    }
-
-    // Navigate to the URL if it exists
-    if (notification.actionUrl) {
-      navigate(notification.actionUrl);
-      setIsOpen(false);
-    }
+  const openEntry = (entry: FeedEntry) => {
+    if (entry.kind === 'event' && !entry.isRead) markRead(entry.id);
+    navigate(entry.link);
+    setIsOpen(false);
   };
 
-  const handleActionClick = (notification: any, event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (notification.actionUrl) {
-      navigate(notification.actionUrl);
-      setIsOpen(false);
-    }
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (open) refresh();
   };
 
-  const handleMarkAsUnread = (notificationId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    markAsUnread(notificationId);
-  };
-
-  const handleMarkAsRead = (notificationId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    markAsRead(notificationId);
-  };
-
-  const handleDelete = (notificationId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    deleteNotification(notificationId);
+  const renderRow = (entry: FeedEntry, last: boolean, inDismissedView: boolean) => {
+    const Icon = MODULE_ICONS[entry.module] ?? Bell;
+    const unreadEvent = entry.kind === 'event' && !entry.isRead;
+    const ago = timeAgo(entry.atUtc);
+    return (
+      <div key={entry.id} className="group">
+        <div
+          className={`p-4 hover:bg-accent/50 cursor-pointer transition-colors ${unreadEvent ? 'bg-blue-50/50' : ''} ${inDismissedView ? 'opacity-60' : SEVERITY_BORDER[entry.severity]}`}
+          onClick={() => openEntry(entry)}
+        >
+          <div className="flex items-start gap-3">
+            <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${SEVERITY_TEXT[entry.severity]}`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className={`text-sm ${unreadEvent ? 'font-medium' : 'font-normal'}`}>{entry.title}</p>
+                    {unreadEvent && <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />}
+                  </div>
+                  {entry.detail && <p className="text-sm text-muted-foreground mb-2">{entry.detail}</p>}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className={`text-xs ${SEVERITY_BADGE[entry.severity]}`}>{entry.severity}</Badge>
+                    <Badge variant="outline" className="text-xs">{entry.module}</Badge>
+                    {ago && <span className="text-xs text-muted-foreground">{ago}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {inDismissedView ? (
+                    <Button
+                      variant="ghost" size="sm" className="p-1 h-auto" title="Restore"
+                      onClick={e => { e.stopPropagation(); restore(entry.id); }}
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </Button>
+                  ) : entry.kind === 'derived' ? (
+                    <Button
+                      variant="ghost" size="sm" className="p-1 h-auto" title="Dismiss"
+                      onClick={e => { e.stopPropagation(); dismiss(entry.id); }}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  ) : entry.isRead ? (
+                    <Button
+                      variant="ghost" size="sm" className="p-1 h-auto" title="Mark as unread"
+                      onClick={e => { e.stopPropagation(); markUnread(entry.id); }}
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost" size="sm" className="p-1 h-auto" title="Mark as read"
+                      onClick={e => { e.stopPropagation(); markRead(entry.id); }}
+                    >
+                      <CheckCircle className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {!last && <Separator />}
+      </div>
+    );
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="relative p-2 hover:bg-accent"
-        >
+        <Button variant="ghost" size="sm" className="relative p-2 hover:bg-accent">
           <Bell className="w-5 h-5" />
-          {counts.unread > 0 && (
+          {counts.attention > 0 && (
             <Badge
-              className={`absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs ${counts.critical > 0 ? 'bg-red-500 animate-pulse' : 'bg-primary'
-                }`}
+              className={`absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs ${counts.critical > 0 ? 'bg-red-500 animate-pulse' : 'bg-primary'}`}
             >
-              {counts.unread > 99 ? '99+' : counts.unread}
+              {counts.attention > 99 ? '99+' : counts.attention}
             </Badge>
           )}
         </Button>
@@ -220,262 +177,73 @@ export default function NotificationCenter({ userRole }: NotificationCenterProps
               <CardTitle className="flex items-center gap-2">
                 <Bell className="w-5 h-5" />
                 Notifications
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={refetch}
-                  disabled={loading}
-                  className="text-xs"
-                  title="Refresh notifications"
-                >
-                  <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-                </Button>
                 {counts.unread > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={markAllAsRead}
-                    className="text-xs"
-                    title="Mark all as read"
-                  >
+                  <Button variant="ghost" size="sm" onClick={markAllRead} className="text-xs" title="Mark all events as read">
                     Mark all read
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsOpen(false)}
-                  title="Close notifications"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} title="Close notifications">
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             </div>
 
-            {/* Quick stats */}
             {counts.critical > 0 && (
               <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center gap-2 text-red-800">
-                  <AlertCircle className="w-4 h-4" />
+                  <AlertTriangle className="w-4 h-4" />
                   <span className="text-sm font-medium">
-                    {counts.critical} critical notification{counts.critical !== 1 ? 's' : ''} requiring immediate attention
+                    {counts.critical} critical item{counts.critical !== 1 ? 's' : ''} requiring attention
                   </span>
                 </div>
               </div>
             )}
 
-          {/* Push notification permission banner */}
-            {permission === 'default' && (
-              <div className="px-4 pb-2">
-                <div className="flex items-center justify-between gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center gap-2 text-blue-800">
-                    <Bell className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-[11px] font-medium">Enable push notifications for audit alerts &amp; safety reminders</span>
-                  </div>
-                  <Button size="sm" className="h-6 text-[10px] px-2 bg-blue-600 hover:bg-blue-700 shrink-0" onClick={handleEnableNotifications}>
-                    Enable
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Filter tabs */}
-            <Tabs value={filter} onValueChange={(value) => setFilter(value as any)} className="w-full">
+            <Tabs value={filter} onValueChange={(value: string) => setFilter(value as 'all' | 'unread' | 'critical')} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="all" className="text-xs">
-                  All ({counts.total})
-                </TabsTrigger>
-                <TabsTrigger value="unread" className="text-xs">
-                  Unread ({counts.unread})
-                </TabsTrigger>
-                <TabsTrigger value="high" className="text-xs">
-                  Priority ({counts.highPriority})
-                </TabsTrigger>
+                <TabsTrigger value="all" className="text-xs">All ({counts.total})</TabsTrigger>
+                <TabsTrigger value="unread" className="text-xs">Unread ({counts.unread})</TabsTrigger>
+                <TabsTrigger value="critical" className="text-xs">Critical ({counts.critical})</TabsTrigger>
               </TabsList>
             </Tabs>
           </CardHeader>
 
           <CardContent className="p-0">
-            {error && (
-              <div className="p-4 bg-red-50 border-b">
-                <div className="flex items-center gap-2 text-red-800">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">Failed to load notifications</span>
-                  <Button variant="ghost" size="sm" onClick={refetch} className="ml-auto">
-                    Retry
-                  </Button>
-                </div>
-              </div>
-            )}
-
             <ScrollArea className="h-96">
-              {loading && notifications.length === 0 ? (
-                <div className="p-6 text-center">
-                  <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Loading notifications...</p>
-                </div>
-              ) : filteredNotifications.length === 0 ? (
+              {showDismissed ? (
+                dismissed.length === 0 ? (
+                  <div className="p-10 text-center text-muted-foreground">
+                    <p className="text-sm">Nothing dismissed</p>
+                  </div>
+                ) : (
+                  <div className="space-y-0">
+                    {dismissed.map((e, i) => renderRow(e, i === dismissed.length - 1, true))}
+                  </div>
+                )
+              ) : visible.length === 0 ? (
                 <div className="p-10 text-center text-muted-foreground flex flex-col items-center justify-center h-full animate-fade-in">
                   <ClearSkiesSVG size={80} className="mb-4 opacity-70" />
                   <p className="font-medium text-foreground">No notifications to display</p>
                   <p className="text-xs mt-1">
-                    {filter === 'unread' ? 'All caught up!' :
-                      filter === 'high' ? 'No high priority items' :
-                        'Check back later for updates'}
+                    {filter === 'unread' ? 'All caught up!' : filter === 'critical' ? 'No critical items' : 'Check back later for updates'}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-0">
-                  {filteredNotifications.map((notification, index) => (
-                    <div
-                      key={notification.id}
-                      className="group animate-list-stagger opacity-0"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <div
-                        className={`p-4 hover:bg-accent/50 cursor-pointer transition-colors ${!notification.isRead ? 'bg-blue-50/50' : ''
-                          } ${notification.priority === 'critical' ? 'border-l-4 border-l-red-500' :
-                            notification.priority === 'high' ? 'border-l-4 border-l-orange-500' : ''} ${notification.type === 'nas_impact' ? 'border-l-4 border-l-blue-500' : ''
-                          }`}
-                        onClick={() => handleNotificationClick(notification)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0 mt-0.5">
-                            {getNotificationIcon(notification.type, notification.priority)}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className={`text-sm ${!notification.isRead ? 'font-medium' : 'font-normal'}`}>
-                                    {notification.title}
-                                  </p>
-                                  {!notification.isRead && (
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  {notification.message}
-                                </p>
-
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge
-                                    className={`text-xs ${getPriorityColor(notification.priority)}`}
-                                  >
-                                    {notification.priority}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-xs">
-                                    {notification.module}
-                                  </Badge>
-                                  {notification.type === 'nas_impact' && (
-                                    <Badge className="bg-blue-100 text-blue-800 text-xs">
-                                      <Globe className="w-3 h-3 mr-1" />
-                                      NAS Impact
-                                    </Badge>
-                                  )}
-                                  {notification.daysUntilDue !== undefined && (
-                                    <Badge
-                                      className={`text-xs ${notification.daysUntilDue < 0 ? 'bg-red-100 text-red-800' :
-                                        notification.daysUntilDue <= 1 ? 'bg-orange-100 text-orange-800' :
-                                          'bg-yellow-100 text-yellow-800'
-                                        }`}
-                                    >
-                                      {notification.daysUntilDue < 0
-                                        ? `${Math.abs(notification.daysUntilDue)}d overdue`
-                                        : notification.daysUntilDue === 0
-                                          ? 'Due today'
-                                          : `${notification.daysUntilDue}d left`
-                                      }
-                                    </Badge>
-                                  )}
-                                  <span className="text-xs text-muted-foreground">
-                                    {getTimeAgo(notification.timestamp)}
-                                  </span>
-                                </div>
-
-                                {notification.assignedBy && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Assigned by {notification.assignedBy}
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* Actions dropdown */}
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto"
-                                    title="More actions"
-                                  >
-                                    <EllipsisVertical className="w-3 h-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  {notification.isRead ? (
-                                    <DropdownMenuItem
-                                      onClick={(e) => handleMarkAsUnread(notification.id, e)}
-                                      className="flex items-center gap-2"
-                                    >
-                                      <RotateCcw className="w-3 h-3" />
-                                      Mark as unread
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem
-                                      onClick={(e) => handleMarkAsRead(notification.id, e)}
-                                      className="flex items-center gap-2"
-                                    >
-                                      <CheckCircle className="w-3 h-3" />
-                                      Mark as read
-                                    </DropdownMenuItem>
-                                  )}
-                                  {notification.actionUrl && (
-                                    <DropdownMenuItem
-                                      onClick={(e) => handleActionClick(notification, e)}
-                                      className="flex items-center gap-2"
-                                    >
-                                      <ExternalLink className="w-3 h-3" />
-                                      Open link
-                                    </DropdownMenuItem>
-                                  )}
-                                  <DropdownMenuItem
-                                    onClick={(e) => handleDelete(notification.id, e)}
-                                    className="flex items-center gap-2 text-red-600"
-                                  >
-                                    <X className="w-3 h-3" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-
-                            {notification.actionUrl && notification.actionText && (
-                              <div className="mt-3 flex gap-2">
-                                <Button
-                                  size="sm"
-                                  className="text-xs h-7"
-                                  onClick={(e) => handleActionClick(notification, e)}
-                                >
-                                  {notification.actionText}
-                                  <ExternalLink className="w-3 h-3 ml-1" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {index < filteredNotifications.length - 1 && <Separator />}
-                    </div>
-                  ))}
+                  {visible.map((e, i) => renderRow(e, i === visible.length - 1, false))}
                 </div>
               )}
             </ScrollArea>
+            <div className="border-t px-4 py-2">
+              <button
+                className="text-xs text-muted-foreground underline hover:text-foreground"
+                onClick={() => setShowDismissed(v => !v)}
+              >
+                {showDismissed ? '← Back to feed' : `Dismissed (${dismissed.length})`}
+              </button>
+            </div>
           </CardContent>
         </Card>
       </PopoverContent>
