@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -10,7 +10,10 @@ import { useInventoryV2 } from '../InventoryV2Context';
 import { V2Badge } from '../shared/V2Badge';
 import { BarcodeScannerDialog } from '../shared/BarcodeScannerDialog';
 import { toast } from 'sonner';
-import { PackagePlus, ChevronDown, Camera, ArrowDown, ArrowUp } from 'lucide-react';
+import {
+  PackagePlus, ChevronDown, Camera, ArrowDown, ArrowUp,
+  Zap, Search, ClipboardCheck, CheckCircle2, Minus, Plus, PlaneTakeoff,
+} from 'lucide-react';
 import type { PickListItem, RestockListItem, TripReturnItem, StockroomItem } from '../types';
 
 export default function Replenish() {
@@ -22,67 +25,106 @@ export default function Replenish() {
   const [scannerOpen, setScannerOpen] = useState(false);
 
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const tailParam = searchParams.get('tail');
 
-  // Find most recently completed trip for this tail that hasn't been returned yet
-  const tripForBaseline = useMemo(() => {
+  // ── Post-trip restock state ──────────────────────────────────────────────
+  // 'usage' = pull only what was tapped as used (fast path).
+  // 'full'  = count every item on board (catches silent depletion).
+  const [restockMode, setRestockMode] = useState<'usage' | 'full'>('usage');
+  // Full-count manual counts (itemId -> counted on board). Falls back to expectedOnBoard.
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  // Cosmetic "physically moved" ticks for usage mode (not persisted).
+  const [checkedPull, setCheckedPull] = useState<Set<string>>(new Set());
+  const [checkedReturn, setCheckedReturn] = useState<Set<string>>(new Set());
+
+  // Most recent completed trip for this tail (whether or not already restocked).
+  const restockTrip = useMemo(() => {
     if (!tailParam) return null;
     return (
       state.trips
-        .filter(t => t.tailNumber === tailParam && t.status === 'completed' && !t.baselineConfirmedAt)
+        .filter(t => t.tailNumber === tailParam && t.status === 'completed')
         .sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''))
         [0] ?? null
     );
   }, [state.trips, tailParam]);
 
-  // Compute per-item aircraft qty from trip data
-  const baselineItems = useMemo(() => {
-    if (!tripForBaseline) return [];
+  const alreadyRestocked = !!restockTrip?.baselineConfirmedAt;
 
-    type BaselineRow = {
-      itemId: string;
-      par: number;
-      aircraftQty: number;
-      pullQty: number;
-      returnQty: number;
-    };
+  // Per-item load + usage totals for the restock trip.
+  const { loadByItem, usageByItem } = useMemo(() => {
+    const load = new Map<string, number>();
+    const usage = new Map<string, number>();
+    if (restockTrip) {
+      restockTrip.loadItems.forEach(li => load.set(li.itemId, (load.get(li.itemId) ?? 0) + li.qty));
+      restockTrip.legs.forEach(leg =>
+        leg.usageLog.forEach(e => usage.set(e.itemId, (usage.get(e.itemId) ?? 0) + e.qtyUsed))
+      );
+    }
+    return { loadByItem: load, usageByItem: usage };
+  }, [restockTrip]);
 
-    const rows: BaselineRow[] = [];
-    const touchedItemIds = new Set<string>();
+  const parOf = (itemId: string) => {
+    const item = state.items.find(i => i.id === itemId);
+    if (!item || !restockTrip) return 0;
+    return item.defaultQuantities[restockTrip.aircraftType] ?? 0;
+  };
+  // What the system believes is on board: par + extras loaded − used.
+  const expectedOnBoard = (itemId: string) =>
+    parOf(itemId) + (loadByItem.get(itemId) ?? 0) - (usageByItem.get(itemId) ?? 0);
+  const getCount = (itemId: string) => counts[itemId] ?? expectedOnBoard(itemId);
+  const setCount = (itemId: string, value: number) =>
+    setCounts(prev => ({ ...prev, [itemId]: Math.max(0, value) }));
 
-    tripForBaseline.loadItems.forEach(li => touchedItemIds.add(li.itemId));
-    tripForBaseline.legs.forEach(leg =>
-      leg.usageLog.forEach(e => touchedItemIds.add(e.itemId))
-    );
+  // Items that belong on this aircraft (have a par for its type), grouped by category.
+  const aircraftItems = useMemo(() => {
+    if (!restockTrip) return [];
+    return state.items
+      .filter(i => i.defaultQuantities[restockTrip.aircraftType] != null)
+      .sort((a, b) => a.itemName.localeCompare(b.itemName));
+  }, [state.items, restockTrip]);
 
-    touchedItemIds.forEach(itemId => {
-      const item = state.items.find(i => i.id === itemId);
-      if (!item) return;
-      const par = item.defaultQuantities[tripForBaseline.aircraftType] ?? 0;
-      const loadTotal = tripForBaseline.loadItems
-        .filter(li => li.itemId === itemId)
-        .reduce((sum, li) => sum + li.qty, 0);
-      const usageTotal = tripForBaseline.legs
-        .flatMap(l => l.usageLog)
-        .filter(e => e.itemId === itemId)
-        .reduce((sum, e) => sum + e.qtyUsed, 0);
-      const aircraftQty = par + loadTotal - usageTotal;
-      const pullQty = Math.max(0, par - aircraftQty);
-      const returnQty = Math.max(0, aircraftQty - par);
-      if (pullQty > 0 || returnQty > 0) {
-        rows.push({ itemId, par, aircraftQty, pullQty, returnQty });
-      }
+  const fullCountGroups = useMemo(() => {
+    const groups: Record<string, typeof aircraftItems> = {};
+    aircraftItems.forEach(it => {
+      (groups[it.category] ??= []).push(it);
     });
+    return groups;
+  }, [aircraftItems]);
 
-    return rows;
-  }, [tripForBaseline, state.items]);
+  // Items touched on the trip (loaded or used) — the usage-only working set.
+  const touchedItemIds = useMemo(() => {
+    const ids = new Set<string>();
+    loadByItem.forEach((_, id) => ids.add(id));
+    usageByItem.forEach((_, id) => ids.add(id));
+    return Array.from(ids);
+  }, [loadByItem, usageByItem]);
 
-  const pullRows = useMemo(() => baselineItems.filter(r => r.pullQty > 0), [baselineItems]);
-  const returnRows = useMemo(() => baselineItems.filter(r => r.returnQty > 0), [baselineItems]);
+  type RestockRow = { itemId: string; par: number; counted: number; pull: number; ret: number };
+  // Pull/return rows derived from the active mode. Usage mode trusts the usage math;
+  // full mode trusts the FA's physical count.
+  const restockRows: RestockRow[] = useMemo(() => {
+    const ids = restockMode === 'full' ? aircraftItems.map(i => i.id) : touchedItemIds;
+    return ids
+      .filter(itemId => state.items.some(i => i.id === itemId))
+      .map(itemId => {
+        const par = parOf(itemId);
+        const counted = restockMode === 'full' ? getCount(itemId) : expectedOnBoard(itemId);
+        return {
+          itemId,
+          par,
+          counted,
+          pull: Math.max(0, par - counted),
+          ret: Math.max(0, counted - par),
+        };
+      })
+      .filter(r => r.pull > 0 || r.ret > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restockMode, aircraftItems, touchedItemIds, counts, loadByItem, usageByItem, state.items]);
 
-  // Local checkbox state (not persisted — FA ticks off as they physically move items)
-  const [checkedPull, setCheckedPull] = useState<Set<string>>(new Set());
-  const [checkedReturn, setCheckedReturn] = useState<Set<string>>(new Set());
+  const pullRows = useMemo(() => restockRows.filter(r => r.pull > 0), [restockRows]);
+  const returnRows = useMemo(() => restockRows.filter(r => r.ret > 0), [restockRows]);
+  const nothingToDo = pullRows.length === 0 && returnRows.length === 0;
 
   const uniqueUnits = useMemo(() => {
     const units = new Set(localPickItems.map(p => p.unitTailNumber));
@@ -210,40 +252,55 @@ export default function Replenish() {
     });
   };
 
-  function handleBaselineConfirm() {
-    if (!tripForBaseline) return;
+  function handleConfirmRestock() {
+    if (!restockTrip) return;
 
     const stockroomUpdates: StockroomItem[] = state.stockroomItems
       .map(si => {
-        const pullRow = pullRows.find(r => r.itemId === si.itemId);
-        const returnRow = returnRows.find(r => r.itemId === si.itemId);
-        if (!pullRow && !returnRow) return null;
-        const pullDelta = pullRow ? pullRow.pullQty : 0;
-        const returnDelta = returnRow ? returnRow.returnQty : 0;
+        const row = restockRows.find(r => r.itemId === si.itemId);
+        if (!row) return null;
         return {
           ...si,
-          qtyOnHand: Math.max(0, si.qtyOnHand - pullDelta + returnDelta),
+          qtyOnHand: Math.max(0, si.qtyOnHand - row.pull + row.ret),
         };
       })
       .filter((si): si is StockroomItem => si !== null);
 
-    const returnItems: TripReturnItem[] = returnRows.map(r => ({
-      id: `tr-${crypto.randomUUID()}`,
-      itemId: r.itemId,
-      qty: r.returnQty,
-      returnedBy: state.currentUser.name,
-      returnedAt: new Date().toISOString(),
-    }));
+    const returnItems: TripReturnItem[] = restockRows
+      .filter(r => r.ret > 0)
+      .map(r => ({
+        id: `tr-${crypto.randomUUID()}`,
+        itemId: r.itemId,
+        qty: r.ret,
+        returnedBy: state.currentUser.name,
+        returnedAt: new Date().toISOString(),
+      }));
 
     dispatch({
       type: 'ADD_TRIP_RETURN_ITEMS',
       payload: {
-        tripId: tripForBaseline.id,
+        tripId: restockTrip.id,
         items: returnItems,
         stockroomUpdates,
       },
     });
-    toast.success('Baseline restored — aircraft back at par');
+    setCounts({});
+    setCheckedPull(new Set());
+    setCheckedReturn(new Set());
+    toast.success(`${restockTrip.tailNumber} restocked to par`);
+  }
+
+  // Hand off to the existing inspection workflow for this tail (resume if in progress).
+  function handleFormalInspection() {
+    if (!restockTrip) return;
+    const inProgress = state.inspections.find(
+      i => i.tailNumber === restockTrip.tailNumber && i.status === 'in_progress'
+    );
+    navigate(
+      inProgress
+        ? `/inventory-v2/inspection?resume=${inProgress.id}`
+        : `/inventory-v2/inspection?tail=${restockTrip.tailNumber}`
+    );
   }
 
   const handleScan = (itemId: string) => {
@@ -287,120 +344,239 @@ export default function Replenish() {
     setOpenSections(prev => ({ ...prev, [unit]: prev[unit] !== false ? false : true }));
   };
 
-  if (tripForBaseline && baselineItems.length > 0) {
+  // ── Post-trip Restock screen (reached from a completed trip via ?tail=) ─────
+  if (tailParam) {
+    // No completed trip for this tail — honest state, never the inspection empty view.
+    if (!restockTrip) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center space-y-3 text-muted-foreground">
+              <PlaneTakeoff className="h-8 w-8 mx-auto opacity-50" />
+              <p>
+                No recent completed trip for{' '}
+                <span className="font-mono font-semibold text-foreground">{tailParam}</span> to restock.
+              </p>
+              <Button variant="outline" onClick={() => navigate('/inventory-v2/trips')}>
+                Go to Trips
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    const segCls = (active: boolean) =>
+      `flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors ${
+        active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+      }`;
+
     return (
-      <div className="max-w-2xl mx-auto space-y-4 pb-8">
+      <div className="max-w-2xl mx-auto space-y-4 pb-28">
+        {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold">Return to Baseline</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <PackagePlus className="h-6 w-6 text-primary" />
+            Restock {restockTrip.tailNumber}
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {tripForBaseline.tailNumber} · {tripForBaseline.tripName || 'Trip'} ·{' '}
-            Pull depleted items and return surplus
+            {restockTrip.tripName || 'Trip'} · return the aircraft to par
           </p>
         </div>
 
-        {/* Pull from Commissary */}
-        {pullRows.length > 0 && (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 border-b border-border">
-              <ArrowDown className="h-4 w-4 text-primary" />
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                Pull from Commissary
-              </span>
-              <span className="ml-auto text-xs font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
-                {pullRows.length} {pullRows.length === 1 ? 'item' : 'items'}
-              </span>
-            </div>
-            <div className="divide-y divide-border">
-              {pullRows.map(row => {
-                const item = state.items.find(i => i.id === row.itemId);
-                if (!item) return null;
-                const checked = checkedPull.has(row.itemId);
-                return (
-                  <div key={row.itemId} className="flex items-center gap-3 px-4 py-3">
-                    <button
-                      onClick={() => setCheckedPull(prev => {
-                        const next = new Set(prev);
-                        if (checked) next.delete(row.itemId);
-                        else next.add(row.itemId);
-                        return next;
-                      })}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                        checked ? 'bg-primary border-primary text-primary-foreground' : 'border-border'
-                      }`}
-                    >
-                      {checked && <span className="text-xs">✓</span>}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${checked ? 'line-through text-muted-foreground' : ''}`}>
-                        {item.itemName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Need {row.pullQty} to reach par {row.par}
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-primary bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1 shrink-0">
-                      +{row.pullQty} {item.uom}
-                    </span>
-                  </div>
-                );
-              })}
+        {alreadyRestocked && (
+          <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold text-emerald-800 dark:text-emerald-300">Already restocked to par</p>
+              <p className="text-emerald-700/80 dark:text-emerald-400/80 text-xs">
+                Confirmed {new Date(restockTrip.baselineConfirmedAt!).toLocaleDateString()}. Run a
+                full count below if you want to check for silent losses.
+              </p>
             </div>
           </div>
         )}
 
-        {/* Return to Commissary */}
-        {returnRows.length > 0 && (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/30 border-b border-border">
-              <ArrowUp className="h-4 w-4 text-emerald-600" />
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                Return to Commissary
-              </span>
-              <span className="ml-auto text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2 py-0.5">
-                {returnRows.length} {returnRows.length === 1 ? 'item' : 'items'}
-              </span>
-            </div>
-            <div className="divide-y divide-border">
-              {returnRows.map(row => {
-                const item = state.items.find(i => i.id === row.itemId);
-                if (!item) return null;
-                const checked = checkedReturn.has(row.itemId);
-                return (
-                  <div key={row.itemId} className="flex items-center gap-3 px-4 py-3">
-                    <button
-                      onClick={() => setCheckedReturn(prev => {
-                        const next = new Set(prev);
-                        if (checked) next.delete(row.itemId);
-                        else next.add(row.itemId);
-                        return next;
-                      })}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                        checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-border'
-                      }`}
-                    >
-                      {checked && <span className="text-xs">✓</span>}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${checked ? 'line-through text-muted-foreground' : ''}`}>
-                        {item.itemName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {row.returnQty} above par — loaded as overstock
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2.5 py-1 shrink-0">
-                      −{row.returnQty} {item.uom}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        {/* Mode switch */}
+        <div className="grid grid-cols-3 gap-1.5 bg-muted rounded-xl p-1.5">
+          <button onClick={() => setRestockMode('usage')} className={segCls(restockMode === 'usage')}>
+            <Zap className="h-3.5 w-3.5" /> Usage only
+          </button>
+          <button onClick={() => setRestockMode('full')} className={segCls(restockMode === 'full')}>
+            <Search className="h-3.5 w-3.5" /> Full count
+          </button>
+          <button onClick={handleFormalInspection} className={segCls(false)}>
+            <ClipboardCheck className="h-3.5 w-3.5" /> Inspection
+          </button>
+        </div>
+
+        {restockMode === 'usage' ? (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Items used this trip that are now below par. Tap ✓ as you physically move each one.
+            </p>
+
+            {/* Pull from Commissary */}
+            {pullRows.length > 0 && (
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 border-b border-border">
+                  <ArrowDown className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary">Pull from Commissary</span>
+                  <span className="ml-auto text-xs font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+                    {pullRows.length} {pullRows.length === 1 ? 'item' : 'items'}
+                  </span>
+                </div>
+                <div className="divide-y divide-border">
+                  {pullRows.map(row => {
+                    const item = state.items.find(i => i.id === row.itemId);
+                    if (!item) return null;
+                    const checked = checkedPull.has(row.itemId);
+                    return (
+                      <div key={row.itemId} className="flex items-center gap-3 px-4 py-3">
+                        <button
+                          onClick={() => setCheckedPull(prev => {
+                            const next = new Set(prev);
+                            if (checked) next.delete(row.itemId); else next.add(row.itemId);
+                            return next;
+                          })}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            checked ? 'bg-primary border-primary text-primary-foreground' : 'border-border'
+                          }`}
+                        >
+                          {checked && <span className="text-xs">✓</span>}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold ${checked ? 'line-through text-muted-foreground' : ''}`}>{item.itemName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            used {usageByItem.get(row.itemId) ?? 0} · on board {row.counted} · par {row.par}
+                          </p>
+                        </div>
+                        <span className="text-sm font-bold text-primary bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1 shrink-0">
+                          +{row.pull} {item.uom}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Return surplus */}
+            {returnRows.length > 0 && (
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/30 border-b border-border">
+                  <ArrowUp className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Return Surplus</span>
+                  <span className="ml-auto text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2 py-0.5">
+                    {returnRows.length} {returnRows.length === 1 ? 'item' : 'items'}
+                  </span>
+                </div>
+                <div className="divide-y divide-border">
+                  {returnRows.map(row => {
+                    const item = state.items.find(i => i.id === row.itemId);
+                    if (!item) return null;
+                    const checked = checkedReturn.has(row.itemId);
+                    return (
+                      <div key={row.itemId} className="flex items-center gap-3 px-4 py-3">
+                        <button
+                          onClick={() => setCheckedReturn(prev => {
+                            const next = new Set(prev);
+                            if (checked) next.delete(row.itemId); else next.add(row.itemId);
+                            return next;
+                          })}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-border'
+                          }`}
+                        >
+                          {checked && <span className="text-xs">✓</span>}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold ${checked ? 'line-through text-muted-foreground' : ''}`}>{item.itemName}</p>
+                          <p className="text-xs text-muted-foreground">on board {row.counted} · par {row.par} — surplus</p>
+                        </div>
+                        <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2.5 py-1 shrink-0">
+                          −{row.ret} {item.uom}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Honest empty state for usage mode */}
+            {nothingToDo && (
+              <Card className="border-dashed">
+                <CardContent className="py-10 text-center space-y-3 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-7 w-7 mx-auto text-emerald-500" />
+                  <p>Everything used this trip is still at par — nothing to pull from the usage log.</p>
+                  <p className="text-xs">
+                    Passengers sometimes take items without them being logged. Switch to a full count to
+                    inspect every item.
+                  </p>
+                  <Button variant="outline" onClick={() => setRestockMode('full')}>
+                    <Search className="mr-2 h-4 w-4" /> Switch to Full count
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Count every item on board. Each starts at what the system expects (par + loaded − used) —
+              correct it to the actual count. Items off par become pull/return below.
+            </p>
+            {Object.entries(fullCountGroups).map(([category, items]) => (
+              <div key={category} className="rounded-xl border border-border overflow-hidden">
+                <div className="px-4 py-2 bg-muted/50 border-b border-border text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  {category}
+                </div>
+                <div className="divide-y divide-border">
+                  {items.map(item => {
+                    const par = parOf(item.id);
+                    const counted = getCount(item.id);
+                    const diff = counted - par;
+                    return (
+                      <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{item.itemName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            par {par} {item.uom}
+                            {diff < 0 && <span className="text-primary font-semibold"> · pull {-diff}</span>}
+                            {diff > 0 && <span className="text-emerald-600 font-semibold"> · return {diff}</span>}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCount(item.id, counted - 1)}>
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-7 text-center font-mono text-sm font-bold">{counted}</span>
+                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCount(item.id, counted + 1)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </>
         )}
 
-        <Button className="w-full" size="lg" onClick={handleBaselineConfirm}>
-          Confirm &amp; Restore Baseline
-        </Button>
+        {/* Sticky confirm bar */}
+        <div className="sticky bottom-0 -mx-1 bg-background/95 backdrop-blur border-t pt-3 pb-2 space-y-2">
+          <p className="text-xs text-center text-muted-foreground">
+            {pullRows.length > 0 && <span className="text-primary font-semibold">{pullRows.length} to pull</span>}
+            {pullRows.length > 0 && returnRows.length > 0 && ' · '}
+            {returnRows.length > 0 && <span className="text-emerald-600 font-semibold">{returnRows.length} to return</span>}
+            {nothingToDo && 'Aircraft at par — nothing to move'}
+          </p>
+          <Button className="w-full" size="lg" onClick={handleConfirmRestock} disabled={nothingToDo}>
+            Confirm restock — return {restockTrip.tailNumber} to par
+          </Button>
+        </div>
       </div>
     );
   }
