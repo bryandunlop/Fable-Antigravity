@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-04
 **Branch:** `feat/global-notifications` (off `main`)
-**Status:** Approved design, pre-implementation
+**Status:** Implemented on feat/global-notifications
 **Production doc:** `~/Obsidian/myGFO/02-Platform/Features/Notification_System_Redesign.md`
 
 ## Problem
