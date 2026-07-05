@@ -15,6 +15,7 @@ import {
   User, Clock, ShoppingCart, X, Camera
 } from 'lucide-react';
 import { BarcodeScannerDialog } from './BarcodeScannerDialog';
+import NewItemDialog from './NewItemDialog';
 
 interface StagedItem {
   qty: number;
@@ -41,6 +42,7 @@ export default function ReceiveStockModal({ open, onOpenChange }: ReceiveStockMo
   // ── View mode ──
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [newItemOpen, setNewItemOpen] = useState(false);
 
   const stockroomItems = useMemo(() =>
     state.stockroomItems.filter(si => si.stockroomId === 'sr-1'),
@@ -106,6 +108,11 @@ export default function ReceiveStockModal({ open, onOpenChange }: ReceiveStockMo
     setStaged(prev => ({ ...prev, [itemId]: { ...prev[itemId], qty: (prev[itemId]?.qty ?? 0) + 1 } }));
     toast.success(`Added: ${item.itemName}`);
     setScannerOpen(false);
+  };
+
+  // New item created inline → stage it at qty 1 without navigating or closing.
+  const handleItemCreated = (itemId: string) => {
+    setStaged(prev => ({ ...prev, [itemId]: { ...prev[itemId], qty: (prev[itemId]?.qty ?? 0) + 1 } }));
   };
 
   const handleSubmit = () => {
@@ -211,6 +218,15 @@ export default function ReceiveStockModal({ open, onOpenChange }: ReceiveStockMo
                     >
                       <Camera className="w-4 h-4" />
                       Scan
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewItemOpen(true)}
+                      className="gap-1.5 shrink-0"
+                    >
+                      <Plus className="w-4 h-4" />
+                      New item
                     </Button>
                   </div>
 
@@ -423,6 +439,13 @@ export default function ReceiveStockModal({ open, onOpenChange }: ReceiveStockMo
         open={scannerOpen}
         onOpenChange={setScannerOpen}
         onItemScanned={handleScan}
+      />
+
+      <NewItemDialog
+        open={newItemOpen}
+        onOpenChange={setNewItemOpen}
+        suppressNavigate
+        onCreated={handleItemCreated}
       />
     </>
   );
