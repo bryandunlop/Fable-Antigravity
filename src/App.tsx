@@ -5,7 +5,6 @@ import { Toaster } from 'sonner';
 import NetworkStatus from './components/NetworkStatus';
 import { HazardProvider } from './contexts/HazardContext';
 import { MaintenanceProvider } from './components/contexts/MaintenanceContext';
-import { NotificationProvider, useNotificationContext } from './components/contexts/NotificationContext';
 import { PassengerFormProvider } from './components/contexts/PassengerFormContext';
 import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
@@ -143,10 +142,10 @@ import LegReconciliationV2 from './components/inventory-v2/pages/LegReconciliati
 import CommissaryKiosk from './components/inventory-v2/pages/CommissaryKiosk';
 import ActivityLog from './components/inventory-v2/pages/ActivityLog';
 
-// ─── Wrapper: bridges NotificationContext into InventoryV2Provider ───────────
+// ─── Wrapper: bridges into InventoryV2Provider ───────────────────────────────
 // Must live outside App so it's a stable component reference, but it's defined
 // here because it needs to be inside the module scope where InventoryV2Provider
-// is imported. It reads from NotificationProvider (which wraps all routes).
+// is imported.
 function InventoryRouteWrapper({ children, userRole }: { children: React.ReactNode; userRole: string }) {
   return (
     <InventoryV2Provider userRole={userRole}>
@@ -174,8 +173,7 @@ export default function App() {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <NotificationProvider>
-        <MaintenanceProvider>
+      <MaintenanceProvider>
           <HazardProvider>
             <AuditProvider>
               <PassengerFormProvider>
@@ -590,7 +588,6 @@ export default function App() {
             </AuditProvider>
           </HazardProvider>
         </MaintenanceProvider>
-      </NotificationProvider>
     </ThemeProvider>
   );
 }
