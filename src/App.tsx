@@ -9,6 +9,8 @@ import { PassengerFormProvider } from './components/contexts/PassengerFormContex
 import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
+import NotFound from './components/NotFound';
+import { FRONT_DOORS } from './navigation/navConfig';
 import Navigation from './components/Navigation';
 import MobileBottomNav from './components/MobileBottomNav';
 import AircraftStatus from './components/AircraftStatus';
@@ -191,10 +193,10 @@ export default function App() {
                       }
                     />
 
-                    {/* Login Route */}
+                    {/* Login Route — lands each role at its workspace front door */}
                     <Route path="/login" element={
                       isAuthenticated ? (
-                        <Navigate to="/" replace />
+                        <Navigate to={FRONT_DOORS[userRole] ?? '/'} replace />
                       ) : (
                         <LoginScreen onLogin={handleLogin} />
                       )
@@ -209,9 +211,10 @@ export default function App() {
                           <Navigation userRole={userRole} additionalRoles={additionalRoles} onLogout={handleLogout}>
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out h-full">
                               <Routes>
+                                {/* Front doors moved to the login redirect — Dashboard stays reachable for every role
+                                    (maintenance-workflow keeps its redirect: its persona can't use the Dashboard). */}
                                 <Route path="/" element={
                                   userRole === 'maintenance-workflow' ? <Navigate to="/maintenance-workflow" replace />
-                                    : userRole === 'pilot' ? <Navigate to="/pilot-workspace" replace />
                                     : <Dashboard userRole={userRole} />
                                 } />
                                 <Route path="/aircraft" element={<AircraftStatus />} />
@@ -556,13 +559,14 @@ export default function App() {
                                 } />
                                 <Route path="/experimental/scheduling-command" element={<SchedulingCommandCenter />} />
                                 <Route path="/experimental/unified-trip" element={<UnifiedTripWorkspace />} />
-                                <Route path="*" element={<Navigate to="/" replace />} />
+                                {/* Real 404 — broken links are visible bugs, not silent redirects */}
+                                <Route path="*" element={<NotFound />} />
                               </Routes>
                             </div>
                           </Navigation>
 
                           {/* Mobile Bottom Navigation */}
-                          <MobileBottomNav userRole={userRole} />
+                          <MobileBottomNav userRole={userRole} additionalRoles={additionalRoles} />
 
                           {/* Network Status Banner */}
                           <NetworkStatus />

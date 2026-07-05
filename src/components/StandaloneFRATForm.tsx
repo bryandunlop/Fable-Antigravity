@@ -13,6 +13,7 @@ import { Progress } from './ui/progress';
 import { toast } from 'sonner';
 import JSConfetti from 'js-confetti';
 import { eventStore } from '../notifications/events';
+import { mergeFratSelections } from './tech-log/util/fratDraft';
 import {
   Shield,
   AlertTriangle,
@@ -65,11 +66,12 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
   const [departureTime, setDepartureTime] = useState(flightData?.time || '');
   const [picName, setPicName] = useState('');
   const [sicName, setSicName] = useState('');
-  const [mitigationNotes, setMitigationNotes] = useState('');
+  const [mitigationNotes, setMitigationNotes] = useState<string>(flightData?.mitigationNotes ?? '');
   const [additionalNotes, setAdditionalNotes] = useState('');
 
-  // FRAT Sections with all items
-  const [fratSections, setFratSections] = useState<FRATSection[]>([
+  // FRAT Sections with all items; a saved draft (initialData.selections) re-applies its
+  // selection matrix over the template — labels/scores always come from the template.
+  const [fratSections, setFratSections] = useState<FRATSection[]>(() => mergeFratSelections([
     {
       title: 'Pilot Qualifications',
       icon: Users,
@@ -168,7 +170,7 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
         { id: 'ot8', label: 'HUD / EVS will be used', score: 0, selected: false },
       ]
     },
-  ]);
+  ], flightData?.selections));
 
   // Calculate total score
   const calculateTotalScore = () => {

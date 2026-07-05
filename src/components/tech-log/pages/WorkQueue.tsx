@@ -4,6 +4,7 @@ import { Inbox, AlertTriangle, Wrench, Clock, CalendarClock, ClipboardList, Chev
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
 import { buildWorkQueue } from '../engine/workqueue';
+import { deriveServiceability } from '../engine/serviceability';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -23,6 +24,16 @@ export default function WorkQueue() {
   const isRii = (w: { riiRequired: boolean; steps: { riiRequired?: boolean }[] }) => w.riiRequired || w.steps.some(s => s.riiRequired);
 
   const wq = useMemo(() => buildWorkQueue(state, now), [state, now]);
+  // Glanceable fleet strip: the landing page answers "what's the state of the world"
+  // (counts) above "what needs me" (the queue). Cards deep-link to the filtered board.
+  const fleetCounts = useMemo(() => {
+    const c = { RED: 0, AMBER: 0, GREEN: 0, PROV: 0 };
+    for (const ac of state.aircraft) {
+      if (ac.isProvisional) { c.PROV++; continue; }
+      c[deriveServiceability(ac.id, state, now).status]++;
+    }
+    return c;
+  }, [state, now]);
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
   const melOf = (id: string) => state.melItems.find(m => m.id === id);
   const open = (tail: string, q = '') => navigate(`/tech-log/aircraft/${tail}${q}`);
@@ -77,6 +88,21 @@ export default function WorkQueue() {
       subtitle={`Everything that needs a human across the fleet · ${wq.counts.urgent} urgent`}
     >
       <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          {([
+            ['Grounded', fleetCounts.RED, 'RED', 'text-[var(--gfo-error,#EF3340)]'],
+            ['MEL / restricted', fleetCounts.AMBER, 'AMBER', 'text-[var(--gfo-warning,#F1B434)]'],
+            ['Serviceable', fleetCounts.GREEN, 'GREEN', 'text-[var(--gfo-success,#00B140)]'],
+            ['Provisional', fleetCounts.PROV, 'PROV', 'text-muted-foreground'],
+          ] as const).map(([label, n, f, cls]) => (
+            <button key={f} onClick={() => navigate(`/tech-log/fleet?filter=${f}`)}
+              className="rounded-md border p-2 text-left transition-colors hover:bg-accent/40">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+              <div className={`text-lg font-semibold ${cls}`}>{n}</div>
+            </button>
+          ))}
+        </div>
+
         <Section icon={<Inbox className="h-4 w-4" />} title="New squawks — awaiting triage" count={wq.counts.newSquawks}>
           {wq.newSquawks.length === 0 ? empty : wq.newSquawks.map(d => (
             <Row key={d.id} onClick={() => open(tailOf(d.aircraftId), '?tab=defects')}>

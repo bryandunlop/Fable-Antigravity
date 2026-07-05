@@ -6,10 +6,8 @@ const sw = (prefix: string) => (p: string) => p.startsWith(prefix);
 const melReadMatch = (p: string) => p.startsWith('/tech-log/mel') && !p.startsWith('/tech-log/admin');
 
 const tripsMatch = (p: string) =>
-  p === '/tech-log' || p.startsWith('/tech-log/trips') || p.startsWith('/tech-log/journey');
+  p === '/tech-log' || p.startsWith('/tech-log/trips') || p.startsWith('/tech-log/journey') || p.startsWith('/tech-log/intermittent');
 const pilotFleetMatch = (p: string) => p.startsWith('/tech-log/fleet') || p.startsWith('/tech-log/aircraft');
-const maintFleetMatch = (p: string) =>
-  p === '/tech-log' || p.startsWith('/tech-log/fleet') || p.startsWith('/tech-log/aircraft');
 
 export const GROUPS_PILOT: NavGroup[] = [
   {
@@ -17,6 +15,7 @@ export const GROUPS_PILOT: NavGroup[] = [
     sub: [
       { label: 'My trips', to: '/tech-log/trips', match: (p) => p === '/tech-log' || p.startsWith('/tech-log/trips') },
       { label: 'Journey log', to: '/tech-log/journey' },
+      { label: 'Nuisance items', to: '/tech-log/intermittent' },
     ],
   },
   { key: 'fleet', label: 'Fleet', to: '/tech-log/fleet', match: pilotFleetMatch, badge: 'red' },
@@ -24,8 +23,9 @@ export const GROUPS_PILOT: NavGroup[] = [
 ];
 
 export const GROUPS_MAINT: NavGroup[] = [
-  { key: 'fleet', label: 'Fleet', to: '/tech-log', match: maintFleetMatch, badge: 'red' },
-  { key: 'workqueue', label: 'Work Queue', to: '/tech-log/work-queue', match: (p) => p.startsWith('/tech-log/work-queue') || p.startsWith('/tech-log/work-cards'), badge: 'urgent' },
+  // Maintenance lands on the Work Queue ("what needs me"); Fleet stays one click away.
+  { key: 'fleet', label: 'Fleet', to: '/tech-log/fleet', match: pilotFleetMatch, badge: 'red' },
+  { key: 'workqueue', label: 'Work Queue', to: '/tech-log/work-queue', match: (p) => p === '/tech-log' || p.startsWith('/tech-log/work-queue') || p.startsWith('/tech-log/work-cards'), badge: 'urgent' },
   {
     key: 'airworthiness', label: 'Airworthiness', to: '/tech-log/airworthiness/forecast',
     match: (p) => p.startsWith('/tech-log/airworthiness'),

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SchedulingService } from './service';
 import { InMemorySchedulingStore } from './memory';
+import { seedTemplates } from './seed';
 import type { ChecklistTemplate, IdFactory } from '../engine';
 import type { TripRecord } from './types';
 
@@ -96,4 +97,20 @@ describe('SchedulingService', () => {
     }
     expect((await service.tripReadiness('T1')).state).toBe('READY');
   });
+
+  it.each(['domestic', 'international', 'dca_dassp'] as const)(
+    'seeded %s trips deliver a crew brief: completing send-crew-brief emits a pilot-targeted event with the tripId',
+    async (tripType) => {
+      const { store, service } = svc();
+      await seedTemplates(store);
+      const t: TripRecord = { ...trip, id: `T-${tripType}`, tripNumber: `TRIP-${tripType}`, tripType };
+      const { instances } = await service.createTripMirror(t, NOW);
+      const brief = instances.find((i) => i.taskDefId === 'send-crew-brief');
+      expect(brief).toBeDefined();
+      const done = await service.applyAction(brief!.id, { kind: 'complete' }, 'sched:1', NOW);
+      expect(done.status).toBe('done');
+      const inbox = await store.listEventsForTarget({ kind: 'role', value: 'pilot' });
+      expect(inbox.some((e) => (e.payload as { tripId?: string }).tripId === t.id)).toBe(true);
+    },
+  );
 });

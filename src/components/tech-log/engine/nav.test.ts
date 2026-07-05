@@ -17,8 +17,15 @@ describe('nav model', () => {
   it('an aircraft detail route resolves to Fleet', () => {
     expect(resolveNav('PILOT', '/tech-log/aircraft/N1PG').activeGroup.key).toBe('fleet');
   });
-  it('maintenance root still resolves to Fleet (no regression)', () => {
-    expect(resolveNav('MAINTENANCE', '/tech-log').activeGroup.key).toBe('fleet');
+  it('maintenance root is the Work Queue; Fleet keeps aircraft pages', () => {
+    expect(resolveNav('MAINTENANCE', '/tech-log').activeGroup.key).toBe('workqueue');
+    expect(resolveNav('MAINTENANCE', '/tech-log/aircraft/N1PG').activeGroup.key).toBe('fleet');
+    expect(resolveNav('MAINTENANCE', '/tech-log/fleet').activeGroup.key).toBe('fleet');
+  });
+  it('pilot Trips group exposes Nuisance items and stays active on /tech-log/intermittent', () => {
+    const r = resolveNav('PILOT', '/tech-log/intermittent');
+    expect(r.activeGroup.key).toBe('trips');
+    expect(r.activeSub?.label).toBe('Nuisance items');
   });
   it('an unknown path falls back to the role home group (first group)', () => {
     expect(resolveNav('PILOT', '/tech-log/zzz').activeGroup.key).toBe('trips');
