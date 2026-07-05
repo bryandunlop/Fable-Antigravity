@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -16,8 +16,22 @@ import type { UnitItemRequest as UnitItemRequestType } from '../types';
 
 export default function UnitItemRequest() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { state, dispatch } = useInventoryV2();
   const [selectedUnit, setSelectedUnit] = useState('');
+
+  // ── Pre-select aircraft from ?tail= query param (keep user-changeable) ──
+  const didApplyTailParam = useRef(false);
+  useEffect(() => {
+    if (didApplyTailParam.current) return;
+    const tailParam = searchParams.get('tail');
+    if (!tailParam) return;
+    const aircraft = state.fleet.find(a => a.tailNumber === tailParam);
+    if (aircraft) {
+      didApplyTailParam.current = true;
+      setSelectedUnit(tailParam);
+    }
+  }, [searchParams, state.fleet]);
   const [isGuestRequest, setIsGuestRequest] = useState(true);
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
