@@ -27,8 +27,10 @@ export function buildHazardFeed(
   const now = new Date(nowUtc).getTime();
   const out: FeedItem[] = [];
   for (const h of hazards) {
-    if (!h.effectivenessReviewDate) continue;
-    const daysUntil = Math.ceil((new Date(h.effectivenessReviewDate).getTime() - now) / DAY);
+    if (!h || !h.effectivenessReviewDate) continue;
+    const reviewTime = new Date(h.effectivenessReviewDate).getTime();
+    if (Number.isNaN(reviewTime)) continue;
+    const daysUntil = Math.ceil((reviewTime - now) / DAY);
     if (daysUntil > 7) continue;
     out.push({
       id: `hazard-review:${h.id}`,

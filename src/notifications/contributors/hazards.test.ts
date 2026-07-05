@@ -40,4 +40,13 @@ describe('buildHazardFeed', () => {
     s.setItem('aviation_hazards', '{}');
     expect(buildHazardFeed('safety', NOW, s)).toEqual([]);
   });
+
+  it('skips malformed records (null entries, unparseable dates)', () => {
+    const s = seeded([
+      null,
+      { id: 'HZ-010', title: 'Bad date', effectivenessReviewDate: 'not-a-date' },
+      { id: 'HZ-011', title: 'Good', effectivenessReviewDate: '2026-06-30' },
+    ]);
+    expect(buildHazardFeed('safety', NOW, s).map(i => i.id)).toEqual(['hazard-review:HZ-011']);
+  });
 });
