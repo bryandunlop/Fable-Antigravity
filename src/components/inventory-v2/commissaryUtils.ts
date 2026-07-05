@@ -78,6 +78,55 @@ export function getAttentionEntries(state: InventoryV2State): AttentionEntries {
   return { low, expiring };
 }
 
+export interface AttentionLocationGroup {
+  /** Storage location id, or 'unassigned' for the pseudo-folder. */
+  locationId: string;
+  locationName: string;
+  low: CommissaryItem[];
+  expiring: AttentionEntries['expiring'];
+}
+
+/**
+ * Attention entries grouped by storage location so a manager can walk the
+ * stockroom in one pass. Sorted by location sortOrder, Unassigned last.
+ * Orphaned locationIds (location deleted out-of-band) fold into Unassigned —
+ * matches the CommissaryHome/CommissaryLocation pseudo-folder contract.
+ */
+export function groupAttentionByLocation(state: InventoryV2State): AttentionLocationGroup[] {
+  const { low, expiring } = getAttentionEntries(state);
+  const locationById = new Map(state.storageLocations.map(l => [l.id, l] as const));
+  const stockroomByItem = new Map(
+    state.stockroomItems
+      .filter(si => si.stockroomId === COMMISSARY_STOCKROOM_ID)
+      .map(si => [si.itemId, si] as const)
+  );
+  const keyFor = (itemId: string): string => {
+    const locId = stockroomByItem.get(itemId)?.locationId;
+    return locId && locationById.has(locId) ? locId : 'unassigned';
+  };
+  const groups = new Map<string, AttentionLocationGroup>();
+  const groupFor = (key: string): AttentionLocationGroup => {
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        locationId: key,
+        locationName: key === 'unassigned' ? 'Unassigned' : locationById.get(key)!.name,
+        low: [],
+        expiring: [],
+      };
+      groups.set(key, group);
+    }
+    return group;
+  };
+  for (const ci of low) groupFor(keyFor(ci.id)).low.push(ci);
+  for (const e of expiring) groupFor(keyFor(e.item.id)).expiring.push(e);
+  return [...groups.values()].sort((a, b) => {
+    if (a.locationId === 'unassigned') return 1;
+    if (b.locationId === 'unassigned') return -1;
+    return locationById.get(a.locationId)!.sortOrder - locationById.get(b.locationId)!.sortOrder;
+  });
+}
+
 /** Total commissary value on hand: Σ qtyOnHand × costPerUnit. */
 export function getStockValue(state: InventoryV2State): number {
   const itemById = new Map(state.items.map(i => [i.id, i] as const));

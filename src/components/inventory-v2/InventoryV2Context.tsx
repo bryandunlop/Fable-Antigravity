@@ -307,6 +307,7 @@ function inventoryReducer(state: InventoryV2State, action: InventoryV2Action): I
     case 'SET_CURRENT_USER':
       return { ...state, currentUser: action.payload };
 
+    // Retained for future server-side threshold evaluation; no UI sets these since the My Alerts tab was removed (2026-07-04).
     case 'ADD_ALERT_THRESHOLD': {
       const existing = state.alertThresholds.findIndex(
         t => t.userId === action.payload.userId && t.itemId === action.payload.itemId
