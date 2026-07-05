@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
@@ -16,17 +16,121 @@ import {
 } from 'lucide-react';
 import type { PickListItem, RestockListItem, TripReturnItem, StockroomItem } from '../types';
 
+// ─── Session Storage: generic pick-list progress ────────────────────────────
+// A physical stockroom pick takes minutes; persist picked/loaded/cancelled +
+// adjusted quantities so navigating away before UPDATE doesn't lose the work.
+const PROGRESS_KEY = 'inv-v2-replenish-progress';
+
+type SavedProgress = {
+  pickItems: Pick<PickListItem, 'id' | 'qtyTaken' | 'done'>[];
+  restockItems: Pick<RestockListItem, 'id' | 'itemId' | 'inspectionId' | 'unitTailNumber' | 'qtyPicked' | 'qtyNeeded' | 'done' | 'cancelled'>[];
+};
+
+// Merge any saved interaction state onto the fresh server pick/restock lists,
+// keyed by id. Saved entries whose ids no longer exist are dropped.
+function restoreProgress(
+  pickListItems: PickListItem[],
+  restockListItems: RestockListItem[],
+): { pickItems: PickListItem[]; restockItems: RestockListItem[] } {
+  let saved: SavedProgress | null = null;
+  try {
+    const raw = sessionStorage.getItem(PROGRESS_KEY);
+    if (raw) saved = JSON.parse(raw) as SavedProgress;
+  } catch {
+    saved = null;
+  }
+  if (!saved) return { pickItems: pickListItems, restockItems: restockListItems };
+
+  const savedPicks = new Map(saved.pickItems?.map(p => [p.id, p]) ?? []);
+  const pickItems = pickListItems.map(p => {
+    const s = savedPicks.get(p.id);
+    return s ? { ...p, qtyTaken: s.qtyTaken, done: s.done } : p;
+  });
+
+  // Restock rows are derived on demand (not in server state until first pick),
+  // so restore only those whose referenced pick item still exists.
+  const pickIds = new Set(pickListItems.map(p => p.id));
+  const restockById = new Map(restockListItems.map(r => [r.id, r]));
+  const restockItems = [...restockListItems];
+  (saved.restockItems ?? []).forEach(s => {
+    // restock ids are `restock-${pickItem.id}` — validate against live pick ids.
+    const pickId = s.id.startsWith('restock-') ? s.id.slice('restock-'.length) : null;
+    if (pickId && !pickIds.has(pickId)) return; // orphaned — drop
+    if (restockById.has(s.id)) {
+      const idx = restockItems.findIndex(r => r.id === s.id);
+      restockItems[idx] = { ...restockItems[idx], done: s.done, cancelled: s.cancelled };
+    } else {
+      restockItems.push({
+        id: s.id,
+        inspectionId: s.inspectionId,
+        unitTailNumber: s.unitTailNumber,
+        itemId: s.itemId,
+        qtyPicked: s.qtyPicked,
+        qtyNeeded: s.qtyNeeded,
+        done: s.done,
+        cancelled: s.cancelled,
+      });
+    }
+  });
+
+  return { pickItems, restockItems };
+}
+
 export default function Replenish() {
   const { state, dispatch } = useInventoryV2();
-  const [unitFilter, setUnitFilter] = useState('all');
-  const [localPickItems, setLocalPickItems] = useState<PickListItem[]>(state.pickListItems);
-  const [localRestockItems, setLocalRestockItems] = useState<RestockListItem[]>(state.restockListItems);
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-  const [scannerOpen, setScannerOpen] = useState(false);
-
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const tailParam = searchParams.get('tail');
+
+  // Seed the generic pick-list unit filter from ?tail= so an FA arriving from
+  // InspectionReview's auto-navigate lands scoped to their aircraft, not "All Units".
+  const [unitFilter, setUnitFilter] = useState(() => searchParams.get('tail') ?? 'all');
+  // Merge any saved sessionStorage progress onto the fresh server lists once, on mount.
+  const [initialProgress] = useState(() =>
+    restoreProgress(state.pickListItems, state.restockListItems)
+  );
+  const [localPickItems, setLocalPickItems] = useState<PickListItem[]>(initialProgress.pickItems);
+  const [localRestockItems, setLocalRestockItems] = useState<RestockListItem[]>(
+    initialProgress.restockItems
+  );
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  // ── Auto-save generic pick progress to sessionStorage on every change ──
+  // Persist only when something is actually in progress; otherwise clear the key.
+  useEffect(() => {
+    const anyPending =
+      localPickItems.some(p => p.done || p.qtyTaken > 0) ||
+      localRestockItems.some(r => r.done || r.cancelled);
+
+    if (!anyPending) {
+      try {
+        sessionStorage.removeItem(PROGRESS_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    const progress: SavedProgress = {
+      pickItems: localPickItems.map(p => ({ id: p.id, qtyTaken: p.qtyTaken, done: p.done })),
+      restockItems: localRestockItems.map(r => ({
+        id: r.id,
+        itemId: r.itemId,
+        inspectionId: r.inspectionId,
+        unitTailNumber: r.unitTailNumber,
+        qtyPicked: r.qtyPicked,
+        qtyNeeded: r.qtyNeeded,
+        done: r.done,
+        cancelled: r.cancelled,
+      })),
+    };
+    try {
+      sessionStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    } catch {
+      // storage full — silently ignore
+    }
+  }, [localPickItems, localRestockItems]);
 
   // ── Post-trip restock state ──────────────────────────────────────────────
   // 'usage' = pull only what was tapped as used (fast path).
@@ -336,6 +440,13 @@ export default function Replenish() {
         }
       }
     });
+
+    // Progress is now committed to server state — drop the local draft.
+    try {
+      sessionStorage.removeItem(PROGRESS_KEY);
+    } catch {
+      // ignore
+    }
 
     toast.success('Replenish list updated');
   };
