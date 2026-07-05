@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useNotificationContext } from '../components/contexts/NotificationContext';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export interface AuditChecklistItem {
     id: number;
@@ -280,55 +279,6 @@ export const AuditProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             localStorage.setItem('antigravity_audits_version', AUDIT_VERSION);
         }
     }, []);
-
-    const { addNotification } = useNotificationContext();
-
-    // Check for audit expiry notifications (throttled to once per day)
-    const checkExpiryNotifications = useCallback((auditList: Audit[]) => {
-        const today = new Date();
-        const todayKey = today.toISOString().split('T')[0];
-        const lastChecked = localStorage.getItem('audit_expiry_checked');
-        if (lastChecked === todayKey) return; // already ran today
-        localStorage.setItem('audit_expiry_checked', todayKey);
-
-        auditList.forEach(audit => {
-            if (!audit.expirationDate) return;
-            const exp = new Date(audit.expirationDate);
-            const daysUntil = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 3600 * 24));
-
-            if (daysUntil < 0) {
-                addNotification({
-                    title: `Audit Expired: ${audit.title}`,
-                    message: `This audit expired ${Math.abs(daysUntil)} day(s) ago. Assigned to: ${audit.assignedTo}.`,
-                    type: 'audit',
-                    priority: 'critical',
-                    actionUrl: '/internal-audits',
-                    actionText: 'View Audit',
-                    module: 'Audit Management',
-                    relatedId: audit.id,
-                    daysUntilDue: daysUntil
-                });
-            } else if (daysUntil <= 30) {
-                addNotification({
-                    title: `Audit Expiring Soon: ${audit.title}`,
-                    message: `This audit expires in ${daysUntil} day(s). Assigned to: ${audit.assignedTo}.`,
-                    type: 'audit',
-                    priority: daysUntil <= 7 ? 'high' : 'medium',
-                    actionUrl: '/safety/audits',
-                    actionText: 'View Audit',
-                    module: 'Audit Management',
-                    relatedId: audit.id,
-                    daysUntilDue: daysUntil
-                });
-            }
-        });
-    }, [addNotification]);
-
-    useEffect(() => {
-        if (audits.length > 0) {
-            checkExpiryNotifications(audits);
-        }
-    }, [audits, checkExpiryNotifications]);
 
     // Save strictly to local storage after any updates.
     useEffect(() => {
