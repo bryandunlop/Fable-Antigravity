@@ -15,8 +15,8 @@ import { DEFAULT_PREFLIGHT_CHECKLIST } from '../constants';
  *   N5PG, N2PG -> GREEN   N6PG -> AMBER (active deferral mid-clock)   N1PG -> RED (open defect)
  *   N3PG -> provisional G800 (no MEL approved)
  */
-export function getDefaultState(): TechLogState {
-  const nowMs = Date.now();
+export function getDefaultState(referenceNowMs: number = Date.now()): TechLogState {
+  const nowMs = referenceNowMs;
   const iso = (msAgo: number) => new Date(nowMs - msAgo).toISOString();
   const H = 3600000, D = 86400000;
 

@@ -14,7 +14,7 @@ const fc = (over: Partial<CampForecastItem>): CampForecastItem => ({
 
 /** Seeded state + real campForecast for every dispatchable tail, on the fixed clock. */
 function seededBoard() {
-  const s = getDefaultState();
+  const s = getDefaultState(NOW_MS);
   const forecast = Object.fromEntries(
     s.aircraft
       .filter(a => !a.isProvisional)
