@@ -9,6 +9,7 @@ import { NotificationProvider, useNotificationContext } from './components/conte
 import { PassengerFormProvider } from './components/contexts/PassengerFormContext';
 import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
+import PasswordGate from './components/PasswordGate';
 import Dashboard from './components/Dashboard';
 import NotFound from './components/NotFound';
 import { FRONT_DOORS } from './navigation/navConfig';
@@ -200,7 +201,9 @@ export default function App() {
                       isAuthenticated ? (
                         <Navigate to={FRONT_DOORS[userRole] ?? '/'} replace />
                       ) : (
-                        <LoginScreen onLogin={handleLogin} />
+                        <PasswordGate>
+                          <LoginScreen onLogin={handleLogin} />
+                        </PasswordGate>
                       )
                     } />
 
