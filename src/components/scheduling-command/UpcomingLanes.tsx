@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Inbox } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
-import { Badge } from '../ui/badge';
 import { TripIdentityLine } from './TripIdentity';
 import type { UpcomingLane, UpcomingModel, UpcomingTrip } from './upcomingLanesSelectors';
 
