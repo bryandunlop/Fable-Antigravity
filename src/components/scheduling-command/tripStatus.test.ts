@@ -16,6 +16,14 @@ describe('deriveTripStatus', () => {
     expect(deriveTripStatus(trip({ readinessScore: 100, departureDate: dep(-1) }), NOW)).toBe('airborne');
   });
 
+  it('a fully-ready trip inside 24h of departure reads ready, not airborne (not yet departed)', () => {
+    expect(deriveTripStatus(trip({ readinessScore: 100, departureDate: dep(0.5) }), NOW)).toBe('ready');
+  });
+
+  it('airborne begins exactly at departure', () => {
+    expect(deriveTripStatus(trip({ readinessScore: 100, departureDate: dep(0) }), NOW)).toBe('airborne');
+  });
+
   it('a fully-ready trip past its arrival reads ready (completed), not airborne', () => {
     expect(deriveTripStatus(trip({ readinessScore: 100, departureDate: dep(-5), durationDays: 2 }), NOW)).toBe('ready');
   });

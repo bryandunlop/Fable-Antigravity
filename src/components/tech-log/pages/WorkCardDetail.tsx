@@ -7,6 +7,7 @@ import { useIntegration } from '../integration/useIntegration';
 import { currentRows } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
 import { riiStepsComplete, pendingRiiSteps } from '../engine/rii';
+import { rectificationClosePush } from '../engine/rectification';
 import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
@@ -178,13 +179,11 @@ export default function WorkCardDetail() {
       if (def && def.status !== 'RECTIFIED' && def.status !== 'CLOSED') {
         const rectified: Defect = { ...def, id: newId('def'), supersedesId: def.id, status: 'RECTIFIED', rectificationText: release.workDescription, clearedByOid: user.oid, clearedTsUtc: now, signatureId: pSig.id };
         dispatch({ type: 'SUPERSEDE_DEFECT', payload: rectified });
-        // CAMP: rectification closes the discrepancy (UPDATE → Closed), carrying the parent ref forward (off-ledger, OQ9).
-        integration.pushDiscrepancy({
-          entityType: 'DEFECT', entityId: rectified.id, aircraftId: def.aircraftId,
-          ata: def.ataChapter, description: def.description, technician: user.displayName,
-          intent: 'CLOSE', supersedesEntityId: def.id,
-          riiItem: needsRii, inspector: inspector?.displayName,
-        });
+        // CAMP: rectification closes the discrepancy (UPDATE → Closed), carrying the parent ref
+        // forward (off-ledger, OQ9) and the pre-rectification status (watch lane stays DEFERRED-WATCHLIST).
+        integration.pushDiscrepancy(rectificationClosePush(def, rectified.id, {
+          technician: user.displayName, riiItem: needsRii, inspector: inspector?.displayName,
+        }));
         const linkedDef = currentRows(state.deferrals).find(d => d.defectId === def.id && d.status !== 'CLEARED');
         if (linkedDef) {
           const cleared: Deferral = { ...linkedDef, id: newId('df'), supersedesId: linkedDef.id, status: 'CLEARED' } as Deferral;

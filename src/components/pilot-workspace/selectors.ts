@@ -16,10 +16,12 @@ function firstDeparture(t: TripRecord): number {
   return times.length ? Math.min(...times) : Number.MAX_SAFE_INTEGER;
 }
 
-/** Trips a pilot should see in their hub: active status, soonest departure first. */
+/** Trips a pilot should see in their hub: active status, soonest departure first. Volume-seed
+ *  trips are board-scale filler for the scheduler surfaces, not the pilot's flights — excluded
+ *  here (stands in for crew assignment until trips carry a crew list). */
 export function selectPilotFlights(trips: TripRecord[], _nowUtc: string): TripRecord[] {
   return trips
-    .filter((t) => ACTIVE_STATUSES.has(t.status))
+    .filter((t) => ACTIVE_STATUSES.has(t.status) && t.createdBy !== 'volume-seed')
     .sort((a, b) => firstDeparture(a) - firstDeparture(b));
 }
 

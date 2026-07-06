@@ -130,6 +130,14 @@ export function parseTemplate(raw: unknown): ChecklistTemplate {
   const status = reqStr(raw, 'status', 'template');
   if (!['draft', 'published', 'archived'].includes(status)) throw new Error(`template: invalid status '${status}'`);
   if (!Array.isArray(raw.taskDefinitions)) throw new Error('template: taskDefinitions not an array');
+  const taskDefinitions = raw.taskDefinitions.map(parseTaskDef);
+  // Duplicate ids collide instance ids downstream (deterministic seed = template:version:defId:trip)
+  // and would silently drop a checklist item on save — reject at the gate.
+  const seenIds = new Set<string>();
+  for (const d of taskDefinitions) {
+    if (seenIds.has(d.id)) throw new Error(`template: duplicate task id '${d.id}'`);
+    seenIds.add(d.id);
+  }
   return {
     id: reqStr(raw, 'id', 'template'),
     name: reqStr(raw, 'name', 'template'),
@@ -138,6 +146,6 @@ export function parseTemplate(raw: unknown): ChecklistTemplate {
     version: reqNum(raw, 'version', 'template'),
     status: status as ChecklistTemplate['status'],
     effectiveFrom: reqStr(raw, 'effectiveFrom', 'template'),
-    taskDefinitions: raw.taskDefinitions.map(parseTaskDef),
+    taskDefinitions,
   };
 }

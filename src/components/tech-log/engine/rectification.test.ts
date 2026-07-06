@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createRectificationCard } from './rectification';
+import { createRectificationCard, rectificationClosePush } from './rectification';
+import { discrepancyTypeFor } from '../integration/pushMapping';
 import type { Defect } from '../types';
 
 const defect = (over: Partial<Defect> = {}): Defect => ({
@@ -31,5 +32,23 @@ describe('createRectificationCard', () => {
     expect(c.steps).toHaveLength(1);
     expect(c.steps[0].text).toContain('Pack 1 fault');
     expect(c.steps[0].done).toBe(false);
+  });
+});
+
+describe('rectificationClosePush', () => {
+  it('closes a WATCHLISTED defect in the CAMP watch lane (DEFERRED-WATCHLIST), not NON-DEFERRED', () => {
+    const push = rectificationClosePush(defect({ status: 'WATCHLISTED' }), 'def-2', { technician: 'Sam Mechanic' });
+    expect(push.defectStatus).toBe('WATCHLISTED');
+    expect(discrepancyTypeFor(push.entityType, push.defectStatus)).toBe('DEFERRED-WATCHLIST');
+  });
+
+  it('closes an ordinary OPEN defect NON-DEFERRED, superseding the parent', () => {
+    const push = rectificationClosePush(defect(), 'def-2', { technician: 'Sam Mechanic', riiItem: true, inspector: 'Pat Inspector' });
+    expect(discrepancyTypeFor(push.entityType, push.defectStatus)).toBe('NON-DEFERRED');
+    expect(push.intent).toBe('CLOSE');
+    expect(push.supersedesEntityId).toBe('def-1');
+    expect(push.entityId).toBe('def-2');
+    expect(push.riiItem).toBe(true);
+    expect(push.inspector).toBe('Pat Inspector');
   });
 });

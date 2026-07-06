@@ -22,7 +22,8 @@ export function deriveTripStatus(t: TripStatusInput, nowMs: number): TripDerived
   const daysUntilDeparture = Math.floor((depMs - nowMs) / DAY_MS);
 
   if (t.readinessScore === 100) {
-    const inFlightWindow = daysUntilDeparture <= 0 && nowMs < depMs + t.durationDays * DAY_MS;
+    // Airborne only from actual departure — a same-day trip still on the ground is 'ready'.
+    const inFlightWindow = nowMs >= depMs && nowMs < depMs + t.durationDays * DAY_MS;
     return inFlightWindow ? 'airborne' : 'ready';
   }
 

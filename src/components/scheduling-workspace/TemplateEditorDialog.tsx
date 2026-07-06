@@ -12,7 +12,7 @@ import { useSchedulingWorkspace } from './SchedulingWorkspaceContext';
 import { parseTemplate } from '../../scheduling/store';
 import type { ChecklistTemplate, DueRule, TaskDefinition, Weekday } from '../../scheduling/engine';
 import {
-  DUE_RULE_KINDS, LEAF_KINDS, defaultDueRule, slugifyTaskId, bumpedTemplatePayload,
+  DUE_RULE_KINDS, LEAF_KINDS, defaultDueRule, slugifyTaskId, bumpedTemplatePayload, publishTaskIds,
   conditionToBuilder, builderToCondition, type ConditionBuilder, type LeafCondition, type LeafKind,
 } from './templateEditor';
 
@@ -306,13 +306,10 @@ export function TemplateEditorDialog({
     if (tasks.some(t => !t.title.trim())) return setError('Every item needs a title.');
     setSaving(true);
     try {
-      const usedIds = new Set<string>();
-      const defs = tasks.map((t, i) => {
-        // New tasks get an id from their final title; existing ids are stable across versions.
-        const id = t.id.startsWith('new-task') || !t.id ? slugifyTaskId(t.title, usedIds) : t.id;
-        usedIds.add(id);
-        return defFromDraft({ ...t, id }, i + 1);
-      });
+      // New tasks get an id from their final title; existing ids are stable across versions,
+      // and are reserved up front so a reordered new task can never collide with one.
+      const ids = publishTaskIds(tasks);
+      const defs = tasks.map((t, i) => defFromDraft({ ...t, id: ids[i] }, i + 1));
       const next = parseTemplate(bumpedTemplatePayload(template, defs));
       await store.saveTemplate(next);
       bump();

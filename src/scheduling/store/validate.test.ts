@@ -54,6 +54,11 @@ describe('parseTemplate', () => {
   it('T3: rejects a recurring template with a tripType scope', () => {
     expect(() => parseTemplate({ ...good, triggerType: 'recurring', scope: 'domestic' })).toThrow(/scope/i);
   });
+  it('rejects duplicate task ids (a duplicate silently drops a checklist item downstream)', () => {
+    const dupe = { ...good.taskDefinitions[0], title: 'same id, different title' };
+    expect(() => parseTemplate({ ...good, taskDefinitions: [good.taskDefinitions[0], dupe] })).toThrow(/duplicate/i);
+  });
+
   it('rejects a task def whose dueRule is invalid', () => {
     expect(() => parseTemplate({ ...good, taskDefinitions: [{ ...good.taskDefinitions[0], dueRule: { kind: 'bogus' } }] })).toThrow(/dueRule/i);
   });
