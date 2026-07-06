@@ -103,4 +103,24 @@ describe('buildUpcomingBoard', () => {
     const m = buildUpcomingBoard([a, b], NOW, 30);
     expect(m.lanes['this-week'].map(u => u.trip.id)).toEqual([b.id, a.id]);
   });
+
+  it('assigns a fixed-due-date trip to the same lane regardless of time-of-day', () => {
+    const early = new Date(2026, 6, 3, 0, 5, 0, 0).getTime();   // 00:05
+    const late = new Date(2026, 6, 3, 23, 55, 0, 0).getTime();  // 23:55, same calendar day
+    const dueFixed = new Date(2026, 6, 10, 18, 0, 0, 0).toISOString(); // 6pm on day+7
+    const laneOf = (nowMs: number) => {
+      const m = buildUpcomingBoard([trip(20, [task({ dueAtUtc: dueFixed })])], nowMs, 30);
+      return (['this-week', 'next-week', 'later'] as const).find(l => m.lanes[l].length > 0);
+    };
+    expect(laneOf(early)).toBe('this-week');
+    expect(laneOf(late)).toBe('this-week');
+    expect(laneOf(early)).toBe(laneOf(late));
+  });
+
+  it('a trip with both overdue and upcoming tasks appears in the strip and a lane', () => {
+    const t = trip(15, [task({ dueAtUtc: dueIn(-1) }), task({ dueAtUtc: dueIn(3) })]);
+    const m = buildUpcomingBoard([t], NOW, 30);
+    expect(m.overdue.map(o => o.tripId)).toContain(t.id);
+    expect(m.lanes['this-week'].map(u => u.trip.id)).toContain(t.id);
+  });
 });

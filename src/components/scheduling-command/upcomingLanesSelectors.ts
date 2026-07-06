@@ -66,9 +66,9 @@ export function buildUpcomingBoard(
   const startOfTodayMs = startOfToday.getTime();
   const endOfTodayMs = startOfTodayMs + DAY_MS - 1;
 
-  const thisWeekEndMs = nowMs + UPCOMING_WINDOWS.thisWeekDays * DAY_MS;
-  const nextWeekEndMs = nowMs + UPCOMING_WINDOWS.nextWeekDays * DAY_MS;
-  const laterEndMs = nowMs + Math.min(UPCOMING_WINDOWS.laterDays, horizonDays) * DAY_MS;
+  const thisWeekEndMs = endOfTodayMs + UPCOMING_WINDOWS.thisWeekDays * DAY_MS;
+  const nextWeekEndMs = endOfTodayMs + UPCOMING_WINDOWS.nextWeekDays * DAY_MS;
+  const laterEndMs = endOfTodayMs + Math.min(UPCOMING_WINDOWS.laterDays, horizonDays) * DAY_MS;
 
   const laneFor = (dueMs: number): UpcomingLane | null => {
     if (dueMs > laterEndMs) return null;
