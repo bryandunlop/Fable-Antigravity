@@ -9,7 +9,6 @@ import CommandPalette from './CommandPalette';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import {
-  Plane,
   Settings,
   FileText,
   LogOut,
@@ -94,11 +93,12 @@ const DraggableNavigationGroup = ({
     const isActive = isActiveEntry(item);
     return (
       <SidebarMenuItem key={`${item.domain}:${item.label}`}>
-        <SidebarMenuButton asChild isActive={isActive} className={`relative overflow-hidden group transition-all duration-300 ${isActive ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-muted-foreground bg-transparent'}`}>
+        <SidebarMenuButton asChild isActive={isActive} className={`relative overflow-hidden group transition-colors duration-200 ${isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' : 'text-sidebar-foreground bg-transparent hover:bg-white/10 hover:text-white'}`}>
           <Link to={item.href ?? item.path} className="flex items-center gap-3 w-full relative">
-            {!isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-muted-foreground/50 rounded-r-full transition-all duration-200 group-hover:h-3/4" />}
-            <Icon className={`w-4 h-4 z-10 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
-            <span className={`z-10 transition-colors duration-300 relative ${isActive ? '' : 'group-hover:text-foreground'}`}>{item.label}</span>
+            {isActive && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gfo-sunrise" />}
+            {!isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-white/40 rounded-r-full transition-all duration-200 group-hover:h-3/4" />}
+            <Icon className={`w-4 h-4 z-10 ${isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground group-hover:text-white'}`} />
+            <span className="z-10 relative">{item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -116,18 +116,20 @@ const DraggableNavigationGroup = ({
       className={isCustomizing ? 'cursor-move' : ''}
     >
       <SidebarGroup>
-        <SidebarGroupLabel asChild>
+        {/* Typography lives on the Label's className (twMerge beats the base text color);
+            the child button only carries layout. */}
+        <SidebarGroupLabel asChild className="text-[10px] font-bold uppercase tracking-[0.16em] text-gfo-sunrise">
           <button
             type="button"
             onClick={() => onToggleCollapse(group.label)}
             className="flex w-full items-center gap-2 cursor-pointer"
             aria-expanded={!isCollapsed}
           >
-            {isCustomizing && <GripVertical className="w-4 h-4 text-muted-foreground" />}
+            {isCustomizing && <GripVertical className="w-4 h-4 text-gfo-sunrise/70" />}
             <span className="flex-1 text-left">{group.label}</span>
             {isCollapsed
-              ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-              : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+              ? <ChevronRight className="w-3.5 h-3.5 text-sidebar-foreground/70" />
+              : <ChevronDown className="w-3.5 h-3.5 text-sidebar-foreground/70" />}
           </button>
         </SidebarGroupLabel>
         {!isCollapsed && (
@@ -140,11 +142,11 @@ const DraggableNavigationGroup = ({
                   <SidebarMenuItem key={`${group.label}:more`}>
                     <SidebarMenuButton
                       onClick={() => setMoreOpen((o) => !o)}
-                      className="text-muted-foreground bg-transparent"
+                      className="text-sidebar-foreground bg-transparent transition-colors duration-200 hover:bg-white/10 hover:text-white"
                     >
                       {moreOpen
-                        ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                        ? <ChevronDown className="w-4 h-4 text-sidebar-foreground/70" />
+                        : <ChevronRight className="w-4 h-4 text-sidebar-foreground/70" />}
                       <span>{moreOpen ? 'Less' : `More (${group.moreItems.length})`}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -316,17 +318,12 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <Sidebar className="border-r border-border/50 bg-card/90 backdrop-blur-xl">
+        <Sidebar className="border-r border-sidebar-border">
           <SidebarHeader className="border-b border-white/5 p-4">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-                  <Plane className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <div>
-                  <h2 className="font-bold text-foreground tracking-wide text-sm">P&G Flight Ops</h2>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{getRoleDisplayName(userRole)}</p>
-                </div>
+              <div className="flex flex-col gap-1.5">
+                <h2 className="text-base font-bold tracking-tight text-white">Global Flight Operations</h2>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-gfo-sunrise font-bold">{getRoleDisplayName(userRole)}</p>
               </div>
               <div className="md:hidden">
                 <ThemeToggle />
@@ -339,7 +336,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
                 variant={isCustomizing ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setIsCustomizing(!isCustomizing)}
-                className="w-full text-xs justify-start text-slate-400 hover:text-white hover:bg-white/5"
+                className="w-full text-xs justify-start text-sidebar-foreground hover:text-white hover:bg-white/10"
               >
                 <Settings className="w-3 h-3 mr-2" />
                 {isCustomizing ? 'Done Customizing' : 'Customize Order'}
@@ -350,7 +347,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
                   variant="ghost"
                   size="sm"
                   onClick={resetToDefault}
-                  className="w-full text-xs justify-start text-slate-400 hover:text-white hover:bg-white/5"
+                  className="w-full text-xs justify-start text-sidebar-foreground hover:text-white hover:bg-white/10"
                 >
                   <RotateCcw className="w-3 h-3 mr-2" />
                   Reset to Default
@@ -361,8 +358,8 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
           <SidebarContent className="px-2 py-2">
             {isCustomizing && (
-              <div className="p-3 mb-2 bg-[var(--color-pg-blue)]/20 border border-[var(--color-pg-blue)]/30 rounded-lg">
-                <p className="text-xs text-[var(--color-pg-cyan)] flex items-center gap-2">
+              <div className="p-3 mb-2 bg-white/10 border border-white/20 rounded-lg">
+                <p className="text-xs text-gfo-daylight-light flex items-center gap-2">
                   <GripVertical className="w-3 h-3" />
                   Drag sections to reorder
                 </p>
@@ -387,19 +384,19 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
         <div className="flex-1 flex flex-col relative min-w-0">
           {/* Enhanced top bar with notification center */}
-          <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-2xl px-6 py-4 flex items-center justify-between">
+          <header className="sticky top-0 z-40 border-b border-border bg-card px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Large, prominent sidebar toggle */}
               <div className="flex items-center gap-3">
-                <SidebarTrigger className="h-10 w-10 p-0 border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground text-foreground transition-all duration-200 shadow-sm rounded-lg">
+                <SidebarTrigger className="h-10 w-10 p-0 border border-border bg-card hover:bg-accent hover:text-accent-foreground text-foreground transition-all duration-200 shadow-sm rounded-lg">
                   <PanelLeft className="h-5 w-5" />
                   <span className="sr-only">Toggle navigation menu</span>
                 </SidebarTrigger>
               </div>
 
               {/* Breadcrumbs / Page Title Placeholder */}
-              <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="text-foreground font-medium">{getRoleDisplayName(userRole)} Workspace</span>
+              <div className="hidden md:flex flex-col">
+                <span className="gfo-eyebrow">{getRoleDisplayName(userRole)} Workspace</span>
               </div>
             </div>
 
@@ -409,7 +406,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               <Button
                 variant="ghost"
                 onClick={() => setIsCommandPaletteOpen(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-background/50 border border-border/50 rounded-full text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-all w-64 justify-between group"
+                className="flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-full text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-all w-64 justify-between group"
               >
                 <div className="flex items-center gap-2">
                   <Search className="w-4 h-4 group-hover:text-primary transition-colors" />
@@ -429,7 +426,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               <Button
                 variant="ghost"
                 onClick={onLogout}
-                className="flex items-center gap-2 px-3 py-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors rounded-full"
+                className="flex items-center gap-2 px-3 py-2 text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors rounded-full"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Logout</span>

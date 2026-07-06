@@ -1,4 +1,5 @@
-import type { IntegrateMode } from './campTaxonomy';
+import type { DiscrepancyType, IntegrateMode } from './campTaxonomy';
+import type { DefectStatus } from '../types';
 
 // How a myGFO mutation maps onto CAMP IntegrateDiscrepancies (modes INSERT/EDIT/UPDATE):
 //   CREATE  → INSERT (new discrepancy, Open)
@@ -27,4 +28,14 @@ export function decidePushMode(intent: PushIntent, parentRef?: string): PushMode
   return parentRef
     ? { mode: 'UPDATE', status: 'Closed', existingDiscrepancyId: parentRef }
     : { mode: 'INSERT', status: 'Closed' };
+}
+
+// Deferral → MEL; WATCHLISTED defect → DEFERRED-WATCHLIST (the CAMP watch lane); every other
+// defect → NON-DEFERRED. The status param is optional so pre-watchlist callers are unchanged.
+export function discrepancyTypeFor(
+  entityType: 'DEFECT' | 'DEFERRAL',
+  defectStatus?: DefectStatus,
+): DiscrepancyType {
+  if (entityType === 'DEFERRAL') return 'MEL';
+  return defectStatus === 'WATCHLISTED' ? 'DEFERRED-WATCHLIST' : 'NON-DEFERRED';
 }

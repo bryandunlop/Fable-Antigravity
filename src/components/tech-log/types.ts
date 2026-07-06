@@ -17,7 +17,7 @@ export interface Aircraft {
 }
 
 export type DefectSource = 'PIREP' | 'MAREP' | 'CABIN' | 'STRUCTURAL' | 'NEF';
-export type DefectStatus = 'OPEN' | 'DEFERRED' | 'RECTIFIED' | 'CLOSED';
+export type DefectStatus = 'OPEN' | 'DEFERRED' | 'RECTIFIED' | 'CLOSED' | 'WATCHLISTED';
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
 /** An attachment is part of the signed payload — its SHA-256 is folded into the content hash (AC 120-78B). */
@@ -186,6 +186,7 @@ export interface WorkCard {
   headerStatusCode: number;    // CAMP WO header status ladder (0=Complied With … 6=Planned)
   scheduled: boolean;          // scheduled task vs corrective (defect-driven)
   linkedDefectId?: string;
+  forecastRef?: string;        // CAMP due-list item this card complies with (CampForecastItem.ref)
   riiRequired: boolean;
   createdAtUtc: string;
   completedReleaseId?: string; // MaintenanceRelease produced on completion

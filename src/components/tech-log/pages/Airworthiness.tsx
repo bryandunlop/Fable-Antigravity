@@ -10,16 +10,16 @@ import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 
-type View = 'forecast' | 'times' | 'adsb' | 'workorders';
+// The 'forecast' view moved to ComingDue.tsx — the cross-fleet board merging the CAMP
+// due list with myGFO's MEL repair clocks and recurring checks (same route).
+type View = 'times' | 'adsb' | 'workorders';
 const TITLES: Record<View, { title: string; subtitle: string }> = {
-  forecast: { title: 'Coming Due — Maintenance Forecast', subtitle: "Upcoming inspections, AD/SB and components from CAMP (≤3 months). CAMP is the system of record — this is a read." },
   times: { title: 'Aircraft Times', subtitle: 'Airframe / engine / APU times from CAMP (stored as minutes, shown in hours).' },
   adsb: { title: 'AD / SB Compliance', subtitle: 'Airworthiness directives & service bulletins from CAMP.' },
   workorders: { title: 'Work Orders', subtitle: 'CAMP work orders pulled into myGFO, by status.' },
 };
 
 const DAY = 86400000;
-const CAT_VARIANT: Record<string, 'destructive' | 'secondary' | 'outline'> = { AD: 'destructive', SB: 'outline', INSPECTION: 'secondary', COMPONENT: 'outline' };
 
 export default function Airworthiness({ view }: { view: View }) {
   const { state } = useTechLog();
@@ -31,7 +31,6 @@ export default function Airworthiness({ view }: { view: View }) {
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
   const now = Date.now();
 
-  const forecast = useMemo(() => (ac ? integration.readForecast(ac.id) : []), [ac]);
   const times = useMemo(() => (ac ? integration.readComponentTimes(ac.id) : null), [ac]);
   const adsb = useMemo(() => (ac ? integration.readAdSb(ac.id) : { items: [], unconfirmed: true, openQuestion: '' }), [ac]);
   const workOrders = useMemo(() => state.workCards.slice().sort((a, b) => a.headerStatusCode - b.headerStatusCode), [state.workCards]);
@@ -60,36 +59,6 @@ export default function Airworthiness({ view }: { view: View }) {
           <Cloud className="h-4 w-4" /> Read-only view of <strong>CAMP</strong> data (sandbox/mock in this demo). myGFO does not author these records — it presents CAMP's data through a cleaner UI and pushes defects/utilization back.
         </CardContent>
       </Card>
-
-      {/* ===== FORECAST ===== */}
-      {view === 'forecast' && ac && (
-        <div className="space-y-2">
-          {forecast.slice().sort((a, b) => (a.dueDateUtc ?? '').localeCompare(b.dueDateUtc ?? '')).map((it, i) => {
-            const days = it.dueDateUtc ? Math.floor((new Date(it.dueDateUtc).getTime() - now) / DAY) : null;
-            const hrsLeft = it.dueHours != null ? Math.round((it.dueHours - ac.airframeTotalHours) * 10) / 10 : null;
-            const urgent = (days != null && days <= 7) || (hrsLeft != null && hrsLeft <= 40);
-            return (
-              <Card key={i} className={urgent ? 'border-[var(--gfo-warning,#F1B434)]/50' : ''}>
-                <CardContent className="flex flex-col gap-2 p-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={CAT_VARIANT[it.category]}>{it.category}</Badge>
-                      <Badge variant="outline">ATA {it.ata}</Badge>
-                      <span className="font-medium">{it.description}</span>
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right text-sm">
-                    {it.dueDateUtc && <div className={urgent ? 'font-medium text-[var(--gfo-warning,#F1B434)]' : 'text-muted-foreground'}>{new Date(it.dueDateUtc).toLocaleDateString()} · {days != null && days >= 0 ? `${days}d` : 'due'}</div>}
-                    {it.dueHours != null && <div className="text-xs text-muted-foreground">{it.dueHours}h{hrsLeft != null ? ` · ${hrsLeft}h left` : ''}</div>}
-                    {it.dueCycles != null && <div className="text-xs text-muted-foreground">{it.dueCycles} cyc</div>}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-          {forecast.length === 0 && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Nothing due in the next 3 months.</CardContent></Card>}
-        </div>
-      )}
 
       {/* ===== TIMES ===== */}
       {view === 'times' && times && (

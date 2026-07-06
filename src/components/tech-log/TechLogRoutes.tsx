@@ -13,6 +13,7 @@ import WorkCards from './pages/WorkCards';
 import WorkCardDetail from './pages/WorkCardDetail';
 import Analytics from './pages/Analytics';
 import Airworthiness from './pages/Airworthiness';
+import ComingDue from './pages/ComingDue';
 import IntermittentFaults from './pages/IntermittentFaults';
 import Trips from './pages/Trips';
 import TripWorkspace from './pages/TripWorkspace';
@@ -44,7 +45,7 @@ export default function TechLogRoutes({ userRole }: { userRole?: string }) {
         <Route path="work-cards/:id" element={<WorkCardDetail />} />
         <Route path="mel" element={<MelBrowser />} />
         <Route path="analytics" element={<Analytics />} />
-        <Route path="airworthiness/forecast" element={<Airworthiness view="forecast" />} />
+        <Route path="airworthiness/forecast" element={<ComingDue />} />
         <Route path="airworthiness/times" element={<Airworthiness view="times" />} />
         <Route path="airworthiness/adsb" element={<Airworthiness view="adsb" />} />
         <Route path="airworthiness/workorders" element={<Airworthiness view="workorders" />} />

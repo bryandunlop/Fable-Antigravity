@@ -42,13 +42,14 @@
 
     --radius: 0.625rem;
 
-    --sidebar: #ffffff;
-    --sidebar-foreground: #4A4A4A;
-    --sidebar-primary: #142D7E;
+    /* Chrome is brand-constant: Midnight sidebar in BOTH modes (only the canvas flips). */
+    --sidebar: #142D7E;
+    --sidebar-foreground: rgba(255, 255, 255, 0.78);
+    --sidebar-primary: #0096FC;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #E6F4FF;
+    --sidebar-accent: #ffffff;
     --sidebar-accent-foreground: #142D7E;
-    --sidebar-border: #E5E7EB;
+    --sidebar-border: rgba(255, 255, 255, 0.14);
     --sidebar-ring: #0096FC;
 
     --chart-1: #142D7E;

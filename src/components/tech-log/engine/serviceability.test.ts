@@ -56,4 +56,17 @@ describe('serviceability §14.2', () => {
     const r = deriveServiceability('ac1', { ...base, defects: [defect({ airworthinessAffecting: null })], deferrals: [] }, NOW);
     expect(r.status).toBe('RED');
   });
+  it('GREEN: a WATCHLISTED non-airworthiness defect is serviceability-neutral', () => {
+    const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'WATCHLISTED', airworthinessAffecting: false })], deferrals: [] }, NOW);
+    expect(r.status).toBe('GREEN'); expect(r.governingRule).toBe(5);
+  });
+  it('AMBER: a watch item never drives status past an active deferral', () => {
+    const watch = defect({ id: 'd2', status: 'WATCHLISTED', airworthinessAffecting: false });
+    const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'DEFERRED' }), watch], deferrals: [deferral({ status: 'ACTIVE' })] }, NOW);
+    expect(r.status).toBe('AMBER'); expect(r.drivingDeferralId).toBe('df1');
+  });
+  it('RED defense-in-depth: a contract-violating WATCHLISTED row still marked airworthiness-affecting grounds', () => {
+    const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'WATCHLISTED', airworthinessAffecting: true })], deferrals: [] }, NOW);
+    expect(r.status).toBe('RED'); expect(r.governingRule).toBe(1);
+  });
 });

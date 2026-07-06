@@ -433,7 +433,7 @@ export default function AircraftDetail() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">ATA {d.ataChapter}</Badge>
-                      <Badge variant={d.status === 'OPEN' ? 'destructive' : d.status === 'DEFERRED' ? 'secondary' : 'outline'}>{d.status}</Badge>
+                      <Badge variant={d.status === 'OPEN' ? 'destructive' : d.status === 'DEFERRED' || d.status === 'WATCHLISTED' ? 'secondary' : 'outline'}>{d.status === 'WATCHLISTED' ? 'WATCH' : d.status}</Badge>
                       <span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span>
                     </div>
                     <p className="mt-1 text-sm">{d.description}</p>

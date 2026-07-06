@@ -82,7 +82,7 @@ import GRATFormBuilder from './components/GRATFormBuilder';
 import ProceduralBulletins from './components/ProceduralBulletins';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 import UnifiedTripWorkspace from './components/experimental/UnifiedTripWorkspace';
-import SchedulingCommandCenter from './components/experimental/SchedulingCommandCenter';
+import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
 
 import ForeFlightSyncProvider from './components/ForeFlightSyncProvider';
 import ForeFlightTestUpload from './components/ForeFlightTestUpload';
@@ -110,7 +110,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import ElectronicLogbook from './components/ElectronicLogbook';
 import { MaintenanceWorkflowProvider } from './components/maintenance-workflow/context/MaintenanceWorkflowContext';
 import { SchedulingWorkspaceProvider } from './components/scheduling-workspace/SchedulingWorkspaceContext';
-import SchedulingWorkspace from './components/scheduling-workspace/SchedulingWorkspace';
 import { TechLogProvider } from './components/tech-log/TechLogContext';
 import PilotWorkspace from './components/pilot-workspace/PilotWorkspace';
 import AviaSyncDashboard from './components/maintenance-workflow/AviaSyncDashboard';
@@ -453,15 +452,17 @@ export default function App() {
                                   }
                                 />
                                 <Route
-                                  path="/scheduling-workspace"
+                                  path="/scheduling-command"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin']}>
                                       <SchedulingWorkspaceProvider>
-                                        <SchedulingWorkspace userRole={userRole} additionalRoles={additionalRoles} />
+                                        <SchedulingCommandCenter userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }
                                 />
+                                {/* Retired: the tabbed workspace folded into the command-center hub. */}
+                                <Route path="/scheduling-workspace" element={<Navigate to="/scheduling-command" replace />} />
                                 <Route
                                   path="/pilot-workspace"
                                   element={
@@ -557,7 +558,7 @@ export default function App() {
                                 <Route path="/maintenance-workflow/analytics" element={
                                   <MaintenanceWorkflowProvider><MWPredictiveAnalytics /></MaintenanceWorkflowProvider>
                                 } />
-                                <Route path="/experimental/scheduling-command" element={<SchedulingCommandCenter />} />
+                                <Route path="/experimental/scheduling-command" element={<Navigate to="/scheduling-command" replace />} />
                                 <Route path="/experimental/unified-trip" element={<UnifiedTripWorkspace />} />
                                 {/* Real 404 — broken links are visible bugs, not silent redirects */}
                                 <Route path="*" element={<NotFound />} />

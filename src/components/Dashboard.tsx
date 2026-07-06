@@ -6,6 +6,7 @@ import DutyRosterWidget from './DutyRosterWidget';
 import WeatherWidget from './WeatherWidget';
 import { ExternalLink, Edit2, Plus, Trash2, X, Check } from 'lucide-react';
 import { useState } from 'react';
+import { GfoPageHeader } from './gfo';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 
@@ -63,24 +64,23 @@ export default function Dashboard({ userRole }: DashboardProps) {
   return (
     <div className="p-6 max-w-[1600px] mx-auto space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">{getCurrentGreeting()}</h1>
-          <p className="text-muted-foreground mt-1">
-            Start your day with an overview of operations.
-          </p>
-        </div>
-        <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs text-muted-foreground">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </div>
-      </div>
+      <GfoPageHeader
+        eyebrow="Global Flight Operations"
+        title={getCurrentGreeting()}
+        description="Start your day with an overview of operations."
+        actions={
+          <span className="gfo-eyebrow text-muted-foreground">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </span>
+        }
+      />
 
       {/* Persistent Weather Widget */}
       <WeatherWidget />
 
       {/* Quick Links Card */}
-      <div className="glass-premium rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-white/5 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center justify-between w-full md:w-auto gap-4 md:border-r border-white/10 md:pr-4">
+      <div className="glass-premium rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center justify-between w-full md:w-auto gap-4 md:border-r border-border md:pr-4">
           <div className="flex items-center gap-2 text-muted-foreground shrink-0">
             <ExternalLink className="w-4 h-4" />
             <span className="text-sm font-semibold tracking-wide uppercase">Quick Links</span>
@@ -101,23 +101,23 @@ export default function Dashboard({ userRole }: DashboardProps) {
           {links.map(link => (
             <div key={link.id} className="relative shrink-0 group flex items-center">
               {editingId === link.id ? (
-                <div className="flex items-center gap-1 bg-background/50 backdrop-blur-md border border-white/20 rounded-xl p-1 z-10 shadow-xl">
+                <div className="flex items-center gap-1 bg-muted border border-border rounded-lg p-1 z-10 shadow-xl">
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     placeholder="Name"
-                    className="h-7 w-24 text-xs bg-transparent border-none focus-visible:ring-1 focus-visible:ring-white/20 px-2"
+                    className="h-7 w-24 text-xs bg-transparent border-none focus-visible:ring-1 focus-visible:ring-ring px-2"
                   />
                   <Input
                     value={editUrl}
                     onChange={(e) => setEditUrl(e.target.value)}
                     placeholder="URL"
-                    className="h-7 w-40 text-xs bg-transparent border-none focus-visible:ring-1 focus-visible:ring-white/20 px-2"
+                    className="h-7 w-40 text-xs bg-transparent border-none focus-visible:ring-1 focus-visible:ring-ring px-2"
                   />
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-emerald-400 hover:text-emerald-300 hover:bg-white/10" onClick={saveEdit}>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-gfo-success hover:text-gfo-success hover:bg-muted" onClick={saveEdit}>
                     <Check className="w-3 h-3" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-white/10" onClick={() => setEditingId(null)}>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => setEditingId(null)}>
                     <X className="w-3 h-3" />
                   </Button>
                 </div>
@@ -127,23 +127,23 @@ export default function Dashboard({ userRole }: DashboardProps) {
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`text-sm px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-foreground transition-all flex items-center gap-2 ${isEditingLinks ? 'rounded-r-none border-r-0' : ''}`}
+                    className={`text-sm px-4 py-2 rounded-lg bg-muted border border-border hover:bg-secondary hover:border-primary/30 text-foreground transition-all flex items-center gap-2 ${isEditingLinks ? 'rounded-r-none border-r-0' : ''}`}
                     onClick={(e) => isEditingLinks && e.preventDefault()}
                   >
                     {link.name}
                     {!isEditingLinks && <ExternalLink className="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors opacity-50 group-hover:opacity-100" />}
                   </a>
                   {isEditingLinks && (
-                    <div className="flex items-center h-full border border-white/10 border-l-0 rounded-r-xl bg-white/5 overflow-hidden">
+                    <div className="flex items-center h-full border border-border border-l-0 rounded-r-lg bg-muted overflow-hidden">
                       <button
                         onClick={() => startEditing(link.id, link.name, link.url)}
-                        className="px-2 h-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors border-r border-white/10"
+                        className="px-2 h-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors border-r border-border"
                       >
                         <Edit2 className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => deleteLink(link.id)}
-                        className="px-2 h-full hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
+                        className="px-2 h-full hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition-colors"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -158,7 +158,7 @@ export default function Dashboard({ userRole }: DashboardProps) {
               variant="outline"
               size="sm"
               onClick={handleAddNewLink}
-              className="h-[38px] rounded-xl border-dashed border-white/20 bg-transparent hover:bg-white/5 text-muted-foreground hover:text-foreground shrink-0 gap-1"
+              className="h-[38px] rounded-lg border-dashed border-border bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 gap-1"
             >
               <Plus className="w-4 h-4" /> Add Link
             </Button>
@@ -170,12 +170,12 @@ export default function Dashboard({ userRole }: DashboardProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-200px)] min-h-[600px]">
 
         {/* Top Left: Aircraft Status */}
-        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-blue transition-all duration-500 opacity-0 animate-slide-up [animation-delay:100ms]">
+        <div className="glass-premium rounded-lg p-6 flex flex-col overflow-hidden relative group transition-all duration-500 opacity-0 animate-slide-up [animation-delay:100ms]">
           <FleetStatusWidget compact={true} showDetailsLink={true} transparent={true} className="flex-1" />
         </div>
 
         {/* Top Right: NAS Impact */}
-        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-orange transition-all duration-500 opacity-0 animate-slide-up [animation-delay:200ms]">
+        <div className="glass-premium rounded-lg p-6 flex flex-col overflow-hidden relative group transition-all duration-500 opacity-0 animate-slide-up [animation-delay:200ms]">
           {/* Padding adjustment to match others since NAS widget has internal titles */}
           <div className="h-full">
             <NASImpactWidget compact={true} transparent={true} />
@@ -183,12 +183,12 @@ export default function Dashboard({ userRole }: DashboardProps) {
         </div>
 
         {/* Bottom Left: Flights Today */}
-        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-green transition-all duration-500 opacity-0 animate-slide-up [animation-delay:300ms]">
+        <div className="glass-premium rounded-lg p-6 flex flex-col overflow-hidden relative group transition-all duration-500 opacity-0 animate-slide-up [animation-delay:300ms]">
           <DailyFlightsWidget />
         </div>
 
         {/* Bottom Right: Duty Roster */}
-        <div className="glass-premium rounded-2xl p-6 flex flex-col overflow-hidden relative group hover:shadow-glow-purple transition-all duration-500 opacity-0 animate-slide-up [animation-delay:400ms]">
+        <div className="glass-premium rounded-lg p-6 flex flex-col overflow-hidden relative group transition-all duration-500 opacity-0 animate-slide-up [animation-delay:400ms]">
           <DutyRosterWidget />
         </div>
 

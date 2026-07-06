@@ -37,6 +37,10 @@ export const INTENT = {
     'I, as PIC, have reviewed this flight briefing — airworthiness status, active MEL deferrals and restrictions, open items, and fuel — and accept the aircraft for the intended flight.',
   POSTFLIGHT:
     'I, as maintenance, certify the postflight check below was accomplished, the aircraft is received back into maintenance custody, and any open crew squawks have been gathered for action.',
+  WATCHLIST:
+    'I have assessed this defect as not affecting airworthiness (cabin/NEF item) and place it on the maintenance watch list for tracking. No MEL deferral is required and dispatch is not restricted.',
+  WATCH_ESCALATION:
+    'I am escalating this watch-list item: it is reassessed as airworthiness-affecting and returns to open grounding status pending deferral or rectification.',
 } as const;
 
 // Standing maintenance preflight checklist (maintenance ticks these, then releases the briefing).

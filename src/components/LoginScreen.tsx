@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Plane, User, Shield, Briefcase, Wrench, Users } from 'lucide-react';
+import { User, Shield, Briefcase, Wrench, Users } from 'lucide-react';
 
 import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES } from '../lib/mockUsers';
 
@@ -25,16 +25,14 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md">
+    <div className="relative min-h-screen overflow-hidden flex flex-col items-center justify-center bg-gfo-midnight p-4">
+      {/* Brand circle motif — opaque, bleeding off the edges, non-overlapping */}
+      <div aria-hidden="true" className="absolute -left-40 -bottom-48 h-[28rem] w-[28rem] rounded-full bg-gfo-daylight" />
+      <div aria-hidden="true" className="absolute -right-28 -top-32 h-72 w-72 rounded-full bg-gfo-sunrise" />
+      <Card className="relative z-10 w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary rounded-full">
-              <Plane className="w-8 h-8 text-primary-foreground" />
-            </div>
-          </div>
-          <CardTitle>Flight Operations</CardTitle>
-          <CardDescription>Sign in to access your dashboard</CardDescription>
+          <CardTitle>Global Flight Operations</CardTitle>
+          <CardDescription>Sign in to access your dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -53,13 +51,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                       {roles.map(role => (
                         <SelectItem key={role.value} value={role.value} className="py-3">
                           <div className="flex items-center gap-3">
-                            <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${
-                              category === 'Flight Operations' ? 'bg-blue-500 shadow-blue-500/50' :
-                              category === 'Cabin' ? 'bg-cyan-500 shadow-cyan-500/50' :
-                              category === 'Maintenance' ? 'bg-orange-500 shadow-orange-500/50' :
-                              category === 'Safety' ? 'bg-red-500 shadow-red-500/50' :
-                              'bg-purple-500 shadow-purple-500/50'
-                            }`}></div>
+                            <div className="w-2.5 h-2.5 rounded-full bg-gfo-daylight"></div>
                             <span className="font-medium">{role.label}</span>
                           </div>
                         </SelectItem>
@@ -73,7 +65,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   {ADDITIONAL_ROLES.map(role => (
                     <SelectItem key={role.id} value={role.id} className="py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-2.5 h-2.5 bg-gray-400 rounded-full"></div>
+                        <div className="w-2.5 h-2.5 bg-muted-foreground/50 rounded-full"></div>
                         <span className="font-medium">{role.label}</span>
                       </div>
                     </SelectItem>
@@ -85,13 +77,13 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   {/* 'Maintenance Workflow (AviaSync)' persona removed — duplicate eTechLog; canonical surface is the Tech Log module. See docs/CANONICAL_MAINTENANCE_SURFACE.md */}
                   <SelectItem value="passenger" className="py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 bg-sky-500 rounded-full"></div>
+                      <div className="w-2.5 h-2.5 bg-gfo-daylight rounded-full"></div>
                       <span className="font-medium">Passenger (Mobile App)</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="lobby-display" className="py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 bg-cyan-500 rounded-full"></div>
+                      <div className="w-2.5 h-2.5 bg-gfo-daylight rounded-full"></div>
                       <span className="font-medium">Lobby Display</span>
                     </div>
                   </SelectItem>

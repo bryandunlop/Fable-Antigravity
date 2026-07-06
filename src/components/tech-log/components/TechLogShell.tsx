@@ -10,8 +10,6 @@ import { buildNotifications, type Notification } from '../engine/notifications';
 import { resolveNav, type NavGroup, type SubItem } from '../engine/nav';
 import { Popover, PopoverTrigger, PopoverContent } from '../../ui/popover';
 import { cn } from '../../ui/utils';
-import lockupBlue from '../../../assets/gfo/gfo-lockup-blue-3line.png';
-import lockupWhite from '../../../assets/gfo/gfo-lockup-white-3line.png';
 
 export function TechLogShell({
   title,
@@ -43,8 +41,7 @@ export function TechLogShell({
     <div className="mx-auto max-w-7xl p-6">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <img src={lockupBlue} alt="GFO — Global Flight Operations" className="mb-2 block h-9 w-auto dark:hidden" />
-          <img src={lockupWhite} alt="GFO — Global Flight Operations" className="mb-2 hidden h-9 w-auto dark:block" />
+          <p className="gfo-eyebrow mb-1 text-muted-foreground">Global Flight Operations</p>
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
         </div>

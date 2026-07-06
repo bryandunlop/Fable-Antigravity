@@ -28,4 +28,17 @@ describe('work queue selector', () => {
   it('seeded fleet has no expired recurring checks (all current/due-soon)', () => {
     expect(wq.expiredChecks).toHaveLength(0);
   });
+
+  it('surfaces WATCHLISTED defects in the watch-items bucket, not as new squawks or urgent', () => {
+    const watched = {
+      ...currentRows(s.defects)[0],
+      id: 'd-watch', status: 'WATCHLISTED' as const, airworthinessAffecting: false,
+      supersedesId: undefined, reportedAtUtc: now,
+    };
+    const wq2 = buildWorkQueue({ ...s, defects: [...s.defects, watched] }, now);
+    expect(wq2.watchItems.some(d => d.id === 'd-watch')).toBe(true);
+    expect(wq2.counts.watchItems).toBe(wq2.watchItems.length);
+    expect(wq2.newSquawks.some(d => d.id === 'd-watch')).toBe(false);
+    expect(wq2.counts.urgent).toBe(wq.counts.urgent); // watch items are never urgent
+  });
 });

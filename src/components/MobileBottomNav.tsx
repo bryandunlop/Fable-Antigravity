@@ -101,7 +101,7 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
 
   // Don't show on desktop
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-40">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gfo-midnight border-t border-white/10 z-40">
       <div className="grid grid-cols-5 gap-1 px-2 py-2">
         {navItems.slice(0, 4).map((item) => {
           const Icon = item.icon;
@@ -111,16 +111,16 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
             <Link
               key={item.href}
               to={item.href}
-              className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-colors ${
+              className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-colors duration-200 ${
                 isActive
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  ? 'bg-white/10 text-gfo-daylight-light'
+                  : 'text-white/65 hover:text-white hover:bg-white/10'
               }`}
             >
               <Icon className="w-5 h-5" />
               <span className="text-xs font-medium">{item.name}</span>
               {isActive && (
-                <div className="w-4 h-0.5 bg-primary rounded-full" />
+                <div className="w-4 h-0.5 bg-gfo-daylight-light rounded-full" />
               )}
             </Link>
           );
@@ -130,7 +130,7 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
-          className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
+          className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-colors duration-200 text-white/65 hover:text-white hover:bg-white/10"
         >
           <Menu className="w-5 h-5" />
           <span className="text-xs font-medium">More</span>

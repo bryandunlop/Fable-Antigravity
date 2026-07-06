@@ -299,6 +299,8 @@ const _D = 86400000;
 
 export type DueCategory = 'INSPECTION' | 'AD' | 'SB' | 'COMPONENT';
 export interface CampForecastItem {
+  /** Stable per-template key; work cards link back to a due-list item via WorkCard.forecastRef. */
+  ref: string;
   category: DueCategory;
   ata: string;
   description: string;
@@ -308,16 +310,16 @@ export interface CampForecastItem {
 }
 
 /** Mock GetAircraftDueList (≤3-month projection, calendar units). Deterministic per serial. */
-export function campForecast(serial: string, airframe: { hours: number; cycles: number }): CampForecastItem[] {
-  const now = Date.now();
+export function campForecast(serial: string, airframe: { hours: number; cycles: number }, nowMs = Date.now()): CampForecastItem[] {
   const s = Math.abs(hashStr(serial));
-  const at = (days: number) => new Date(now + days * _D).toISOString();
+  const at = (days: number) => new Date(nowMs + days * _D).toISOString();
   return [
-    { category: 'INSPECTION', ata: '05', description: 'Phase A inspection', dueDateUtc: at(12 + (s % 6)), dueHours: Math.round(airframe.hours + 38) },
-    { category: 'AD', ata: '27', description: 'AD 2024-12-05 flight-control rigging (recurring)', dueDateUtc: at(5 + (s % 4)) },
-    { category: 'INSPECTION', ata: '24', description: 'Battery capacity check', dueDateUtc: at(21) },
-    { category: 'SB', ata: '21', description: 'SB 21-117 pack controller upgrade', dueDateUtc: at(45 + (s % 20)) },
-    { category: 'COMPONENT', ata: '32', description: 'MLG overhaul (life-limited)', dueDateUtc: at(80), dueHours: Math.round(airframe.hours + 620), dueCycles: airframe.cycles + 410 },
+    { ref: 'FC-05-PHASEA', category: 'INSPECTION', ata: '05', description: 'Phase A inspection', dueDateUtc: at(12 + (s % 6)), dueHours: Math.round(airframe.hours + 38) },
+    { ref: 'FC-27-AD2024-12', category: 'AD', ata: '27', description: 'AD 2024-12-05 flight-control rigging (recurring)', dueDateUtc: at(5 + (s % 4)) },
+    { ref: 'FC-28-AD-WAI', category: 'AD', ata: '28', description: 'AD 2025-03-14 wing anti-ice duct inspection', dueDateUtc: at((s % 11) - 4) },
+    { ref: 'FC-24-BATT', category: 'INSPECTION', ata: '24', description: 'Battery capacity check', dueDateUtc: at(21) },
+    { ref: 'FC-21-SB117', category: 'SB', ata: '21', description: 'SB 21-117 pack controller upgrade', dueDateUtc: at(45 + (s % 20)) },
+    { ref: 'FC-32-MLG', category: 'COMPONENT', ata: '32', description: 'MLG 600-hr functional check (life-limited package)', dueDateUtc: at(80), dueHours: Math.round(airframe.hours + 620), dueCycles: airframe.cycles + 410 },
   ];
 }
 

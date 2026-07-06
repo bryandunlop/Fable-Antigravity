@@ -20,6 +20,9 @@ import { releaseSchedulingTripToPreflight, readPreflightSummary, readTripLifecyc
 
 interface TripsPanelProps {
   userRole: string;
+  /** When set (e.g. from a command-center board click), opens that trip's detail. The nonce lets
+   *  the same trip be re-focused after the user backed out to the list. */
+  focusTrip?: { id: string; n: number } | null;
 }
 
 type TripType = TripRecord['tripType'];
@@ -45,12 +48,16 @@ function readinessBadgeClassName(state: Readiness['state']): string {
   }
 }
 
-export default function TripsPanel({ userRole }: TripsPanelProps) {
+export default function TripsPanel({ userRole, focusTrip }: TripsPanelProps) {
   const { service, store, tick, bump, nowUtc } = useSchedulingWorkspace();
   const navigate = useNavigate();
   const [trips, setTrips] = useState<TripRecord[]>([]);
   const [readinessByTrip, setReadinessByTrip] = useState<Record<string, Readiness>>({});
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(focusTrip?.id ?? null);
+
+  useEffect(() => {
+    if (focusTrip) setSelectedTripId(focusTrip.id);
+  }, [focusTrip?.id, focusTrip?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [instances, setInstances] = useState<TaskInstance[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
 

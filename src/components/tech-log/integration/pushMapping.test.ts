@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decidePushMode } from './pushMapping';
+import { decidePushMode, discrepancyTypeFor } from './pushMapping';
 
 describe('decidePushMode (supersede → CAMP IntegrateDiscrepancies)', () => {
   it('CREATE → INSERT Open', () => {
@@ -29,6 +29,24 @@ describe('decidePushMode (supersede → CAMP IntegrateDiscrepancies)', () => {
       const d = decidePushMode(intent); // no parentRef
       expect(d.mode).toBe('INSERT');
       expect(d.existingDiscrepancyId).toBeUndefined();
+    }
+  });
+});
+
+describe('discrepancyTypeFor (myGFO entity → CAMP discrepancyType)', () => {
+  it('a deferral is always MEL', () => {
+    expect(discrepancyTypeFor('DEFERRAL')).toBe('MEL');
+    expect(discrepancyTypeFor('DEFERRAL', 'WATCHLISTED')).toBe('MEL');
+  });
+
+  it('a WATCHLISTED defect maps to DEFERRED-WATCHLIST', () => {
+    expect(discrepancyTypeFor('DEFECT', 'WATCHLISTED')).toBe('DEFERRED-WATCHLIST');
+  });
+
+  it('every other defect (and the legacy no-status call) stays NON-DEFERRED', () => {
+    expect(discrepancyTypeFor('DEFECT')).toBe('NON-DEFERRED');
+    for (const status of ['OPEN', 'DEFERRED', 'RECTIFIED', 'CLOSED'] as const) {
+      expect(discrepancyTypeFor('DEFECT', status)).toBe('NON-DEFERRED');
     }
   });
 });

@@ -70,7 +70,8 @@ export function urgencyTextClassName(urgency: RowUrgency): string {
 }
 
 interface TaskActionButtonsProps {
-  instance: TaskInstance;
+  // Structural Pick so both full TaskInstances and the command-center's BoardTask projection fit.
+  instance: Pick<TaskInstance, 'status' | 'requiresAck' | 'ackState'>;
   onAction: (action: TaskAction) => void;
   disabled?: boolean;
 }
