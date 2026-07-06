@@ -299,9 +299,11 @@ export function buildUpcomingBoard(
   const startOfTodayMs = startOfToday.getTime();
   const endOfTodayMs = startOfTodayMs + DAY_MS - 1;
 
-  const thisWeekEndMs = startOfTodayMs + UPCOMING_WINDOWS.thisWeekDays * DAY_MS;
-  const nextWeekEndMs = startOfTodayMs + UPCOMING_WINDOWS.nextWeekDays * DAY_MS;
-  const laterEndMs = startOfTodayMs + Math.min(UPCOMING_WINDOWS.laterDays, horizonDays) * DAY_MS;
+  // Lane windows are anchored to end-of-day (not nowMs) so a fixed due date never
+  // changes lane by time-of-day, matching the calendar-day convention in runBoardSelectors.ts.
+  const thisWeekEndMs = endOfTodayMs + UPCOMING_WINDOWS.thisWeekDays * DAY_MS;
+  const nextWeekEndMs = endOfTodayMs + UPCOMING_WINDOWS.nextWeekDays * DAY_MS;
+  const laterEndMs = endOfTodayMs + Math.min(UPCOMING_WINDOWS.laterDays, horizonDays) * DAY_MS;
 
   const laneFor = (dueMs: number): UpcomingLane | null => {
     if (dueMs > laterEndMs) return null;
