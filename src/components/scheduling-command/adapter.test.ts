@@ -60,6 +60,7 @@ describe('boardTripOf', () => {
     expect(b.route).toBe('KLUK → KTEB');
     expect(b.departureDate).toBe('2026-07-05T12:00:00.000Z'); // earliest leg departure
     expect(b.aircraft).toBe('N2PG');
+    expect(b.tripType).toBe('domestic');
   });
 
   it('surfaces the blocked task title (with note) as the critical blocker', () => {
