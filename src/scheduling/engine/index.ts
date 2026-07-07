@@ -5,6 +5,8 @@ export { instantiateRecurring, instantiatePerTrip } from './instantiate';
 export { matchAirport, expandEndpoints } from './airports';
 export { diffTrip } from './diff';
 export type { TripDiff, LegChange, TripSnapshot, LegSnapshot } from './diff';
+export { reconcileTrip, instanceKey } from './reconcile';
+export type { ReconcilePlan } from './reconcile';
 export { evaluateTriggers, computeEscalations } from './triggers';
 export type { TriggerBuckets, EscalationFiring } from './triggers';
 export { deriveSchedulingReadiness } from './readiness';
