@@ -44,6 +44,17 @@ export const HAZARD_CATEGORIES = [
 
 export const SEVERITY_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
 
+/** One message in a hazard's secure two-way follow-up thread. Only available for
+ * known (non-anonymous) submitters — anonymous reports have no thread. */
+export interface HazardMessage {
+    id: string;
+    authorId: string;              // stable per-browser id of the author
+    authorRole: 'safety' | 'submitter';
+    authorName: string;
+    body: string;
+    atUtc: string;
+}
+
 export interface Hazard {
     id: string;
     title: string;
@@ -183,6 +194,9 @@ export interface Hazard {
     documentComplianceId?: string; // Link to R&I
     effectivenessReviewNotes?: string;
 
+    // Secure two-way follow-up thread (known submitters only)
+    messages?: HazardMessage[];
+
     // Audit trail
     workflowHistory?: Array<{ stage: string; date: string; user: string; action: string }>;
     notificationsSent?: Array<{ recipient: string; type: string; date: string }>;
@@ -196,6 +210,7 @@ interface HazardContextType {
     updateHazard: (id: string, updates: Partial<Hazard>) => void;
     deleteHazard: (id: string) => void;
     publishHazard: (id: string) => void;
+    postHazardMessage: (hazardId: string, body: string, authorRole: 'safety' | 'submitter', authorName: string) => void;
     currentUserId: string;
 }
 
@@ -506,8 +521,29 @@ export const HazardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateHazard(id, { isPublished: true });
     };
 
+    const postHazardMessage = (hazardId: string, body: string, authorRole: 'safety' | 'submitter', authorName: string) => {
+        const trimmed = body.trim();
+        if (!trimmed) return;
+        setHazards(prev => prev.map(h => {
+            if (h.id !== hazardId) return h;
+            // Guard: anonymous reports have no secure back-channel.
+            if (h.isAnonymous) return h;
+            const message: HazardMessage = {
+                id: `msg-${hazardId}-${(h.messages?.length ?? 0) + 1}-${Math.random().toString(36).slice(2, 8)}`,
+                authorId: currentUserId,
+                authorRole,
+                authorName,
+                body: trimmed,
+                atUtc: new Date().toISOString(),
+            };
+            return { ...h, messages: [...(h.messages ?? []), message] };
+        }));
+        // Notifications for both directions are derived client-side by
+        // buildHazardMessageFeed (a message awaiting reply clears itself once answered).
+    };
+
     return (
-        <HazardContext.Provider value={{ hazards, getHazardById, submitHazard, updateHazard, deleteHazard, publishHazard, currentUserId }}>
+        <HazardContext.Provider value={{ hazards, getHazardById, submitHazard, updateHazard, deleteHazard, publishHazard, postHazardMessage, currentUserId }}>
             {children}
         </HazardContext.Provider>
     );
