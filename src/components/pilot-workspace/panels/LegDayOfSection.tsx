@@ -10,8 +10,8 @@ import { newId } from '../../tech-log/util/id';
 import { fratEarlySubmitWarning } from '../legContext';
 import type { Trip, TripLeg } from '../../tech-log/types';
 
-/** Day-of actions for one leg: FRAT (fill → draft → submit, with an early-submit soft warning) + airport review.
- *  Outstanding items lead; the airport data + full FRAT page keep their tech-log links. */
+/** FRAT & airport module body (board): FRAT (fill → draft → submit, with an early-submit soft
+ *  warning) plus airport review, for the selected leg. Bare — the ModuleCard supplies the header. */
 export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg: TripLeg; tripNumber: string }) {
   const { state, dispatch } = useTechLog();
   const ac = state.aircraft.find((a) => a.id === tlTrip.aircraftId);
@@ -27,24 +27,24 @@ export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 text-sm">
       {/* FRAT */}
-      <div className="rounded-lg border p-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">FRAT
-            {leg.fratStatus === 'COMPLETED' && <span className="ml-2 text-xs text-emerald-700"><Check className="inline h-3.5 w-3.5" /> submitted{leg.fratScore != null ? ` · ${leg.fratScore}` : ''}</span>}
-            {leg.fratStatus === 'IN_PROGRESS' && <span className="ml-2 text-xs text-amber-600">draft saved</span>}
-            {leg.fratStatus === 'NOT_STARTED' && <span className="ml-2 text-xs text-amber-600">not started</span>}
-          </span>
-        </div>
+      <div>
+        <span className="font-medium">FRAT · leg {leg.sequence}
+          {leg.fratStatus === 'COMPLETED' && <span className="ml-2 text-xs text-emerald-700"><Check className="inline h-3.5 w-3.5" /> submitted{leg.fratScore != null ? ` · ${leg.fratScore}` : ''}</span>}
+          {leg.fratStatus === 'IN_PROGRESS' && <span className="ml-2 text-xs text-muted-foreground">draft saved</span>}
+          {leg.fratStatus === 'NOT_STARTED' && <span className="ml-2 text-xs text-muted-foreground">not started</span>}
+        </span>
         {leg.fratStatus !== 'COMPLETED' && (
-          <button className="mt-2 text-sm rounded border px-3 py-2 min-h-[44px] hover:bg-accent"
-            onClick={() => setFratOpen((o) => !o)}>
-            {fratOpen ? 'Close FRAT' : leg.fratStatus === 'IN_PROGRESS' ? 'Resume FRAT (draft)' : 'Start FRAT'}
-          </button>
+          <div>
+            <button className="mt-2 min-h-[44px] rounded border px-3 py-2 text-sm hover:bg-accent"
+              onClick={() => setFratOpen((o) => !o)}>
+              {fratOpen ? 'Close FRAT' : leg.fratStatus === 'IN_PROGRESS' ? 'Resume FRAT (draft)' : 'Start FRAT'}
+            </button>
+          </div>
         )}
         {fratOpen && (
-          <div className="border-t mt-2 pt-2">
+          <div className="mt-2 border-t pt-2">
             <StandaloneFRATForm
               userRole={user.role}
               initialData={{ flightNumber: tripNumber, aircraft: ac?.tailNumber, departure: leg.departureIcao, destination: leg.arrivalIcao,
@@ -68,17 +68,17 @@ export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg
       </div>
 
       {/* Airport review */}
-      <div className="rounded-lg border p-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Airport review
+      <div className="border-t pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-medium">Airport review
             {leg.airportReviewed
               ? <span className="ml-2 text-xs text-emerald-700"><Check className="inline h-3.5 w-3.5" /> reviewed</span>
-              : <span className="ml-2 text-xs text-amber-600">not reviewed</span>}
+              : <span className="ml-2 text-xs text-muted-foreground">not reviewed</span>}
           </span>
           <Link to={`/tech-log/trips/${tlTrip.id}/legs/${leg.id}`} className="text-xs text-primary hover:underline">open details ↗</Link>
         </div>
         {!leg.airportReviewed && (
-          <button className="mt-2 text-sm rounded border px-3 py-2 min-h-[44px] hover:bg-accent"
+          <button className="mt-2 min-h-[44px] rounded border px-3 py-2 text-sm hover:bg-accent"
             onClick={() => markAirportReviewedOnLeg({ dispatch, newId, trip: tlTrip, leg, actorOid: user.oid })}>
             Mark airport reviewed
           </button>

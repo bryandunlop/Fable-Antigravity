@@ -117,6 +117,7 @@
     --gfo-daylight: #0096FC;
     --gfo-daylight-deep: #0077CC;
     --gfo-daylight-light: #7FCCFE;
+    --gfo-custody-crew: #003DA5;   /* P&G corporate blue (PMS 293) — crew holds custody */
     --gfo-sunrise: #D1AC6B;
     --gfo-sunrise-deep: #B8913D;
     --gfo-sunrise-light: #EDD9A9;
@@ -517,10 +518,13 @@
   }
   .gfo-chip-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; flex: none; }
 
-  /* Custody axis (distinct from airworthiness R/A/G): gold = maintenance holds, daylight = crew holds. */
-  .gfo-dot-maint         { background: var(--gfo-sunrise-deep); }
-  .gfo-dot-maint-offered { background: transparent; box-shadow: inset 0 0 0 1.5px var(--gfo-sunrise-deep); }
-  .gfo-dot-crew          { background: var(--gfo-daylight); }
+  /* Custody axis (distinct from airworthiness R/A/G): slate = maintenance holds, P&G blue = crew holds.
+     Retired gold — it collided with amber (--gfo-warning) serviceability on the accept surface. */
+  .gfo-dot-maint         { background: var(--muted-foreground); }
+  .gfo-dot-maint-offered { background: transparent; box-shadow: inset 0 0 0 1.5px var(--gfo-daylight); }
+  .gfo-dot-crew          { background: var(--gfo-custody-crew); }
+  /* Custody status pill (board module header) — P&G-blue tint, off the RAG axis. */
+  .gfo-pill-custody { background: color-mix(in srgb, var(--gfo-custody-crew) 12%, transparent); color: var(--gfo-custody-crew); }
 
   /* Stat tile brand moment — 3px Midnight top rule (rounded card kept) */
   .gfo-stat-rule { position: relative; }

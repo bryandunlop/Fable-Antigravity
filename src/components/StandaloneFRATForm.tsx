@@ -11,7 +11,6 @@ import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
 import { toast } from 'sonner';
-import JSConfetti from 'js-confetti';
 import { eventStore } from '../notifications/events';
 import { mergeFratSelections } from './tech-log/util/fratDraft';
 import {
@@ -29,7 +28,9 @@ import {
   MapPin,
   Cloud,
   Package,
-  Wrench
+  Wrench,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 
 interface FRATItem {
@@ -56,6 +57,9 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
   const navigate = useNavigate();
   // Use initialData or fall back to defaults
   const flightData = initialData;
+  // Embedded from a leg (initialData carries the route) → hide the standalone header + flight-info
+  // card; the surrounding module already shows the leg context. The standalone route shows them.
+  const inContext = Boolean(flightData?.departure && flightData?.destination);
 
   // Basic flight information
   const [flightNumber, setFlightNumber] = useState(flightData?.flightNumber || '');
@@ -188,11 +192,12 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
   const totalScore = calculateTotalScore();
 
   // Determine risk level based on score
+  // Bands match the submit logic exactly: low 0–10, medium 11–19, high (mitigation required) 20–24, no-go ≥25.
   const getRiskLevel = (score: number) => {
-    if (score >= 25) return { level: 'no-go', color: 'black', label: 'No-Go' };
-    if (score >= 20) return { level: 'high', color: 'red', label: 'High Risk' };
-    if (score >= 11) return { level: 'medium', color: 'yellow', label: 'Medium Risk' };
-    return { level: 'low', color: 'green', label: 'Low Risk' };
+    if (score >= 25) return { level: 'no-go', color: 'black', label: 'No-go' };
+    if (score >= 20) return { level: 'high', color: 'red', label: 'High — mitigation required' };
+    if (score >= 11) return { level: 'medium', color: 'yellow', label: 'Medium risk' };
+    return { level: 'low', color: 'green', label: 'Low risk' };
   };
 
   const riskLevel = getRiskLevel(totalScore);
@@ -214,8 +219,16 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
     return section.items.reduce((acc, item) => item.selected ? acc + item.score : acc, 0);
   };
 
-  // Success Animation State
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  // Accordion: sections start collapsed except those already carrying a selection (e.g. a resumed draft).
+  const [openSections, setOpenSections] = useState<Set<number>>(
+    () => new Set(fratSections.flatMap((s, i) => (s.items.some((it) => it.selected) ? [i] : []))),
+  );
+  const toggleSection = (i: number) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
 
   // Handle form submission
   const handleSubmit = (newStatus: string) => {
@@ -260,18 +273,10 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
     };
 
     if (newStatus === 'submitted') {
-      const jsConfetti = new JSConfetti();
-      jsConfetti.addConfetti({
-        emojis: ['✈️', '✅', '☁️', '🛫'],
-        emojiSize: 30,
-        confettiNumber: 40,
-      });
-      setShowSuccessModal(true);
-      setTimeout(() => {
-        setShowSuccessModal(false);
-        if (onSave) onSave(data);
-        if (onClose) onClose();
-      }, 2500);
+      // Calm confirmation for a safety-of-flight record — no confetti.
+      toast.success(`FRAT submitted · ${riskLevel.label}`);
+      if (onSave) onSave(data);
+      if (onClose) onClose();
       return;
     }
 
@@ -293,34 +298,18 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
 
   return (
     <>
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-card border shadow-2xl rounded-3xl p-8 flex flex-col items-center max-w-sm text-center animate-in zoom-in-95 duration-500 delay-150">
-            <div className="relative w-24 h-24 mb-6">
-              <svg viewBox="0 0 100 100" className="w-full h-full text-green-500 overflow-visible">
-                {/* Circle growing */}
-                <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" className="animate-[dash_0.8s_ease-out_forwards]" strokeDasharray="283" strokeDashoffset="283" />
-                {/* Airplane flying in to form the checkmark */}
-                <path d="M 30,50 L 45,65 L 75,35" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="animate-[dash_0.6s_ease-out_0.6s_forwards]" strokeDasharray="100" strokeDashoffset="100" />
-                <Plane className="absolute text-accent-foreground w-8 h-8 animate-[takeoff-arc_1s_ease-out_1.2s_forwards] opacity-0" style={{ transformOrigin: 'center' }} />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold tracking-tight text-foreground mb-2">FRAT Submitted</h3>
-            <p className="text-muted-foreground">Clear skies ahead.</p>
-          </div>
-        </div>
-      )}
       <div className="p-6 max-w-4xl mx-auto space-y-6 pb-20">
-        {/* Header */}
+        {/* Header — standalone only; embedded, the surrounding module already titles it */}
+        {!inContext && (
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600 rounded-lg">
               <Shield className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Standalone FRAT Form</h1>
+              <h1 className="text-2xl font-bold tracking-tight">Flight risk assessment</h1>
               <p className="text-sm text-muted-foreground">
-                Flight Risk Assessment Tool - Gulfstream G650
+                FRAT — Gulfstream G650
               </p>
             </div>
           </div>
@@ -329,9 +318,10 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
             Back
           </Button>
         </div>
+        )}
 
-        {/* Risk Score Card */}
-        < Card className={`border-2 ${riskLevel.level === 'low' ? 'border-green-500 bg-green-50 dark:bg-green-950' :
+        {/* Risk Score Card — sticky so the running score stays visible while selecting */}
+        < Card className={`sticky top-2 z-10 border-2 ${riskLevel.level === 'low' ? 'border-green-500 bg-green-50 dark:bg-green-950' :
           riskLevel.level === 'medium' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950' :
             'border-red-500 bg-red-50 dark:bg-red-950'
           }`
@@ -369,22 +359,24 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
               className="h-3"
             />
             <div className="mt-4 flex justify-between text-xs text-muted-foreground">
-              <span>0-10: Low Risk</span>
-              <span>11-20: Medium Risk</span>
-              <span>21+: High Risk</span>
+              <span>0–10 low</span>
+              <span>11–19 medium</span>
+              <span>20 mitigate</span>
+              <span>25 no-go</span>
             </div>
             {mitigationRequired && (
               <Alert className="mt-4">
                 <AlertTriangle className="w-4 h-4" />
                 <AlertDescription>
-                  <strong>Mitigation Required:</strong> This flight exceeds low risk threshold. Please document mitigation strategies below before submitting.
+                  <strong>Mitigation required (score ≥ 20):</strong> document a mitigation strategy below, then submit for Scheduling and Chief Pilot review. A score of 25 or above is an automatic no-go.
                 </AlertDescription>
               </Alert>
             )}
           </CardContent>
         </Card >
 
-        {/* Flight Information */}
+        {/* Flight Information — hidden when embedded (the leg already supplies the route) */}
+        {!inContext && (
         < Card >
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -480,6 +472,7 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
             </div>
           </CardContent>
         </Card >
+        )}
 
         {/* FRAT Sections */}
         {
@@ -490,19 +483,24 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
 
             return (
               <Card key={sectionIndex} className={hasSelectedItems ? 'border-blue-500' : ''}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
+                <CardHeader className="cursor-pointer select-none" onClick={() => toggleSection(sectionIndex)}>
+                  <div className="flex items-center justify-between gap-2">
                     <CardTitle className="flex items-center gap-2">
+                      {openSections.has(sectionIndex) ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                       <Icon className="w-5 h-5" />
                       {section.title}
                     </CardTitle>
-                    {sectionScore > 0 && (
-                      <Badge variant="secondary" className="text-lg px-3 py-1">
-                        +{sectionScore} points
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {hasSelectedItems && (
+                        <Badge variant="outline" className="text-xs">{section.items.filter(i => i.selected).length} selected</Badge>
+                      )}
+                      {sectionScore > 0 && (
+                        <Badge variant="secondary" className="text-base px-2.5 py-0.5">+{sectionScore}</Badge>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
+                {openSections.has(sectionIndex) && (
                 <CardContent>
                   <div className="space-y-3">
                     {section.items.map((item, itemIndex) => (
@@ -535,6 +533,7 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
                     ))}
                   </div>
                 </CardContent>
+                )}
               </Card>
             );
           })
