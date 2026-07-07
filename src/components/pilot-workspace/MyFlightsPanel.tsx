@@ -95,10 +95,10 @@ export default function MyFlightsPanel({ onOpen }: { onOpen: (trip: TripRecord) 
         className={`w-full text-left rounded-lg border p-4 hover:bg-accent transition-colors ${pinned ? 'border-primary bg-accent/40' : ''}`}>
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 font-semibold">
-            {r && <span className={`h-2.5 w-2.5 rounded-full ${DOT[r.state]}`} aria-hidden />}
+            {r && <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${DOT[r.state]}`} aria-hidden />}
             {t.tripNumber} · {t.tail}
           </span>
-          <span className="flex items-center gap-1.5">
+          <span className="flex shrink-0 items-center gap-1.5">
             {badge && (
               <span className="text-[10px] font-medium uppercase tracking-wide rounded border px-1.5 py-0.5 text-muted-foreground">{badge}</span>
             )}
