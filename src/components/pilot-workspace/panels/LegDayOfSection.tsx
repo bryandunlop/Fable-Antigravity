@@ -32,8 +32,8 @@ export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg
       <div>
         <span className="font-medium">FRAT · leg {leg.sequence}
           {leg.fratStatus === 'COMPLETED' && <span className="ml-2 text-xs text-emerald-700"><Check className="inline h-3.5 w-3.5" /> submitted{leg.fratScore != null ? ` · ${leg.fratScore}` : ''}</span>}
-          {leg.fratStatus === 'IN_PROGRESS' && <span className="ml-2 text-xs text-amber-600">draft saved</span>}
-          {leg.fratStatus === 'NOT_STARTED' && <span className="ml-2 text-xs text-amber-600">not started</span>}
+          {leg.fratStatus === 'IN_PROGRESS' && <span className="ml-2 text-xs text-muted-foreground">draft saved</span>}
+          {leg.fratStatus === 'NOT_STARTED' && <span className="ml-2 text-xs text-muted-foreground">not started</span>}
         </span>
         {leg.fratStatus !== 'COMPLETED' && (
           <div>
@@ -73,7 +73,7 @@ export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg
           <span className="font-medium">Airport review
             {leg.airportReviewed
               ? <span className="ml-2 text-xs text-emerald-700"><Check className="inline h-3.5 w-3.5" /> reviewed</span>
-              : <span className="ml-2 text-xs text-amber-600">not reviewed</span>}
+              : <span className="ml-2 text-xs text-muted-foreground">not reviewed</span>}
           </span>
           <Link to={`/tech-log/trips/${tlTrip.id}/legs/${leg.id}`} className="text-xs text-primary hover:underline">open details ↗</Link>
         </div>

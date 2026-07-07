@@ -63,8 +63,10 @@ export function handoverModule(
     return { ...base, tone: 'blocked', summary: 'grounded', outstanding: 1 };
   }
   switch (deriveCustody(aircraft.id, state, nowUtc).state) {
+    // Both crew-custody states sit on the P&G-blue axis — "ready to accept" is a custody prompt,
+    // not an airworthiness warning, so it must not read amber.
     case 'WITH_CREW': return { ...base, tone: 'custody', summary: 'in your custody', outstanding: 0 };
-    case 'OFFERED': return { ...base, tone: 'action', summary: 'ready to accept', outstanding: 1 };
+    case 'OFFERED': return { ...base, tone: 'custody', summary: 'ready to accept', outstanding: 1 };
     default: return { ...base, tone: 'muted', summary: 'in maintenance', outstanding: 0 };
   }
 }

@@ -88,9 +88,9 @@ describe('handoverModule (aircraft-keyed, independent of trip release)', () => {
   it('is muted "in maintenance" when serviceable and no briefing has been released', () => {
     expect(handoverModule(AC, state(), NOW)).toMatchObject({ tone: 'muted', summary: 'in maintenance' });
   });
-  it('is an action "ready to accept" once a briefing is released to the crew', () => {
+  it('is on the custody axis (not amber) "ready to accept" once a briefing is released to the crew', () => {
     const briefings = [{ id: 'b1', aircraftId: AC_ID, status: 'RELEASED', releasedAtUtc: PAST } as FlightBriefing];
-    expect(handoverModule(AC, state({ briefings }), NOW)).toMatchObject({ tone: 'action', summary: 'ready to accept', outstanding: 1 });
+    expect(handoverModule(AC, state({ briefings }), NOW)).toMatchObject({ tone: 'custody', summary: 'ready to accept', outstanding: 1 });
   });
   it('is on the custody axis once the PIC has accepted', () => {
     const briefings = [{ id: 'b1', aircraftId: AC_ID, status: 'ACKNOWLEDGED', releasedAtUtc: PAST, acknowledgedAtUtc: PAST } as FlightBriefing];

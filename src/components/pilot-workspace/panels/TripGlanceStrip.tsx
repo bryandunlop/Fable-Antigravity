@@ -9,11 +9,12 @@ const ICON: Record<ModuleKey, React.ElementType> = {
   scheduling: CalendarClock,
 };
 
-// All four positions always shown; colour only where it matters (the user's chosen density).
+// All four positions always shown; colour only where it matters. Amber is reserved for airworthiness
+// caution (it lives on the readiness dot), so routine to-dos read as normal foreground, not yellow.
 const TONE: Record<ModuleTone, string> = {
   done: 'text-muted-foreground',
   muted: 'text-muted-foreground/50',
-  action: 'text-amber-600',
+  action: 'text-foreground',
   blocked: 'text-red-600',
   custody: 'text-[var(--gfo-custody-crew)]',
 };
@@ -23,7 +24,10 @@ function shortLabel(m: ModuleStatus): string {
     case 'frat': return m.tone === 'action' ? `FRAT · ${m.outstanding}` : 'FRAT';
     case 'fuel': return m.tone === 'action' ? `Fuel · ${m.outstanding}` : 'Fuel';
     case 'handover':
-      return m.tone === 'custody' ? 'Yours' : m.tone === 'blocked' ? 'Grounded' : m.tone === 'action' ? 'Accept' : 'A/C';
+      if (m.tone === 'blocked') return 'Grounded';
+      if (m.summary === 'ready to accept') return 'Accept';
+      if (m.tone === 'custody') return 'Yours';
+      return 'A/C';
     case 'scheduling': return 'Sched';
     default: return m.label;
   }

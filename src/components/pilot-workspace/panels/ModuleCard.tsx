@@ -9,10 +9,11 @@ const ICON: Record<ModuleKey, React.ElementType> = {
   scheduling: CalendarClock,
 };
 
-// done/action/blocked map to RAG green/amber/red; custody is the P&G-blue axis; muted is neutral.
+// Colour is spent only on genuine status: green = done, red = grounded, P&G-blue = custody.
+// Routine "to-do" (action) stays neutral — amber is reserved for airworthiness caution, not prep.
 const TONE_PILL: Record<ModuleTone, string> = {
   done: 'bg-emerald-100 text-emerald-800',
-  action: 'bg-amber-100 text-amber-800',
+  action: 'bg-muted text-foreground',
   blocked: 'bg-red-100 text-red-800',
   custody: 'gfo-pill-custody',
   muted: 'bg-muted text-muted-foreground',

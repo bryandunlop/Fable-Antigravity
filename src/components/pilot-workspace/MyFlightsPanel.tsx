@@ -17,10 +17,11 @@ const TRIP_TYPE_OPTIONS: [TripType, string][] = [
   ['dca_dassp', 'DASSP'],
 ];
 
-// RAG-aligned dispatch dot (this is the airworthiness axis; the "needs prep" pill below is NOT).
+// Readiness dot: green = ready, red = grounded/blocked (airworthiness stop). NOT_READY (routine prep
+// in progress) is neutral — amber stays reserved for a genuinely AMBER aircraft, shown in the card.
 const DOT: Record<PilotReadiness['state'], string> = {
   READY: 'bg-emerald-500',
-  NOT_READY: 'bg-amber-500',
+  NOT_READY: 'bg-muted-foreground',
   BLOCKED: 'bg-red-500',
 };
 
