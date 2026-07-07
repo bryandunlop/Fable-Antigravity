@@ -32,4 +32,15 @@ describe('createRectificationCard', () => {
     expect(c.steps[0].text).toContain('Pack 1 fault');
     expect(c.steps[0].done).toBe(false);
   });
+
+  it('links the card to the deferral when a deferralId is given (traceability)', () => {
+    const c = createRectificationCard(defect(), { cardId: 'wc-abcd', stepId: 'st-1' }, 'now', 'df-99');
+    expect(c.linkedDeferralId).toBe('df-99');
+    expect(c.linkedDefectId).toBe('def-1');
+  });
+
+  it('leaves linkedDeferralId undefined when raised straight from a defect (no deferral)', () => {
+    const c = createRectificationCard(defect(), { cardId: 'wc-abcd', stepId: 'st-1' }, 'now');
+    expect(c.linkedDeferralId).toBeUndefined();
+  });
 });

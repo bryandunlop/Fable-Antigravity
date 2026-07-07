@@ -1,11 +1,12 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Wrench, Clock, TimerReset } from 'lucide-react';
+import { Wrench, Clock, TimerReset, Hammer } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
 import { computeRepairDue, isDeferralExpired } from '../engine/pl25';
 import { CATEGORY_DAYS } from '../constants';
 import { newId } from '../util/id';
+import { useRaiseFixFromDeferral } from '../useRectify';
 import type { Deferral } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
@@ -19,6 +20,7 @@ export default function Deferrals() {
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
+  const raiseFix = useRaiseFixFromDeferral();
 
   const defectId = params.get('defect') ?? undefined;
   const defect = defectId ? currentRows(state.defects).find(d => d.id === defectId) : undefined;
@@ -92,6 +94,11 @@ export default function Deferrals() {
                   )}
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
+                  {isMaint && (
+                    <Button size="sm" variant="outline" onClick={() => raiseFix(d)}>
+                      <Hammer className="mr-1.5 h-4 w-4" /> Start fix
+                    </Button>
+                  )}
                   {effective === 'PENDING_PLACARD' && isMaint && (
                     <Button size="sm" onClick={() => navigate(`/tech-log/aircraft/${tailOf(d.aircraftId)}?tab=deferrals`)}>
                       <Wrench className="mr-1.5 h-4 w-4" /> Sign (M)/placard release

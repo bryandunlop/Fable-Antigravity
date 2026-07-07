@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { AlertTriangle, Clock, CalendarClock, CalendarDays, ChevronRight, CheckCircle2, Cloud, CloudDownload, RefreshCw, ClipboardList } from 'lucide-react';
+import { AlertTriangle, Clock, CalendarClock, CalendarDays, ChevronRight, CheckCircle2, Cloud, CloudDownload, RefreshCw, ClipboardList, Hammer } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import type { CampForecastItem } from '../integration/campClient';
 import { buildUpcomingBoard, createForecastCard, BUCKET_ORDER, type DueBucket, type UpcomingItem } from '../engine/upcomingBoard';
+import { currentRows } from '../engine/supersede';
+import { useRaiseFixFromDeferral } from '../useRectify';
 import { newId } from '../util/id';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -42,6 +44,7 @@ export default function ComingDue() {
   const user = useCurrentUser();
   const navigate = useNavigate();
   const integration = useIntegration();
+  const raiseFix = useRaiseFixFromDeferral();
   const isMaint = user.role === 'MAINTENANCE';
   const now = new Date().toISOString();
   const [tailFilter, setTailFilter] = useState<string | null>(null);
@@ -68,6 +71,13 @@ export default function ComingDue() {
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'WORKCARD_PULLED', entityType: 'WorkCard', entityId: card.id, atUtc: nowUtc, summary: `Pulled from CAMP due list ${item.ref} → ${card.cardNumber} (${it.tailNumber})` } });
     toast.success(`${card.cardNumber} ready to execute — ${item.description}.`);
     navigate(`/tech-log/work-cards/${card.id}`);
+  };
+
+  // Start the fix for a deferred item: raise a corrective card against the deferral's defect.
+  const startFix = (it: UpcomingItem) => {
+    const d = currentRows(state.deferrals).find(x => x.id === it.refId);
+    if (!d) return toast.error('Deferral not found for that item.');
+    raiseFix(d);
   };
 
   const rowNav = (it: UpcomingItem): (() => void) | null => {
@@ -102,6 +112,10 @@ export default function ComingDue() {
           ) : it.kind === 'CAMP_FORECAST' && isMaint ? (
             <Button size="sm" className="h-7" onClick={e => { e.stopPropagation(); pullCard(it); }}>
               <CloudDownload className="mr-1 h-3.5 w-3.5" /> Pull card from CAMP
+            </Button>
+          ) : it.kind === 'DEFERRAL' && isMaint ? (
+            <Button size="sm" variant="outline" className="h-7" onClick={e => { e.stopPropagation(); startFix(it); }}>
+              <Hammer className="mr-1 h-3.5 w-3.5" /> Start fix
             </Button>
           ) : nav ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : null}
         </div>

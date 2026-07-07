@@ -10,6 +10,7 @@ export function createRectificationCard(
   defect: Defect,
   ids: { cardId: string; stepId: string },
   nowUtc: string,
+  deferralId?: string,
 ): WorkCard {
   return {
     id: ids.cardId,
@@ -24,6 +25,7 @@ export function createRectificationCard(
     headerStatusCode: 1, // Open (CAMP WO header ladder)
     scheduled: false,    // corrective (defect-driven), not a scheduled task
     linkedDefectId: defect.id,
+    linkedDeferralId: deferralId,
     riiRequired: false,
     createdAtUtc: nowUtc,
   };
