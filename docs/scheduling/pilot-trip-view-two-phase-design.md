@@ -35,7 +35,7 @@ Reorganize the single-trip view into two touch-first phases — **Prep** (ahead 
 4. **Split the per-leg panel.** Today's `PreflightLegsPanel` bundles fuel + airport + FRAT; fuel moves to **Prep**, airport + FRAT to **Day-of**, each scoped to the selected leg.
 5. **Squawks + Messages live in an always-visible footer** below both tabs (not phase-specific).
 6. **Keep tech-log link-outs** — re-group + ergonomics only, no inlining (that would be a later slice).
-7. **iPad-first, touch.** Portrait shows one tab at a time; large tap targets; the leg strip scrolls horizontally.
+7. **iPad landscape-first, responsive to portrait, touch.** Primary target is iPad **landscape** — the active tab's cards lay out two-up and the leg strip shows more legs without scrolling. **Portrait** is a responsive fallback: a narrower single column with stacked cards. Same components throughout; large (≥44px) tap targets; the leg strip scrolls horizontally when it overflows.
 
 ## 4. Design
 
@@ -66,6 +66,9 @@ Leads with the pilot's outstanding prep action; keeps scheduling's completed wor
 
 ### 4.6 Outstanding-first pattern
 A single reusable presentation: given the pilot's actionable items each with a done/not-done state, render the not-done ones expanded and the done ones behind a collapsible "✓ N completed · tap to view". Applied to the current leg's Prep + Day-of actions (fuel, FRAT, airport review). The trip-prep list is a special case — all-completed scheduling reference — so it renders as a single collapsed "✓ N done · tap to view" block by default (§4.4).
+
+### 4.7 Responsive layout (landscape-first)
+Optimize for iPad **landscape** (~1024×768): the header sits in one row (identity · readiness · tabs), the leg strip shows more legs, and the active tab's cards flow into a **two-column grid**. **Portrait** (~768×1024) degrades via CSS to a single column with stacked cards. No orientation-specific components — a width-responsive grid (`repeat(auto-fit, minmax(...))` with a landscape breakpoint). Tap targets stay ≥44px in both.
 
 ## 5. Integration points
 - `src/components/pilot-workspace/FlightHub.tsx` — the reorganization: header + tabs + leg stepper + footer; route panels into the two tabs.
