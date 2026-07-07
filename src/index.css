@@ -523,6 +523,8 @@
   .gfo-dot-maint         { background: var(--muted-foreground); }
   .gfo-dot-maint-offered { background: transparent; box-shadow: inset 0 0 0 1.5px var(--gfo-daylight); }
   .gfo-dot-crew          { background: var(--gfo-custody-crew); }
+  /* Custody status pill (board module header) — P&G-blue tint, off the RAG axis. */
+  .gfo-pill-custody { background: color-mix(in srgb, var(--gfo-custody-crew) 12%, transparent); color: var(--gfo-custody-crew); }
 
   /* Stat tile brand moment — 3px Midnight top rule (rounded card kept) */
   .gfo-stat-rule { position: relative; }

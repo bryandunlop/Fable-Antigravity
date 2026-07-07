@@ -81,25 +81,24 @@ describe('schedulingModule', () => {
   });
 });
 
-describe('handoverModule', () => {
-  it('is muted when the trip or aircraft is missing', () => {
-    expect(handoverModule(null, AC, state(), NOW)).toMatchObject({ tone: 'muted', summary: 'not released' });
-    expect(handoverModule(mirror([mLeg({})]), undefined, state(), NOW)).toMatchObject({ tone: 'muted' });
+describe('handoverModule (aircraft-keyed, independent of trip release)', () => {
+  it('is muted when the aircraft is unknown (e.g. a non-fleet tail)', () => {
+    expect(handoverModule(undefined, state(), NOW)).toMatchObject({ tone: 'muted', summary: 'no aircraft' });
   });
   it('is muted "in maintenance" when serviceable and no briefing has been released', () => {
-    expect(handoverModule(mirror([mLeg({})]), AC, state(), NOW)).toMatchObject({ tone: 'muted', summary: 'in maintenance' });
+    expect(handoverModule(AC, state(), NOW)).toMatchObject({ tone: 'muted', summary: 'in maintenance' });
   });
   it('is an action "ready to accept" once a briefing is released to the crew', () => {
     const briefings = [{ id: 'b1', aircraftId: AC_ID, status: 'RELEASED', releasedAtUtc: PAST } as FlightBriefing];
-    expect(handoverModule(mirror([mLeg({})]), AC, state({ briefings }), NOW)).toMatchObject({ tone: 'action', summary: 'ready to accept', outstanding: 1 });
+    expect(handoverModule(AC, state({ briefings }), NOW)).toMatchObject({ tone: 'action', summary: 'ready to accept', outstanding: 1 });
   });
   it('is on the custody axis once the PIC has accepted', () => {
     const briefings = [{ id: 'b1', aircraftId: AC_ID, status: 'ACKNOWLEDGED', releasedAtUtc: PAST, acknowledgedAtUtc: PAST } as FlightBriefing];
-    expect(handoverModule(mirror([mLeg({})]), AC, state({ briefings }), NOW)).toMatchObject({ tone: 'custody', summary: 'in your custody' });
+    expect(handoverModule(AC, state({ briefings }), NOW)).toMatchObject({ tone: 'custody', summary: 'in your custody' });
   });
-  it('is blocked when the aircraft is RED (grounded)', () => {
+  it('is blocked when the aircraft is RED (grounded), overriding custody', () => {
     const defects = [{ id: 'd1', aircraftId: AC_ID, status: 'OPEN', airworthinessAffecting: true, ataChapter: '27' } as unknown as TechLogState['defects'][number]];
-    expect(handoverModule(mirror([mLeg({})]), AC, state({ defects }), NOW)).toMatchObject({ tone: 'blocked', summary: 'grounded' });
+    expect(handoverModule(AC, state({ defects }), NOW)).toMatchObject({ tone: 'blocked', summary: 'grounded' });
   });
 });
 

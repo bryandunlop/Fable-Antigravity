@@ -50,13 +50,14 @@ export function fuelModule(tlTrip: Trip | null, aircraft: Aircraft | undefined):
 }
 
 export function handoverModule(
-  tlTrip: Trip | null,
   aircraft: Aircraft | undefined,
   state: TechLogState,
   nowUtc: string,
 ): ModuleStatus {
   const base = { key: 'handover' as const, label: 'Handover' };
-  if (!tlTrip || !aircraft) return { ...base, tone: 'muted', summary: 'not released', outstanding: 0 };
+  // Handover is aircraft-keyed (by tail), not trip-keyed: it reflects the aircraft's real
+  // serviceability + custody even before the trip is released to preflight (cold-open demo).
+  if (!aircraft) return { ...base, tone: 'muted', summary: 'no aircraft', outstanding: 0 };
   // RED grounding beats custody — a grounded aircraft is a hard stop regardless of who holds it.
   if (deriveServiceability(aircraft.id, state, nowUtc).status === 'RED') {
     return { ...base, tone: 'blocked', summary: 'grounded', outstanding: 1 };
@@ -90,7 +91,7 @@ export function deriveTripModules(
   return [
     fratModule(tlTrip),
     fuelModule(tlTrip, aircraft),
-    handoverModule(tlTrip, aircraft, state, nowUtc),
+    handoverModule(aircraft, state, nowUtc),
     schedulingModule(scheduling),
   ];
 }
