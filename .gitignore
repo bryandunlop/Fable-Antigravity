@@ -41,3 +41,14 @@ docs/superpowers/
 # Drizzle migration output (we use db:push, no migrations committed)
 drizzle/
 .env*
+
+# Build / type-check / tooling reports
+*-report.txt
+repomix-output.xml
+
+# Abandoned scratch source files
+temp_*.ts
+temp_*.tsx
+
+# Accidental git-directory snapshots
+_git/
