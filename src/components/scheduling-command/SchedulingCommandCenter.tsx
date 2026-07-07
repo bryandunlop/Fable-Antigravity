@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { CalendarClock, CalendarDays, ClipboardList, Inbox as InboxIcon, LayoutList, ListChecks, Loader2, Plus, Rows3, Send } from 'lucide-react';
+import { CalendarClock, CalendarDays, ClipboardList, Eye, Inbox as InboxIcon, LayoutList, ListChecks, Loader2, Plus, Rows3, Send } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
 import TemplatesPanel from '../scheduling-workspace/TemplatesPanel';
 import InboxPanel from '../scheduling-workspace/InboxPanel';
 import ForeFlightPanel from '../scheduling-workspace/ForeFlightPanel';
+import PilotVisibilityPanel from '../scheduling-workspace/PilotVisibilityPanel';
 import type { TaskAction } from '../../scheduling/engine/tasks';
 import { boardTripOf, toBoardTask, type BoardTrip, type BoardTask } from './adapter';
 import { readFleetServiceability } from '../tech-log/bridge';
@@ -25,13 +26,14 @@ import { UpcomingLanes } from './UpcomingLanes';
 import { matchesTripTypeFilter } from './tripFilters';
 import type { TripType } from '../../scheduling/engine';
 
-type Surface = 'schedule' | 'upcoming' | 'action' | 'templates' | 'inbox' | 'foreflight';
+type Surface = 'schedule' | 'upcoming' | 'action' | 'templates' | 'inbox' | 'foreflight' | 'pilot-visibility';
 type ScheduleView = 'board' | 'calendar' | 'list';
 
 const UTILITY_TABS: { key: Surface; label: string; icon: React.ElementType }[] = [
   { key: 'templates', label: 'Templates', icon: ClipboardList },
   { key: 'inbox', label: 'Inbox', icon: InboxIcon },
   { key: 'foreflight', label: 'ForeFlight', icon: Send },
+  { key: 'pilot-visibility', label: 'Pilot visibility', icon: Eye },
 ];
 
 /**
@@ -245,6 +247,7 @@ export default function SchedulingCommandCenter({
       {surface === 'templates' && <TemplatesPanel userRole={userRole} additionalRoles={additionalRoles} />}
       {surface === 'inbox' && <InboxPanel defaultTargetRole="pilot" />}
       {surface === 'foreflight' && <ForeFlightPanel />}
+      {surface === 'pilot-visibility' && <PilotVisibilityPanel />}
 
       {/* The trip workspace, over whichever view you're in */}
       <TripDrawer
