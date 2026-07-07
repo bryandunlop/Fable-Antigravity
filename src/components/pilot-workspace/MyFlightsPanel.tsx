@@ -5,6 +5,8 @@ import { deriveTripReadiness } from '../tech-log/engine/readiness';
 import { deriveSchedulingReadiness } from '../../scheduling/engine/readiness';
 import { selectPilotFlights, composePilotReadiness, type PilotReadiness } from './selectors';
 import { groupTripsByHorizon, tripNeedsPrep, type HorizonGroups } from './myFlights';
+import { deriveTripModules } from './moduleStatus';
+import { TripGlanceStrip } from './panels/TripGlanceStrip';
 import { matchesTripTypeFilter } from '../scheduling-command/tripFilters';
 import type { TripRecord } from '../../scheduling/store/types';
 import type { TripType } from '../../scheduling/engine/types';
@@ -88,6 +90,9 @@ export default function MyFlightsPanel({ onOpen }: { onOpen: (trip: TripRecord) 
 
   const card = (t: TripRecord, pinned = false) => {
     const r = readiness[t.id];
+    const tlTrip = state.trips.find((x) => x.tripNumber === t.tripNumber) ?? null;
+    const ac = tlTrip ? state.aircraft.find((a) => a.id === tlTrip.aircraftId) : state.aircraft.find((a) => a.tailNumber === t.tail);
+    const modules = deriveTripModules(tlTrip, ac, state, r?.scheduling, nowUtc());
     const dep = t.legs?.[0];
     const badge = t.tripType === 'international' ? "Int'l" : t.tripType === 'dca_dassp' ? 'DASSP' : null;
     return (
@@ -112,7 +117,7 @@ export default function MyFlightsPanel({ onOpen }: { onOpen: (trip: TripRecord) 
         <div className="text-sm text-muted-foreground mt-1">
           {dep ? `${dep.departureIcao} → ${t.legs[t.legs.length - 1].arrivalIcao} · ${dep.departureTimeUtc.slice(0, 16).replace('T', ' ')}Z` : 'No legs'}
         </div>
-        {r?.blocker && <div className="text-xs mt-1 text-muted-foreground">{r.blocker}</div>}
+        <div className="mt-2"><TripGlanceStrip modules={modules} /></div>
       </button>
     );
   };
