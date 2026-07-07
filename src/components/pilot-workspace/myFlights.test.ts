@@ -112,4 +112,23 @@ describe('groupTripsByHorizon', () => {
       inProgress: [], thisWeek: [], next2Weeks: [], laterThisMonth: [], nextMonth: [],
     });
   });
+
+  it('places a past-due trip that never went in_progress in This week (most-urgent band)', () => {
+    // A confirmed trip whose only leg already departed (negative days-to-departure).
+    const g = groupTripsByHorizon([trip({ tripNumber: 'PD', status: 'confirmed', daysOut: -3 })], NOW);
+    expect(g.thisWeek.map((t) => t.tripNumber)).toEqual(['PD']);
+  });
+
+  it('places a trip with no legs in Next month (firstDeparture falls back to the far future)', () => {
+    const g = groupTripsByHorizon([trip({ tripNumber: 'NL', legs: [] })], NOW);
+    expect(g.nextMonth.map((t) => t.tripNumber)).toEqual(['NL']);
+  });
+
+  it('orders in_progress trips soonest-departure-first', () => {
+    const g = groupTripsByHorizon([
+      trip({ tripNumber: 'IP2', status: 'in_progress', daysOut: 4 }),
+      trip({ tripNumber: 'IP1', status: 'in_progress', daysOut: 1 }),
+    ], NOW);
+    expect(g.inProgress.map((t) => t.tripNumber)).toEqual(['IP1', 'IP2']);
+  });
 });

@@ -32,7 +32,8 @@ export function tripNeedsPrep(tlTrip: Trip | null, aircraft: Aircraft | undefine
 
 /** Bucket a pilot's trips into an in-progress pin plus four forward time bands,
  *  soonest departure first within each band. Self-contained: sorts internally, so
- *  callers need not pre-sort. Boundaries (7/14/30 days) are inclusive at the lower band. */
+ *  callers need not pre-sort. Boundaries (7/14/30 days) are inclusive at the lower band.
+ *  A past-due trip (departure already elapsed) that is not in_progress falls into thisWeek. */
 export function groupTripsByHorizon(trips: TripRecord[], nowUtc: string): HorizonGroups {
   const nowMs = new Date(nowUtc).getTime();
   const groups: HorizonGroups = {
