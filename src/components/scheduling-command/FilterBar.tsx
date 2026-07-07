@@ -2,6 +2,13 @@ import { Search } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Switch } from '../ui/switch';
 import type { FleetAircraft } from './fleet';
+import type { TripType } from '../../scheduling/engine';
+
+const TRIP_TYPE_OPTIONS: [TripType, string][] = [
+  ['domestic', 'Domestic'],
+  ['international', "Int'l"],
+  ['dca_dassp', 'DASSP'],
+];
 
 export const HORIZON_PRESETS = [14, 30, 60, 90] as const;
 
@@ -12,6 +19,8 @@ export function FilterBar({
   onSearch,
   tailFilter,
   onToggleTail,
+  tripTypeFilter,
+  onToggleTripType,
   actionRequiredOnly,
   onActionRequired,
   horizonDays,
@@ -22,6 +31,8 @@ export function FilterBar({
   onSearch: (s: string) => void;
   tailFilter: Set<string>;
   onToggleTail: (tail: string) => void;
+  tripTypeFilter: Set<TripType>;
+  onToggleTripType: (t: TripType) => void;
   actionRequiredOnly: boolean;
   onActionRequired: (v: boolean) => void;
   horizonDays: number;
@@ -44,6 +55,15 @@ export function FilterBar({
           <button key={ac.tail} onClick={() => onToggleTail(ac.tail)}
             className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${tailFilter.has(ac.tail) ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-input hover:text-foreground hover:bg-accent'}`}>
             {ac.tail}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-1">
+        {TRIP_TYPE_OPTIONS.map(([value, label]) => (
+          <button key={value} onClick={() => onToggleTripType(value)}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${tripTypeFilter.has(value) ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-input hover:text-foreground hover:bg-accent'}`}>
+            {label}
           </button>
         ))}
       </div>

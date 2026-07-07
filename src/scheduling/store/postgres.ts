@@ -19,6 +19,7 @@ import {
   schedulingTripLegs,
   taskInstances,
   schedulingEvents,
+  pilotVisibility,
 } from './drizzle-schema';
 import type {
   ChecklistTemplate,
@@ -201,6 +202,23 @@ export class DrizzleSchedulingStore implements SchedulingStore {
       .from(schedulingEvents)
       .where(and(eq(schedulingEvents.targetKind, target.kind), eq(schedulingEvents.targetValue, target.value)));
     return rows.map(rowToEvent);
+  }
+
+  // ─── Pilot visibility ─────────────────────────────────────────────────
+
+  async getPilotVisibility(): Promise<string[]> {
+    const rows = await this.db
+      .select()
+      .from(pilotVisibility)
+      .where(eq(pilotVisibility.visible, true));
+    return rows.map((r) => r.taskDefId);
+  }
+
+  async setPilotVisible(taskDefId: string, visible: boolean): Promise<void> {
+    await this.db
+      .insert(pilotVisibility)
+      .values({ taskDefId, visible })
+      .onConflictDoUpdate({ target: pilotVisibility.taskDefId, set: { visible } });
   }
 }
 

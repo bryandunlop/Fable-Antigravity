@@ -81,4 +81,8 @@ export interface SchedulingStore {
   getEvent(id: string): Promise<SchedulingEvent | null>;
   updateEvent(e: SchedulingEvent): Promise<void>;
   listEventsForTarget(target: EventTarget): Promise<SchedulingEvent[]>;
+
+  // Pilot-visibility config — which per-trip checklist items pilots see as completed.
+  getPilotVisibility(): Promise<string[]>;                          // visible taskDefIds
+  setPilotVisible(taskDefId: string, visible: boolean): Promise<void>;
 }

@@ -8,3 +8,5 @@ export { deriveSchedulingReadiness } from './readiness';
 export type { ReadinessState, Readiness } from './readiness';
 export { applyTaskAction } from './tasks';
 export type { TaskAction } from './tasks';
+export { perTripTaskDefs, defaultPilotVisibleDefs } from './pilotVisibility';
+export type { PilotTaskDef } from './pilotVisibility';

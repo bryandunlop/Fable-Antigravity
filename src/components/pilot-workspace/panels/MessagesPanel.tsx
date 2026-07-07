@@ -11,7 +11,10 @@ export default function MessagesPanel() {
     let cancelled = false;
     (async () => {
       const all = await store.listEventsForTarget({ kind: 'role', value: 'pilot' });
-      if (!cancelled) setEvents(all);
+      // Handoff-completion items are shown read-only in the Trip prep panel now — exclude them
+      // here so pilots don't see a duplicate, still-ackable copy of the same item.
+      const msgs = all.filter((e) => !e.type.startsWith('handoff:'));
+      if (!cancelled) setEvents(msgs);
     })();
     return () => { cancelled = true; };
   }, [store, tick]);

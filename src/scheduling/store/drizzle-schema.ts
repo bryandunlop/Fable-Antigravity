@@ -98,3 +98,8 @@ export const schedulingEvents = pgTable('scheduling_events', {
   ackedBy: text('acked_by'),
   ackedAtUtc: timestamp('acked_at_utc', { withTimezone: true }),
 });
+
+export const pilotVisibility = pgTable('pilot_visibility', {
+  taskDefId: text('task_def_id').primaryKey(),
+  visible: boolean('visible').notNull(),
+});

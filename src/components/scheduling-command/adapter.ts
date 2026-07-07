@@ -33,6 +33,7 @@ export interface BoardTrip {
   readinessScore: number; // engine completion × 100
   criticalBlocker?: string; // blocked task title (+ note)
   isInternational: boolean;
+  tripType: TripRecord['tripType'];
   priority: TripRecord['priority'];
   tripStatus: TripRecord['status'];
   tasks: BoardTask[];
@@ -84,6 +85,7 @@ export function boardTripOf(trip: TripRecord, instances: TaskInstance[]): BoardT
     readinessScore: Math.round(readiness.completion * 100),
     criticalBlocker: blocked ? (blocked.notes ? `${blocked.title} — ${blocked.notes}` : blocked.title) : undefined,
     isInternational: trip.tripType === 'international',
+    tripType: trip.tripType,
     priority: trip.priority,
     tripStatus: trip.status,
     tasks: instances.map(toBoardTask).sort((a, b) => a.order - b.order),

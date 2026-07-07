@@ -6,6 +6,7 @@ export class InMemorySchedulingStore implements SchedulingStore {
   private trips = new Map<string, TripRecord>();
   private instances = new Map<string, TaskInstance>();
   private events = new Map<string, SchedulingEvent>();
+  private pilotVisible = new Set<string>();
 
   async saveTemplate(t: ChecklistTemplate): Promise<ChecklistTemplate> {
     this.templates.set(`${t.id}:${t.version}`, structuredClone(t));
@@ -49,5 +50,10 @@ export class InMemorySchedulingStore implements SchedulingStore {
     return [...this.events.values()]
       .filter((e) => e.target.kind === target.kind && e.target.value === target.value)
       .map((e) => structuredClone(e));
+  }
+
+  async getPilotVisibility(): Promise<string[]> { return [...this.pilotVisible]; }
+  async setPilotVisible(taskDefId: string, visible: boolean): Promise<void> {
+    if (visible) this.pilotVisible.add(taskDefId); else this.pilotVisible.delete(taskDefId);
   }
 }

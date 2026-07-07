@@ -19,7 +19,7 @@ function trip(depDaysFromNow: number, tasks: BoardTask[], p: Partial<BoardTrip> 
     id: `t${seq++}`, tripNumber: `T-2026-07${seq}`, client: 'Domestic', aircraft: 'N2PG',
     aircraftType: 'G650ER', route: 'KLUK → KTEB',
     departureDate: new Date(NOW + depDaysFromNow * DAY).toISOString(), durationDays: 2,
-    readinessScore: 50, isInternational: false, priority: 'standard', tripStatus: 'planning',
+    readinessScore: 50, isInternational: false, tripType: 'domestic', priority: 'standard', tripStatus: 'planning',
     tasks, ...p,
   };
 }

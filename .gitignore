@@ -40,3 +40,4 @@ docs/superpowers/
 
 # Drizzle migration output (we use db:push, no migrations committed)
 drizzle/
+.env*

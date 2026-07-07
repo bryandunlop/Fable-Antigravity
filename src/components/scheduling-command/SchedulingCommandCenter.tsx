@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { CalendarDays, ClipboardList, Inbox as InboxIcon, LayoutList, ListChecks, Loader2, Plus, Rows3, Send } from 'lucide-react';
+import { CalendarClock, CalendarDays, ClipboardList, Eye, Inbox as InboxIcon, LayoutList, ListChecks, Loader2, Plus, Rows3, Send } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
 import TemplatesPanel from '../scheduling-workspace/TemplatesPanel';
 import InboxPanel from '../scheduling-workspace/InboxPanel';
 import ForeFlightPanel from '../scheduling-workspace/ForeFlightPanel';
+import PilotVisibilityPanel from '../scheduling-workspace/PilotVisibilityPanel';
 import type { TaskAction } from '../../scheduling/engine/tasks';
 import { boardTripOf, toBoardTask, type BoardTrip, type BoardTask } from './adapter';
 import { readFleetServiceability } from '../tech-log/bridge';
@@ -20,14 +21,19 @@ import { FilterBar } from './FilterBar';
 import { TripDrawer } from './TripDrawer';
 import { NewTripDialog } from './NewTripDialog';
 import { buildRunBoard, type RunTask } from './runBoardSelectors';
+import { buildUpcomingBoard } from './upcomingLanesSelectors';
+import { UpcomingLanes } from './UpcomingLanes';
+import { matchesTripTypeFilter } from './tripFilters';
+import type { TripType } from '../../scheduling/engine';
 
-type Surface = 'schedule' | 'action' | 'templates' | 'inbox' | 'foreflight';
+type Surface = 'schedule' | 'upcoming' | 'action' | 'templates' | 'inbox' | 'foreflight' | 'pilot-visibility';
 type ScheduleView = 'board' | 'calendar' | 'list';
 
 const UTILITY_TABS: { key: Surface; label: string; icon: React.ElementType }[] = [
   { key: 'templates', label: 'Templates', icon: ClipboardList },
   { key: 'inbox', label: 'Inbox', icon: InboxIcon },
   { key: 'foreflight', label: 'ForeFlight', icon: Send },
+  { key: 'pilot-visibility', label: 'Pilot visibility', icon: Eye },
 ];
 
 /**
@@ -50,6 +56,7 @@ export default function SchedulingCommandCenter({
   const [scheduleView, setScheduleView] = useState<ScheduleView>('board');
   const [searchTerm, setSearchTerm] = useState('');
   const [tailFilter, setTailFilter] = useState<Set<string>>(new Set());
+  const [tripTypeFilter, setTripTypeFilter] = useState<Set<TripType>>(new Set());
   const [actionRequiredOnly, setActionRequiredOnly] = useState(false);
   const [horizonDays, setHorizonDays] = useState(30);
   const [funnelFilters, setFunnelFilters] = useState<Set<FunnelFilter>>(new Set());
@@ -97,6 +104,7 @@ export default function SchedulingCommandCenter({
 
   const filteredTrips = useMemo(() => trips.filter(t => {
     if (tailFilter.size > 0 && !tailFilter.has(t.aircraft)) return false;
+    if (!matchesTripTypeFilter(t.tripType, tripTypeFilter)) return false;
     if (actionRequiredOnly) {
       const s = deriveTripStatus(t, nowMs);
       if (s !== 'blocked' && s !== 'behind' && s !== 'attention' && s !== 'uninteracted') return false;
@@ -108,12 +116,18 @@ export default function SchedulingCommandCenter({
     }
     return true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [trips, tailFilter, actionRequiredOnly, searchTerm]);
+  }), [trips, tailFilter, tripTypeFilter, actionRequiredOnly, searchTerm]);
 
   const runModel = useMemo(
     () => buildRunBoard(filteredTrips, officeTasks, nowMs, horizonDays),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filteredTrips, officeTasks, horizonDays],
+  );
+
+  const upcomingModel = useMemo(
+    () => buildUpcomingBoard(filteredTrips, nowMs, horizonDays),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredTrips, horizonDays],
   );
 
   const openTrip = (tripId: string, taskId?: string) => setDrawer({ tripId, taskId });
@@ -127,6 +141,8 @@ export default function SchedulingCommandCenter({
   };
   const toggleTail = (tail: string) =>
     setTailFilter(prev => { const s = new Set(prev); s.has(tail) ? s.delete(tail) : s.add(tail); return s; });
+  const toggleTripType = (t: TripType) =>
+    setTripTypeFilter(prev => { const s = new Set(prev); s.has(t) ? s.delete(t) : s.add(t); return s; });
   const toggleFunnel = (f: FunnelFilter) =>
     setFunnelFilters(prev => { const s = new Set(prev); s.has(f) ? s.delete(f) : s.add(f); return s; });
 
@@ -138,7 +154,7 @@ export default function SchedulingCommandCenter({
     );
   }
 
-  const showsFilterBar = surface === 'schedule' || surface === 'action';
+  const showsFilterBar = surface === 'schedule' || surface === 'upcoming' || surface === 'action';
 
   return (
     <div className="space-y-4">
@@ -157,10 +173,13 @@ export default function SchedulingCommandCenter({
 
       {/* Surfaces: two primary + quiet utilities */}
       <div className="flex flex-wrap items-center gap-3 border-b pb-px">
-        <Tabs value={surface === 'schedule' || surface === 'action' ? surface : ''} className="w-auto">
+        <Tabs value={surface === 'schedule' || surface === 'upcoming' || surface === 'action' ? surface : ''} className="w-auto">
           <TabsList>
             <TabsTrigger value="schedule" onClick={() => setSurface('schedule')}>
               <Rows3 className="h-4 w-4 mr-1.5" /> Schedule
+            </TabsTrigger>
+            <TabsTrigger value="upcoming" onClick={() => setSurface('upcoming')}>
+              <CalendarClock className="h-4 w-4 mr-1.5" /> Upcoming
             </TabsTrigger>
             <TabsTrigger value="action" onClick={() => setSurface('action')}>
               <ListChecks className="h-4 w-4 mr-1.5" /> Action Center
@@ -199,6 +218,7 @@ export default function SchedulingCommandCenter({
           fleet={fleetRowsFor(trips)}
           searchTerm={searchTerm} onSearch={setSearchTerm}
           tailFilter={tailFilter} onToggleTail={toggleTail}
+          tripTypeFilter={tripTypeFilter} onToggleTripType={toggleTripType}
           actionRequiredOnly={actionRequiredOnly} onActionRequired={setActionRequiredOnly}
           horizonDays={horizonDays} onHorizon={setHorizonDays}
         />
@@ -214,6 +234,9 @@ export default function SchedulingCommandCenter({
       {surface === 'schedule' && scheduleView === 'list' && (
         <DispatchTable trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
       )}
+      {surface === 'upcoming' && (
+        <UpcomingLanes model={upcomingModel} onOpenTrip={openTrip} />
+      )}
       {surface === 'action' && (
         <RunBoard
           model={runModel} trips={filteredTrips}
@@ -224,6 +247,7 @@ export default function SchedulingCommandCenter({
       {surface === 'templates' && <TemplatesPanel userRole={userRole} additionalRoles={additionalRoles} />}
       {surface === 'inbox' && <InboxPanel defaultTargetRole="pilot" />}
       {surface === 'foreflight' && <ForeFlightPanel />}
+      {surface === 'pilot-visibility' && <PilotVisibilityPanel />}
 
       {/* The trip workspace, over whichever view you're in */}
       <TripDrawer

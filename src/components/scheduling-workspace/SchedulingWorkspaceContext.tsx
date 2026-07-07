@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { InMemorySchedulingStore, SchedulingService, seedTemplates, seedDemoTrips, seedVolumeTrips } from '../../scheduling/store';
+import { defaultPilotVisibleDefs } from '../../scheduling/engine';
 
 interface SchedulingWorkspaceContextValue {
   service: SchedulingService;
@@ -33,6 +34,10 @@ function ensureSeeded(): Promise<void> {
   if (!seedPromise) {
     seedPromise = (async () => {
       await seedTemplates(store);
+      // Default pilot-visible set = the per-trip items that already hand off to the pilot.
+      for (const id of defaultPilotVisibleDefs(await store.listPublishedTemplates())) {
+        await store.setPilotVisible(id, true);
+      }
       // Demo trips so every role lands on a populated Trips tab + ForeFlight push list.
       // Stable trip ids make this idempotent across StrictMode remounts. Remove this
       // one call for a clean/empty workspace.
