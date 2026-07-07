@@ -1,6 +1,6 @@
 import type {
   DueRule, Condition, ChecklistTemplate, TaskDefinition, RecurringScope, TripType,
-  HandoffTarget, HandoffChannel,
+  HandoffTarget, HandoffChannel, AppliesTo, AirportEndpoint, AirportMatch, ReTrigger,
 } from '../engine';
 
 function isObj(x: unknown): x is Record<string, unknown> {
@@ -24,6 +24,8 @@ const RECURRING_SCOPES: RecurringScope[] = ['daily', 'monthly', 'quarterly'];
 const TRIP_TYPES: TripType[] = ['domestic', 'international', 'dca_dassp'];
 const HANDOFF_KINDS = ['role', 'dept', 'person'];
 const HANDOFF_CHANNELS = ['inbox', 'teams', 'email'];
+const AIRPORT_ENDPOINTS = ['departure', 'arrival', 'both'];
+const RE_TRIGGERS = ['legScheduleChange', 'aircraftChange', 'passengerChange'];
 
 export function parseDueRule(raw: unknown): DueRule {
   if (!isObj(raw)) throw new Error('dueRule: not an object');
@@ -76,6 +78,36 @@ export function parseCondition(raw: unknown): Condition {
   }
 }
 
+function parseAppliesTo(raw: unknown): AppliesTo {
+  if (!isObj(raw)) throw new Error('appliesTo: not an object');
+  const endpoint = reqStr(raw, 'endpoint', 'appliesTo');
+  if (!AIRPORT_ENDPOINTS.includes(endpoint)) throw new Error(`appliesTo: invalid endpoint '${endpoint}'`);
+  const a = raw.airport;
+  if (!isObj(a)) throw new Error('appliesTo.airport: not an object');
+  if (a.kind === 'exact') {
+    return { endpoint: endpoint as AirportEndpoint, airport: { kind: 'exact', icao: reqStr(a, 'icao', 'appliesTo.airport') } };
+  }
+  if (a.kind === 'prefix') {
+    const airport: AirportMatch = { kind: 'prefix', prefix: reqStr(a, 'prefix', 'appliesTo.airport') };
+    if (a.except !== undefined) {
+      if (!Array.isArray(a.except) || !a.except.every((x) => typeof x === 'string')) {
+        throw new Error('appliesTo.airport.except: not a string[]');
+      }
+      airport.except = a.except as string[];
+    }
+    return { endpoint: endpoint as AirportEndpoint, airport };
+  }
+  throw new Error(`appliesTo.airport: invalid kind '${String(a.kind)}'`);
+}
+
+function parseReTriggerOn(raw: unknown): ReTrigger[] {
+  if (!Array.isArray(raw)) throw new Error('reTriggerOn: not an array');
+  return raw.map((r) => {
+    if (typeof r !== 'string' || !RE_TRIGGERS.includes(r)) throw new Error(`reTriggerOn: invalid value '${String(r)}'`);
+    return r as ReTrigger;
+  });
+}
+
 function parseTaskDef(raw: unknown): TaskDefinition {
   if (!isObj(raw)) throw new Error('taskDefinition: not an object');
   const def: TaskDefinition = {
@@ -112,6 +144,8 @@ function parseTaskDef(raw: unknown): TaskDefinition {
     def.handoffTarget = target;
   }
   if (typeof raw.dependsOn === 'string') def.dependsOn = raw.dependsOn;
+  if (raw.appliesTo !== undefined) def.appliesTo = parseAppliesTo(raw.appliesTo);
+  if (raw.reTriggerOn !== undefined) def.reTriggerOn = parseReTriggerOn(raw.reTriggerOn);
   return def;
 }
 

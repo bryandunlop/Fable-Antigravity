@@ -54,3 +54,31 @@ describe('applyTaskAction §7', () => {
     expect(next.auditTrail[1]).toMatchObject({ actor: 'user:sched1', action: 'status:n_a', atUtc: NOW });
   });
 });
+
+describe('applyTaskAction reopen (Phase 2)', () => {
+  it('reopens a completed+acked task: resets status/ack/completion, sets reflag, refreshes due', () => {
+    const done = t({
+      requiresAck: true, ackState: 'acked', ackedBy: 'p', ackedAtUtc: NOW,
+      status: 'done', completedBy: 'p', completedAtUtc: NOW,
+    });
+    const re = applyTaskAction(
+      done,
+      { kind: 'reopen', change: 'passengerChange', detail: 'pax +1', newDueAtUtc: '2026-07-01T00:00:00.000Z' },
+      'system', NOW,
+    );
+    expect(re.status).toBe('open');
+    expect(re.ackState).toBe('pending');
+    expect(re.ackedBy).toBeUndefined();
+    expect(re.completedBy).toBeUndefined();
+    expect(re.reflag).toEqual({ change: 'passengerChange' });
+    expect(re.dueAtUtc).toBe('2026-07-01T00:00:00.000Z');
+    expect(re.auditTrail[re.auditTrail.length - 1]).toMatchObject({ action: 'reopened:passengerChange', detail: 'pax +1' });
+  });
+
+  it('complete clears the reflag', () => {
+    const flagged = t({ reflag: { change: 'aircraftChange' } });
+    const done = applyTaskAction(flagged, { kind: 'complete' }, 'x', NOW);
+    expect(done.status).toBe('done');
+    expect(done.reflag).toBeUndefined();
+  });
+});

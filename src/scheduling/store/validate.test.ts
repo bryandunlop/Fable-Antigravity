@@ -75,3 +75,38 @@ describe('parseTemplate', () => {
     expect(() => parseTemplate({ ...good, taskDefinitions: [bad] })).toThrow(/requiresAck/i);
   });
 });
+
+describe('parseTaskDef — Phase 2 appliesTo + reTriggerOn', () => {
+  const good = {
+    id: 't', name: 'D', triggerType: 'per_trip', scope: 'domestic', version: 1,
+    status: 'published', effectiveFrom: '2026-01-01T00:00:00.000Z',
+    taskDefinitions: [{ id: 'a', title: 'x', ownerRole: 'scheduling', category: 'ops', order: 1,
+      dueRule: { kind: 'hoursBeforeEtd', hours: 24 }, requiresAck: false }],
+  };
+  const withDef = (extra: Record<string, unknown>) =>
+    parseTemplate({ ...good, taskDefinitions: [{ ...good.taskDefinitions[0], ...extra }] });
+
+  it('accepts appliesTo (prefix+except) and reTriggerOn', () => {
+    const d = withDef({
+      appliesTo: { endpoint: 'both', airport: { kind: 'prefix', prefix: 'K', except: ['KLUK'] } },
+      reTriggerOn: ['legScheduleChange', 'aircraftChange'],
+    }).taskDefinitions[0];
+    expect(d.appliesTo).toEqual({ endpoint: 'both', airport: { kind: 'prefix', prefix: 'K', except: ['KLUK'] } });
+    expect(d.reTriggerOn).toEqual(['legScheduleChange', 'aircraftChange']);
+  });
+  it('accepts an exact-airport appliesTo', () => {
+    expect(withDef({ appliesTo: { endpoint: 'arrival', airport: { kind: 'exact', icao: 'KBOS' } } }).taskDefinitions[0].appliesTo)
+      .toEqual({ endpoint: 'arrival', airport: { kind: 'exact', icao: 'KBOS' } });
+  });
+  it('rejects an invalid endpoint', () => {
+    expect(() => withDef({ appliesTo: { endpoint: 'sideways', airport: { kind: 'exact', icao: 'KBOS' } } })).toThrow(/endpoint/i);
+  });
+  it('rejects an invalid reTriggerOn value', () => {
+    expect(() => withDef({ reTriggerOn: ['legScheduleChange', 'bogus'] })).toThrow(/reTriggerOn/i);
+  });
+  it('still parses a task def with neither field (back-compat)', () => {
+    const d = withDef({}).taskDefinitions[0];
+    expect(d.appliesTo).toBeUndefined();
+    expect(d.reTriggerOn).toBeUndefined();
+  });
+});

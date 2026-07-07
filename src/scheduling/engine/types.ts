@@ -23,6 +23,28 @@ export interface DueContext {
 
 export type TripType = 'domestic' | 'international' | 'dca_dassp';
 
+/** Per-leg / exact-airport instantiation (Phase 2). */
+export type AirportEndpoint = 'departure' | 'arrival' | 'both';
+export type AirportMatch =
+  | { kind: 'exact'; icao: string }
+  | { kind: 'prefix'; prefix: string; except?: string[] };
+export interface AppliesTo {
+  endpoint: AirportEndpoint;
+  airport: AirportMatch;
+}
+/** What kind of trip change re-flags a completed task (Phase 2). */
+export type ReTrigger = 'legScheduleChange' | 'aircraftChange' | 'passengerChange';
+
+export interface LegContext {
+  legId: string;
+  sequence: number;
+  departureIcao: string;
+  arrivalIcao: string;
+  departureTimeUtc: string;
+  arrivalTimeUtc?: string;
+  paxCount: number;
+}
+
 export interface TripContext {
   tripId: string;
   tripType: TripType;
@@ -33,6 +55,9 @@ export interface TripContext {
   isWeekendDeparture: boolean;
   /** Every leg's departure + arrival ICAO, upper-cased and deduped. */
   routeIcaos: string[];
+  /** Per-leg context for per-airport instantiation + reconcile (Phase 2). Optional for
+   *  back-compat with trip-level-only callers; toTripContext populates it for real trips. */
+  legs?: LegContext[];
 }
 
 export type Condition =
@@ -76,6 +101,10 @@ export interface TaskDefinition {
   escalation?: EscalationRule;
   condition?: Condition;      // undefined == always
   handoffTarget?: HandoffTarget;
+  /** Per-airport instantiation (Phase 2). undefined = trip-level (one instance per trip). */
+  appliesTo?: AppliesTo;
+  /** Which trip changes re-flag a completed instance (Phase 2). undefined/empty = never. */
+  reTriggerOn?: ReTrigger[];
   dependsOn?: string; // task-def id — NOTE: declared for future dependency gating; the engine does NOT enforce it (instantiate ignores it; readiness never derives BLOCKED from it). A later Plan 2/3 store/UI concern.
 }
 
@@ -90,7 +119,7 @@ export interface ChecklistTemplate {
   taskDefinitions: TaskDefinition[];
 }
 
-export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'n_a';
+export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'n_a' | 'cancelled';
 export type AckState = 'n_a' | 'pending' | 'acked';
 
 export interface AuditEntry {
@@ -126,6 +155,12 @@ export interface TaskInstance {
   notes?: string;
   handoffTarget?: HandoffTarget;
   escalation?: EscalationRule;
+  /** Per-airport instance provenance (Phase 2): which leg + endpoint this instance is for. */
+  legId?: string;
+  airportIcao?: string;
+  airportRole?: 'departure' | 'arrival';
+  /** Set when a completed task was re-opened by a trip change; cleared on re-completion. */
+  reflag?: { change: ReTrigger };
   auditTrail: AuditEntry[];
 }
 
