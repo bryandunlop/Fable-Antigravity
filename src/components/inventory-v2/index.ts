@@ -7,7 +7,6 @@ export { InventoryV2Provider, useInventoryV2 } from './InventoryV2Context';
 export { default as AircraftInspections } from './pages/AircraftInspections';
 export { default as InspectionForm } from './pages/InspectionForm';
 export { default as InspectionReview } from './pages/InspectionReview';
-export { default as RecentlyCompleted } from './pages/RecentlyCompleted';
 export { default as Replenish } from './pages/Replenish';
 export { default as UnitItemRequest } from './pages/UnitItemRequest';
 export { default as UnitItemRequestList } from './pages/UnitItemRequestList';

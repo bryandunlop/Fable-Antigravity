@@ -30,7 +30,7 @@ export const GROUPS_MAINT: NavGroup[] = [
     key: 'airworthiness', label: 'Airworthiness', to: '/tech-log/airworthiness/forecast',
     match: (p) => p.startsWith('/tech-log/airworthiness'),
     sub: [
-      { label: 'Forecast', to: '/tech-log/airworthiness/forecast' },
+      { label: 'Coming due', to: '/tech-log/airworthiness/forecast' },
       { label: 'Times', to: '/tech-log/airworthiness/times' },
       { label: 'AD / SB', to: '/tech-log/airworthiness/adsb' },
       { label: 'Work Orders', to: '/tech-log/airworthiness/workorders' },

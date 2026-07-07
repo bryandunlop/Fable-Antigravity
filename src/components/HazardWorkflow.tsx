@@ -51,7 +51,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useHazards, WORKFLOW_STAGES } from '../contexts/HazardContext';
-import { useNotificationContext } from './contexts/NotificationContext';
 import ProgressTracker, { PHASES } from './HazardWorkflow/ProgressTracker';
 import { SYSTEM_USERS } from '../lib/mockUsers';
 

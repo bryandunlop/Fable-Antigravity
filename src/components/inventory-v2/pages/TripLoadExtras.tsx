@@ -93,8 +93,8 @@ function TripLoadExtrasInner({ trip, onBack }: TripLoadExtrasProps) {
           <ChevronLeft size={16} />
           {trip.tailNumber} · Pre-flight
         </button>
-        <h1 className="text-lg font-bold text-primary-foreground">Load Extras</h1>
-        <p className="text-xs text-primary-foreground/70">From commissary · Deducts stock on confirm</p>
+        <h1 className="text-lg font-bold text-primary-foreground">Pull from Commissary</h1>
+        <p className="text-xs text-primary-foreground/70">Extra stock above par · deducts from commissary on confirm. Return any unused at trip end.</p>
       </div>
 
       {/* Category pills */}
@@ -194,7 +194,7 @@ function TripLoadExtrasInner({ trip, onBack }: TripLoadExtrasProps) {
           disabled={selectedItemCount === 0}
           onClick={handleConfirm}
         >
-          {selectedItemCount === 0 ? 'Select items to load' : 'Confirm Load from Commissary'}
+          {selectedItemCount === 0 ? 'Select items to pull' : `Pull ${totalUnits} ${totalUnits === 1 ? 'unit' : 'units'} from Commissary`}
         </Button>
       </div>
     </div>

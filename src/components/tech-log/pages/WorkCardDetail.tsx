@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { currentRows } from '../engine/supersede';
@@ -82,6 +82,9 @@ export default function WorkCardDetail() {
   const allStepsDone = card.steps.length > 0 && stepsDone === card.steps.length;
   const totalLabor = Math.round(labor.reduce((s, l) => s + l.hours, 0) * 10) / 10;
   const release = card.completedReleaseId ? state.releases.find(r => r.id === card.completedReleaseId) : undefined;
+  // Due context from the CAMP due-list item this card complies with (read-view; CAMP is the system of record).
+  const forecastItem = card.forecastRef ? integration.readForecast(card.aircraftId).find(f => f.ref === card.forecastRef) : undefined;
+  const forecastDays = forecastItem?.dueDateUtc ? Math.floor((new Date(forecastItem.dueDateUtc).getTime() - Date.now()) / 86400000) : null;
   const hasRiiSteps = card.steps.some(s => s.riiRequired);
   const needsRii = card.riiRequired || hasRiiSteps;
   const riiStepsDone = riiStepsComplete(card.steps);
@@ -245,6 +248,12 @@ export default function WorkCardDetail() {
           {card.scheduled ? <Badge variant="outline">scheduled</Badge> : <Badge variant="outline">corrective</Badge>}
           {card.riiRequired && <Badge variant="outline"><UserCheck className="mr-1 h-3 w-3" />RII required</Badge>}
           {card.linkedDefectId && <Badge variant="outline">linked defect</Badge>}
+          {forecastItem && (
+            <Badge variant="outline" className={!completed && forecastDays != null && forecastDays <= 7 ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]' : ''}>
+              <CalendarClock className="mr-1 h-3 w-3" />
+              CAMP due list{forecastItem.dueDateUtc ? ` · ${new Date(forecastItem.dueDateUtc).toLocaleDateString()} · ${forecastDays != null && forecastDays < 0 ? `overdue ${Math.abs(forecastDays)}d` : `${forecastDays}d`}` : ''}
+            </Badge>
+          )}
           <span className="ml-auto text-xs text-muted-foreground">steps {stepsDone}/{card.steps.length} · labor {totalLabor} h · {parts.length} part(s)</span>
         </CardContent>
       </Card>

@@ -6,8 +6,8 @@ self.addEventListener('push', (event) => {
         const data = event.data.json();
         const options = {
             body: data.message,
-            icon: '/icons/icon-192x192.png', // Fallback icon
-            badge: '/icons/badge-72x72.png',
+            icon: '/favicon.png',
+            badge: '/favicon.png',
             vibrate: [100, 50, 100],
             data: {
                 url: data.actionUrl || '/'
@@ -29,21 +29,23 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    const urlToOpen = event.notification.data.url;
+    const urlToOpen = (event.notification.data && event.notification.data.url) || '/';
 
     event.waitUntil(
         clients.matchAll({
             type: 'window',
             includeUncontrolled: true
         }).then((windowClients) => {
-            // If a window is already open, focus it and navigate
-            for (let i = 0; i < windowClients.length; i++) {
-                const client = windowClients[i];
-                if (client.url === urlToOpen && 'focus' in client) {
-                    return client.focus();
+            // Focus an existing tab and route it to the target; otherwise open one.
+            for (const client of windowClients) {
+                if ('focus' in client) {
+                    client.focus();
+                    if ('navigate' in client) {
+                        return client.navigate(urlToOpen).catch(() => {});
+                    }
+                    return;
                 }
             }
-            // If no window is open, open a new one
             if (clients.openWindow) {
                 return clients.openWindow(urlToOpen);
             }

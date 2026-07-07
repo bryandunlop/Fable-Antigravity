@@ -47,7 +47,7 @@ import {
   Calendar as CalendarIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useNotifications } from './hooks/useNotifications';
+import { addTripReminder } from '../notifications/tripReminderStore';
 
 interface TripLeg {
   id: string;
@@ -166,9 +166,6 @@ export default function TripCoordination() {
     priority: 'medium' as const,
     type: 'general' as 'general' | 'checklist' | 'deadline' | 'milestone'
   });
-  
-  // Get notification system functions
-  const { addNotification } = useNotifications({ userRole: 'scheduling' });
 
   useEffect(() => {
     // Initialize with mock data
@@ -593,22 +590,13 @@ export default function TripCoordination() {
       ? `${newReminder.reminderDate}T${newReminder.reminderTime}:00`
       : `${newReminder.reminderDate}T09:00:00`;
 
-    const reminder = {
+    addTripReminder({
+      id: `TR_${Date.now()}`,
       title: newReminder.title,
-      message: newReminder.message || `Reminder for ${selectedTrip.tripNumber}: ${newReminder.title}`,
-      type: 'trip' as const,
-      priority: newReminder.priority,
-      timestamp: reminderDateTime,
-      isRead: false,
-      actionUrl: '/trip-coordination',
-      actionText: 'View Trip',
-      module: 'Trip Coordination',
-      relatedId: selectedTrip.id,
-      assignedBy: selectedTrip.leadScheduler
-    };
-
-    // Add to notification system
-    addNotification(reminder);
+      detail: newReminder.message || `Reminder for ${selectedTrip.tripNumber}: ${newReminder.title}`,
+      dueAtUtc: new Date(reminderDateTime).toISOString(),
+      tripId: selectedTrip.id,
+    });
 
     // Reset form
     setNewReminder({

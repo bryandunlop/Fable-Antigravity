@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useHazards, WORKFLOW_STAGES, Hazard } from '../contexts/HazardContext';
-import { useNotificationContext } from './contexts/NotificationContext';
+import { eventStore } from '../notifications/events';
 import { useAudits, Audit } from '../contexts/AuditContext';
 import AuditDetailDrawer from './audit/AuditDetailDrawer';
 
@@ -88,7 +88,6 @@ interface UnifiedTasksActionItemsProps {
 
 export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksActionItemsProps) {
   const navigate = useNavigate();
-  const { addNotification } = useNotificationContext();
   const [activeTab, setActiveTab] = useState('action-items');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -533,31 +532,21 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
   const userActionItems = applyWaiverDecisions([...getUserActionItems(MOCK_ACTION_ITEMS, userRole), ...getHazardTasks(), ...getWaiverApprovalTasks(), ...getAuditTasks()]);
   const actionItemsStats = getStats(userActionItems);
 
-  // Fire notification center alert for pending waiver tasks on first load
+  // Surface pending waiver decisions as events (publish is idempotent by id)
   useEffect(() => {
-    const pendingWaivers = userActionItems.filter(
-      item => item.module === 'Waiver Approval' && item.status === 'Pending'
-    );
-    if (pendingWaivers.length > 0) {
-      const notifKey = `waiver_notif_${pendingWaivers.map(w => w.id).join('_')}`;
-      const alreadyNotified = sessionStorage.getItem(notifKey);
-      if (!alreadyNotified) {
-        pendingWaivers.forEach(waiver => {
-          addNotification({
-            title: `Waiver Pending Your Decision: ${waiver.title.replace('Waiver Final Approval: ', '').replace('Waiver Approval: ', '')}`,
-            message: waiver.description,
-            type: 'safety',
-            priority: waiver.priority.toLowerCase() as 'low' | 'medium' | 'high' | 'critical',
-            module: 'Waiver Approval',
-            actionUrl: '/tasks-action-items',
-            actionText: 'Review Now',
-            relatedId: waiver.id,
-            assignedBy: waiver.assignedBy
-          });
+    userActionItems
+      .filter(item => item.module === 'Waiver Approval' && item.status === 'Pending')
+      .forEach(waiver => {
+        eventStore.publish({
+          id: `waiver-pending:${waiver.id}`,
+          severity: 'warn',
+          title: `Waiver pending your decision: ${waiver.title.replace('Waiver Final Approval: ', '').replace('Waiver Approval: ', '')}`,
+          detail: waiver.description,
+          module: 'Waiver Approval',
+          link: '/tasks-action-items',
+          audienceRoles: ['lead', 'admin'],
         });
-        sessionStorage.setItem(notifKey, 'true');
-      }
-    }
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1780,16 +1769,14 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
                     const decisionLabel = waiverDecision === 'approved' ? 'Approved' : waiverDecision === 'denied' ? 'Denied' : 'Marked In Progress';
 
                     // Notify the Safety Manager
-                    addNotification({
-                      title: `Waiver ${decisionLabel}: ${decidingWaiverItem.title}`,
-                      message: `The waiver request has been ${decisionLabel.toLowerCase()} by the ${userRole === 'lead' ? 'Chief Pilot' : 'VP'}. ${waiverDecisionComment ? `Comment: ${waiverDecisionComment}` : ''}`,
-                      type: 'safety',
-                      priority: waiverDecision === 'denied' ? 'high' : 'medium',
+                    eventStore.publish({
+                      id: `waiver-decision:${decidingWaiverItem.id}`,
+                      severity: waiverDecision === 'denied' ? 'warn' : 'info',
+                      title: `Waiver ${decisionLabel.toLowerCase()}: ${decidingWaiverItem.title}`,
+                      detail: `The waiver request has been ${decisionLabel.toLowerCase()} by the ${userRole === 'lead' ? 'Chief Pilot' : 'VP'}.${waiverDecisionComment ? ` Comment: ${waiverDecisionComment}` : ''}`,
                       module: 'Waiver Approval',
-                      actionUrl: '/tasks-action-items',
-                      actionText: 'View Decision',
-                      relatedId: decidingWaiverItem.id,
-                      assignedBy: decidingWaiverItem.assignedBy
+                      link: '/tasks-action-items',
+                      audienceRoles: ['safety', 'admin'],
                     });
 
                     // Update the waiver decision tracking state

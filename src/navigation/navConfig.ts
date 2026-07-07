@@ -96,6 +96,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/fuel-load-request', label: 'Fuel Load Request', domain: 'flight-ops', icon: Fuel, primary: false, roles: ['pilot', 'admin'] },
   { path: '/frat/review', label: 'FRAT Review', domain: 'flight-ops', icon: FileText, sidebar: false, roles: ['safety', 'admin'] },
   { path: '/flight-operations-center', label: 'Flight Operations Center', domain: 'flight-ops', icon: Monitor, sidebar: false, keywords: ['foc', 'ops center'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  { path: '/flight-operations-bulletins', label: 'Flight Ops Bulletins', domain: 'flight-ops', icon: BookOpen, primary: false, keywords: ['fob', 'bulletin', 'interim', 'nonofficial', 'read and initial'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/aircraft', label: 'Aircraft Status', domain: 'flight-ops', icon: Plane, sidebar: false, keywords: ['fleet', 'tail number', 'status'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   { path: '/fleet-map', label: 'Live Fleet Map', domain: 'flight-ops', icon: MapPin, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
 
@@ -125,9 +126,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/inventory-v2/replenish', label: 'Replenish', domain: 'inventory', icon: PackagePlus, primary: true, keywords: ['restock'], roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/unit-requests', label: 'Unit Requests', domain: 'inventory', icon: Send, primary: true, roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/settings', label: 'Inventory Settings', domain: 'inventory', icon: Settings, primary: false, keywords: ['par levels', 'fleet', 'items'], roles: ['admin', 'commissary-manager'] },
-  { path: '/inventory-v2/alerts', label: 'Stock Alerts', domain: 'inventory', icon: AlertTriangle, sidebar: false, roles: ['commissary-manager', 'admin'] },
   { path: '/inventory-v2/activity-log', label: 'Activity Log', domain: 'inventory', icon: Activity, sidebar: false, roles: ['inflight', 'admin'] },
-  { path: '/inventory-v2/recently-completed', label: 'Recently Completed', domain: 'inventory', icon: ClipboardCheck, sidebar: false, roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/unit-request', label: 'New Unit Request', domain: 'inventory', icon: Send, sidebar: false, searchable: false, roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/inspection', label: 'Inspection', domain: 'inventory', icon: ClipboardCheck, sidebar: false, searchable: false, detailLabel: 'Review', roles: ['inflight', 'admin'] },
 

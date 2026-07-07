@@ -310,7 +310,7 @@ export default function LiveMetricsDashboard() {
                 <Plane className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-bold text-white tracking-wide uppercase">P&G Global Flight Ops</h1>
+                <h1 className="text-sm font-bold text-white tracking-wide uppercase">Flight Operations</h1>
                 <div className="text-[10px] text-[var(--color-pg-cyan)] tracking-wider">LIVE DASHBOARD</div>
               </div>
             </div>

@@ -5,7 +5,6 @@ import { Toaster } from 'sonner';
 import NetworkStatus from './components/NetworkStatus';
 import { HazardProvider } from './contexts/HazardContext';
 import { MaintenanceProvider } from './components/contexts/MaintenanceContext';
-import { NotificationProvider, useNotificationContext } from './components/contexts/NotificationContext';
 import { PassengerFormProvider } from './components/contexts/PassengerFormContext';
 import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
@@ -82,6 +81,10 @@ import FormFieldManager from './components/FormFieldManager';
 import FRATFormBuilder from './components/FRATFormBuilder';
 import GRATFormBuilder from './components/GRATFormBuilder';
 import ProceduralBulletins from './components/ProceduralBulletins';
+import FlightOperationsBulletins from './components/bulletins/FlightOperationsBulletins';
+import { BulletinProvider } from './components/bulletins/BulletinContext';
+import { PassengerProvider } from './components/passengers/PassengerContext';
+import FlightAttendantFlights from './components/inflight/FlightAttendantFlights';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 import UnifiedTripWorkspace from './components/experimental/UnifiedTripWorkspace';
 import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
@@ -129,7 +132,6 @@ import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Contex
 import InspectionFormV2 from './components/inventory-v2/pages/InspectionForm';
 import InspectionReviewV2 from './components/inventory-v2/pages/InspectionReview';
 import AircraftInspectionsV2 from './components/inventory-v2/pages/AircraftInspections';
-import RecentlyCompletedV2 from './components/inventory-v2/pages/RecentlyCompleted';
 import ReplenishV2 from './components/inventory-v2/pages/Replenish';
 import UnitItemRequestV2 from './components/inventory-v2/pages/UnitItemRequest';
 import UnitItemRequestListV2 from './components/inventory-v2/pages/UnitItemRequestList';
@@ -137,7 +139,6 @@ import SettingsV2 from './components/inventory-v2/pages/Settings';
 import CommissaryHome from './components/inventory-v2/pages/CommissaryHome';
 import CommissaryLocation from './components/inventory-v2/pages/CommissaryLocation';
 import CommissaryItemDetail from './components/inventory-v2/pages/CommissaryItemDetail';
-import AlertsPage from './components/inventory-v2/pages/AlertsPage';
 import TripListV2 from './components/inventory-v2/pages/TripList';
 import TripHomeV2 from './components/inventory-v2/pages/TripHome';
 import GroceryListPageV2 from './components/inventory-v2/pages/GroceryListPage';
@@ -145,14 +146,13 @@ import LegReconciliationV2 from './components/inventory-v2/pages/LegReconciliati
 import CommissaryKiosk from './components/inventory-v2/pages/CommissaryKiosk';
 import ActivityLog from './components/inventory-v2/pages/ActivityLog';
 
-// ─── Wrapper: bridges NotificationContext into InventoryV2Provider ───────────
+// ─── Wrapper: bridges into InventoryV2Provider ───────────────────────────────
 // Must live outside App so it's a stable component reference, but it's defined
 // here because it needs to be inside the module scope where InventoryV2Provider
-// is imported. It reads from NotificationProvider (which wraps all routes).
+// is imported.
 function InventoryRouteWrapper({ children, userRole }: { children: React.ReactNode; userRole: string }) {
-  const { addNotification } = useNotificationContext();
   return (
-    <InventoryV2Provider userRole={userRole} addNotification={addNotification}>
+    <InventoryV2Provider userRole={userRole}>
       {children}
     </InventoryV2Provider>
   );
@@ -177,12 +177,13 @@ export default function App() {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <NotificationProvider>
-        <MaintenanceProvider>
+      <MaintenanceProvider>
           <HazardProvider>
             <AuditProvider>
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
+                <BulletinProvider>
+                <PassengerProvider>
                 <Router>
                   <Routes>
                     {/* Public Routes - No Authentication Required */}
@@ -362,6 +363,7 @@ export default function App() {
                                 <Route path="/safety/audits" element={<InternalAuditManagement />} />
                                 <Route path="/safety/compliance" element={<DocumentCompliance />} />
                                 <Route path="/procedural-bulletins" element={<ProceduralBulletins userRole={userRole} />} />
+                                <Route path="/flight-operations-bulletins" element={<FlightOperationsBulletins userRole={userRole} />} />
                                 <Route
                                   path="/safety/form-fields"
                                   element={
@@ -428,9 +430,8 @@ export default function App() {
                                 {/* ─── Inventory V2 Routes ─── */}
                                 <Route path="/inventory-v2" element={<Navigate to="/inventory-v2/inspections" replace />} />
                                 <Route path="/inventory-v2/inspection" element={<InventoryRouteWrapper userRole={userRole}><InspectionFormV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/inspection/:id/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/inspection/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/inspections" element={<InventoryRouteWrapper userRole={userRole}><AircraftInspectionsV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/recently-completed" element={<InventoryRouteWrapper userRole={userRole}><RecentlyCompletedV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/replenish" element={<InventoryRouteWrapper userRole={userRole}><ReplenishV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/unit-request" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/unit-requests" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestListV2 /></InventoryRouteWrapper>} />
@@ -438,7 +439,6 @@ export default function App() {
                                 <Route path="/inventory-v2/commissary" element={<InventoryRouteWrapper userRole={userRole}><CommissaryHome /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/commissary/location/:locationId" element={<InventoryRouteWrapper userRole={userRole}><CommissaryLocation /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/commissary/item/:itemId" element={<InventoryRouteWrapper userRole={userRole}><CommissaryItemDetail /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/alerts" element={<InventoryRouteWrapper userRole={userRole}><AlertsPage /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips" element={<InventoryRouteWrapper userRole={userRole}><TripListV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId" element={<InventoryRouteWrapper userRole={userRole}><TripHomeV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryRouteWrapper userRole={userRole}><GroceryListPageV2 /></InventoryRouteWrapper>} />
@@ -486,7 +486,7 @@ export default function App() {
                                 <Route path="/passenger-forms" element={<PassengerForms />} />
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
                                 <Route path="/aog-management" element={<AOGManagement />} />
-                                <Route path="/upcoming-flights" element={<UpcomingFlights userRole={userRole} />} />
+                                <Route path="/upcoming-flights" element={userRole === 'inflight' ? <FlightAttendantFlights /> : <UpcomingFlights userRole={userRole} />} />
                                 <Route path="/tech-log/*" element={<TechLogRoutes userRole={userRole} />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
@@ -594,12 +594,13 @@ export default function App() {
                     } />
                   </Routes>
                 </Router>
+                </PassengerProvider>
+                </BulletinProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
             </AuditProvider>
           </HazardProvider>
         </MaintenanceProvider>
-      </NotificationProvider>
     </ThemeProvider>
   );
 }

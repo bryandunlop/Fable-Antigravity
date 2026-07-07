@@ -11,7 +11,7 @@ import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
 import { toast } from 'sonner';
-import { useNotificationContext } from './contexts/NotificationContext';
+import { eventStore } from '../notifications/events';
 import { mergeFratSelections } from './tech-log/util/fratDraft';
 import {
   Shield,
@@ -219,8 +219,6 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
     return section.items.reduce((acc, item) => item.selected ? acc + item.score : acc, 0);
   };
 
-  const { addNotification } = useNotificationContext();
-
   // Accordion: sections start collapsed except those already carrying a selection (e.g. a resumed draft).
   const [openSections, setOpenSections] = useState<Set<number>>(
     () => new Set(fratSections.flatMap((s, i) => (s.items.some((it) => it.selected) ? [i] : []))),
@@ -246,15 +244,14 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
         newStatus = 'Requires Review';
         
         // Dispatched Notification
-        addNotification({
-          title: 'Submitted FRAT Needs Approval',
-          message: `Flight ${flightNumber} has a FRAT score of ${totalScore}. Approval required from Scheduling Manager and Chief Pilot or Assistant Chief Pilot.`,
-          type: 'safety',
-          priority: 'high',
+        eventStore.publish({
+          id: `frat-review:${flightNumber}`,
+          severity: 'warn',
+          title: 'Submitted FRAT needs approval',
+          detail: `Flight ${flightNumber} has a FRAT score of ${totalScore}. Approval required from Scheduling Manager and Chief Pilot or Assistant Chief Pilot.`,
           module: 'Safety Systems',
-          relatedId: flightNumber,
-          actionUrl: '/frat/review',
-          actionText: 'Review FRAT'
+          link: '/frat/review',
+          audienceRoles: ['scheduling', 'safety', 'admin', 'lead'],
         });
       }
     }
