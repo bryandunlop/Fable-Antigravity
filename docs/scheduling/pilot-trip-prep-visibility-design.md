@@ -58,7 +58,7 @@ Replaces the ackable brief with a read-only projection:
 The panel stays in its current `FlightHub` position for this slice; Slice 2 relocates it into the Prep phase.
 
 ### 4.4 What's retired
-The pilot acknowledgement UI and its event dependence. The pilot view is now a **projection over completed instances**, so it needs no `SchedulingEvent`s. The handoff-event firing in `applyAction` (`service.ts:56`) remains only meaningful for **non-pilot** targets; the pilot no longer consumes or acks those events. (Whether to stop firing pilot-targeted handoff events entirely, or leave them as harmless dead output, is a small implementation call for the plan — the pilot view ignores them either way.)
+The pilot acknowledgement UI and its event dependence. The pilot view is now a **projection over completed instances**, so it needs no `SchedulingEvent`s. The handoff-event firing in `applyAction` (`service.ts:56`) is unchanged (non-pilot handoffs and the scheduling-side inbox still rely on it). The pilot's `MessagesPanel` filters out `handoff:*` events so the completed items are not shown a second time as an ackable duplicate — the read-only Trip prep view is the pilot's only surface for them.
 
 ## 5. Integration points
 - `src/components/pilot-workspace/panels/TripBriefPanel.tsx` — rework into the read-only completed projection.

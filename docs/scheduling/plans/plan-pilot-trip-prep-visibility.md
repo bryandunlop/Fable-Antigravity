@@ -16,7 +16,7 @@
 - **Pilot view shows completed items only** — `status === 'done'` ∩ visible. No `n_a`, no open/blocked/in_progress. **No acknowledge control.**
 - **Scope to per-trip templates.** The toggle list and the default seed consider only `triggerType === 'per_trip'` templates; recurring office tasks are excluded.
 - **Default seed** = per-trip task defs whose `handoffTarget` is `{ kind: 'role', value: 'pilot' }`.
-- **Do not touch** `service.ts` handoff-event firing, the tech-log side, fuel/FRAT/airport/handoff, or non-pilot event acks. `TripBriefPanel` no longer reads events; leftover pilot-target events are harmless dead output.
+- **Do not touch** `service.ts` handoff-event firing, the tech-log side, fuel/FRAT/airport/handoff, or non-pilot event acks. `TripBriefPanel` no longer reads events; the pilot's `MessagesPanel` excludes `handoff:*` events so they are not shown as an ackable duplicate of the Trip prep list.
 - **Copy:** sentence case everywhere.
 - **Determinism:** selectors take explicit inputs; no `Date.now()` inside pure logic.
 
