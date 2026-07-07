@@ -11,7 +11,7 @@ export interface PilotReadiness {
 
 const ACTIVE_STATUSES: ReadonlySet<TripRecord['status']> = new Set(['planning', 'confirmed', 'in_progress']);
 
-function firstDeparture(t: TripRecord): number {
+export function firstDeparture(t: TripRecord): number {
   const times = (t.legs ?? []).map((l) => new Date(l.departureTimeUtc).getTime()).filter(Number.isFinite);
   return times.length ? Math.min(...times) : Number.MAX_SAFE_INTEGER;
 }
