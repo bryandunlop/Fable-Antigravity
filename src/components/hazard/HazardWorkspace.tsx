@@ -99,8 +99,10 @@ export default function HazardWorkspace({ userRole = 'safety' }: HazardWorkspace
     const isApproverAssigned     = (hazard.mitigationAssignments?.approver?.length ?? 0) > 0 && hazard.workflowStage === WORKFLOW_STAGES.MANAGER_APPROVAL;
     const isExecAssigned         = (hazard.mitigationAssignments?.executers?.length ?? 0) > 0 && hazard.workflowStage === WORKFLOW_STAGES.EXEC_APPROVAL;
     const isMockAssignedUser     = (userRole !== 'safety' && userRole !== 'admin') && (isProcessOwnerAssigned || isApproverAssigned || isExecAssigned);
+    // Known (non-anonymous) reporters can see their own reports so they can follow up.
+    const isOwnReport            = !!hazard.submitterId && hazard.submitterId === currentUserId && !hazard.isAnonymous;
 
-    const isVisible = isSafetyManager || hazard.isPublished || isMockAssignedUser;
+    const isVisible = isSafetyManager || hazard.isPublished || isMockAssignedUser || isOwnReport;
 
     if (!isVisible) return false;
 
