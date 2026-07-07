@@ -36,6 +36,7 @@ Reorganize the single-trip view into two touch-first phases — **Prep** (ahead 
 5. **Squawks + Messages live in an always-visible footer** below both tabs (not phase-specific).
 6. **Keep tech-log link-outs** — re-group + ergonomics only, no inlining (that would be a later slice).
 7. **iPad landscape-first, responsive to portrait, touch.** Primary target is iPad **landscape** — the active tab's cards lay out two-up and the leg strip shows more legs without scrolling. **Portrait** is a responsive fallback: a narrower single column with stacked cards. Same components throughout; large (≥44px) tap targets; the leg strip scrolls horizontally when it overflows.
+8. **Tabs are organizing defaults, never gates — day-of items support fill-ahead + draft-then-submit.** Pilots often prepare a flight before the day, so any item can be worked at any time (the tab default just picks what leads). FRAT follows **fill → save draft → submit**: the existing `fratStatus` (not-started / in-progress-draft / completed) + `FratDraft` (`saveFratDraftOnLeg`) let a pilot draft a leg's FRAT days ahead, save it, and finalize it day-of via `completeFratOnLeg`. The final submit is the day-of action but is **not hard-gated** (see A6).
 
 ## 4. Design
 
@@ -59,7 +60,7 @@ Leads with the pilot's outstanding prep action; keeps scheduling's completed wor
 - **Trip prep** (trip-level, from Slice 1) is scheduling's *completed* work — read-only. Since it is all done, it sits **collapsed by default** under "✓ N prep items done · tap to view", grouped by category when expanded. This preserves Slice 1's completed-only decision: no ack, and scheduling's still-open items are never shown to the pilot.
 
 ### 4.5 Day-of tab (selected leg)
-- **FRAT** for the selected leg (the existing inline start + score from `PreflightLegsPanel`; the full page keeps its link-out).
+- **FRAT** for the selected leg — **fill → save draft → submit**. The card reflects `fratStatus`: **Start FRAT** (not started) / **Resume FRAT · draft saved** (in progress) / **✓ submitted · score** (completed), backed by the existing `saveFratDraftOnLeg` (draft) and `completeFratOnLeg` (submit); the full page keeps its link-out. A saved-but-unsubmitted draft is flagged on that leg's chip in the stepper, so a pilot can see which future legs are already part-prepared.
 - **Airport review** for the selected leg (the existing `markAirportReviewedOnLeg` chip/action; airport *data* keeps its "open details ↗" link to `LegDetail`).
 - **Maintenance handoff** (trip-level): the existing `AircraftAcceptancePanel` summary + "review & accept in tech-log ↗".
 - Presented outstanding-first: not-yet-done items (FRAT not started, airport not reviewed, acceptance pending) lead; completed ones collapse.
@@ -92,6 +93,7 @@ Optimize for iPad **landscape** (~1024×768): the header sits in one row (identi
 - **A3** "Current leg" = first not-yet-departed leg (vs. the leg currently airborne). 
 - **A4** Day grouping keys on the leg's office-local departure date. 
 - **A5** Tabs are local component state (no URL routing), consistent with today's `FlightHub`.
+- **A6** The final FRAT **submit** is not hard-gated to a day-of window — pilots draft ahead and submit when ready (typically day-of). Open question: no gate at all, or a *soft warning* when submitting more than N hours before ETD (a FRAT should reflect day-of conditions). Confirm.
 
 ## 8. Out of scope — Slice 3 (recorded, not built here)
 **The My Flights list at scale.** A pilot holds ~2 months of trips at once (a few international planned far out, plus many domestic). The list (`MyFlightsPanel` / `selectPilotFlights`) needs grouping/filtering — by time horizon and international-vs-domestic — so the *entry point* across many trips stays navigable, mirroring the scheduling Upcoming board's forward-lane idea on the pilot side. Separate spec after Slice 2 ships.
