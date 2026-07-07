@@ -3,26 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import {
-  Plane, Users, ShieldAlert, AlertTriangle, AlertCircle, Cake, Utensils,
+  Plane, Users, ShieldAlert, AlertTriangle, Cake, Utensils, ThumbsDown,
   ChevronDown, ChevronRight, Clock, MapPin, Coffee, FileText, Image as ImageIcon,
 } from 'lucide-react';
 import { usePassengers } from '../passengers/PassengerContext';
-import type { Passenger, AllergySeverity } from '../passengers/passengerData';
-import { getFlightPassengers, flightAllergyAlerts, countCriticalAllergies } from '../passengers/engine/flights';
+import type { Passenger } from '../passengers/passengerData';
+import { getFlightPassengers, flightAllergyAlerts } from '../passengers/engine/flights';
 import { buildFaFlights } from './faFlights';
 
-function severityClasses(sev: AllergySeverity) {
-  switch (sev) {
-    case 'Critical': return 'bg-red-500 text-white border-red-600';
-    case 'Moderate': return 'bg-orange-500 text-white border-orange-600';
-    default: return 'bg-yellow-500 text-white border-yellow-600';
-  }
-}
-function severityIcon(sev: AllergySeverity) {
-  if (sev === 'Critical') return <ShieldAlert className="w-3 h-3" />;
-  if (sev === 'Moderate') return <AlertTriangle className="w-3 h-3" />;
-  return <AlertCircle className="w-3 h-3" />;
-}
+// Two categories only: allergies (medical) are red, dislikes (preference) are yellow.
+const ALLERGY_BADGE = 'bg-red-500 text-white border-red-600';
+const DISLIKE_BADGE = 'bg-yellow-400 text-yellow-950 border-yellow-500';
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -55,17 +46,21 @@ function PassengerRow({ passenger, departureUtc }: { passenger: Passenger; depar
               <Badge variant="outline" className="text-xs"><ImageIcon className="w-3 h-3 mr-1" />{photos.length}</Badge>
             )}
           </div>
-          {passenger.allergies.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 mt-2 ml-6">
-              {passenger.allergies.map((a, i) => (
-                <Badge key={i} className={`text-xs ${severityClasses(a.severity)}`}>
-                  {severityIcon(a.severity)}<span className="ml-1">{a.allergen}</span>
-                </Badge>
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs text-emerald-600 mt-2 ml-6">No known allergies</div>
-          )}
+          <div className="flex flex-wrap gap-1.5 mt-2 ml-6">
+            {passenger.allergies.map((a, i) => (
+              <Badge key={`al-${i}`} className={`text-xs ${ALLERGY_BADGE}`}>
+                <ShieldAlert className="w-3 h-3" /><span className="ml-1">{a.allergen}</span>
+              </Badge>
+            ))}
+            {(passenger.dislikes ?? []).map((d, i) => (
+              <Badge key={`dl-${i}`} className={`text-xs ${DISLIKE_BADGE}`}>
+                <ThumbsDown className="w-3 h-3" /><span className="ml-1">{d}</span>
+              </Badge>
+            ))}
+            {passenger.allergies.length === 0 && (passenger.dislikes ?? []).length === 0 && (
+              <span className="text-xs text-emerald-600">No allergies or dislikes</span>
+            )}
+          </div>
         </div>
       </button>
 
@@ -131,7 +126,7 @@ export default function FlightAttendantFlights() {
   const legsWithPax = legs.map(leg => ({ leg, pax: getFlightPassengers(leg.passengerIds, passengers) }));
   const uniquePaxIds = new Set(legs.flatMap(l => l.passengerIds));
   const allPax = getFlightPassengers([...uniquePaxIds], passengers);
-  const totalCritical = countCriticalAllergies(allPax);
+  const totalAllergies = allPax.reduce((n, p) => n + p.allergies.length, 0);
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -155,9 +150,9 @@ export default function FlightAttendantFlights() {
           <p className="text-sm text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> Passengers</p>
           <p className="text-2xl font-bold">{uniquePaxIds.size}</p>
         </CardContent></Card>
-        <Card className={totalCritical > 0 ? 'border-red-200 bg-red-50/50' : ''}><CardContent className="p-4">
-          <p className="text-sm text-muted-foreground flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Critical allergies</p>
-          <p className={`text-2xl font-bold ${totalCritical > 0 ? 'text-red-700' : ''}`}>{totalCritical}</p>
+        <Card className={totalAllergies > 0 ? 'border-red-200 bg-red-50/50' : ''}><CardContent className="p-4">
+          <p className="text-sm text-muted-foreground flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Allergy alerts</p>
+          <p className={`text-2xl font-bold ${totalAllergies > 0 ? 'text-red-700' : ''}`}>{totalAllergies}</p>
         </CardContent></Card>
       </div>
 
@@ -194,8 +189,8 @@ export default function FlightAttendantFlights() {
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {alerts.map((a, i) => (
-                        <Badge key={i} className={`text-xs ${severityClasses(a.severity)}`}>
-                          {severityIcon(a.severity)}
+                        <Badge key={i} className={`text-xs ${ALLERGY_BADGE}`}>
+                          <ShieldAlert className="w-3 h-3" />
                           <span className="ml-1">{a.allergen} — {a.passengers.join(', ')}</span>
                         </Badge>
                       ))}

@@ -33,6 +33,8 @@ export interface Passenger {
   birthday: string;
   beverage: string[];
   food: string[];
+  /** Foods/things the passenger dislikes (a preference, not a medical allergy). */
+  dislikes?: string[];
   passengerComfort: {
     temperature?: string;
     seating?: string;
@@ -58,6 +60,7 @@ export const SEED_PASSENGERS: Passenger[] = [
     birthday: '1975-03-15',
     beverage: ['Dom Pérignon', 'Macallan 18', 'Perrier', 'Espresso'],
     food: ['Wagyu Beef', 'Lobster Thermidor', 'Truffle Pasta', 'Aged Ribeye', 'French cuisine', 'Italian cuisine'],
+    dislikes: ['Cilantro', 'Well-done steak', 'Sparkling water'],
     passengerComfort: {
       temperature: '72°F', seating: 'Forward-facing window seat with extra legroom',
       tvPreference: 'Action movies', lighting: 'Dimmed lighting preferred',
@@ -75,6 +78,7 @@ export const SEED_PASSENGERS: Passenger[] = [
     birthday: '1985-08-22',
     beverage: ['Green tea', 'Kombucha', 'Sparkling water', 'Oat milk latte'],
     food: ['Vegetarian meals', 'Quinoa bowls', 'Mediterranean salads', 'Fresh fruit', 'Japanese cuisine', 'Plant-based options'],
+    dislikes: ['Red meat', 'Heavy sauces'],
     passengerComfort: {
       temperature: '70°F', seating: 'Aisle seat near power outlet',
       tvPreference: 'Documentaries', lighting: 'Bright lighting for work',
@@ -93,6 +97,7 @@ export const SEED_PASSENGERS: Passenger[] = [
     birthday: '1990-12-03',
     beverage: ['Coffee (black)', 'Whiskey neat', 'Craft beer', 'Energy drinks'],
     food: ['Grilled meats', 'BBQ', 'Mexican cuisine', 'Cheese platters', 'Keto-friendly options', 'High-protein meals'],
+    dislikes: ['Seafood', 'Tofu'],
     passengerComfort: {
       temperature: '68°F', seating: 'Window seat', tvPreference: 'Comedy shows', lighting: 'Standard lighting',
       specialRequests: 'Tour of cockpit if possible, interested in flight operations',
@@ -111,6 +116,7 @@ export const SEED_PASSENGERS: Passenger[] = [
     birthday: '1978-06-10',
     beverage: ['Oat milk latte', 'Sparkling water', 'Champagne', 'Herbal tea'],
     food: ['Seafood', 'Nordic cuisine', 'Dairy-free options', 'Modern European', 'Artisanal breads', 'Root vegetables'],
+    dislikes: ['Very spicy food', 'Blue cheese'],
     passengerComfort: {
       temperature: '71°F', seating: 'Aisle seat', tvPreference: 'Drama series', lighting: 'Soft lighting',
       specialRequests: 'No latex materials anywhere, all dairy-free meal options, minimal conversation',
@@ -128,6 +134,7 @@ export const SEED_PASSENGERS: Passenger[] = [
     birthday: '1995-07-09',
     beverage: ['Cold brew', 'IPA', 'Still water'],
     food: ['Gluten-free options', 'Grilled chicken', 'Sushi', 'Fresh salads'],
+    dislikes: ['Mushrooms', 'Olives'],
     passengerComfort: {
       temperature: '70°F', seating: 'Window seat', tvPreference: 'Sports', lighting: 'Standard lighting',
       specialRequests: 'Gluten-free meal, prefers window shades open',
@@ -143,6 +150,7 @@ export const SEED_PASSENGERS: Passenger[] = [
     birthday: '1968-11-28',
     beverage: ['Cabernet Sauvignon', 'Sparkling water', 'Chamomile tea'],
     food: ['Mediterranean cuisine', 'Grilled fish', 'Fresh vegetables', 'Dark chocolate'],
+    dislikes: ['Overly sweet desserts', 'Carbonated drinks'],
     passengerComfort: {
       temperature: '73°F', seating: 'Forward-facing aisle seat', tvPreference: 'News', lighting: 'Warm lighting',
       specialRequests: 'Prefers a blanket at cruise altitude, sparkling water on arrival',

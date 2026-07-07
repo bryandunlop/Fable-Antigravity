@@ -38,7 +38,8 @@ import {
   FileText,
   Trash2,
   Camera,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ThumbsDown
 } from 'lucide-react';
 import { usePassengers } from './passengers/PassengerContext';
 import type { Passenger } from './passengers/passengerData';
@@ -92,14 +93,8 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
     return 'bg-blue-100 text-blue-800 border-blue-200';
   };
 
-  const getAllergySeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'Critical': return 'bg-red-500 text-white border-red-600';
-      case 'Moderate': return 'bg-orange-500 text-white border-orange-600';
-      case 'Mild': return 'bg-yellow-500 text-white border-yellow-600';
-      default: return 'bg-gray-500 text-white border-gray-600';
-    }
-  };
+  // Allergies are medical → always red. Dislikes (a preference) render yellow.
+  const getAllergySeverityColor = (_severity: string) => 'bg-red-500 text-white border-red-600';
 
   const getAllergySeverityIcon = (severity: string) => {
     switch (severity) {
@@ -146,6 +141,7 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
       birthday: newPassengerForm.birthday || '',
       beverage: newPassengerForm.beverage || [],
       food: newPassengerForm.food || [],
+      dislikes: newPassengerForm.dislikes || [],
       passengerComfort: newPassengerForm.passengerComfort || {},
       additionalNotes: newPassengerForm.additionalNotes || '',
       flightAttendantNotes: newPassengerForm.flightAttendantNotes || ''
@@ -208,7 +204,7 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
       onClose();
     };
 
-    const updateArrayField = (field: 'beverage' | 'food', value: string) => {
+    const updateArrayField = (field: 'beverage' | 'food' | 'dislikes', value: string) => {
       const items = value.split(',').map(s => s.trim()).filter(s => s);
       setFormData({
         ...formData,
@@ -479,6 +475,19 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
                 rows={4}
                 value={formData.food?.join(', ') || ''}
                 onChange={(e) => updateArrayField('food', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="dislikes" className="flex items-center gap-2">
+                <ThumbsDown className="w-4 h-4" />
+                Dislikes
+              </Label>
+              <Textarea
+                id="dislikes"
+                placeholder="Foods/things the passenger dislikes, separated by commas&#10;Example: Cilantro, Well-done steak"
+                rows={3}
+                value={formData.dislikes?.join(', ') || ''}
+                onChange={(e) => updateArrayField('dislikes', e.target.value)}
               />
             </div>
           </TabsContent>
@@ -1001,6 +1010,22 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
                   </div>
                 </div>
               </div>
+
+              {(selectedPassenger.dislikes?.length ?? 0) > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <ThumbsDown className="w-4 h-4 text-yellow-600" /> Dislikes
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPassenger.dislikes!.map((d, index) => (
+                        <Badge key={index} className="bg-yellow-400 text-yellow-950 border-yellow-500">{d}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <Separator />
 
