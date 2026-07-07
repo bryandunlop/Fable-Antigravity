@@ -67,31 +67,25 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         </div>
       </div>
 
-      {!tlTrip && <div className="rounded-lg border p-4 text-sm text-muted-foreground">Not released to preflight yet.</div>}
-
-      {tlTrip && (
-        <>
-          {legs.length > 1 && (
-            <LegStepper legs={legs} currentIndex={currentIdx < 0 ? 0 : currentIdx} selectedIndex={selectedIdx}
-              officeTzOffsetMinutes={officeTzOffsetMinutes} onSelect={(i) => setPinnedIdx(i === currentIdx ? null : i)} />
-          )}
-
-          {/* landscape: two columns; portrait: one */}
-          <div className="grid grid-cols-1 landscape:grid-cols-2 gap-3">
-            {phase === 'prep' ? (
-              <>
-                {selectedLeg && <LegFuelSection tlTrip={tlTrip} leg={selectedLeg} />}
-                <TripBriefPanel trip={trip} userRole={userRole} />
-              </>
-            ) : (
-              <>
-                {selectedLeg && <LegDayOfSection tlTrip={tlTrip} leg={selectedLeg} tripNumber={trip.tripNumber} />}
-                <AircraftAcceptancePanel trip={trip} />
-              </>
-            )}
-          </div>
-        </>
+      {tlTrip && legs.length > 1 && (
+        <LegStepper legs={legs} currentIndex={currentIdx < 0 ? 0 : currentIdx} selectedIndex={selectedIdx}
+          officeTzOffsetMinutes={officeTzOffsetMinutes} onSelect={(i) => setPinnedIdx(i === currentIdx ? null : i)} />
       )}
+
+      {/* landscape: two columns; portrait: one */}
+      <div className="grid grid-cols-1 landscape:grid-cols-2 gap-3">
+        {phase === 'prep' ? (
+          <>
+            {tlTrip && selectedLeg && <LegFuelSection tlTrip={tlTrip} leg={selectedLeg} />}
+            <TripBriefPanel trip={trip} userRole={userRole} />
+          </>
+        ) : (
+          <>
+            {tlTrip && selectedLeg && <LegDayOfSection tlTrip={tlTrip} leg={selectedLeg} tripNumber={trip.tripNumber} />}
+            <AircraftAcceptancePanel trip={trip} />
+          </>
+        )}
+      </div>
 
       {/* Always-visible footer */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
