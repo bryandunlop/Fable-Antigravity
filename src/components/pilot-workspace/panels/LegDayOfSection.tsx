@@ -13,7 +13,8 @@ import type { Trip, TripLeg } from '../../tech-log/types';
 /** Day-of actions for one leg: FRAT (fill → draft → submit, with an early-submit soft warning) + airport review.
  *  Outstanding items lead; the airport data + full FRAT page keep their tech-log links. */
 export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg: TripLeg; tripNumber: string }) {
-  const { dispatch } = useTechLog();
+  const { state, dispatch } = useTechLog();
+  const ac = state.aircraft.find((a) => a.id === tlTrip.aircraftId);
   const user = useCurrentUser();
   const [fratOpen, setFratOpen] = useState(false);
 
@@ -46,7 +47,7 @@ export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg
           <div className="border-t mt-2 pt-2">
             <StandaloneFRATForm
               userRole={user.role}
-              initialData={{ flightNumber: tripNumber, departure: leg.departureIcao, destination: leg.arrivalIcao,
+              initialData={{ flightNumber: tripNumber, aircraft: ac?.tailNumber, departure: leg.departureIcao, destination: leg.arrivalIcao,
                 date: leg.departureTimeUtc.slice(0, 10), time: leg.departureTimeUtc.slice(11, 16), pic: user.displayName,
                 selections: leg.fratDraft?.selections, mitigationNotes: leg.fratDraft?.mitigationNotes }}
               onClose={() => setFratOpen(false)}

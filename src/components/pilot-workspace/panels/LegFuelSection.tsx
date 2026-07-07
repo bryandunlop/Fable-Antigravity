@@ -3,13 +3,17 @@ import { toast } from 'sonner';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import { submitFuelOnLeg } from '../../tech-log/preflightActions';
 import { newId } from '../../tech-log/util/id';
+import { requiresFuelFarmSubmission } from '../../tech-log/engine/fuel';
 import type { Trip, TripLeg } from '../../tech-log/types';
 
 /** Prep-tab fuel submission for one leg (home-base fuel-farm). Keeps the existing 4h-before-ETD lock. */
 export function LegFuelSection({ tlTrip, leg }: { tlTrip: Trip; leg: TripLeg }) {
-  const { dispatch } = useTechLog();
+  const { state, dispatch } = useTechLog();
+  const ac = state.aircraft.find((a) => a.id === tlTrip.aircraftId);
   const user = useCurrentUser();
   const [lbs, setLbs] = useState('');
+
+  if (!ac || !requiresFuelFarmSubmission(leg, ac)) return null;
 
   if (leg.fuelRequestId) {
     return (
