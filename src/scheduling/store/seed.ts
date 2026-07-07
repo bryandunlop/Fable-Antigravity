@@ -3,7 +3,7 @@
 // (§1, "the nine source checklists") as editable template DATA. Nothing about checklist
 // content lives in engine/store logic — this file is the seam the department will edit
 // via a UI in a later slice (D9: templates are editable data, role-gated, versioned).
-import type { ChecklistTemplate } from '../engine';
+import type { ChecklistTemplate, TaskDefinition } from '../engine';
 import type { SchedulingStore } from './types';
 import { parseTemplate } from './validate';
 
@@ -24,6 +24,63 @@ const SEND_CREW_BRIEF = {
   requiresAck: false, // the PILOT acks the delivered event in the Flight Hub, not this task
   handoffTarget: { kind: 'role', value: 'pilot', channel: 'teams' },
 } as const;
+
+// Trip-prep tasks that apply to EVERY trip regardless of type. Like SEND_CREW_BRIEF, these are
+// shared definitions spread into each per-trip template (domestic / international / DASSP) so
+// "all trips" coverage lives in one place in the seed. Transcribed from the department's Portal
+// trip-checklist examples (Portal-TripChecklistExamples.xlsx, 2026-07-07). The Excel's per-leg,
+// exact-airport, and re-trigger tasks (FBO, hangar, KLUK fuel, KBOS PPR, KLGA ARO, pax forms)
+// need engine work the current per-trip/trip-level model does not have yet — deferred, not here.
+const ALL_TRIPS_TASKS: TaskDefinition[] = [
+  {
+    id: 'confirm-catering-needs',
+    title: 'Confirm catering needs',
+    // Department checklist scopes this "each leg"; captured trip-level until per-leg tasks ship.
+    description: 'Confirm catering for the trip. (Per-leg catering arrives with the leg-level task work.)',
+    ownerRole: 'scheduling',
+    category: 'ops',
+    order: 50,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 7 },
+    requiresAck: false,
+  },
+  {
+    id: 'push-to-foreflight',
+    title: 'Push trip to ForeFlight',
+    ownerRole: 'scheduling',
+    category: 'ops',
+    order: 51,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 5 },
+    requiresAck: false,
+  },
+  {
+    id: 'final-trip-confirmation-admin',
+    title: 'Final trip confirmation with admin',
+    ownerRole: 'scheduling',
+    category: 'handoff',
+    order: 52,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 2 },
+    requiresAck: true,
+    handoffTarget: { kind: 'role', value: 'executive-assistant', channel: 'email' },
+  },
+  {
+    id: 'passenger-itinerary-received',
+    title: 'Passenger itinerary received',
+    ownerRole: 'scheduling',
+    category: 'ops',
+    order: 53,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 1 },
+    requiresAck: true,
+  },
+  {
+    id: 'crew-hotel-information-obtained',
+    title: 'Crew hotel information obtained',
+    ownerRole: 'scheduling',
+    category: 'crew',
+    order: 54,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 1 },
+    requiresAck: false,
+  },
+];
 
 const SCHEDULER_DAILY: ChecklistTemplate = {
   id: 'scheduler-daily',
@@ -254,6 +311,7 @@ const DOMESTIC_PER_TRIP: ChecklistTemplate = {
       },
       handoffTarget: { kind: 'role', value: 'pilot', channel: 'teams' },
     },
+    ...ALL_TRIPS_TASKS,
     SEND_CREW_BRIEF,
   ],
 };
@@ -408,6 +466,35 @@ const INTERNATIONAL_PER_TRIP: ChecklistTemplate = {
       condition: { kind: 'routeTouchesCountry', country: 'IN' },
       handoffTarget: { kind: 'dept', value: 'universal-aviation', channel: 'email' },
     },
+    // -- International-only tasks from the department Portal trip-checklist examples (2026-07-07) --
+    {
+      id: 'intl-schedule-brief',
+      title: 'Schedule international trip brief',
+      ownerRole: 'scheduling',
+      category: 'crew',
+      order: 15,
+      dueRule: { kind: 'businessDaysBeforeEtd', days: 10 },
+      requiresAck: true,
+    },
+    {
+      id: 'intl-mark-post-rest-off',
+      title: 'Mark 48h post-trip rest as off in the schedule',
+      ownerRole: 'scheduling',
+      category: 'crew',
+      order: 16,
+      dueRule: { kind: 'businessDaysBeforeEtd', days: 7 },
+      requiresAck: false,
+    },
+    {
+      id: 'intl-trip-binder-printed',
+      title: 'Print international trip binder',
+      ownerRole: 'scheduling',
+      category: 'customs',
+      order: 17,
+      dueRule: { kind: 'businessDaysBeforeEtd', days: 1 },
+      requiresAck: false,
+    },
+    ...ALL_TRIPS_TASKS,
     SEND_CREW_BRIEF,
   ],
 };
@@ -502,6 +589,7 @@ const DASSP_PER_TRIP: ChecklistTemplate = {
       dueRule: { kind: 'hoursBeforeEtd', hours: 1 },
       requiresAck: true,
     },
+    ...ALL_TRIPS_TASKS,
     SEND_CREW_BRIEF,
   ],
 };

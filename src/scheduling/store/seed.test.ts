@@ -59,4 +59,47 @@ describe('international per-trip template — country-conditional tasks', () => 
     );
     expect(out.some((t) => t.taskDefId === 'intl-china-arrival-card')).toBe(false);
   });
+
+  it('includes the international-only tasks from the department checklist', () => {
+    const out = instantiatePerTrip(
+      [internationalTemplate],
+      trip({ routeIcaos: ['KLUK', 'EGLL'] }),
+      { ...ctx, etdUtc: trip().etdUtc },
+      idf,
+    );
+    const ids = out.map((t) => t.taskDefId);
+    expect(ids).toEqual(expect.arrayContaining([
+      'intl-schedule-brief', 'intl-mark-post-rest-off', 'intl-trip-binder-printed',
+    ]));
+  });
+});
+
+describe('all-trips tasks — shared across every per-trip template', () => {
+  const idf: IdFactory = (seed) => `id:${seed}`;
+  const ctx: DueContext = { nowUtc: '2026-06-29T12:00:00.000Z', officeTzOffsetMinutes: -240 };
+  const ALL_TRIPS_IDS = [
+    'confirm-catering-needs', 'push-to-foreflight', 'final-trip-confirmation-admin',
+    'passenger-itinerary-received', 'crew-hotel-information-obtained',
+  ];
+  const perTripTemplates = SEED_TEMPLATES.filter((t) => t.triggerType === 'per_trip');
+
+  it('every per-trip template defines all five all-trips tasks', () => {
+    expect(perTripTemplates.length).toBe(3); // domestic / international / dca_dassp
+    for (const t of perTripTemplates) {
+      const ids = t.taskDefinitions.map((d) => d.id);
+      expect(ids).toEqual(expect.arrayContaining(ALL_TRIPS_IDS));
+    }
+  });
+
+  it('a domestic trip instantiates all five all-trips tasks', () => {
+    const domestic = SEED_TEMPLATES.find((t) => t.triggerType === 'per_trip' && t.scope === 'domestic')!;
+    const trip: TripContext = {
+      tripId: 'T-dom', tripType: 'domestic', tail: 'N1PG', aircraftType: 'G650ER',
+      etdUtc: '2026-07-10T14:00:00.000Z', maxPaxCount: 4, isWeekendDeparture: false,
+      routeIcaos: ['KLUK', 'KTEB'],
+    };
+    const ids = instantiatePerTrip([domestic], trip, { ...ctx, etdUtc: trip.etdUtc }, idf)
+      .map((t) => t.taskDefId);
+    expect(ids).toEqual(expect.arrayContaining(ALL_TRIPS_IDS));
+  });
 });
