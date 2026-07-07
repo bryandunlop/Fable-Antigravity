@@ -80,6 +80,8 @@ import FormFieldManager from './components/FormFieldManager';
 import FRATFormBuilder from './components/FRATFormBuilder';
 import GRATFormBuilder from './components/GRATFormBuilder';
 import ProceduralBulletins from './components/ProceduralBulletins';
+import FlightOperationsBulletins from './components/bulletins/FlightOperationsBulletins';
+import { BulletinProvider } from './components/bulletins/BulletinContext';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 import UnifiedTripWorkspace from './components/experimental/UnifiedTripWorkspace';
 import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
@@ -179,6 +181,7 @@ export default function App() {
             <AuditProvider>
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
+                <BulletinProvider>
                 <Router>
                   <Routes>
                     {/* Public Routes - No Authentication Required */}
@@ -356,6 +359,7 @@ export default function App() {
                                 <Route path="/safety/audits" element={<InternalAuditManagement />} />
                                 <Route path="/safety/compliance" element={<DocumentCompliance />} />
                                 <Route path="/procedural-bulletins" element={<ProceduralBulletins userRole={userRole} />} />
+                                <Route path="/flight-operations-bulletins" element={<FlightOperationsBulletins userRole={userRole} />} />
                                 <Route
                                   path="/safety/form-fields"
                                   element={
@@ -588,6 +592,7 @@ export default function App() {
                     } />
                   </Routes>
                 </Router>
+                </BulletinProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
             </AuditProvider>

@@ -4,6 +4,7 @@ import { buildAuditFeed } from './contributors/audits';
 import { buildHazardFeed } from './contributors/hazards';
 import { buildInventoryFeed } from './contributors/inventory';
 import { buildTripReminderFeed } from './contributors/tripReminders';
+import { buildBulletinFeed } from './contributors/bulletins';
 
 export type FeedContributor = (userRole: string, nowUtc: string) => FeedItem[];
 
@@ -15,4 +16,5 @@ export const CONTRIBUTORS: FeedContributor[] = [
   (r, t) => buildHazardFeed(r, t),
   (r, t) => buildInventoryFeed(r, t),
   (r, t) => buildTripReminderFeed(r, t),
+  (r, t) => buildBulletinFeed(r, t),
 ];

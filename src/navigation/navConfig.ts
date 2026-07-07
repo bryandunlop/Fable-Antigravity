@@ -96,6 +96,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/fuel-load-request', label: 'Fuel Load Request', domain: 'flight-ops', icon: Fuel, primary: false, roles: ['pilot', 'admin'] },
   { path: '/frat/review', label: 'FRAT Review', domain: 'flight-ops', icon: FileText, sidebar: false, roles: ['safety', 'admin'] },
   { path: '/flight-operations-center', label: 'Flight Operations Center', domain: 'flight-ops', icon: Monitor, sidebar: false, keywords: ['foc', 'ops center'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  { path: '/flight-operations-bulletins', label: 'Flight Ops Bulletins', domain: 'flight-ops', icon: BookOpen, primary: false, keywords: ['fob', 'bulletin', 'interim', 'nonofficial', 'read and initial'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/aircraft', label: 'Aircraft Status', domain: 'flight-ops', icon: Plane, sidebar: false, keywords: ['fleet', 'tail number', 'status'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   { path: '/fleet-map', label: 'Live Fleet Map', domain: 'flight-ops', icon: MapPin, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
 
