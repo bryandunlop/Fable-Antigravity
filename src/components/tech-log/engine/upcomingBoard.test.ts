@@ -14,7 +14,7 @@ const fc = (over: Partial<CampForecastItem>): CampForecastItem => ({
 
 /** Seeded state + real campForecast for every dispatchable tail, on the fixed clock. */
 function seededBoard() {
-  const s = getDefaultState();
+  const s = getDefaultState(NOW_MS); // seed on the same fixed clock we evaluate against
   const forecast = Object.fromEntries(
     s.aircraft
       .filter(a => !a.isProvisional)
@@ -24,7 +24,7 @@ function seededBoard() {
 }
 
 describe('buildUpcomingBoard — forecast bucketing', () => {
-  const s = getDefaultState();
+  const s = getDefaultState(NOW_MS);
   const n2 = s.aircraft.find(a => a.id === 'ac-n2pg')!;
 
   it('buckets by calendar days: overdue / ≤7d / ≤30d / horizon; >90d dropped', () => {
@@ -89,6 +89,8 @@ describe('buildUpcomingBoard — MEL repair clocks', () => {
 
 describe('buildUpcomingBoard — recurring checks', () => {
   it('shows the N2PG altimeter check due soon; checks >90d out are excluded', () => {
+    // Seed pins the N2PG altimeter accomplishment to 5d shy of its 24-month due (DUE_SOON),
+    // deterministic because seededBoard seeds on the same fixed NOW the board evaluates against.
     const { board } = seededBoard();
     const alt = board.buckets.DUE_7D.find(i => i.kind === 'RECURRING_CHECK' && i.refId === 'rc-ac-n2pg-altstatic');
     expect(alt).toBeDefined();

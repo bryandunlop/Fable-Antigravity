@@ -14,9 +14,13 @@ import { DEFAULT_PREFLIGHT_CHECKLIST } from '../constants';
  * stays mid-clock and the RED aircraft stays grounded whenever the demo is run or reset.
  *   N5PG, N2PG -> GREEN   N6PG -> AMBER (active deferral mid-clock)   N1PG -> RED (open defect)
  *   N3PG -> provisional G800 (no MEL approved)
+ *
+ * `nowMs` is the clock the seed dates are anchored to; it defaults to the real wall clock
+ * (`Date.now()`) so the live demo always looks fresh. Tests that evaluate time-relative logic
+ * against a fixed instant MUST pass that same instant here, so the seed and the evaluation share
+ * one clock and due dates don't drift as the real date advances.
  */
-export function getDefaultState(): TechLogState {
-  const nowMs = Date.now();
+export function getDefaultState(nowMs: number = Date.now()): TechLogState {
   const iso = (msAgo: number) => new Date(nowMs - msAgo).toISOString();
   const H = 3600000, D = 86400000;
 
