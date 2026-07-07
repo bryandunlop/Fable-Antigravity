@@ -1,50 +1,50 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
+import { Check } from 'lucide-react';
 import { useSchedulingWorkspace } from '../../scheduling-workspace/SchedulingWorkspaceContext';
 import type { TripRecord } from '../../../scheduling/store/types';
-import type { SchedulingEvent } from '../../../scheduling/store/types';
+import { completedVisibleItems, type CompletedPrepItem } from '../tripPrep';
 
+const fmtWhen = (iso?: string) =>
+  iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+
+/**
+ * Pilot "Trip prep" — a read-only list of the completed scheduling checklist items the operator
+ * has chosen to expose (see the scheduling Pilot-visibility panel). A live projection over the
+ * trip's task instances; no acknowledgement (replaces the former ackable brief).
+ */
 export default function TripBriefPanel({ trip, userRole }: { trip: TripRecord; userRole: string }) {
-  const { store, tick, bump, nowUtc } = useSchedulingWorkspace();
-  const [events, setEvents] = useState<SchedulingEvent[]>([]);
+  const { store, tick } = useSchedulingWorkspace();
+  const [items, setItems] = useState<CompletedPrepItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const all = await store.listEventsForTarget({ kind: 'role', value: 'pilot' });
-      const forTrip = all.filter((e) => (e.payload as { tripId?: string }).tripId === trip.id);
-      if (!cancelled) setEvents(forTrip);
+      const [instances, visible] = await Promise.all([
+        store.listInstancesForTrip(trip.id),
+        store.getPilotVisibility(),
+      ]);
+      if (!cancelled) setItems(completedVisibleItems(instances, new Set(visible)));
     })();
     return () => { cancelled = true; };
   }, [store, tick, trip]);
 
-  async function ack(e: SchedulingEvent) {
-    try {
-      await store.updateEvent({ ...e, ackState: 'acked', ackedBy: 'pilot', ackedAtUtc: nowUtc() });
-      bump();
-    } catch {
-      toast.error('Could not acknowledge the brief');
-    }
-  }
-
   return (
     <section className="rounded-lg border p-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="font-semibold">Trip brief <span className="text-xs text-muted-foreground">from scheduling</span></h2>
-        {/* /scheduling-workspace is role-gated to scheduling/admin — don't dead-end other roles */}
+        <h2 className="font-semibold">Trip prep <span className="text-xs text-muted-foreground">from scheduling</span></h2>
         {['scheduling', 'admin'].includes(userRole) && (
           <Link to="/scheduling-workspace" className="text-xs text-primary hover:underline">Open in scheduling ↗</Link>
         )}
       </div>
-      {events.length === 0 && <p className="text-sm text-muted-foreground">No brief delivered yet.</p>}
+      {items.length === 0 && <p className="text-sm text-muted-foreground">No trip prep completed yet.</p>}
       <ul className="space-y-2">
-        {events.map((e) => (
-          <li key={e.id} className="flex items-center justify-between rounded border px-3 py-2">
-            <span className="text-sm">{String((e.payload as { title?: string }).title ?? e.type)}</span>
-            {e.ackState === 'acked'
-              ? <span className="text-xs text-emerald-700">Acknowledged</span>
-              : <button onClick={() => ack(e)} className="text-xs rounded bg-primary text-primary-foreground px-2 py-1">Acknowledge</button>}
+        {items.map((it) => (
+          <li key={it.id} className="flex items-center justify-between rounded border px-3 py-2">
+            <span className="text-sm">{it.title}</span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
+              <Check className="h-3.5 w-3.5" /> done{it.completedAtUtc ? ` · ${fmtWhen(it.completedAtUtc)}` : ''}
+            </span>
           </li>
         ))}
       </ul>
