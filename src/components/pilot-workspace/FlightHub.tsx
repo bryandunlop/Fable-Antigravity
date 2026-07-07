@@ -27,7 +27,9 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
 
   const now = nowUtc();
   const currentIdx = currentLegIndex(legs, now);
-  const [selectedIdx, setSelectedIdx] = useState(currentIdx < 0 ? 0 : currentIdx);
+  // Auto-follow the current leg as legs depart, unless the pilot has manually pinned one via the stepper.
+  const [pinnedIdx, setPinnedIdx] = useState<number | null>(null);
+  const selectedIdx = pinnedIdx ?? (currentIdx < 0 ? 0 : currentIdx);
   const [phase, setPhase] = useState<'prep' | 'day-of'>(
     defaultPhase(trip.status, legs[currentIdx]?.departureTimeUtc, now),
   );
@@ -71,7 +73,7 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         <>
           {legs.length > 1 && (
             <LegStepper legs={legs} currentIndex={currentIdx < 0 ? 0 : currentIdx} selectedIndex={selectedIdx}
-              officeTzOffsetMinutes={officeTzOffsetMinutes} onSelect={setSelectedIdx} />
+              officeTzOffsetMinutes={officeTzOffsetMinutes} onSelect={setPinnedIdx} />
           )}
 
           {/* landscape: two columns; portrait: one */}
