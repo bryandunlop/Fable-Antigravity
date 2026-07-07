@@ -204,6 +204,10 @@ export class DrizzleSchedulingStore implements SchedulingStore {
     return rows.map(rowToEvent);
   }
 
+  async removeEvent(id: string): Promise<void> {
+    await this.db.delete(schedulingEvents).where(eq(schedulingEvents.id, id));
+  }
+
   // ─── Pilot visibility ─────────────────────────────────────────────────
 
   async getPilotVisibility(): Promise<string[]> {

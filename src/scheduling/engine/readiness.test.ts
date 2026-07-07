@@ -27,4 +27,14 @@ describe('deriveSchedulingReadiness §7', () => {
   it('empty checklist is READY at completion 1', () => {
     expect(deriveSchedulingReadiness([])).toEqual({ state: 'READY', completion: 1 });
   });
+  it('excludes cancelled tasks from the rollup (no completion inflation, no hold)', () => {
+    // one done + one cancelled -> the cancelled task is ignored, so completion is 1/1 = READY
+    const r = deriveSchedulingReadiness([t({ id: 'a', status: 'done' }), t({ id: 'b', status: 'cancelled' })]);
+    expect(r.state).toBe('READY');
+    expect(r.completion).toBe(1);
+    // one open + one cancelled -> still NOT_READY, denominator excludes the cancelled task
+    const r2 = deriveSchedulingReadiness([t({ id: 'a', status: 'open' }), t({ id: 'b', status: 'cancelled' })]);
+    expect(r2.state).toBe('NOT_READY');
+    expect(r2.completion).toBe(0);
+  });
 });

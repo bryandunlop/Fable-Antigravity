@@ -98,6 +98,57 @@ describe('SchedulingService', () => {
     expect((await service.tripReadiness('T1')).state).toBe('READY');
   });
 
+  const paxTpl: ChecklistTemplate = {
+    id: 'dom2', name: 'D', triggerType: 'per_trip', scope: 'domestic', version: 1,
+    status: 'published', effectiveFrom: '2026-01-01T00:00:00.000Z',
+    taskDefinitions: [
+      { id: 'pax', title: 'Confirm PAX forms', ownerRole: 'scheduling', category: 'ops', order: 1,
+        dueRule: { kind: 'hoursBeforeEtd', hours: 24 }, requiresAck: true, reTriggerOn: ['passengerChange'],
+        escalation: { deadline: { kind: 'hoursBeforeEtd', hours: 1 }, notifyRole: 'scheduling' },
+        handoffTarget: { kind: 'role', value: 'pilot', channel: 'inbox' } },
+    ],
+  };
+  const addPax = (t: TripRecord, n = 1): TripRecord =>
+    ({ ...t, legs: [{ ...t.legs[0], paxCount: t.legs[0].paxCount + n }] });
+
+  it('updateTrip re-opens a completed pax task when a passenger is added', async () => {
+    const { store, service } = svc();
+    await store.saveTemplate(paxTpl);
+    const { instances } = await service.createTripMirror(trip, NOW);
+    const pax = instances.find((i) => i.taskDefId === 'pax')!;
+    await service.applyAction(pax.id, { kind: 'ack' }, 'p', NOW);
+    await service.applyAction(pax.id, { kind: 'complete' }, 's', NOW);
+    const { updated } = await service.updateTrip(addPax(trip), NOW);
+    expect(updated.find((i) => i.taskDefId === 'pax')?.reflag).toEqual({ change: 'passengerChange' });
+    const stored = await store.getInstance(pax.id);
+    expect(stored?.status).toBe('open');
+    expect(stored?.reflag).toEqual({ change: 'passengerChange' });
+  });
+
+  it('updateTrip leaves a completed task done when the change does not re-trigger it', async () => {
+    const { store, service } = svc();
+    await store.saveTemplate({ ...paxTpl, taskDefinitions: [{ ...paxTpl.taskDefinitions[0], reTriggerOn: [] }] });
+    const { instances } = await service.createTripMirror(trip, NOW);
+    const pax = instances.find((i) => i.taskDefId === 'pax')!;
+    await service.applyAction(pax.id, { kind: 'ack' }, 'p', NOW);
+    await service.applyAction(pax.id, { kind: 'complete' }, 's', NOW);
+    await service.updateTrip(addPax(trip), NOW);
+    expect((await store.getInstance(pax.id))?.status).toBe('done');
+  });
+
+  it('a reopened task can re-escalate (stale escalation event cleared on reopen)', async () => {
+    const { store, service } = svc();
+    await store.saveTemplate(paxTpl);
+    const { instances } = await service.createTripMirror(trip, NOW);
+    const pax = instances.find((i) => i.taskDefId === 'pax')!;
+    const late = '2026-07-10T13:30:00.000Z';
+    expect((await service.runEscalations(late)).length).toBe(1);
+    await service.applyAction(pax.id, { kind: 'ack' }, 'p', NOW);
+    await service.applyAction(pax.id, { kind: 'complete' }, 's', NOW);
+    await service.updateTrip(addPax(trip, 2), NOW);
+    expect((await service.runEscalations(late)).length).toBe(1); // re-fires
+  });
+
   it.each(['domestic', 'international', 'dca_dassp'] as const)(
     'seeded %s trips deliver a crew brief: completing send-crew-brief emits a pilot-targeted event with the tripId',
     async (tripType) => {

@@ -51,6 +51,7 @@ export class InMemorySchedulingStore implements SchedulingStore {
       .filter((e) => e.target.kind === target.kind && e.target.value === target.value)
       .map((e) => structuredClone(e));
   }
+  async removeEvent(id: string): Promise<void> { this.events.delete(id); }
 
   async getPilotVisibility(): Promise<string[]> { return [...this.pilotVisible]; }
   async setPilotVisible(taskDefId: string, visible: boolean): Promise<void> {

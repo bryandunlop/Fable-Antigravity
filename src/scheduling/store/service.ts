@@ -1,7 +1,8 @@
 import {
   instantiatePerTrip, instantiateRecurring, applyTaskAction, computeEscalations, deriveSchedulingReadiness,
+  diffTrip, reconcileTrip,
 } from '../engine';
-import type { IdFactory, TaskInstance, TaskAction, Readiness } from '../engine';
+import type { IdFactory, TaskInstance, TaskAction, Readiness, TaskDefinition } from '../engine';
 import type { SchedulingStore, TripRecord, SchedulingEvent } from './types';
 import { toTripContext } from './mapping';
 
@@ -31,6 +32,42 @@ export class SchedulingService {
     );
     await this.store.saveInstances(instances);
     return { trip, instances };
+  }
+
+  /** Reconcile a trip's checklist after an edit: add tasks for new legs, cancel tasks for removed
+   *  legs, and re-flag (re-open) completed tasks whose trigger fired. Survivors keep their live
+   *  state; only the reconcile plan's create/update sets touch the store. */
+  async updateTrip(
+    updatedTrip: TripRecord, nowUtc: string,
+  ): Promise<{ trip: TripRecord; created: TaskInstance[]; updated: TaskInstance[] }> {
+    const old = await this.store.getTrip(updatedTrip.id);
+    await this.store.saveTrip(updatedTrip);
+    const templates = await this.store.listPublishedTemplates();
+    const tripCtx = toTripContext(updatedTrip);
+    const desired = instantiatePerTrip(
+      templates, tripCtx, { nowUtc, officeTzOffsetMinutes: this.off, etdUtc: tripCtx.etdUtc }, this.idFactory,
+    );
+    const existing = await this.store.listInstancesForTrip(updatedTrip.id);
+    const defsById = new Map<string, TaskDefinition>();
+    for (const t of templates) {
+      if (t.triggerType === 'per_trip' && t.scope === updatedTrip.tripType) {
+        for (const d of t.taskDefinitions) defsById.set(d.id, d);
+      }
+    }
+    const diff = old ? diffTrip(old, updatedTrip) : { aircraftChanged: false, legChanges: {} };
+    const plan = reconcileTrip(existing, desired, diff, defsById, 'system', nowUtc);
+    if (plan.toCreate.length) await this.store.saveInstances(plan.toCreate);
+    for (const u of plan.toUpdate) {
+      await this.store.updateInstance(u);
+      if (!u.reflag) continue; // only a reopened (re-flagged) task re-surfaces downstream
+      if (u.handoffTarget) await this.store.saveEvent(this.handoffEvent(u, nowUtc));
+      if (u.escalation) {
+        const evs = await this.store.listEventsForTarget({ kind: 'role', value: u.escalation.notifyRole });
+        const stale = evs.find((e) => e.type === 'escalation' && e.entityRef.id === u.id);
+        if (stale) await this.store.removeEvent(stale.id); // let a reopened critical task re-escalate
+      }
+    }
+    return { trip: updatedTrip, created: plan.toCreate, updated: plan.toUpdate };
   }
 
   async generateRunBoard(nowUtc: string): Promise<TaskInstance[]> {

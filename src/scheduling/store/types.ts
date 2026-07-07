@@ -81,6 +81,7 @@ export interface SchedulingStore {
   getEvent(id: string): Promise<SchedulingEvent | null>;
   updateEvent(e: SchedulingEvent): Promise<void>;
   listEventsForTarget(target: EventTarget): Promise<SchedulingEvent[]>;
+  removeEvent(id: string): Promise<void>; // clears a stale event (e.g. escalation on task reopen)
 
   // Pilot-visibility config — which per-trip checklist items pilots see as completed.
   getPilotVisibility(): Promise<string[]>;                          // visible taskDefIds
