@@ -2,6 +2,7 @@ export * from './types';
 export { computeDueAtUtc } from './dueDates';
 export { evaluateCondition } from './conditions';
 export { instantiateRecurring, instantiatePerTrip } from './instantiate';
+export { matchAirport, expandEndpoints } from './airports';
 export { evaluateTriggers, computeEscalations } from './triggers';
 export type { TriggerBuckets, EscalationFiring } from './triggers';
 export { deriveSchedulingReadiness } from './readiness';

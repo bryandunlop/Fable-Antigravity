@@ -22,5 +22,14 @@ export function toTripContext(trip: TripRecord): TripContext {
     maxPaxCount,
     isWeekendDeparture: dow === 0 || dow === 6,
     routeIcaos,
+    legs: legs.map((l) => ({
+      legId: l.id,
+      sequence: l.sequence,
+      departureIcao: l.departureIcao,
+      arrivalIcao: l.arrivalIcao,
+      departureTimeUtc: l.departureTimeUtc,
+      arrivalTimeUtc: l.arrivalTimeUtc,
+      paxCount: l.paxCount,
+    })),
   };
 }
