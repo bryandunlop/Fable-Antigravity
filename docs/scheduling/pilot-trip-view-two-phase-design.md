@@ -60,7 +60,7 @@ Leads with the pilot's outstanding prep action; keeps scheduling's completed wor
 - **Trip prep** (trip-level, from Slice 1) is scheduling's *completed* work — read-only. Since it is all done, it sits **collapsed by default** under "✓ N prep items done · tap to view", grouped by category when expanded. This preserves Slice 1's completed-only decision: no ack, and scheduling's still-open items are never shown to the pilot.
 
 ### 4.5 Day-of tab (selected leg)
-- **FRAT** for the selected leg — **fill → save draft → submit**. The card reflects `fratStatus`: **Start FRAT** (not started) / **Resume FRAT · draft saved** (in progress) / **✓ submitted · score** (completed), backed by the existing `saveFratDraftOnLeg` (draft) and `completeFratOnLeg` (submit); the full page keeps its link-out. A saved-but-unsubmitted draft is flagged on that leg's chip in the stepper, so a pilot can see which future legs are already part-prepared.
+- **FRAT** for the selected leg — **fill → save draft → submit**. The card reflects `fratStatus`: **Start FRAT** (not started) / **Resume FRAT · draft saved** (in progress) / **✓ submitted · score** (completed), backed by the existing `saveFratDraftOnLeg` (draft) and `completeFratOnLeg` (submit); the full page keeps its link-out. A saved-but-unsubmitted draft is flagged on that leg's chip in the stepper, so a pilot can see which future legs are already part-prepared. Submitting the final FRAT more than `FRAT_EARLY_SUBMIT_WARN_HOURS` (default 24h) before the leg's ETD raises a soft, confirmable warning (conditions may change) but is allowed (A6).
 - **Airport review** for the selected leg (the existing `markAirportReviewedOnLeg` chip/action; airport *data* keeps its "open details ↗" link to `LegDetail`).
 - **Maintenance handoff** (trip-level): the existing `AircraftAcceptancePanel` summary + "review & accept in tech-log ↗".
 - Presented outstanding-first: not-yet-done items (FRAT not started, airport not reviewed, acceptance pending) lead; completed ones collapse.
@@ -78,13 +78,14 @@ Optimize for iPad **landscape** (~1024×768): the header sits in one row (identi
 - `src/components/pilot-workspace/panels/AircraftAcceptancePanel.tsx` — Day-of tab (unchanged internally).
 - `src/components/pilot-workspace/panels/MessagesPanel.tsx` + the squawks affordance — relocate into the footer.
 - `src/components/pilot-workspace/ReadinessBar.tsx` — header (unchanged).
-- New pure helpers (unit-tested) — a leg-context module (e.g. `src/components/pilot-workspace/legContext.ts`): `currentLegIndex(legs, nowUtc)`, `groupLegsByDay(legs, officeTzOffsetMinutes)`, `defaultPhase(trip, currentLeg, nowUtc)` → `'prep' | 'day-of'`, and an `partitionOutstanding(items)` helper. Data comes from the tech-log mirror trip's `TripLeg[]` (`fratStatus`, `airportReviewed`, `fuelRequestId`) already consumed by `PreflightLegsPanel`.
+- New pure helpers (unit-tested) — a leg-context module (e.g. `src/components/pilot-workspace/legContext.ts`): `currentLegIndex(legs, nowUtc)`, `groupLegsByDay(legs, officeTzOffsetMinutes)`, `defaultPhase(trip, currentLeg, nowUtc)` → `'prep' | 'day-of'`, `partitionOutstanding(items)`, and `fratEarlySubmitWarning(nowUtc, etdUtc, thresholdHours)` → boolean (the A6 soft warning). Data comes from the tech-log mirror trip's `TripLeg[]` (`fratStatus`, `airportReviewed`, `fuelRequestId`) already consumed by `PreflightLegsPanel`; the FRAT draft/submit actions (`saveFratDraftOnLeg`, `completeFratOnLeg`) are reused unchanged.
 
 ## 6. Testing (pure logic; UI verified by type-check + the app)
 - `currentLegIndex`: next-not-departed selection; all-departed → last; single leg; boundary at exactly `now`.
 - `groupLegsByDay`: multi-day grouping by office-local date; a 6-leg single day; day boundaries across the office TZ offset.
 - `defaultPhase`: in-progress → day-of; within 24h → day-of; far out → prep.
 - `partitionOutstanding`: leads with not-done, collapses done, counts correct; all-done and none-done edges.
+- `fratEarlySubmitWarning`: warns beyond the threshold, no warn within it, boundary at exactly the threshold hours before ETD.
 - Follow the existing pilot-workspace `selectors.test.ts` Vitest pattern.
 
 ## 7. Assumptions (confirm at plan review)
@@ -93,7 +94,7 @@ Optimize for iPad **landscape** (~1024×768): the header sits in one row (identi
 - **A3** "Current leg" = first not-yet-departed leg (vs. the leg currently airborne). 
 - **A4** Day grouping keys on the leg's office-local departure date. 
 - **A5** Tabs are local component state (no URL routing), consistent with today's `FlightHub`.
-- **A6** The final FRAT **submit** is not hard-gated to a day-of window — pilots draft ahead and submit when ready (typically day-of). Open question: no gate at all, or a *soft warning* when submitting more than N hours before ETD (a FRAT should reflect day-of conditions). Confirm.
+- **A6** (resolved) The final FRAT **submit** is not hard-gated. A **soft, confirmable warning** appears when submitting more than `FRAT_EARLY_SUBMIT_WARN_HOURS` (default **24h**) before the leg's ETD — "this FRAT is being submitted early; conditions may change" — the pilot confirms and proceeds. Drafting is always allowed. The exact hour threshold is a tunable constant to confirm at plan time.
 
 ## 8. Out of scope — Slice 3 (recorded, not built here)
 **The My Flights list at scale.** A pilot holds ~2 months of trips at once (a few international planned far out, plus many domestic). The list (`MyFlightsPanel` / `selectPilotFlights`) needs grouping/filtering — by time horizon and international-vs-domestic — so the *entry point* across many trips stays navigable, mirroring the scheduling Upcoming board's forward-lane idea on the pilot side. Separate spec after Slice 2 ships.
