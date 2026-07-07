@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ClipboardCheck, Send, CheckCircle2, Printer, Plane, Wrench, AlertTriangle, Fuel, CalendarClock, FileSignature } from 'lucide-react';
+import { ClipboardCheck, Send, CheckCircle2, Printer, Plane, Wrench, AlertTriangle, Fuel, CalendarClock, FileSignature, ArrowRight, Lock, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
@@ -35,6 +35,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   const [ackOpen, setAckOpen] = useState(false);
   const [pendingSigId, setPendingSigId] = useState('');
   const [ackChecks, setAckChecks] = useState<Record<string, boolean>>({});
+  const [briefOpen, setBriefOpen] = useState(false);
   const ackDeferrals = deferralsRequiringAck(aircraft.id, state, now);
   const allAcked = ackDeferrals.every(d => ackChecks[d.id]);
   const acceptGate = canAcceptDispatch(aircraft.id, state, now);
@@ -168,18 +169,47 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
     );
   }
 
-  // ── RELEASED (assembled briefing; pilot acknowledges) ──
+  // ── RELEASED — maintenance sees the readout awaiting the crew; the pilot gets a focused accept sheet ──
+  if (isMaint) {
+    return (
+      <div className="space-y-3">
+        <BriefingReadout b={briefing} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => printBriefing(briefing)}><Printer className="mr-1.5 h-4 w-4" /> View / Print</Button>
+          <span className="self-center text-xs text-muted-foreground">Released — awaiting crew acknowledgement.</span>
+        </div>
+      </div>
+    );
+  }
+
+  const svAtRelease = briefing.serviceabilityAtRelease ?? sv.status;
+  const svColor = svAtRelease === 'GREEN' ? 'var(--gfo-success,#00B140)' : svAtRelease === 'AMBER' ? 'var(--gfo-warning,#F1B434)' : 'var(--gfo-error,#EF3340)';
+  const svText = svAtRelease === 'GREEN' ? 'Serviceable — no open items' : svAtRelease === 'AMBER' ? 'Serviceable with limitations' : 'Unserviceable — grounded';
   return (
     <div className="space-y-3">
-      <BriefingReadout b={briefing} />
-      {!isMaint && ackDeferrals.length > 0 && (
+      {/* Custody transfer — maintenance → you, on the P&G-blue axis (distinct from RAG serviceability) */}
+      <div className="flex items-center gap-3 rounded-lg border p-3 text-sm">
+        <span className="inline-flex items-center gap-1.5 text-muted-foreground"><span className="gfo-chip-dot gfo-dot-maint" /> Maintenance</span>
+        <ArrowRight className="h-4 w-4" style={{ color: 'var(--gfo-custody-crew)' }} />
+        <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: 'var(--gfo-custody-crew)' }}><span className="gfo-chip-dot gfo-dot-crew" /> You · PIC</span>
+        {briefing.releasedAtUtc && <span className="ml-auto text-xs text-muted-foreground">released {new Date(briefing.releasedAtUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
+      </div>
+
+      {/* Serviceability verdict (RAG) */}
+      <div className="flex items-center gap-3 rounded-lg border p-3" style={{ borderColor: svColor }}>
+        <span className="inline-block h-3 w-3 rounded-full" style={{ background: svColor }} />
+        <span className="font-medium" style={{ color: svColor }}>{svText}</span>
+      </div>
+
+      {/* MEL items the PIC must acknowledge before accepting */}
+      {ackDeferrals.length > 0 && (
         <Card>
           <CardContent className="space-y-2 p-4 text-sm">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acknowledge each active MEL item before accepting</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acknowledge each active MEL item before you accept</div>
             {ackDeferrals.map(d => {
               const mel = melOf(d.melItemId);
               return (
-                <label key={d.id} className="flex items-start gap-2">
+                <label key={d.id} className="flex items-start gap-2 rounded-md border p-2">
                   <input type="checkbox" className="mt-1" checked={!!ackChecks[d.id]} onChange={() => setAckChecks(prev => ({ ...prev, [d.id]: !prev[d.id] }))} />
                   <span>MEL {mel?.subItemNumber ?? '—'} (Cat {d.category}) — {d.restrictionText || mel?.oProcedure || mel?.title || 'restriction/placard'}</span>
                 </label>
@@ -188,16 +218,27 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
           </CardContent>
         </Card>
       )}
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" onClick={() => printBriefing(briefing)}><Printer className="mr-1.5 h-4 w-4" /> View / Print</Button>
-        {isMaint && <span className="self-center text-xs text-muted-foreground">Released — awaiting crew acknowledgement.</span>}
-        {!isMaint && (
-          <Button size="sm" disabled={!acceptGate.ok || !allAcked} onClick={beginAck}>
-            <CheckCircle2 className="mr-1.5 h-4 w-4" /> Acknowledge &amp; accept (PIC)
-          </Button>
-        )}
+
+      {/* Full briefing — collapsed so the decision-critical items lead */}
+      <div>
+        <button onClick={() => setBriefOpen(o => !o)} className="flex w-full items-center justify-between rounded-lg border p-3 text-sm hover:bg-muted/40">
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground"><FileSignature className="h-4 w-4" /> Full briefing — fuel, coming-due, checklist</span>
+          {briefOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+        </button>
+        {briefOpen && <div className="mt-3"><BriefingReadout b={briefing} /></div>}
       </div>
-      {!isMaint && !acceptGate.ok && <p className="text-xs text-[var(--gfo-error,#EF3340)]">{acceptGate.reason}</p>}
+
+      {!acceptGate.ok && <p className="text-xs" style={{ color: 'var(--gfo-error,#EF3340)' }}>{acceptGate.reason}</p>}
+
+      {/* One weighty acceptance — the gravity of a PIC signature + custody transfer */}
+      <Button className="w-full" size="lg" disabled={!acceptGate.ok || !allAcked} onClick={beginAck}>
+        <FileSignature className="mr-2 h-4 w-4" /> Acknowledge &amp; accept — sign as PIC
+      </Button>
+      <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <Lock className="h-3.5 w-3.5" /> step-up signature · transfers custody to you and is recorded
+      </p>
+      <div><Button size="sm" variant="ghost" onClick={() => printBriefing(briefing)}><Printer className="mr-1.5 h-4 w-4" /> View / Print</Button></div>
+
       <SignCeremonyDialog open={ackOpen} onOpenChange={setAckOpen} signer={user} signedEntity="BRIEFING" signedEntityId={pendingSigId}
         intentStatement={INTENT.BRIEFING_ACK} validate={() => ({ ok: acceptGate.ok && allAcked, error: !acceptGate.ok ? acceptGate.reason : !allAcked ? 'Acknowledge each active MEL item before accepting.' : undefined })}
         payloadExtra={ackDeferrals.map(d => d.id).join(',')}
