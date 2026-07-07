@@ -9,6 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import {
   Bell,
+  BellRing,
+  BellOff,
   AlertTriangle,
   CheckCircle,
   Shield,
@@ -21,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ClearSkiesSVG } from './ui/EmptyStateSVGs';
 import { useNotificationFeed } from '../notifications/useNotificationFeed';
+import { usePushNotifications } from '../notifications/usePushNotifications';
 import type { FeedEntry, FeedSeverity } from '../notifications/types';
 
 interface NotificationCenterProps {
@@ -71,8 +74,11 @@ export default function NotificationCenter({ userRole, additionalRoles }: Notifi
   const [filter, setFilter] = useState<'all' | 'unread' | 'critical'>('all');
   const [showDismissed, setShowDismissed] = useState(false);
 
-  const { entries, dismissed, counts, refresh, markRead, markUnread, markAllRead, dismiss, restore } =
+  const { entries, dismissed, counts, refresh, markRead, markUnread, markAllRead, dismiss, restore, userId } =
     useNotificationFeed(userRole, additionalRoles);
+
+  // Bridge the feed to OS-level notifications (opt-in, critical/warn only).
+  const push = usePushNotifications(entries, userId);
 
   const visible = entries.filter(e => {
     if (filter === 'unread') return e.kind === 'event' && !e.isRead;
@@ -237,13 +243,36 @@ export default function NotificationCenter({ userRole, additionalRoles }: Notifi
                 </div>
               )}
             </ScrollArea>
-            <div className="border-t px-4 py-2">
+            <div className="border-t px-4 py-2 flex items-center justify-between gap-2">
               <button
                 className="text-xs text-muted-foreground underline hover:text-foreground"
                 onClick={() => setShowDismissed(v => !v)}
               >
                 {showDismissed ? '← Back to feed' : `Dismissed (${dismissed.length})`}
               </button>
+              {push.supported && (
+                push.permission === 'denied' ? (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1" title="Notifications are blocked in your browser settings">
+                    <BellOff className="w-3 h-3" /> Alerts blocked
+                  </span>
+                ) : push.enabled && push.permission === 'granted' ? (
+                  <button
+                    className="text-xs text-emerald-600 flex items-center gap-1 hover:underline"
+                    onClick={push.disable}
+                    title="Turn off desktop alerts"
+                  >
+                    <BellRing className="w-3 h-3" /> Desktop alerts on
+                  </button>
+                ) : (
+                  <button
+                    className="text-xs text-primary flex items-center gap-1 hover:underline"
+                    onClick={push.enable}
+                    title="Get desktop alerts for critical and warning items"
+                  >
+                    <BellRing className="w-3 h-3" /> Enable desktop alerts
+                  </button>
+                )
+              )}
             </div>
           </CardContent>
         </Card>
