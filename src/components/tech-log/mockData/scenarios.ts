@@ -258,6 +258,17 @@ export function getDefaultState(): TechLogState {
       ],
       createdByOid: pilot.oid, createdAtUtc: iso(0),
     },
+    // Released-to-preflight mirror of scheduling demo trip T-2026-0714 (N2PG, KLUK–KTEB) so the pilot
+    // Flight Hub shows a live four-module board out of the box (FRAT + fuel outstanding, N2PG offered
+    // to the crew via brief-1 below). Matches seedTrips.ts demo-trip-domestic.
+    {
+      id: 'trip-0714', tripNumber: 'T-2026-0714', aircraftId: 'ac-n2pg', name: 'KLUK–KTEB morning', status: 'OPEN',
+      flightLogIds: [],
+      legs: [
+        { id: 'leg-0714a', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'KTEB', departureTimeUtc: new Date(nowMs + 2 * D).toISOString(), arrivalTimeUtc: new Date(nowMs + 2 * D + 100 * 60000).toISOString(), fratStatus: 'NOT_STARTED', airportReviewed: false },
+      ],
+      createdByOid: pilot.oid, createdAtUtc: iso(0),
+    },
   ];
 
   // ── A maintenance flight briefing on N2PG (GREEN), RELEASED and awaiting PIC acknowledgement —
