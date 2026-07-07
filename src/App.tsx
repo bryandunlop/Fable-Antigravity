@@ -130,7 +130,6 @@ import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Contex
 import InspectionFormV2 from './components/inventory-v2/pages/InspectionForm';
 import InspectionReviewV2 from './components/inventory-v2/pages/InspectionReview';
 import AircraftInspectionsV2 from './components/inventory-v2/pages/AircraftInspections';
-import RecentlyCompletedV2 from './components/inventory-v2/pages/RecentlyCompleted';
 import ReplenishV2 from './components/inventory-v2/pages/Replenish';
 import UnitItemRequestV2 from './components/inventory-v2/pages/UnitItemRequest';
 import UnitItemRequestListV2 from './components/inventory-v2/pages/UnitItemRequestList';
@@ -138,7 +137,6 @@ import SettingsV2 from './components/inventory-v2/pages/Settings';
 import CommissaryHome from './components/inventory-v2/pages/CommissaryHome';
 import CommissaryLocation from './components/inventory-v2/pages/CommissaryLocation';
 import CommissaryItemDetail from './components/inventory-v2/pages/CommissaryItemDetail';
-import AlertsPage from './components/inventory-v2/pages/AlertsPage';
 import TripListV2 from './components/inventory-v2/pages/TripList';
 import TripHomeV2 from './components/inventory-v2/pages/TripHome';
 import GroceryListPageV2 from './components/inventory-v2/pages/GroceryListPage';
@@ -429,9 +427,8 @@ export default function App() {
                                 {/* ─── Inventory V2 Routes ─── */}
                                 <Route path="/inventory-v2" element={<Navigate to="/inventory-v2/inspections" replace />} />
                                 <Route path="/inventory-v2/inspection" element={<InventoryRouteWrapper userRole={userRole}><InspectionFormV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/inspection/:id/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/inspection/review" element={<InventoryRouteWrapper userRole={userRole}><InspectionReviewV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/inspections" element={<InventoryRouteWrapper userRole={userRole}><AircraftInspectionsV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/recently-completed" element={<InventoryRouteWrapper userRole={userRole}><RecentlyCompletedV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/replenish" element={<InventoryRouteWrapper userRole={userRole}><ReplenishV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/unit-request" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/unit-requests" element={<InventoryRouteWrapper userRole={userRole}><UnitItemRequestListV2 /></InventoryRouteWrapper>} />
@@ -439,7 +436,6 @@ export default function App() {
                                 <Route path="/inventory-v2/commissary" element={<InventoryRouteWrapper userRole={userRole}><CommissaryHome /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/commissary/location/:locationId" element={<InventoryRouteWrapper userRole={userRole}><CommissaryLocation /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/commissary/item/:itemId" element={<InventoryRouteWrapper userRole={userRole}><CommissaryItemDetail /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/alerts" element={<InventoryRouteWrapper userRole={userRole}><AlertsPage /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips" element={<InventoryRouteWrapper userRole={userRole}><TripListV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId" element={<InventoryRouteWrapper userRole={userRole}><TripHomeV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryRouteWrapper userRole={userRole}><GroceryListPageV2 /></InventoryRouteWrapper>} />

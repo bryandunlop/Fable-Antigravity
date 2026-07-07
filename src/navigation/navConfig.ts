@@ -126,9 +126,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/inventory-v2/replenish', label: 'Replenish', domain: 'inventory', icon: PackagePlus, primary: true, keywords: ['restock'], roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/unit-requests', label: 'Unit Requests', domain: 'inventory', icon: Send, primary: true, roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/settings', label: 'Inventory Settings', domain: 'inventory', icon: Settings, primary: false, keywords: ['par levels', 'fleet', 'items'], roles: ['admin', 'commissary-manager'] },
-  { path: '/inventory-v2/alerts', label: 'Stock Alerts', domain: 'inventory', icon: AlertTriangle, sidebar: false, roles: ['commissary-manager', 'admin'] },
   { path: '/inventory-v2/activity-log', label: 'Activity Log', domain: 'inventory', icon: Activity, sidebar: false, roles: ['inflight', 'admin'] },
-  { path: '/inventory-v2/recently-completed', label: 'Recently Completed', domain: 'inventory', icon: ClipboardCheck, sidebar: false, roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/unit-request', label: 'New Unit Request', domain: 'inventory', icon: Send, sidebar: false, searchable: false, roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/inspection', label: 'Inspection', domain: 'inventory', icon: ClipboardCheck, sidebar: false, searchable: false, detailLabel: 'Review', roles: ['inflight', 'admin'] },
 

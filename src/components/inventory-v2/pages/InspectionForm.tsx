@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Scan, RotateCcw, Settings, ArrowRight } from 'lucide-react';
+import { Scan, RotateCcw, Settings, ArrowRight, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -63,6 +63,22 @@ function buildInitialCheckedItems(
   return map;
 }
 
+// ─── Helper: resolve the default inspector from the logged-in user ─────────
+// state.currentUser lives in a separate id-space (USR###) from MOCK_USERS
+// (u#), so we match by id first, then fall back to name, then MOCK_USERS[0].
+
+function resolveDefaultInspector(
+  currentUser: { id?: string; name?: string } | undefined | null,
+): typeof MOCK_USERS[number] {
+  if (currentUser) {
+    const byId = MOCK_USERS.find((u) => u.id === currentUser.id);
+    if (byId) return byId;
+    const byName = MOCK_USERS.find((u) => u.name === currentUser.name);
+    if (byName) return byName;
+  }
+  return MOCK_USERS[0];
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function InspectionForm() {
@@ -71,7 +87,9 @@ export default function InspectionForm() {
   const { state } = useInventoryV2();
 
   // ── Local state ──
-  const [selectedUser, setSelectedUser] = useState<typeof MOCK_USERS[number]>(MOCK_USERS[0]);
+  const [selectedUser, setSelectedUser] = useState<typeof MOCK_USERS[number]>(
+    () => resolveDefaultInspector(state.currentUser),
+  );
   const [selectedTailNumber, setSelectedTailNumber] = useState('');
   const [checkedItems, setCheckedItems] = useState<Map<string, InspectionCheckedItem>>(
     new Map(),
@@ -85,6 +103,7 @@ export default function InspectionForm() {
   const didResume = React.useRef(false);
   const didDetectDraft = React.useRef(false);
   const didApplyTailParam = React.useRef(false);
+  const didRestoreFromReview = React.useRef(false);
 
   // ── Auto-save draft to sessionStorage on every change (debounced 500ms) ──
   useEffect(() => {
@@ -122,18 +141,82 @@ export default function InspectionForm() {
     }
   }, [searchParams, state.fleet]);
 
-  // ── Detect unsaved draft on mount (only when not resuming via ?resume) ──
+  // ── Restore silently when coming Back from Review (?fromReview=1) ──
+  // No banner, no wipe — repopulate everything the draft holds and strip param.
+  useEffect(() => {
+    if (didRestoreFromReview.current) return;
+    if (searchParams.get('fromReview') !== '1') return;
+    didRestoreFromReview.current = true;
+
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft?.tailNumber) setSelectedTailNumber(draft.tailNumber);
+        if (Array.isArray(draft?.checkedItems)) {
+          const restored = new Map<string, InspectionCheckedItem>();
+          draft.checkedItems.forEach((ci: InspectionCheckedItem) => {
+            if (ci?.itemId) restored.set(ci.itemId, ci);
+          });
+          setCheckedItems(restored);
+        }
+        if (draft?.reportedBy) {
+          const inspector = MOCK_USERS.find((u) => u.name === draft.reportedBy);
+          if (inspector) setSelectedUser(inspector);
+        }
+      }
+    } catch {
+      // corrupt draft — leave form as-is rather than wiping
+    }
+
+    // Strip the param so a refresh doesn't re-trigger the restore
+    const next = new URLSearchParams(searchParams);
+    next.delete('fromReview');
+    navigate(
+      { pathname: '/inventory-v2/inspection', search: next.toString() },
+      { replace: true },
+    );
+  }, [searchParams, navigate]);
+
+  // ── Detect unsaved draft + reconcile against persisted in_progress ──
+  // Only on a plain mount (no ?resume, no ?fromReview). Before offering the
+  // draft banner, discard any draft for a tail that ALSO has a persisted
+  // in_progress inspection — the persisted record wins, so the banner can't
+  // offer a stale overwrite. The effect re-runs as state.inspections loads
+  // from /api/state; the empty list simply means "no conflict possible".
   useEffect(() => {
     if (didDetectDraft.current) return;
-    const resumeId = searchParams.get('resume');
-    if (resumeId) return; // Task 2 handles this case
+    if (searchParams.get('resume')) return; // resume flow handles this case
+    if (searchParams.get('fromReview') === '1') return; // silent restore, no banner
 
     const raw = sessionStorage.getItem(SESSION_KEY);
-    if (raw) {
+    if (!raw) return; // no draft yet — leave unlatched in case one appears
+
+    let tail: string | undefined;
+    try {
+      tail = JSON.parse(raw)?.tailNumber;
+    } catch {
+      // corrupt draft — drop it and don't surface a banner
+      sessionStorage.removeItem(SESSION_KEY);
       didDetectDraft.current = true;
-      setHasUnsavedDraft(true);
+      return;
     }
-  }, [searchParams]);
+
+    const hasPersisted =
+      !!tail &&
+      state.inspections.some(
+        (i) => i.tailNumber === tail && i.status === 'in_progress',
+      );
+
+    if (hasPersisted) {
+      sessionStorage.removeItem(SESSION_KEY); // persisted record wins
+      didDetectDraft.current = true;
+      return;
+    }
+
+    didDetectDraft.current = true;
+    setHasUnsavedDraft(true);
+  }, [searchParams, state.inspections]);
 
   // ── Resume in-progress inspection ──
   useEffect(() => {
@@ -149,6 +232,10 @@ export default function InspectionForm() {
 
     didResume.current = true;
     setSelectedTailNumber(inspection.tailNumber);
+
+    // Keep the resumed inspection's own inspector (fall back to current default)
+    const resumedInspector = MOCK_USERS.find((u) => u.name === inspection.reportedBy);
+    if (resumedInspector) setSelectedUser(resumedInspector);
 
     // Restore checkedItems map from saved inspection
     const restored = new Map<string, InspectionCheckedItem>();
@@ -319,7 +406,7 @@ export default function InspectionForm() {
     };
 
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(draft));
-    navigate('/inventory-v2/inspection/new/review');
+    navigate('/inventory-v2/inspection/review');
   }, [selectedTailNumber, aircraftType, checkedItems, selectedUser, navigate]);
 
   // ── Readiness stats per compartment ──
@@ -356,6 +443,22 @@ export default function InspectionForm() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Request an item (visible once an aircraft is selected) */}
+          {selectedTailNumber && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                navigate(`/inventory-v2/unit-request?tail=${selectedTailNumber}`)
+              }
+              title="Request an item for this aircraft"
+              className="gap-1.5"
+            >
+              <Send className="h-4 w-4" />
+              <span className="hidden sm:inline">Request item</span>
+            </Button>
+          )}
+
           {/* Barcode Scanner */}
           <Button
             variant="outline"

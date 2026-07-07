@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   Coffee, GlassWater, Cookie, Wine, Scroll, Pill, SprayCan,
-  Minus, Plus, X, ChevronDown, ShoppingCart, Zap, type LucideIcon,
+  Minus, Plus, X, ChevronDown, ShoppingCart, Zap, Star, type LucideIcon,
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -37,6 +37,8 @@ interface QuickTapViewProps {
   onDecrement: (item: InventoryItemV2) => void;
   getLegUsage: (item: InventoryItemV2) => number;
   getOnBoard: (item: InventoryItemV2) => number;
+  isFavorite: (itemId: string) => boolean;
+  onToggleFavorite: (itemId: string) => void;
 }
 
 // ─── Quick-Tap Tile ─────────────────────────────────────────────────────────
@@ -47,12 +49,16 @@ function TapTile({
   onBoard,
   onTap,
   onLongPress,
+  starred,
+  onToggleStar,
 }: {
   item: InventoryItemV2;
   usage: number;
   onBoard: number;
   onTap: () => void;
   onLongPress: () => void;
+  starred?: boolean;
+  onToggleStar?: () => void;
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggered = useRef(false);
@@ -99,6 +105,24 @@ function TapTile({
       {usage > 0 && (
         <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1 shadow-lg shadow-blue-500/30 z-10">
           {usage}
+        </span>
+      )}
+
+      {/* Favorite star — top-left, kept clear of the usage badge and the main
+          tap target. Uses pointer handlers that stop propagation so tapping the
+          star never logs usage or triggers the long-press qty picker. */}
+      {onToggleStar && (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={starred ? 'Unpin from Quick Add' : 'Pin to Quick Add'}
+          onPointerDown={e => e.stopPropagation()}
+          onPointerUp={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); onToggleStar(); }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleStar(); } }}
+          className="absolute top-0.5 left-0.5 w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground/60 hover:text-amber-400 transition-colors z-10 cursor-pointer"
+        >
+          <Star size={13} className={cn(starred && 'fill-amber-400 text-amber-400')} />
         </span>
       )}
 
@@ -404,6 +428,8 @@ export default function QuickTapView({
   onDecrement,
   getLegUsage,
   getOnBoard,
+  isFavorite,
+  onToggleFavorite,
 }: QuickTapViewProps) {
   const { state } = useInventoryV2();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
@@ -416,15 +442,21 @@ export default function QuickTapView({
   }, [items]);
 
   // ── Quick Add items (configurable global list, managed in Commissary) ──
+  // Favorited items float to the front; otherwise the stored order is preserved.
   const quickAddItems = useMemo(() => {
-    return state.quickAddItemIds
+    const list = state.quickAddItemIds
       .map(id => consumableItems.find(i => i.id === id))
       .filter((item): item is InventoryItemV2 => {
         if (!item) return false;
         const qty = item.defaultQuantities[aircraftType];
         return qty !== undefined && qty > 0;
       });
-  }, [consumableItems, aircraftType, state.quickAddItemIds]);
+    // Stable partition: favorites keep their relative order, then the rest.
+    return [
+      ...list.filter(i => isFavorite(i.id)),
+      ...list.filter(i => !isFavorite(i.id)),
+    ];
+  }, [consumableItems, aircraftType, state.quickAddItemIds, isFavorite]);
 
   // ── Items grouped by POS category ──
   const categoryGroups = useMemo(() => {
@@ -494,6 +526,8 @@ export default function QuickTapView({
               onBoard={getOnBoard(item)}
               onTap={() => onIncrement(item)}
               onLongPress={() => handleLongPress(item)}
+              starred={isFavorite(item.id)}
+              onToggleStar={() => onToggleFavorite(item.id)}
             />
           ))}
         </div>
