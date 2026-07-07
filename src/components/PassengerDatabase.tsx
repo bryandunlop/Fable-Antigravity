@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -36,41 +36,19 @@ import {
   Save,
   X,
   FileText,
-  Trash2
+  Trash2,
+  Camera,
+  Image as ImageIcon
 } from 'lucide-react';
+import { usePassengers } from './passengers/PassengerContext';
+import type { Passenger } from './passengers/passengerData';
+import { fileToDataUrl, makePhoto } from './passengers/photoUtil';
 
 interface PassengerDatabaseProps {
   userRole?: string;
 }
 
-interface Passenger {
-  id: string;
-  name: string;
-  info: {
-    email?: string;
-    phone?: string;
-    address?: string;
-  };
-  role: string;
-  allergies: Array<{
-    allergen: string;
-    severity: 'Critical' | 'Moderate' | 'Mild';
-    reaction?: string;
-    medication?: string;
-  }>;
-  birthday: string;
-  beverage: string[];
-  food: string[];
-  passengerComfort: {
-    temperature?: string;
-    seating?: string;
-    tvPreference?: string;
-    lighting?: string;
-    specialRequests?: string;
-  };
-  additionalNotes: string;
-  flightAttendantNotes?: string;
-}
+// Passenger type is imported from the shared passengers module.
 
 export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatabaseProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,129 +58,10 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
   const [isEditingPassenger, setIsEditingPassenger] = useState(false);
   const [isPassengerDetailOpen, setIsPassengerDetailOpen] = useState(false);
 
-  // Mock passengers data
-  const [passengers, setPassengers] = useState<Passenger[]>([
-    {
-      id: 'PAX001',
-      name: 'Robert Johnson',
-      info: {
-        email: 'robert.johnson@email.com',
-        phone: '+1 (555) 123-4567',
-        address: '123 Park Avenue, New York, NY 10021'
-      },
-      role: 'Board Chairman',
-      allergies: [
-        {
-          allergen: 'Shellfish',
-          severity: 'Critical',
-          reaction: 'Anaphylaxis',
-          medication: 'EpiPen - seat pocket'
-        },
-        {
-          allergen: 'Tree nuts',
-          severity: 'Moderate',
-          reaction: 'Hives, swelling',
-          medication: 'Benadryl'
-        }
-      ],
-      birthday: '1975-03-15',
-      beverage: ['Dom Pérignon', 'Macallan 18', 'Perrier', 'Espresso'],
-      food: ['Wagyu Beef', 'Lobster Thermidor', 'Truffle Pasta', 'Aged Ribeye', 'French cuisine', 'Italian cuisine'],
-      passengerComfort: {
-        temperature: '72°F',
-        seating: 'Forward-facing window seat with extra legroom',
-        tvPreference: 'Action movies',
-        lighting: 'Dimmed lighting preferred',
-        specialRequests: 'Fresh orchids for cabin, Evian water only, prefers to board last for privacy'
-      },
-      additionalNotes: 'High-profile business executive. Values privacy and premium service. Always travels with personal security. Enjoys discussing business and golf. Prefers traditional preparations and formal service style.',
-      flightAttendantNotes: 'Prefers to be addressed as "Mr. Chairman". Very particular about napkin folding.'
-    },
-    {
-      id: 'PAX002',
-      name: 'Sarah Chen',
-      info: {
-        email: 'sarah.chen@techcorp.com',
-        phone: '+1 (555) 987-6543'
-      },
-      role: 'CEO',
-      allergies: [],
-      birthday: '1985-08-22',
-      beverage: ['Green tea', 'Kombucha', 'Sparkling water', 'Oat milk latte'],
-      food: ['Vegetarian meals', 'Quinoa bowls', 'Mediterranean salads', 'Fresh fruit', 'Japanese cuisine', 'Plant-based options'],
-      passengerComfort: {
-        temperature: '70°F',
-        seating: 'Aisle seat near power outlet',
-        tvPreference: 'Documentaries',
-        lighting: 'Bright lighting for work',
-        specialRequests: 'Extra power outlets, noise-canceling headphones, minimal conversation during flight'
-      },
-      additionalNotes: 'Tech executive who frequently works during flights. Very punctual and prefers quiet environment. Focus on healthy, fresh food options. Environmentally conscious - prefers eco-friendly options when available.'
-    },
-    {
-      id: 'PAX003',
-      name: 'Michael Rodriguez',
-      info: {
-        email: 'mrodriguez@email.com',
-        phone: '+1 (555) 456-7890'
-      },
-      role: 'Authorized User',
-      allergies: [
-        {
-          allergen: 'Peanuts',
-          severity: 'Critical',
-          reaction: 'Severe breathing difficulty',
-          medication: 'EpiPen required immediately'
-        }
-      ],
-      birthday: '1990-12-03',
-      beverage: ['Coffee (black)', 'Whiskey neat', 'Craft beer', 'Energy drinks'],
-      food: ['Grilled meats', 'BBQ', 'Mexican cuisine', 'Cheese platters', 'Keto-friendly options', 'High-protein meals'],
-      passengerComfort: {
-        temperature: '68°F',
-        seating: 'Window seat',
-        tvPreference: 'Comedy shows',
-        lighting: 'Standard lighting',
-        specialRequests: 'Tour of cockpit if possible, interested in flight operations'
-      },
-      additionalNotes: 'Young entrepreneur, first-time private jet passenger. Very interested in the aircraft and flight operations. Strict keto diet adherence. Enjoys bold flavors and spicy food. Appreciates quality meat preparations.'
-    },
-    {
-      id: 'PAX004',
-      name: 'Emily Watson',
-      info: {
-        email: 'emily.watson@email.com',
-        phone: '+1 (555) 234-5678'
-      },
-      role: 'Standard',
-      allergies: [
-        {
-          allergen: 'Bee stings',
-          severity: 'Moderate',
-          reaction: 'Localized swelling',
-          medication: 'Antihistamine'
-        },
-        {
-          allergen: 'Latex',
-          severity: 'Mild',
-          reaction: 'Skin irritation',
-          medication: 'Avoid latex gloves'
-        }
-      ],
-      birthday: '1978-06-10',
-      beverage: ['Oat milk latte', 'Sparkling water', 'Champagne', 'Herbal tea'],
-      food: ['Seafood', 'Nordic cuisine', 'Dairy-free options', 'Modern European', 'Artisanal breads', 'Root vegetables'],
-      passengerComfort: {
-        temperature: '71°F',
-        seating: 'Aisle seat',
-        tvPreference: 'Drama series',
-        lighting: 'Soft lighting',
-        specialRequests: 'No latex materials anywhere, all dairy-free meal options, minimal conversation'
-      },
-      additionalNotes: 'Frequent business traveler with lactose intolerance. Prefers minimal conversation during flights. Appreciates innovative and artistic food presentation. Ensure all items are completely dairy-free.'
-    }
-  ]);
-
+  // Passengers come from the shared store (persisted, shared with the FA flight view).
+  const { passengers, addPassenger, updatePassenger, addPhoto, removePhoto } = usePassengers();
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [pendingPhotoCaption, setPendingPhotoCaption] = useState('');
   const matchesAllergy = (passenger: Passenger) => {
     if (allergyFilter === 'all') return true;
     if (allergyFilter === 'none') return passenger.allergies.length === 0;
@@ -292,7 +151,7 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
       flightAttendantNotes: newPassengerForm.flightAttendantNotes || ''
     };
 
-    setPassengers([...passengers, newPassenger]);
+    addPassenger(newPassenger);
     setNewPassengerForm({
       name: '',
       info: { email: '', phone: '', address: '' },
@@ -312,6 +171,20 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
     });
   };
 
+  const handlePhotoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !selectedPassenger) return;
+    try {
+      const url = await fileToDataUrl(file);
+      addPhoto(selectedPassenger.id, makePhoto(url, pendingPhotoCaption, new Date().toISOString()));
+      setPendingPhotoCaption('');
+      toast.success('Photo added to passenger card');
+    } catch {
+      toast.error('Could not add photo');
+    }
+  };
+
   const PassengerForm = ({ passenger, onClose, isEditing = false }: {
     passenger?: Passenger;
     onClose: () => void;
@@ -324,10 +197,7 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
     const handleSave = () => {
       if (isEditing && passenger) {
         // Update existing passenger
-        const updatedPassengers = passengers.map(p =>
-          p.id === passenger.id ? { ...formData as Passenger, id: passenger.id } : p
-        );
-        setPassengers(updatedPassengers);
+        updatePassenger({ ...(formData as Passenger), id: passenger.id });
         toast.success('Passenger Updated');
         setIsEditingPassenger(false);
       } else {
@@ -1156,6 +1026,54 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
                   <p className="text-sm">{selectedPassenger.additionalNotes}</p>
                 </div>
               )}
+
+              <Separator />
+
+              {/* Photos — cabin setup references (plating, bed setup, etc.) */}
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4" /> Photos
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={pendingPhotoCaption}
+                      onChange={(e) => setPendingPhotoCaption(e.target.value)}
+                      placeholder="Caption (e.g. bed setup)"
+                      className="h-8 w-48"
+                    />
+                    <Button size="sm" variant="outline" onClick={() => photoInputRef.current?.click()}>
+                      <Camera className="w-4 h-4 mr-1" /> Add Photo
+                    </Button>
+                  </div>
+                </div>
+                {(() => {
+                  const live = passengers.find(p => p.id === selectedPassenger.id);
+                  const photos = live?.photos ?? [];
+                  return photos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No photos yet. Add cabin setup references — how they like food plated, bed setup, etc.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {photos.map(ph => (
+                        <div key={ph.id} className="relative group border rounded-lg overflow-hidden bg-slate-50">
+                          <img src={ph.url} alt={ph.caption || 'Passenger photo'} className="w-full h-28 object-cover" />
+                          {ph.caption && <div className="px-2 py-1 text-xs truncate" title={ph.caption}>{ph.caption}</div>}
+                          <button
+                            className="absolute top-1 right-1 bg-white/90 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Remove photo"
+                            onClick={() => { removePhoto(selectedPassenger.id, ph.id); toast.success('Photo removed'); }}
+                          >
+                            <Trash2 className="w-3 h-3 text-red-600" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+                <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={handlePhotoFile} />
+              </div>
             </div>
           )}
 
