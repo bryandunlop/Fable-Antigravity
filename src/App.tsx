@@ -83,6 +83,8 @@ import GRATFormBuilder from './components/GRATFormBuilder';
 import ProceduralBulletins from './components/ProceduralBulletins';
 import FlightOperationsBulletins from './components/bulletins/FlightOperationsBulletins';
 import { BulletinProvider } from './components/bulletins/BulletinContext';
+import { PassengerProvider } from './components/passengers/PassengerContext';
+import FlightAttendantFlights from './components/inflight/FlightAttendantFlights';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 import UnifiedTripWorkspace from './components/experimental/UnifiedTripWorkspace';
 import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
@@ -181,6 +183,7 @@ export default function App() {
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
                 <BulletinProvider>
+                <PassengerProvider>
                 <Router>
                   <Routes>
                     {/* Public Routes - No Authentication Required */}
@@ -483,7 +486,7 @@ export default function App() {
                                 <Route path="/passenger-forms" element={<PassengerForms />} />
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
                                 <Route path="/aog-management" element={<AOGManagement />} />
-                                <Route path="/upcoming-flights" element={<UpcomingFlights userRole={userRole} />} />
+                                <Route path="/upcoming-flights" element={userRole === 'inflight' ? <FlightAttendantFlights /> : <UpcomingFlights userRole={userRole} />} />
                                 <Route path="/tech-log/*" element={<TechLogRoutes userRole={userRole} />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
@@ -591,6 +594,7 @@ export default function App() {
                     } />
                   </Routes>
                 </Router>
+                </PassengerProvider>
                 </BulletinProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
