@@ -10,82 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useSchedulingWorkspace } from './SchedulingWorkspaceContext';
 import { parseTemplate } from '../../scheduling/store';
-import type { ChecklistTemplate, DueRule, TaskDefinition, Weekday } from '../../scheduling/engine';
+import type {
+  ChecklistTemplate, DueRule, Weekday, AppliesTo, AirportEndpoint, AirportMatch, ReTrigger,
+} from '../../scheduling/engine';
 import {
   DUE_RULE_KINDS, LEAF_KINDS, defaultDueRule, slugifyTaskId, bumpedTemplatePayload, publishTaskIds,
-  conditionToBuilder, builderToCondition, type ConditionBuilder, type LeafCondition, type LeafKind,
+  draftFromDef, defFromDraft,
+  type ConditionBuilder, type LeafCondition, type LeafKind, type DraftTask,
 } from './templateEditor';
-
-// ─── Draft model (form-friendly) ───────────────────────────────────────────────────────────────
-
-interface DraftTask {
-  id: string;
-  title: string;
-  description: string;
-  ownerRole: string;
-  category: string;
-  requiresAck: boolean;
-  dueRule: DueRule;
-  condition: ConditionBuilder;
-  handoffEnabled: boolean;
-  handoffKind: 'role' | 'dept' | 'person';
-  handoffValue: string;
-  handoffChannel: 'inbox' | 'teams' | 'email';
-  escalationEnabled: boolean;
-  escalationDeadline: DueRule;
-  escalationNotifyRole: string;
-  escalationReason: string;
-  dependsOn?: string;
-}
-
-function draftFromDef(def: TaskDefinition): DraftTask {
-  return {
-    id: def.id,
-    title: def.title,
-    description: def.description ?? '',
-    ownerRole: def.ownerRole,
-    category: def.category,
-    requiresAck: def.requiresAck,
-    dueRule: def.dueRule,
-    condition: conditionToBuilder(def.condition),
-    handoffEnabled: !!def.handoffTarget,
-    handoffKind: def.handoffTarget?.kind ?? 'role',
-    handoffValue: def.handoffTarget?.value ?? '',
-    handoffChannel: def.handoffTarget?.channel ?? 'inbox',
-    escalationEnabled: !!def.escalation,
-    escalationDeadline: def.escalation?.deadline ?? defaultDueRule('dayOfTimeLocal'),
-    escalationNotifyRole: def.escalation?.notifyRole ?? 'scheduling',
-    escalationReason: def.escalation?.reason ?? '',
-    dependsOn: def.dependsOn,
-  };
-}
-
-function defFromDraft(d: DraftTask, order: number): TaskDefinition {
-  const def: TaskDefinition = {
-    id: d.id,
-    title: d.title.trim(),
-    ownerRole: d.ownerRole.trim() || 'scheduling',
-    category: d.category.trim() || 'ops',
-    order,
-    dueRule: d.dueRule,
-    requiresAck: d.requiresAck,
-  };
-  if (d.description.trim()) def.description = d.description.trim();
-  const condition = builderToCondition(d.condition);
-  if (condition) def.condition = condition;
-  if (d.handoffEnabled && d.handoffValue.trim()) {
-    def.handoffTarget = { kind: d.handoffKind, value: d.handoffValue.trim(), channel: d.handoffChannel };
-  }
-  if (d.escalationEnabled && d.escalationNotifyRole.trim()) {
-    def.escalation = {
-      deadline: d.escalationDeadline,
-      notifyRole: d.escalationNotifyRole.trim(),
-      ...(d.escalationReason.trim() ? { reason: d.escalationReason.trim() } : {}),
-    };
-  }
-  if (d.dependsOn) def.dependsOn = d.dependsOn;
-  return def;
-}
 
 // ─── Due-rule fields ───────────────────────────────────────────────────────────────────────────
 
@@ -249,6 +181,94 @@ function ConditionFields({ builder, onChange }: { builder: ConditionBuilder; onC
   );
 }
 
+// ─── Per-airport + re-flag fields (per-trip templates only) ──────────────────────────────────────
+
+const RE_TRIGGERS: { value: ReTrigger; label: string }[] = [
+  { value: 'legScheduleChange', label: 'Leg date/time change' },
+  { value: 'aircraftChange', label: 'Aircraft change' },
+  { value: 'passengerChange', label: 'Passenger added' },
+];
+
+function PerAirportReflagFields({ appliesTo, reTriggerOn, onChange }: {
+  appliesTo?: AppliesTo;
+  reTriggerOn: ReTrigger[];
+  onChange: (patch: { appliesTo?: AppliesTo; reTriggerOn?: ReTrigger[] }) => void;
+}) {
+  const endpoint: AirportEndpoint = appliesTo?.endpoint ?? 'both';
+  const prefixExcept = (m: AirportMatch): string[] => (m.kind === 'prefix' ? m.except ?? [] : []);
+  const setMatch = (airport: AirportMatch) => onChange({ appliesTo: { endpoint, airport } });
+
+  return (
+    <div className="space-y-2 border rounded-md p-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Label className="text-xs">Applies to</Label>
+        <Select
+          value={appliesTo ? 'perAirport' : 'trip'}
+          onValueChange={(v: string) => onChange({ appliesTo: v === 'perAirport' ? { endpoint: 'both', airport: { kind: 'exact', icao: '' } } : undefined })}
+        >
+          <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="trip">Whole trip (one item)</SelectItem>
+            <SelectItem value="perAirport">Per airport (each leg)</SelectItem>
+          </SelectContent>
+        </Select>
+        {appliesTo && (
+          <>
+            <Select value={endpoint} onValueChange={(e: string) => onChange({ appliesTo: { endpoint: e as AirportEndpoint, airport: appliesTo.airport } })}>
+              <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="departure">Departure</SelectItem>
+                <SelectItem value="arrival">Arrival</SelectItem>
+                <SelectItem value="both">Dep + Arr</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={appliesTo.airport.kind}
+              onValueChange={(k: string) => setMatch(k === 'exact' ? { kind: 'exact', icao: '' } : { kind: 'prefix', prefix: '' })}
+            >
+              <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="exact">Exact ICAO</SelectItem>
+                <SelectItem value="prefix">ICAO prefix</SelectItem>
+              </SelectContent>
+            </Select>
+            {appliesTo.airport.kind === 'exact' ? (
+              <Input className="h-8 w-28 text-xs" placeholder="KBOS" value={appliesTo.airport.icao}
+                onChange={(e) => setMatch({ kind: 'exact', icao: e.target.value.toUpperCase() })} />
+            ) : (
+              <>
+                <Input className="h-8 w-20 text-xs" placeholder="K" value={appliesTo.airport.prefix}
+                  onChange={(e) => setMatch({ kind: 'prefix', prefix: e.target.value.toUpperCase(), ...(prefixExcept(appliesTo.airport).length ? { except: prefixExcept(appliesTo.airport) } : {}) })} />
+                <Input className="h-8 w-40 text-xs" placeholder="except (KLUK, …)"
+                  value={prefixExcept(appliesTo.airport).join(', ')}
+                  onChange={(e) => {
+                    const except = e.target.value.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+                    const prefix = appliesTo.airport.kind === 'prefix' ? appliesTo.airport.prefix : '';
+                    setMatch({ kind: 'prefix', prefix, ...(except.length ? { except } : {}) });
+                  }} />
+              </>
+            )}
+          </>
+        )}
+      </div>
+      <div>
+        <Label className="text-xs">Re-flag a completed item when</Label>
+        <div className="flex flex-wrap gap-3 mt-1">
+          {RE_TRIGGERS.map((rt) => (
+            <label key={rt.value} className="flex items-center gap-1.5 text-xs">
+              <Checkbox
+                checked={reTriggerOn.includes(rt.value)}
+                onCheckedChange={(v: boolean | 'indeterminate') => onChange({ reTriggerOn: v === true ? [...reTriggerOn, rt.value] : reTriggerOn.filter((x) => x !== rt.value) })}
+              />
+              {rt.label}
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── The editor dialog ─────────────────────────────────────────────────────────────────────────
 
 /**
@@ -298,6 +318,7 @@ export function TemplateEditorDialog({
       handoffEnabled: false, handoffKind: 'role', handoffValue: '', handoffChannel: 'inbox',
       escalationEnabled: false, escalationDeadline: defaultDueRule('dayOfTimeLocal'),
       escalationNotifyRole: 'scheduling', escalationReason: '',
+      appliesTo: undefined, reTriggerOn: [],
     }]);
 
   async function handlePublish() {
@@ -362,6 +383,13 @@ export function TemplateEditorDialog({
 
                   {template.triggerType === 'per_trip' && (
                     <ConditionFields builder={t.condition} onChange={b => update(i, { condition: b })} />
+                  )}
+                  {template.triggerType === 'per_trip' && (
+                    <PerAirportReflagFields
+                      appliesTo={t.appliesTo}
+                      reTriggerOn={t.reTriggerOn}
+                      onChange={(patch) => update(i, patch)}
+                    />
                   )}
 
                   <div className="flex flex-wrap gap-6">

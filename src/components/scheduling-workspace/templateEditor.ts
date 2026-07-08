@@ -1,4 +1,4 @@
-import type { ChecklistTemplate, Condition, DueRule, TaskDefinition, TripType } from '../../scheduling/engine';
+import type { ChecklistTemplate, Condition, DueRule, TaskDefinition, TripType, AppliesTo, ReTrigger } from '../../scheduling/engine';
 
 // Pure state helpers for the no-code template editor. The UI edits a flat, form-friendly builder
 // model; these functions translate to/from the engine's Condition/DueRule unions and produce the
@@ -142,4 +142,83 @@ export function bumpedTemplatePayload(template: ChecklistTemplate, taskDefinitio
     status: 'published',
     taskDefinitions: taskDefinitions.map((d, i) => ({ ...d, order: i + 1 })),
   };
+}
+
+// ─── Draft task model (form-friendly) ────────────────────────────────────────────────────────────
+// Pure transforms between a TaskDefinition and the flat form model the editor dialog edits. Kept
+// here (not in the .tsx) so they carry no UI imports and stay unit-testable.
+
+export interface DraftTask {
+  id: string;
+  title: string;
+  description: string;
+  ownerRole: string;
+  category: string;
+  requiresAck: boolean;
+  dueRule: DueRule;
+  condition: ConditionBuilder;
+  handoffEnabled: boolean;
+  handoffKind: 'role' | 'dept' | 'person';
+  handoffValue: string;
+  handoffChannel: 'inbox' | 'teams' | 'email';
+  escalationEnabled: boolean;
+  escalationDeadline: DueRule;
+  escalationNotifyRole: string;
+  escalationReason: string;
+  dependsOn?: string;
+  appliesTo?: AppliesTo;       // per-airport fan-out (per-trip templates only)
+  reTriggerOn: ReTrigger[];    // which trip changes re-flag a completed item
+}
+
+export function draftFromDef(def: TaskDefinition): DraftTask {
+  return {
+    id: def.id,
+    title: def.title,
+    description: def.description ?? '',
+    ownerRole: def.ownerRole,
+    category: def.category,
+    requiresAck: def.requiresAck,
+    dueRule: def.dueRule,
+    condition: conditionToBuilder(def.condition),
+    handoffEnabled: !!def.handoffTarget,
+    handoffKind: def.handoffTarget?.kind ?? 'role',
+    handoffValue: def.handoffTarget?.value ?? '',
+    handoffChannel: def.handoffTarget?.channel ?? 'inbox',
+    escalationEnabled: !!def.escalation,
+    escalationDeadline: def.escalation?.deadline ?? defaultDueRule('dayOfTimeLocal'),
+    escalationNotifyRole: def.escalation?.notifyRole ?? 'scheduling',
+    escalationReason: def.escalation?.reason ?? '',
+    dependsOn: def.dependsOn,
+    appliesTo: def.appliesTo,
+    reTriggerOn: def.reTriggerOn ?? [],
+  };
+}
+
+export function defFromDraft(d: DraftTask, order: number): TaskDefinition {
+  const def: TaskDefinition = {
+    id: d.id,
+    title: d.title.trim(),
+    ownerRole: d.ownerRole.trim() || 'scheduling',
+    category: d.category.trim() || 'ops',
+    order,
+    dueRule: d.dueRule,
+    requiresAck: d.requiresAck,
+  };
+  if (d.description.trim()) def.description = d.description.trim();
+  const condition = builderToCondition(d.condition);
+  if (condition) def.condition = condition;
+  if (d.handoffEnabled && d.handoffValue.trim()) {
+    def.handoffTarget = { kind: d.handoffKind, value: d.handoffValue.trim(), channel: d.handoffChannel };
+  }
+  if (d.escalationEnabled && d.escalationNotifyRole.trim()) {
+    def.escalation = {
+      deadline: d.escalationDeadline,
+      notifyRole: d.escalationNotifyRole.trim(),
+      ...(d.escalationReason.trim() ? { reason: d.escalationReason.trim() } : {}),
+    };
+  }
+  if (d.dependsOn) def.dependsOn = d.dependsOn;
+  if (d.appliesTo) def.appliesTo = d.appliesTo;
+  if (d.reTriggerOn.length) def.reTriggerOn = d.reTriggerOn;
+  return def;
 }

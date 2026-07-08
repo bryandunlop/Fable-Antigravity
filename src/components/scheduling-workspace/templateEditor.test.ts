@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   conditionToBuilder, builderToCondition, defaultDueRule, slugifyTaskId, bumpedTemplatePayload,
-  publishTaskIds,
+  publishTaskIds, draftFromDef, defFromDraft,
 } from './templateEditor';
 import { parseDueRule, parseTemplate } from '../../scheduling/store';
-import type { ChecklistTemplate, Condition, DueRule } from '../../scheduling/engine';
+import type { ChecklistTemplate, Condition, DueRule, TaskDefinition } from '../../scheduling/engine';
 
 describe('conditionToBuilder ⇄ builderToCondition', () => {
   it('undefined / always → always mode → omitted condition', () => {
@@ -113,5 +113,29 @@ describe('bumpedTemplatePayload', () => {
     expect(parsed.version).toBe(4);
     expect(parsed.status).toBe('published');
     expect(parsed.taskDefinitions).toHaveLength(1);
+  });
+});
+
+describe('draftFromDef ⇄ defFromDraft — Phase 2 fields survive the editor', () => {
+  it('preserves appliesTo + reTriggerOn through the draft round-trip', () => {
+    const def: TaskDefinition = {
+      id: 'fbo', title: 'FBO handling', ownerRole: 'scheduling', category: 'handling', order: 1,
+      dueRule: { kind: 'businessDaysBeforeEtd', days: 1 }, requiresAck: false,
+      appliesTo: { endpoint: 'both', airport: { kind: 'prefix', prefix: 'K', except: ['KLUK'] } },
+      reTriggerOn: ['legScheduleChange', 'aircraftChange'],
+    };
+    const round = defFromDraft(draftFromDef(def), 1);
+    expect(round.appliesTo).toEqual(def.appliesTo);
+    expect(round.reTriggerOn).toEqual(def.reTriggerOn);
+  });
+
+  it('a trip-level task stays trip-level (no appliesTo, no reTriggerOn)', () => {
+    const def: TaskDefinition = {
+      id: 'catering', title: 'Catering', ownerRole: 'scheduling', category: 'ops', order: 1,
+      dueRule: { kind: 'businessDaysBeforeEtd', days: 7 }, requiresAck: false,
+    };
+    const round = defFromDraft(draftFromDef(def), 1);
+    expect(round.appliesTo).toBeUndefined();
+    expect(round.reTriggerOn).toBeUndefined();
   });
 });
