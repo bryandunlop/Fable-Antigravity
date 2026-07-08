@@ -16,6 +16,7 @@ export function statusBadgeClassName(status: TaskInstance['status']): string {
     case 'in_progress': return 'status-info';
     case 'blocked': return 'status-error';
     case 'n_a': return 'bg-muted text-muted-foreground border-transparent';
+    case 'cancelled': return 'bg-muted text-muted-foreground border-transparent line-through';
     case 'open':
     default: return 'bg-secondary text-secondary-foreground border-transparent';
   }
@@ -28,12 +29,30 @@ export function statusLabel(status: TaskInstance['status']): string {
     case 'blocked': return 'Blocked';
     case 'done': return 'Done';
     case 'n_a': return 'N/A';
+    case 'cancelled': return 'Cancelled';
     default: return status;
   }
 }
 
 export function StatusBadge({ status }: { status: TaskInstance['status'] }) {
   return <span className={`status-badge ${statusBadgeClassName(status)}`}>{statusLabel(status)}</span>;
+}
+
+// Why a completed task got re-opened when the trip changed under it (Phase 2 re-flag).
+const RETRIGGER_LABEL: Record<string, string> = {
+  passengerChange: 'passenger changed',
+  legScheduleChange: 'schedule changed',
+  aircraftChange: 'aircraft changed',
+};
+export function ReflagBadge({ reflag }: { reflag: TaskInstance['reflag'] }) {
+  if (!reflag) return null;
+  return <span className="status-badge status-warning">Re-opened · {RETRIGGER_LABEL[reflag.change] ?? reflag.change}</span>;
+}
+
+/** For a per-airport instance, a short "KBOS arrival" suffix; null for trip-level tasks. */
+export function airportLabel(inst: Pick<TaskInstance, 'airportIcao' | 'airportRole'>): string | null {
+  if (!inst.airportIcao) return null;
+  return inst.airportRole ? `${inst.airportIcao} ${inst.airportRole}` : inst.airportIcao;
 }
 
 export function AckBadge({ ackState }: { ackState: TaskInstance['ackState'] }) {
@@ -84,7 +103,7 @@ interface TaskActionButtonsProps {
 // all other transitions (e.g. blocking an already-done task), not a defense against an engine
 // that rejects everything invalid.
 export function TaskActionButtons({ instance, onAction, disabled }: TaskActionButtonsProps) {
-  const settled = instance.status === 'done' || instance.status === 'n_a';
+  const settled = instance.status === 'done' || instance.status === 'n_a' || instance.status === 'cancelled';
   if (settled) return null;
 
   const canAck = instance.requiresAck && instance.ackState === 'pending';

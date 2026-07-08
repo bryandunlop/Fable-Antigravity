@@ -11,11 +11,13 @@ import {
 } from '../ui/dialog';
 import { Separator } from '../ui/separator';
 import { Progress } from '../ui/progress';
-import { Plus, Plane, ArrowLeft, Trash2, Send, ExternalLink } from 'lucide-react';
+import { Plus, Plane, ArrowLeft, Trash2, Send, ExternalLink, Users, Clock } from 'lucide-react';
 import { useSchedulingWorkspace } from './SchedulingWorkspaceContext';
 import type { TripRecord, TripLegRecord } from '../../scheduling/store';
 import type { TaskInstance, TaskAction, Readiness } from '../../scheduling/engine';
-import { StatusBadge, AckBadge, TaskActionButtons, formatDueTime, groupByCategory } from './taskRowHelpers';
+import { StatusBadge, AckBadge, ReflagBadge, TaskActionButtons, formatDueTime, groupByCategory, airportLabel } from './taskRowHelpers';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 import { releaseSchedulingTripToPreflight, readPreflightSummary, readTripLifecycleSummary } from '../tech-log/bridge';
 
 interface TripsPanelProps {
@@ -181,6 +183,23 @@ export default function TripsPanel({ userRole, focusTrip }: TripsPanelProps) {
     }
   }
 
+  // A trip edit (pax/schedule/aircraft/leg) runs the Phase-2 reconcile: it re-flags completed
+  // tasks whose trigger fired, adds tasks for new legs, and cancels tasks for removed legs.
+  async function handleUpdateTrip(mutate: (t: TripRecord) => TripRecord, label: string) {
+    if (!selectedTrip) return;
+    try {
+      const res = await service.updateTrip(mutate(selectedTrip), nowUtc());
+      bump();
+      const reflagged = res.updated.filter((i) => i.reflag).length;
+      const parts = [label];
+      if (reflagged) parts.push(`${reflagged} task${reflagged > 1 ? 's' : ''} re-flagged`);
+      if (res.created.length) parts.push(`${res.created.length} new`);
+      toast.success(parts.join(' · '));
+    } catch (err) {
+      toast.error(`Couldn't update trip: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
+  }
+
   function handleReleaseToPreflight(trip: TripRecord) {
     try {
       const { createdAircraft } = releaseSchedulingTripToPreflight({
@@ -247,11 +266,78 @@ export default function TripsPanel({ userRole, focusTrip }: TripsPanelProps) {
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <h3 className="text-sm font-semibold mb-2">Legs</h3>
-            <div className="space-y-1 text-sm text-muted-foreground">
-              {selectedTrip.legs.map((leg) => (
-                <div key={leg.id}>
-                  Leg {leg.sequence}: {leg.departureIcao} → {leg.arrivalIcao} · dep {formatDueTime(leg.departureTimeUtc)} · {leg.paxCount} pax
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+              <h3 className="text-sm font-semibold">Legs</h3>
+              <div className="flex items-center gap-1.5">
+                <Select
+                  value={selectedTrip.aircraftType}
+                  onValueChange={(v: string) => handleUpdateTrip((t) => ({ ...t, aircraftType: v }), `Aircraft → ${v}`)}
+                >
+                  <SelectTrigger className="h-7 w-[110px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="G650ER">G650ER</SelectItem>
+                    <SelectItem value="G500">G500</SelectItem>
+                    <SelectItem value="G800">G800</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline" size="sm" className="h-7 text-xs"
+                  onClick={() => handleUpdateTrip((t) => {
+                    const last = t.legs[t.legs.length - 1];
+                    const dep = new Date(new Date(last.arrivalTimeUtc ?? last.departureTimeUtc).getTime() + 2 * 60 * 60 * 1000).toISOString();
+                    return { ...t, legs: [...t.legs, {
+                      id: `${t.id}-leg-${t.legs.length + 1}-${dep}`,
+                      sequence: t.legs.length + 1,
+                      departureIcao: last.arrivalIcao, arrivalIcao: 'KLUK',
+                      departureTimeUtc: dep,
+                      arrivalTimeUtc: new Date(new Date(dep).getTime() + 2 * 60 * 60 * 1000).toISOString(),
+                      paxCount: last.paxCount,
+                    }] };
+                  }, 'Leg added')}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add leg
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">Editing a leg re-flags any completed task that depends on it.</p>
+            <div className="space-y-1.5">
+              {selectedTrip.legs.map((leg, idx) => (
+                <div key={leg.id} className="flex items-center justify-between gap-3 border rounded-md p-2 text-sm flex-wrap">
+                  <span className="text-foreground">
+                    Leg {leg.sequence}: {leg.departureIcao} → {leg.arrivalIcao} · dep {formatDueTime(leg.departureTimeUtc)} · {leg.paxCount} pax
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost" size="sm" className="h-7 text-xs"
+                      onClick={() => handleUpdateTrip((t) => ({
+                        ...t, legs: t.legs.map((l, i) => (i === idx ? { ...l, paxCount: l.paxCount + 1 } : l)),
+                      }), `Passenger added to leg ${leg.sequence}`)}
+                    >
+                      <Users className="h-3.5 w-3.5 mr-1" /> Add pax
+                    </Button>
+                    <Button
+                      variant="ghost" size="sm" className="h-7 text-xs"
+                      onClick={() => handleUpdateTrip((t) => ({
+                        ...t, legs: t.legs.map((l, i) => (i === idx ? {
+                          ...l,
+                          departureTimeUtc: new Date(new Date(l.departureTimeUtc).getTime() + DAY_MS).toISOString(),
+                          arrivalTimeUtc: l.arrivalTimeUtc ? new Date(new Date(l.arrivalTimeUtc).getTime() + DAY_MS).toISOString() : l.arrivalTimeUtc,
+                        } : l)),
+                      }), `Leg ${leg.sequence} delayed 1 day`)}
+                    >
+                      <Clock className="h-3.5 w-3.5 mr-1" /> Delay 1d
+                    </Button>
+                    {selectedTrip.legs.length > 1 && (
+                      <Button
+                        variant="ghost" size="sm" className="h-7 text-xs text-destructive"
+                        onClick={() => handleUpdateTrip((t) => ({
+                          ...t, legs: t.legs.filter((_, i) => i !== idx).map((l, i) => ({ ...l, sequence: i + 1 })),
+                        }), `Leg ${leg.sequence} removed`)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -343,8 +429,12 @@ export default function TripsPanel({ userRole, focusTrip }: TripsPanelProps) {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-foreground">{inst.title}</span>
+                            {airportLabel(inst) && (
+                              <span className="text-xs text-muted-foreground">— {airportLabel(inst)}</span>
+                            )}
                             <StatusBadge status={inst.status} />
                             {inst.requiresAck && <AckBadge ackState={inst.ackState} />}
+                            <ReflagBadge reflag={inst.reflag} />
                           </div>
                           <div className="text-xs mt-1 text-muted-foreground">
                             Owner: {inst.ownerRole} · Due {formatDueTime(inst.dueAtUtc)}
