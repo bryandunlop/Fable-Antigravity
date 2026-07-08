@@ -359,6 +359,10 @@ function instanceToRow(x: TaskInstance) {
     notes: x.notes ?? null,
     handoffTarget: x.handoffTarget ?? null,
     escalation: x.escalation ?? null,
+    legId: x.legId ?? null,
+    airportIcao: x.airportIcao ?? null,
+    airportRole: x.airportRole ?? null,
+    reflag: x.reflag ?? null,
     auditTrail: x.auditTrail,
   };
 }
@@ -388,6 +392,10 @@ function rowToInstance(row: typeof taskInstances.$inferSelect): TaskInstance {
     notes: row.notes ?? undefined,
     handoffTarget: (row.handoffTarget as HandoffTarget | null) ?? undefined,
     escalation: (row.escalation as EscalationRule | null) ?? undefined,
+    legId: row.legId ?? undefined,
+    airportIcao: row.airportIcao ?? undefined,
+    airportRole: (row.airportRole as TaskInstance['airportRole']) ?? undefined,
+    reflag: (row.reflag as TaskInstance['reflag']) ?? undefined,
     auditTrail: row.auditTrail as AuditEntry[],
   };
 }

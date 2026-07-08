@@ -77,6 +77,10 @@ export const taskInstances = pgTable('task_instances', {
   notes: text('notes'),
   handoffTarget: jsonb('handoff_target'),
   escalation: jsonb('escalation'),
+  legId: text('leg_id'),
+  airportIcao: text('airport_icao'),
+  airportRole: text('airport_role'),
+  reflag: jsonb('reflag'),
   auditTrail: jsonb('audit_trail').notNull(),
 });
 
