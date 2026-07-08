@@ -82,6 +82,80 @@ const ALL_TRIPS_TASKS: TaskDefinition[] = [
   },
 ];
 
+// Per-leg / exact-airport + re-trigger tasks from the department Portal trip-checklist examples
+// (Phase 2). Shared into every per-trip template like ALL_TRIPS_TASKS — a K airport is a K airport
+// regardless of trip type. `appliesTo` drives per-leg fan-out (one instance per matching
+// leg-endpoint); `reTriggerOn` re-flags a completed instance when the trip changes. See
+// docs/scheduling/2026-07-07-per-leg-reflag-design.md.
+const PER_AIRPORT_TASKS: TaskDefinition[] = [
+  {
+    id: 'fbo-handling',
+    title: 'Arrange FBO handling',
+    ownerRole: 'scheduling',
+    category: 'handling',
+    order: 60,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 1 },
+    requiresAck: false,
+    appliesTo: { endpoint: 'both', airport: { kind: 'prefix', prefix: 'K', except: ['KLUK'] } },
+    reTriggerOn: ['legScheduleChange', 'aircraftChange'],
+  },
+  {
+    id: 'hangar-needed',
+    title: 'Confirm hangar needs',
+    ownerRole: 'scheduling',
+    category: 'handling',
+    order: 61,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 1 },
+    requiresAck: false,
+    appliesTo: { endpoint: 'both', airport: { kind: 'prefix', prefix: 'K', except: ['KLUK'] } },
+    reTriggerOn: ['legScheduleChange', 'aircraftChange'],
+  },
+  {
+    id: 'fuel-load-luk',
+    title: 'Confirm fuel load (KLUK departure)',
+    ownerRole: 'scheduling',
+    category: 'fuel',
+    order: 62,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 1 },
+    requiresAck: false,
+    appliesTo: { endpoint: 'departure', airport: { kind: 'exact', icao: 'KLUK' } },
+  },
+  {
+    id: 'kbos-ppr',
+    title: 'Obtain KBOS PPR',
+    ownerRole: 'scheduling',
+    category: 'permits',
+    order: 63,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 7 },
+    requiresAck: true,
+    appliesTo: { endpoint: 'arrival', airport: { kind: 'exact', icao: 'KBOS' } },
+    reTriggerOn: ['legScheduleChange', 'aircraftChange'],
+  },
+  {
+    id: 'klga-aro-slot',
+    title: 'Obtain KLGA ARO slot',
+    ownerRole: 'scheduling',
+    category: 'permits',
+    order: 64,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 3 },
+    requiresAck: true,
+    appliesTo: { endpoint: 'both', airport: { kind: 'exact', icao: 'KLGA' } },
+    reTriggerOn: ['legScheduleChange', 'aircraftChange'],
+  },
+  {
+    id: 'pax-forms',
+    // Excel left the deadline blank; assumed 1 business day before departure (flagged for the DOM).
+    title: 'Confirm passenger forms',
+    description: 'Confirm all passenger forms are on file. Re-flags when a passenger is added.',
+    ownerRole: 'scheduling',
+    category: 'ops',
+    order: 65,
+    dueRule: { kind: 'businessDaysBeforeEtd', days: 1 },
+    requiresAck: false,
+    reTriggerOn: ['passengerChange'],
+  },
+];
+
 const SCHEDULER_DAILY: ChecklistTemplate = {
   id: 'scheduler-daily',
   name: 'Scheduler Daily Checklist',
@@ -311,6 +385,7 @@ const DOMESTIC_PER_TRIP: ChecklistTemplate = {
       },
       handoffTarget: { kind: 'role', value: 'pilot', channel: 'teams' },
     },
+    ...PER_AIRPORT_TASKS,
     ...ALL_TRIPS_TASKS,
     SEND_CREW_BRIEF,
   ],
@@ -494,6 +569,7 @@ const INTERNATIONAL_PER_TRIP: ChecklistTemplate = {
       dueRule: { kind: 'businessDaysBeforeEtd', days: 1 },
       requiresAck: false,
     },
+    ...PER_AIRPORT_TASKS,
     ...ALL_TRIPS_TASKS,
     SEND_CREW_BRIEF,
   ],
@@ -589,6 +665,7 @@ const DASSP_PER_TRIP: ChecklistTemplate = {
       dueRule: { kind: 'hoursBeforeEtd', hours: 1 },
       requiresAck: true,
     },
+    ...PER_AIRPORT_TASKS,
     ...ALL_TRIPS_TASKS,
     SEND_CREW_BRIEF,
   ],

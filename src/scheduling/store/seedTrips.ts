@@ -131,6 +131,28 @@ export function buildDemoTrips(nowUtcIso: string): TripRecord[] {
       ], base),
       ...common,
     },
+    {
+      // Northeast round-trip that exercises the Phase-2 per-airport tasks (KLGA ARO, KBOS PPR,
+      // FBO/hangar at every K airport except KLUK, fuel at the KLUK departure) and, with a few
+      // re-triggerable tasks pre-completed below, demonstrates re-flag-on-change from the UI.
+      id: 'demo-trip-northeast',
+      tripNumber: 'T-2026-0716',
+      sourceSystem: 'myairops',
+      sourceTripRef: 'MAO-4479',
+      tail: 'N2PG',
+      aircraftType: 'G650ER',
+      tripType: 'domestic',
+      priority: 'standard',
+      status: 'confirmed',
+      startDate: iso(base, 3 * DAY_MS),
+      endDate: iso(base, 3 * DAY_MS + 10 * HOUR_MS),
+      legs: buildLegs('demo-trip-northeast', [
+        { from: 'KLUK', to: 'KLGA', depOffsetMs: 3 * DAY_MS, durationMs: 105 * MIN_MS, pax: 4 },
+        { from: 'KLGA', to: 'KBOS', depOffsetMs: 3 * DAY_MS + 5 * HOUR_MS, durationMs: 55 * MIN_MS, pax: 4 },
+        { from: 'KBOS', to: 'KLUK', depOffsetMs: 3 * DAY_MS + 8 * HOUR_MS, durationMs: 110 * MIN_MS, pax: 4 },
+      ], base),
+      ...common,
+    },
   ];
 }
 
@@ -144,6 +166,18 @@ export async function seedDemoTrips(service: SchedulingService, nowUtcIso: strin
     if (trip.id === 'demo-trip-domestic') {
       const firstTwo = instances.slice().sort((a, b) => a.order - b.order).slice(0, 2);
       for (const inst of firstTwo) {
+        if (inst.requiresAck) await service.applyAction(inst.id, { kind: 'ack' }, 'demo-seed', nowUtcIso);
+        await service.applyAction(inst.id, { kind: 'complete' }, 'demo-seed', nowUtcIso);
+      }
+    }
+
+    // Pre-complete a few re-triggerable tasks on the northeast trip so the inline-edit re-flag is
+    // immediately demoable: pax-forms re-flags on "Add passenger", the KBOS PPR / FBO / hangar
+    // re-flag on "Reschedule leg" or "Swap aircraft".
+    if (trip.id === 'demo-trip-northeast') {
+      const reTriggerable = new Set(['pax-forms', 'kbos-ppr', 'fbo-handling', 'hangar-needed', 'confirm-catering-needs']);
+      for (const inst of instances) {
+        if (!reTriggerable.has(inst.taskDefId)) continue;
         if (inst.requiresAck) await service.applyAction(inst.id, { kind: 'ack' }, 'demo-seed', nowUtcIso);
         await service.applyAction(inst.id, { kind: 'complete' }, 'demo-seed', nowUtcIso);
       }

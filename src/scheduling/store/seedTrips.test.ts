@@ -48,11 +48,27 @@ describe('seedDemoTrips', () => {
     await seedDemoTrips(service, NOW);
 
     const trips = await store.listTrips();
-    expect(trips).toHaveLength(4);
+    expect(trips).toHaveLength(5);
     for (const trip of trips) {
       const instances = await store.listInstancesForTrip(trip.id);
       expect(instances.length).toBeGreaterThan(0);
     }
+  });
+
+  it('the northeast trip exercises per-airport tasks and pre-completes the re-triggerable ones', async () => {
+    const { store, service } = makeService();
+    await seedTemplates(store);
+    await seedDemoTrips(service, NOW);
+
+    const inst = await store.listInstancesForTrip('demo-trip-northeast');
+    const defIds = new Set(inst.map((i) => i.taskDefId));
+    expect(defIds).toContain('kbos-ppr');       // KBOS arrival
+    expect(defIds).toContain('klga-aro-slot');  // KLGA
+    expect(defIds).toContain('fbo-handling');   // K airports
+    // KLUK is excluded from FBO handling ("K" except "KLUK")
+    expect(inst.some((i) => i.taskDefId === 'fbo-handling' && i.airportIcao === 'KLUK')).toBe(false);
+    // pax-forms pre-completed so an "Add passenger" edit re-flags it in the demo
+    expect(inst.find((i) => i.taskDefId === 'pax-forms')?.status).toBe('done');
   });
 
   it('triggers the UK-ETA country-conditional item on the international trip', async () => {
@@ -90,7 +106,7 @@ describe('seedDemoTrips', () => {
     await seedDemoTrips(service, NOW);
     await seedDemoTrips(service, NOW);
 
-    expect(await store.listTrips()).toHaveLength(4);
+    expect(await store.listTrips()).toHaveLength(5);
   });
 });
 
