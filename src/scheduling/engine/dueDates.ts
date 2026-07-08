@@ -73,6 +73,14 @@ export function computeDueAtUtc(rule: DueRule, ctx: DueContext): string {
       return localWallClockToUtc(y, rule.month, rule.day, 17, 0, off);
     case 'hoursBeforeEtd':
       return new Date(new Date(requireEtd()).getTime() - rule.hours * 3_600_000).toISOString();
+    case 'daysBeforeEtd': {
+      // Calendar days: subtract N days (weekends included), land at 12:00 office-local —
+      // the same noon-local convention as businessDaysBeforeEtd, minus the weekend skipping.
+      const target = new Date(localClock(requireEtd(), off).getTime() - rule.days * DAY_MS);
+      return localWallClockToUtc(
+        target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), 12, 0, off,
+      );
+    }
     case 'businessDaysBeforeEtd': {
       // Step back `days` business days from ETD, skipping Sat/Sun. A Sunday ETD
       // naturally lands on the preceding Friday for days=1 (the "Fri-for-Sun" rule).

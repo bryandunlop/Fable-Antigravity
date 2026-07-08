@@ -9,6 +9,7 @@ export type DueRule =
   | { kind: 'quarterWeek'; week: number /* 1 = first week of the quarter */ }
   | { kind: 'annualDate'; month: number /* 1-12 */; day: number }
   | { kind: 'hoursBeforeEtd'; hours: number }
+  | { kind: 'daysBeforeEtd'; days: number /* calendar days, weekends included */ }
   | { kind: 'businessDaysBeforeEtd'; days: number }
   | { kind: 'monthsBeforeEtd'; months: number };
 

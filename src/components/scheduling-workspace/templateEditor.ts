@@ -86,6 +86,7 @@ export function builderToCondition(b: ConditionBuilder): Condition | undefined {
 
 export const DUE_RULE_KINDS: { kind: DueRule['kind']; label: string; scope: 'recurring' | 'per_trip' | 'both' }[] = [
   { kind: 'hoursBeforeEtd', label: 'Hours before departure', scope: 'per_trip' },
+  { kind: 'daysBeforeEtd', label: 'Calendar days before departure', scope: 'per_trip' },
   { kind: 'businessDaysBeforeEtd', label: 'Business days before departure', scope: 'per_trip' },
   { kind: 'monthsBeforeEtd', label: 'Months before departure', scope: 'per_trip' },
   { kind: 'dayOfTimeLocal', label: 'Day-of at time (office local)', scope: 'both' },
@@ -103,6 +104,7 @@ export function defaultDueRule(kind: DueRule['kind']): DueRule {
     case 'quarterWeek': return { kind, week: 1 };
     case 'annualDate': return { kind, month: 1, day: 31 };
     case 'hoursBeforeEtd': return { kind, hours: 48 };
+    case 'daysBeforeEtd': return { kind, days: 1 };
     case 'businessDaysBeforeEtd': return { kind, days: 1 };
     case 'monthsBeforeEtd': return { kind, months: 1 };
   }

@@ -67,6 +67,34 @@ describe('reconcileTrip', () => {
     expect(plan.toCreate[0].status).toBe('open');
   });
 
+  it('restores a cancelled task when its leg-airport key comes back (leg re-added under the same id)', () => {
+    // Audit #4: a removed leg was cancelled, then the SAME leg id reappears in desired. The task
+    // must come back live — not stay cancelled (which would leave the airport with no task), and
+    // not spawn a duplicate create (the deterministic id collides with the cancelled row).
+    const cancelled = inst({
+      taskDefId: 'fbo', legId: 'L1', airportRole: 'departure', status: 'cancelled',
+      completedBy: 'x', completedAtUtc: NOW, dueAtUtc: '2026-07-09T16:00:00.000Z',
+      auditTrail: [{ atUtc: NOW, actor: 'system', action: 'cancelled', detail: 'no longer applies' }],
+    });
+    const desired = [inst({ taskDefId: 'fbo', legId: 'L1', airportRole: 'departure', dueAtUtc: '2026-07-11T16:00:00.000Z', etdUtc: '2026-07-12T16:00:00.000Z' })];
+    const plan = reconcileTrip([cancelled], desired, NO_CHANGE, defs([def('fbo', ['legScheduleChange', 'aircraftChange'])]), 'system', NOW);
+
+    expect(plan.toCreate).toHaveLength(0); // restored in place, not duplicated
+    const restored = plan.toUpdate.find((i) => i.taskDefId === 'fbo');
+    expect(restored?.status).toBe('open');
+    expect(restored?.completedBy).toBeUndefined();
+    expect(restored?.reflag).toBeUndefined();
+    expect(restored?.dueAtUtc).toBe('2026-07-11T16:00:00.000Z'); // timing refreshed to the re-added leg
+    expect(restored?.auditTrail.at(-1)).toMatchObject({ action: 'restored' });
+  });
+
+  it('leaves a cancelled task cancelled when its leg stays gone (idempotent, not re-cancelled)', () => {
+    const cancelled = inst({ taskDefId: 'fbo', legId: 'L1', airportRole: 'departure', status: 'cancelled' });
+    const plan = reconcileTrip([cancelled], [], NO_CHANGE, defs([def('fbo', ['legScheduleChange'])]), 'system', NOW);
+    expect(plan.toCreate).toHaveLength(0);
+    expect(plan.toUpdate).toHaveLength(0); // no churn on an already-cancelled, still-absent task
+  });
+
   it('cancels (never deletes) a task whose leg was removed; completion fields preserved', () => {
     const removed = inst({ taskDefId: 'fbo', legId: 'L3', airportRole: 'departure', status: 'done', completedBy: 'x', completedAtUtc: NOW });
     const plan = reconcileTrip([removed], [], NO_CHANGE, defs([def('fbo', ['legScheduleChange'])]), 'system', NOW);

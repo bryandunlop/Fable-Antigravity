@@ -73,6 +73,27 @@ export function reconcileTrip(
       continue;
     }
 
+    // RESTORED — a previously-cancelled task whose leg/airport key is back in the desired set
+    // (a removed leg re-added under the same id). The deterministic instance id collides with the
+    // cancelled row, so it cannot be re-created via toCreate; reopen it in place, clearing
+    // completion/ack and refreshing timing, so the airport is not left with no live task. (Audit #4.)
+    if (live.status === 'cancelled') {
+      toUpdate.push({
+        ...live,
+        status: 'open',
+        ackState: live.requiresAck ? 'pending' : 'n_a',
+        ackedBy: undefined,
+        ackedAtUtc: undefined,
+        completedBy: undefined,
+        completedAtUtc: undefined,
+        reflag: undefined,
+        etdUtc: desiredInst.etdUtc,
+        dueAtUtc: desiredInst.dueAtUtc,
+        auditTrail: [...live.auditTrail, { atUtc: nowUtc, actor, action: 'restored', detail: 'leg re-added' }],
+      });
+      continue;
+    }
+
     // SURVIVING — start from the LIVE instance, never the fresh build.
     const reTriggers = defsById.get(live.taskDefId)?.reTriggerOn ?? [];
     const change = firedChange(reTriggers, live, diff);

@@ -5,6 +5,9 @@ describe('parseDueRule', () => {
   it('accepts a valid rule', () => {
     expect(parseDueRule({ kind: 'hoursBeforeEtd', hours: 24 })).toEqual({ kind: 'hoursBeforeEtd', hours: 24 });
   });
+  it('accepts the calendar daysBeforeEtd rule', () => {
+    expect(parseDueRule({ kind: 'daysBeforeEtd', days: 7 })).toEqual({ kind: 'daysBeforeEtd', days: 7 });
+  });
   it('throws on unknown kind', () => {
     expect(() => parseDueRule({ kind: 'bogus' })).toThrow(/dueRule/i);
   });
@@ -108,5 +111,35 @@ describe('parseTaskDef — Phase 2 appliesTo + reTriggerOn', () => {
     const d = withDef({}).taskDefinitions[0];
     expect(d.appliesTo).toBeUndefined();
     expect(d.reTriggerOn).toBeUndefined();
+  });
+});
+
+describe('validator hardening — silently-useless configs are rejected (audit #6)', () => {
+  const perTrip = {
+    id: 't', name: 'D', triggerType: 'per_trip', scope: 'domestic', version: 1,
+    status: 'published', effectiveFrom: '2026-01-01T00:00:00.000Z',
+    taskDefinitions: [{ id: 'a', title: 'x', ownerRole: 'scheduling', category: 'ops', order: 1,
+      dueRule: { kind: 'hoursBeforeEtd', hours: 24 }, requiresAck: false }],
+  };
+  const withDef = (extra: Record<string, unknown>) =>
+    parseTemplate({ ...perTrip, taskDefinitions: [{ ...perTrip.taskDefinitions[0], ...extra }] });
+
+  it('rejects an empty prefix (would silently match every airport)', () => {
+    expect(() => withDef({ appliesTo: { endpoint: 'both', airport: { kind: 'prefix', prefix: '' } } })).toThrow(/prefix/i);
+  });
+  it('rejects an empty exact icao (would silently match no airport)', () => {
+    expect(() => withDef({ appliesTo: { endpoint: 'arrival', airport: { kind: 'exact', icao: '' } } })).toThrow(/icao/i);
+  });
+  it('rejects appliesTo on a recurring template (per-airport fan-out never runs for recurring)', () => {
+    const recurring = { ...perTrip, triggerType: 'recurring', scope: 'daily',
+      taskDefinitions: [{ ...perTrip.taskDefinitions[0], dueRule: { kind: 'weekday', day: 'MON' },
+        appliesTo: { endpoint: 'both', airport: { kind: 'exact', icao: 'KBOS' } } }] };
+    expect(() => parseTemplate(recurring)).toThrow(/recurring/i);
+  });
+  it('rejects reTriggerOn on a recurring template (reconcile only runs for per-trip)', () => {
+    const recurring = { ...perTrip, triggerType: 'recurring', scope: 'daily',
+      taskDefinitions: [{ ...perTrip.taskDefinitions[0], dueRule: { kind: 'weekday', day: 'MON' },
+        reTriggerOn: ['legScheduleChange'] }] };
+    expect(() => parseTemplate(recurring)).toThrow(/recurring/i);
   });
 });

@@ -91,6 +91,10 @@ function DueRuleFields({ rule, onChange, triggerType, idPrefix }: {
         <div><Label className="text-xs">Hours</Label>
           <Input className="mt-1 w-24" type="number" min={0} value={rule.hours} onChange={e => onChange({ ...rule, hours: num(e.target.value) })} /></div>
       )}
+      {rule.kind === 'daysBeforeEtd' && (
+        <div><Label className="text-xs">Calendar days</Label>
+          <Input className="mt-1 w-24" type="number" min={0} value={rule.days} onChange={e => onChange({ ...rule, days: num(e.target.value) })} /></div>
+      )}
       {rule.kind === 'businessDaysBeforeEtd' && (
         <div><Label className="text-xs">Business days</Label>
           <Input className="mt-1 w-24" type="number" min={0} value={rule.days} onChange={e => onChange({ ...rule, days: num(e.target.value) })} /></div>

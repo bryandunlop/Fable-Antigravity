@@ -47,6 +47,7 @@ export function parseDueRule(raw: unknown): DueRule {
     case 'quarterWeek': return { kind, week: reqNum(raw, 'week', 'dueRule.quarterWeek') };
     case 'annualDate': return { kind, month: reqNum(raw, 'month', 'dueRule.annualDate'), day: reqNum(raw, 'day', 'dueRule.annualDate') };
     case 'hoursBeforeEtd': return { kind, hours: reqNum(raw, 'hours', 'dueRule.hoursBeforeEtd') };
+    case 'daysBeforeEtd': return { kind, days: reqNum(raw, 'days', 'dueRule.daysBeforeEtd') };
     case 'businessDaysBeforeEtd': return { kind, days: reqNum(raw, 'days', 'dueRule.businessDaysBeforeEtd') };
     case 'monthsBeforeEtd': return { kind, months: reqNum(raw, 'months', 'dueRule.monthsBeforeEtd') };
     default: throw new Error(`dueRule: unknown kind '${String(kind)}'`);
@@ -85,10 +86,16 @@ function parseAppliesTo(raw: unknown): AppliesTo {
   const a = raw.airport;
   if (!isObj(a)) throw new Error('appliesTo.airport: not an object');
   if (a.kind === 'exact') {
-    return { endpoint: endpoint as AirportEndpoint, airport: { kind: 'exact', icao: reqStr(a, 'icao', 'appliesTo.airport') } };
+    const icao = reqStr(a, 'icao', 'appliesTo.airport');
+    // An empty icao matches no airport, so the task would silently never instantiate.
+    if (!icao.trim()) throw new Error('appliesTo.airport: empty icao matches no airport');
+    return { endpoint: endpoint as AirportEndpoint, airport: { kind: 'exact', icao } };
   }
   if (a.kind === 'prefix') {
-    const airport: AirportMatch = { kind: 'prefix', prefix: reqStr(a, 'prefix', 'appliesTo.airport') };
+    const prefix = reqStr(a, 'prefix', 'appliesTo.airport');
+    // An empty prefix matches EVERY airport — almost never intended, and un-reviewable. Reject it.
+    if (!prefix.trim()) throw new Error('appliesTo.airport: empty prefix matches every airport');
+    const airport: AirportMatch = { kind: 'prefix', prefix };
     if (a.except !== undefined) {
       if (!Array.isArray(a.except) || !a.except.every((x) => typeof x === 'string')) {
         throw new Error('appliesTo.airport.except: not a string[]');
@@ -171,6 +178,15 @@ export function parseTemplate(raw: unknown): ChecklistTemplate {
   for (const d of taskDefinitions) {
     if (seenIds.has(d.id)) throw new Error(`template: duplicate task id '${d.id}'`);
     seenIds.add(d.id);
+  }
+  // appliesTo (per-airport fan-out) and reTriggerOn (reconcile re-flag) only take effect for
+  // per_trip templates — instantiateRecurring ignores both and reconcile never runs for recurring.
+  // Reject them on a recurring template rather than let a department author set a silent no-op.
+  if (triggerType === 'recurring') {
+    for (const d of taskDefinitions) {
+      if (d.appliesTo) throw new Error(`template: task '${d.id}' sets appliesTo on a recurring template (only valid on per_trip)`);
+      if (d.reTriggerOn) throw new Error(`template: task '${d.id}' sets reTriggerOn on a recurring template (only valid on per_trip)`);
+    }
   }
   return {
     id: reqStr(raw, 'id', 'template'),

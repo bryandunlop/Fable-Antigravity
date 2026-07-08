@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   conditionToBuilder, builderToCondition, defaultDueRule, slugifyTaskId, bumpedTemplatePayload,
-  publishTaskIds, draftFromDef, defFromDraft,
+  publishTaskIds, draftFromDef, defFromDraft, DUE_RULE_KINDS,
 } from './templateEditor';
 import { parseDueRule, parseTemplate } from '../../scheduling/store';
 import type { ChecklistTemplate, Condition, DueRule, TaskDefinition } from '../../scheduling/engine';
@@ -61,12 +61,18 @@ describe('defaultDueRule', () => {
   it('produces a validator-accepted rule for every kind', () => {
     const kinds: DueRule['kind'][] = [
       'dayOfTimeLocal', 'weekday', 'dayOfMonth', 'quarterWeek', 'annualDate',
-      'hoursBeforeEtd', 'businessDaysBeforeEtd', 'monthsBeforeEtd',
+      'hoursBeforeEtd', 'daysBeforeEtd', 'businessDaysBeforeEtd', 'monthsBeforeEtd',
     ];
     for (const kind of kinds) {
       expect(() => parseDueRule(defaultDueRule(kind))).not.toThrow();
       expect(defaultDueRule(kind).kind).toBe(kind);
     }
+  });
+
+  it('offers the calendar daysBeforeEtd rule as a per_trip option in the editor dropdown', () => {
+    const entry = DUE_RULE_KINDS.find((k) => k.kind === 'daysBeforeEtd');
+    expect(entry).toBeDefined();
+    expect(entry?.scope).toBe('per_trip');
   });
 });
 

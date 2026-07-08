@@ -28,15 +28,17 @@ const SEND_CREW_BRIEF = {
 // Trip-prep tasks that apply to EVERY trip regardless of type. Like SEND_CREW_BRIEF, these are
 // shared definitions spread into each per-trip template (domestic / international / DASSP) so
 // "all trips" coverage lives in one place in the seed. Transcribed from the department's Portal
-// trip-checklist examples (Portal-TripChecklistExamples.xlsx, 2026-07-07). The Excel's per-leg,
-// exact-airport, and re-trigger tasks (FBO, hangar, KLUK fuel, KBOS PPR, KLGA ARO, pax forms)
-// need engine work the current per-trip/trip-level model does not have yet — deferred, not here.
+// trip-checklist examples (Portal-TripChecklistExamples.xlsx, 2026-07-07). The Excel's exact-airport
+// and prefix (K-except-KLUK) per-leg tasks (FBO, hangar, KLUK fuel, KBOS PPR, KLGA ARO) plus the
+// re-triggering pax-forms task now ship below as PER_AIRPORT_TASKS on the per-airport engine.
 const ALL_TRIPS_TASKS: TaskDefinition[] = [
   {
     id: 'confirm-catering-needs',
     title: 'Confirm catering needs',
-    // Department checklist scopes this "each leg"; captured trip-level until per-leg tasks ship.
-    description: 'Confirm catering for the trip. (Per-leg catering arrives with the leg-level task work.)',
+    // Department checklist scopes this "each leg — all airports". The per-airport engine fans out by
+    // an airport MATCH (exact / prefix), so "every leg regardless of airport" is not yet expressible;
+    // kept trip-level pending an any-airport matcher (audit #2).
+    description: 'Confirm catering for the trip. (Per-leg catering needs an any-airport match rule the engine does not have yet.)',
     ownerRole: 'scheduling',
     category: 'ops',
     order: 50,

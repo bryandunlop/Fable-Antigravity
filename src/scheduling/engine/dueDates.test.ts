@@ -71,6 +71,30 @@ describe('computeDueAtUtc §7', () => {
     expect(r).toBe('2026-07-10T16:00:00.000Z');
   });
 
+  it('daysBeforeEtd 1: calendar day before a Sunday ETD lands on Saturday (weekend NOT skipped)', () => {
+    // ETD Sun 2026-07-12; 1 calendar day before = Sat 2026-07-11, 12:00 EDT == 16:00 UTC.
+    // Contrast businessDaysBeforeEtd 1 above, which skips the weekend to Fri 07-10.
+    const r = computeDueAtUtc(
+      { kind: 'daysBeforeEtd', days: 1 },
+      ctx({ etdUtc: '2026-07-12T14:00:00.000Z' }),
+    );
+    expect(r).toBe('2026-07-11T16:00:00.000Z');
+  });
+
+  it('daysBeforeEtd 7: pure calendar subtraction (7 days before a Monday = the prior Monday)', () => {
+    // ETD Mon 2026-07-13; 7 calendar days before = Mon 2026-07-06, 12:00 local.
+    // Contrast businessDaysBeforeEtd 7, which lands on Thu 2026-07-02.
+    const r = computeDueAtUtc(
+      { kind: 'daysBeforeEtd', days: 7 },
+      ctx({ etdUtc: '2026-07-13T14:00:00.000Z' }),
+    );
+    expect(r).toBe('2026-07-06T16:00:00.000Z');
+  });
+
+  it('daysBeforeEtd requires etdUtc', () => {
+    expect(() => computeDueAtUtc({ kind: 'daysBeforeEtd', days: 1 }, ctx())).toThrow(/etdUtc/);
+  });
+
   it('monthsBeforeEtd 1 -> ETD minus one month at 12:00 local', () => {
     // ETD 2026-08-10 -> 2026-07-10, 12:00 EDT == 16:00 UTC
     const r = computeDueAtUtc(
