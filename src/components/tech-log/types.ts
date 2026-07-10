@@ -184,6 +184,19 @@ export interface WorkStep {
   riiSignatureId?: string;    // the inspector's signature on this step
 }
 
+/** Expected part / tool / consumable mirrored from the CAMP WO detail (WRK 2_0_8: per-line part
+ * numbers + Required Tools + Required Consumables). Read-only context on the pulled card — what
+ * was actually installed is still captured as PartUsage under the signed CRS. */
+export type CampExpectedKind = 'PART' | 'TOOL' | 'CONSUMABLE';
+export interface CampExpectedItem {
+  kind: CampExpectedKind;
+  name: string;
+  partNumber?: string;
+  serialNumber?: string;
+  qty?: number;
+  calibrationDueUtc?: string;  // tools
+}
+
 /** A pulled CAMP work order / task card under execution. Updatable WIP until the completion sign-off. */
 export interface WorkCard {
   id: string;
@@ -206,6 +219,7 @@ export interface WorkCard {
   completedReleaseId?: string; // MaintenanceRelease produced on completion
   completedAtUtc?: string;
   statusTags?: StatusTagEvent[]; // QM4/D27 work/wait history (chronological; last entry is current)
+  campExpected?: CampExpectedItem[]; // expected parts/tools/consumables mirrored from the CAMP WO
 }
 
 /** A part installed/removed under a work card. Removals feed MTBUR (§Phase 4). */

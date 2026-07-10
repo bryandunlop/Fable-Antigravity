@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock, PlayCircle, PackageSearch, ClipboardCheck, Hourglass } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
-import { useIntegration } from '../integration/useIntegration';
+import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { currentRows } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
 import { riiStepsComplete, pendingRiiSteps } from '../engine/rii';
@@ -160,9 +160,13 @@ export default function WorkCardDetail() {
       id: newId('st'), seq: card.steps.length + i + 1, text: l.description, done: false,
       riiRequired: wo.riiRequired && /independent inspection|\bRII\b/i.test(l.description),
     }));
-    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, steps: [...card.steps, ...newSteps], woNumber: card.woNumber ?? wo.woNumber } });
+    // Merge the WO's expected parts/tools/consumables (dedupe on kind+part number+name).
+    const seen = new Set((card.campExpected ?? []).map(e => `${e.kind}|${e.partNumber ?? ''}|${e.name}`));
+    const addedExpected = expectedFromWo(wo).filter(e => !seen.has(`${e.kind}|${e.partNumber ?? ''}|${e.name}`));
+    const campExpected = [...(card.campExpected ?? []), ...addedExpected];
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, steps: [...card.steps, ...newSteps], woNumber: card.woNumber ?? wo.woNumber, campExpected: campExpected.length ? campExpected : undefined } });
     setAddWo('');
-    toast.success(`Added ${newSteps.length} step(s) from CAMP ${wo.woNumber}.`);
+    toast.success(`Added ${newSteps.length} step(s)${addedExpected.length ? ` + ${addedExpected.length} expected part/tool item(s)` : ''} from CAMP ${wo.woNumber}.`);
   };
 
   const beginStepRii = (stepId: string) => {
@@ -403,6 +407,33 @@ export default function WorkCardDetail() {
             )}
           </CardContent>
         </Card>
+
+        {/* Expected parts & tooling mirrored from the CAMP WO (read-only; install is still captured below) */}
+        {card.campExpected && card.campExpected.length > 0 && (
+          <Card className="lg:col-span-2">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><PackageSearch className="h-4 w-4" /> Expected parts &amp; tooling — from CAMP {card.woNumber ?? ''}</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {card.campExpected.map((e, i) => (
+                <div key={i} className="flex flex-col gap-1 rounded-md border border-dashed p-2 text-sm md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <Badge variant="outline" className="mr-2 text-[10px]">{e.kind === 'PART' ? 'Part' : e.kind === 'TOOL' ? 'Tool' : 'Consumable'}</Badge>
+                    <span className="font-medium">{e.partNumber ?? '—'}</span> · {e.name}
+                    {e.serialNumber && <span className="text-muted-foreground"> · S/N {e.serialNumber}</span>}
+                    {e.qty != null && <span className="text-muted-foreground"> · ×{e.qty}</span>}
+                    {e.calibrationDueUtc && <span className="text-muted-foreground"> · cal due {new Date(e.calibrationDueUtc).toLocaleDateString()}</span>}
+                  </div>
+                  {!completed && isMaint && e.kind !== 'TOOL' && (
+                    <Button size="sm" variant="ghost" className="h-7 shrink-0 text-xs"
+                      onClick={() => { setPn(e.partNumber ?? ''); setPdesc(e.name); setPsn(e.serialNumber ?? ''); setPqty(String(e.qty ?? 1)); toast.info('Copied into the part form below — confirm and add when installed.'); }}>
+                      Use in part form
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">Mirrored from the CAMP work order (WRK required tools/consumables + task part numbers). What was actually installed is recorded under Parts and covered by the signed CRS.</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Parts */}
         <Card className="lg:col-span-2">

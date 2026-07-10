@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
-import { Cloud, Webhook, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Cloud, Webhook, RefreshCw, AlertTriangle, HeartPulse } from 'lucide-react';
+import { toast } from 'sonner';
 import { useState } from 'react';
 import type { ReconcileResult } from '../integration/reconcile';
 
@@ -26,7 +27,7 @@ function ReconCol({ title, tone, items }: { title: string; tone: 'ok' | 'warn' |
 
 export default function Integration() {
   const { state } = useTechLog();
-  const { refreshCampReads, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook } = useIntegration();
+  const { refreshCampReads, pushUtilization, pushContactHeartbeat, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook } = useIntegration();
   const [recon, setRecon] = useState<Record<string, (ReconcileResult & { tail: string }) | undefined>>({});
   const [promoteText, setPromoteText] = useState('');
   const [inbox, setInbox] = useState<WebhookEnvelope[]>([]);
@@ -64,6 +65,12 @@ export default function Integration() {
                   </Button>
                 ))}
               </div>
+            </div>
+            <div className="mt-2 pt-2">
+              <div className="mb-1 text-muted-foreground">Contact-date heartbeat (<code>UpdateAircraftContactDate</code>) — a documented write that stamps &quot;last integrated with CAMP&quot; for every tail, so CAMP-side users see the feed is alive on no-fly days. Sandbox-gated like every write.</div>
+              <Button size="sm" variant="outline" onClick={() => { const r = pushContactHeartbeat(); r.failed ? toast.warning(`Heartbeat: ${r.stamped} stamped, ${r.failed} blocked/failed (see log).`) : toast.success(`Heartbeat sent — ${r.stamped} tail(s) stamped in CAMP.`); }}>
+                <HeartPulse className="mr-1.5 h-3.5 w-3.5" /> Send contact heartbeat (all tails)
+              </Button>
             </div>
             <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50/60 p-2">
               <div className="flex items-center gap-1.5 font-medium text-amber-700"><AlertTriangle className="h-3.5 w-3.5" /> Utilization push — blocked (OQ1)</div>

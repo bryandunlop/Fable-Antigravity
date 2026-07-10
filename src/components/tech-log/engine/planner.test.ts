@@ -119,6 +119,24 @@ describe('planning calendar (month grid + vacation/flight overlays)', () => {
   });
 });
 
+describe('CAMP WO overlay (scheduled in/out windows on the planning calendar)', () => {
+  it('a mirrored CAMP WO renders across its scheduled window with service-center context', () => {
+    const weeks = buildPlannerCalendar('2026-08-01T00:00:00.000Z', {
+      projects: [], trips: [], techVacations: [],
+      campWos: [{ woNumber: 'WO-24-0188', aircraftId: 'ac-n5pg', title: 'APU generator GCU inspection', startUtc: '2026-08-18T13:00:00.000Z', endUtc: '2026-08-19T22:00:00.000Z', icao: 'KSAV', serviceCenter: 'Gulfstream Savannah' }],
+    });
+    const days = weeks.flat();
+    const withWo = days.filter(d => d.campWos.length > 0).map(d => d.iso);
+    expect(withWo).toEqual(['2026-08-18', '2026-08-19']);
+    expect(days.find(d => d.iso === '2026-08-18')?.campWos[0].serviceCenter).toBe('Gulfstream Savannah');
+  });
+
+  it('the overlay is optional — calendars built without campWos still work', () => {
+    const weeks = buildPlannerCalendar('2026-08-01T00:00:00.000Z', { projects: [], trips: [], techVacations: [] });
+    expect(weeks.flat().every(d => d.campWos.length === 0)).toBe(true);
+  });
+});
+
 describe('aircraft-away conflict (planned window overlapping the flight schedule)', () => {
   it('flags legs of the same tail inside the planned window', () => {
     const hits = aircraftAwayConflicts(project(), trips);

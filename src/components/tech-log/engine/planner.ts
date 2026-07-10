@@ -56,12 +56,23 @@ export function prepReadiness(p: MaintenanceProject): { done: number; total: num
 // (TL-2) will move both together.
 
 export interface PlannerLeg { aircraftId: string; label: string; atUtc: string; tripNumber: string; }
+/** A mirrored CAMP work order's scheduled window (WRK header: in/out, ICAO, service center). */
+export interface PlannerCampWo {
+  woNumber: string;
+  aircraftId: string;
+  title: string;
+  startUtc: string;
+  endUtc: string;
+  icao?: string;
+  serviceCenter?: string;
+}
 export interface PlannerDay {
   iso: string;         // YYYY-MM-DD (UTC)
   inMonth: boolean;
   projects: MaintenanceProject[];
   legs: PlannerLeg[];
   vacations: TechVacation[];
+  campWos: PlannerCampWo[];
 }
 
 const DAY_MS = 86400000;
@@ -70,7 +81,7 @@ const isoOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const overlapsDay = (startUtc: string, endUtc: string, dayMs: number) =>
   new Date(startUtc).getTime() < dayMs + DAY_MS && new Date(endUtc).getTime() >= dayMs;
 
-type CalendarSlice = { projects: MaintenanceProject[]; trips: Trip[]; techVacations: TechVacation[] };
+type CalendarSlice = { projects: MaintenanceProject[]; trips: Trip[]; techVacations: TechVacation[]; campWos?: PlannerCampWo[] };
 
 /** Month grid of full Sunday-start weeks: each day carries the projects spanning it, the flight
  * legs departing on it (myairops overlay), and the technicians off that day (vacation overlay). */
@@ -102,6 +113,7 @@ export function buildPlannerCalendar(monthAnchorUtc: string, slice: CalendarSlic
         projects: slice.projects.filter(p => overlapsDay(p.plannedStartUtc, p.plannedEndUtc, dayMs)),
         legs: legs.filter(l => dayStartMs(l.atUtc.slice(0, 10)) === dayMs),
         vacations: slice.techVacations.filter(v => overlapsDay(v.startUtc, v.endUtc, dayMs)),
+        campWos: (slice.campWos ?? []).filter(w => overlapsDay(w.startUtc, w.endUtc, dayMs)),
       });
     }
     weeks.push(week);

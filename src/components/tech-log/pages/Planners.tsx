@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   CalendarDays, KanbanSquare, Plus, Play, Pause, CheckCircle2, PackageSearch,
-  ChevronLeft, ChevronRight, Plane, Palmtree, ClipboardList, AlertTriangle,
+  ChevronLeft, ChevronRight, Plane, Palmtree, ClipboardList, AlertTriangle, Wrench,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
-import { transitionProject, prepReadiness, buildPlannerCalendar, aircraftAwayConflicts } from '../engine/planner';
+import { useIntegration } from '../integration/useIntegration';
+import { transitionProject, prepReadiness, buildPlannerCalendar, aircraftAwayConflicts, type PlannerCampWo } from '../engine/planner';
 import { newId } from '../util/id';
 import type { MaintenanceProject, ProjectPauseReason, ProjectStatus } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
@@ -36,6 +37,7 @@ export default function Planners() {
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
   const navigate = useNavigate();
+  const { listWorkOrders } = useIntegration();
   const isMaint = user.role === 'MAINTENANCE';
   const nameOf = (oid: string) => state.personnel.find(p => p.oid === oid)?.displayName ?? oid;
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
@@ -44,6 +46,7 @@ export default function Planners() {
   const [tailFilter, setTailFilter] = useState('ALL');
   const [showVacations, setShowVacations] = useState(true);
   const [showFlights, setShowFlights] = useState(true);
+  const [showCampWos, setShowCampWos] = useState(true);
   const [month, setMonth] = useState(() => { const d = new Date(); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString(); });
 
   // pause dialog
@@ -102,13 +105,25 @@ export default function Planners() {
     toast.success('Planner created — in planning.');
   };
 
+  // Mirror open CAMP work orders (with their scheduled in/out window + service center) for the
+  // calendar overlay. Fetched once per tail set; only recomputed when the fleet/filter changes.
+  const campWos = useMemo<PlannerCampWo[]>(() => {
+    const tails = state.aircraft.filter(a => !a.isProvisional && (tailFilter === 'ALL' || a.id === tailFilter));
+    return tails.flatMap(ac => listWorkOrders(ac.id).map(w => ({
+      woNumber: w.woNumber, aircraftId: ac.id, title: w.title,
+      startUtc: w.scheduledInUtc, endUtc: w.scheduledOutUtc, icao: w.icao, serviceCenter: w.serviceCenter,
+    })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.aircraft, tailFilter]);
+
   const weeks = useMemo(
     () => buildPlannerCalendar(month, {
       projects,
       trips: tailFilter === 'ALL' ? state.trips : state.trips.filter(t => t.aircraftId === tailFilter),
       techVacations: state.techVacations,
+      campWos: showCampWos ? campWos : [],
     }),
-    [month, projects, state.trips, state.techVacations, tailFilter],
+    [month, projects, state.trips, state.techVacations, tailFilter, campWos, showCampWos],
   );
   const monthLabel = new Date(month).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const shiftMonth = (dir: number) => { const d = new Date(month); setMonth(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + dir, 1)).toISOString()); };
@@ -140,6 +155,9 @@ export default function Planners() {
             </Button>
             <Button size="sm" variant={showFlights ? 'secondary' : 'outline'} onClick={() => setShowFlights(v => !v)}>
               <Plane className="mr-1.5 h-3.5 w-3.5" /> Flight schedule
+            </Button>
+            <Button size="sm" variant={showCampWos ? 'secondary' : 'outline'} onClick={() => setShowCampWos(v => !v)}>
+              <Wrench className="mr-1.5 h-3.5 w-3.5" /> CAMP work orders
             </Button>
             <div className="ml-auto flex items-center gap-1">
               <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => shiftMonth(-1)}><ChevronLeft className="h-4 w-4" /></Button>
@@ -264,6 +282,11 @@ export default function Planners() {
                       {tailOf(p.aircraftId)} · {p.name}
                     </div>
                   ))}
+                  {showCampWos && day.campWos.map((w, i) => (
+                    <div key={i} title={`CAMP ${w.woNumber} — ${w.title}${w.serviceCenter ? ` @ ${w.serviceCenter}` : ''}`} className="flex items-center gap-1 truncate rounded border px-1 py-0.5 text-[10px] text-[var(--gfo-info,#0096FC)]">
+                      <Wrench className="h-2.5 w-2.5 shrink-0" /> {tailOf(w.aircraftId)} {w.woNumber}
+                    </div>
+                  ))}
                   {showFlights && day.legs.map((l, i) => (
                     <div key={i} title={`${l.tripNumber} · ${new Date(l.atUtc).toLocaleTimeString()}`} className="flex items-center gap-1 truncate rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
                       <Plane className="h-2.5 w-2.5 shrink-0" /> {tailOf(l.aircraftId)} {l.label}
@@ -278,7 +301,7 @@ export default function Planners() {
               ))}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Overlays: <Palmtree className="inline h-3 w-3" /> technician vacations (myGFO ops) · <Plane className="inline h-3 w-3" /> flight schedule (myairops, read-only). Planner bars colored by status.
+              Overlays: <Palmtree className="inline h-3 w-3" /> technician vacations (myGFO ops) · <Plane className="inline h-3 w-3" /> flight schedule (myairops, read-only) · <Wrench className="inline h-3 w-3" /> CAMP work orders (scheduled in/out window + service center, read-only). Planner bars colored by status.
             </p>
           </CardContent>
         </Card>
