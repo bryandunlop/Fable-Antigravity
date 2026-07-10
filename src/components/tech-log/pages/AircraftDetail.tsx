@@ -10,10 +10,10 @@ import { useIntegration } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
-import { isDeferralExpired, computeRepairDue } from '../engine/pl25';
+import { isDeferralExpired } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
 import { canSignPlacardDischarge } from '../engine/disposition';
-import { CATEGORY_DAYS, INTENT } from '../constants';
+import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { newId } from '../util/id';
@@ -33,6 +33,7 @@ import { PostflightPanel } from '../components/PostflightPanel';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
 import { RectifyPanel } from '../components/panels/RectifyPanel';
 import { GatingReleasePanel } from '../components/panels/GatingReleasePanel';
+import { ExtendDeferralDialog } from '../components/panels/ExtendDeferralDialog';
 import { LifecycleStepper, type StepKey } from '../components/LifecycleStepper';
 import { ActivityFeed } from '../components/ActivityFeed';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -194,16 +195,9 @@ export default function AircraftDetail() {
     toast.warning(`${check.name} added — due immediately until accomplished and signed.`);
   };
 
-  const extend = (d: Deferral) => {
-    if (d.category === 'A' || d.category === 'D') return toast.error(`Cat ${d.category} deferrals cannot be extended.`);
-    if (d.extensionUsed) return toast.error('This deferral has already used its one extension.');
-    const value = (CATEGORY_DAYS[d.category] ?? 0) * 2;
-    const due = computeRepairDue(d.category, d.clockStartDateUtc, { repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: value }, airframe);
-    const ext: Deferral = { ...d, id: newId('df'), supersedesId: d.id, extensionUsed: true, extensionTsUtc: new Date().toISOString(), extensionJustification: 'One-time extension (demo)', repairIntervalValue: value, repairDueDateUtc: due.repairDueDateUtc };
-    dispatch({ type: 'SUPERSEDE_DEFERRAL', payload: ext });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFERRAL_EXTENDED', entityType: 'Deferral', entityId: ext.id, atUtc: ext.extensionTsUtc!, summary: `Extended ${ac.tailNumber} Cat ${d.category} deferral once` } });
-    toast.success(`Cat ${d.category} deferral extended once.`);
-  };
+  // One-tap extension (DOM 2026-07-09) — a fully signed, authorized supersede (TL-1), never an inline edit.
+  const [extendFor, setExtendFor] = useState<Deferral | null>(null);
+  const extendable = (d: Deferral) => d.category !== 'A' && d.category !== 'D' && !d.extensionUsed;
 
   const startTriage = (defectId: string, kind: 'defer' | 'rectify') => {
     if (kind === 'defer' && ac.isProvisional) return toast.error('Deferrals are blocked on a provisional aircraft.');
@@ -494,8 +488,8 @@ export default function AircraftDetail() {
                     {effective === 'PENDING_PLACARD' && canSignPlacardDischarge(user, d) && (
                       <Button size="sm" onClick={() => setInline({ kind: 'gating', id: d.id })}><Wrench className="mr-1.5 h-4 w-4" /> {user.role === 'MAINTENANCE' ? 'Sign (M)/placard release' : 'Attest placard'}</Button>
                     )}
-                    {effective === 'ACTIVE' && isMaint && (
-                      <Button size="sm" variant="outline" onClick={() => extend(d)}><TimerReset className="mr-1.5 h-4 w-4" /> Extend</Button>
+                    {effective === 'ACTIVE' && isMaint && extendable(d) && (
+                      <Button size="sm" variant="outline" onClick={() => setExtendFor(d)}><TimerReset className="mr-1.5 h-4 w-4" /> Extend</Button>
                     )}
                   </div>
                 </CardContent>
@@ -635,6 +629,15 @@ export default function AircraftDetail() {
           intentStatement={INTENT.RECURRING_CHECK}
           payloadSummary={`${accCheck.name} on ${ac.tailNumber} — airframe ${ac.airframeTotalHours}h / ${ac.airframeTotalCycles} cyc.`}
           onSigned={onAccomplished} title="Sign recurring-check accomplishment" />
+      )}
+
+      {extendFor && (
+        <ExtendDeferralDialog
+          deferral={extendFor}
+          ataChapter={currentRows(state.defects).find(x => x.id === extendFor.defectId)?.ataChapter}
+          open
+          onOpenChange={(o) => { if (!o) setExtendFor(null); }}
+        />
       )}
 
       <Dialog open={pullOpen} onOpenChange={setPullOpen}>

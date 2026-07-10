@@ -1,15 +1,15 @@
+import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Wrench, Clock, TimerReset, Hammer } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
-import { computeRepairDue, isDeferralExpired } from '../engine/pl25';
-import { CATEGORY_DAYS } from '../constants';
-import { newId } from '../util/id';
+import { isDeferralExpired } from '../engine/pl25';
 import { useRaiseFixFromDeferral } from '../useRectify';
 import type { Deferral } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
+import { ExtendDeferralDialog } from '../components/panels/ExtendDeferralDialog';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -17,7 +17,7 @@ import { Button } from '../../ui/button';
 export default function Deferrals() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { state, dispatch } = useTechLog();
+  const { state } = useTechLog();
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
   const raiseFix = useRaiseFixFromDeferral();
@@ -29,17 +29,9 @@ export default function Deferrals() {
   const openDeferrals = currentRows(state.deferrals).filter(d => d.status !== 'CLEARED');
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
 
-  const extend = (d: Deferral) => {
-    if (d.category === 'A' || d.category === 'D') return toast.error(`Cat ${d.category} deferrals cannot be extended.`);
-    if (d.extensionUsed) return toast.error('This deferral has already used its one extension.');
-    const ac = state.aircraft.find(a => a.id === d.aircraftId)!;
-    const value = (CATEGORY_DAYS[d.category] ?? 0) * 2;
-    const due = computeRepairDue(d.category, d.clockStartDateUtc, { repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: value }, { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles });
-    const ext: Deferral = { ...d, id: newId('df'), supersedesId: d.id, extensionUsed: true, extensionTsUtc: new Date().toISOString(), extensionJustification: 'One-time extension (demo)', repairIntervalValue: value, repairDueDateUtc: due.repairDueDateUtc };
-    dispatch({ type: 'SUPERSEDE_DEFERRAL', payload: ext });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFERRAL_EXTENDED', entityType: 'Deferral', entityId: ext.id, atUtc: ext.extensionTsUtc!, summary: `Extended ${tailOf(d.aircraftId)} Cat ${d.category} deferral once` } });
-    toast.success(`Cat ${d.category} deferral extended once.`);
-  };
+  // One-tap extension (DOM 2026-07-09) — a fully signed, authorized supersede (TL-1), never an inline edit.
+  const [extendFor, setExtendFor] = useState<Deferral | null>(null);
+  const extendable = (d: Deferral) => d.category !== 'A' && d.category !== 'D' && !d.extensionUsed;
 
   // ===== CREATE MODE (deep-link from a defect) =====
   if (defect && aircraft) {
@@ -104,8 +96,8 @@ export default function Deferrals() {
                       <Wrench className="mr-1.5 h-4 w-4" /> Sign (M)/placard release
                     </Button>
                   )}
-                  {effective === 'ACTIVE' && isMaint && (
-                    <Button size="sm" variant="outline" onClick={() => extend(d)}>
+                  {effective === 'ACTIVE' && isMaint && extendable(d) && (
+                    <Button size="sm" variant="outline" onClick={() => setExtendFor(d)}>
                       <TimerReset className="mr-1.5 h-4 w-4" /> Extend
                     </Button>
                   )}
@@ -116,6 +108,14 @@ export default function Deferrals() {
           );
         })}
       </div>
+      {extendFor && (
+        <ExtendDeferralDialog
+          deferral={extendFor}
+          ataChapter={currentRows(state.defects).find(x => x.id === extendFor.defectId)?.ataChapter}
+          open
+          onOpenChange={(o) => { if (!o) setExtendFor(null); }}
+        />
+      )}
     </TechLogShell>
   );
 }
