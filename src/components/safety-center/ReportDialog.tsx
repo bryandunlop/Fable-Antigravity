@@ -106,8 +106,8 @@ export function ReportDialog({
           )}
           {step === 1 && kind === 'cws' && (
             <div className="flex flex-col gap-3.5">
-              <Field label="Who"><Input placeholder="Name" /></Field>
-              <Field label="For what"><Textarea rows={3} placeholder="What did they do…" /></Field>
+              <Field label="Who"><Input placeholder="Name" value={values.who || ''} onChange={(e) => set('who', e.target.value)} /></Field>
+              <Field label="For what"><Textarea rows={3} placeholder="What did they do…" value={values.forWhat || ''} onChange={(e) => set('forWhat', e.target.value)} /></Field>
             </div>
           )}
           {step === 1 && kind === 'waiver' && (

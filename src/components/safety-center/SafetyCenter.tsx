@@ -13,12 +13,14 @@ import { NotificationsPanel } from './NotificationsPanel';
 import { ReportDialog, type Kind } from './ReportDialog';
 import { FormsCatalog } from './FormsCatalog';
 import { SubmissionsArchive } from './SubmissionsArchive';
-import { PublishedReports } from './PublishedReports';
+import { PublishedArea } from './PublishedArea';
 import { FormManager } from './FormManager';
 import { OperationsAudits, MyAudits } from './AuditsArea';
 import { ReviewsArea } from './ReviewsArea';
-import { ReadAndInitialInbox, BulletinsManager } from './ReadAndSign';
+import { ReadAndInitialInbox } from './ReadAndSign';
 import { createAsap } from './asapReports';
+import { createCws } from './cwsRecognitions';
+import MyFRATSubmissions from '../MyFRATSubmissions';
 
 const CURRENT_USER = { id: 'u-demo', name: 'Capt. Dunlop' };
 import { FORM_CATALOG } from './forms';
@@ -110,14 +112,20 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
       });
       return;
     }
-    // CWS/waiver don't have stores wired yet (later phases) — notify for now.
-    const title: Record<Kind, string> = {
-      hazard: '', asap: '',
-      cws: 'CWS recognition logged', waiver: 'New waiver request',
-    };
+    if (kind === 'cws') {
+      // Persist a recognition — it appears on the Recognitions wall.
+      createCws({ recognized: (values.who || '').trim(), forWhat: (values.forWhat || '').trim(), submittedBy: CURRENT_USER.name });
+      eventStore.publish({
+        id: `cws-file-${Date.now()}`, severity: 'info',
+        title: `Recognition logged: ${(values.who || 'a colleague').trim()}`, detail: 'Caught Working Safely',
+        module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin', 'lead'],
+      });
+      return;
+    }
+    // Waiver doesn't have a store wired yet (later phase) — notify for now.
     eventStore.publish({
       id: `safety-file-${kind}-${Date.now()}`,
-      severity: 'info', title: title[kind], detail: 'Awaiting triage',
+      severity: 'info', title: 'New waiver request', detail: 'Awaiting review',
       module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin'],
     });
   }
@@ -139,12 +147,12 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
 
   const bucket = model[view] as Record<string, SafetyItem[]>;
   const tabs: [string, string][] = view === 'my'
-    ? [['move', 'Your move'], ['waiting', 'Waiting'], ['done', 'Done'], ['audits', 'My audits'], ['forms', 'Forms'], ['published', 'Published']]
+    ? [['move', 'Your move'], ['waiting', 'Waiting'], ['done', 'Done'], ['audits', 'My audits'], ['assessments', 'My assessments'], ['forms', 'Forms'], ['published', 'Published']]
     : [['move', 'Your move'], ['track', 'Track'], ['audits', 'Audits'], ['reviews', 'Reviews'], ['submissions', 'Submissions'], ['formsMgr', 'Form manager'], ['published', 'Published']];
 
   function countFor(key: string): number | null {
     if (key === 'forms') return FORM_CATALOG.length;
-    if (key === 'formsMgr' || key === 'audits' || key === 'reviews') return null;
+    if (key === 'formsMgr' || key === 'audits' || key === 'reviews' || key === 'assessments') return null;
     if (key === 'submissions') return model.submissions.length;
     if (key === 'published') return model.published.length;
     return (bucket[key] || []).length;
@@ -261,12 +269,8 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         {tab === 'forms' && <FormsCatalog onPick={(k) => openReport(k)} />}
         {tab === 'submissions' && <SubmissionsArchive items={model.submissions} onOpen={open} />}
         {tab === 'formsMgr' && <FormManager />}
-        {tab === 'published' && (
-          <>
-            {view === 'ops' && <BulletinsManager />}
-            <PublishedReports reports={model.published} />
-          </>
-        )}
+        {tab === 'assessments' && <div className="-mx-6"><MyFRATSubmissions userRole={userRole} /></div>}
+        {tab === 'published' && <PublishedArea view={view} reports={model.published} />}
       </div>
 
       <ItemDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} onAdvance={advanceHazard} onOpenWorkflow={openWorkflow} />
