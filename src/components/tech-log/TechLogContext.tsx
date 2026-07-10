@@ -10,7 +10,7 @@ import { newId } from './util/id';
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-07-v9';
+export const DATA_VERSION = '2026-07-09-v10';
 
 function loadInitialState(): TechLogState {
   try {

@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plane, Clock, Check, RefreshCw, BellRing } from 'lucide-react';
+import { Plane, Clock, Check, RefreshCw, BellRing, FileText, PlayCircle, PackageSearch, ClipboardCheck, HelpCircle, Users } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
+import { buildDowntimeDebrief } from '../engine/debrief';
 import type { AogAck } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
@@ -17,6 +19,9 @@ export default function Aog() {
   const navigate = useNavigate();
   const now = new Date().toISOString();
   const acks = state.aogAcks ?? [];
+  // Downtime debrief (QM5/D27) — the "why is it down, what has every hour been spent on" answer.
+  const [debriefFor, setDebriefFor] = useState<string | null>(null);
+  const nameOf = (oid?: string) => (oid && state.personnel.find(p => p.oid === oid)?.displayName) || oid || '—';
 
   const aog = state.aircraft
     .filter(ac => !ac.isProvisional)
@@ -70,6 +75,11 @@ export default function Aog() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {driver && (
+                    <Button size="sm" variant={debriefFor === ac.id ? 'secondary' : 'outline'} onClick={() => setDebriefFor(debriefFor === ac.id ? null : ac.id)}>
+                      <FileText className="mr-1.5 h-3.5 w-3.5" /> Debrief
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => acknowledge(ac.id, esc)}>
                     <Check className="mr-1.5 h-3.5 w-3.5" /> Acknowledge
                   </Button>
@@ -84,6 +94,48 @@ export default function Aog() {
                   <BellRing className="h-3.5 w-3.5" /> Acknowledged by {latestAck.acknowledgedByName} · {new Date(latestAck.atUtc).toLocaleString()} (at {latestAck.escalationAtAck})
                 </div>
               )}
+              {debriefFor === ac.id && driver && (() => {
+                const dbf = buildDowntimeDebrief(driver.id, state, now);
+                return (
+                  <div className="rounded-md border bg-muted/30 p-3">
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold uppercase tracking-wide text-muted-foreground">Downtime debrief</span>
+                      <Badge variant="outline">{dbf.elapsedHours} h elapsed{dbf.ongoing ? ' · ongoing' : ''}</Badge>
+                      <Badge variant="outline"><PlayCircle className="mr-1 h-3 w-3" />in work {dbf.stateHours.IN_WORK} h</Badge>
+                      <Badge variant="outline"><PackageSearch className="mr-1 h-3 w-3" />parts (POO) {dbf.stateHours.WAITING_PARTS} h</Badge>
+                      <Badge variant="outline"><ClipboardCheck className="mr-1 h-3 w-3" />inspection {dbf.stateHours.WAITING_INSPECTION} h</Badge>
+                      <Badge variant="outline"><HelpCircle className="mr-1 h-3 w-3" />unattributed {dbf.untaggedHours} h</Badge>
+                      <Badge variant="outline"><Users className="mr-1 h-3 w-3" />labor {dbf.labor.totalHours} man-h</Badge>
+                    </div>
+                    <div className="space-y-1.5 border-l-2 pl-3">
+                      {dbf.events.map((e, i) => (
+                        <div key={i} className="text-xs">
+                          <span className="tabular-nums text-muted-foreground">{new Date(e.atUtc).toLocaleString()} — </span>
+                          <span className={e.kind === 'TAG' ? '' : 'font-medium'}>{e.label}</span>
+                          {e.byOid && <span className="text-muted-foreground"> · {nameOf(e.byOid)}</span>}
+                          {e.note && <div className="ml-4 italic text-muted-foreground">{e.note}</div>}
+                        </div>
+                      ))}
+                      {dbf.ongoing && <div className="text-xs text-muted-foreground">… still down ({dbf.elapsedHours} h and counting)</div>}
+                    </div>
+                    {(dbf.labor.byTech.length > 0 || dbf.labor.whyNotes.length > 0) && (
+                      <div className="mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+                        <div>
+                          <div className="font-medium">Man-hours</div>
+                          {dbf.labor.byTech.map(t => <div key={t.techOid} className="text-muted-foreground">{nameOf(t.techOid)} — {t.hours} h</div>)}
+                          <div className="mt-1 text-muted-foreground">{dbf.labor.byCategory.map(c => `${c.category.toLowerCase().replace(/_/g, ' ')} ${c.hours}h`).join(' · ')}</div>
+                        </div>
+                        {dbf.labor.whyNotes.length > 0 && (
+                          <div>
+                            <div className="font-medium">Why it took this long</div>
+                            {dbf.labor.whyNotes.map((n, i) => <div key={i} className="italic text-muted-foreground">"{n.note}" — {nameOf(n.techOid)}, {n.hours} h</div>)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         ))}

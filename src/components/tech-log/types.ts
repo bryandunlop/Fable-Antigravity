@@ -161,6 +161,19 @@ export type SignedEntity =
 export type WorkCardStatus = 'OPEN' | 'IN_WORK' | 'COMPLETED';
 export type WorkCardSource = 'CAMP' | 'MANUAL';
 
+/** Task-level work/wait state (QM4/D27): what this card's elapsed time is currently being spent on.
+ * The DOM's shop vocabulary: in work, waiting on parts ("POO" — parts on order), waiting on
+ * inspection. Off-ledger WIP state on the card — wrench-vs-elapsed analytics derive from the
+ * timestamped history, never from a timer. */
+export type WorkCardStatusTag = 'IN_WORK' | 'WAITING_PARTS' | 'WAITING_INSPECTION';
+
+export interface StatusTagEvent {
+  tag: WorkCardStatusTag;
+  atUtc: string;
+  byOid: string;
+  note?: string;   // required for WAITING_PARTS — what part, from whom (the POO record)
+}
+
 export interface WorkStep {
   id: string;
   seq: number;
@@ -192,6 +205,7 @@ export interface WorkCard {
   createdAtUtc: string;
   completedReleaseId?: string; // MaintenanceRelease produced on completion
   completedAtUtc?: string;
+  statusTags?: StatusTagEvent[]; // QM4/D27 work/wait history (chronological; last entry is current)
 }
 
 /** A part installed/removed under a work card. Removals feed MTBUR (§Phase 4). */
@@ -212,6 +226,10 @@ export interface PartUsage {
   addedByOid: string;
 }
 
+/** What the hours were spent on (QM1/D27) — man-hours must be answerable beyond wrench time:
+ * troubleshooting, calls to tech ops, ordering parts. Legacy rows without a category read as WRENCH. */
+export type LaborCategory = 'WRENCH' | 'TROUBLESHOOTING' | 'TECH_OPS_CALL' | 'PARTS_ORDERING' | 'INSPECTION' | 'OTHER';
+
 export interface LaborEntry {
   id: string;
   workCardId: string;
@@ -219,6 +237,8 @@ export interface LaborEntry {
   hours: number;
   dateUtc: string;
   description: string;
+  category?: LaborCategory;  // default WRENCH for pre-existing rows
+  note?: string;             // why-note — prompted (not buried) when the work ran long (QM1/QM5)
 }
 
 // ── §17.4: recurring dispatch-gating checks (Part-91 / IS-BAO). Expiry GROUNDS the aircraft. ──
