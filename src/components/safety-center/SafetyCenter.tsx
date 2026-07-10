@@ -371,8 +371,12 @@ function MoveList({ items, view, heading, doneSet, onToggle, onOpen }: {
         {items.map((i) => {
           const done = doneSet.has(i.id);
           return (
-            <div key={i.id} onClick={() => onOpen(i)}
-              className={`flex items-center gap-3 bg-card border border-border rounded-[12px] pl-2 pr-4 py-2.5 min-h-[60px] cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] ${done ? 'opacity-50' : ''}`}>
+            // A clickable row that also contains a checkbox button, so it stays a
+            // div with an explicit button role + keyboard handler (a <button> can't
+            // nest the checkbox <button>).
+            <div key={i.id} role="button" tabIndex={0} onClick={() => onOpen(i)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(i); } }}
+              className={`flex items-center gap-3 bg-card border border-border rounded-[12px] pl-2 pr-4 py-2.5 min-h-[60px] cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${done ? 'opacity-50' : ''}`}>
               {/* 44px hit area around a 24px checkbox */}
               <button onClick={(e) => { e.stopPropagation(); onToggle(i.id); }} aria-label={done ? 'Mark not done' : 'Mark done'}
                 className="w-11 h-11 grid place-items-center shrink-0 rounded-[10px] hover:bg-muted/60 transition-colors">
@@ -404,8 +408,8 @@ function WaitingList({ items, heading, onOpen }: { items: SafetyItem[]; heading?
       {heading !== null && <SectionHeading>{heading ?? 'With other people — not your move'}</SectionHeading>}
       <div className="flex flex-col gap-2">
         {items.map((i) => (
-          <div key={i.id} onClick={() => onOpen(i)}
-            className="flex items-center gap-3 bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[56px] cursor-pointer hover:border-muted-foreground/40 transition-colors active:scale-[.995]">
+          <button key={i.id} onClick={() => onOpen(i)}
+            className="w-full text-left flex items-center gap-3 bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[56px] cursor-pointer hover:border-muted-foreground/40 transition-colors active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1">
             <div className="w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold text-white bg-muted-foreground shrink-0">{i.who || '··'}</div>
             <div className="flex-1 min-w-0">
               <div className="text-[14.5px] text-muted-foreground">{i.title}</div>
@@ -413,7 +417,7 @@ function WaitingList({ items, heading, onOpen }: { items: SafetyItem[]; heading?
             </div>
             <span className="text-[13px] font-semibold text-accent whitespace-nowrap">{i.nudge || 'View'}</span>
             <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
-          </div>
+          </button>
         ))}
       </div>
     </>
@@ -439,15 +443,15 @@ function DoneList({ items, view, heading, onOpen }: { items: SafetyItem[]; view:
               </div>
             )
             : (
-              <div key={i.id} onClick={() => onOpen(i)}
-                className="grid grid-cols-[76px_1fr_auto] gap-3.5 items-center bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[56px] cursor-pointer hover:border-muted-foreground/40 transition-colors">
+              <button key={i.id} onClick={() => onOpen(i)}
+                className="w-full text-left grid grid-cols-[76px_1fr_auto] gap-3.5 items-center bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[56px] cursor-pointer hover:border-muted-foreground/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1">
                 <TypeLabel>{i.type}</TypeLabel>
                 <div className="min-w-0">
                   <div className="text-[14.5px] text-foreground truncate">{i.title}</div>
                   <div className="text-[12.5px] text-muted-foreground mt-0.5">{i.when}</div>
                 </div>
                 {i.status && <span className={`text-[12px] font-medium rounded-full px-3 py-1.5 ${toneClass(i.status.tone)}`}>{i.status.label}</span>}
-              </div>
+              </button>
             )
         ))}
       </div>
