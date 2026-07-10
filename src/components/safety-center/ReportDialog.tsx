@@ -130,12 +130,12 @@ export function ReportDialog({
         </div>
 
         <DialogFooter className="px-6 py-3.5 border-t border-border flex-row justify-between sm:justify-between">
-          {step === 0 && <Button variant="outline" onClick={close}>Cancel</Button>}
+          {step === 0 && <Button variant="outline" className="h-11 px-5 text-[14px]" onClick={close}>Cancel</Button>}
           {step === 1 && <>
-            <Button variant="outline" onClick={() => setStep(0)}>Back</Button>
-            <Button onClick={() => { setStep(2); if (kind) onFiled?.(kind, values); }}>Submit report</Button>
+            <Button variant="outline" className="h-11 px-5 text-[14px]" onClick={() => setStep(0)}>Back</Button>
+            <Button className="h-11 px-5 text-[14px]" onClick={() => { setStep(2); if (kind) onFiled?.(kind, values); }}>Submit report</Button>
           </>}
-          {step === 2 && <><span /><Button onClick={close}>Done</Button></>}
+          {step === 2 && <><span /><Button className="h-11 px-5 text-[14px]" onClick={close}>Done</Button></>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

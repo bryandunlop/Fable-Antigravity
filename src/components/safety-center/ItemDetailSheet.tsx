@@ -84,18 +84,18 @@ export function ItemDetailSheet({
             {isHazard && (onAdvance || onOpenWorkflow) ? (
               <div className="px-6 py-3.5 border-t border-border flex gap-2.5">
                 {canAdvance && (
-                  <Button variant="outline" className="flex-1" onClick={() => { onAdvance!(item); onOpenChange(false); }}>
+                  <Button variant="outline" className="flex-1 h-11 text-[14px]" onClick={() => { onAdvance!(item); onOpenChange(false); }}>
                     {item.bucket === 'move' ? 'Triage →' : 'Advance stage →'}
                   </Button>
                 )}
                 {onOpenWorkflow && (
-                  <Button className="flex-1" onClick={() => onOpenWorkflow(item)}>Open full workflow →</Button>
+                  <Button className="flex-1 h-11 text-[14px]" onClick={() => onOpenWorkflow(item)}>Open full workflow →</Button>
                 )}
               </div>
             ) : item.actions && item.actions.length > 0 ? (
               <div className="px-6 py-3.5 border-t border-border flex gap-2.5">
                 {item.actions.map((a, i) => (
-                  <Button key={i} variant={a.primary ? 'default' : 'outline'} className="flex-1" onClick={() => onOpenChange(false)}>
+                  <Button key={i} variant={a.primary ? 'default' : 'outline'} className="flex-1 h-11 text-[14px]" onClick={() => onOpenChange(false)}>
                     {a.label}
                   </Button>
                 ))}

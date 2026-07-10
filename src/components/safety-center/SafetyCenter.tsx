@@ -1,40 +1,43 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Plus, Check } from 'lucide-react';
+import { Bell, Plus, Check, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useNotificationFeed } from '../../notifications/useNotificationFeed';
 import { eventStore } from '../../notifications/events';
 import { useHazards, WORKFLOW_STAGES } from '../../contexts/HazardContext';
+import { useAudits } from '../../contexts/AuditContext';
 import { useSafetyModel } from './useSafetyModel';
 import { ToneStyles, TypeLabel, toneClass } from './ui-bits';
 import { TrackBoard } from './TrackBoard';
 import { ItemDetailSheet } from './ItemDetailSheet';
 import { NotificationsPanel } from './NotificationsPanel';
 import { ReportDialog, type Kind } from './ReportDialog';
-import { FormsCatalog } from './FormsCatalog';
 import { SubmissionsArchive } from './SubmissionsArchive';
 import { PublishedArea } from './PublishedArea';
 import { FormManager } from './FormManager';
-import { OperationsAudits, MyAudits } from './AuditsArea';
+import { OperationsAudits, MyAudits, auditsForMe } from './AuditsArea';
 import { ReviewsArea } from './ReviewsArea';
 import { ReadAndInitialInbox } from './ReadAndSign';
+import { useRequiredReads, pendingForUser } from './requiredReads';
 import { createAsap } from './asapReports';
 import { createCws } from './cwsRecognitions';
 import MyFRATSubmissions from '../MyFRATSubmissions';
+import type { KnowItem, SafetyItem, SafetyView } from './types';
 
 const CURRENT_USER = { id: 'u-demo', name: 'Capt. Dunlop' };
-import { FORM_CATALOG } from './forms';
-import type { KnowItem, SafetyItem, SafetyView } from './types';
 
 interface Props { userRole: string; additionalRoles?: string[] }
 
+// IA note (iPad / low-tech-comfort pass): crew gets 3 tabs + one Report button —
+// Home is a single scrolling page (needs you → waiting → done) so nothing hides
+// behind tab-hunting. The manager gets 5 tabs, daily work first, setup last.
 export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) {
   const roles = [userRole, ...additionalRoles];
   const hasManagerAccess = roles.some((r) => r === 'safety' || r === 'admin');
 
   const [persona, setPersona] = useState<'crew' | 'manager'>(hasManagerAccess ? 'manager' : 'crew');
   const [view, setView] = useState<SafetyView>(hasManagerAccess ? 'ops' : 'my');
-  const [tab, setTab] = useState<string>('move');
+  const [tab, setTab] = useState<string>(hasManagerAccess ? 'inbox' : 'home');
   const [selected, setSelected] = useState<SafetyItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [knowOpen, setKnowOpen] = useState(false);
@@ -45,7 +48,13 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const model = useSafetyModel();
   const feed = useNotificationFeed(userRole, additionalRoles);
   const { submitHazard, updateHazard } = useHazards();
+  const { audits } = useAudits();
+  const { reads, acks } = useRequiredReads();
   const navigate = useNavigate();
+
+  const pendingInitials = pendingForUser(reads, acks, CURRENT_USER.name).length;
+  const auditsDue = auditsForMe(audits).filter((a) => a.status !== 'Complete').length;
+  const needsYou = model.my.move.length + pendingInitials + auditsDue;
 
   // The Know panel reads the REAL app notification feed (Safety module) merged
   // with the model's illustrative items — so a filed report shows up here and in
@@ -68,9 +77,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   function choosePersona(p: 'crew' | 'manager') {
     setPersona(p);
     setView(p === 'manager' ? 'ops' : 'my');
-    setTab('move');
+    setTab(p === 'manager' ? 'inbox' : 'home');
   }
-  function switchView(v: SafetyView) { setView(v); setTab('move'); }
+  function switchView(v: SafetyView) { setView(v); setTab(v === 'ops' ? 'inbox' : 'home'); }
   function open(item: SafetyItem) { setSelected(item); setDetailOpen(true); }
   function toggleDone(id: string) {
     setDoneSet((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -145,29 +154,28 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     navigate(view === 'ops' ? `/safety/hazard-workflow/${item.sourceId}` : `/safety/hazards/${item.sourceId}`);
   }
 
-  const bucket = model[view] as Record<string, SafetyItem[]>;
+  const stalled = model.ops.track.filter((i) => i.stalled).length;
+
   const tabs: [string, string][] = view === 'my'
-    ? [['move', 'Your move'], ['waiting', 'Waiting'], ['done', 'Done'], ['audits', 'My audits'], ['assessments', 'My assessments'], ['forms', 'Forms'], ['published', 'Published']]
-    : [['move', 'Your move'], ['track', 'Track'], ['audits', 'Audits'], ['reviews', 'Reviews'], ['submissions', 'Submissions'], ['formsMgr', 'Form manager'], ['published', 'Published']];
+    ? [['home', 'Home'], ['records', 'My records'], ['library', 'Library']]
+    : [['inbox', 'Inbox'], ['track', 'Track'], ['reviews', 'Reviews'], ['audits', 'Audits'], ['manage', 'Manage']];
 
   function countFor(key: string): number | null {
-    if (key === 'forms') return FORM_CATALOG.length;
-    if (key === 'formsMgr' || key === 'audits' || key === 'reviews' || key === 'assessments') return null;
-    if (key === 'submissions') return model.submissions.length;
-    if (key === 'published') return model.published.length;
-    return (bucket[key] || []).length;
+    if (key === 'home') return needsYou;
+    if (key === 'inbox') return model.ops.move.length;
+    if (key === 'track') return model.ops.track.length;
+    return null;
   }
 
-  const stalled = model.ops.track.filter((i) => i.stalled).length;
   const summary = view === 'my'
     ? [
-        { n: model.my.move.length, l: 'Your move', tone: 'red' as const },
+        { n: needsYou, l: 'Need you today', tone: needsYou > 0 ? ('red' as const) : ('green' as const) },
         { n: model.my.waiting.length, l: 'Waiting on others', tone: 'neutral' as const },
         { n: model.my.done.length, l: 'Done this week', tone: 'green' as const },
-        { n: '100%', l: 'Docs current', tone: 'green' as const },
+        { n: pendingInitials === 0 ? '100%' : `${pendingInitials} due`, l: 'Sign-offs current', tone: pendingInitials === 0 ? ('green' as const) : ('red' as const) },
       ]
     : [
-        { n: model.ops.move.length, l: 'Your move', tone: 'amber' as const },
+        { n: model.ops.move.length, l: 'In your inbox', tone: 'amber' as const },
         { n: stalled, l: 'Stalled >30d', tone: 'red' as const },
         { n: model.ops.track.length, l: 'Open in Track', tone: 'neutral' as const },
         { n: 12, l: 'Closed this week', tone: 'green' as const },
@@ -186,8 +194,8 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
       <div className="flex items-start gap-4 flex-wrap">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight m-0">{view === 'my' ? 'My Safety' : 'Safety Operations'}</h1>
-          <div className="text-[13px] text-muted-foreground mt-0.5">
-            {view === 'my' ? "What needs you, what you're waiting on, what you've done." : 'Act on what needs you; shepherd everything in motion.'}
+          <div className="text-[13.5px] text-muted-foreground mt-0.5">
+            {view === 'my' ? 'One button to report anything. Everything that needs you is right here.' : 'Act on what needs you; shepherd everything in motion.'}
           </div>
         </div>
         <div className="flex-1" />
@@ -198,18 +206,18 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
             <div className="flex bg-muted rounded-[9px] p-[3px] gap-[3px]">
               {(['crew', 'manager'] as const).map((p) => (
                 <button key={p} onClick={() => choosePersona(p)}
-                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-[7px] transition-colors ${persona === p ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                  className={`text-[11px] font-semibold px-3 py-1.5 rounded-[7px] transition-colors ${persona === p ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
                   {p === 'crew' ? 'Crew' : 'Safety mgr'}
                 </button>
               ))}
             </div>
           </div>
           <button onClick={() => setKnowOpen(true)} aria-label="Notifications"
-            className="relative w-10 h-10 rounded-[10px] border border-muted-foreground/30 bg-card grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-            <Bell className="w-[19px] h-[19px]" />
-            <span className="absolute top-1.5 right-2 min-w-[15px] h-[15px] rounded-full bg-[color:var(--gfo-error)] text-white text-[9.5px] font-bold grid place-items-center px-[3px]">{knowItems.length}</span>
+            className="relative w-11 h-11 rounded-[11px] border border-muted-foreground/30 bg-card grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            <Bell className="w-[21px] h-[21px]" />
+            <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] rounded-full bg-[color:var(--gfo-error)] text-white text-[10px] font-bold grid place-items-center px-1">{knowItems.length}</span>
           </button>
-          <Button onClick={() => openReport()} className="gap-2"><Plus className="w-4 h-4" /> Report</Button>
+          <Button onClick={() => openReport()} className="gap-2 h-11 px-5 text-[14.5px]"><Plus className="w-[18px] h-[18px]" /> Report</Button>
         </div>
       </div>
 
@@ -218,7 +226,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         <div className="flex gap-2 mt-4">
           {(['my', 'ops'] as SafetyView[]).map((v) => (
             <button key={v} onClick={() => switchView(v)}
-              className={`text-[13px] font-semibold px-3.5 py-1.5 rounded-full border transition-colors ${view === v ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border'}`}>
+              className={`text-[14px] font-semibold px-4 py-2 min-h-[40px] rounded-full border transition-colors ${view === v ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border'}`}>
               {v === 'my' ? 'My Safety' : 'Operations'}
             </button>
           ))}
@@ -228,9 +236,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
       {/* summary */}
       <div className="flex gap-3 flex-wrap my-5">
         {summary.map((s, i) => (
-          <div key={i} className="bg-card border border-border rounded-[10px] px-4 py-3 min-w-[120px] flex-1">
-            <div className={`text-[25px] font-semibold tracking-tight leading-none tabular-nums ${statTone[s.tone]}`}>{s.n}</div>
-            <div className="text-xs text-muted-foreground mt-1">{s.l}</div>
+          <div key={i} className="bg-card border border-border rounded-[12px] px-4 py-3.5 min-w-[130px] flex-1">
+            <div className={`text-[26px] font-semibold tracking-tight leading-none tabular-nums ${statTone[s.tone]}`}>{s.n}</div>
+            <div className="text-[12.5px] text-muted-foreground mt-1">{s.l}</div>
           </div>
         ))}
       </div>
@@ -240,14 +248,14 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         {tabs.map(([key, label]) => {
           const count = countFor(key);
           const on = tab === key;
-          const attn = key === 'move';
+          const attn = key === 'home' || key === 'inbox';
           const showStall = key === 'track' && stalled > 0;
           return (
             <button key={key} onClick={() => setTab(key)}
-              className={`relative text-[14.5px] font-semibold py-2.5 mr-5 flex items-center gap-2 whitespace-nowrap ${on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}>
+              className={`relative text-[15px] font-semibold py-3 mr-6 min-h-[48px] flex items-center gap-2 whitespace-nowrap ${on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}>
               {label}
-              {count != null && <span className={`text-[11.5px] font-semibold rounded-full px-2 tabular-nums ${showStall ? 'sc-red' : on && attn ? 'bg-[color:var(--gfo-error)] text-white' : 'bg-muted text-muted-foreground'}`}>{count}</span>}
-              {on && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent rounded" />}
+              {count != null && count > 0 && <span className={`text-[12px] font-semibold rounded-full px-2 py-0.5 tabular-nums ${showStall ? 'sc-red' : attn ? 'bg-[color:var(--gfo-error)] text-white' : 'bg-muted text-muted-foreground'}`}>{count}</span>}
+              {on && <span className="absolute left-0 right-0 -bottom-px h-[3px] bg-accent rounded" />}
             </button>
           );
         })}
@@ -255,22 +263,34 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
 
       {/* content */}
       <div className="mt-2">
-        {tab === 'move' && (
+        {/* ── Crew ── */}
+        {tab === 'home' && (
           <>
-            {view === 'my' && <ReadAndInitialInbox currentUser={CURRENT_USER} />}
-            <MoveList items={bucket.move || []} view={view} doneSet={doneSet} onToggle={toggleDone} onOpen={open} />
+            {needsYou === 0
+              ? <Empty big="You're all caught up." small="Nothing needs you right now. Anything you file shows up under Waiting until the safety team resolves it." />
+              : (
+                <>
+                  <SectionHeading>Needs you today</SectionHeading>
+                  <ReadAndInitialInbox currentUser={CURRENT_USER} bare />
+                  <div className="mt-2"><MyAudits dueOnly /></div>
+                  <div className="mt-2"><MoveList items={model.my.move} view="my" heading={null} doneSet={doneSet} onToggle={toggleDone} onOpen={open} /></div>
+                </>
+              )}
+            <SectionHeading className="mt-8">Waiting on others — no action needed</SectionHeading>
+            <WaitingList items={model.my.waiting} heading={null} onOpen={open} />
+            <SectionHeading className="mt-8">Done this week</SectionHeading>
+            <DoneList items={model.my.done} view="my" heading={null} onOpen={open} />
           </>
         )}
-        {tab === 'waiting' && <WaitingList items={bucket.waiting || []} onOpen={open} />}
-        {tab === 'track' && <TrackBoard items={bucket.track || []} onOpen={open} />}
-        {tab === 'done' && <DoneList items={bucket.done || []} view={view} onOpen={open} />}
-        {tab === 'audits' && (view === 'ops' ? <OperationsAudits /> : <MyAudits />)}
+        {tab === 'records' && <MyRecords userRole={userRole} submissions={model.submissions} onOpen={open} />}
+        {tab === 'library' && <PublishedArea view="my" reports={model.published} />}
+
+        {/* ── Manager ── */}
+        {tab === 'inbox' && <MoveList items={model.ops.move} view="ops" heading="Decisions waiting on you" doneSet={doneSet} onToggle={toggleDone} onOpen={open} />}
+        {tab === 'track' && <TrackBoard items={model.ops.track} onOpen={open} />}
         {tab === 'reviews' && <ReviewsArea />}
-        {tab === 'forms' && <FormsCatalog onPick={(k) => openReport(k)} />}
-        {tab === 'submissions' && <SubmissionsArchive items={model.submissions} onOpen={open} />}
-        {tab === 'formsMgr' && <FormManager />}
-        {tab === 'assessments' && <div className="-mx-6"><MyFRATSubmissions userRole={userRole} /></div>}
-        {tab === 'published' && <PublishedArea view={view} reports={model.published} />}
+        {tab === 'audits' && <OperationsAudits />}
+        {tab === 'manage' && <ManageArea submissions={model.submissions} published={model.published} onOpen={open} />}
       </div>
 
       <ItemDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} onAdvance={advanceHazard} onOpenWorkflow={openWorkflow} />
@@ -280,32 +300,92 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   );
 }
 
-function GroupHeading({ children }: { children: React.ReactNode }) {
-  return <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-5 mb-2 px-0.5">{children}</div>;
+// ── crew: My records (everything you've filed or been assigned) ─────────────
+function MyRecords({ userRole, submissions, onOpen }: { userRole: string; submissions: SafetyItem[]; onOpen: (i: SafetyItem) => void }) {
+  const [sub, setSub] = useState<'reports' | 'assessments' | 'audits'>('reports');
+  const mine = submissions.filter((s) => s.submittedBy === CURRENT_USER.name || s.submittedBy === 'You');
+  return (
+    <div className="mt-4">
+      <SubChips
+        value={sub}
+        onChange={(v) => setSub(v as typeof sub)}
+        options={[['reports', 'My reports'], ['assessments', 'My risk assessments'], ['audits', 'My audits']]}
+      />
+      {sub === 'reports' && (
+        <>
+          <p className="text-[13.5px] text-muted-foreground mt-3 px-0.5">Everything you've filed — tap one to see its status and the safety team's replies.</p>
+          <SubmissionsArchive items={mine} onOpen={onOpen} />
+        </>
+      )}
+      {sub === 'assessments' && <div className="-mx-6"><MyFRATSubmissions userRole={userRole} /></div>}
+      {sub === 'audits' && <MyAudits />}
+    </div>
+  );
 }
 
-function MoveList({ items, view, doneSet, onToggle, onOpen }: {
-  items: SafetyItem[]; view: SafetyView; doneSet: Set<string>; onToggle: (id: string) => void; onOpen: (i: SafetyItem) => void;
+// ── manager: Manage (the occasional stuff, out of the daily path) ───────────
+function ManageArea({ submissions, published, onOpen }: { submissions: SafetyItem[]; published: import('./types').PublishedReport[]; onOpen: (i: SafetyItem) => void }) {
+  const [sub, setSub] = useState<'records' | 'comms' | 'forms'>('records');
+  return (
+    <div className="mt-4">
+      <SubChips
+        value={sub}
+        onChange={(v) => setSub(v as typeof sub)}
+        options={[['records', 'All records'], ['comms', 'Communications'], ['forms', 'Form setup']]}
+      />
+      {sub === 'records' && <SubmissionsArchive items={submissions} onOpen={onOpen} />}
+      {sub === 'comms' && <PublishedArea view="ops" reports={published} />}
+      {sub === 'forms' && <FormManager />}
+    </div>
+  );
+}
+
+function SubChips({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {options.map(([key, label]) => (
+        <button key={key} onClick={() => onChange(key)}
+          className={`text-[14px] font-semibold px-4 py-2 min-h-[40px] rounded-full border transition-colors ${value === key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SectionHeading({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`text-[12px] uppercase tracking-wider text-muted-foreground font-semibold mt-5 mb-2.5 px-0.5 ${className}`}>{children}</div>;
+}
+
+function MoveList({ items, view, heading, doneSet, onToggle, onOpen }: {
+  items: SafetyItem[]; view: SafetyView; heading?: string | null; doneSet: Set<string>; onToggle: (id: string) => void; onOpen: (i: SafetyItem) => void;
 }) {
-  if (!items.length) return <Empty big="You're all caught up." small="No actions need you right now." />;
+  if (!items.length) {
+    if (heading === null) return null; // Home renders its own empty state
+    return <Empty big="You're all caught up." small="No actions need you right now." />;
+  }
   return (
     <>
-      <GroupHeading>{view === 'my' ? "Clear these and you're done for the day" : 'Decisions waiting on you'}</GroupHeading>
+      {heading !== null && <SectionHeading>{heading ?? (view === 'my' ? "Clear these and you're done for the day" : 'Decisions waiting on you')}</SectionHeading>}
       <div className="flex flex-col gap-2">
         {items.map((i) => {
           const done = doneSet.has(i.id);
           return (
             <div key={i.id} onClick={() => onOpen(i)}
-              className={`flex items-center gap-3 bg-card border border-border rounded-[10px] px-4 py-3 cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm ${done ? 'opacity-50' : ''}`}>
-              <button onClick={(e) => { e.stopPropagation(); onToggle(i.id); }} aria-label="Mark done"
-                className={`w-5 h-5 rounded-[6px] border-[1.5px] shrink-0 grid place-items-center transition-colors ${done ? 'bg-[color:var(--gfo-success)] border-[color:var(--gfo-success)] text-white' : 'border-muted-foreground/40 text-transparent hover:border-accent'}`}>
-                <Check className="w-3 h-3" />
+              className={`flex items-center gap-3 bg-card border border-border rounded-[12px] pl-2 pr-4 py-2.5 min-h-[60px] cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] ${done ? 'opacity-50' : ''}`}>
+              {/* 44px hit area around a 24px checkbox */}
+              <button onClick={(e) => { e.stopPropagation(); onToggle(i.id); }} aria-label={done ? 'Mark not done' : 'Mark done'}
+                className="w-11 h-11 grid place-items-center shrink-0 rounded-[10px] hover:bg-muted/60 transition-colors">
+                <span className={`w-6 h-6 rounded-[7px] border-2 grid place-items-center transition-colors ${done ? 'bg-[color:var(--gfo-success)] border-[color:var(--gfo-success)] text-white' : 'border-muted-foreground/40 text-transparent'}`}>
+                  <Check className="w-3.5 h-3.5" />
+                </span>
               </button>
               <div className={`flex-1 min-w-0 ${done ? 'line-through text-muted-foreground' : ''}`}>
-                <div className="text-[14.5px] text-foreground">{i.title}</div>
-                {i.sub && <div className="text-[11.5px] text-muted-foreground mt-0.5">{i.sub}</div>}
+                <div className="text-[15px] text-foreground">{i.title}</div>
+                {i.sub && <div className="text-[12.5px] text-muted-foreground mt-0.5">{i.sub}</div>}
               </div>
-              {i.due && <span className={`text-xs font-semibold whitespace-nowrap ${i.due.tone === 'red' ? 'text-[color:var(--gfo-error)]' : i.due.tone === 'amber' ? 'text-[color:var(--gfo-warning)]' : 'text-muted-foreground'}`}>{i.due.label}</span>}
+              {i.due && <span className={`text-[13px] font-semibold whitespace-nowrap ${i.due.tone === 'red' ? 'text-[color:var(--gfo-error)]' : i.due.tone === 'amber' ? 'text-[color:var(--gfo-warning)]' : 'text-muted-foreground'}`}>{i.due.label}</span>}
+              <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
             </div>
           );
         })}
@@ -314,21 +394,25 @@ function MoveList({ items, view, doneSet, onToggle, onOpen }: {
   );
 }
 
-function WaitingList({ items, onOpen }: { items: SafetyItem[]; onOpen: (i: SafetyItem) => void }) {
-  if (!items.length) return <Empty big="Nothing in flight." small="Items you've handed off will appear here." />;
+function WaitingList({ items, heading, onOpen }: { items: SafetyItem[]; heading?: string | null; onOpen: (i: SafetyItem) => void }) {
+  if (!items.length) {
+    if (heading === null) return <div className="text-[13.5px] text-muted-foreground px-0.5 py-3">Nothing in flight — items you file appear here while the safety team works them.</div>;
+    return <Empty big="Nothing in flight." small="Items you've handed off will appear here." />;
+  }
   return (
     <>
-      <GroupHeading>With other people — not your move</GroupHeading>
+      {heading !== null && <SectionHeading>{heading ?? 'With other people — not your move'}</SectionHeading>}
       <div className="flex flex-col gap-2">
         {items.map((i) => (
           <div key={i.id} onClick={() => onOpen(i)}
-            className="flex items-center gap-3 bg-card border border-border rounded-[10px] px-4 py-3 cursor-pointer hover:border-muted-foreground/40 transition-colors">
-            <div className="w-[26px] h-[26px] rounded-full grid place-items-center text-[10px] font-semibold text-white bg-muted-foreground shrink-0">{i.who || '··'}</div>
+            className="flex items-center gap-3 bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[56px] cursor-pointer hover:border-muted-foreground/40 transition-colors active:scale-[.995]">
+            <div className="w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold text-white bg-muted-foreground shrink-0">{i.who || '··'}</div>
             <div className="flex-1 min-w-0">
-              <div className="text-[14px] text-muted-foreground">{i.title}</div>
-              {i.sub && <div className="text-[11.5px] text-muted-foreground/70 mt-0.5">{i.sub}</div>}
+              <div className="text-[14.5px] text-muted-foreground">{i.title}</div>
+              {i.sub && <div className="text-[12.5px] text-muted-foreground/70 mt-0.5">{i.sub}</div>}
             </div>
-            <span className="text-xs font-semibold text-accent whitespace-nowrap">{i.nudge || 'View'}</span>
+            <span className="text-[13px] font-semibold text-accent whitespace-nowrap">{i.nudge || 'View'}</span>
+            <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
           </div>
         ))}
       </div>
@@ -336,30 +420,33 @@ function WaitingList({ items, onOpen }: { items: SafetyItem[]; onOpen: (i: Safet
   );
 }
 
-function DoneList({ items, view, onOpen }: { items: SafetyItem[]; view: SafetyView; onOpen: (i: SafetyItem) => void }) {
-  if (!items.length) return <Empty big="Nothing yet." small="Completed items land here." />;
+function DoneList({ items, view, heading, onOpen }: { items: SafetyItem[]; view: SafetyView; heading?: string | null; onOpen: (i: SafetyItem) => void }) {
+  if (!items.length) {
+    if (heading === null) return <div className="text-[13.5px] text-muted-foreground px-0.5 py-3">Nothing completed yet this week.</div>;
+    return <Empty big="Nothing yet." small="Completed items land here." />;
+  }
   return (
     <>
-      <GroupHeading>{view === 'my' ? 'What you cleared' : 'Recently closed'}</GroupHeading>
+      {heading !== null && <SectionHeading>{heading ?? (view === 'my' ? 'What you cleared' : 'Recently closed')}</SectionHeading>}
       <div className="flex flex-col gap-2">
         {items.map((i) => (
           view === 'my'
             ? (
-              <div key={i.id} className="flex items-center gap-3 bg-card border border-border rounded-[10px] px-4 py-3 opacity-70">
-                <div className="w-5 h-5 rounded-[6px] grid place-items-center shrink-0 sc-green"><Check className="w-3 h-3" /></div>
-                <div className="flex-1 min-w-0 text-[13.5px] text-muted-foreground">{i.title}</div>
-                <span className="text-[11.5px] text-muted-foreground whitespace-nowrap">{i.when}</span>
+              <div key={i.id} className="flex items-center gap-3 bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[52px] opacity-70">
+                <div className="w-6 h-6 rounded-[7px] grid place-items-center shrink-0 sc-green"><Check className="w-3.5 h-3.5" /></div>
+                <div className="flex-1 min-w-0 text-[14px] text-muted-foreground">{i.title}</div>
+                <span className="text-[12px] text-muted-foreground whitespace-nowrap">{i.when}</span>
               </div>
             )
             : (
               <div key={i.id} onClick={() => onOpen(i)}
-                className="grid grid-cols-[76px_1fr_auto] gap-3.5 items-center bg-card border border-border rounded-[10px] px-4 py-3 cursor-pointer hover:border-muted-foreground/40 transition-colors">
+                className="grid grid-cols-[76px_1fr_auto] gap-3.5 items-center bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[56px] cursor-pointer hover:border-muted-foreground/40 transition-colors">
                 <TypeLabel>{i.type}</TypeLabel>
                 <div className="min-w-0">
                   <div className="text-[14.5px] text-foreground truncate">{i.title}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{i.when}</div>
+                  <div className="text-[12.5px] text-muted-foreground mt-0.5">{i.when}</div>
                 </div>
-                {i.status && <span className={`text-xs font-medium rounded-full px-2.5 py-1 ${toneClass(i.status.tone)}`}>{i.status.label}</span>}
+                {i.status && <span className={`text-[12px] font-medium rounded-full px-3 py-1.5 ${toneClass(i.status.tone)}`}>{i.status.label}</span>}
               </div>
             )
         ))}
@@ -371,8 +458,8 @@ function DoneList({ items, view, onOpen }: { items: SafetyItem[]; view: SafetyVi
 function Empty({ big, small }: { big: string; small: string }) {
   return (
     <div className="text-center py-12">
-      <div className="text-[15px] text-foreground/70 font-medium mb-1">{big}</div>
-      <div className="text-sm text-muted-foreground">{small}</div>
+      <div className="text-[16px] text-foreground/70 font-medium mb-1">{big}</div>
+      <div className="text-[14px] text-muted-foreground max-w-md mx-auto">{small}</div>
     </div>
   );
 }

@@ -16,7 +16,7 @@ const STATUS_TONE: Record<string, string> = {
   'Overdue': 'sc-red',
 };
 
-function auditsForMe(all: Audit[]): Audit[] {
+export function auditsForMe(all: Audit[]): Audit[] {
   // Demo has no auth: show every assigned (non-pool) audit so any persona can
   // experience the flow. In production this filters by the signed-in user.
   return all.filter((a) => a.assignedTo && a.assignedTo !== 'Unassigned');
@@ -31,8 +31,10 @@ export function OperationsAudits() {
   );
 }
 
-/** My Safety → My audits: assigned audits + the real findings drawer. */
-export function MyAudits() {
+/** My Safety: assigned audits + the real findings drawer.
+ *  dueOnly renders just the open ones as rows (no headers/empty state) so the
+ *  Home "Needs you" section can include audits without a separate tab. */
+export function MyAudits({ dueOnly = false }: { dueOnly?: boolean }) {
   const { audits } = useAudits();
   const [sel, setSel] = useState<Audit | null>(null);
   const [open, setOpen] = useState(false);
@@ -42,6 +44,34 @@ export function MyAudits() {
   const done = mine.filter((a) => a.status === 'Complete');
 
   function openAudit(a: Audit) { setSel(a); setOpen(true); }
+
+  const activeRows = active.map((a) => (
+    <button key={a.id} onClick={() => openAudit(a)}
+      className="text-left bg-card border border-border rounded-[12px] px-4 py-4 min-h-[60px] flex items-center gap-3 hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995]">
+      <div className="w-10 h-10 rounded-[10px] grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)' }}>
+        <ClipboardCheck className="w-5 h-5 text-accent" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[15px] font-medium text-foreground truncate">{a.title}</div>
+        <div className="text-[12.5px] text-muted-foreground mt-0.5 flex gap-2 flex-wrap items-center">
+          {a.isbaoPart && <span>{a.isbaoPart}</span>}
+          {a.dueDate && <span className="inline-flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> due {a.dueDate}</span>}
+          <span>· {a.completionRate}% done</span>
+        </div>
+      </div>
+      <span className={`text-[12px] font-medium rounded-full px-3 py-1.5 shrink-0 ${STATUS_TONE[a.status] ?? 'sc-neutral'}`}>{a.status}</span>
+      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+    </button>
+  ));
+
+  if (dueOnly) {
+    return (
+      <>
+        {activeRows.length > 0 && <div className="flex flex-col gap-2">{activeRows}</div>}
+        <AuditDetailDrawer audit={sel} open={open} onClose={() => setOpen(false)} />
+      </>
+    );
+  }
 
   if (mine.length === 0) {
     return (
@@ -56,40 +86,21 @@ export function MyAudits() {
     <div className="mt-4">
       {active.length > 0 && (
         <>
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 px-0.5">Assigned to you</div>
-          <div className="flex flex-col gap-2">
-            {active.map((a) => (
-              <button key={a.id} onClick={() => openAudit(a)}
-                className="text-left bg-card border border-border rounded-[10px] px-4 py-3 flex items-center gap-3 hover:border-muted-foreground/40 hover:shadow-sm transition-all">
-                <div className="w-9 h-9 rounded-[9px] grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)' }}>
-                  <ClipboardCheck className="w-[18px] h-[18px] text-accent" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[14.5px] font-medium text-foreground truncate">{a.title}</div>
-                  <div className="text-[12px] text-muted-foreground mt-0.5 flex gap-2 flex-wrap items-center">
-                    {a.isbaoPart && <span>{a.isbaoPart}</span>}
-                    {a.dueDate && <span className="inline-flex items-center gap-1"><CalendarClock className="w-3 h-3" /> due {a.dueDate}</span>}
-                    <span>· {a.completionRate}% done</span>
-                  </div>
-                </div>
-                <span className={`text-xs font-medium rounded-full px-2.5 py-1 shrink-0 ${STATUS_TONE[a.status] ?? 'sc-neutral'}`}>{a.status}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-              </button>
-            ))}
-          </div>
+          <div className="text-[11.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 px-0.5">Assigned to you</div>
+          <div className="flex flex-col gap-2">{activeRows}</div>
         </>
       )}
 
       {done.length > 0 && (
         <>
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-6 mb-2 px-0.5">Completed</div>
+          <div className="text-[11.5px] uppercase tracking-wider text-muted-foreground font-semibold mt-6 mb-2 px-0.5">Completed</div>
           <div className="flex flex-col gap-2">
             {done.map((a) => (
               <button key={a.id} onClick={() => openAudit(a)}
-                className="text-left bg-card border border-border rounded-[10px] px-4 py-3 flex items-center gap-3 opacity-80 hover:opacity-100 transition-opacity">
-                <div className="w-5 h-5 rounded-[6px] grid place-items-center shrink-0 sc-green">✓</div>
-                <div className="flex-1 min-w-0 text-[13.5px] text-muted-foreground truncate">{a.title}</div>
-                <span className="text-[11.5px] text-muted-foreground shrink-0">{a.dueDate}</span>
+                className="text-left bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[52px] flex items-center gap-3 opacity-80 hover:opacity-100 transition-opacity">
+                <div className="w-6 h-6 rounded-[7px] grid place-items-center shrink-0 sc-green">✓</div>
+                <div className="flex-1 min-w-0 text-[14px] text-muted-foreground truncate">{a.title}</div>
+                <span className="text-[12px] text-muted-foreground shrink-0">{a.dueDate}</span>
               </button>
             ))}
           </div>

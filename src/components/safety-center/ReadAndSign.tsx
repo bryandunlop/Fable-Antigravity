@@ -33,7 +33,7 @@ function resolveRecipients(groups: string[], individuals: string[]): string[] {
 }
 
 // ─────────────────────────────────────────────── crew: read + initial ────────
-export function ReadAndInitialInbox({ currentUser }: { currentUser: { id: string; name: string } }) {
+export function ReadAndInitialInbox({ currentUser, bare = false }: { currentUser: { id: string; name: string }; bare?: boolean }) {
   const { reads, acks, acknowledge } = useRequiredReads();
   const pending = pendingForUser(reads, acks, currentUser.name);
   const [active, setActive] = useState<RequiredRead | null>(null);
@@ -55,24 +55,26 @@ export function ReadAndInitialInbox({ currentUser }: { currentUser: { id: string
 
   return (
     <>
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-5 mb-2 px-0.5 flex items-center gap-2">
-        <span className="text-[color:var(--gfo-error)]">Needs your initials</span>
-        <span className="sc-red text-[11px] font-semibold rounded-full px-2">{pending.length}</span>
-      </div>
+      {!bare && (
+        <div className="text-[11.5px] uppercase tracking-wider text-muted-foreground font-semibold mt-5 mb-2 px-0.5 flex items-center gap-2">
+          <span className="text-[color:var(--gfo-error)]">Needs your initials</span>
+          <span className="sc-red text-[11px] font-semibold rounded-full px-2">{pending.length}</span>
+        </div>
+      )}
       <div className="flex flex-col gap-2">
         {pending.map((r) => (
           <button key={r.id} onClick={() => setActive(r)}
-            className="text-left bg-card border border-border rounded-[10px] px-4 py-3 flex items-center gap-3 hover:border-accent hover:shadow-sm transition-all"
+            className="text-left bg-card border border-border rounded-[12px] px-4 py-4 min-h-[60px] flex items-center gap-3 hover:border-accent hover:shadow-sm transition-all active:scale-[.995]"
             style={{ borderColor: r.urgent ? 'var(--gfo-error)' : undefined }}>
-            <div className="w-9 h-9 rounded-[9px] grid place-items-center shrink-0" style={{ background: r.urgent ? 'color-mix(in srgb, var(--gfo-error) 12%, transparent)' : 'color-mix(in srgb, var(--accent) 12%, transparent)' }}>
-              {r.urgent ? <TriangleAlert className="w-[18px] h-[18px] text-[color:var(--gfo-error)]" /> : <FileCheck className="w-[18px] h-[18px] text-accent" />}
+            <div className="w-10 h-10 rounded-[10px] grid place-items-center shrink-0" style={{ background: r.urgent ? 'color-mix(in srgb, var(--gfo-error) 12%, transparent)' : 'color-mix(in srgb, var(--accent) 12%, transparent)' }}>
+              {r.urgent ? <TriangleAlert className="w-5 h-5 text-[color:var(--gfo-error)]" /> : <FileCheck className="w-5 h-5 text-accent" />}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[14.5px] font-medium text-foreground truncate">{r.title}</div>
-              <div className="text-[12px] text-muted-foreground mt-0.5 truncate">{r.summary}</div>
+              <div className="text-[15px] font-medium text-foreground truncate">{r.title}</div>
+              <div className="text-[12.5px] text-muted-foreground mt-0.5 truncate">{r.summary}</div>
             </div>
             {r.urgent && <span className="sc-red text-[11px] font-semibold rounded-full px-2.5 py-1 shrink-0">Urgent</span>}
-            <span className="text-xs font-semibold text-accent shrink-0">Read &amp; initial →</span>
+            <span className="text-[13px] font-semibold text-accent shrink-0">Read &amp; initial →</span>
           </button>
         ))}
       </div>
@@ -96,7 +98,7 @@ export function ReadAndInitialInbox({ currentUser }: { currentUser: { id: string
               <div className="px-6 py-4 border-t border-border bg-muted/30">
                 <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5 block">Completion code (your initials)</Label>
                 <div className="flex gap-2">
-                  <Input value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder="Type the code from the document" className="flex-1" />
+                  <Input value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder="Type the code from the document" className="flex-1 h-11 text-[15px]" />
                 </div>
                 {err && <div className="text-[12px] text-[color:var(--gfo-error)] mt-1.5">{err}</div>}
                 <div className="text-[11.5px] text-muted-foreground mt-1.5">Demo code: <b className="text-foreground font-medium">{active.completionCode}</b></div>

@@ -24,10 +24,10 @@ export function TrackBoard({ items, onOpen }: { items: SafetyItem[]; onOpen: (i:
 
   return (
     <div>
-      <div className="flex gap-1.5 flex-wrap my-4">
+      <div className="flex gap-2 flex-wrap my-4">
         {chips.map((c) => {
           const on = filter === c.key;
-          const base = 'text-xs font-medium rounded-full px-3 py-1.5 border cursor-pointer transition-colors';
+          const base = 'text-[13.5px] font-medium rounded-full px-4 py-2 min-h-[40px] border cursor-pointer transition-colors';
           const cls = c.alert
             ? (on ? 'bg-[color:var(--gfo-error)] text-white border-[color:var(--gfo-error)]' : 'sc-red border-[color:var(--gfo-error)]')
             : (on ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-[color:var(--border-strong,var(--muted-foreground))]');
@@ -51,28 +51,28 @@ export function TrackBoard({ items, onOpen }: { items: SafetyItem[]; onOpen: (i:
       <div className="flex flex-col gap-2.5">
         {shown.map((i) => (
           <button key={i.id} onClick={() => onOpen(i)}
-            className={`text-left bg-card rounded-[11px] px-4 py-3 border transition-shadow hover:shadow-sm ${i.stalled ? 'border-[color:var(--gfo-error)]' : 'border-border hover:border-muted-foreground/40'}`}>
+            className={`text-left bg-card rounded-[12px] px-4 py-4 border transition-shadow hover:shadow-sm active:scale-[.995] ${i.stalled ? 'border-[color:var(--gfo-error)]' : 'border-border hover:border-muted-foreground/40'}`}>
             <div className="flex items-center gap-2 justify-between">
               <div className="min-w-0">
-                <span className="text-[11px] text-muted-foreground font-semibold tracking-wide">{i.ref} · </span>
-                <span className="text-[14.5px] font-medium text-foreground">{i.title}</span>
+                <span className="text-[11.5px] text-muted-foreground font-semibold tracking-wide">{i.ref} · </span>
+                <span className="text-[15px] font-medium text-foreground">{i.title}</span>
               </div>
               {i.status && <StatusPill tone={i.status.tone}>{i.status.label}</StatusPill>}
             </div>
 
-            <div className="flex items-center gap-1.5 my-2 text-[11.5px] text-muted-foreground flex-wrap">
+            <div className="flex items-center gap-1.5 my-2.5 text-[12px] text-muted-foreground flex-wrap">
               <StageBar phaseIndex={i.phaseIndex ?? 0} stalled={i.stalled} />
               <span className="font-semibold text-foreground">{stageName(i.phaseIndex ?? 0)}</span>
               {i.ageLabel && <> · <span className={i.stalled ? 'text-[color:var(--gfo-error)] font-semibold' : ''}>{i.ageLabel}</span></>}
             </div>
 
-            <div className="flex items-center justify-between gap-2 flex-wrap text-[12.5px] text-muted-foreground">
+            <div className="flex items-center justify-between gap-2 flex-wrap text-[13px] text-muted-foreground">
               <div>
                 {i.mine
                   ? <span className="text-accent font-medium">Your move — {i.waitingText}</span>
                   : <>Waiting on {i.owner ? <b className="text-foreground font-medium">{i.owner}</b> : <span>mitigation</span>}{i.waitingText ? ` — ${i.waitingText}` : ''}</>}
               </div>
-              <span className={`text-xs font-semibold rounded-lg px-2.5 py-1 border ${i.mine ? 'bg-accent text-accent-foreground border-accent' : 'text-accent border-accent bg-card'}`}>
+              <span className={`text-[13px] font-semibold rounded-[10px] px-3.5 py-2 border ${i.mine ? 'bg-accent text-accent-foreground border-accent' : 'text-accent border-accent bg-card'}`}>
                 {i.nextAction ?? 'View'} →
               </span>
             </div>

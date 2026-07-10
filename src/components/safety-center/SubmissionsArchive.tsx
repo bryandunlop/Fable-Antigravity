@@ -21,17 +21,17 @@ export function SubmissionsArchive({ items, onOpen }: { items: SafetyItem[]; onO
 
   return (
     <div className="mt-4">
-      <div className="flex items-center gap-2 bg-card border border-border rounded-[10px] px-3 h-10 mb-3">
-        <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search every submission — title, tail, reporter, ref…"
-          className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground" />
-        {q && <button onClick={() => setQ('')} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>}
+      <div className="flex items-center gap-2.5 bg-card border border-border rounded-[12px] px-3.5 h-12 mb-3">
+        <Search className="w-5 h-5 text-muted-foreground shrink-0" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search — title, tail, reporter, ref…"
+          className="flex-1 bg-transparent outline-none text-[15px] text-foreground placeholder:text-muted-foreground" />
+        {q && <button onClick={() => setQ('')} className="text-[13px] text-muted-foreground hover:text-foreground px-2 py-1.5">Clear</button>}
       </div>
 
-      <div className="flex gap-1.5 flex-wrap mb-3">
+      <div className="flex gap-2 flex-wrap mb-3">
         {TYPES.map((t) => (
           <button key={t} onClick={() => setType(t)}
-            className={`text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${type === t ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
+            className={`text-[13.5px] font-medium rounded-full px-4 py-2 min-h-[40px] border transition-colors ${type === t ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
             {t === 'All' ? 'All types' : t.charAt(0) + t.slice(1).toLowerCase()}
           </button>
         ))}
@@ -50,7 +50,7 @@ export function SubmissionsArchive({ items, onOpen }: { items: SafetyItem[]; onO
         <div className="flex flex-col gap-2">
           {filtered.map((i) => (
             <button key={i.id} onClick={() => onOpen(i)}
-              className="text-left grid grid-cols-[70px_1fr_auto] gap-3.5 items-center bg-card border border-border rounded-[10px] px-4 py-3 hover:border-muted-foreground/40 hover:shadow-sm transition-all">
+              className="text-left grid grid-cols-[70px_1fr_auto] gap-3.5 items-center bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[56px] hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995]">
               <TypeLabel>{i.type}</TypeLabel>
               <div className="min-w-0">
                 <div className="text-[14.5px] text-foreground truncate">{i.title}</div>

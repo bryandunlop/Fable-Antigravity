@@ -23,7 +23,7 @@ export function ReviewsArea() {
       <div className="flex gap-2 flex-wrap mb-1">
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setSub(t.key)}
-            className={`text-[13px] font-semibold px-3.5 py-1.5 rounded-full border transition-colors ${sub === t.key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
+            className={`text-[14px] font-semibold px-4 py-2 min-h-[40px] rounded-full border transition-colors ${sub === t.key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
             {t.label}
           </button>
         ))}
