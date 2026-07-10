@@ -126,6 +126,34 @@ const MY_REPLY: SafetyItem = {
   actions: [{ label: 'Reply', primary: true }, { label: 'View report' }],
 };
 
+// Demo identity — matches the reporter stamped by SafetyCenter.handleFiled.
+const REPORTER = 'Capt. Dunlop';
+
+/** The reporter's own open hazard, shaped for their Waiting list — so "track it
+ *  under Waiting" is literally true the moment they file. */
+function hazardToWaitingItem(h: Hazard): SafetyItem {
+  const phase = phaseIndexOf(h.workflowStage);
+  return {
+    id: `hzw-${h.id}`,
+    type: 'HAZARD',
+    bucket: 'waiting',
+    sourceId: h.id,
+    rawStage: h.workflowStage,
+    who: 'SF',
+    title: h.title || 'Your hazard report',
+    sub: `#${h.id} · with the safety team · ${phase === 0 ? 'awaiting triage' : h.workflowStage}`,
+    nudge: 'View',
+    fields: [
+      { label: 'Ref', value: `#${h.id}` },
+      { label: 'Stage', value: h.workflowStage },
+      { label: 'Filed', value: h.reportedDate ? String(h.reportedDate).slice(0, 10) : '—' },
+      { label: 'Location', value: h.location || '—' },
+    ],
+    thread: threadFor(h),
+    actions: [{ label: 'View report', primary: true }],
+  };
+}
+
 export function useSafetyModel(extraMove: SafetyItem[] = []): SafetyModel {
   const { hazards } = useHazards();
 
@@ -135,6 +163,10 @@ export function useSafetyModel(extraMove: SafetyItem[] = []): SafetyModel {
     const hzMove = hz.filter((i) => i.bucket === 'move');
     const hzTrack = hz.filter((i) => i.bucket === 'track');
     const hzDone = hz.filter((i) => i.bucket === 'done');
+    // Crew view: my own open reports, visible under Waiting.
+    const myWaiting = live
+      .filter((h) => !h.isAnonymous && h.reportedBy === REPORTER && phaseIndexOf(h.workflowStage) < 4)
+      .map(hazardToWaitingItem);
 
     // Submissions archive = every hazard (any state) + non-hazard records.
     const submissions: SafetyItem[] = [...hz, ...MOCK_SUBMISSIONS]
@@ -157,7 +189,7 @@ export function useSafetyModel(extraMove: SafetyItem[] = []): SafetyModel {
     return {
       my: {
         move: [...extraMove, ...MY_MOVE, MY_REPLY],
-        waiting: MY_WAITING,
+        waiting: [...myWaiting, ...MY_WAITING],
         done: MY_DONE,
       },
       ops: {
