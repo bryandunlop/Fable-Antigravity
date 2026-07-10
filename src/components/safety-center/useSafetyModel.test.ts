@@ -74,4 +74,17 @@ describe('hazardToItem — bucket routing', () => {
     expect(closed.stalled).toBe(false);
     expect(closed.status?.tone).toBe('green');
   });
+
+  it('carries the raw hazard id + stage so actions can write back', () => {
+    const item = hazardToItem(makeHazard({ id: 'HZ-042', workflowStage: WORKFLOW_STAGES.SM_INVESTIGATION }));
+    expect(item.sourceId).toBe('HZ-042');
+    expect(item.rawStage).toBe(WORKFLOW_STAGES.SM_INVESTIGATION);
+  });
+
+  it('advances one granular stage using the WORKFLOW_STAGES order', () => {
+    // Mirrors SafetyCenter.advanceHazard — the ordered stage list is the contract.
+    const order = Object.values(WORKFLOW_STAGES);
+    const i = order.indexOf(WORKFLOW_STAGES.SUBMITTED);
+    expect(order[i + 1]).toBe(WORKFLOW_STAGES.SM_INVESTIGATION);
+  });
 });

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Plus, Check } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useNotificationFeed } from '../../notifications/useNotificationFeed';
 import { eventStore } from '../../notifications/events';
+import { useHazards, WORKFLOW_STAGES } from '../../contexts/HazardContext';
 import { useSafetyModel } from './useSafetyModel';
 import { ToneStyles, TypeLabel, toneClass } from './ui-bits';
 import { TrackBoard } from './TrackBoard';
@@ -35,13 +37,15 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
 
   const model = useSafetyModel();
   const feed = useNotificationFeed(userRole, additionalRoles);
+  const { submitHazard, updateHazard } = useHazards();
+  const navigate = useNavigate();
 
   // The Know panel reads the REAL app notification feed (Safety module) merged
   // with the model's illustrative items — so a filed report shows up here and in
   // the app-wide bell.
   const knowItems: KnowItem[] = useMemo(() => {
     const real: KnowItem[] = feed.entries
-      .filter((e) => e.module === 'Safety')
+      .filter((e) => e.module.toLowerCase().includes('safety'))
       .map((e) => ({
         id: e.id,
         icon: e.severity === 'critical' ? 'triangle-alert' : e.severity === 'warn' ? 'file-text' : 'clock',
@@ -65,17 +69,51 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     setDoneSet((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
   function openReport(kind: Kind | null = null) { setReportKind(kind); setReportOpen(true); }
-  function handleFiled(kind: Kind) {
+
+  function handleFiled(kind: Kind, values: Record<string, string>) {
+    if (kind === 'hazard') {
+      // Persist a real hazard — it lands in Track / Submissions and submitHazard
+      // itself notifies safety staff.
+      const desc = (values.what || '').trim();
+      const severity = values.risk === 'high' ? 'High' : values.risk === 'low' ? 'Low' : 'Medium';
+      submitHazard({
+        title: desc ? desc.slice(0, 60) : 'Reported hazard',
+        description: desc || '(no description provided)',
+        location: (values.where || '').trim() || 'Unspecified',
+        category: 'Other',
+        severity,
+        reportedBy: 'Capt. Dunlop',
+        immediateActions: '',
+        potentialConsequences: '',
+        isAnonymous: false,
+      });
+      return;
+    }
+    // ASAP/CWS/waiver don't have stores wired yet (later phases) — notify for now.
     const title: Record<Kind, string> = {
-      hazard: 'New hazard report filed', asap: 'New ASAP report filed',
+      hazard: '', asap: 'New ASAP report filed',
       cws: 'CWS recognition logged', waiver: 'New waiver request',
     };
-    // Emits into the real notification system → appears in the app-wide bell for safety staff.
     eventStore.publish({
       id: `safety-file-${kind}-${Date.now()}`,
       severity: 'info', title: title[kind], detail: 'Awaiting triage',
       module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin'],
     });
+  }
+
+  const STAGE_ORDER = Object.values(WORKFLOW_STAGES);
+  function advanceHazard(item: SafetyItem) {
+    if (!item.sourceId || !item.rawStage) return;
+    const i = STAGE_ORDER.indexOf(item.rawStage);
+    const next = i >= 0 && i < STAGE_ORDER.length - 1 ? STAGE_ORDER[i + 1] : item.rawStage;
+    updateHazard(item.sourceId, { workflowStage: next, daysInStage: 0 });
+  }
+  // Opens the full, proven hazard workflow (risk matrix, 5-Whys, assignment,
+  // approval chain, final report) for the SM — or the reporter's detail view.
+  function openWorkflow(item: SafetyItem) {
+    if (item.type !== 'HAZARD' || !item.sourceId) return;
+    setDetailOpen(false);
+    navigate(view === 'ops' ? `/safety/hazard-workflow/${item.sourceId}` : `/safety/hazards/${item.sourceId}`);
   }
 
   const bucket = model[view] as Record<string, SafetyItem[]>;
@@ -199,7 +237,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         {tab === 'published' && <PublishedReports reports={model.published} />}
       </div>
 
-      <ItemDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} />
+      <ItemDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} onAdvance={advanceHazard} onOpenWorkflow={openWorkflow} />
       <NotificationsPanel items={knowItems} open={knowOpen} onOpenChange={setKnowOpen} />
       <ReportDialog open={reportOpen} onOpenChange={setReportOpen} initialKind={reportKind} onFiled={handleFiled} />
     </div>

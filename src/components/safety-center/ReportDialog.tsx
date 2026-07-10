@@ -18,19 +18,22 @@ const TYPES: Record<Kind, { name: string; desc: string; icon: typeof TriangleAle
 
 export function ReportDialog({
   open, onOpenChange, onFiled, initialKind = null,
-}: { open: boolean; onOpenChange: (v: boolean) => void; onFiled?: (kind: Kind) => void; initialKind?: Kind | null }) {
+}: { open: boolean; onOpenChange: (v: boolean) => void; onFiled?: (kind: Kind, values: Record<string, string>) => void; initialKind?: Kind | null }) {
   const [step, setStep] = useState(0);
   const [kind, setKind] = useState<Kind | null>(null);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const set = (k: string, v: string) => setValues((p) => ({ ...p, [k]: v }));
 
   // Opening from the Forms catalog jumps straight to a specific form's details.
   useEffect(() => {
     if (open) {
       setKind(initialKind);
       setStep(initialKind ? 1 : 0);
+      setValues({});
     }
   }, [open, initialKind]);
 
-  function reset() { setStep(0); setKind(null); }
+  function reset() { setStep(0); setKind(null); setValues({}); }
   function close() { onOpenChange(false); setTimeout(reset, 200); }
 
   const t = kind ? TYPES[kind] : null;
@@ -68,11 +71,11 @@ export function ReportDialog({
 
           {step === 1 && kind === 'hazard' && (
             <div className="flex flex-col gap-3.5">
-              <Field label="Where"><Input placeholder="e.g. KTEB · stand 3" /></Field>
-              <Field label="Aircraft (optional)"><Input placeholder="e.g. N2PG" /></Field>
-              <Field label="What you saw"><Textarea rows={3} placeholder="Describe it…" /></Field>
+              <Field label="Where"><Input placeholder="e.g. KTEB · stand 3" value={values.where || ''} onChange={(e) => set('where', e.target.value)} /></Field>
+              <Field label="Aircraft (optional)"><Input placeholder="e.g. N2PG" value={values.aircraft || ''} onChange={(e) => set('aircraft', e.target.value)} /></Field>
+              <Field label="What you saw"><Textarea rows={3} placeholder="Describe it…" value={values.what || ''} onChange={(e) => set('what', e.target.value)} /></Field>
               <Field label="How risky?">
-                <Select defaultValue="med">
+                <Select value={values.risk || 'med'} onValueChange={(v: string) => set('risk', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low — minor</SelectItem>
@@ -129,7 +132,7 @@ export function ReportDialog({
           {step === 0 && <Button variant="outline" onClick={close}>Cancel</Button>}
           {step === 1 && <>
             <Button variant="outline" onClick={() => setStep(0)}>Back</Button>
-            <Button onClick={() => { setStep(2); if (kind) onFiled?.(kind); }}>Submit report</Button>
+            <Button onClick={() => { setStep(2); if (kind) onFiled?.(kind, values); }}>Submit report</Button>
           </>}
           {step === 2 && <><span /><Button onClick={close}>Done</Button></>}
         </DialogFooter>

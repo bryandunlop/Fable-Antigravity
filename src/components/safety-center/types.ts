@@ -67,6 +67,10 @@ export interface SafetyItem {
   date?: string;       // ISO or display date used for sort/search
   tail?: string;
 
+  // provenance — set on hazard-derived items so actions can write back
+  sourceId?: string;   // raw HazardContext id
+  rawStage?: string;   // raw WORKFLOW_STAGES value (for stage advance)
+
   // shared
   status?: StatusChip;
   fields?: Field[];

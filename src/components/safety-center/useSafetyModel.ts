@@ -76,6 +76,8 @@ export function hazardToItem(h: Hazard): SafetyItem {
     id: `hz-${h.id}`,
     type: 'HAZARD',
     bucket: closed ? 'done' : mine ? 'move' : 'track',
+    sourceId: h.id,
+    rawStage: h.workflowStage,
     ref: `#${h.id}`,
     title: h.title || 'Untitled hazard',
     sub: h.category,

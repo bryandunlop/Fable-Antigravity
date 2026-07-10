@@ -29,8 +29,13 @@ function Message({ m }: { m: ThreadMsg }) {
 }
 
 export function ItemDetailSheet({
-  item, open, onOpenChange,
-}: { item: SafetyItem | null; open: boolean; onOpenChange: (v: boolean) => void }) {
+  item, open, onOpenChange, onAdvance, onOpenWorkflow,
+}: {
+  item: SafetyItem | null; open: boolean; onOpenChange: (v: boolean) => void;
+  onAdvance?: (item: SafetyItem) => void; onOpenWorkflow?: (item: SafetyItem) => void;
+}) {
+  const isHazard = !!(item && item.type === 'HAZARD' && item.sourceId);
+  const canAdvance = !!(onAdvance && isHazard && item && (item.bucket === 'track' || item.bucket === 'move'));
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[440px] max-w-[92vw] p-0 flex flex-col gap-0">
@@ -76,7 +81,18 @@ export function ItemDetailSheet({
               )}
             </div>
 
-            {item.actions && item.actions.length > 0 && (
+            {isHazard && (onAdvance || onOpenWorkflow) ? (
+              <div className="px-6 py-3.5 border-t border-border flex gap-2.5">
+                {canAdvance && (
+                  <Button variant="outline" className="flex-1" onClick={() => { onAdvance!(item); onOpenChange(false); }}>
+                    {item.bucket === 'move' ? 'Triage →' : 'Advance stage →'}
+                  </Button>
+                )}
+                {onOpenWorkflow && (
+                  <Button className="flex-1" onClick={() => onOpenWorkflow(item)}>Open full workflow →</Button>
+                )}
+              </div>
+            ) : item.actions && item.actions.length > 0 ? (
               <div className="px-6 py-3.5 border-t border-border flex gap-2.5">
                 {item.actions.map((a, i) => (
                   <Button key={i} variant={a.primary ? 'default' : 'outline'} className="flex-1" onClick={() => onOpenChange(false)}>
@@ -84,7 +100,7 @@ export function ItemDetailSheet({
                   </Button>
                 ))}
               </div>
-            )}
+            ) : null}
           </>
         )}
       </SheetContent>
