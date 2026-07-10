@@ -6,11 +6,13 @@ import { useState } from 'react';
 import FRATReview from '../FRATReview';
 import GRATReview from '../GRATReview';
 import WaiverManagement from '../WaiverManagement';
+import { AsapReview } from './AsapReview';
 
-type Sub = 'frat' | 'grat' | 'waivers';
+type Sub = 'frat' | 'grat' | 'waivers' | 'asap';
 const TABS: { key: Sub; label: string }[] = [
   { key: 'frat', label: 'FRAT reviews' },
   { key: 'grat', label: 'GRAT reviews' },
+  { key: 'asap', label: 'ASAP' },
   { key: 'waivers', label: 'Waivers' },
 ];
 
@@ -26,11 +28,17 @@ export function ReviewsArea() {
           </button>
         ))}
       </div>
-      <div className="-mx-6">
-        {sub === 'frat' && <FRATReview />}
-        {sub === 'grat' && <GRATReview />}
-        {sub === 'waivers' && <WaiverManagement />}
-      </div>
+      {/* ASAP reviewer is a native Safety-Center surface; the others are the full
+          existing consoles (full-width, so they get the -mx-6 bleed). */}
+      {sub === 'asap' ? (
+        <AsapReview />
+      ) : (
+        <div className="-mx-6">
+          {sub === 'frat' && <FRATReview />}
+          {sub === 'grat' && <GRATReview />}
+          {sub === 'waivers' && <WaiverManagement />}
+        </div>
+      )}
     </div>
   );
 }

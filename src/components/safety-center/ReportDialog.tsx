@@ -89,17 +89,18 @@ export function ReportDialog({
           {step === 1 && kind === 'asap' && (
             <div className="flex flex-col gap-3.5">
               <Field label="Phase of flight">
-                <Select defaultValue="approach">
+                <Select value={values.phase || 'Approach'} onValueChange={(v: string) => set('phase', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {['Taxi', 'Takeoff', 'Climb', 'Cruise', 'Approach', 'Landing'].map((p) => (
-                      <SelectItem key={p} value={p.toLowerCase()}>{p}</SelectItem>
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Airport / area"><Input placeholder="e.g. KTEB" /></Field>
-              <Field label="What happened"><Textarea rows={3} placeholder="Describe it…" /></Field>
+              <Field label="Airport / area"><Input placeholder="e.g. KTEB" value={values.airport || ''} onChange={(e) => set('airport', e.target.value)} /></Field>
+              <Field label="What happened"><Textarea rows={3} placeholder="Describe it…" value={values.what || ''} onChange={(e) => set('what', e.target.value)} /></Field>
+              <Field label="Contributing factors (optional)"><Textarea rows={2} placeholder="Fatigue, weather, workload…" value={values.contributing || ''} onChange={(e) => set('contributing', e.target.value)} /></Field>
               <div className="rounded-[9px] px-3 py-2.5 text-[12.5px] leading-snug sc-accent">🔒 Confidential — your name is separated from the event before review.</div>
             </div>
           )}

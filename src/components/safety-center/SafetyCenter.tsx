@@ -18,6 +18,7 @@ import { FormManager } from './FormManager';
 import { OperationsAudits, MyAudits } from './AuditsArea';
 import { ReviewsArea } from './ReviewsArea';
 import { ReadAndInitialInbox, BulletinsManager } from './ReadAndSign';
+import { createAsap } from './asapReports';
 
 const CURRENT_USER = { id: 'u-demo', name: 'Capt. Dunlop' };
 import { FORM_CATALOG } from './forms';
@@ -93,9 +94,25 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
       });
       return;
     }
-    // ASAP/CWS/waiver don't have stores wired yet (later phases) — notify for now.
+    if (kind === 'asap') {
+      // Persist a confidential ASAP report — it lands in the ASAP reviewer queue.
+      createAsap({
+        phase: values.phase || 'Approach',
+        airport: (values.airport || '').trim() || '—',
+        description: (values.what || '').trim() || '(no description provided)',
+        contributing: (values.contributing || '').trim(),
+        severity: 'Medium',
+      });
+      eventStore.publish({
+        id: `asap-file-${Date.now()}`,
+        severity: 'info', title: 'New ASAP report filed', detail: 'Confidential — awaiting review',
+        module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin'],
+      });
+      return;
+    }
+    // CWS/waiver don't have stores wired yet (later phases) — notify for now.
     const title: Record<Kind, string> = {
-      hazard: '', asap: 'New ASAP report filed',
+      hazard: '', asap: '',
       cws: 'CWS recognition logged', waiver: 'New waiver request',
     };
     eventStore.publish({
