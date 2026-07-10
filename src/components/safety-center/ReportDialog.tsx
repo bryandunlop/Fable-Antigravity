@@ -1,25 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { TriangleAlert, Plane, ThumbsUp, Check } from 'lucide-react';
+import { TriangleAlert, Plane, ThumbsUp, FileCheck, Check } from 'lucide-react';
 
-type Kind = 'hazard' | 'asap' | 'cws';
+export type Kind = 'hazard' | 'asap' | 'cws' | 'waiver';
 
 const TYPES: Record<Kind, { name: string; desc: string; icon: typeof TriangleAlert; bg: string }> = {
   hazard: { name: 'A hazard or unsafe condition', desc: 'Something that could cause harm — FOD, a broken fixture, a risky procedure.', icon: TriangleAlert, bg: 'color-mix(in srgb, var(--gfo-warning) 22%, transparent)' },
   asap: { name: 'A flight safety event (ASAP)', desc: 'Confidential. An in-flight event — an altitude or approach deviation, a TCAS RA.', icon: Plane, bg: 'color-mix(in srgb, var(--gfo-error) 12%, transparent)' },
   cws: { name: 'Someone working safely (CWS)', desc: 'A positive observation worth recognizing.', icon: ThumbsUp, bg: 'color-mix(in srgb, var(--gfo-sunrise) 22%, transparent)' },
+  waiver: { name: 'A waiver request', desc: 'Ask for an exception — a duty-time extension, a procedure deviation.', icon: FileCheck, bg: 'color-mix(in srgb, var(--accent) 12%, transparent)' },
 };
 
 export function ReportDialog({
-  open, onOpenChange, onFiled,
-}: { open: boolean; onOpenChange: (v: boolean) => void; onFiled?: () => void }) {
+  open, onOpenChange, onFiled, initialKind = null,
+}: { open: boolean; onOpenChange: (v: boolean) => void; onFiled?: (kind: Kind) => void; initialKind?: Kind | null }) {
   const [step, setStep] = useState(0);
   const [kind, setKind] = useState<Kind | null>(null);
+
+  // Opening from the Forms catalog jumps straight to a specific form's details.
+  useEffect(() => {
+    if (open) {
+      setKind(initialKind);
+      setStep(initialKind ? 1 : 0);
+    }
+  }, [open, initialKind]);
 
   function reset() { setStep(0); setKind(null); }
   function close() { onOpenChange(false); setTimeout(reset, 200); }
@@ -97,6 +106,13 @@ export function ReportDialog({
               <Field label="For what"><Textarea rows={3} placeholder="What did they do…" /></Field>
             </div>
           )}
+          {step === 1 && kind === 'waiver' && (
+            <div className="flex flex-col gap-3.5">
+              <Field label="What are you requesting?"><Textarea rows={2} placeholder="e.g. +1:30 duty-time extension" /></Field>
+              <Field label="Reason / justification"><Textarea rows={3} placeholder="Why is it needed…" /></Field>
+              <Field label="Trip / date (optional)"><Input placeholder="e.g. KTEB-KASE, tomorrow" /></Field>
+            </div>
+          )}
 
           {step === 2 && (
             <div className="text-center pt-3 pb-1">
@@ -113,7 +129,7 @@ export function ReportDialog({
           {step === 0 && <Button variant="outline" onClick={close}>Cancel</Button>}
           {step === 1 && <>
             <Button variant="outline" onClick={() => setStep(0)}>Back</Button>
-            <Button onClick={() => { setStep(2); onFiled?.(); }}>Submit report</Button>
+            <Button onClick={() => { setStep(2); if (kind) onFiled?.(kind); }}>Submit report</Button>
           </>}
           {step === 2 && <><span /><Button onClick={close}>Done</Button></>}
         </DialogFooter>

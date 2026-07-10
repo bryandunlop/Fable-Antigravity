@@ -4,10 +4,11 @@
 import { useMemo } from 'react';
 import { differenceInCalendarDays } from 'date-fns';
 import { useHazards, WORKFLOW_STAGES, type Hazard } from '../../contexts/HazardContext';
-import type { SafetyItem, SafetyModel, StatusChip, ThreadMsg } from './types';
+import type { PublishedReport, SafetyItem, SafetyModel, StatusChip, ThreadMsg } from './types';
 import {
   MY_MOVE, MY_WAITING, MY_DONE, OPS_MOVE, OPS_TRACK, OPS_DONE, KNOW,
 } from './mockSafetyItems';
+import { MOCK_SUBMISSIONS, MOCK_PUBLISHED } from './forms';
 
 const STALL_DAYS = 30;
 
@@ -88,6 +89,8 @@ export function hazardToItem(h: Hazard): SafetyItem {
       : owner ? `with ${owner}` : 'awaiting mitigation',
     nextAction: mine ? 'Triage' : 'View',
     when: closed ? (h.reportedDate ? String(h.reportedDate).slice(0, 10) : 'recently') : undefined,
+    submittedBy: h.isAnonymous ? 'Anonymous' : (h.reportedBy || 'Crew'),
+    date: h.reportedDate ? String(h.reportedDate).slice(0, 10) : undefined,
     status: closed ? { label: 'Closed', tone: 'green' } : statusFor(phase, stalled),
     due: mine ? { label: 'Triage now', tone: 'red' } : undefined,
     fields: [
@@ -125,10 +128,29 @@ export function useSafetyModel(extraMove: SafetyItem[] = []): SafetyModel {
   const { hazards } = useHazards();
 
   return useMemo(() => {
-    const hz = (hazards || []).filter((h) => !h.isDeleted).map(hazardToItem);
+    const live = (hazards || []).filter((h) => !h.isDeleted);
+    const hz = live.map(hazardToItem);
     const hzMove = hz.filter((i) => i.bucket === 'move');
     const hzTrack = hz.filter((i) => i.bucket === 'track');
     const hzDone = hz.filter((i) => i.bucket === 'done');
+
+    // Submissions archive = every hazard (any state) + non-hazard records.
+    const submissions: SafetyItem[] = [...hz, ...MOCK_SUBMISSIONS]
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    // Published library = de-identified final reports.
+    const derivedPublished: PublishedReport[] = live
+      .filter((h) => h.workflowStage === WORKFLOW_STAGES.PUBLISHED || h.isPublished)
+      .map((h) => ({
+        id: `pub-${h.id}`,
+        ref: `#${h.id}`,
+        title: h.title || 'Published safety report',
+        category: h.category || 'Safety',
+        publishedDate: h.finalReportPublished ? '' : (h.reportedDate ? String(h.reportedDate).slice(0, 10) : ''),
+        summary: h.deidentifiedMitigationSummary || h.description?.slice(0, 200) || '',
+        whatHappened: h.finalReportPublished || h.description || '',
+        lessons: h.suggestedCorrectiveAction ? [h.suggestedCorrectiveAction] : [],
+      }));
 
     return {
       my: {
@@ -141,6 +163,8 @@ export function useSafetyModel(extraMove: SafetyItem[] = []): SafetyModel {
         track: [...hzTrack, ...OPS_TRACK],
         done: [...hzDone.slice(0, 4), ...OPS_DONE],
       },
+      submissions,
+      published: [...MOCK_PUBLISHED, ...derivedPublished],
       know: KNOW,
     };
   }, [hazards, extraMove]);

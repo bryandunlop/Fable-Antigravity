@@ -62,11 +62,60 @@ export interface SafetyItem {
   // done
   when?: string;
 
+  // archive / search
+  submittedBy?: string;
+  date?: string;       // ISO or display date used for sort/search
+  tail?: string;
+
   // shared
   status?: StatusChip;
   fields?: Field[];
   thread?: ThreadMsg[];
   actions?: ItemAction[];
+}
+
+// ---- Forms catalog (crew fill-out) ----
+export interface FormDef {
+  key: 'hazard' | 'asap' | 'cws' | 'waiver';
+  name: string;
+  blurb: string;
+  icon: string;        // lucide icon name
+  tone: 'amber' | 'red' | 'gold' | 'accent';
+  time: string;        // rough time-to-fill
+}
+
+// ---- Form templates (SM management) ----
+export type FieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'number' | 'date';
+
+export interface FormField {
+  id: string;
+  label: string;
+  type: FieldType;
+  required: boolean;
+  options?: string[];
+}
+
+export type FormKind = 'Hazard' | 'ASAP' | 'CWS' | 'Waiver' | 'FRAT' | 'GRAT' | 'Audit';
+
+export interface FormTemplate {
+  id: string;
+  kind: FormKind;
+  name: string;
+  description: string;
+  scored: boolean;      // risk-scored forms (FRAT/GRAT) vs plain
+  fields: FormField[];
+}
+
+// ---- Published reports (everyone) ----
+export interface PublishedReport {
+  id: string;
+  ref: string;
+  title: string;
+  category: string;
+  publishedDate: string;
+  summary: string;
+  whatHappened: string;
+  lessons: string[];
 }
 
 export interface KnowItem {
@@ -82,6 +131,8 @@ export interface KnowItem {
 export interface SafetyModel {
   my: { move: SafetyItem[]; waiting: SafetyItem[]; done: SafetyItem[] };
   ops: { move: SafetyItem[]; track: SafetyItem[]; done: SafetyItem[] };
+  submissions: SafetyItem[];      // every record ever filed — the SM archive
+  published: PublishedReport[];   // de-identified lessons-learned library
   know: KnowItem[];
 }
 

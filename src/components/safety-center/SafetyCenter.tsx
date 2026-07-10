@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Bell, Plus, Check } from 'lucide-react';
 import { Button } from '../ui/button';
+import { useNotificationFeed } from '../../notifications/useNotificationFeed';
+import { eventStore } from '../../notifications/events';
 import { useSafetyModel } from './useSafetyModel';
 import { ToneStyles, TypeLabel, toneClass } from './ui-bits';
 import { TrackBoard } from './TrackBoard';
 import { ItemDetailSheet } from './ItemDetailSheet';
 import { NotificationsPanel } from './NotificationsPanel';
-import { ReportDialog } from './ReportDialog';
-import type { SafetyItem, SafetyView } from './types';
+import { ReportDialog, type Kind } from './ReportDialog';
+import { FormsCatalog } from './FormsCatalog';
+import { SubmissionsArchive } from './SubmissionsArchive';
+import { PublishedReports } from './PublishedReports';
+import { FormManager } from './FormManager';
+import { FORM_CATALOG } from './forms';
+import type { KnowItem, SafetyItem, SafetyView } from './types';
 
 interface Props { userRole: string; additionalRoles?: string[] }
 
@@ -22,9 +29,29 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const [detailOpen, setDetailOpen] = useState(false);
   const [knowOpen, setKnowOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [reportKind, setReportKind] = useState<Kind | null>(null);
   const [doneSet, setDoneSet] = useState<Set<string>>(new Set());
 
   const model = useSafetyModel();
+  const feed = useNotificationFeed(userRole, additionalRoles);
+
+  // The Know panel reads the REAL app notification feed (Safety module) merged
+  // with the model's illustrative items — so a filed report shows up here and in
+  // the app-wide bell.
+  const knowItems: KnowItem[] = useMemo(() => {
+    const real: KnowItem[] = feed.entries
+      .filter((e) => e.module === 'Safety')
+      .map((e) => ({
+        id: e.id,
+        icon: e.severity === 'critical' ? 'triangle-alert' : e.severity === 'warn' ? 'file-text' : 'clock',
+        tone: (e.severity === 'critical' ? 'haz' : e.severity === 'warn' ? 'doc' : 'info') as KnowItem['tone'],
+        text: e.title,
+        at: e.atUtc ? new Date(e.atUtc).toLocaleDateString() : 'just now',
+        promo: 'fyi' as const,
+        promoLabel: e.detail || 'Safety',
+      }));
+    return [...real, ...model.know];
+  }, [feed.entries, model.know]);
 
   function choosePersona(p: 'crew' | 'manager') {
     setPersona(p);
@@ -36,11 +63,32 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   function toggleDone(id: string) {
     setDoneSet((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
+  function openReport(kind: Kind | null = null) { setReportKind(kind); setReportOpen(true); }
+  function handleFiled(kind: Kind) {
+    const title: Record<Kind, string> = {
+      hazard: 'New hazard report filed', asap: 'New ASAP report filed',
+      cws: 'CWS recognition logged', waiver: 'New waiver request',
+    };
+    // Emits into the real notification system → appears in the app-wide bell for safety staff.
+    eventStore.publish({
+      id: `safety-file-${kind}-${Date.now()}`,
+      severity: 'info', title: title[kind], detail: 'Awaiting triage',
+      module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin'],
+    });
+  }
 
   const bucket = model[view] as Record<string, SafetyItem[]>;
   const tabs: [string, string][] = view === 'my'
-    ? [['move', 'Your move'], ['waiting', 'Waiting'], ['done', 'Done']]
-    : [['move', 'Your move'], ['track', 'Track'], ['done', 'Done']];
+    ? [['move', 'Your move'], ['waiting', 'Waiting'], ['done', 'Done'], ['forms', 'Forms'], ['published', 'Published']]
+    : [['move', 'Your move'], ['track', 'Track'], ['submissions', 'Submissions'], ['formsMgr', 'Form manager'], ['published', 'Published']];
+
+  function countFor(key: string): number | null {
+    if (key === 'forms') return FORM_CATALOG.length;
+    if (key === 'formsMgr') return null;
+    if (key === 'submissions') return model.submissions.length;
+    if (key === 'published') return model.published.length;
+    return (bucket[key] || []).length;
+  }
 
   const stalled = model.ops.track.filter((i) => i.stalled).length;
   const summary = view === 'my'
@@ -91,9 +139,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
           <button onClick={() => setKnowOpen(true)} aria-label="Notifications"
             className="relative w-10 h-10 rounded-[10px] border border-muted-foreground/30 bg-card grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             <Bell className="w-[19px] h-[19px]" />
-            <span className="absolute top-1.5 right-2 min-w-[15px] h-[15px] rounded-full bg-[color:var(--gfo-error)] text-white text-[9.5px] font-bold grid place-items-center px-[3px]">{model.know.length}</span>
+            <span className="absolute top-1.5 right-2 min-w-[15px] h-[15px] rounded-full bg-[color:var(--gfo-error)] text-white text-[9.5px] font-bold grid place-items-center px-[3px]">{knowItems.length}</span>
           </button>
-          <Button onClick={() => setReportOpen(true)} className="gap-2"><Plus className="w-4 h-4" /> Report</Button>
+          <Button onClick={() => openReport()} className="gap-2"><Plus className="w-4 h-4" /> Report</Button>
         </div>
       </div>
 
@@ -120,17 +168,17 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
       </div>
 
       {/* spine */}
-      <div className="flex items-center gap-0 border-b border-border">
+      <div className="flex items-center gap-0 border-b border-border overflow-x-auto">
         {tabs.map(([key, label]) => {
-          const count = (bucket[key] || []).length;
+          const count = countFor(key);
           const on = tab === key;
           const attn = key === 'move';
           const showStall = key === 'track' && stalled > 0;
           return (
             <button key={key} onClick={() => setTab(key)}
-              className={`relative text-[14.5px] font-semibold py-2.5 mr-6 flex items-center gap-2 ${on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}>
+              className={`relative text-[14.5px] font-semibold py-2.5 mr-5 flex items-center gap-2 whitespace-nowrap ${on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}>
               {label}
-              <span className={`text-[11.5px] font-semibold rounded-full px-2 tabular-nums ${showStall ? 'sc-red' : on && attn ? 'bg-[color:var(--gfo-error)] text-white' : 'bg-muted text-muted-foreground'}`}>{count}</span>
+              {count != null && <span className={`text-[11.5px] font-semibold rounded-full px-2 tabular-nums ${showStall ? 'sc-red' : on && attn ? 'bg-[color:var(--gfo-error)] text-white' : 'bg-muted text-muted-foreground'}`}>{count}</span>}
               {on && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent rounded" />}
             </button>
           );
@@ -143,11 +191,15 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         {tab === 'waiting' && <WaitingList items={bucket.waiting || []} onOpen={open} />}
         {tab === 'track' && <TrackBoard items={bucket.track || []} onOpen={open} />}
         {tab === 'done' && <DoneList items={bucket.done || []} view={view} onOpen={open} />}
+        {tab === 'forms' && <FormsCatalog onPick={(k) => openReport(k)} />}
+        {tab === 'submissions' && <SubmissionsArchive items={model.submissions} onOpen={open} />}
+        {tab === 'formsMgr' && <FormManager />}
+        {tab === 'published' && <PublishedReports reports={model.published} />}
       </div>
 
       <ItemDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} />
-      <NotificationsPanel items={model.know} open={knowOpen} onOpenChange={setKnowOpen} />
-      <ReportDialog open={reportOpen} onOpenChange={setReportOpen} />
+      <NotificationsPanel items={knowItems} open={knowOpen} onOpenChange={setKnowOpen} />
+      <ReportDialog open={reportOpen} onOpenChange={setReportOpen} initialKind={reportKind} onFiled={handleFiled} />
     </div>
   );
 }
