@@ -2,6 +2,7 @@ import type {
   TechLogState, Defect, Deferral, Signature, AuditEntry, FlightLog, MaintenanceRelease,
   WorkCard, PartUsage, LaborEntry, RecurringCheck, RecurringCheckAccomplishment,
   IntermittentFault, IntermittentFaultOccurrence, Trip, FlightBriefing,
+  MaintenanceProject, TechVacation,
 } from '../types';
 import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
@@ -210,6 +211,73 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     { id: 'lb-4', workCardId: 'wc-3', techOid: tech.oid, hours: 0.5, dateUtc: iso(1 * H), description: 'Sourced replacement sensor, raised purchase order', category: 'PARTS_ORDERING' },
   );
 
+  // ── D28 maintenance planners: packages of work per tail, staged while the aircraft is away. ──
+  const ahead = (msAhead: number) => new Date(nowMs + msAhead).toISOString();
+  const projects: MaintenanceProject[] = [
+    {
+      id: 'prj-n2pg-12mo', aircraftId: 'ac-n2pg', name: '12-Month Inspection Package',
+      description: 'Annual package: due-list items FC-32-MLG + FC-05 group, plus open cabin squawks.',
+      status: 'PLANNING', plannedStartUtc: ahead(10 * D), plannedEndUtc: ahead(14 * D),
+      prepItems: [
+        { id: 'pi-1a', text: 'Parts ordered', done: true },
+        { id: 'pi-1b', text: 'Task cards loaded', done: true },
+        { id: 'pi-1c', text: 'Job codes loaded', done: false },
+        { id: 'pi-1d', text: 'Tooling staged', done: false },
+      ],
+      workCardIds: [], campWoRefs: ['WO-05-0490'],
+      createdByOid: dom.oid, createdAtUtc: iso(4 * D),
+      statusHistory: [{ status: 'PLANNING', atUtc: iso(4 * D), byOid: dom.oid }],
+    },
+    {
+      id: 'prj-n5pg-batt', aircraftId: 'ac-n5pg', name: 'Main battery replacement',
+      description: 'Battery reaching calendar limit — change on return to base.',
+      status: 'PLANNING', plannedStartUtc: ahead(4 * D), plannedEndUtc: ahead(5 * D),
+      prepItems: [
+        { id: 'pi-2a', text: 'Parts ordered', done: true },
+        { id: 'pi-2b', text: 'Task cards loaded', done: true },
+        { id: 'pi-2c', text: 'Job codes loaded', done: true },
+        { id: 'pi-2d', text: 'Tooling staged', done: true },
+      ],
+      workCardIds: [], campWoRefs: [],
+      createdByOid: dom.oid, createdAtUtc: iso(6 * D),
+      statusHistory: [{ status: 'PLANNING', atUtc: iso(6 * D), byOid: dom.oid }],
+    },
+    {
+      id: 'prj-n6pg-sw', aircraftId: 'ac-n6pg', name: 'Avionics software + nav DB load',
+      status: 'PAUSED', pauseReason: 'WAITING_PARTS', pauseNote: 'POO — data-loader cable from GAC Savannah, ETA next week',
+      plannedStartUtc: iso(2 * D), plannedEndUtc: ahead(3 * D),
+      prepItems: [
+        { id: 'pi-3a', text: 'Parts ordered', done: true },
+        { id: 'pi-3b', text: 'Task cards loaded', done: true },
+      ],
+      workCardIds: [], campWoRefs: [],
+      createdByOid: dom.oid, createdAtUtc: iso(6 * D),
+      statusHistory: [
+        { status: 'PLANNING', atUtc: iso(6 * D), byOid: dom.oid },
+        { status: 'IN_WORK', atUtc: iso(2 * D), byOid: tech.oid },
+        { status: 'PAUSED', atUtc: iso(1 * D), byOid: tech.oid, note: 'POO — data-loader cable from GAC Savannah, ETA next week' },
+      ],
+    },
+    {
+      id: 'prj-n1pg-lmlg', aircraftId: 'ac-n1pg', name: 'LMLG sensor R&R (AOG follow-on)',
+      description: 'Unplanned — wraps the AOG corrective card so leadership sees it on the plan.',
+      status: 'IN_WORK', plannedStartUtc: iso(1 * D), plannedEndUtc: ahead(2 * D),
+      prepItems: [{ id: 'pi-4a', text: 'Parts ordered', done: true }],
+      workCardIds: ['wc-3'], campWoRefs: [],
+      createdByOid: dom.oid, createdAtUtc: iso(3 * H),
+      statusHistory: [
+        { status: 'PLANNING', atUtc: iso(3 * H), byOid: dom.oid },
+        { status: 'IN_WORK', atUtc: iso(2.5 * H), byOid: tech.oid },
+      ],
+    },
+  ];
+
+  // Vacation overlay (demo-local; production reads the myGFO vacation module).
+  const techVacations: TechVacation[] = [
+    { id: 'vac-1', techOid: tech.oid, startUtc: ahead(6 * D), endUtc: ahead(10 * D), note: 'PTO' },
+    { id: 'vac-2', techOid: chiefInsp.oid, startUtc: ahead(12 * D), endUtc: ahead(16 * D), note: 'PTO' },
+  ];
+
   // ── §17.4 recurring dispatch-gating checks. All seeded CURRENT (one DUE_SOON) so colors are unchanged.
   //    Expiry is DERIVED from the latest accomplishment — to demo grounding, add a back-dated check in-app. ──
   const recurringChecks: RecurringCheck[] = [];
@@ -290,6 +358,25 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       ],
       createdByOid: pilot.oid, createdAtUtc: iso(0),
     },
+    // Future legs for the D28 planning-calendar flight overlay. The N2PG KDAL day trip deliberately
+    // lands INSIDE the 12-month-package window (+10d→+14d) so the aircraft-away warning demos.
+    {
+      id: 'trip-plan-a', tripNumber: 'T-2026-0721', aircraftId: 'ac-n2pg', name: 'KLUK–KDAL day trip', status: 'OPEN',
+      flightLogIds: [],
+      legs: [
+        { id: 'leg-pa1', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'KDAL', departureTimeUtc: new Date(nowMs + 12 * D).toISOString(), arrivalTimeUtc: new Date(nowMs + 12 * D + 150 * 60000).toISOString(), fratStatus: 'NOT_STARTED', airportReviewed: false },
+        { id: 'leg-pa2', sequence: 2, departureIcao: 'KDAL', arrivalIcao: 'KLUK', departureTimeUtc: new Date(nowMs + 12 * D + 8 * H).toISOString(), arrivalTimeUtc: new Date(nowMs + 12 * D + 8 * H + 140 * 60000).toISOString(), fratStatus: 'NOT_STARTED', airportReviewed: false },
+      ],
+      createdByOid: pilot.oid, createdAtUtc: iso(0),
+    },
+    {
+      id: 'trip-plan-b', tripNumber: 'T-2026-0717', aircraftId: 'ac-n5pg', name: 'KLUK–KPBI', status: 'OPEN',
+      flightLogIds: [],
+      legs: [
+        { id: 'leg-pb1', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'KPBI', departureTimeUtc: new Date(nowMs + 8 * D).toISOString(), arrivalTimeUtc: new Date(nowMs + 8 * D + 130 * 60000).toISOString(), fratStatus: 'NOT_STARTED', airportReviewed: false },
+      ],
+      createdByOid: pilot.oid, createdAtUtc: iso(0),
+    },
   ];
 
   // ── A maintenance flight briefing on N2PG (GREEN), RELEASED and awaiting PIC acknowledgement —
@@ -327,6 +414,8 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     workCards,
     partUsages,
     laborEntries,
+    projects,
+    techVacations,
     recurringChecks,
     recurringAccomplishments,
     intermittentFaults,

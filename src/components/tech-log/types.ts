@@ -241,6 +241,45 @@ export interface LaborEntry {
   note?: string;             // why-note — prompted (not buried) when the work ran long (QM1/QM5)
 }
 
+// ── D28: maintenance planners / project planning (DOM 2026-07-09). Operational workflow state,
+//    OFF-ledger — a project organizes work, it is never itself a signed regulatory record. ──
+export type ProjectStatus = 'PLANNING' | 'IN_WORK' | 'PAUSED' | 'CLOSED';
+export type ProjectPauseReason = 'WAITING_PARTS' | 'WAITING_HANGAR' | 'WAITING_VENDOR' | 'AIRCRAFT_AWAY' | 'OTHER';
+
+export interface ProjectPrepItem { id: string; text: string; done: boolean; }
+
+/** A planned package of work per tail — a 12-month inspection package, a known upcoming
+ * discrepancy (battery change) — assembled while the aircraft is away: parts ordered, task cards
+ * and codes loaded, so it's ready to execute on arrival. "Our own layer filtered on top of CAMP." */
+export interface MaintenanceProject {
+  id: string;
+  aircraftId: string;
+  name: string;
+  description?: string;
+  status: ProjectStatus;
+  pauseReason?: ProjectPauseReason;
+  pauseNote?: string;
+  plannedStartUtc: string;      // planning window shown on the calendar
+  plannedEndUtc: string;        // inclusive
+  prepItems: ProjectPrepItem[]; // parts ordered / task cards loaded / job codes / tooling
+  workCardIds: string[];        // execution cards raised under this project
+  campWoRefs?: string[];        // CAMP work orders this project wraps
+  createdByOid: string;
+  createdAtUtc: string;
+  statusHistory: { status: ProjectStatus; atUtc: string; byOid: string; note?: string }[];
+  closedAtUtc?: string;
+}
+
+/** Technician vacation range for the planning-calendar overlay. Demo-local seed — production
+ * reads the myGFO vacation module. */
+export interface TechVacation {
+  id: string;
+  techOid: string;
+  startUtc: string;
+  endUtc: string;   // inclusive
+  note?: string;
+}
+
 // ── §17.4: recurring dispatch-gating checks (Part-91 / IS-BAO). Expiry GROUNDS the aircraft. ──
 export type RecurringIntervalUnit = 'CALENDAR_DAY' | 'MONTH' | 'FLIGHT_HOUR' | 'CYCLE';
 
@@ -545,6 +584,8 @@ export interface TechLogState {
   workCards: WorkCard[];
   partUsages: PartUsage[];
   laborEntries: LaborEntry[];
+  projects: MaintenanceProject[];   // D28 maintenance planners (off-ledger workflow state)
+  techVacations: TechVacation[];    // calendar overlay data (demo-local seed)
   recurringChecks: RecurringCheck[];
   recurringAccomplishments: RecurringCheckAccomplishment[];
   intermittentFaults: IntermittentFault[];
@@ -580,6 +621,8 @@ export type TechLogAction =
   | { type: 'DELETE_PART_USAGE'; payload: string }
   | { type: 'ADD_LABOR_ENTRY'; payload: LaborEntry }
   | { type: 'DELETE_LABOR_ENTRY'; payload: string }
+  | { type: 'ADD_PROJECT'; payload: MaintenanceProject }
+  | { type: 'EDIT_PROJECT'; payload: MaintenanceProject }
   | { type: 'ADD_RECURRING_CHECK'; payload: RecurringCheck }
   | { type: 'EDIT_RECURRING_CHECK'; payload: RecurringCheck }
   | { type: 'ADD_RECURRING_ACCOMPLISHMENT'; payload: RecurringCheckAccomplishment }

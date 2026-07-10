@@ -26,6 +26,8 @@ export const GROUPS_MAINT: NavGroup[] = [
   // Maintenance lands on the Work Queue ("what needs me"); Fleet stays one click away.
   { key: 'fleet', label: 'Fleet', to: '/tech-log/fleet', match: pilotFleetMatch, badge: 'red' },
   { key: 'workqueue', label: 'Work Queue', to: '/tech-log/work-queue', match: (p) => p === '/tech-log' || p.startsWith('/tech-log/work-queue') || p.startsWith('/tech-log/work-cards'), badge: 'urgent' },
+  // D28 maintenance planners — plan packages of work per tail (board + calendar with overlays).
+  { key: 'planners', label: 'Planners', to: '/tech-log/planners', match: sw('/tech-log/planners') },
   {
     key: 'airworthiness', label: 'Airworthiness', to: '/tech-log/airworthiness/forecast',
     match: (p) => p.startsWith('/tech-log/airworthiness'),
