@@ -23,6 +23,7 @@ import AdminPersonnel from './pages/AdminPersonnel';
 import AdminMel from './pages/AdminMel';
 import AuditTrail from './pages/AuditTrail';
 import Aog from './pages/Aog';
+import Planners from './pages/Planners';
 import Integration from './pages/Integration';
 
 /**
@@ -54,6 +55,7 @@ export default function TechLogRoutes({ userRole }: { userRole?: string }) {
         <Route path="trips/:tripId" element={<TripWorkspace />} />
         <Route path="trips/:tripId/legs/:legId" element={<LegDetail />} />
         <Route path="aog" element={<Aog />} />
+        <Route path="planners" element={<Planners />} />
         <Route path="audit" element={<AuditTrail />} />
         <Route path="integration" element={<Integration />} />
         <Route path="admin/fleet" element={<AdminFleet />} />

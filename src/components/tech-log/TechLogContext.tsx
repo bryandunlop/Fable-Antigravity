@@ -10,7 +10,7 @@ import { newId } from './util/id';
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-09-v10';
+export const DATA_VERSION = '2026-07-09-v11';
 
 function loadInitialState(): TechLogState {
   try {
@@ -79,6 +79,10 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       return { ...state, laborEntries: [...state.laborEntries, action.payload] };
     case 'DELETE_LABOR_ENTRY':
       return { ...state, laborEntries: state.laborEntries.filter(l => l.id !== action.payload) };
+    case 'ADD_PROJECT':
+      return { ...state, projects: [...state.projects, action.payload] };
+    case 'EDIT_PROJECT':
+      return { ...state, projects: state.projects.map(p => (p.id === action.payload.id ? action.payload : p)) };
     case 'ADD_RECURRING_CHECK':
       return { ...state, recurringChecks: [...state.recurringChecks, action.payload] };
     case 'EDIT_RECURRING_CHECK':
