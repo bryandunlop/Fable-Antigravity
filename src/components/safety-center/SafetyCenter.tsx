@@ -17,6 +17,9 @@ import { PublishedReports } from './PublishedReports';
 import { FormManager } from './FormManager';
 import { OperationsAudits, MyAudits } from './AuditsArea';
 import { ReviewsArea } from './ReviewsArea';
+import { ReadAndInitialInbox, BulletinsManager } from './ReadAndSign';
+
+const CURRENT_USER = { id: 'u-demo', name: 'Capt. Dunlop' };
 import { FORM_CATALOG } from './forms';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
 
@@ -227,7 +230,12 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
 
       {/* content */}
       <div className="mt-2">
-        {tab === 'move' && <MoveList items={bucket.move || []} view={view} doneSet={doneSet} onToggle={toggleDone} onOpen={open} />}
+        {tab === 'move' && (
+          <>
+            {view === 'my' && <ReadAndInitialInbox currentUser={CURRENT_USER} />}
+            <MoveList items={bucket.move || []} view={view} doneSet={doneSet} onToggle={toggleDone} onOpen={open} />
+          </>
+        )}
         {tab === 'waiting' && <WaitingList items={bucket.waiting || []} onOpen={open} />}
         {tab === 'track' && <TrackBoard items={bucket.track || []} onOpen={open} />}
         {tab === 'done' && <DoneList items={bucket.done || []} view={view} onOpen={open} />}
@@ -236,7 +244,12 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         {tab === 'forms' && <FormsCatalog onPick={(k) => openReport(k)} />}
         {tab === 'submissions' && <SubmissionsArchive items={model.submissions} onOpen={open} />}
         {tab === 'formsMgr' && <FormManager />}
-        {tab === 'published' && <PublishedReports reports={model.published} />}
+        {tab === 'published' && (
+          <>
+            {view === 'ops' && <BulletinsManager />}
+            <PublishedReports reports={model.published} />
+          </>
+        )}
       </div>
 
       <ItemDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} onAdvance={advanceHazard} onOpenWorkflow={openWorkflow} />
