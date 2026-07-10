@@ -189,6 +189,27 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     ],
   });
 
+  // Corrective card on the RED N1PG gear defect — live status tags + categorized labor so the AOG
+  // downtime debrief (QM5/D27) answers "why is it down and where has every hour gone" out of the box.
+  workCards.push({
+    id: 'wc-3', cardNumber: 'WC-1015', aircraftId: 'ac-n1pg', title: 'LMLG unsafe indication — troubleshoot & repair',
+    ataChapter: '32', description: 'Corrective — intermittent gear-unsafe indication on retraction.', source: 'MANUAL', headerStatusCode: 1,
+    scheduled: false, riiRequired: false, linkedDefectId: 'd-n1pg', createdAtUtc: iso(2.5 * H), status: 'IN_WORK',
+    steps: [
+      { id: 'wc3-s1', seq: 1, text: 'Interrogate MAU fault history; isolate sensor vs harness', done: true },
+      { id: 'wc3-s2', seq: 2, text: 'Replace LMLG uplock proximity sensor', done: false },
+      { id: 'wc3-s3', seq: 3, text: 'Gear swing / retraction check per AMM 32-30-00', done: false },
+    ],
+    statusTags: [
+      { tag: 'IN_WORK', atUtc: iso(2.5 * H), byOid: tech.oid },
+      { tag: 'WAITING_PARTS', atUtc: iso(1 * H), byOid: tech.oid, note: 'POO — LMLG uplock proximity sensor from Gulfstream Savannah, ETA tomorrow 10:00' },
+    ],
+  });
+  laborEntries.push(
+    { id: 'lb-3', workCardId: 'wc-3', techOid: tech.oid, hours: 1.5, dateUtc: iso(1 * H), description: 'Fault isolation — MAU history + harness continuity', category: 'TROUBLESHOOTING', note: 'Intermittent only under gear load; 1.5 h isolating to the uplock prox sensor with tech ops on the line' },
+    { id: 'lb-4', workCardId: 'wc-3', techOid: tech.oid, hours: 0.5, dateUtc: iso(1 * H), description: 'Sourced replacement sensor, raised purchase order', category: 'PARTS_ORDERING' },
+  );
+
   // ── §17.4 recurring dispatch-gating checks. All seeded CURRENT (one DUE_SOON) so colors are unchanged.
   //    Expiry is DERIVED from the latest accomplishment — to demo grounding, add a back-dated check in-app. ──
   const recurringChecks: RecurringCheck[] = [];

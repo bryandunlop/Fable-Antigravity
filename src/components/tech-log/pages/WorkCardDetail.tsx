@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock, PlayCircle, PackageSearch, ClipboardCheck, Hourglass } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { currentRows } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
 import { riiStepsComplete, pendingRiiSteps } from '../engine/rii';
+import { appendStatusTag, statusDurations, currentTag } from '../engine/statusTags';
+import { whyNoteRequired } from '../engine/labor';
 import { rectificationClosePush } from '../engine/rectification';
 import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { newId } from '../util/id';
-import type { WorkCard, PartUsage, LaborEntry, MaintenanceRelease, Defect, Deferral, Signature } from '../types';
+import type { WorkCard, PartUsage, LaborEntry, LaborCategory, MaintenanceRelease, Defect, Deferral, Signature, WorkCardStatusTag } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -21,6 +23,14 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+
+const LABOR_CATEGORY_LABELS: Record<LaborCategory, string> = {
+  WRENCH: 'Wrench time', TROUBLESHOOTING: 'Troubleshooting', TECH_OPS_CALL: 'Tech-ops call',
+  PARTS_ORDERING: 'Parts ordering', INSPECTION: 'Inspection', OTHER: 'Other',
+};
+const TAG_LABELS: Record<WorkCardStatusTag, string> = {
+  IN_WORK: 'in work', WAITING_PARTS: 'waiting on parts (POO)', WAITING_INSPECTION: 'waiting on inspection',
+};
 
 export default function WorkCardDetail() {
   const { id } = useParams();
@@ -47,6 +57,11 @@ export default function WorkCardDetail() {
   const [ltech, setLtech] = useState(user.oid);
   const [lhours, setLhours] = useState('');
   const [ldesc, setLdesc] = useState('');
+  const [lcat, setLcat] = useState<LaborCategory>('WRENCH');
+  const [lnote, setLnote] = useState('');
+  // status-tag control (QM4/D27) — POO demands a note (what part, from whom)
+  const [pooNote, setPooNote] = useState('');
+  const [pooPromptOpen, setPooPromptOpen] = useState(false);
   // completion sign
   const [inspectorOid, setInspectorOid] = useState('');
   const [crsOpen, setCrsOpen] = useState(false);
@@ -110,11 +125,31 @@ export default function WorkCardDetail() {
     setPn(''); setPdesc(''); setPsn(''); setPqty('1'); setRotable(false); setShowRemoved(false); setRpn(''); setRsn(''); setRreason('');
   };
 
+  // Why-note prompting (QM1/QM5): long work must say why — prompted at entry, not buried.
+  const pendingHours = Number(lhours) || 0;
+  const needsWhyNote = whyNoteRequired(pendingHours, totalLabor + pendingHours);
+
   const addLabor = () => {
     if (!lhours || !ldesc.trim()) return toast.error('Hours and description are required.');
-    const entry: LaborEntry = { id: newId('lb'), workCardId: card.id, techOid: ltech, hours: Number(lhours) || 0, dateUtc: new Date().toISOString(), description: ldesc.trim() };
+    if (needsWhyNote && !lnote.trim()) return toast.error('This work ran long — add a why-note (what drove the time: troubleshooting path, parts wait, tech-ops call…).');
+    const entry: LaborEntry = {
+      id: newId('lb'), workCardId: card.id, techOid: ltech, hours: pendingHours,
+      dateUtc: new Date().toISOString(), description: ldesc.trim(),
+      category: lcat, note: lnote.trim() || undefined,
+    };
     dispatch({ type: 'ADD_LABOR_ENTRY', payload: entry });
-    setLhours(''); setLdesc('');
+    setLhours(''); setLdesc(''); setLnote(''); setLcat('WRENCH');
+  };
+
+  // ── work/wait status tags (QM4/D27) ──
+  const tagNow = currentTag(card);
+  const durations = statusDurations(card, new Date().toISOString());
+  const setStatusTag = (tag: WorkCardStatusTag, note?: string) => {
+    const r = appendStatusTag(card, tag, user.oid, new Date().toISOString(), note);
+    if (!r.ok) return toast.error(r.error);
+    dispatch({ type: 'EDIT_WORK_CARD', payload: r.card });
+    setPooPromptOpen(false); setPooNote('');
+    toast.success(tag === 'WAITING_PARTS' ? 'Tagged waiting on parts (POO) — wait time now accruing to parts.' : tag === 'WAITING_INSPECTION' ? 'Tagged waiting on inspection.' : 'Card tagged in work.');
   };
 
   const addStepsFromCamp = () => {
@@ -258,6 +293,38 @@ export default function WorkCardDetail() {
         </CardContent>
       </Card>
 
+      {/* Work/wait time attribution (QM4/D27) — in work / waiting on parts (POO) / waiting on inspection */}
+      <Card className="mb-4">
+        <CardContent className="flex flex-col gap-3 p-4 text-sm md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <Hourglass className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Time attribution</span>
+            <Badge variant="outline"><PlayCircle className="mr-1 h-3 w-3" />in work {durations.hours.IN_WORK} h</Badge>
+            <Badge variant="outline" className={durations.openTag === 'WAITING_PARTS' ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]' : ''}><PackageSearch className="mr-1 h-3 w-3" />parts (POO) {durations.hours.WAITING_PARTS} h</Badge>
+            <Badge variant="outline"><ClipboardCheck className="mr-1 h-3 w-3" />inspection wait {durations.hours.WAITING_INSPECTION} h</Badge>
+            {durations.openTag && <span className="text-xs text-muted-foreground">accruing now: {TAG_LABELS[durations.openTag]}</span>}
+          </div>
+          {!completed && isMaint && (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant={tagNow === 'IN_WORK' ? 'secondary' : 'outline'} disabled={tagNow === 'IN_WORK'} onClick={() => setStatusTag('IN_WORK')}><PlayCircle className="mr-1.5 h-3.5 w-3.5" /> In work</Button>
+              <Button size="sm" variant={tagNow === 'WAITING_PARTS' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_PARTS'} onClick={() => setPooPromptOpen(true)}><PackageSearch className="mr-1.5 h-3.5 w-3.5" /> Waiting on parts</Button>
+              <Button size="sm" variant={tagNow === 'WAITING_INSPECTION' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_INSPECTION'} onClick={() => setStatusTag('WAITING_INSPECTION')}><ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Waiting on inspection</Button>
+            </div>
+          )}
+        </CardContent>
+        {pooPromptOpen && !completed && (
+          <CardContent className="border-t p-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              <Input autoFocus placeholder="POO note — what part, ordered from whom (e.g. battery, GAC Savannah, ETA Fri)" value={pooNote} onChange={e => setPooNote(e.target.value)} />
+              <div className="flex shrink-0 gap-2">
+                <Button size="sm" onClick={() => setStatusTag('WAITING_PARTS', pooNote)}>Tag POO</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setPooPromptOpen(false); setPooNote(''); }}>Cancel</Button>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Steps */}
         <Card>
@@ -298,7 +365,12 @@ export default function WorkCardDetail() {
           <CardContent className="space-y-2">
             {labor.map(l => (
               <div key={l.id} className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
-                <div><span className="font-medium">{nameOf(l.techOid)}</span> · {l.hours} h<div className="text-xs text-muted-foreground">{l.description}</div></div>
+                <div>
+                  <span className="font-medium">{nameOf(l.techOid)}</span> · {l.hours} h
+                  <Badge variant="outline" className="ml-2 text-[10px]">{LABOR_CATEGORY_LABELS[l.category ?? 'WRENCH']}</Badge>
+                  <div className="text-xs text-muted-foreground">{l.description}</div>
+                  {l.note && <div className="mt-0.5 border-l-2 pl-2 text-xs italic text-muted-foreground">why: {l.note}</div>}
+                </div>
                 {!completed && isMaint && <Button size="icon" variant="ghost" onClick={() => dispatch({ type: 'DELETE_LABOR_ENTRY', payload: l.id })}><Trash2 className="h-4 w-4" /></Button>}
               </div>
             ))}
@@ -313,7 +385,20 @@ export default function WorkCardDetail() {
                   <Input type="number" step="0.1" placeholder="Hours" value={lhours} onChange={e => setLhours(e.target.value)} />
                   <Input className="col-span-2" placeholder="Description" value={ldesc} onChange={e => setLdesc(e.target.value)} />
                 </div>
-                <Button size="sm" variant="outline" onClick={addLabor}><Plus className="mr-1.5 h-4 w-4" /> Add labor</Button>
+                <Select value={lcat} onValueChange={(v: string) => setLcat(v as LaborCategory)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(LABOR_CATEGORY_LABELS) as LaborCategory[]).map(c => <SelectItem key={c} value={c}>{LABOR_CATEGORY_LABELS[c]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {needsWhyNote && (
+                  <div className="rounded bg-[var(--gfo-warning,#F1B434)]/10 p-2 text-xs">
+                    This work ran long — say why (drives the "why did it take that long" answer later):
+                    <Input className="mt-1" placeholder="e.g. 3 hrs isolating harness chafe with tech ops on the line" value={lnote} onChange={e => setLnote(e.target.value)} />
+                  </div>
+                )}
+                {!needsWhyNote && <Input placeholder="Why-note (optional — what drove the time)" value={lnote} onChange={e => setLnote(e.target.value)} />}
+                <Button size="sm" variant="outline" onClick={addLabor}><Plus className="mr-1.5 h-4 w-4" /> Add labor (end of shift)</Button>
               </div>
             )}
           </CardContent>

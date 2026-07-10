@@ -29,6 +29,8 @@ export const INTENT = {
     'I, as PIC, accept this aircraft for the intended flight, having reviewed its airworthiness status and any active MEL deferrals/restrictions.',
   CORRECTION:
     'I certify this entry corrects and supersedes the original signed record, which is retained unaltered. The corrected entry above is accurate to the best of my knowledge.',
+  EXTENSION:
+    'I authorize the one-time extension of this MEL deferral for an equal repair interval, having reviewed the governing MEL item and recorded the justification. The original deferral is retained unaltered and is superseded by this signed entry.',
   RECURRING_CHECK:
     'I certify the recurring inspection/check identified above was accomplished and the aircraft meets its requirements as of this signature.',
   BRIEFING_RELEASE:
