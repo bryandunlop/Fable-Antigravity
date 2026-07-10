@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  campLogin, campLogoff, integrateDiscrepancies,
+  campLogin, campLogoff, integrateDiscrepancies, updateAircraftContactDate, getWODetails, listOpenWorkOrders,
   pushUtilization_TODO_UNDOCUMENTED, UTILIZATION_PUSH_OPEN_QUESTION, CAMP_ADSB_OPEN_QUESTION,
   getCampEnv, promoteToProduction, revertToSandbox, setEnvUnsafeForDemo, PROMOTION_CONFIRM_PHRASE,
 } from './campClient';
@@ -55,6 +55,69 @@ describe('utilization push — BLOCKED guardrail (Open Question 1)', () => {
       { airframeHours: 90, cycles: 48, landings: 55 });
     expect(dec.data?.validation.increaseOnly).toBe(false);
     expect(dec.data?.preparedPayload).toBeUndefined();
+  });
+});
+
+describe('UpdateAircraftContactDate — the GEN heartbeat write (gated like every CAMP write)', () => {
+  it('stamps the contact date in sandbox and reports rows affected', () => {
+    revertToSandbox();
+    campLogin();
+    const res = updateAircraftContactDate('6051', '6051');
+    campLogoff();
+    expect(res.ok).toBe(true);
+    expect(res.data?.rowsAffected).toBe(1);
+  });
+
+  it('refuses in production while the promotion gate is closed — it is a WRITE', () => {
+    setEnvUnsafeForDemo('production');
+    campLogin();
+    const res = updateAircraftContactDate('6051', '6051');
+    campLogoff();
+    revertToSandbox();
+    expect(res.ok).toBe(false);
+    expect(String(res.errorCode)).toBe('PROD_GATE_CLOSED');
+  });
+
+  it('rejects a serial mismatch and a missing session', () => {
+    revertToSandbox();
+    campLogin();
+    expect(updateAircraftContactDate('9999', '6051').ok).toBe(false);
+    campLogoff();
+    expect(updateAircraftContactDate('6051', '6051').ok).toBe(false);
+  });
+});
+
+describe('WO detail carries parts, tools, consumables + header scheduling (WRK 2_0_8 fields)', () => {
+  it('GetWODetails exposes per-line part numbers where the WO has them', () => {
+    campLogin();
+    const res = getWODetails('6051', 'WO-21-0231');
+    campLogoff();
+    expect(res.ok).toBe(true);
+    const partLine = res.data?.lines.find(l => l.partNbr);
+    expect(partLine?.partNbr).toBeTruthy();
+  });
+
+  it('GetWODetails exposes required tools (with calibration) and consumables (with qty)', () => {
+    campLogin();
+    const res = getWODetails('6051', 'WO-32-0455');
+    campLogoff();
+    expect(res.data?.requiredTools?.length).toBeGreaterThan(0);
+    expect(res.data?.requiredTools?.[0].calibrationDueUtc).toBeTruthy();
+    expect(res.data?.requiredConsumables?.[0].qty).toBeGreaterThan(0);
+  });
+
+  it('WO headers carry the scheduling block: in/out window, ICAO, service center, lead technician', () => {
+    campLogin();
+    const list = listOpenWorkOrders('6051');
+    const detail = getWODetails('6051', 'WO-24-0188');
+    campLogoff();
+    const w = list.data?.[0];
+    expect(w?.scheduledInUtc).toBeTruthy();
+    expect(w?.scheduledOutUtc).toBeTruthy();
+    expect(new Date(w!.scheduledOutUtc).getTime()).toBeGreaterThanOrEqual(new Date(w!.scheduledInUtc).getTime());
+    expect(w?.icao).toBeTruthy();
+    expect(detail.data?.serviceCenter).toBeTruthy();
+    expect(detail.data?.leadTechnician).toBeTruthy();
   });
 });
 

@@ -81,6 +81,22 @@ export function integrateDiscrepancies(p: DiscrepancyPush, expectedSerial: strin
   return { ok: true, data: { discrepancyId: id } };
 }
 
+/**
+ * GEN UpdateAircraftContactDate — stamps the "last date this aircraft was integrated with CAMP";
+ * the guide says it's used on days with no flight activity. A benign heartbeat, but still a WRITE:
+ * it rides the same production-promotion gate as every other CAMP write (CLAUDE.md Sandbox rule).
+ */
+export function updateAircraftContactDate(serial: string, expectedSerial: string): CampResult<{ rowsAffected: number }> {
+  if (_env === 'production' && !_prodGateOpen) {
+    return { ok: false, errorCode: 'PROD_GATE_CLOSED', errorMsg: 'Refusing production CAMP write — promotion gate not open (deliberate human-gated step required).' };
+  }
+  if (!_sessionKey) return sessionError();
+  if (serial !== expectedSerial) {
+    return { ok: false, errorCode: CAMP_ERROR.INVALID_OPERATION.code, errorMsg: `serial mismatch '${serial}' vs CAMP '${expectedSerial}' (the #1 CAMP integration failure mode)` };
+  }
+  return { ok: true, data: { rowsAffected: 1 } };
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // UTILIZATION PUSH — OPEN QUESTION 1 (BLOCKED; do NOT implement a transport).
 // The CAMP SOAP operation to push utilization (airframe hours/cycles/landings) is
@@ -193,8 +209,24 @@ export interface CampWoDetailLine {
   ata: string;
   description: string;
   itemStatusCode: number; // WO_ITEM_STATUS ladder
+  partNbr?: string;        // WRK: Task Part Number (per line)
+  partSerialNbr?: string;  // WRK: Task Part Serial Number
 }
-export interface CampWoDetails {
+// WRK 2_0_8 also exports Required Tools (name/PN-SN/calibration date) + Required Consumables
+// (name/PN-SN/quantity) per work order — field POPULATION in our tenant is the C9 PoC question.
+export interface CampWoRequiredTool { name: string; partNumber: string; serialNumber?: string; calibrationDueUtc?: string; }
+export interface CampWoConsumable { name: string; partNumber: string; qty: number; }
+
+export interface CampWoHeaderSchedule {
+  scheduledInUtc: string;   // WRK: Scheduled Date/Time In
+  scheduledOutUtc: string;  // WRK: Scheduled Date/Time Out
+  icao: string;             // WRK: ICAO Location
+  department: string;       // WRK: Responsible Department
+  leadTechnician: string;   // WRK: Lead Technician
+  serviceCenter: string;    // WRK: Responsible Service Center
+}
+
+export interface CampWoDetails extends CampWoHeaderSchedule {
   woNumber: string;
   serial: string;
   title: string;
@@ -203,49 +235,93 @@ export interface CampWoDetails {
   scheduled: boolean;
   riiRequired: boolean;
   lines: CampWoDetailLine[];
+  requiredTools?: CampWoRequiredTool[];
+  requiredConsumables?: CampWoConsumable[];
 }
 
+type WoCatalogEntry = Omit<CampWoDetails, 'serial' | 'headerStatusCode' | keyof CampWoHeaderSchedule> & {
+  schedInDays: number;  // relative-to-now scheduling window (materialized at read time)
+  schedOutDays: number;
+  icao: string;
+  department: string;
+  leadTechnician: string;
+  serviceCenter: string;
+};
+
 // Faked catalog of "open" CAMP work orders, keyed loosely so the demo can pull a few per aircraft.
-const WO_CATALOG: Omit<CampWoDetails, 'serial' | 'headerStatusCode'>[] = [
+const WO_CATALOG: WoCatalogEntry[] = [
   {
     woNumber: 'WO-32-0455', title: 'Main Landing Gear — 600-hr functional check', ata: '32', scheduled: true, riiRequired: true,
+    schedInDays: 11, schedOutDays: 13, icao: 'KLUK', department: 'MAINTENANCE', leadTechnician: 'Tom Parker', serviceCenter: 'P&G GFO Hangar — Lunken',
     lines: [
       { lineType: 'T', ata: '32', description: 'Perform MLG retraction test per AMM 32-30-00', itemStatusCode: 5 },
       { lineType: 'T', ata: '32', description: 'Inspect MLG actuator and downlock for leakage/wear', itemStatusCode: 5 },
       { lineType: 'T', ata: '32', description: 'Lubricate landing gear per CMM; record grease P/N', itemStatusCode: 5 },
     ],
+    requiredTools: [
+      { name: 'MLG rig pin set', partNumber: 'GT-32-114', serialNumber: 'RP-0071', calibrationDueUtc: new Date(Date.now() + 90 * 86400000).toISOString() },
+      { name: 'Hydraulic mule — 3,000 psi', partNumber: 'GSE-HM-3000', serialNumber: 'HM-12', calibrationDueUtc: new Date(Date.now() + 42 * 86400000).toISOString() },
+    ],
+    requiredConsumables: [
+      { name: 'Grease — Mobilgrease 33', partNumber: 'MOB-33', qty: 2 },
+      { name: 'Lockwire 0.032', partNumber: 'MS20995C32', qty: 1 },
+    ],
   },
   {
     woNumber: 'WO-21-0231', title: 'Air conditioning pack valve replacement', ata: '21', scheduled: false, riiRequired: false,
+    schedInDays: 2, schedOutDays: 2, icao: 'KLUK', department: 'MAINTENANCE', leadTechnician: 'Tom Parker', serviceCenter: 'P&G GFO Hangar — Lunken',
     lines: [
       { lineType: 'S', ata: '21', description: 'PACK 1 FAULT CAS recurring — pack flow control valve suspect', itemStatusCode: 5 },
-      { lineType: 'T', ata: '21', description: 'Remove and replace flow control valve P/N 1159SCB... ', itemStatusCode: 5 },
+      { lineType: 'T', ata: '21', description: 'Remove and replace pack 1 flow control valve', itemStatusCode: 5, partNbr: '1159SCB300-1', partSerialNbr: 'SN-FCV-44821' },
       { lineType: 'T', ata: '21', description: 'Operational test of pack 1 per AMM 21-50-00', itemStatusCode: 5 },
+    ],
+    requiredConsumables: [
+      { name: 'O-ring kit, pack valve', partNumber: 'KIT-21-FCV', qty: 1 },
     ],
   },
   {
     woNumber: 'WO-24-0188', title: 'APU generator GCU inspection', ata: '24', scheduled: true, riiRequired: false,
+    schedInDays: 18, schedOutDays: 19, icao: 'KSAV', department: 'MAINTENANCE', leadTechnician: 'GAC crew chief', serviceCenter: 'Gulfstream Savannah',
     lines: [
       { lineType: 'T', ata: '24', description: 'Inspect APU GCU connectors and bonding', itemStatusCode: 5 },
       { lineType: 'T', ata: '24', description: 'Megger APU generator feeders; record values', itemStatusCode: 5 },
     ],
+    requiredTools: [
+      { name: 'Insulation tester (megger)', partNumber: 'FLK-1507', serialNumber: 'MG-204', calibrationDueUtc: new Date(Date.now() + 120 * 86400000).toISOString() },
+    ],
   },
   {
     woNumber: 'WO-27-0512', title: 'Flight control rigging check (RII)', ata: '27', scheduled: true, riiRequired: true,
+    schedInDays: 26, schedOutDays: 28, icao: 'KLUK', department: 'MAINTENANCE', leadTechnician: 'Amanda Brooks', serviceCenter: 'P&G GFO Hangar — Lunken',
     lines: [
       { lineType: 'T', ata: '27', description: 'Verify aileron rig pins and cable tension per AMM 27-10-00', itemStatusCode: 5 },
       { lineType: 'T', ata: '27', description: 'Independent inspection of control continuity (RII)', itemStatusCode: 5, },
     ],
+    requiredTools: [
+      { name: 'Cable tensiometer', partNumber: 'PAC-T5-2000', serialNumber: 'TM-88', calibrationDueUtc: new Date(Date.now() + 60 * 86400000).toISOString() },
+    ],
   },
 ];
 
+function materializeSchedule(w: WoCatalogEntry): CampWoHeaderSchedule {
+  return {
+    scheduledInUtc: new Date(Date.now() + w.schedInDays * 86400000).toISOString(),
+    scheduledOutUtc: new Date(Date.now() + w.schedOutDays * 86400000 + 8 * 3600000).toISOString(),
+    icao: w.icao, department: w.department, leadTechnician: w.leadTechnician, serviceCenter: w.serviceCenter,
+  };
+}
+
+export interface CampWoListEntry extends CampWoHeaderSchedule {
+  woNumber: string; title: string; ata: string; scheduled: boolean; riiRequired: boolean;
+}
+
 /** List the open CAMP work orders available to pull for a serial (faked). */
-export function listOpenWorkOrders(serial: string): CampResult<{ woNumber: string; title: string; ata: string; scheduled: boolean; riiRequired: boolean }[]> {
+export function listOpenWorkOrders(serial: string): CampResult<CampWoListEntry[]> {
   if (!_sessionKey) return sessionError();
   // Serial-key the catalog so different tails surface a different open-WO ordering (rotation keeps every WO findable by getWODetails).
   const off = Math.abs(hashStr(serial)) % WO_CATALOG.length;
   const rotated = [...WO_CATALOG.slice(off), ...WO_CATALOG.slice(0, off)];
-  return { ok: true, data: rotated.map(w => ({ woNumber: w.woNumber, title: w.title, ata: w.ata, scheduled: w.scheduled, riiRequired: w.riiRequired })) };
+  return { ok: true, data: rotated.map(w => ({ woNumber: w.woNumber, title: w.title, ata: w.ata, scheduled: w.scheduled, riiRequired: w.riiRequired, ...materializeSchedule(w) })) };
 }
 
 /** GetWODetails (WRK). Mock returns the catalog entry with task/squawk detail lines. */
@@ -253,7 +329,8 @@ export function getWODetails(serial: string, woNumber: string): CampResult<CampW
   if (!_sessionKey) return sessionError();
   const found = WO_CATALOG.find(w => w.woNumber === woNumber);
   if (!found) return { ok: false, errorCode: CAMP_ERROR.NO_MATCHING_RECORD.code, errorMsg: CAMP_ERROR.NO_MATCHING_RECORD.msg };
-  return { ok: true, data: { ...found, serial, headerStatusCode: 1 } }; // 1 = Open
+  const { schedInDays: _i, schedOutDays: _o, ...entry } = found;
+  return { ok: true, data: { ...entry, ...materializeSchedule(found), serial, headerStatusCode: 1 } }; // 1 = Open
 }
 
 export interface CampClosedWo {

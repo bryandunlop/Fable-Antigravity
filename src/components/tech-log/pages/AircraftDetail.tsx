@@ -6,7 +6,7 @@ import {
   Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, CloudDownload,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
-import { useIntegration } from '../integration/useIntegration';
+import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
@@ -211,6 +211,7 @@ export default function AircraftDetail() {
     if (!wo) return toast.error('CAMP returned no detail for that work order.');
     const id = newId('wc');
     const nowIso = new Date().toISOString();
+    const expected = expectedFromWo(wo);
     const card: WorkCard = {
       id, cardNumber: `WC-${id.slice(-4).toUpperCase()}`, woNumber: wo.woNumber, aircraftId: ac.id,
       title: wo.title, ataChapter: wo.ata,
@@ -218,6 +219,7 @@ export default function AircraftDetail() {
       source: 'CAMP', headerStatusCode: wo.headerStatusCode, scheduled: wo.scheduled, riiRequired: wo.riiRequired,
       createdAtUtc: nowIso, status: 'OPEN',
       steps: wo.lines.filter(l => l.lineType === 'T').map((l, i) => ({ id: newId('st'), seq: i + 1, text: l.description, done: false, riiRequired: wo.riiRequired && /independent inspection|\bRII\b/i.test(l.description) })),
+      campExpected: expected.length ? expected : undefined,
     };
     dispatch({ type: 'ADD_WORK_CARD', payload: card });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'WORKCARD_PULLED', entityType: 'WorkCard', entityId: id, atUtc: nowIso, summary: `Pulled ${wo.woNumber} from CAMP → ${card.cardNumber} (${ac.tailNumber})` } });

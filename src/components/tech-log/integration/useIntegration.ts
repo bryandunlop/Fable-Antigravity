@@ -3,12 +3,22 @@ import { useTechLog } from '../TechLogContext';
 import { newId } from '../util/id';
 import * as camp from './campClient';
 import { odataPullLatestFlight, simulateWebhook, type WebhookEnvelope } from './myairopsClient';
-import type { DefectStatus, IntegrationEvent, CampCorrelation } from '../types';
+import type { CampExpectedItem, DefectStatus, IntegrationEvent, CampCorrelation } from '../types';
 import { CAMP_ERROR } from './campTaxonomy';
 import type { MelFlag } from './campTaxonomy';
 import { reconcileDiscrepancies, type ReconcileResult } from './reconcile';
 import { decidePushMode, discrepancyTypeFor, type PushIntent } from './pushMapping';
 import { runWithSession } from './campSession';
+
+/** Map a CAMP WO detail's parts / required tools / consumables (WRK 2_0_8) onto the pulled card's
+ * read-only expected list. Pure — shared by every pull path. */
+export function expectedFromWo(wo: camp.CampWoDetails): CampExpectedItem[] {
+  return [
+    ...wo.lines.filter(l => l.partNbr).map(l => ({ kind: 'PART' as const, name: l.description, partNumber: l.partNbr, serialNumber: l.partSerialNbr })),
+    ...(wo.requiredTools ?? []).map(t => ({ kind: 'TOOL' as const, name: t.name, partNumber: t.partNumber, serialNumber: t.serialNumber, calibrationDueUtc: t.calibrationDueUtc })),
+    ...(wo.requiredConsumables ?? []).map(c => ({ kind: 'CONSUMABLE' as const, name: c.name, partNumber: c.partNumber, qty: c.qty })),
+  ];
+}
 
 export function useIntegration() {
   const { state, dispatch } = useTechLog();
@@ -128,6 +138,28 @@ export function useIntegration() {
     const p = odataPullLatestFlight(tailNumber, dateUtc);
     logEvent('MYAIROPS', 'OData pull', 'OK', `prefilled ${tailNumber} movement ${p.origin}→${p.destination}`);
     return p;
+  }
+
+  /**
+   * GEN UpdateAircraftContactDate — daily heartbeat stamping "last integrated with CAMP" for every
+   * active tail, so CAMP-side users see the feed is alive even on no-fly days. A WRITE: rides the
+   * same sandbox/production gate as every CAMP write.
+   */
+  function pushContactHeartbeat(): { stamped: number; failed: number } {
+    let stamped = 0, failed = 0;
+    camp.campLogin();
+    logEvent('CAMP', 'LogIn', 'OK', `session opened (${camp.campMeta.env})`);
+    try {
+      for (const ac of state.aircraft.filter(a => !a.isProvisional)) {
+        const res = camp.updateAircraftContactDate(ac.serialNumber, ac.serialNumber);
+        if (res.ok) { stamped++; logEvent('CAMP', 'UpdateAircraftContactDate', 'OK', `${ac.tailNumber}: contact date stamped (heartbeat)`); }
+        else { failed++; logEvent('CAMP', 'UpdateAircraftContactDate', res.errorCode === 'PROD_GATE_CLOSED' ? 'BLOCKED' : 'ERROR', `${ac.tailNumber}: ${res.errorCode} — ${res.errorMsg}`); }
+      }
+    } finally {
+      camp.campLogoff();
+      logEvent('CAMP', 'LogOff', 'OK', 'session closed');
+    }
+    return { stamped, failed };
   }
 
   /** List open CAMP work orders for an aircraft (mock listOpenWorkOrders). */
@@ -266,5 +298,5 @@ export function useIntegration() {
     return ac ? (camp.getClosedWorkOrders(ac.serialNumber).data ?? []) : [];
   }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook, readForecast, readComponentTimes, readAdSb, readClosedWorkOrders };
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushContactHeartbeat, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook, readForecast, readComponentTimes, readAdSb, readClosedWorkOrders };
 }
