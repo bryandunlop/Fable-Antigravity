@@ -16,6 +16,7 @@ import { SubmissionsArchive } from './SubmissionsArchive';
 import { PublishedReports } from './PublishedReports';
 import { FormManager } from './FormManager';
 import { OperationsAudits, MyAudits } from './AuditsArea';
+import { ReviewsArea } from './ReviewsArea';
 import { FORM_CATALOG } from './forms';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
 
@@ -119,11 +120,11 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const bucket = model[view] as Record<string, SafetyItem[]>;
   const tabs: [string, string][] = view === 'my'
     ? [['move', 'Your move'], ['waiting', 'Waiting'], ['done', 'Done'], ['audits', 'My audits'], ['forms', 'Forms'], ['published', 'Published']]
-    : [['move', 'Your move'], ['track', 'Track'], ['audits', 'Audits'], ['submissions', 'Submissions'], ['formsMgr', 'Form manager'], ['published', 'Published']];
+    : [['move', 'Your move'], ['track', 'Track'], ['audits', 'Audits'], ['reviews', 'Reviews'], ['submissions', 'Submissions'], ['formsMgr', 'Form manager'], ['published', 'Published']];
 
   function countFor(key: string): number | null {
     if (key === 'forms') return FORM_CATALOG.length;
-    if (key === 'formsMgr' || key === 'audits') return null;
+    if (key === 'formsMgr' || key === 'audits' || key === 'reviews') return null;
     if (key === 'submissions') return model.submissions.length;
     if (key === 'published') return model.published.length;
     return (bucket[key] || []).length;
@@ -231,6 +232,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         {tab === 'track' && <TrackBoard items={bucket.track || []} onOpen={open} />}
         {tab === 'done' && <DoneList items={bucket.done || []} view={view} onOpen={open} />}
         {tab === 'audits' && (view === 'ops' ? <OperationsAudits /> : <MyAudits />)}
+        {tab === 'reviews' && <ReviewsArea />}
         {tab === 'forms' && <FormsCatalog onPick={(k) => openReport(k)} />}
         {tab === 'submissions' && <SubmissionsArchive items={model.submissions} onOpen={open} />}
         {tab === 'formsMgr' && <FormManager />}
