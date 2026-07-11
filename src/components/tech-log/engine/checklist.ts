@@ -1,4 +1,7 @@
-import type { ChecklistTemplate, ChecklistItemDef, ChecklistItemEntry, ChecklistInstance } from '../types';
+import type {
+  ChecklistTemplate, ChecklistItemDef, ChecklistItemEntry, ChecklistInstance,
+  AircraftType, ChecklistPhase, Personnel,
+} from '../types';
 
 export function buildInitialEntries(template: ChecklistTemplate): ChecklistItemEntry[] {
   return template.sections.flatMap(s => s.items).map(def => ({ itemDefId: def.id, state: 'OPEN' as const }));
@@ -81,4 +84,56 @@ export function checklistProgress(
   const total = allItems(template).length;
   const done = instance.entries.filter(e => e.state === 'DONE' || e.state === 'NA').length;
   return { done, total };
+}
+
+export function latestPublishedTemplate(
+  templates: ChecklistTemplate[],
+  aircraftType: AircraftType,
+  phase: ChecklistPhase,
+): ChecklistTemplate | undefined {
+  return templates
+    .filter(t => t.aircraftType === aircraftType && t.phase === phase && t.status === 'PUBLISHED')
+    .sort((a, b) => b.version - a.version)[0];
+}
+
+export function nextVersionFor(templates: ChecklistTemplate[], templateId: string): number {
+  const versions = templates.filter(t => t.id === templateId).map(t => t.version);
+  return versions.length ? Math.max(...versions) + 1 : 1;
+}
+
+export function publishTemplate(draft: ChecklistTemplate, nowUtc: string): ChecklistTemplate {
+  return { ...draft, status: 'PUBLISHED', effectiveFrom: nowUtc };
+}
+
+export function cloneTemplateForType(args: {
+  source: ChecklistTemplate;
+  newTemplateId: string;
+  newAircraftType: AircraftType;
+  newIdPrefix: string;
+  createdByOid: string;
+  nowUtc: string;
+}): ChecklistTemplate {
+  let n = 0;
+  const fresh = () => `${args.newIdPrefix}-${++n}`;
+  return {
+    id: args.newTemplateId,
+    aircraftType: args.newAircraftType,
+    phase: args.source.phase,
+    aodReference: args.source.aodReference,
+    version: 1,
+    status: 'DRAFT',
+    clonedFromTemplateId: args.source.id,
+    clonedFromVersion: args.source.version,
+    sections: args.source.sections.map(s => ({
+      id: fresh(),
+      title: s.title,
+      items: s.items.map(i => ({ ...i, id: fresh(), fields: i.fields?.map(f => ({ ...f, id: fresh() })) })),
+    })),
+    createdByOid: args.createdByOid,
+    createdAtUtc: args.nowUtc,
+  };
+}
+
+export function canEditChecklistTemplates(user: Personnel): boolean {
+  return user.role === 'MAINTENANCE' && !!user.isSupervisor;
 }
