@@ -6,6 +6,7 @@ import type {
 } from '../types';
 import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
+import { SEED_CHECKLIST_TEMPLATES } from './checklistTemplates';
 import { computeClockStart, computeRepairDue } from '../engine/pl25';
 import { makeSignature } from '../engine/signing';
 import { DEFAULT_PREFLIGHT_CHECKLIST } from '../constants';
@@ -423,7 +424,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     trips,
     briefings,
     postflights: [],
-    checklistTemplates: [],
+    checklistTemplates: SEED_CHECKLIST_TEMPLATES,
     checklistInstances: [],
     coordinationMessages: [
       { id: 'cm-seed-1', aircraftId: 'ac-n2pg', authorOid: tech.oid, text: 'Aircraft fueled and ready for the morning KLUK–KTEB leg.', atUtc: iso(3 * H) },
