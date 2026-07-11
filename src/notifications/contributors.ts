@@ -4,7 +4,8 @@ import { buildAuditFeed } from './contributors/audits';
 import { buildHazardFeed } from './contributors/hazards';
 import { buildInventoryFeed } from './contributors/inventory';
 import { buildTripReminderFeed } from './contributors/tripReminders';
-import { buildBulletinFeed } from './contributors/bulletins';
+// buildBulletinFeed superseded by the unified documents contributor (bulletins.ts kept in-tree, unregistered)
+import { buildDocumentsFeed } from './contributors/documents';
 import { buildHazardMessageFeed } from './contributors/hazardMessages';
 
 export type FeedContributor = (userRole: string, nowUtc: string) => FeedItem[];
@@ -17,6 +18,6 @@ export const CONTRIBUTORS: FeedContributor[] = [
   (r, t) => buildHazardFeed(r, t),
   (r, t) => buildInventoryFeed(r, t),
   (r, t) => buildTripReminderFeed(r, t),
-  (r, t) => buildBulletinFeed(r, t),
+  (r, t) => buildDocumentsFeed(r, t),
   (r, t) => buildHazardMessageFeed(r, t),
 ];

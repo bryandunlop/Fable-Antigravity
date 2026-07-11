@@ -155,7 +155,8 @@ export type SignedEntity =
   | 'RECURRING_CHECK'
   | 'WORK_CARD'
   | 'BRIEFING'
-  | 'POSTFLIGHT';
+  | 'POSTFLIGHT'
+  | 'DOC_ACK'; // documents module: signature-level read-and-understood acknowledgment
 
 // ── Phase 3: work-card execution + parts/labor (D10) ──
 export type WorkCardStatus = 'OPEN' | 'IN_WORK' | 'COMPLETED';

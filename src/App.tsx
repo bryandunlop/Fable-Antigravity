@@ -25,7 +25,8 @@ import PassengerMobileApp from './components/PassengerMobileApp';
 import AdminUserManagement from './components/AdminUserManagement';
 import AirportEvaluationOfficer from './components/AirportEvaluationOfficer';
 import ScheduleCalendar from './components/ScheduleCalendar';
-import DocumentCenter from './components/DocumentCenter';
+import { DocumentHub } from './components/documents/pages/DocumentHub';
+import { DocReader } from './components/documents/pages/DocReader';
 import DocumentManagement from './components/DocumentManagement';
 import DocumentRequest from './components/DocumentRequest';
 import OfflineDocuments from './components/OfflineDocuments';
@@ -44,7 +45,8 @@ import HazardReporting from './components/HazardReporting';
 import HazardWorkspace from './components/hazard/HazardWorkspace';
 import HazardDetailView from './components/hazard/HazardDetailView';
 import InternalAuditManagement from './components/InternalAuditManagement';
-import DocumentCompliance from './components/DocumentCompliance';
+// DocumentCompliance mock superseded by documents/ComplianceDashboard (kept in-tree, de-routed)
+import { ComplianceDashboard } from './components/documents/pages/ComplianceDashboard';
 import UserSafety from './components/UserSafety';
 import CateringTracker from './components/CateringTracker';
 import CateringOrders from './components/CateringOrders';
@@ -83,6 +85,7 @@ import GRATFormBuilder from './components/GRATFormBuilder';
 import ProceduralBulletins from './components/ProceduralBulletins';
 import FlightOperationsBulletins from './components/bulletins/FlightOperationsBulletins';
 import { BulletinProvider } from './components/bulletins/BulletinContext';
+import { DocumentsProvider } from './components/documents/DocumentsContext';
 import { PassengerProvider } from './components/passengers/PassengerContext';
 import FlightAttendantFlights from './components/inflight/FlightAttendantFlights';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
@@ -182,6 +185,7 @@ export default function App() {
             <AuditProvider>
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
+                <DocumentsProvider>
                 <BulletinProvider>
                 <PassengerProvider>
                 <Router>
@@ -301,7 +305,9 @@ export default function App() {
                                   }
                                 />
                                 <Route path="/schedule" element={<ScheduleCalendar />} />
-                                <Route path="/documents" element={<DocumentCenter userRole={userRole} />} />
+                                {/* Unified document-compliance hub (legacy DocumentCenter de-routed, kept in-tree) */}
+                                <Route path="/documents" element={<DocumentHub userRole={userRole} additionalRoles={additionalRoles} />} />
+                                <Route path="/documents/:docId" element={<DocReader userRole={userRole} additionalRoles={additionalRoles} />} />
 
                                 {/* Document Management - Document Manager & DMS Manager role only, others get Document Request */}
                                 <Route
@@ -361,7 +367,7 @@ export default function App() {
                                 <Route path="/safety/hazards" element={<HazardWorkspace userRole={userRole} />} />
                                 <Route path="/safety/hazards/:id" element={<HazardDetailView userRole={userRole} />} />
                                 <Route path="/safety/audits" element={<InternalAuditManagement />} />
-                                <Route path="/safety/compliance" element={<DocumentCompliance />} />
+                                <Route path="/safety/compliance" element={<ComplianceDashboard standalone />} />
                                 <Route path="/procedural-bulletins" element={<ProceduralBulletins userRole={userRole} />} />
                                 <Route path="/flight-operations-bulletins" element={<FlightOperationsBulletins userRole={userRole} />} />
                                 <Route
@@ -596,6 +602,7 @@ export default function App() {
                 </Router>
                 </PassengerProvider>
                 </BulletinProvider>
+                </DocumentsProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
             </AuditProvider>

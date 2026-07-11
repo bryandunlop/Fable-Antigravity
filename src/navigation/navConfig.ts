@@ -161,10 +161,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/safety/form-fields', label: 'Form Field Manager', domain: 'safety', icon: Sliders, sidebar: false, keywords: ['frat', 'grat', 'customize', 'scoring'], roles: ['safety', 'admin'] },
 
   // ── Documents ─────────────────────────────────────────────────────────────
-  { path: '/documents', label: 'Document Center', domain: 'documents', icon: Archive, primary: true, keywords: ['manual', 'gom', 'library'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
+  { path: '/documents', label: 'Document Center', domain: 'documents', icon: Archive, primary: true, detailLabel: 'Document', keywords: ['manual', 'gom', 'library', 'sop', 'compliance', 'read and initial', 'tribal knowledge', 'bulletin'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'procedural-specialist'] },
   { path: '/documents', label: 'Document Library', domain: 'documents', icon: Archive, primary: true, roles: ['dms-manager'] },
-  { path: '/document-management', label: 'Document Request', domain: 'documents', icon: Send, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-  { path: '/document-management', label: 'Document Management', domain: 'documents', icon: FileText, primary: false, keywords: ['publish', 'distribute'], roles: ['document-manager'] },
+  // De-navved: superseded by the Document Center suggestion workflow (routes kept, reversible)
+  { path: '/document-management', label: 'Document Request', domain: 'documents', icon: Send, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  { path: '/document-management', label: 'Document Management', domain: 'documents', icon: FileText, sidebar: false, searchable: false, roles: ['document-manager'] },
   { path: '/dms/offline', label: 'Offline Documents', domain: 'documents', icon: HardDrive, primary: false, roles: ['dms-manager', 'admin'] },
 
   // ── Admin ─────────────────────────────────────────────────────────────────
