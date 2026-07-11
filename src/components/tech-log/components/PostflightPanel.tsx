@@ -63,7 +63,7 @@ export function PostflightPanel({ aircraft }: { aircraft: Aircraft }) {
     const nowIso = new Date().toISOString();
     const pf: Postflight = {
       id: pendingId, aircraftId: aircraft.id, briefingId: briefing?.id, performedByOid: user.oid, performedAtUtc: nowIso,
-      checklist: [], checklistInstanceId: instance?.id, notes: notes || undefined, gatheredDefectIds: openSquawks.map(d => d.id), signatureId: sig.id,
+      checklistInstanceId: instance?.id, notes: notes || undefined, gatheredDefectIds: openSquawks.map(d => d.id), signatureId: sig.id,
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig });
     dispatch({ type: 'ADD_POSTFLIGHT', payload: pf });

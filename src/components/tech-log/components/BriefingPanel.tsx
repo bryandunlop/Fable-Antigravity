@@ -68,7 +68,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
     const instanceId = newId('cli');
     const b: FlightBriefing = {
       id: newId('brief'), aircraftId: aircraft.id, preparedByOid: user.oid, createdAtUtc: new Date().toISOString(), status: 'DRAFT',
-      checklist: [], checklistInstanceId: instanceId,
+      checklistInstanceId: instanceId,
     };
     dispatch({
       type: 'ADD_CHECKLIST_INSTANCE',

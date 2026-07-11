@@ -394,19 +394,12 @@ export interface Trip {
 // ── Preflight checklist → Flight Briefing (maintenance → pilot handoff) ──
 export type BriefingStatus = 'DRAFT' | 'RELEASED' | 'ACKNOWLEDGED';
 
-export interface BriefingChecklistItem {
-  id: string;
-  text: string;
-  done: boolean;
-  mandatory?: boolean;
-  source?: 'TEMPLATE' | 'CAMP'; // pulled from a CAMP task vs a standing template item
-}
-
 /**
- * A maintenance "release for flight" briefing sent to the crew. The checklist + fuel + notes are
- * captured here; the airworthiness content (serviceability, MELs, defects, coming-due) is derived
- * live for display, with the headline serviceability snapshotted at release. Release + acknowledge
- * are e-signed events (not a CRS — this is a dispatch briefing).
+ * A maintenance "release for flight" briefing sent to the crew. Fuel + notes are captured here;
+ * the preflight checklist is a separate ChecklistInstance referenced by checklistInstanceId; the
+ * airworthiness content (serviceability, MELs, defects, coming-due) is derived live for display,
+ * with the headline serviceability snapshotted at release. Release + acknowledge are e-signed
+ * events (not a CRS — this is a dispatch briefing).
  */
 export interface FlightBriefing {
   id: string;
@@ -414,7 +407,6 @@ export interface FlightBriefing {
   preparedByOid: string;
   createdAtUtc: string;
   status: BriefingStatus;
-  checklist: BriefingChecklistItem[];
   checklistInstanceId?: string;
   fuelPlannedLb?: number;
   notes?: string;
@@ -439,7 +431,6 @@ export interface Postflight {
   briefingId?: string;        // the dispatch this closes, if known
   performedByOid: string;     // maintenance
   performedAtUtc: string;
-  checklist: BriefingChecklistItem[];
   checklistInstanceId?: string;
   notes?: string;
   gatheredDefectIds: string[]; // still-open squawks gathered for the work queue
