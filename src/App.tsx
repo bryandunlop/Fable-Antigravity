@@ -25,7 +25,8 @@ import PassengerMobileApp from './components/PassengerMobileApp';
 import AdminUserManagement from './components/AdminUserManagement';
 import AirportEvaluationOfficer from './components/AirportEvaluationOfficer';
 import ScheduleCalendar from './components/ScheduleCalendar';
-import DocumentCenter from './components/DocumentCenter';
+import { DocumentHub } from './components/documents/pages/DocumentHub';
+import { DocReader } from './components/documents/pages/DocReader';
 import DocumentManagement from './components/DocumentManagement';
 import DocumentRequest from './components/DocumentRequest';
 import OfflineDocuments from './components/OfflineDocuments';
@@ -303,7 +304,9 @@ export default function App() {
                                   }
                                 />
                                 <Route path="/schedule" element={<ScheduleCalendar />} />
-                                <Route path="/documents" element={<DocumentCenter userRole={userRole} />} />
+                                {/* Unified document-compliance hub (legacy DocumentCenter de-routed, kept in-tree) */}
+                                <Route path="/documents" element={<DocumentHub userRole={userRole} additionalRoles={additionalRoles} />} />
+                                <Route path="/documents/:docId" element={<DocReader userRole={userRole} />} />
 
                                 {/* Document Management - Document Manager & DMS Manager role only, others get Document Request */}
                                 <Route
