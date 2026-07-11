@@ -306,7 +306,7 @@ export default function App() {
                                 <Route path="/schedule" element={<ScheduleCalendar />} />
                                 {/* Unified document-compliance hub (legacy DocumentCenter de-routed, kept in-tree) */}
                                 <Route path="/documents" element={<DocumentHub userRole={userRole} additionalRoles={additionalRoles} />} />
-                                <Route path="/documents/:docId" element={<DocReader userRole={userRole} />} />
+                                <Route path="/documents/:docId" element={<DocReader userRole={userRole} additionalRoles={additionalRoles} />} />
 
                                 {/* Document Management - Document Manager & DMS Manager role only, others get Document Request */}
                                 <Route

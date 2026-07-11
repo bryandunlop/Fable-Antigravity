@@ -15,7 +15,7 @@ import { applyPublish, promoteScheduled, currentRevision } from './engine/revisi
 import { validateSubmit, validateDecision, validateDirectPublish } from './engine/lifecycle';
 import { computeNextReviewDate } from './engine/review';
 import { importLegacyBulletins, isBulletinClass } from './engine/bulletinCompat';
-import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES } from '../../lib/mockUsers';
+import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES, getRoleLabelByValue } from '../../lib/mockUsers';
 import { resolveUserId } from '../../notifications/identity';
 import { eventStore } from '../../notifications/events';
 
@@ -37,7 +37,7 @@ export function expandAudience(roles: string[]): string[] {
 
 export function identityFor(userRole: string): { userId: string; userName: string } {
   const userId = resolveUserId(userRole);
-  const userName = SYSTEM_USERS.find((u) => u.id === userId)?.name ?? userRole;
+  const userName = SYSTEM_USERS.find((u) => u.id === userId)?.name ?? getRoleLabelByValue(userRole);
   return { userId, userName };
 }
 

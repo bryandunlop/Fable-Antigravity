@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpenCheck, Library, Pin, Search } from 'lucide-react';
+import { BookOpenCheck, CheckSquare, FilePlus2, Library, Pin, Search } from 'lucide-react';
+import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
@@ -10,6 +11,7 @@ import { Label } from '../../ui/label';
 import { GfoPageHeader, GfoStatCard, GfoEmptyState } from '../../gfo';
 import { useDocuments, identityFor } from '../DocumentsContext';
 import { classFor, DOC_CLASS_LIST } from '../classes';
+import { canApprove, canAuthor } from '../engine/lifecycle';
 import { currentRevision } from '../engine/revisions';
 import { unacknowledgedRequiredReads } from '../engine/acknowledgments';
 import { readersFor, complianceSummary } from '../engine/compliance';
@@ -19,6 +21,8 @@ import { documentsRoleUniverse, canManageDocuments } from '../roles';
 import { DocIdentityLine } from '../components/DocIdentity';
 import { RequiredReadsList } from '../components/RequiredReadsList';
 import { ReviewFlagBadge } from '../components/ReviewFlagBadge';
+import { ApprovalQueuePanel } from '../components/ApprovalQueuePanel';
+import { DocEditorDialog } from '../components/DocEditorDialog';
 
 const LIBRARY_CLASSES = ['procedural-bulletin', 'flight-ops-bulletin', 'sop', 'manual'];
 
@@ -27,11 +31,20 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const { userId } = identityFor(userRole);
+  const userRoles = [userRole, ...additionalRoles];
   const manager = canManageDocuments(userRole, additionalRoles);
+  const authorCapable = DOC_CLASS_LIST.some((c) => canAuthor(c, userRoles));
   const universe = useMemo(() => documentsRoleUniverse(), []);
+
+  const pendingApprovals = state.revisions.filter((r) => {
+    if (r.status !== 'pending-approval') return false;
+    const d = state.docs.find((x) => x.id === r.docId);
+    return d ? canApprove(classFor(d.classId), userRoles) : false;
+  });
 
   const myOutstanding = unacknowledgedRequiredReads(
     state.docs, state.revisions, state.acknowledgments, userRole, userId,
@@ -73,6 +86,13 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
         eyebrow="Documents"
         title="Document Center"
         description="Controlled publications, read-and-acknowledge compliance, and operational knowledge."
+        actions={
+          authorCapable ? (
+            <Button onClick={() => setCreating(true)}>
+              <FilePlus2 className="mr-1.5 h-4 w-4" /> New document
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -93,6 +113,14 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           <TabsTrigger value="library" className="gap-1.5">
             <Library className="h-4 w-4" /> Library
           </TabsTrigger>
+          {pendingApprovals.length > 0 || manager ? (
+            <TabsTrigger value="approvals" className="gap-1.5">
+              <CheckSquare className="h-4 w-4" /> Approvals
+              {pendingApprovals.length > 0 && (
+                <Badge variant="secondary" className="ml-1 px-1.5 text-[10px]">{pendingApprovals.length}</Badge>
+              )}
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="my-reads" className="mt-4">
@@ -160,7 +188,19 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
             </ul>
           )}
         </TabsContent>
+
+        <TabsContent value="approvals" className="mt-4">
+          <ApprovalQueuePanel userRole={userRole} additionalRoles={additionalRoles} />
+        </TabsContent>
       </Tabs>
+
+      <DocEditorDialog
+        open={creating}
+        onOpenChange={setCreating}
+        mode={{ kind: 'create' }}
+        userRole={userRole}
+        additionalRoles={additionalRoles}
+      />
     </div>
   );
 }
