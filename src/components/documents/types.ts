@@ -60,7 +60,7 @@ export interface DocRevision {
   docId: string;
   revision: string; // display label: '1.0', '2.0'
   status: RevisionStatus;
-  content: string; // markdown
+  sections: DocSection[]; // structured content — the block tree (replaces the markdown blob)
   /** Reader-facing "what changed" — REQUIRED when a prior published revision exists. */
   changeSummary: string;
   effectiveDate: string;
@@ -71,7 +71,7 @@ export interface DocRevision {
   ackLevel: AckLevel;
   /** Drives the overdue chase list. */
   ackDueDate?: string;
-  /** mockSha256 of content — shown as an integrity chip; folded into signature payloads. */
+  /** mockSha256 of the canonical section serialization — shown as an integrity chip; folded into signature payloads. */
   mockChecksum: string;
   submittedAtUtc?: string;
   decidedAtUtc?: string;

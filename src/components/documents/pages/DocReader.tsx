@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
+import { SectionedContent } from '../components/SectionedContent';
 import { useDocuments } from '../DocumentsContext';
 import { classFor } from '../classes';
 import { canAuthor } from '../engine/lifecycle';
@@ -94,7 +93,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
       {rev ? (
         <GfoPanel>
           <article className="prose-bulletin">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{rev.content}</ReactMarkdown>
+            <SectionedContent sections={rev.sections} />
           </article>
           <AckPanel doc={doc} rev={rev} userRole={userRole} />
         </GfoPanel>

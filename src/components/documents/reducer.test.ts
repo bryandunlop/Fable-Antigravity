@@ -28,7 +28,7 @@ function rev(overrides: Partial<DocRevision> = {}): DocRevision {
     docId: 'SOP-001',
     revision: '1.0',
     status: 'pending-approval',
-    content: 'Body',
+    sections: [{ id: 'SOP-001::preamble', level: 1, number: '', title: '', blocks: [{ id: 'SOP-001::preamble::b0', type: 'paragraph', md: 'Body' }] }],
     changeSummary: '',
     effectiveDate: '2026-07-01',
     authorUserId: 'USR007',
@@ -102,7 +102,13 @@ describe('documentsReducer four-eyes guards (no-ops on invalid transitions)', ()
     let s = documentsReducer(state(), decide({ approve: false, reason: 'Gate table conflicts with FOM 4.2.' }));
     expect(s.revisions[0].status).toBe('rejected');
     expect(s.revisions[0].rejectionReason).toBe('Gate table conflicts with FOM 4.2.');
-    s = documentsReducer(s, { type: 'UPDATE_DRAFT', payload: { ...s.revisions[0], content: 'Fixed' } });
+    s = documentsReducer(s, {
+      type: 'UPDATE_DRAFT',
+      payload: {
+        ...s.revisions[0],
+        sections: [{ id: 'SOP-001::preamble', level: 1, number: '', title: '', blocks: [{ id: 'SOP-001::preamble::b0', type: 'paragraph', md: 'Fixed' }] }],
+      },
+    });
     expect(s.revisions[0].status).toBe('draft');
     s = documentsReducer(s, { type: 'SUBMIT_FOR_APPROVAL', payload: { revisionId: 'SOP-001-r1', atUtc: NOW } });
     expect(s.revisions[0].status).toBe('pending-approval');

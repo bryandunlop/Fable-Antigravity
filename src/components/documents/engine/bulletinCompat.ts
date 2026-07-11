@@ -3,7 +3,7 @@
 // one thing this module must never lose — migrate, don't wipe.
 import type { Bulletin, BulletinAcknowledgment, BulletinType } from '../../bulletins/types';
 import type { Doc, DocRevision, DocAcknowledgment, RevisionStatus } from '../types';
-import { mockSha256 } from '../../tech-log/engine/signing';
+import { sectionsFromMarkdown, sectionsToMarkdown, checksumForSections } from './blocks';
 
 export function bulletinClassId(t: BulletinType): string {
   return t === 'flight-ops' ? 'flight-ops-bulletin' : 'procedural-bulletin';
@@ -28,7 +28,7 @@ export function docToBulletin(doc: Doc, rev: DocRevision): Bulletin {
     id: doc.id,
     bulletinType: bulletinTypeFor(doc.classId),
     title: doc.title,
-    content: rev.content,
+    content: sectionsToMarkdown(rev.sections),
     category: doc.category,
     roles: doc.roles,
     effectiveDate: rev.effectiveDate,
@@ -71,7 +71,7 @@ export function bulletinToDocAndRevision(
     docId: b.id,
     revision: b.version,
     status,
-    content: b.content,
+    sections: sectionsFromMarkdown(b.content, b.id),
     changeSummary: '',
     effectiveDate: b.effectiveDate,
     ...(b.expirationDate !== undefined ? { expirationDate: b.expirationDate } : {}),
@@ -79,7 +79,7 @@ export function bulletinToDocAndRevision(
     authorName: b.author,
     requireAcknowledgment: b.requireAcknowledgment,
     ackLevel: b.requireAcknowledgment ? 'initials' : 'none',
-    mockChecksum: mockSha256(b.content),
+    mockChecksum: checksumForSections(sectionsFromMarkdown(b.content, b.id)),
     ...(status === 'published' ? { publishedAtUtc: `${b.effectiveDate}T00:00:00.000Z` } : {}),
     ...(b.lastUpdated !== undefined ? { lastUpdatedDate: b.lastUpdated } : {}),
     ...(b.images !== undefined ? { images: b.images } : {}),

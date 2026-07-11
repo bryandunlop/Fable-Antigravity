@@ -17,11 +17,12 @@ import { useDocuments, identityFor, publishApprovalRequestedEvent, publishRequir
 import { canAuthor, validateSubmit, validateDirectPublish } from '../engine/lifecycle';
 import { nextDocId, nextRevisionId, nextRevisionLabel, currentRevision } from '../engine/revisions';
 import { computeNextReviewDate } from '../engine/review';
-import { mockSha256 } from '../../tech-log/engine/signing';
+import { sectionsFromMarkdown, sectionsToMarkdown, checksumForSections } from '../engine/blocks';
 
 export type EditorMode =
   | { kind: 'create'; classId?: string }
-  | { kind: 'revise'; doc: Doc; baseRev: DocRevision; prefill?: Partial<DocRevision> }
+  // 'content' is the interim textarea's markdown prefill — independent of DocRevision.sections.
+  | { kind: 'revise'; doc: Doc; baseRev: DocRevision; prefill?: Partial<DocRevision> & { content?: string } }
   | { kind: 'edit-draft'; doc: Doc; rev: DocRevision };
 
 const ALL_ROLES = Object.values(ROLE_CATEGORIES).flat();
@@ -87,7 +88,7 @@ export function DocEditorDialog({
       setTitle(doc.title);
       setCategory(doc.category);
       setRoles(doc.roles);
-      setContent(mode.kind === 'revise' ? (mode.prefill?.content ?? rev.content) : rev.content);
+      setContent(mode.kind === 'revise' ? (mode.prefill?.content ?? sectionsToMarkdown(rev.sections)) : sectionsToMarkdown(rev.sections));
       setChangeSummary(mode.kind === 'revise' ? (mode.prefill?.changeSummary ?? '') : rev.changeSummary);
       setRevisionLabel(mode.kind === 'revise' ? nextRevisionLabel(rev.revision, 'major') : rev.revision);
       setEffectiveDate(mode.kind === 'revise' ? todayIso() : rev.effectiveDate);
@@ -157,7 +158,7 @@ export function DocEditorDialog({
       docId: doc.id,
       revision: revisionLabel.trim() || '1.0',
       status: 'draft',
-      content,
+      sections: sectionsFromMarkdown(content, doc.id),
       changeSummary: changeSummary.trim(),
       effectiveDate,
       authorUserId: userId,
@@ -165,7 +166,7 @@ export function DocEditorDialog({
       requireAcknowledgment: effAckLevel !== 'none',
       ackLevel: effAckLevel,
       ackDueDate: effAckLevel !== 'none' && ackDueDate ? ackDueDate : undefined,
-      mockChecksum: mockSha256(content),
+      mockChecksum: checksumForSections(sectionsFromMarkdown(content, doc.id)),
     };
     return { doc, rev };
   };

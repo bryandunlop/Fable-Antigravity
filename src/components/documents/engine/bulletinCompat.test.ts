@@ -11,12 +11,19 @@ import {
   isBulletinClass,
 } from './bulletinCompat';
 import { unacknowledgedRequiredReads } from './acknowledgments';
+import { sectionsFromMarkdown } from './blocks';
 
 describe('bulletinCompat round-trip', () => {
-  it('SEED_BULLETINS → doc/revision → bulletin reproduces every field', () => {
+  it('SEED_BULLETINS → doc/revision → bulletin reproduces every field (content normalized to canonical markdown)', () => {
     for (const b of SEED_BULLETINS) {
       const { doc, rev } = bulletinToDocAndRevision(b);
-      expect(docToBulletin(doc, rev)).toEqual(b);
+      const out = docToBulletin(doc, rev);
+      // content is now derived from the section tree, so it round-trips to
+      // semantically-identical (canonical-whitespace) markdown, not byte-identical.
+      const { content: outContent, ...outRest } = out;
+      const { content: origContent, ...origRest } = b;
+      expect(outRest).toEqual(origRest);
+      expect(sectionsFromMarkdown(outContent, b.id)).toEqual(sectionsFromMarkdown(origContent, b.id));
     }
   });
   it('classId mapping is stable both ways', () => {

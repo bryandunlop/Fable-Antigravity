@@ -4,6 +4,7 @@
 import type { DocRevision } from '../types';
 import type { DocumentClassConfig } from '../classes';
 import { hasAnyRole } from '../classes';
+import { sectionsPlainText } from './blocks';
 
 export function canAuthor(cfg: DocumentClassConfig, userRoles: string | string[]): boolean {
   return hasAnyRole(cfg.authorRoles, userRoles);
@@ -20,13 +21,13 @@ export function isSelfApproval(rev: Pick<DocRevision, 'authorUserId'>, deciderUs
 
 /** A draft may be submitted when complete; a re-issue must say what changed. */
 export function validateSubmit(
-  rev: Pick<DocRevision, 'status' | 'content' | 'changeSummary'>,
+  rev: Pick<DocRevision, 'status' | 'sections' | 'changeSummary'>,
   hasPriorPublished: boolean,
 ): { ok: boolean; error?: string } {
   if (rev.status !== 'draft' && rev.status !== 'rejected') {
     return { ok: false, error: 'Only a draft (or rejected draft) can be submitted for approval.' };
   }
-  if (!rev.content.trim()) return { ok: false, error: 'Content is required before submitting.' };
+  if (!sectionsPlainText(rev.sections).trim()) return { ok: false, error: 'Content is required before submitting.' };
   if (hasPriorPublished && !rev.changeSummary.trim()) {
     return { ok: false, error: 'A "what changed" summary is required when re-issuing a published document.' };
   }
@@ -54,7 +55,7 @@ export function validateDecision(
 /** Direct publish is only for uncontrolled classes (tribal knowledge). */
 export function validateDirectPublish(
   cfg: DocumentClassConfig,
-  rev: Pick<DocRevision, 'status' | 'content'>,
+  rev: Pick<DocRevision, 'status' | 'sections'>,
 ): { ok: boolean; error?: string } {
   if (cfg.controlled) {
     return { ok: false, error: `${cfg.label} requires draft → approval — direct publish is not permitted.` };
@@ -62,6 +63,6 @@ export function validateDirectPublish(
   if (rev.status !== 'draft' && rev.status !== 'rejected') {
     return { ok: false, error: 'Only a draft can be published.' };
   }
-  if (!rev.content.trim()) return { ok: false, error: 'Content is required before publishing.' };
+  if (!sectionsPlainText(rev.sections).trim()) return { ok: false, error: 'Content is required before publishing.' };
   return { ok: true };
 }

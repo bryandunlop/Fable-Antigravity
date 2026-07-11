@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { Check, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
@@ -11,6 +9,7 @@ import { useDocuments, identityFor, publishRequiredReadEvent } from '../Document
 import { classFor } from '../classes';
 import { canApprove, validateDecision } from '../engine/lifecycle';
 import { DocIdentityLine } from './DocIdentity';
+import { SectionedContent } from './SectionedContent';
 
 /** Pending-approval queue for approver roles. Own submissions are decision-
  * disabled (four-eyes) — the guard also lives in the reducer. */
@@ -118,7 +117,7 @@ export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRol
 
             {isOpen && (
               <div className="prose-bulletin mt-3 max-h-96 overflow-y-auto rounded-md border border-border bg-muted/20 p-4">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{rev.content}</ReactMarkdown>
+                <SectionedContent sections={rev.sections} />
               </div>
             )}
           </li>

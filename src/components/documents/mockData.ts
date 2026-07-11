@@ -6,6 +6,7 @@ import type { Signature } from '../tech-log/types';
 import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
 import { mockSha256 } from '../tech-log/engine/signing';
+import { sectionsFromMarkdown, checksumForSections } from './engine/blocks';
 
 function daysFromNow(n: number): string {
   const d = new Date();
@@ -113,14 +114,14 @@ const sop1r1: DocRevision = {
   docId: 'SOP-001',
   revision: '1.0',
   status: 'superseded',
-  content: SOP1_R1_CONTENT,
+  sections: sectionsFromMarkdown(SOP1_R1_CONTENT, 'SOP-001'),
   changeSummary: '',
   effectiveDate: '2025-03-01',
   authorUserId: 'USR007',
   authorName: 'First Officer Emily Chen',
   requireAcknowledgment: true,
   ackLevel: 'signature',
-  mockChecksum: mockSha256(SOP1_R1_CONTENT),
+  mockChecksum: checksumForSections(sectionsFromMarkdown(SOP1_R1_CONTENT, 'SOP-001')),
   publishedAtUtc: '2025-03-01T00:00:00.000Z',
 };
 
@@ -129,7 +130,7 @@ const sop1r2: DocRevision = {
   docId: 'SOP-001',
   revision: '2.0',
   status: 'published',
-  content: SOP1_R2_CONTENT,
+  sections: sectionsFromMarkdown(SOP1_R2_CONTENT, 'SOP-001'),
   changeSummary:
     'Stabilized-approach gate raised from 500 ft to 1,000 ft AFE for circling approaches; go-around callout standardized ("GO AROUND", immediate execution).',
   effectiveDate: daysFromNow(-3),
@@ -138,7 +139,7 @@ const sop1r2: DocRevision = {
   requireAcknowledgment: true,
   ackLevel: 'signature',
   ackDueDate: daysFromNow(7),
-  mockChecksum: mockSha256(SOP1_R2_CONTENT),
+  mockChecksum: checksumForSections(sectionsFromMarkdown(SOP1_R2_CONTENT, 'SOP-001')),
   submittedAtUtc: daysFromNow(-5) + 'T14:00:00.000Z',
   decidedAtUtc: daysFromNow(-4) + 'T09:30:00.000Z',
   decidedByUserId: 'role:document-manager',
@@ -152,7 +153,7 @@ const sop2r1: DocRevision = {
   docId: 'SOP-002',
   revision: '1.0',
   status: 'pending-approval',
-  content: SOP2_CONTENT,
+  sections: sectionsFromMarkdown(SOP2_CONTENT, 'SOP-002'),
   changeSummary: '',
   effectiveDate: daysFromNow(14),
   authorUserId: 'role:procedural-specialist',
@@ -160,7 +161,7 @@ const sop2r1: DocRevision = {
   requireAcknowledgment: true,
   ackLevel: 'signature',
   ackDueDate: daysFromNow(21),
-  mockChecksum: mockSha256(SOP2_CONTENT),
+  mockChecksum: checksumForSections(sectionsFromMarkdown(SOP2_CONTENT, 'SOP-002')),
   submittedAtUtc: daysFromNow(-1) + 'T16:20:00.000Z',
 };
 
@@ -170,7 +171,7 @@ const gom3r1: DocRevision = {
   docId: 'GOM-3',
   revision: '12.0',
   status: 'published',
-  content: GOM3_CONTENT,
+  sections: sectionsFromMarkdown(GOM3_CONTENT, 'GOM-3'),
   changeSummary: 'Fuel policy (§3.5) aligned with the new 45-minute reserve wording; international ops cross-references updated.',
   effectiveDate: daysFromNow(-30),
   authorUserId: 'role:document-manager',
@@ -178,7 +179,7 @@ const gom3r1: DocRevision = {
   requireAcknowledgment: true,
   ackLevel: 'initials',
   ackDueDate: daysFromNow(-2),
-  mockChecksum: mockSha256(GOM3_CONTENT),
+  mockChecksum: checksumForSections(sectionsFromMarkdown(GOM3_CONTENT, 'GOM-3')),
   publishedAtUtc: daysFromNow(-30) + 'T12:00:00.000Z',
 };
 
@@ -188,14 +189,14 @@ const tk1r1: DocRevision = {
   docId: 'TK-001',
   revision: '1.0',
   status: 'published',
-  content: TK1_CONTENT,
+  sections: sectionsFromMarkdown(TK1_CONTENT, 'TK-001'),
   changeSummary: '',
   effectiveDate: daysFromNow(-12),
   authorUserId: 'role:scheduling-manager',
   authorName: 'Scheduling Manager Reyes',
   requireAcknowledgment: false,
   ackLevel: 'none',
-  mockChecksum: mockSha256(TK1_CONTENT),
+  mockChecksum: checksumForSections(sectionsFromMarkdown(TK1_CONTENT, 'TK-001')),
   publishedAtUtc: daysFromNow(-12) + 'T12:00:00.000Z',
 };
 
@@ -204,14 +205,14 @@ const tk2r1: DocRevision = {
   docId: 'TK-002',
   revision: '1.0',
   status: 'published',
-  content: TK2_CONTENT,
+  sections: sectionsFromMarkdown(TK2_CONTENT, 'TK-002'),
   changeSummary: '',
   effectiveDate: daysFromNow(-220),
   authorUserId: 'USR002',
   authorName: 'Sarah Wilson',
   requireAcknowledgment: false,
   ackLevel: 'none',
-  mockChecksum: mockSha256(TK2_CONTENT),
+  mockChecksum: checksumForSections(sectionsFromMarkdown(TK2_CONTENT, 'TK-002')),
   publishedAtUtc: daysFromNow(-220) + 'T12:00:00.000Z',
 };
 

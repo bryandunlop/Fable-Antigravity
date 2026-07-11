@@ -25,7 +25,7 @@ function rev(overrides: Partial<DocRevision> = {}): DocRevision {
     docId: 'SOP-001',
     revision: '1.0',
     status: 'published',
-    content: 'x',
+    sections: [{ id: 'SOP-001::preamble', level: 1, number: '', title: '', blocks: [{ id: 'SOP-001::preamble::b0', type: 'paragraph', md: 'Body' }] }],
     changeSummary: '',
     effectiveDate: '2026-01-01',
     authorUserId: 'U1',
