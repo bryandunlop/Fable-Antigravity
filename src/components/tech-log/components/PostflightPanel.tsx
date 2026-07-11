@@ -67,7 +67,7 @@ export function PostflightPanel({ aircraft }: { aircraft: Aircraft }) {
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig });
     dispatch({ type: 'ADD_POSTFLIGHT', payload: pf });
-    if (instance) dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: { ...instance, signatureId: sig.id } });
+    if (instance) dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: { ...instance, signatureId: sig.id, fuelLoad } });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'POSTFLIGHT_COMPLETED', entityType: 'Postflight', entityId: pf.id, atUtc: nowIso, summary: `${aircraft.tailNumber} postflight — reclaimed to maintenance; ${pf.gatheredDefectIds.length} open squawk(s) gathered` } });
     toast.success(`${aircraft.tailNumber} postflight signed — back in maintenance custody.`);
   };
