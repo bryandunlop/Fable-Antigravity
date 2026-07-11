@@ -10,7 +10,7 @@ import { newId } from './util/id';
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-09-v11';
+export const DATA_VERSION = '2026-07-10-v12';
 
 function loadInitialState(): TechLogState {
   try {
@@ -121,6 +121,12 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       const rejected = maybeRejectSupersede(state, state.postflights, 'Postflight', action.payload);
       return rejected ?? { ...state, postflights: [...state.postflights, action.payload] };
     }
+    case 'ADD_CHECKLIST_TEMPLATE':
+      return { ...state, checklistTemplates: [...state.checklistTemplates, action.payload] };
+    case 'ADD_CHECKLIST_INSTANCE':
+      return { ...state, checklistInstances: [...state.checklistInstances, action.payload] };
+    case 'EDIT_CHECKLIST_INSTANCE':
+      return { ...state, checklistInstances: state.checklistInstances.map(i => (i.id === action.payload.id ? action.payload : i)) };
     case 'ADD_COORDINATION_MESSAGE':
       return { ...state, coordinationMessages: [...state.coordinationMessages, action.payload] };
     case 'EDIT_COORDINATION_MESSAGE':
