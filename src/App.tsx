@@ -83,6 +83,7 @@ import GRATFormBuilder from './components/GRATFormBuilder';
 import ProceduralBulletins from './components/ProceduralBulletins';
 import FlightOperationsBulletins from './components/bulletins/FlightOperationsBulletins';
 import { BulletinProvider } from './components/bulletins/BulletinContext';
+import { DocumentsProvider } from './components/documents/DocumentsContext';
 import { PassengerProvider } from './components/passengers/PassengerContext';
 import FlightAttendantFlights from './components/inflight/FlightAttendantFlights';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
@@ -182,6 +183,7 @@ export default function App() {
             <AuditProvider>
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
+                <DocumentsProvider>
                 <BulletinProvider>
                 <PassengerProvider>
                 <Router>
@@ -596,6 +598,7 @@ export default function App() {
                 </Router>
                 </PassengerProvider>
                 </BulletinProvider>
+                </DocumentsProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
             </AuditProvider>
