@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import WaiverRequestForm from './safety/WaiverRequestForm';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { RequiredReadsList } from './documents/components/RequiredReadsList';
+import { useDocuments, identityFor } from './documents/DocumentsContext';
+import { unacknowledgedRequiredReads } from './documents/engine/acknowledgments';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
@@ -43,6 +46,10 @@ interface UserSafetyProps {
 }
 
 export default function UserSafety({ userRole }: UserSafetyProps) {
+  const { state: docsState } = useDocuments();
+  const outstandingReads = unacknowledgedRequiredReads(
+    docsState.docs, docsState.revisions, docsState.acknowledgments, userRole, identityFor(userRole).userId,
+  ).length;
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('overview');
   const [showWaiverDialog, setShowWaiverDialog] = useState(false);
@@ -487,9 +494,7 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
               <FileText className="w-4 h-4 text-orange-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Documents</p>
-                <p className="text-2xl">
-                  {myDocuments.filter(d => d.status === 'Pending').length}
-                </p>
+                <p className="text-2xl">{outstandingReads}</p>
               </div>
             </div>
           </CardContent>
@@ -818,73 +823,14 @@ export default function UserSafety({ userRole }: UserSafetyProps) {
         </TabsContent>
 
         <TabsContent value="documents" className="mt-6">
+          {/* Legacy completion-code mock replaced by the unified documents engine
+              (myDocuments/handleCompleteDocument retained above, unused). */}
           <Card>
             <CardHeader>
-              <CardTitle>My Document Assignments</CardTitle>
+              <CardTitle>My Required Reads</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {myDocuments.map((doc) => (
-                  <div key={doc.id} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{doc.title}</h4>
-                        <p className="text-sm text-muted-foreground mt-1">{doc.description}</p>
-                        <div className="flex items-center gap-4 mt-3">
-                          <Badge className={getStatusColor(doc.status)}>
-                            {doc.status}
-                          </Badge>
-                          {doc.dueDate && (
-                            <span className="text-sm text-muted-foreground">
-                              Due: {new Date(doc.dueDate).toLocaleDateString()}
-                            </span>
-                          )}
-                          {doc.readDate && (
-                            <span className="text-sm text-muted-foreground">
-                              Read: {new Date(doc.readDate).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {doc.status === 'Pending' ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2">
-                              <Hash className="w-4 h-4 text-muted-foreground" />
-                              <Input
-                                placeholder="Enter completion code"
-                                className="w-40"
-                                onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                                  if (e.key === 'Enter') {
-                                    handleCompleteDocument(doc.id, (e.target as HTMLInputElement).value);
-                                  }
-                                }}
-                              />
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                const input = e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement;
-                                handleCompleteDocument(doc.id, input?.value || '');
-                              }}
-                            >
-                              Mark as Read
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                            <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                              {doc.completionCode}
-                            </code>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <RequiredReadsList userRole={userRole} />
             </CardContent>
           </Card>
         </TabsContent>

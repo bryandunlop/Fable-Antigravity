@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquarePlus, PencilLine, History, Users } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { useDocuments } from '../DocumentsContext';
@@ -15,6 +15,7 @@ import { readersFor } from '../engine/compliance';
 import { AckPanel } from '../components/AckPanel';
 import { ComplianceRoster } from '../components/ComplianceRoster';
 import { SuggestionDialog } from '../components/SuggestionDialog';
+import { CommentThread } from '../components/CommentThread';
 import { DocIdentityHeader } from '../components/DocIdentity';
 import { DocEditorDialog, type EditorMode } from '../components/DocEditorDialog';
 import { RevisionTimeline } from '../components/RevisionTimeline';
@@ -99,6 +100,12 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
         </GfoPanel>
       ) : (
         <GfoEmptyState message="No published revision yet — see the revision history below." />
+      )}
+
+      {rev && classFor(doc.classId).commentsEnabled && (
+        <GfoPanel title="Field notes & comments" action={<MessageSquare className="h-4 w-4 text-muted-foreground" />}>
+          <CommentThread doc={doc} userRole={userRole} />
+        </GfoPanel>
       )}
 
       {manager && <ReviewPanel doc={doc} userRole={userRole} />}

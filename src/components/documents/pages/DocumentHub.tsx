@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, BookOpenCheck, CheckSquare, FilePlus2, Library, MessageSquareText, Pin, Search } from 'lucide-react';
+import { BarChart3, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -23,6 +23,7 @@ import { RequiredReadsList } from '../components/RequiredReadsList';
 import { ReviewFlagBadge } from '../components/ReviewFlagBadge';
 import { ApprovalQueuePanel } from '../components/ApprovalQueuePanel';
 import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
+import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
 import { DocEditorDialog } from '../components/DocEditorDialog';
 
@@ -117,6 +118,9 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           <TabsTrigger value="library" className="gap-1.5">
             <Library className="h-4 w-4" /> Library
           </TabsTrigger>
+          <TabsTrigger value="tribal-knowledge" className="gap-1.5">
+            <Lightbulb className="h-4 w-4" /> Tribal knowledge
+          </TabsTrigger>
           {manager && (
             <TabsTrigger value="compliance" className="gap-1.5">
               <BarChart3 className="h-4 w-4" /> Compliance
@@ -204,6 +208,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
               })}
             </ul>
           )}
+        </TabsContent>
+
+        <TabsContent value="tribal-knowledge" className="mt-4">
+          <TribalKnowledgePanel userRole={userRole} additionalRoles={additionalRoles} />
         </TabsContent>
 
         <TabsContent value="compliance" className="mt-4">
