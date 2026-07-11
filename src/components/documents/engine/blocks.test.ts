@@ -96,6 +96,28 @@ describe('round-trip', () => {
   });
 });
 
+describe('degenerate & extra-coverage cases', () => {
+  it('keeps ids stable and round-trips a blank heading after a leading blank line', () => {
+    const md = '\n## \n\nReal content.';
+    const once = sectionsFromMarkdown(md, 'DOC');
+    expect(once).toHaveLength(1);
+    expect(once[0].id).toBe('DOC::untitled');
+    const twice = sectionsFromMarkdown(sectionsToMarkdown(once), 'DOC');
+    expect(twice).toEqual(once);
+    expect(checksumForSections(twice)).toBe(checksumForSections(once));
+  });
+
+  it('classifies an H3+ line inside a section body as a heading block', () => {
+    const s = sectionsFromMarkdown('## Parent\n\n### Sub heading\n\nText.', 'D-2');
+    expect(s[0].blocks[0].type).toBe('heading');
+    expect(s[0].blocks[1].type).toBe('paragraph');
+  });
+
+  it('returns an empty array for empty input', () => {
+    expect(sectionsFromMarkdown('', 'D-3')).toEqual([]);
+  });
+});
+
 describe('canonicalizeSections / checksum', () => {
   it('is stable regardless of object key insertion order', () => {
     const s = sectionsFromMarkdown(GOM, 'GOM-3');

@@ -69,32 +69,38 @@ function classify(chunk: string): { type: BlockType; calloutKind?: DocBlock['cal
 }
 
 export function sectionsFromMarkdown(markdown: string, docId: string): DocSection[] {
-  const raws = splitRawSections(markdown);
+  const raws = splitRawSections(markdown).map((raw) => ({ raw, chunks: chunkBody(raw.body) }));
+  // Drop a fully empty leading preamble (e.g. a blank line before the first heading)
+  // BEFORE id allocation, so it cannot reserve a slug the first real section then collides with.
+  const kept = raws.filter(
+    ({ raw, chunks }, i) =>
+      !(i === 0 && raw.level === 1 && raw.title === '' && raw.number === '' && chunks.length === 0),
+  );
   const usedIds = new Map<string, number>();
-  const sections: DocSection[] = [];
-  for (const raw of raws) {
+  return kept.map(({ raw, chunks }) => {
     const base = `${docId}::${slug(raw.title)}`;
     const seen = usedIds.get(base) ?? 0;
     usedIds.set(base, seen + 1);
     const id = seen === 0 ? base : `${base}-${seen + 1}`;
-    const blocks: DocBlock[] = chunkBody(raw.body).map((chunk, ordinal) => {
+    const blocks: DocBlock[] = chunks.map((chunk, ordinal) => {
       const c = classify(chunk);
       const block: DocBlock = { id: `${id}::b${ordinal}`, type: c.type, md: chunk };
       if (c.calloutKind) block.calloutKind = c.calloutKind;
       if (c.figureRef) block.figureRef = c.figureRef;
       return block;
     });
-    sections.push({ id, level: raw.level, number: raw.number, title: raw.title, blocks });
-  }
-  // Drop a fully empty leading preamble (e.g. content that starts with '## ').
-  return sections.filter((s, i) => !(i === 0 && s.title === '' && s.number === '' && s.blocks.length === 0));
+    return { id, level: raw.level, number: raw.number, title: raw.title, blocks };
+  });
 }
 
 export function sectionsToMarkdown(sections: DocSection[]): string {
   return sections
     .map((s) => {
-      const heading = s.title || s.number
-        ? `${'#'.repeat(Math.max(1, s.level))} ${s.number ? `${s.number} ` : ''}${s.title}`.trimEnd()
+      const hasHeading = s.level >= 2 || s.title !== '' || s.number !== '';
+      // No trimEnd: a blank level-2 heading must keep its trailing space ('## ')
+      // so it re-parses back into a heading rather than collapsing into a preamble.
+      const heading = hasHeading
+        ? `${'#'.repeat(Math.max(1, s.level))} ${s.number ? `${s.number} ` : ''}${s.title}`
         : '';
       const body = s.blocks.map((b) => b.md).join('\n\n');
       return [heading, body].filter((p) => p.length > 0).join('\n\n');
