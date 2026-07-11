@@ -9,7 +9,7 @@ import { projectCheck } from '../engine/recurringChecks';
 import { campForecast } from '../integration/campClient';
 import { deferralsRequiringAck, canAcceptDispatch } from '../engine/handover';
 import { INTENT } from '../constants';
-import { latestPublishedTemplate, isReleaseGated } from '../engine/checklist';
+import { latestPublishedTemplate, isReleaseGated, buildInitialEntries } from '../engine/checklist';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { newId } from '../util/id';
 import type { Aircraft, FlightBriefing, Signature } from '../types';
@@ -59,6 +59,9 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
 
   const template = latestPublishedTemplate(state.checklistTemplates, aircraft.type, 'PREFLIGHT');
   const instance = state.checklistInstances.find(i => i.id === briefing?.checklistInstanceId);
+  // Version-pinned template the instance was actually built from — NOT the latest published template,
+  // which may have drifted (a new version can be published while this briefing sits in DRAFT).
+  const instanceTemplate = instance && state.checklistTemplates.find(t => t.id === instance.templateId && t.version === instance.templateVersion);
 
   const createDraft = () => {
     if (!template) return toast.error(`No published preflight checklist for ${aircraft.type} yet — ask a maintenance admin to publish one in Admin > Checklists.`);
@@ -71,7 +74,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
       type: 'ADD_CHECKLIST_INSTANCE',
       payload: {
         id: instanceId, aircraftId: aircraft.id, phase: 'PREFLIGHT', templateId: template.id, templateVersion: template.version,
-        briefingId: b.id, entries: template.sections.flatMap(s => s.items).map(def => ({ itemDefId: def.id, state: 'OPEN' as const })),
+        briefingId: b.id, entries: buildInitialEntries(template),
         createdAtUtc: new Date().toISOString(),
       },
     });
@@ -82,8 +85,8 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   const patch = (b: FlightBriefing) => dispatch({ type: 'EDIT_BRIEFING', payload: b });
 
   const beginRelease = (b: FlightBriefing) => {
-    if (!template || !instance) return;
-    const gate = isReleaseGated(instance, template);
+    if (!instanceTemplate || !instance) return;
+    const gate = isReleaseGated(instance, instanceTemplate);
     if (!gate.ok) return toast.error(`Complete the required checklist items first (${gate.missing.length} remaining).`);
     setPendingSigId(newId('sig'));
     setRelOpen(true);
@@ -163,8 +166,8 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardCheck className="h-4 w-4" /> Preflight checklist</CardTitle></CardHeader>
           <CardContent>
-            {template && instance
-              ? <ChecklistRunner aircraft={aircraft} template={template} instance={instance} onChange={next => dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: next })} />
+            {instanceTemplate && instance
+              ? <ChecklistRunner aircraft={aircraft} template={instanceTemplate} instance={instance} onChange={next => dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: next })} />
               : <p className="text-sm text-muted-foreground">No checklist instance found for this briefing.</p>}
           </CardContent>
         </Card>
