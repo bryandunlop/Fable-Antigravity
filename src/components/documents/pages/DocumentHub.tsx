@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpenCheck, CheckSquare, FilePlus2, Library, Pin, Search } from 'lucide-react';
+import { BarChart3, BookOpenCheck, CheckSquare, FilePlus2, Library, MessageSquareText, Pin, Search } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -22,6 +22,8 @@ import { DocIdentityLine } from '../components/DocIdentity';
 import { RequiredReadsList } from '../components/RequiredReadsList';
 import { ReviewFlagBadge } from '../components/ReviewFlagBadge';
 import { ApprovalQueuePanel } from '../components/ApprovalQueuePanel';
+import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
+import { ComplianceDashboard } from './ComplianceDashboard';
 import { DocEditorDialog } from '../components/DocEditorDialog';
 
 const LIBRARY_CLASSES = ['procedural-bulletin', 'flight-ops-bulletin', 'sop', 'manual'];
@@ -63,6 +65,8 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
   const reviewDue = docsDueForReview(state.docs, todayIso).length;
   const openSugs = openSuggestions(state.suggestions).length;
+  const ownsDocs = state.docs.some((d) => d.ownerUserId === userId);
+  const seesFeedback = manager || ownsDocs;
 
   const libraryDocs = state.docs
     .filter((d) => LIBRARY_CLASSES.includes(d.classId))
@@ -113,6 +117,11 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           <TabsTrigger value="library" className="gap-1.5">
             <Library className="h-4 w-4" /> Library
           </TabsTrigger>
+          {manager && (
+            <TabsTrigger value="compliance" className="gap-1.5">
+              <BarChart3 className="h-4 w-4" /> Compliance
+            </TabsTrigger>
+          )}
           {pendingApprovals.length > 0 || manager ? (
             <TabsTrigger value="approvals" className="gap-1.5">
               <CheckSquare className="h-4 w-4" /> Approvals
@@ -121,6 +130,14 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
               )}
             </TabsTrigger>
           ) : null}
+          {seesFeedback && (
+            <TabsTrigger value="feedback" className="gap-1.5">
+              <MessageSquareText className="h-4 w-4" /> Feedback
+              {openSugs > 0 && (
+                <Badge variant="secondary" className="ml-1 px-1.5 text-[10px]">{openSugs}</Badge>
+              )}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="my-reads" className="mt-4">
@@ -189,8 +206,16 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           )}
         </TabsContent>
 
+        <TabsContent value="compliance" className="mt-4">
+          <ComplianceDashboard />
+        </TabsContent>
+
         <TabsContent value="approvals" className="mt-4">
           <ApprovalQueuePanel userRole={userRole} additionalRoles={additionalRoles} />
+        </TabsContent>
+
+        <TabsContent value="feedback" className="mt-4">
+          <SuggestionQueuePanel userRole={userRole} additionalRoles={additionalRoles} />
         </TabsContent>
       </Tabs>
 

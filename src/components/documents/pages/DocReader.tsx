@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowLeft, AlertTriangle, FilePlus2, PencilLine, History } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquarePlus, PencilLine, History, Users } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { useDocuments } from '../DocumentsContext';
@@ -10,7 +10,11 @@ import { classFor } from '../classes';
 import { canAuthor } from '../engine/lifecycle';
 import { currentRevision, revisionsFor } from '../engine/revisions';
 import { canManageDocuments } from '../roles';
+import { documentsRoleUniverse } from '../roles';
+import { readersFor } from '../engine/compliance';
 import { AckPanel } from '../components/AckPanel';
+import { ComplianceRoster } from '../components/ComplianceRoster';
+import { SuggestionDialog } from '../components/SuggestionDialog';
 import { DocIdentityHeader } from '../components/DocIdentity';
 import { DocEditorDialog, type EditorMode } from '../components/DocEditorDialog';
 import { RevisionTimeline } from '../components/RevisionTimeline';
@@ -20,6 +24,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const { docId } = useParams<{ docId: string }>();
   const { state } = useDocuments();
   const [editor, setEditor] = useState<EditorMode | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
 
   const doc = state.docs.find((d) => d.id === docId);
   const rev = doc ? currentRevision(doc.id, state.revisions) : undefined;
@@ -51,8 +56,14 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
         <Button variant="ghost" size="sm" asChild className="-ml-2">
           <Link to="/documents"><ArrowLeft className="mr-1.5 h-4 w-4" /> Documents</Link>
         </Button>
-        {author && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          {rev && (
+            <Button size="sm" variant="outline" onClick={() => setSuggesting(true)}>
+              <MessageSquarePlus className="mr-1.5 h-4 w-4" /> Suggest a change
+            </Button>
+          )}
+          {author && (
+            <>
             {editableRev && (
               <Button size="sm" variant="secondary" onClick={() => setEditor({ kind: 'edit-draft', doc, rev: editableRev })}>
                 <PencilLine className="mr-1.5 h-4 w-4" /> Edit draft (rev {editableRev.revision})
@@ -63,8 +74,9 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
                 <FilePlus2 className="mr-1.5 h-4 w-4" /> New revision
               </Button>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {headerRev && <DocIdentityHeader doc={doc} rev={headerRev} />}
@@ -91,10 +103,20 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
 
       {manager && <ReviewPanel doc={doc} userRole={userRole} />}
 
+      {manager && rev && rev.requireAcknowledgment && rev.ackLevel !== 'none' && (
+        <GfoPanel title="Read receipts" action={<Users className="h-4 w-4 text-muted-foreground" />}>
+          <ComplianceRoster rev={rev} readers={readersFor(doc, documentsRoleUniverse())} acks={state.acknowledgments} />
+        </GfoPanel>
+      )}
+
       {(manager || author) && allRevs.length > 0 && (
         <GfoPanel title="Revision history" action={<History className="h-4 w-4 text-muted-foreground" />}>
           <RevisionTimeline revisions={allRevs} />
         </GfoPanel>
+      )}
+
+      {rev && (
+        <SuggestionDialog open={suggesting} onOpenChange={setSuggesting} doc={doc} rev={rev} userRole={userRole} />
       )}
 
       {editor && (

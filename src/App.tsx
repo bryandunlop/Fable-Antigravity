@@ -45,7 +45,8 @@ import HazardReporting from './components/HazardReporting';
 import HazardWorkspace from './components/hazard/HazardWorkspace';
 import HazardDetailView from './components/hazard/HazardDetailView';
 import InternalAuditManagement from './components/InternalAuditManagement';
-import DocumentCompliance from './components/DocumentCompliance';
+// DocumentCompliance mock superseded by documents/ComplianceDashboard (kept in-tree, de-routed)
+import { ComplianceDashboard } from './components/documents/pages/ComplianceDashboard';
 import UserSafety from './components/UserSafety';
 import CateringTracker from './components/CateringTracker';
 import CateringOrders from './components/CateringOrders';
@@ -366,7 +367,7 @@ export default function App() {
                                 <Route path="/safety/hazards" element={<HazardWorkspace userRole={userRole} />} />
                                 <Route path="/safety/hazards/:id" element={<HazardDetailView userRole={userRole} />} />
                                 <Route path="/safety/audits" element={<InternalAuditManagement />} />
-                                <Route path="/safety/compliance" element={<DocumentCompliance />} />
+                                <Route path="/safety/compliance" element={<ComplianceDashboard standalone />} />
                                 <Route path="/procedural-bulletins" element={<ProceduralBulletins userRole={userRole} />} />
                                 <Route path="/flight-operations-bulletins" element={<FlightOperationsBulletins userRole={userRole} />} />
                                 <Route
