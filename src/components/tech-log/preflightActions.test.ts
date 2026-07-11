@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg, saveFratDraftOnLeg } from './preflightActions';
+import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg, saveFratDraftOnLeg, setPlannedFuelOnLeg, markFuelFinalOnLeg } from './preflightActions';
 import type { Trip, TripLeg, TechLogAction } from './types';
 
 const leg: TripLeg = {
@@ -90,5 +90,27 @@ describe('submitFuelOnLeg', () => {
     expect(r.ok).toBe(true);
     const edit = actions.find((a) => a.type === 'EDIT_TRIP') as Extract<TechLogAction, { type: 'EDIT_TRIP' }>;
     expect(edit.payload.legs!.find((l) => l.id === 'leg-1')!.fuelRequestId).toBe('fr-1');
+  });
+});
+
+describe('setPlannedFuelOnLeg', () => {
+  it('dispatches EDIT_TRIP with the leg planned fuel set', () => {
+    const { dispatch, actions } = collect();
+    setPlannedFuelOnLeg({ dispatch, newId: (p) => `${p}-1`, trip, leg, actorOid: 'oid-pic', lbs: 9400 });
+    const edit = actions.find((a) => a.type === 'EDIT_TRIP') as Extract<TechLogAction, { type: 'EDIT_TRIP' }>;
+    const patched = edit.payload.legs!.find((l) => l.id === 'leg-1')!;
+    expect(patched.plannedFuelLb).toBe(9400);
+    expect(actions.some((a) => a.type === 'ADD_AUDIT')).toBe(true);
+  });
+});
+
+describe('markFuelFinalOnLeg', () => {
+  it('dispatches EDIT_TRIP with the leg fuel finalized and stamps the actor', () => {
+    const { dispatch, actions } = collect();
+    markFuelFinalOnLeg({ dispatch, newId: (p) => `${p}-1`, trip, leg, actorOid: 'oid-pic', nowUtc: '2026-07-10T18:00:00.000Z' });
+    const edit = actions.find((a) => a.type === 'EDIT_TRIP') as Extract<TechLogAction, { type: 'EDIT_TRIP' }>;
+    const patched = edit.payload.legs!.find((l) => l.id === 'leg-1')!;
+    expect(patched.fuelFinalizedByOid).toBe('oid-pic');
+    expect(patched.fuelFinalizedAtUtc).toBe('2026-07-10T18:00:00.000Z');
   });
 });
