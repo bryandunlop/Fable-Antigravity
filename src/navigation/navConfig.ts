@@ -11,7 +11,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Activity, AlertOctagon, AlertTriangle, Archive, ArrowRightLeft, BarChart3,
   BookOpen, Boxes, Building2, Calendar, CalendarCheck, ClipboardCheck,
-  ClipboardList, Database, FileText, Fuel, HardDrive, HardHat, Home, Layers,
+  ClipboardList, Database, FileText, Flag, Fuel, HardDrive, HardHat, Home, Layers,
   MapPin, Monitor, Package, PackagePlus, Plane, Send, Settings, Shield,
   Sliders, Sparkles, Target, Upload, UserCheck, Users, Utensils, Warehouse,
   Wrench,
@@ -98,6 +98,8 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/flight-operations-center', label: 'Flight Operations Center', domain: 'flight-ops', icon: Monitor, sidebar: false, keywords: ['foc', 'ops center'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   { path: '/flight-operations-bulletins', label: 'Flight Ops Bulletins', domain: 'flight-ops', icon: BookOpen, primary: false, keywords: ['fob', 'bulletin', 'interim', 'nonofficial', 'read and initial'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/aircraft', label: 'Aircraft Status', domain: 'flight-ops', icon: Plane, sidebar: false, keywords: ['fleet', 'tail number', 'status'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  // FIR — retrospective ops explainability (docs/FIR_MODULE_DESIGN.md). Any role can open one (§7 bottom-up capture).
+  { path: '/fir', label: 'Irregularity Reports', domain: 'flight-ops', icon: Flag, primary: false, detailLabel: 'FIR', keywords: ['fir', 'irregularity', 'aog report', 'delay', 'debrief', 'downtime', 'why'], roles: ['pilot', 'chief-pilot', 'inflight', 'maintenance', 'maintenance-coordinator', 'dom', 'lead', 'safety', 'scheduling', 'admin'] },
   { path: '/fleet-map', label: 'Live Fleet Map', domain: 'flight-ops', icon: MapPin, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
 
   // ── Scheduling — the Scheduling Workspace leads ───────────────────────────

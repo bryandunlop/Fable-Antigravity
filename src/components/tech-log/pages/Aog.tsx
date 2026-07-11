@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plane, Clock, Check, RefreshCw, BellRing, FileText, PlayCircle, PackageSearch, ClipboardCheck, HelpCircle, Users } from 'lucide-react';
+import { Plane, Clock, Check, RefreshCw, BellRing, FileText, Flag, PlayCircle, PackageSearch, ClipboardCheck, HelpCircle, Users } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { deriveServiceability } from '../engine/serviceability';
@@ -100,6 +100,10 @@ export default function Aog() {
                   <div className="rounded-md border bg-muted/30 p-3">
                     <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
                       <span className="font-semibold uppercase tracking-wide text-muted-foreground">Downtime debrief</span>
+                      {/* The debrief is the seed of an FIR — retrospective explainability (FIR design §9). */}
+                      <Button size="sm" variant="outline" className="ml-auto h-7" onClick={() => navigate(`/fir/new?defect=${driver.id}`)}>
+                        <Flag className="mr-1.5 h-3.5 w-3.5" /> Open FIR
+                      </Button>
                       <Badge variant="outline">{dbf.elapsedHours} h elapsed{dbf.ongoing ? ' · ongoing' : ''}</Badge>
                       <Badge variant="outline"><PlayCircle className="mr-1 h-3 w-3" />in work {dbf.stateHours.IN_WORK} h</Badge>
                       <Badge variant="outline"><PackageSearch className="mr-1 h-3 w-3" />parts (POO) {dbf.stateHours.WAITING_PARTS} h</Badge>
