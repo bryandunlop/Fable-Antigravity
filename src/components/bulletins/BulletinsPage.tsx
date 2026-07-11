@@ -7,20 +7,20 @@ import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '../ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import {
-  BookOpen, Plus, Search, Filter, Calendar, User, Tag, Eye, Edit, Trash2, Pin, Archive,
+  BookOpen, Plus, Search, Filter, Calendar, User, Tag, Eye, Edit, Pin, Archive,
   Clock, X, ShieldCheck, Printer, CheckCircle2, PenLine, ClipboardCheck,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Bulletin, BulletinType } from './types';
 import { useBulletins } from './BulletinContext';
+import { useDocuments } from '../documents/DocumentsContext';
+import { currentRevision } from '../documents/engine/revisions';
+import { bulletinClassId } from '../documents/engine/bulletinCompat';
+import { DocEditorDialog, type EditorMode } from '../documents/components/DocEditorDialog';
 import { resolveUserId } from '../../notifications/identity';
 import {
   isAcknowledged, acknowledgedFor, outstandingReaders, isTargetRole, type Reader,
@@ -75,33 +75,23 @@ function getRoleBadgeColor(role: string) {
   return colors[role] || 'bg-gray-100 text-gray-800';
 }
 
-function emptyBulletin(bulletinType: BulletinType, userName: string): Partial<Bulletin> {
-  return {
-    title: '', content: '', category: '', roles: [],
-    effectiveDate: new Date().toISOString().split('T')[0], expirationDate: '',
-    author: userName, version: '1.0', isPinned: false, isArchived: false,
-    requireAcknowledgment: false, bulletinType, tags: [], images: [], videos: [], links: [],
-  };
-}
-
 export default function BulletinsPage({ userRole, config }: BulletinsPageProps) {
-  const { state, addBulletin, updateBulletin, deleteBulletin, togglePin, toggleArchive, acknowledge } = useBulletins();
+  const { state, togglePin, toggleArchive, acknowledge } = useBulletins();
+  const { state: docState } = useDocuments();
   const userName = 'Current User';
   const currentUserId = resolveUserId(userRole);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedBulletin, setSelectedBulletin] = useState<Bulletin | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<Bulletin | null>(null);
+  const [editor, setEditor] = useState<EditorMode | null>(null);
 
   // Read-and-Initial confirm state (reset each time a bulletin is opened).
   const [ackChecked, setAckChecked] = useState(false);
   const [ackInitials, setAckInitials] = useState('');
 
-  const [newBulletin, setNewBulletin] = useState<Partial<Bulletin>>(emptyBulletin(config.bulletinType, userName));
 
   // Only admin/safety/lead/document-manager/procedural-specialist can manage.
   const canManage = ['admin', 'safety', 'lead', 'document-manager', 'procedural-specialist'].includes(userRole);
@@ -151,76 +141,13 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
     return new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime();
   });
 
-  const nextId = () => {
-    const nums = bulletinsOfType
-      .map((b) => Number(b.id.replace(/^\D+-?/, '')))
-      .filter((n) => !Number.isNaN(n));
-    const next = (nums.length ? Math.max(...nums) : 0) + 1;
-    return `${config.idPrefix}-${String(next).padStart(3, '0')}`;
-  };
-
-  const resetNewBulletin = () => setNewBulletin(emptyBulletin(config.bulletinType, userName));
-
-  const handleCreateBulletin = () => {
-    if (!newBulletin.title || !newBulletin.content || !newBulletin.category || !newBulletin.roles?.length) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    const bulletin: Bulletin = {
-      id: nextId(),
-      bulletinType: config.bulletinType,
-      title: newBulletin.title,
-      content: newBulletin.content,
-      category: newBulletin.category,
-      roles: newBulletin.roles,
-      effectiveDate: newBulletin.effectiveDate || new Date().toISOString().split('T')[0],
-      expirationDate: newBulletin.expirationDate,
-      author: userName,
-      createdDate: new Date().toISOString().split('T')[0],
-      version: newBulletin.version || '1.0',
-      isPinned: newBulletin.isPinned || false,
-      isArchived: false,
-      requireAcknowledgment: newBulletin.requireAcknowledgment || false,
-      tags: newBulletin.tags || [],
-      images: newBulletin.images || [],
-      videos: newBulletin.videos || [],
-      links: newBulletin.links || [],
-    };
-    addBulletin(bulletin);
-    setIsCreateDialogOpen(false);
-    resetNewBulletin();
-    toast.success(`${config.docLabel} created successfully`);
-  };
-
-  const handleEditBulletin = () => {
-    if (!newBulletin.id || !newBulletin.title || !newBulletin.content || !newBulletin.category || !newBulletin.roles?.length) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    const existing = state.bulletins.find((b) => b.id === newBulletin.id);
-    if (!existing) return;
-    updateBulletin({
-      ...existing,
-      title: newBulletin.title!,
-      content: newBulletin.content!,
-      category: newBulletin.category!,
-      roles: newBulletin.roles!,
-      effectiveDate: newBulletin.effectiveDate || existing.effectiveDate,
-      expirationDate: newBulletin.expirationDate,
-      version: newBulletin.version || existing.version,
-      isPinned: newBulletin.isPinned || false,
-      requireAcknowledgment: newBulletin.requireAcknowledgment || false,
-      tags: newBulletin.tags || [],
-      lastUpdated: new Date().toISOString().split('T')[0],
-    });
-    setIsCreateDialogOpen(false);
-    resetNewBulletin();
-    toast.success(`${config.docLabel} updated successfully`);
-  };
-
+  // Authoring now goes through the shared four-eyes flow (documents engine):
+  // Create opens a bulletin-class draft; Edit starts a new revision of the doc.
   const handleEditClick = (bulletin: Bulletin) => {
-    setNewBulletin(bulletin);
-    setIsCreateDialogOpen(true);
+    const doc = docState.docs.find((d) => d.id === bulletin.id);
+    const baseRev = doc ? currentRevision(doc.id, docState.revisions) : undefined;
+    if (!doc || !baseRev) return;
+    setEditor({ kind: 'revise', doc, baseRev });
   };
 
   const handleViewBulletin = (bulletin: Bulletin) => {
@@ -242,18 +169,6 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
     setAckInitials('');
   };
 
-  const handleRoleToggle = (role: string) => {
-    const currentRoles = newBulletin.roles || [];
-    if (role === 'all') {
-      setNewBulletin({ ...newBulletin, roles: ['all'] });
-    } else {
-      const updatedRoles = currentRoles.includes(role)
-        ? currentRoles.filter((r) => r !== role && r !== 'all')
-        : [...currentRoles.filter((r) => r !== 'all'), role];
-      setNewBulletin({ ...newBulletin, roles: updatedRoles });
-    }
-  };
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -266,7 +181,7 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
           <p className="text-sm text-muted-foreground">{config.headerSubtitle}</p>
         </div>
         {canManage && (
-          <Button onClick={() => { resetNewBulletin(); setIsCreateDialogOpen(true); }}>
+          <Button onClick={() => setEditor({ kind: 'create', classId: bulletinClassId(config.bulletinType) })}>
             <Plus className="w-4 h-4 mr-2" />
             New Bulletin
           </Button>
@@ -405,14 +320,6 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
                           <Button variant="ghost" size="sm" onClick={() => handleEditClick(bulletin)}>
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPendingDelete(bulletin)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </>
                       )}
                     </div>
@@ -429,133 +336,15 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
         )}
       </div>
 
-      {/* Create / Edit Bulletin Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{newBulletin.id ? `Edit ${config.docLabel}` : `Create New ${config.docLabel}`}</DialogTitle>
-            <DialogDescription>Create a reference document for specific roles</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                value={newBulletin.title}
-                onChange={(e) => setNewBulletin({ ...newBulletin, title: e.target.value })}
-                placeholder="Enter bulletin title..."
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="category">Category *</Label>
-                <Select value={newBulletin.category} onValueChange={(value: string) => setNewBulletin({ ...newBulletin, category: value })}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((category) => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="version">Version</Label>
-                <Input
-                  id="version"
-                  value={newBulletin.version}
-                  onChange={(e) => setNewBulletin({ ...newBulletin, version: e.target.value })}
-                  placeholder="1.0"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="effectiveDate">Effective Date *</Label>
-                <Input
-                  id="effectiveDate"
-                  type="date"
-                  value={newBulletin.effectiveDate}
-                  onChange={(e) => setNewBulletin({ ...newBulletin, effectiveDate: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="expirationDate">Expiration Date (Optional)</Label>
-                <Input
-                  id="expirationDate"
-                  type="date"
-                  value={newBulletin.expirationDate || ''}
-                  onChange={(e) => setNewBulletin({ ...newBulletin, expirationDate: e.target.value })}
-                />
-              </div>
-            </div>
-            <div>
-              <Label>Applicable Roles *</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-                {ROLE_OPTIONS.map((role) => (
-                  <div key={role.value} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`role-${role.value}`}
-                      checked={newBulletin.roles?.includes(role.value) || false}
-                      onCheckedChange={() => handleRoleToggle(role.value)}
-                    />
-                    <Label htmlFor={`role-${role.value}`} className="cursor-pointer">{role.label}</Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="tags">Tags (comma-separated)</Label>
-              <Input
-                id="tags"
-                value={newBulletin.tags?.join(', ')}
-                onChange={(e) => setNewBulletin({
-                  ...newBulletin,
-                  tags: e.target.value.split(',').map((t) => t.trim()).filter((t) => t),
-                })}
-                placeholder="winter, safety, maintenance..."
-              />
-            </div>
-            <div>
-              <Label htmlFor="content">Content * (Markdown supported)</Label>
-              <Textarea
-                id="content"
-                value={newBulletin.content}
-                onChange={(e) => setNewBulletin({ ...newBulletin, content: e.target.value })}
-                placeholder="Enter bulletin content using Markdown formatting..."
-                rows={15}
-                className="font-mono text-sm"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="isPinned"
-                checked={newBulletin.isPinned}
-                onCheckedChange={(checked: boolean | 'indeterminate') => setNewBulletin({ ...newBulletin, isPinned: checked as boolean })}
-              />
-              <Label htmlFor="isPinned" className="cursor-pointer">Pin this bulletin (appears at top of list)</Label>
-            </div>
-            <div className="flex items-center space-x-2 rounded-md border border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 p-3">
-              <Checkbox
-                id="requireAck"
-                checked={newBulletin.requireAcknowledgment}
-                onCheckedChange={(checked: boolean | 'indeterminate') => setNewBulletin({ ...newBulletin, requireAcknowledgment: checked as boolean })}
-              />
-              <Label htmlFor="requireAck" className="cursor-pointer">
-                <span className="font-medium">Require Read &amp; Initial</span>
-                <span className="block text-xs text-muted-foreground">
-                  Target-role readers must confirm they have read this bulletin. Read receipts are tracked below.
-                </span>
-              </Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetNewBulletin(); }}>Cancel</Button>
-            <Button onClick={newBulletin.id ? handleEditBulletin : handleCreateBulletin}>
-              {newBulletin.id ? 'Update Bulletin' : 'Create Bulletin'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Authoring via the shared documents four-eyes flow */}
+      {editor && (
+        <DocEditorDialog
+          open={!!editor}
+          onOpenChange={(o: boolean) => { if (!o) setEditor(null); }}
+          mode={editor}
+          userRole={userRole}
+        />
+      )}
 
       {/* View Bulletin Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
@@ -721,32 +510,6 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={!!pendingDelete} onOpenChange={(open: boolean) => !open && setPendingDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this bulletin?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingDelete ? `"${pendingDelete.title}" and its read receipts will be permanently removed. This cannot be undone.` : ''}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => {
-                if (pendingDelete) {
-                  deleteBulletin(pendingDelete.id);
-                  toast.success('Bulletin deleted');
-                  setPendingDelete(null);
-                }
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
