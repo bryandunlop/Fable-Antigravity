@@ -15,6 +15,26 @@ export type RevisionStatus =
   | 'superseded'
   | 'rejected';
 
+export type BlockType = 'paragraph' | 'heading' | 'list' | 'table' | 'callout' | 'figure';
+
+export interface DocBlock {
+  id: string;                 // stable across revisions; '<sectionId>::b<ordinal>' this slice
+  type: BlockType;
+  md: string;                 // block content as markdown (GFM)
+  calloutKind?: 'note' | 'caution' | 'warning';
+  splitFrom?: string;         // lineage when a block is split (set by the editor in Slice 3)
+  effectivity?: string[];     // per-tail/type applicability — field now, UI later (spec D-12)
+  figureRef?: string;         // image src for 'figure' blocks
+}
+
+export interface DocSection {
+  id: string;                 // '<docId>::<slug(heading)>', de-duplicated on collision
+  level: number;              // 1 = document preamble/title, 2 = '##' section
+  number: string;              // display number '3.1' or '' when the heading has none
+  title: string;
+  blocks: DocBlock[];
+}
+
 export interface Doc {
   id: string; // 'SOP-001' — generated from the class idPrefix
   classId: string; // key into DOC_CLASSES
