@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Switch } from '../../ui/switch';
 import { Label } from '../../ui/label';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../ui/accordion';
 import { GfoPageHeader, GfoStatCard, GfoEmptyState } from '../../gfo';
 import { useDocuments, identityFor } from '../DocumentsContext';
 import { classFor, DOC_CLASS_LIST } from '../classes';
@@ -17,6 +18,7 @@ import { unacknowledgedRequiredReads } from '../engine/acknowledgments';
 import { readersFor, complianceSummary } from '../engine/compliance';
 import { docsDueForReview } from '../engine/review';
 import { openSuggestions } from '../engine/suggestions';
+import { groupDocsByCategory, yearsFor, matchesYear } from '../engine/library';
 import { documentsRoleUniverse, canManageDocuments } from '../roles';
 import { DocIdentityLine } from '../components/DocIdentity';
 import { RequiredReadsList } from '../components/RequiredReadsList';
@@ -33,6 +35,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
   const { state } = useDocuments();
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('all');
+  const [yearFilter, setYearFilter] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -69,10 +72,12 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
   const ownsDocs = state.docs.some((d) => d.ownerUserId === userId);
   const seesFeedback = manager || ownsDocs;
 
-  const libraryDocs = state.docs
-    .filter((d) => LIBRARY_CLASSES.includes(d.classId))
+  const allLibraryDocs = state.docs.filter((d) => LIBRARY_CLASSES.includes(d.classId));
+
+  const libraryDocs = allLibraryDocs
     .filter((d) => showArchived || !d.isArchived)
     .filter((d) => classFilter === 'all' || d.classId === classFilter)
+    .filter((d) => matchesYear(d, state.revisions, yearFilter))
     .filter((d) => {
       const q = search.trim().toLowerCase();
       if (!q) return true;
@@ -82,8 +87,19 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
         d.category.toLowerCase().includes(q) ||
         d.tags.some((t) => t.toLowerCase().includes(q))
       );
-    })
-    .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || a.id.localeCompare(b.id));
+    });
+
+  // Buckets: group the filtered set by category; keep all category sections
+  // expanded by default regardless of which filters are active.
+  const categoryGroups = useMemo(
+    () => groupDocsByCategory(libraryDocs, state.revisions),
+    [libraryDocs, state.revisions],
+  );
+  const allCategories = useMemo(
+    () => [...new Set(DOC_CLASS_LIST.filter((c) => LIBRARY_CLASSES.includes(c.id)).flatMap((c) => c.categories))],
+    [],
+  );
+  const availableYears = useMemo(() => yearsFor(allLibraryDocs, state.revisions), [allLibraryDocs, state.revisions]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -168,6 +184,17 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
                 ))}
               </SelectContent>
             </Select>
+            {availableYears.length > 0 && (
+              <Select value={yearFilter} onValueChange={setYearFilter}>
+                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All years</SelectItem>
+                  {availableYears.map((y) => (
+                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {manager && (
               <div className="flex items-center gap-2">
                 <Switch id="showArchived" checked={showArchived} onCheckedChange={setShowArchived} />
@@ -176,37 +203,55 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
             )}
           </div>
 
-          {libraryDocs.length === 0 ? (
+          {categoryGroups.length === 0 ? (
             <GfoEmptyState message="No documents match the current filters." />
           ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-              {libraryDocs.map((doc) => {
-                const rev = currentRevision(doc.id, state.revisions);
-                const cfg = classFor(doc.classId);
-                const to = cfg.readerRoute === '/documents' ? `/documents/${doc.id}` : cfg.readerRoute;
-                const summary = rev && rev.requireAcknowledgment && rev.ackLevel !== 'none'
-                  ? complianceSummary(rev, readersFor(doc, universe), state.acknowledgments, todayIso)
-                  : undefined;
-                return (
-                  <li key={doc.id}>
-                    <Link to={to} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50">
-                      {doc.isPinned && <Pin className="h-3.5 w-3.5 shrink-0 text-gfo-daylight" />}
-                      <div className="min-w-0 flex-1">
-                        <DocIdentityLine doc={doc} rev={rev} />
-                        <p className="mt-0.5 text-xs text-muted-foreground">{doc.category}{rev ? '' : ' · no published revision yet'}</p>
-                      </div>
-                      {doc.isArchived && <Badge variant="outline" className="shrink-0 text-[10px]">Archived</Badge>}
-                      {manager && <ReviewFlagBadge doc={doc} todayIso={todayIso} />}
-                      {manager && summary && (
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground" title="Read-and-acknowledge compliance">
-                          {summary.read}/{summary.total} read
-                        </span>
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <Accordion type="multiple" defaultValue={allCategories} className="space-y-3">
+              {categoryGroups.map(({ category, docs }) => (
+                <AccordionItem
+                  key={category}
+                  value={category}
+                  className="rounded-lg border border-border bg-card px-4 last:border-b"
+                >
+                  <AccordionTrigger className="py-3 hover:no-underline">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-primary">
+                      {category}
+                      <Badge variant="secondary" className="px-1.5 text-[10px] font-normal">{docs.length}</Badge>
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-0">
+                    <ul className="-mx-4 divide-y divide-border border-t border-border">
+                      {docs.map((doc) => {
+                        const rev = currentRevision(doc.id, state.revisions);
+                        const cfg = classFor(doc.classId);
+                        const to = cfg.readerRoute === '/documents' ? `/documents/${doc.id}` : cfg.readerRoute;
+                        const summary = rev && rev.requireAcknowledgment && rev.ackLevel !== 'none'
+                          ? complianceSummary(rev, readersFor(doc, universe), state.acknowledgments, todayIso)
+                          : undefined;
+                        return (
+                          <li key={doc.id}>
+                            <Link to={to} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50">
+                              {doc.isPinned && <Pin className="h-3.5 w-3.5 shrink-0 text-gfo-daylight" />}
+                              <div className="min-w-0 flex-1">
+                                <DocIdentityLine doc={doc} rev={rev} />
+                                {!rev && <p className="mt-0.5 text-xs text-muted-foreground">No published revision yet</p>}
+                              </div>
+                              {doc.isArchived && <Badge variant="outline" className="shrink-0 text-[10px]">Archived</Badge>}
+                              {manager && <ReviewFlagBadge doc={doc} todayIso={todayIso} />}
+                              {manager && summary && (
+                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground" title="Read-and-acknowledge compliance">
+                                  {summary.read}/{summary.total} read
+                                </span>
+                              )}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           )}
         </TabsContent>
 
