@@ -11,9 +11,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { GfoEmptyState, GfoPanel } from '../../gfo';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import { useFir } from '../FirContext';
-import { canSeeFir, isFirLeadership } from '../engine/access';
+import { canSeeFir, isFirLeadership, visibleStatements } from '../engine/access';
 import { defectDebriefs, deriveSystemEntries, mergeTimeline } from '../engine/timeline';
 import { FirCategoryChip, FirStatusChip } from '../components/chips';
+import { StatementsTab } from '../components/StatementsTab';
+import { NarrativeTab } from '../components/NarrativeTab';
+import { ImpactTab } from '../components/ImpactTab';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const toLocalInput = (iso: string) => {
@@ -86,8 +89,16 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
   };
   const totalHours = Object.values(hours).reduce((a, b) => a + b, 0);
   const elapsedHours = Math.round(debriefs.reduce((s, d) => s + d.elapsedHours, 0) * 10) / 10;
+  const derivedDowntimeHours = debriefs.length ? elapsedHours : undefined;
 
-  const canAssemble = fir.status === 'OPEN' && (leadership || user?.oid === fir.ownerOid || user?.oid === fir.openedByOid);
+  // Access split (§7): owner/opener/leadership assemble & see everything; a requestee
+  // gets a scoped view (timeline + their own statement only — no narrative/impact).
+  const viewer = { oid: user?.oid ?? '', roles };
+  const isOwner = user?.oid === fir.ownerOid;
+  const fullAccess = leadership || isOwner || user?.oid === fir.openedByOid;
+  const canAssemble = fir.status === 'OPEN' && fullAccess;
+  const canRequest = (leadership || isOwner) && fir.status === 'OPEN';
+  const statementCount = visibleStatements(fir, viewer).length;
 
   const addEntry = () => {
     if (!entryLabel.trim() || !user) return;
@@ -155,11 +166,36 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
       <Tabs defaultValue="timeline">
         <TabsList>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="statements" disabled title="Slice 2">Statements</TabsTrigger>
-          <TabsTrigger value="narrative" disabled title="Slice 2">Narrative</TabsTrigger>
-          <TabsTrigger value="impact" disabled title="Slice 2">Impact</TabsTrigger>
+          <TabsTrigger value="statements">
+            Statements{statementCount > 0 && <Badge variant="secondary" className="ml-1.5">{statementCount}</Badge>}
+          </TabsTrigger>
+          {fullAccess && <TabsTrigger value="narrative">Narrative</TabsTrigger>}
+          {fullAccess && <TabsTrigger value="impact">Impact</TabsTrigger>}
           <TabsTrigger value="publish" disabled title="Slice 3">Publish</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="statements" className="mt-4">
+          <StatementsTab
+            fir={fir}
+            viewer={viewer}
+            canRequest={canRequest}
+            personnel={techLog.personnel}
+            dispatch={dispatch}
+            nameOf={nameOf}
+          />
+        </TabsContent>
+
+        {fullAccess && (
+          <TabsContent value="narrative" className="mt-4">
+            <NarrativeTab fir={fir} canEdit={canAssemble} dispatch={dispatch} />
+          </TabsContent>
+        )}
+
+        {fullAccess && (
+          <TabsContent value="impact" className="mt-4">
+            <ImpactTab fir={fir} canEdit={canAssemble} derivedDowntimeHours={derivedDowntimeHours} dispatch={dispatch} />
+          </TabsContent>
+        )}
 
         <TabsContent value="timeline" className="mt-4 space-y-4">
           {debriefs.length > 0 && (

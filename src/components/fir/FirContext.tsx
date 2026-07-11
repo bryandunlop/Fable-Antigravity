@@ -3,9 +3,8 @@ import type { FirState } from './types';
 import { firReducer, type FirAction } from './reducer';
 import { getSeedState } from './mockData';
 
-export const STORAGE_KEY = 'fir-state';
-export const VERSION_KEY = 'fir-data-version';
-export const DATA_VERSION = '2026-07-11-v1';
+export { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './storageKeys';
+import { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './storageKeys';
 
 function loadInitialState(): FirState {
   try {
