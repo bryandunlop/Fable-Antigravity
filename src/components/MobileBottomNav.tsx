@@ -39,7 +39,7 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
       case 'pilot':
         return [
           ...baseItems,
-          { name: 'Documents', href: '/document-management', icon: FileText },
+          { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Aircraft', href: '/aircraft', icon: Plane }
         ];
 
@@ -60,7 +60,7 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
       case 'safety':
         return [
           ...baseItems,
-          { name: 'Documents', href: '/document-management', icon: FileText },
+          { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Safety', href: '/safety', icon: Shield },
           { name: 'Hazards', href: '/safety/hazards', icon: AlertTriangle }
         ];
@@ -68,14 +68,13 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
       case 'document-manager':
         return [
           ...baseItems,
-          { name: 'Documents', href: '/document-management', icon: FileText },
-          { name: 'Center', href: '/documents', icon: Shield },
+          { name: 'Documents', href: '/documents', icon: FileText },
         ];
 
       case 'admin-assistant':
         return [
           ...baseItems,
-          { name: 'Documents', href: '/document-management', icon: FileText },
+          { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Trips', href: '/booking-profile', icon: BookOpen },
           { name: 'Passengers', href: '/passenger-database', icon: Users }
         ];
@@ -90,7 +89,7 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
       default:
         return [
           ...baseItems,
-          { name: 'Documents', href: '/document-management', icon: FileText },
+          { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Aircraft', href: '/aircraft', icon: Plane }
         ];
     }

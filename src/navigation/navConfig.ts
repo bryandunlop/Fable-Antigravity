@@ -11,7 +11,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Activity, AlertOctagon, AlertTriangle, Archive, ArrowRightLeft, BarChart3,
   BookOpen, Boxes, Building2, Calendar, CalendarCheck, ClipboardCheck,
-  ClipboardList, Database, FileText, Flag, Fuel, HardDrive, HardHat, Home, Layers,
+  ClipboardList, Database, FileText, Flag, Fuel, HardHat, Home, Layers,
   MapPin, Monitor, Package, PackagePlus, Plane, Send, Settings, Shield,
   Sliders, Sparkles, Target, Upload, UserCheck, Users, Utensils, Warehouse,
   Wrench,
@@ -165,10 +165,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // ── Documents ─────────────────────────────────────────────────────────────
   { path: '/documents', label: 'Document Center', domain: 'documents', icon: Archive, primary: true, detailLabel: 'Document', keywords: ['manual', 'gom', 'library', 'sop', 'compliance', 'read and initial', 'tribal knowledge', 'bulletin'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'procedural-specialist'] },
   { path: '/documents', label: 'Document Library', domain: 'documents', icon: Archive, primary: true, roles: ['dms-manager'] },
-  // De-navved: superseded by the Document Center suggestion workflow (routes kept, reversible)
-  { path: '/document-management', label: 'Document Request', domain: 'documents', icon: Send, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-  { path: '/document-management', label: 'Document Management', domain: 'documents', icon: FileText, sidebar: false, searchable: false, roles: ['document-manager'] },
-  { path: '/dms/offline', label: 'Offline Documents', domain: 'documents', icon: HardDrive, primary: false, roles: ['dms-manager', 'admin'] },
 
   // ── Admin ─────────────────────────────────────────────────────────────────
   { path: '/admin', label: 'Admin Panel', domain: 'admin', icon: Settings, primary: true, keywords: ['users', 'management'], roles: ['admin'] },
