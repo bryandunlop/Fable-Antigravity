@@ -3,4 +3,4 @@
 // FirContext (and React) — same split the notifications contributors use.
 export const STORAGE_KEY = 'fir-state';
 export const VERSION_KEY = 'fir-data-version';
-export const DATA_VERSION = '2026-07-11-v3';
+export const DATA_VERSION = '2026-07-11-v4';

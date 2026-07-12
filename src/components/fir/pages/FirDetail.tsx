@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Anchor, ClipboardCheck, Flag, HelpCircle, PackageSearch, PlayCircle, Plus, UserRoundPen } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Archive, ArrowLeft, Anchor, ClipboardCheck, Flag, HelpCircle, PackageSearch, PlayCircle, Plus, UserRoundPen } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Input } from '../../ui/input';
@@ -17,6 +17,8 @@ import { FirCategoryChip, FirStatusChip } from '../components/chips';
 import { StatementsTab } from '../components/StatementsTab';
 import { NarrativeTab } from '../components/NarrativeTab';
 import { ImpactTab } from '../components/ImpactTab';
+import { PublishTab } from '../components/PublishTab';
+import { canCloseInternal } from '../engine/lifecycle';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const toLocalInput = (iso: string) => {
@@ -35,6 +37,7 @@ const BAR_SEGMENTS = [
 
 export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: string; additionalRoles?: string[] }) {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { state: techLog } = useTechLog();
   const { state, dispatch } = useFir();
   const user = useCurrentUser();
@@ -136,6 +139,15 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
     setNewOwnerOid('');
   };
 
+  const closeInternal = () => {
+    if (!user) return;
+    dispatch({
+      type: 'CLOSE_INTERNAL',
+      payload: { firId: fir.id, byOid: user.oid, byName: user.displayName, byRoles: roles, atUtc: new Date().toISOString() },
+    });
+  };
+  const canClose = canCloseInternal(fir, viewer);
+
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       {back}
@@ -156,10 +168,17 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
             {' · '}opened by {nameOf(fir.openedByOid, fir.openedByName)}, {new Date(fir.openedAtUtc).toLocaleString()}
           </p>
         </div>
-        {(leadership || user?.oid === fir.ownerOid) && fir.status === 'OPEN' && (
-          <Button size="sm" variant="outline" onClick={() => setReassigning(true)}>
-            <UserRoundPen className="mr-1.5 h-4 w-4" /> Reassign owner
-          </Button>
+        {fir.status === 'OPEN' && (leadership || user?.oid === fir.ownerOid) && (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setReassigning(true)}>
+              <UserRoundPen className="mr-1.5 h-4 w-4" /> Reassign owner
+            </Button>
+            {canClose && (
+              <Button size="sm" variant="outline" onClick={closeInternal}>
+                <Archive className="mr-1.5 h-4 w-4" /> Close internal
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -171,7 +190,7 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
           </TabsTrigger>
           {fullAccess && <TabsTrigger value="narrative">Narrative</TabsTrigger>}
           {fullAccess && <TabsTrigger value="impact">Impact</TabsTrigger>}
-          <TabsTrigger value="publish" disabled title="Slice 3">Publish</TabsTrigger>
+          {fullAccess && <TabsTrigger value="publish">Publish</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="statements" className="mt-4">
@@ -194,6 +213,22 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
         {fullAccess && (
           <TabsContent value="impact" className="mt-4">
             <ImpactTab fir={fir} canEdit={canAssemble} derivedDowntimeHours={derivedDowntimeHours} dispatch={dispatch} />
+          </TabsContent>
+        )}
+
+        {fullAccess && (
+          <TabsContent value="publish" className="mt-4">
+            <PublishTab
+              fir={fir}
+              viewer={viewer}
+              leadership={leadership}
+              personnel={techLog.personnel}
+              timeline={merged}
+              user={user ? { oid: user.oid, displayName: user.displayName } : undefined}
+              nameOf={nameOf}
+              dispatch={dispatch}
+              onViewPublished={() => navigate(`/fir/published/${fir.id}`)}
+            />
           </TabsContent>
         )}
 

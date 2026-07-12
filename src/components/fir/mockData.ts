@@ -84,7 +84,63 @@ export function getSeedState(referenceNowMs = Date.now()): FirState {
     tripsAffected: 1,
     costNote: 'One repositioning leg re-tailed to N2PG; AOG freight from Savannah. No pax impact.',
   };
+  // A curation draft in progress — one roster name (“Capt. John Smith”) is still in the
+  // text so the Publish tab's redaction assist bar demonstrates the name → role swap.
+  aog.pendingPublished = {
+    summary: 'A G650 went AOG on a landing-gear indication; recovered with an overnight AOG-freight part, no passenger impact.',
+    whatHappened:
+      'Capt. John Smith returned to base after an intermittent main-gear unsafe indication under load. The assigned technician isolated the uplock proximity sensor; the part shipped overnight AOG freight from the OEM. The next leg was re-tailed early — zero passenger impact.',
+    timeline: [],
+    lessons: ['Uplock proximity sensor is single-source with no local stock — plan freight lead time into AOG recovery.'],
+    ackLevel: 'none',
+  };
   firs.push(aog);
+
+  // 3 — A prior AOG already curated and PUBLISHED — the all-employees reading surface
+  // and the initials acknowledgement (§7, §9). Content is roles-only by construction.
+  const published = buildFir({
+    id: 'fir-seed-windshield',
+    ref: nextFirRef(refs(), iso(30 * D)),
+    title: 'N6PG windshield crack — repositioning and 3-day AOG',
+    category: 'AOG',
+    openedBy: { oid: 'USR002', name: 'Sarah Wilson (DOM)' },
+    atUtc: iso(33 * D),
+    eventStartUtc: iso(34 * D),
+    eventEndUtc: iso(31 * D),
+    aircraftId: 'ac-n6pg',
+  });
+  published.narrative =
+    'N6PG took a cracked outboard windshield ply on descent into a hot-and-high field. The PIC (Capt. Dave Rourke) declared the aircraft unairworthy; the OEM shipped a replacement ply and the aircraft repositioned empty once temporary limits were cleared.';
+  published.status = 'PUBLISHED';
+  published.reviewSubmittedByOid = 'USR002';
+  published.publishedRevision = {
+    revision: 1,
+    approvedByOid: 'USR010',
+    publishedAtUtc: iso(30 * D),
+    summary: 'A cracked windshield ply grounded an aircraft for three days at an out-station; the OEM part and a temporary limit drove the timeline.',
+    whatHappened:
+      'On descent the crew observed a cracked outboard windshield ply. The PIC declared the aircraft unairworthy. The OEM shipped a replacement ply overnight; the aircraft was repositioned empty under a temporary limitation once the field team confirmed the inner ply was intact. Total downtime was three days, driven by part logistics to an out-station rather than the repair itself.',
+    timeline: [
+      { atUtc: iso(34 * D), label: 'Cracked outboard windshield ply observed on descent' },
+      { atUtc: iso(34 * D - 3 * H), label: 'Aircraft declared unairworthy — AOG at out-station' },
+      { atUtc: iso(32 * D), label: 'OEM replacement ply delivered' },
+      { atUtc: iso(31 * D), label: 'Ply replaced, temporary limitation cleared, repositioned empty' },
+    ],
+    lessons: [
+      'Windshield plies are OEM-only with multi-day logistics to out-stations — carry the OEM AOG-desk contact in the trip pack.',
+      'A temporary limitation let us reposition empty before the full repair, recovering the tail two days sooner.',
+    ],
+    ackLevel: 'initials',
+  };
+  published.publishedAcks = [
+    { oid: 'USR001', initials: 'JS', atUtc: iso(29 * D) },
+    { oid: 'USR007', initials: 'MB', atUtc: iso(29 * D - 6 * H) },
+  ];
+  published.audit.push(
+    { kind: 'SUBMITTED_FOR_REVIEW', atUtc: iso(31 * D), byOid: 'USR002', byName: 'Sarah Wilson (DOM)', detail: 'Submitted the published version for review' },
+    { kind: 'PUBLISHED', atUtc: iso(30 * D), byOid: 'USR010', byName: 'Chief Pilot', detail: 'Approved and published revision 1' },
+  );
+  firs.push(published);
 
   return { firs };
 }

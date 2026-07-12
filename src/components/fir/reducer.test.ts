@@ -154,3 +154,84 @@ describe('firReducer — UPDATE_NARRATIVE / UPDATE_IMPACT (OPEN-gated assembly)'
     expect(firReducer(closed, { type: 'UPDATE_IMPACT', payload: { firId: 'fir-1', impact: {} } })).toBe(closed);
   });
 });
+
+const completeDraft = {
+  summary: 'A gear indication grounded the aircraft; recovered with an AOG-freight part.',
+  whatHappened: 'The PIC returned to base; the technician isolated a sensor.',
+  timeline: [{ atUtc: '2026-07-11T08:40:00.000Z', label: 'Returned with gear indication' }],
+  lessons: ['Single-source part — plan freight lead time.'],
+  ackLevel: 'none' as const,
+};
+
+/** OPEN FIR carrying a complete curation draft, ready to submit. */
+const withDraft: FirState = { firs: [{ ...opened, pendingPublished: completeDraft }] };
+const LEAD = ['chief-pilot'];
+
+describe('firReducer — publish four-eyes lifecycle (§4)', () => {
+  it('curation draft is editable only while OPEN', () => {
+    const next = firReducer(state, { type: 'UPDATE_PUBLISHED_DRAFT', payload: { firId: 'fir-1', draft: completeDraft } });
+    expect(next.firs[0].pendingPublished).toEqual(completeDraft);
+    const inReview: FirState = { firs: [{ ...opened, status: 'IN_REVIEW' }] };
+    expect(firReducer(inReview, { type: 'UPDATE_PUBLISHED_DRAFT', payload: { firId: 'fir-1', draft: completeDraft } })).toBe(inReview);
+  });
+
+  it('submit requires a complete draft, then moves OPEN → IN_REVIEW recording the submitter', () => {
+    expect(firReducer(state, { type: 'SUBMIT_FOR_REVIEW', payload: { firId: 'fir-1', byOid: 'USR002', atUtc: 'T1' } })).toBe(state); // no draft
+    const next = firReducer(withDraft, { type: 'SUBMIT_FOR_REVIEW', payload: { firId: 'fir-1', byOid: 'USR002', byName: 'Sarah', atUtc: 'T1' } });
+    expect(next.firs[0].status).toBe('IN_REVIEW');
+    expect(next.firs[0].reviewSubmittedByOid).toBe('USR002');
+    expect(next.firs[0].audit.at(-1)?.kind).toBe('SUBMITTED_FOR_REVIEW');
+  });
+
+  it('blocks the submitter from approving their own submission (four-eyes)', () => {
+    const submitted = firReducer(withDraft, { type: 'SUBMIT_FOR_REVIEW', payload: { firId: 'fir-1', byOid: 'USR002', atUtc: 'T1' } });
+    const self = firReducer(submitted, { type: 'APPROVE_PUBLISH', payload: { firId: 'fir-1', byOid: 'USR002', byRoles: LEAD, atUtc: 'T2' } });
+    expect(self).toBe(submitted); // rejected — still IN_REVIEW
+    expect(self.firs[0].status).toBe('IN_REVIEW');
+  });
+
+  it('a separate leadership approver publishes a stamped revision', () => {
+    const submitted = firReducer(withDraft, { type: 'SUBMIT_FOR_REVIEW', payload: { firId: 'fir-1', byOid: 'USR002', atUtc: 'T1' } });
+    const published = firReducer(submitted, { type: 'APPROVE_PUBLISH', payload: { firId: 'fir-1', byOid: 'USR009', byName: 'CP', byRoles: LEAD, atUtc: 'T2' } });
+    const rev = published.firs[0].publishedRevision;
+    expect(published.firs[0].status).toBe('PUBLISHED');
+    expect(rev).toMatchObject({ revision: 1, approvedByOid: 'USR009', publishedAtUtc: 'T2', summary: completeDraft.summary });
+    expect(published.firs[0].reviewSubmittedByOid).toBeUndefined();
+  });
+
+  it('a non-leadership decider cannot approve', () => {
+    const submitted = firReducer(withDraft, { type: 'SUBMIT_FOR_REVIEW', payload: { firId: 'fir-1', byOid: 'USR002', atUtc: 'T1' } });
+    const denied = firReducer(submitted, { type: 'APPROVE_PUBLISH', payload: { firId: 'fir-1', byOid: 'USR009', byRoles: ['pilot'], atUtc: 'T2' } });
+    expect(denied).toBe(submitted);
+  });
+
+  it('request changes returns to OPEN with a note and keeps the draft', () => {
+    const submitted = firReducer(withDraft, { type: 'SUBMIT_FOR_REVIEW', payload: { firId: 'fir-1', byOid: 'USR002', atUtc: 'T1' } });
+    const back = firReducer(submitted, { type: 'REQUEST_CHANGES', payload: { firId: 'fir-1', byOid: 'USR009', byRoles: LEAD, note: 'Strip the tail number', atUtc: 'T2' } });
+    expect(back.firs[0].status).toBe('OPEN');
+    expect(back.firs[0].pendingPublished).toEqual(completeDraft);
+    expect(back.firs[0].audit.at(-1)).toMatchObject({ kind: 'CHANGES_REQUESTED', detail: 'Strip the tail number' });
+    // an empty note is rejected
+    expect(firReducer(submitted, { type: 'REQUEST_CHANGES', payload: { firId: 'fir-1', byOid: 'USR009', byRoles: LEAD, note: '  ', atUtc: 'T2' } })).toBe(submitted);
+  });
+
+  it('close internal and reopen honor the guards', () => {
+    const closed = firReducer(state, { type: 'CLOSE_INTERNAL', payload: { firId: 'fir-1', byOid: 'USR002', byRoles: [], atUtc: 'T1' } }); // owner
+    expect(closed.firs[0].status).toBe('CLOSED_INTERNAL');
+    const reopened = firReducer(closed, { type: 'REOPEN_FIR', payload: { firId: 'fir-1', byOid: 'USR009', byRoles: LEAD, atUtc: 'T2' } });
+    expect(reopened.firs[0].status).toBe('OPEN');
+    // a non-leadership stranger cannot close someone else's FIR
+    expect(firReducer(state, { type: 'CLOSE_INTERNAL', payload: { firId: 'fir-1', byOid: 'USR999', byRoles: [], atUtc: 'T1' } })).toBe(state);
+  });
+
+  it('acknowledges a published report requesting initials, idempotently', () => {
+    const base: FirState = { firs: [{ ...opened, status: 'PUBLISHED', publishedRevision: { ...completeDraft, ackLevel: 'initials', revision: 1, approvedByOid: 'USR009', publishedAtUtc: 'T2' }, publishedAcks: [] }] };
+    const acked = firReducer(base, { type: 'ACKNOWLEDGE_PUBLISHED', payload: { firId: 'fir-1', oid: 'USR005', initials: 'jd', atUtc: 'T3' } });
+    expect(acked.firs[0].publishedAcks).toEqual([{ oid: 'USR005', initials: 'JD', atUtc: 'T3' }]);
+    const again = firReducer(acked, { type: 'ACKNOWLEDGE_PUBLISHED', payload: { firId: 'fir-1', oid: 'USR005', initials: 'JD', atUtc: 'T4' } });
+    expect(again).toBe(acked); // idempotent
+    // a report that doesn't ask for acks rejects
+    const noAck: FirState = { firs: [{ ...opened, status: 'PUBLISHED', publishedRevision: { ...completeDraft, revision: 1, approvedByOid: 'USR009', publishedAtUtc: 'T2' } }] };
+    expect(firReducer(noAck, { type: 'ACKNOWLEDGE_PUBLISHED', payload: { firId: 'fir-1', oid: 'USR005', initials: 'JD', atUtc: 'T3' } })).toBe(noAck);
+  });
+});

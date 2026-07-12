@@ -43,20 +43,40 @@ export interface PerspectiveStatement {
   declineReason?: string;
 }
 
-/** Curated, de-identified published revision — roles only, never names (§7).
- * (Curation/publish flow is slice 3.) */
-export interface FirPublished {
-  revision: number;
-  approvedByOid: string; // four-eyes approver, ≠ author
-  publishedAtUtc: string;
+/** Curated, de-identified published content — roles only, never names (§7). While
+ * being curated (and while IN_REVIEW) it lives on the FIR as `pendingPublished`;
+ * on four-eyes approval it is stamped into a `FirPublished` revision. */
+export interface FirPublishedDraft {
   summary: string;
-  whatHappened: string;
-  timeline: { atUtc: string; label: string }[];
+  whatHappened: string; // roles only — de-identified in the curation pass
+  timeline: { atUtc: string; label: string }[]; // curated subset, times + labels only
   lessons: string[];
-  ackLevel: 'none' | 'initials';
+  ackLevel: 'none' | 'initials'; // default 'none'; DOM may raise per report (§12 Q3)
 }
 
-export type FirAuditKind = 'OPENED' | 'OWNER_REASSIGNED' | 'STATUS_CHANGED' | 'PUBLISHED' | 'REOPENED';
+/** An approved, published revision (documents-engine revision semantics). */
+export interface FirPublished extends FirPublishedDraft {
+  revision: number;
+  approvedByOid: string; // four-eyes approver, ≠ the submitter
+  publishedAtUtc: string;
+}
+
+/** All-employees read acknowledgement, recorded only when ackLevel = 'initials'. */
+export interface FirAck {
+  oid: string;
+  initials: string;
+  atUtc: string;
+}
+
+export type FirAuditKind =
+  | 'OPENED'
+  | 'OWNER_REASSIGNED'
+  | 'STATUS_CHANGED'
+  | 'SUBMITTED_FOR_REVIEW'
+  | 'CHANGES_REQUESTED'
+  | 'PUBLISHED'
+  | 'REOPENED'
+  | 'CLOSED_INTERNAL';
 
 export interface FirAuditEvent {
   kind: FirAuditKind;
@@ -94,7 +114,14 @@ export interface FlightIrregularityReport {
   manualTimeline: FirTimelineEntry[]; // MANUAL only; SYSTEM derived at render
   statements: PerspectiveStatement[];
   relatedSafetyItems: string[]; // link-only chips — no content crosses the safety boundary (§3)
+  /** Curation working draft — edited while OPEN, locked and reviewed while IN_REVIEW. */
+  pendingPublished?: FirPublishedDraft;
+  /** Who submitted the pending draft — the four-eyes approver must differ from this. */
+  reviewSubmittedByOid?: string;
+  /** The latest approved, published revision (all-employees surface). */
   publishedRevision?: FirPublished;
+  /** Read acknowledgements on the published revision (ackLevel = 'initials' only). */
+  publishedAcks?: FirAck[];
   audit: FirAuditEvent[];
 }
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Anchor, FilePlus2, Flag, MessagesSquare, StickyNote } from 'lucide-react';
+import { Anchor, BookOpen, FilePlus2, Flag, MessagesSquare, StickyNote } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Card, CardContent } from '../../ui/card';
@@ -56,9 +56,14 @@ export function FirList({ userRole, additionalRoles = [] }: { userRole?: string;
         title="Flight Irregularity Reports"
         description="Retrospective, evidence-backed explanations of operational irregularities — why it happened, when, and what every hour was spent on."
         actions={
-          <Button size="sm" onClick={() => navigate('/fir/new')}>
-            <FilePlus2 className="mr-1.5 h-4 w-4" /> Open FIR
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate('/fir/published')}>
+              <BookOpen className="mr-1.5 h-4 w-4" /> Published reports
+            </Button>
+            <Button size="sm" onClick={() => navigate('/fir/new')}>
+              <FilePlus2 className="mr-1.5 h-4 w-4" /> Open FIR
+            </Button>
+          </div>
         }
       />
 

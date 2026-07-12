@@ -8,6 +8,7 @@ import { currentRows } from '../engine/supersede';
 import { buildDowntimeDebrief } from '../engine/debrief';
 import type { AogAck } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
+import { FirSuggestions } from '../../fir/components/FirSuggestions';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -49,6 +50,9 @@ export default function Aog() {
       title="AOG — Aircraft on Ground"
       subtitle="Grounded aircraft, derived from serviceability — with escalation, acknowledgement, and CAMP cross-check."
     >
+      {/* "Open an FIR?" nudges — retrospective explainability capture (FIR design §8). */}
+      <div className="mb-3"><FirSuggestions /></div>
+
       {aog.length === 0 && (
         <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No aircraft are grounded — fleet is dispatchable.</CardContent></Card>
       )}
