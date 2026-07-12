@@ -17,7 +17,7 @@ import { useDocuments, identityFor, publishApprovalRequestedEvent, publishRequir
 import { canAuthor, validateSubmit, validateDirectPublish } from '../engine/lifecycle';
 import { nextDocId, nextRevisionId, nextRevisionLabel, currentRevision } from '../engine/revisions';
 import { computeNextReviewDate } from '../engine/review';
-import { sectionsFromMarkdown, sectionsToMarkdown, checksumForSections } from '../engine/blocks';
+import { sectionsToMarkdown, contentFieldsFromMarkdown } from '../engine/blocks';
 
 export type EditorMode =
   | { kind: 'create'; classId?: string }
@@ -158,7 +158,7 @@ export function DocEditorDialog({
       docId: doc.id,
       revision: revisionLabel.trim() || '1.0',
       status: 'draft',
-      sections: sectionsFromMarkdown(content, doc.id),
+      ...contentFieldsFromMarkdown(content, doc.id),
       changeSummary: changeSummary.trim(),
       effectiveDate,
       authorUserId: userId,
@@ -166,7 +166,6 @@ export function DocEditorDialog({
       requireAcknowledgment: effAckLevel !== 'none',
       ackLevel: effAckLevel,
       ackDueDate: effAckLevel !== 'none' && ackDueDate ? ackDueDate : undefined,
-      mockChecksum: checksumForSections(sectionsFromMarkdown(content, doc.id)),
     };
     return { doc, rev };
   };

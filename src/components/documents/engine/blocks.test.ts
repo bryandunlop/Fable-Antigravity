@@ -116,6 +116,13 @@ describe('degenerate & extra-coverage cases', () => {
   it('returns an empty array for empty input', () => {
     expect(sectionsFromMarkdown('', 'D-3')).toEqual([]);
   });
+
+  it('keeps a fenced code block with an internal blank line as one block', () => {
+    const md = '## Snippet\n\n```js\nconst a = 1;\n\nconst b = 2;\n```';
+    const s = sectionsFromMarkdown(md, 'D-4');
+    expect(s[0].blocks).toHaveLength(1);
+    expect(s[0].blocks[0].md).toBe('```js\nconst a = 1;\n\nconst b = 2;\n```');
+  });
 });
 
 describe('canonicalizeSections / checksum', () => {

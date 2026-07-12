@@ -3,7 +3,7 @@
 // one thing this module must never lose — migrate, don't wipe.
 import type { Bulletin, BulletinAcknowledgment, BulletinType } from '../../bulletins/types';
 import type { Doc, DocRevision, DocAcknowledgment, RevisionStatus } from '../types';
-import { sectionsFromMarkdown, sectionsToMarkdown, checksumForSections } from './blocks';
+import { sectionsToMarkdown, contentFieldsFromMarkdown } from './blocks';
 
 export function bulletinClassId(t: BulletinType): string {
   return t === 'flight-ops' ? 'flight-ops-bulletin' : 'procedural-bulletin';
@@ -71,7 +71,7 @@ export function bulletinToDocAndRevision(
     docId: b.id,
     revision: b.version,
     status,
-    sections: sectionsFromMarkdown(b.content, b.id),
+    ...contentFieldsFromMarkdown(b.content, b.id),
     changeSummary: '',
     effectiveDate: b.effectiveDate,
     ...(b.expirationDate !== undefined ? { expirationDate: b.expirationDate } : {}),
@@ -79,7 +79,6 @@ export function bulletinToDocAndRevision(
     authorName: b.author,
     requireAcknowledgment: b.requireAcknowledgment,
     ackLevel: b.requireAcknowledgment ? 'initials' : 'none',
-    mockChecksum: checksumForSections(sectionsFromMarkdown(b.content, b.id)),
     ...(status === 'published' ? { publishedAtUtc: `${b.effectiveDate}T00:00:00.000Z` } : {}),
     ...(b.lastUpdated !== undefined ? { lastUpdatedDate: b.lastUpdated } : {}),
     ...(b.images !== undefined ? { images: b.images } : {}),

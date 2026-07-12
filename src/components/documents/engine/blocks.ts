@@ -47,9 +47,12 @@ function splitRawSections(markdown: string): RawSection[] {
 function chunkBody(body: string[]): string[] {
   const chunks: string[] = [];
   let buf: string[] = [];
+  let inFence = false;
   const flush = () => { if (buf.length) { chunks.push(buf.join('\n').trim()); buf = []; } };
   for (const line of body) {
-    if (line.trim() === '') flush();
+    // A fenced code block may contain blank lines — don't split inside one.
+    if (/^```/.test(line.trim())) inFence = !inFence;
+    if (line.trim() === '' && !inFence) flush();
     else buf.push(line);
   }
   flush();
@@ -131,6 +134,16 @@ export function canonicalizeSections(sections: DocSection[]): string {
 
 export function checksumForSections(sections: DocSection[]): string {
   return mockSha256(canonicalizeSections(sections));
+}
+
+/** The two content-derived DocRevision fields from a single parse — so the
+ * rendered `sections` and the signed `mockChecksum` can never diverge. */
+export function contentFieldsFromMarkdown(
+  markdown: string,
+  docId: string,
+): { sections: DocSection[]; mockChecksum: string } {
+  const sections = sectionsFromMarkdown(markdown, docId);
+  return { sections, mockChecksum: checksumForSections(sections) };
 }
 
 export function sectionsPlainText(sections: DocSection[]): string {
