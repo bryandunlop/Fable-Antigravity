@@ -313,11 +313,11 @@ describe('summarizeTripLifecycle', () => {
 });
 
 describe('summarizeFleetServiceability', () => {
-  it('derives per-tail RAG from tech-log state — N1PG RED (open defect), N6PG AMBER (active deferral), N2PG GREEN', () => {
+  it('derives per-tail RAG from tech-log state — N1PG RED (open defect), N6PG AMBER (active deferral), N5PG GREEN', () => {
     const svc = summarizeFleetServiceability(getDefaultState(), new Date().toISOString());
     expect(svc['N1PG']).toBe('RED');
     expect(svc['N6PG']).toBe('AMBER');
-    expect(svc['N2PG']).toBe('GREEN');
+    expect(svc['N5PG']).toBe('GREEN');
   });
 
   it('covers every aircraft in the fleet', () => {

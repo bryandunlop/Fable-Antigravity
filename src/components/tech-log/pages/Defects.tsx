@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FilePlus, AlertTriangle, Wrench, CheckCircle2, Paperclip, Camera, MapPin, X, Repeat, Pencil, Eye, TriangleAlert } from 'lucide-react';
+import { FilePlus, AlertTriangle, Flag, Wrench, CheckCircle2, Paperclip, Camera, MapPin, X, Repeat, Pencil, Eye, TriangleAlert } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
@@ -301,6 +301,10 @@ export default function Defects() {
                     </Button>
                   </>
                 )}
+                {/* FIR is retrospective — any role, any defect status (even rectified) can seed one. */}
+                <Button size="sm" variant="outline" onClick={() => navigate(`/fir/new?defect=${d.id}`)}>
+                  <Flag className="mr-1.5 h-4 w-4" /> Open FIR
+                </Button>
               </div>
             </CardContent>
           </Card>
