@@ -383,6 +383,7 @@ interface Ctx {
     doc: Doc;
     rev: DocRevision;
     sectionRef?: string;
+    blockId?: string;
     proposedChange: string;
     rationale: string;
     userRole: string;
@@ -502,6 +503,7 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
       authorName: userName,
       role: input.userRole,
       sectionRef: input.sectionRef,
+      blockId: input.blockId,
       proposedChange: input.proposedChange.trim(),
       rationale: input.rationale.trim(),
       status: 'open',

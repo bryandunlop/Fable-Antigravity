@@ -119,8 +119,10 @@ export interface DocSuggestion {
   authorUserId: string;
   authorName: string;
   role: string;
-  /** Free-text "which part" (no PDF selection rects in this demo). */
+  /** Free-text "which part" (legacy / fallback display). */
   sectionRef?: string;
+  /** Block this suggestion is anchored to (Slice 2 block-anchoring). */
+  blockId?: string;
   proposedChange: string;
   rationale: string;
   status: 'open' | 'accepted' | 'declined';

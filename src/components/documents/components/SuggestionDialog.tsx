@@ -5,14 +5,21 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../../ui/dialog';
 import { Button } from '../../ui/button';
-import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import type { Doc, DocRevision } from '../types';
 import { useDocuments, publishSuggestionFiledEvent, identityFor } from '../DocumentsContext';
 
-/** Reader feedback: suggest a change on the current revision. Routed to the
- * document owner's queue (Comply365-style crew → manual loop). */
+function excerptOf(md: string): string {
+  return md.replace(/[#>*`_|~-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+}
+function sectionLabel(number: string, title: string): string {
+  return `${number ? `${number} ` : ''}${title}`.trim() || 'Preamble';
+}
+
+/** Reader feedback: suggest a change on the current revision, optionally anchored
+ * to a specific block. Routed to the document owner's queue (Comply365-style
+ * crew → manual loop). */
 export function SuggestionDialog({
   open,
   onOpenChange,
@@ -27,9 +34,19 @@ export function SuggestionDialog({
   userRole: string;
 }) {
   const { addSuggestion } = useDocuments();
-  const [sectionRef, setSectionRef] = useState('');
+  const [blockId, setBlockId] = useState('');
   const [proposedChange, setProposedChange] = useState('');
   const [rationale, setRationale] = useState('');
+
+  const groups = rev.sections.map((s) => ({
+    label: sectionLabel(s.number, s.title),
+    blocks: s.blocks.map((b) => ({ id: b.id, excerpt: excerptOf(b.md) || '(block)' })),
+  }));
+
+  const anchorSectionRef = (): string | undefined => {
+    if (!blockId) return undefined;
+    return groups.find((g) => g.blocks.some((b) => b.id === blockId))?.label;
+  };
 
   const submit = () => {
     if (proposedChange.trim().length < 10) {
@@ -40,10 +57,14 @@ export function SuggestionDialog({
       toast.error('A brief rationale is required.');
       return;
     }
-    addSuggestion({ doc, rev, sectionRef: sectionRef.trim() || undefined, proposedChange, rationale, userRole });
+    addSuggestion({
+      doc, rev, userRole, proposedChange, rationale,
+      blockId: blockId || undefined,
+      sectionRef: anchorSectionRef(),
+    });
     publishSuggestionFiledEvent(doc, identityFor(userRole).userName);
     toast.success(`Suggestion filed — routed to ${doc.ownerName}.`);
-    setSectionRef('');
+    setBlockId('');
     setProposedChange('');
     setRationale('');
     onOpenChange(false);
@@ -62,14 +83,22 @@ export function SuggestionDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label htmlFor="sugSection" className="text-xs">Which part? (optional)</Label>
-            <Input
-              id="sugSection"
-              value={sectionRef}
-              onChange={(e) => setSectionRef(e.target.value)}
-              placeholder='e.g. "Go-Around Callout" or "§3.5 Fuel Policy"'
-              className="mt-1"
-            />
+            <Label htmlFor="sugAnchor" className="text-xs">Which part?</Label>
+            <select
+              id="sugAnchor"
+              value={blockId}
+              onChange={(e) => setBlockId(e.target.value)}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">General — the whole document</option>
+              {groups.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.blocks.map((b) => (
+                    <option key={b.id} value={b.id}>{b.excerpt}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
           <div>
             <Label htmlFor="sugChange" className="text-xs">Proposed change</Label>
