@@ -447,7 +447,7 @@ export default function App() {
                                 {/* Retired: the tabbed workspace folded into the command-center hub. */}
                                 <Route path="/scheduling-workspace" element={<Navigate to="/scheduling-command" replace />} />
                                 <Route
-                                  path="/pilot-workspace"
+                                  path="/pilot-workspace/*"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['pilot', 'chief-pilot', 'admin']}>
                                       <SchedulingWorkspaceProvider>

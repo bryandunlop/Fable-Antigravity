@@ -8,6 +8,20 @@ export function currentLegIndex(legs: { departureTimeUtc: string }[], nowUtc: st
   return idx === -1 ? legs.length - 1 : idx;
 }
 
+/**
+ * The leg index to show, given the URL `?leg` param and the current (first-not-departed) leg.
+ * A param matching a leg id wins (the pilot pinned it); an absent/stale param follows the current
+ * leg. Result is clamped to a valid index; empty lists return 0 (callers guard on the leg existing).
+ */
+export function selectedLegIndex(
+  legs: { id: string }[], legParam: string | null | undefined, currentIdx: number,
+): number {
+  if (legs.length === 0) return 0;
+  const pinned = legParam ? legs.findIndex((l) => l.id === legParam) : -1;
+  const base = pinned >= 0 ? pinned : (currentIdx < 0 ? 0 : currentIdx);
+  return Math.min(Math.max(base, 0), legs.length - 1);
+}
+
 /** Group legs by their office-local departure date, preserving each leg's original index. */
 export function groupLegsByDay<T extends { departureTimeUtc: string }>(
   legs: T[], officeTzOffsetMinutes: number,
