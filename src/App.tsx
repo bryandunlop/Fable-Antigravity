@@ -27,11 +27,6 @@ import AirportEvaluationOfficer from './components/AirportEvaluationOfficer';
 import ScheduleCalendar from './components/ScheduleCalendar';
 import { DocumentHub } from './components/documents/pages/DocumentHub';
 import { DocReader } from './components/documents/pages/DocReader';
-import DocumentManagement from './components/DocumentManagement';
-import DocumentRequest from './components/DocumentRequest';
-import OfflineDocuments from './components/OfflineDocuments';
-import DocumentReviewQueue from './components/DocumentReviewQueue';
-import DocumentCollaborations from './components/DocumentCollaborations';
 import LeadDashboard from './components/LeadDashboard';
 import ManagerInsights from './components/ManagerInsights';
 import AirportServicesDatabase from './components/AirportServicesDatabase';
@@ -45,7 +40,6 @@ import HazardReporting from './components/HazardReporting';
 import HazardWorkspace from './components/hazard/HazardWorkspace';
 import HazardDetailView from './components/hazard/HazardDetailView';
 import InternalAuditManagement from './components/InternalAuditManagement';
-// DocumentCompliance mock superseded by documents/ComplianceDashboard (kept in-tree, de-routed)
 import { ComplianceDashboard } from './components/documents/pages/ComplianceDashboard';
 import UserSafety from './components/UserSafety';
 import CateringTracker from './components/CateringTracker';
@@ -68,6 +62,7 @@ import AOGManagement from './components/AOGManagement';
 import LobbyDisplay from './components/LobbyDisplay';
 import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
+import FirRoutes from './components/fir/FirRoutes';
 import BookingProfile from './components/BookingProfile';
 import TripBuilder from './components/TripBuilder';
 import FlightFamily from './components/FlightFamily';
@@ -305,33 +300,9 @@ export default function App() {
                                   }
                                 />
                                 <Route path="/schedule" element={<ScheduleCalendar />} />
-                                {/* Unified document-compliance hub (legacy DocumentCenter de-routed, kept in-tree) */}
+                                {/* Unified document-compliance hub (legacy document surfaces deleted 2026-07-11) */}
                                 <Route path="/documents" element={<DocumentHub userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/documents/:docId" element={<DocReader userRole={userRole} additionalRoles={additionalRoles} />} />
-
-                                {/* Document Management - Document Manager & DMS Manager role only, others get Document Request */}
-                                <Route
-                                  path="/document-management"
-                                  element={
-                                    ['document-manager', 'dms-manager'].includes(userRole) ?
-                                      <DocumentManagement userRole={userRole} /> :
-                                      <DocumentRequest userRole={userRole} />
-                                  }
-                                />
-
-                                <Route
-                                  path="/dms/offline"
-                                  element={
-                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['dms-manager', 'admin']}>
-                                      <OfflineDocuments />
-                                    </ProtectedRoute>
-                                  }
-                                />
-
-                                {/* Document Review Queue - Visible to all, approval actions restricted to document manager */}
-                                <Route path="/document-management/queue" element={<DocumentReviewQueue userRole={userRole} />} />
-
-                                <Route path="/document-management/collaborations" element={<DocumentCollaborations userRole={userRole} />} />
 
                                 <Route
                                   path="/lead-dashboard"
@@ -494,6 +465,7 @@ export default function App() {
                                 <Route path="/aog-management" element={<AOGManagement />} />
                                 <Route path="/upcoming-flights" element={userRole === 'inflight' ? <FlightAttendantFlights /> : <UpcomingFlights userRole={userRole} />} />
                                 <Route path="/tech-log/*" element={<TechLogRoutes userRole={userRole} />} />
+                                <Route path="/fir/*" element={<FirRoutes userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
                                   path="/flight-operations-center"

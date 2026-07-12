@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { GfoPageHeader } from './gfo';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { FirLeadershipChip } from './fir/components/FirLeadershipChip';
 
 const DEFAULT_LINKS = [
   { id: '1', name: 'FltPlan.com', url: 'https://www.fltplan.com/' },
@@ -165,6 +166,9 @@ export default function Dashboard({ userRole }: DashboardProps) {
           )}
         </div>
       </div>
+
+      {/* Leadership-only: FIRs in progress (renders nothing for other roles) */}
+      <FirLeadershipChip roles={[userRole]} className="mb-6" />
 
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-200px)] min-h-[600px]">
