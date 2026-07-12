@@ -1,5 +1,7 @@
 // Maintenance utility functions for consistent UI behavior across the system
 
+import type { Deferral } from '../contexts/MaintenanceContext';
+
 /**
  * Priority Color System - Consistent across all maintenance components
  */
@@ -266,6 +268,19 @@ export function formatHours(hours: number): string {
   const days = Math.floor(hours / 24);
   const remainingHours = Math.floor(hours % 24);
   return `${days}d ${remainingHours}h`;
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Whole days until a deferral's expiresAt, partial days rounded up.
+ */
+export function getDeferralDaysRemaining(deferral: Deferral, now: Date = new Date()): number {
+  return Math.ceil((new Date(deferral.expiresAt).getTime() - now.getTime()) / MS_PER_DAY);
+}
+
+export function isDeferralExpired(deferral: Deferral, now: Date = new Date()): boolean {
+  return new Date(deferral.expiresAt).getTime() < now.getTime();
 }
 
 /**
