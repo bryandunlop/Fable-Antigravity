@@ -18,6 +18,7 @@ import { canAuthor, validateSubmit, validateDirectPublish } from '../engine/life
 import { nextDocId, nextRevisionId, nextRevisionLabel, currentRevision } from '../engine/revisions';
 import { computeNextReviewDate } from '../engine/review';
 import { sectionsToMarkdown, contentFieldsFromMarkdown } from '../engine/blocks';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 
 export type EditorMode =
   | { kind: 'create'; classId?: string }
@@ -28,7 +29,7 @@ export type EditorMode =
 const ALL_ROLES = Object.values(ROLE_CATEGORIES).flat();
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return operatorTodayIso(); // D24: operator calendar day, not UTC (C6)
 }
 
 /** Class-aware create / revise / edit-draft dialog. Controlled classes submit
@@ -39,12 +40,16 @@ export function DocEditorDialog({
   mode,
   userRole,
   additionalRoles = [],
+  onPersisted,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   mode: EditorMode;
   userRole: string;
   additionalRoles?: string[];
+  /** Fired after a draft is actually persisted (save/submit/publish) — the
+   * suggestion accept flow resolves feedback on this, not on dialog open (C4). */
+  onPersisted?: () => void;
 }) {
   const { state, createDoc, updateDocMeta, createDraft, updateDraft, submitForApproval, publishDirect } = useDocuments();
   const userRoles = [userRole, ...additionalRoles];
@@ -84,10 +89,15 @@ export function DocEditorDialog({
       const doc = mode.doc;
       const rev = mode.kind === 'revise' ? mode.baseRev : mode.rev;
       const cfg = classFor(doc.classId);
+      // A draft may carry proposed identity changes not yet applied to the doc.
+      const meta =
+        mode.kind === 'edit-draft' && rev.proposedMeta
+          ? rev.proposedMeta
+          : { title: doc.title, category: doc.category, roles: doc.roles, tags: doc.tags };
       setClassId(doc.classId);
-      setTitle(doc.title);
-      setCategory(doc.category);
-      setRoles(doc.roles);
+      setTitle(meta.title);
+      setCategory(meta.category);
+      setRoles(meta.roles);
       setContent(mode.kind === 'revise' ? (mode.prefill?.content ?? sectionsToMarkdown(rev.sections)) : sectionsToMarkdown(rev.sections));
       setChangeSummary(mode.kind === 'revise' ? (mode.prefill?.changeSummary ?? '') : rev.changeSummary);
       setRevisionLabel(mode.kind === 'revise' ? nextRevisionLabel(rev.revision, 'major') : rev.revision);
@@ -101,7 +111,7 @@ export function DocEditorDialog({
             : ''
           : rev.ackDueDate ?? '',
       );
-      setTags(doc.tags.join(', '));
+      setTags(meta.tags.join(', '));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -119,7 +129,7 @@ export function DocEditorDialog({
   const toggleRole = (r: string) =>
     setRoles((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev.filter((x) => x !== 'all'), r]));
 
-  const buildRecords = (): { doc: Doc; rev: DocRevision } | null => {
+  const buildRecords = (): { doc: Doc; rev: DocRevision; liveControlled: boolean } | null => {
     if (!cfg) return null;
     if (!title.trim() || !content.trim() || roles.length === 0) {
       toast.error('Title, content, and at least one audience role are required.');
@@ -150,6 +160,17 @@ export function DocEditorDialog({
             roles,
             tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
           };
+    // C1: a live controlled doc's identity never changes on draft save — the
+    // edits ride the revision (proposedMeta) and apply when it publishes.
+    const liveControlled = mode.kind !== 'create' && cfg.controlled && hasPriorPublished;
+    const metaChanged =
+      mode.kind !== 'create' &&
+      (doc.title !== mode.doc.title ||
+        doc.category !== mode.doc.category ||
+        doc.roles.length !== mode.doc.roles.length ||
+        doc.roles.some((r, i) => r !== mode.doc.roles[i]) ||
+        doc.tags.length !== mode.doc.tags.length ||
+        doc.tags.some((t, i) => t !== mode.doc.tags[i]));
     const rev: DocRevision = {
       id:
         mode.kind === 'edit-draft'
@@ -166,20 +187,27 @@ export function DocEditorDialog({
       requireAcknowledgment: effAckLevel !== 'none',
       ackLevel: effAckLevel,
       ackDueDate: effAckLevel !== 'none' && ackDueDate ? ackDueDate : undefined,
+      proposedMeta:
+        liveControlled && metaChanged
+          ? { title: doc.title, category: doc.category, roles: doc.roles, tags: doc.tags }
+          : undefined,
     };
-    return { doc, rev };
+    return { doc, rev, liveControlled };
   };
 
-  const persistDraft = (records: { doc: Doc; rev: DocRevision }) => {
-    const { doc, rev } = records;
+  const persistDraft = (records: { doc: Doc; rev: DocRevision; liveControlled: boolean }) => {
+    const { doc, rev, liveControlled } = records;
     if (mode.kind === 'create') {
       createDoc(doc, rev);
     } else {
-      // Doc metadata (title/roles/tags) may have been edited alongside the revision.
-      updateDocMeta(doc);
+      // Meta edits on a never-published or uncontrolled doc apply directly
+      // (role-gated in the reducer); on a live controlled doc they ride the
+      // revision via proposedMeta instead — the published doc stays untouched.
+      if (!liveControlled) updateDocMeta(doc, userRole, additionalRoles);
       if (mode.kind === 'revise') createDraft(rev);
       else updateDraft(rev);
     }
+    onPersisted?.();
   };
 
   const saveDraft = () => {

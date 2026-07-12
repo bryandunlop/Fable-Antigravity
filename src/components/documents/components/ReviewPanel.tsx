@@ -7,13 +7,14 @@ import type { Doc } from '../types';
 import { useDocuments } from '../DocumentsContext';
 import { reviewStatus } from '../engine/review';
 import { ReviewFlagBadge } from './ReviewFlagBadge';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** Periodic-review controls (managers). Completing a review advances the
  * doc's next-review date by its cycle; publishing a revision also resets it. */
 export function ReviewPanel({ doc, userRole }: { doc: Doc; userRole: string }) {
   const { state, completeReview } = useDocuments();
   const [note, setNote] = useState('');
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = operatorTodayIso();
   const status = reviewStatus(doc, todayIso);
   const lastReview = state.reviews
     .filter((r) => r.docId === doc.id)

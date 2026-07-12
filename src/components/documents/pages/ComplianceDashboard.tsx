@@ -20,13 +20,14 @@ import {
 import { documentsRoleUniverse } from '../roles';
 import { DocIdentityLine } from '../components/DocIdentity';
 import { ComplianceRoster } from '../components/ComplianceRoster';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** Manager compliance view: per-doc roster + overdue chase list + auditor CSV.
  * Rendered as a hub tab and standalone at /safety/compliance. */
 export function ComplianceDashboard({ standalone = false }: { standalone?: boolean }) {
   const { state } = useDocuments();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = operatorTodayIso();
   const universe = useMemo(() => documentsRoleUniverse(), []);
 
   const rows = useMemo(() => {

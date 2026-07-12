@@ -8,17 +8,28 @@ import { GfoEmptyState } from '../../gfo';
 import { useDocuments, identityFor } from '../DocumentsContext';
 import { openSuggestions, openSuggestionsForOwner } from '../engine/suggestions';
 import { currentRevision } from '../engine/revisions';
+import {
+  IDLE_ACCEPT_FLOW,
+  beginAccept,
+  acceptFlowOnPersisted,
+  acceptFlowOnCancelled,
+  acceptPrefill,
+  type AcceptFlow,
+} from '../engine/acceptFlow';
 import { DocEditorDialog, type EditorMode } from './DocEditorDialog';
 
 const SEE_ALL_ROLES = ['document-manager', 'admin'];
 
-/** Owner feedback queue. Accepting a suggestion records the decision and opens
- * a pre-filled draft revision; declining requires a note back to the reader. */
+/** Owner feedback queue. Accepting a suggestion opens a pre-filled draft
+ * revision and records the decision only once that draft is actually persisted
+ * (C4 — cancelling the editor leaves the suggestion open); declining requires
+ * a note back to the reader. */
 export function SuggestionQueuePanel({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { state, resolveSuggestion } = useDocuments();
   const [declining, setDeclining] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [editor, setEditor] = useState<EditorMode | null>(null);
+  const [acceptFlow, setAcceptFlow] = useState<AcceptFlow>(IDLE_ACCEPT_FLOW);
 
   const { userId } = identityFor(userRole);
   const seesAll = [userRole, ...additionalRoles].some((r) => SEE_ALL_ROLES.includes(r));
@@ -35,17 +46,21 @@ export function SuggestionQueuePanel({ userRole, additionalRoles = [] }: { userR
     const sug = state.suggestions.find((s) => s.id === id)!;
     const doc = state.docs.find((d) => d.id === sug.docId);
     const baseRev = doc ? currentRevision(doc.id, state.revisions) : undefined;
-    resolveSuggestion(id, 'accepted', undefined, userRole);
-    toast.success('Suggestion accepted.');
-    if (doc && baseRev) {
-      setEditor({
-        kind: 'revise',
-        doc,
-        baseRev,
-        prefill: {
-          changeSummary: `Incorporates feedback from ${sug.authorName}: ${sug.proposedChange}`,
-        },
-      });
+    if (!doc || !baseRev) {
+      toast.error('No published revision to revise — the suggestion stays open.');
+      return;
+    }
+    // Resolution waits until the draft actually exists (onPersisted below).
+    setAcceptFlow(beginAccept(id));
+    setEditor({ kind: 'revise', doc, baseRev, prefill: acceptPrefill(sug) });
+  };
+
+  const onEditorPersisted = () => {
+    const { resolveSuggestionId, flow } = acceptFlowOnPersisted(acceptFlow);
+    setAcceptFlow(flow);
+    if (resolveSuggestionId) {
+      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole);
+      toast.success('Suggestion accepted — draft created.');
     }
   };
 
@@ -121,7 +136,14 @@ export function SuggestionQueuePanel({ userRole, additionalRoles = [] }: { userR
       {editor && (
         <DocEditorDialog
           open={!!editor}
-          onOpenChange={(o) => { if (!o) setEditor(null); }}
+          onOpenChange={(o) => {
+            if (!o) {
+              setEditor(null);
+              // Closed without persisting → nothing resolves; suggestion stays open.
+              setAcceptFlow(acceptFlowOnCancelled(acceptFlow).flow);
+            }
+          }}
+          onPersisted={onEditorPersisted}
           mode={editor}
           userRole={userRole}
           additionalRoles={additionalRoles}

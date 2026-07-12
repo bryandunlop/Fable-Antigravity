@@ -79,6 +79,10 @@ export interface DocRevision {
   decidedByName?: string;
   rejectionReason?: string;
   publishedAtUtc?: string;
+  /** Doc-identity changes (title/audience/category/tags) riding this revision
+   * through four-eyes; applied to the Doc when the revision publishes. A live
+   * controlled doc's meta is never edited in place (C1). */
+  proposedMeta?: { title: string; category: string; roles: string[]; tags: string[] };
   /** Legacy bulletins 'lastUpdated' display date — preserved for lossless round-trips. */
   lastUpdatedDate?: string;
   images?: BulletinImage[];
@@ -97,6 +101,9 @@ export interface DocAcknowledgment {
   initials?: string; // level 'initials'
   signatureId?: string; // level 'signature' → Signature in state.signatures
   acknowledgedAtUtc: string;
+  /** A newer ack by the same user for the same revision replaced this record;
+   * kept for the audit trail (C2 — append-with-supersede, never delete). */
+  superseded?: boolean;
 }
 
 /** Tribal-knowledge discussion thread entry. */
