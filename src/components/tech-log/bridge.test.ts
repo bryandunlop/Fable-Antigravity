@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getDefaultState } from './mockData/scenarios';
-import { projectTripIntoTechLogState, summarizePreflight, summarizeTripLifecycle, summarizeFleetServiceability } from './bridge';
+import { projectTripIntoTechLogState, summarizePreflight, summarizeTripLifecycle, summarizeFleetServiceability, summarizeFleetAirworthiness } from './bridge';
 import type { PreflightTripInput } from './bridge';
 import type { Defect, Postflight, Trip } from './types';
 
@@ -324,5 +324,54 @@ describe('summarizeFleetServiceability', () => {
     const state = getDefaultState();
     const svc = summarizeFleetServiceability(state, new Date().toISOString());
     for (const ac of state.aircraft) expect(svc[ac.tailNumber]).toMatch(/^(GREEN|AMBER|RED)$/);
+  });
+});
+
+describe('summarizeFleetAirworthiness', () => {
+  function makeGroundingDefect(aircraftId: string): Defect {
+    return {
+      id: 'test-defect-' + aircraftId,
+      aircraftId,
+      source: 'PIREP',
+      ataChapter: '32',
+      description: 'test grounding defect',
+      severity: 'HIGH',
+      airworthinessAffecting: true,
+      status: 'OPEN',
+      reportedByOid: 'USR001',
+      reportedAtUtc: '2026-06-30T12:00:00Z',
+      signatureId: 'sig-1',
+    } as Defect;
+  }
+
+  it('statuses agree with summarizeFleetServiceability for every seeded tail', () => {
+    const state = getDefaultState();
+    const now = new Date().toISOString();
+    const svc = summarizeFleetServiceability(state, now);
+    const detail = summarizeFleetAirworthiness(state, now);
+    expect(detail).toHaveLength(state.aircraft.length);
+    for (const entry of detail) expect(entry.status).toBe(svc[entry.tailNumber]);
+  });
+
+  it('carries type/isProvisional and per-tail counts on the seeded fleet', () => {
+    const detail = summarizeFleetAirworthiness(getDefaultState(), new Date().toISOString());
+    const n1 = detail.find(e => e.tailNumber === 'N1PG')!;
+    expect(n1.status).toBe('RED');
+    expect(n1.openAffectingDefects).toBeGreaterThanOrEqual(1);
+    const n6 = detail.find(e => e.tailNumber === 'N6PG')!;
+    expect(n6.status).toBe('AMBER');
+    expect(n6.activeDeferrals).toBeGreaterThanOrEqual(1);
+    for (const e of detail) {
+      expect(typeof e.type).toBe('string');
+      expect(typeof e.isProvisional).toBe('boolean');
+    }
+  });
+
+  it('an injected grounding defect flips the GREEN tail to RED with a count', () => {
+    const state = getDefaultState();
+    const withDefect = { ...state, defects: [...state.defects, makeGroundingDefect('ac-n5pg')] };
+    const n5 = summarizeFleetAirworthiness(withDefect, new Date().toISOString()).find(e => e.tailNumber === 'N5PG')!;
+    expect(n5.status).toBe('RED');
+    expect(n5.openAffectingDefects).toBe(1);
   });
 });

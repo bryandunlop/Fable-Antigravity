@@ -70,3 +70,31 @@ describe('serviceability §14.2', () => {
     expect(r.status).toBe('RED'); expect(r.governingRule).toBe(1);
   });
 });
+
+describe('serviceability counts (fleet-surface projection)', () => {
+  it('GREEN state has zero counts', () => {
+    const r = deriveServiceability('ac1', { ...base, defects: [], deferrals: [] }, NOW);
+    expect(r.openAffectingDefects).toBe(0);
+    expect(r.activeDeferrals).toBe(0);
+  });
+  it('counts every open affecting defect, not just the driving one', () => {
+    const r = deriveServiceability('ac1', { ...base, defects: [defect(), defect({ id: 'd2' })], deferrals: [] }, NOW);
+    expect(r.openAffectingDefects).toBe(2);
+    expect(r.activeDeferrals).toBe(0);
+  });
+  it('AMBER: counts both the deferred defect and its active deferral', () => {
+    const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'DEFERRED' })], deferrals: [deferral({ status: 'ACTIVE' })] }, NOW);
+    expect(r.openAffectingDefects).toBe(1);
+    expect(r.activeDeferrals).toBe(1);
+  });
+  it('an expired deferral is not counted active', () => {
+    const overdue = deferral({ status: 'ACTIVE', repairDueDateUtc: '2026-06-20T00:00:00Z' });
+    const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'DEFERRED', airworthinessAffecting: false })], deferrals: [overdue] }, NOW);
+    expect(r.activeDeferrals).toBe(0);
+    expect(r.openAffectingDefects).toBe(0);
+  });
+  it('non-affecting watch items are not counted', () => {
+    const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'WATCHLISTED', airworthinessAffecting: false })], deferrals: [] }, NOW);
+    expect(r.openAffectingDefects).toBe(0);
+  });
+});

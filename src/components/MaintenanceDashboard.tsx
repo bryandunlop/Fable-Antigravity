@@ -284,7 +284,7 @@ export default function MaintenanceDashboard() {
 
       {/* Fleet Status Widget */}
       <div className="mb-6">
-        <FleetStatusWidget compact={true} showDetailsLink={true} />
+        <FleetStatusWidget showDetailsLink={true} />
       </div>
 
       {/* Summary Cards */}

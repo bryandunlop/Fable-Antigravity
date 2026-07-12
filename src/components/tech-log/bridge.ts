@@ -184,6 +184,36 @@ export function readFleetServiceability(asOfUtc: string): FleetServiceability {
   return summarizeFleetServiceability(loadState(), asOfUtc);
 }
 
+/** Per-tail airworthiness detail for fleet surfaces outside tech-log (widget, /aircraft). */
+export interface FleetAirworthinessEntry {
+  tailNumber: string;
+  type: AircraftType;
+  isProvisional: boolean;
+  status: Serviceability;
+  openAffectingDefects: number;
+  activeDeferrals: number;
+}
+
+/** PURE — testable without localStorage. Same §14.2 derivation as summarizeFleetServiceability. */
+export function summarizeFleetAirworthiness(state: TechLogState, asOfUtc: string): FleetAirworthinessEntry[] {
+  return state.aircraft.map(ac => {
+    const r = deriveServiceability(ac.id, state, asOfUtc);
+    return {
+      tailNumber: ac.tailNumber,
+      type: ac.type,
+      isProvisional: ac.isProvisional,
+      status: r.status,
+      openAffectingDefects: r.openAffectingDefects,
+      activeDeferrals: r.activeDeferrals,
+    };
+  });
+}
+
+/** THIN localStorage wrapper — the only untested seam. */
+export function readFleetAirworthiness(asOfUtc: string): FleetAirworthinessEntry[] {
+  return summarizeFleetAirworthiness(loadState(), asOfUtc);
+}
+
 const newLocalId = (p: string) => `${p}-${Math.random().toString(36).slice(2, 10)}`;
 
 function loadState(): TechLogState {
