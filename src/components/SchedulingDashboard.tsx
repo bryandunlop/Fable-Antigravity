@@ -112,7 +112,7 @@ export default function SchedulingDashboard() {
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           {/* Fleet Status Widget */}
-          <FleetStatusWidget compact={true} showDetailsLink={true} />
+          <FleetStatusWidget showDetailsLink={true} />
 
           {/* NAS Impact Alerts - Prominently displayed */}
           <NASImpactWidget compact={false} />

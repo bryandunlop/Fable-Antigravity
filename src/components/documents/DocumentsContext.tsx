@@ -12,10 +12,13 @@ import type { Signature } from '../tech-log/types';
 import { classFor } from './classes';
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision } from './engine/revisions';
-import { validateSubmit, validateDecision, validateDirectPublish } from './engine/lifecycle';
+import { canAuthor, validateSubmit, validateDecision, validateDirectPublish } from './engine/lifecycle';
 import { computeNextReviewDate } from './engine/review';
+import { isTargetRole } from './engine/acknowledgments';
+import { migrateStoredState } from './engine/migrations';
 import { importLegacyBulletins, isBulletinClass } from './engine/bulletinCompat';
 import { contentFieldsFromMarkdown } from './engine/blocks';
+import { operatorTodayIso } from '../../lib/operatorDate';
 import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES, getRoleLabelByValue } from '../../lib/mockUsers';
 import { resolveUserId } from '../../notifications/identity';
 import { eventStore } from '../../notifications/events';
@@ -23,6 +26,9 @@ import { eventStore } from '../../notifications/events';
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
 export const DATA_VERSION = '2026-07-11-blocks-v1';
+/** Set once the legacy 'bulletins-state' store has been imported — a later
+ * re-seed must never resurrect stale pre-migration bulletins (C5). */
+export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';
 
 /** Every login role — used to expand an 'all' audience for stored events. */
 export function allAudienceRoles(): string[] {
@@ -46,7 +52,7 @@ function nowUtc(): string {
   return new Date().toISOString();
 }
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return operatorTodayIso(); // D24: calendar days in the operator zone, not UTC (C6)
 }
 
 /** Bring one persisted revision forward to the block model. A pre-block-model
@@ -71,14 +77,19 @@ export function documentsStateIsUnusable(parsed: unknown): boolean {
   return !Array.isArray((parsed as { revisions?: unknown }).revisions);
 }
 
-function loadInitialState(): DocumentsState {
+/** Exported for tests. */
+export function loadInitialState(): DocumentsState {
   const seedWithLegacy = (): DocumentsState => {
     const seed = getSeedState();
     // One-time migration of the legacy bulletins store: user edits + ack history
     // replace the bulletin-class seeds (ack records must never be silently lost).
+    // Flagged after the first successful import so a later re-seed can never
+    // resurrect stale pre-migration bulletins over edits made since (C5).
     try {
+      if (localStorage.getItem(BULLETINS_IMPORTED_KEY)) return seed;
       const legacy = importLegacyBulletins(localStorage.getItem('bulletins-state'));
       if (legacy) {
+        localStorage.setItem(BULLETINS_IMPORTED_KEY, nowUtc());
         const nonBulletinDocs = seed.docs.filter((d) => !isBulletinClass(d.classId));
         const bulletinDocIds = new Set(seed.docs.filter((d) => isBulletinClass(d.classId)).map((d) => d.id));
         const nonBulletinRevs = seed.revisions.filter((r) => !bulletinDocIds.has(r.docId));
@@ -96,17 +107,25 @@ function loadInitialState(): DocumentsState {
   };
 
   try {
-    localStorage.setItem(VERSION_KEY, DATA_VERSION);
+    const storedVersion = localStorage.getItem(VERSION_KEY);
     const raw = localStorage.getItem(STORAGE_KEY);
+    localStorage.setItem(VERSION_KEY, DATA_VERSION);
     // No prior store → genuine first seed: import the legacy bulletins store ONCE.
     if (!raw) return promote(seedWithLegacy());
     const parsed = JSON.parse(raw);
     // Structurally broken → re-seed rather than crash.
     if (documentsStateIsUnusable(parsed)) return promote(seedWithLegacy());
-    // Existing user data → migrate revisions forward (transform, never wipe) and do
-    // NOT re-import legacy bulletins over edits (that only happens on a first seed,
-    // above) — otherwise every schema bump resurrects pre-migration bulletins.
-    const migrated = { ...parsed, revisions: (parsed.revisions as unknown[]).map(migrateRevisionForward) };
+    // Existing user data → transform forward, never wipe (C5), and do NOT
+    // re-import legacy bulletins over edits (first-seed only, above):
+    // 1. idempotent shape heal — pre-block-model revisions gain `sections`;
+    // 2. version-keyed steps for later schema bumps (engine/migrations.ts).
+    const healed = { ...parsed, revisions: (parsed.revisions as unknown[]).map(migrateRevisionForward) };
+    const migrated = migrateStoredState(healed as DocumentsState, storedVersion);
+    if (storedVersion !== DATA_VERSION) {
+      // Persist the upgraded state now so a crash before the debounced save
+      // can't leave the new version stamped over the old shape.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+    }
     return promote({ ...getSeedState(), ...migrated });
   } catch {
     return getSeedState();
@@ -121,7 +140,7 @@ function promote(state: DocumentsState): DocumentsState {
 
 export type DocumentsAction =
   | { type: 'CREATE_DOC'; payload: { doc: Doc; revision: DocRevision } }
-  | { type: 'UPDATE_DOC_META'; payload: Doc }
+  | { type: 'UPDATE_DOC_META'; payload: { doc: Doc; actorUserId: string; actorRoles: string[] } }
   | { type: 'TOGGLE_PIN'; payload: string }
   | { type: 'TOGGLE_ARCHIVE'; payload: string }
   | { type: 'CREATE_DRAFT'; payload: DocRevision }
@@ -165,8 +184,38 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       }
       return { ...state, docs: [doc, ...state.docs], revisions: [...state.revisions, revision] };
     }
-    case 'UPDATE_DOC_META':
-      return { ...state, docs: state.docs.map((d) => (d.id === action.payload.id ? action.payload : d)) };
+    case 'UPDATE_DOC_META': {
+      // C1: meta writes are role-gated, and the identity fields of a live
+      // controlled doc (title/category/audience) may only change by riding a
+      // revision through four-eyes (see DocRevision.proposedMeta/applyPublish).
+      const { doc: next, actorRoles } = action.payload;
+      const existing = state.docs.find((d) => d.id === next.id);
+      if (!existing) {
+        warnNoop(`no doc ${next.id} to update`);
+        return state;
+      }
+      const cfg = classFor(existing.classId);
+      if (!canAuthor(cfg, actorRoles)) {
+        warnNoop(`doc meta changes require an authoring role for ${cfg.label}`);
+        return state;
+      }
+      if (next.classId !== existing.classId) {
+        warnNoop('a document cannot change class');
+        return state;
+      }
+      const hasBeenPublished = state.revisions.some(
+        (r) => r.docId === existing.id && (r.status === 'published' || r.status === 'superseded'),
+      );
+      if (cfg.controlled && hasBeenPublished) {
+        const sameRoles =
+          next.roles.length === existing.roles.length && next.roles.every((r, i) => r === existing.roles[i]);
+        if (next.title !== existing.title || next.category !== existing.category || !sameRoles) {
+          warnNoop('identity fields of a published controlled doc must ride a revision (four-eyes)');
+          return state;
+        }
+      }
+      return { ...state, docs: state.docs.map((d) => (d.id === next.id ? next : d)) };
+    }
     case 'TOGGLE_PIN':
       return {
         ...state,
@@ -300,13 +349,39 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
     }
     case 'ACKNOWLEDGE': {
       const { ack, signature } = action.payload;
-      // One ack per (revision, user): replace any prior record.
-      const kept = state.acknowledgments.filter(
-        (x) => !(x.revisionId === ack.revisionId && x.userId === ack.userId),
+      // C2: this is compliance evidence — guard it like one.
+      const rev = state.revisions.find((r) => r.id === ack.revisionId);
+      if (!rev || rev.status !== 'published') {
+        warnNoop('acknowledgments are recorded against a published revision only');
+        return state;
+      }
+      const doc = state.docs.find((d) => d.id === ack.docId);
+      if (!doc || !isTargetRole(doc, ack.role)) {
+        warnNoop('acknowledger is not in the document audience');
+        return state;
+      }
+      if (ack.level !== rev.ackLevel) {
+        warnNoop(`ack level '${ack.level}' does not match the required '${rev.ackLevel}'`);
+        return state;
+      }
+      if (ack.level === 'initials' && !ack.initials?.trim()) {
+        warnNoop('initials are required for an initials-level ack');
+        return state;
+      }
+      if (ack.level === 'signature' && (!ack.signatureId || !signature)) {
+        warnNoop('a signature record is required for a signature-level ack');
+        return state;
+      }
+      // Append-with-supersede: a prior (revision, user) record is flagged, never
+      // dropped — its signature row stays intact for the audit trail.
+      const acknowledgments = state.acknowledgments.map((x) =>
+        x.revisionId === ack.revisionId && x.userId === ack.userId && !x.superseded
+          ? { ...x, superseded: true }
+          : x,
       );
       return {
         ...state,
-        acknowledgments: [...kept, ack],
+        acknowledgments: [...acknowledgments, ack],
         signatures: signature ? [...state.signatures, signature] : state.signatures,
       };
     }
@@ -359,7 +434,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
 interface Ctx {
   state: DocumentsState;
   createDoc: (doc: Doc, revision: DocRevision) => void;
-  updateDocMeta: (doc: Doc) => void;
+  updateDocMeta: (doc: Doc, userRole: string, additionalRoles?: string[]) => void;
   togglePin: (docId: string) => void;
   toggleArchive: (docId: string) => void;
   createDraft: (revision: DocRevision) => void;
@@ -542,7 +617,13 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
   const value: Ctx = {
     state,
     createDoc: useCallback((doc, revision) => dispatch({ type: 'CREATE_DOC', payload: { doc, revision } }), []),
-    updateDocMeta: useCallback((doc) => dispatch({ type: 'UPDATE_DOC_META', payload: doc }), []),
+    updateDocMeta: useCallback((doc, userRole, additionalRoles = []) => {
+      const { userId } = identityFor(userRole);
+      dispatch({
+        type: 'UPDATE_DOC_META',
+        payload: { doc, actorUserId: userId, actorRoles: [userRole, ...additionalRoles] },
+      });
+    }, []),
     togglePin: useCallback((id) => dispatch({ type: 'TOGGLE_PIN', payload: id }), []),
     toggleArchive: useCallback((id) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: id }), []),
     createDraft: useCallback((r) => dispatch({ type: 'CREATE_DRAFT', payload: r }), []),

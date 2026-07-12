@@ -28,6 +28,7 @@ import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
 import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
 import { DocEditorDialog } from '../components/DocEditorDialog';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 
 const LIBRARY_CLASSES = ['procedural-bulletin', 'flight-ops-bulletin', 'sop', 'manual'];
 
@@ -39,7 +40,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
   const [showArchived, setShowArchived] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = operatorTodayIso();
   const { userId } = identityFor(userRole);
   const userRoles = [userRole, ...additionalRoles];
   const manager = canManageDocuments(userRole, additionalRoles);

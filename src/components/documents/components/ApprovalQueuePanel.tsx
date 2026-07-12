@@ -13,6 +13,7 @@ import { SectionedContent } from './SectionedContent';
 import { DiffedContent } from './DiffedContent';
 import { diffRevisions } from '../engine/diff';
 import { currentRevision } from '../engine/revisions';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** Pending-approval queue for approver roles. Own submissions are decision-
  * disabled (four-eyes) — the guard also lives in the reducer. */
@@ -32,7 +33,7 @@ export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRol
 
   const userRoles = [userRole, ...additionalRoles];
   const { userId } = identityFor(userRole);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = operatorTodayIso();
 
   const pending = state.revisions
     .filter((r) => r.status === 'pending-approval')

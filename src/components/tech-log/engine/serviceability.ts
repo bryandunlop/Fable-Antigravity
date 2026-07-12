@@ -10,6 +10,8 @@ export interface ServiceabilityResult {
   drivingDeferralId?: string;
   drivingCheckId?: string;
   computedAtUtc: string;
+  openAffectingDefects: number;
+  activeDeferrals: number;
 }
 
 /** Derived serviceability projection — design §14.2, first-match-wins precedence. */
@@ -45,6 +47,8 @@ export function deriveServiceability(
   const activeDeferralFor = (defectId: string) =>
     deferrals.find(df => df.defectId === defectId && effectiveStatus(df) === 'ACTIVE');
 
+  const activeDeferralCount = deferrals.filter(df => effectiveStatus(df) === 'ACTIVE').length;
+
   const result = (
     status: Serviceability,
     governingRule: number,
@@ -56,6 +60,8 @@ export function deriveServiceability(
     drivingDeferralId: ids.deferral,
     drivingCheckId: ids.check,
     computedAtUtc: asOfUtc,
+    openAffectingDefects: openAffecting.length,
+    activeDeferrals: activeDeferralCount,
   });
 
   // Rule 1: open airworthiness defect not covered by an ACTIVE deferral -> RED
