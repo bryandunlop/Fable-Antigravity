@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   currentLegIndex, groupLegsByDay, defaultPhase, partitionOutstanding, fratEarlySubmitWarning,
+  selectedLegIndex,
 } from './legContext';
 
 const leg = (dep: string) => ({ departureTimeUtc: dep });
+const idLeg = (id: string) => ({ id });
 
 describe('currentLegIndex', () => {
   const NOW = '2026-07-09T12:00:00.000Z';
@@ -18,6 +20,28 @@ describe('currentLegIndex', () => {
   it('returns -1 for no legs; treats a leg departing exactly now as current', () => {
     expect(currentLegIndex([], NOW)).toBe(-1);
     expect(currentLegIndex([leg(NOW)], NOW)).toBe(0);
+  });
+});
+
+describe('selectedLegIndex', () => {
+  const legs = [idLeg('l1'), idLeg('l2'), idLeg('l3')];
+  it('honours a ?leg param that matches a leg id, overriding the current leg', () => {
+    expect(selectedLegIndex(legs, 'l3', 0)).toBe(2);
+    expect(selectedLegIndex(legs, 'l1', 2)).toBe(0);
+  });
+  it('follows the current leg when there is no ?leg param', () => {
+    expect(selectedLegIndex(legs, null, 1)).toBe(1);
+    expect(selectedLegIndex(legs, undefined, 2)).toBe(2);
+  });
+  it('ignores a stale/unknown ?leg id and falls back to the current leg', () => {
+    expect(selectedLegIndex(legs, 'gone', 1)).toBe(1);
+  });
+  it('treats a negative current index as leg 0 and clamps out-of-range', () => {
+    expect(selectedLegIndex(legs, null, -1)).toBe(0);
+    expect(selectedLegIndex(legs, null, 99)).toBe(2);
+  });
+  it('returns 0 for an empty leg list (caller guards on the leg existing)', () => {
+    expect(selectedLegIndex([], 'l1', -1)).toBe(0);
   });
 });
 

@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Check } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import StandaloneFRATForm from '../../StandaloneFRATForm';
 import { completeFratOnLeg, markAirportReviewedOnLeg, saveFratDraftOnLeg } from '../../tech-log/preflightActions';
@@ -12,7 +11,7 @@ import type { Trip, TripLeg } from '../../tech-log/types';
 
 /** FRAT & airport module body (board): FRAT (fill → draft → submit, with an early-submit soft
  *  warning) plus airport review, for the selected leg. Bare — the ModuleCard supplies the header. */
-export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg: TripLeg; tripNumber: string }) {
+export function LegDayOfSection({ tlTrip, leg, tripNumber, onOpenAirport }: { tlTrip: Trip; leg: TripLeg; tripNumber: string; onOpenAirport: () => void }) {
   const { state, dispatch } = useTechLog();
   const ac = state.aircraft.find((a) => a.id === tlTrip.aircraftId);
   const user = useCurrentUser();
@@ -75,7 +74,10 @@ export function LegDayOfSection({ tlTrip, leg, tripNumber }: { tlTrip: Trip; leg
               ? <span className="ml-2 text-xs text-emerald-700"><Check className="inline h-3.5 w-3.5" /> reviewed</span>
               : <span className="ml-2 text-xs text-muted-foreground">not reviewed</span>}
           </span>
-          <Link to={`/tech-log/trips/${tlTrip.id}/legs/${leg.id}`} className="text-xs text-primary hover:underline">open details ↗</Link>
+          <button type="button" onClick={onOpenAirport}
+            className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline">
+            View airport details <ChevronRight className="h-3.5 w-3.5" />
+          </button>
         </div>
         {!leg.airportReviewed && (
           <button className="mt-2 min-h-[44px] rounded border px-3 py-2 text-sm hover:bg-accent"
