@@ -17,6 +17,8 @@ export type SectionChange = 'unchanged' | 'added' | 'removed' | 'renumbered' | '
 export interface SectionDiff {
   id: string;
   kind: SectionChange;
+  /** number or title differs — independent of block changes (both chips can show). */
+  headingChanged: boolean;
   section?: DocSection;     // next-revision section (all but 'removed')
   prevSection?: DocSection; // prev-revision section ('removed')
   blocks: BlockDiff[];
@@ -27,6 +29,8 @@ export interface DocDiff {
   counts: {
     added: number; removed: number; modified: number; moved: number;
     sectionsAdded: number; sectionsRemoved: number;
+    /** The displayed/navigable change count: changed blocks + heading-only sections. */
+    total: number;
   };
   hasChanges: boolean;
 }
@@ -69,34 +73,44 @@ function diffBlocks(prev: DocBlock[], next: DocBlock[]): { blocks: BlockDiff[]; 
   const prevById = new Map(prev.map((b) => [b.id, b]));
   const nextById = new Map(next.map((b) => [b.id, b]));
   const prevOrder = prev.map((b) => b.id);
-  const out: BlockDiff[] = [];
+  const claimed = new Set(next.flatMap((b) => [b.id, b.splitFrom].filter(Boolean) as string[]));
   let added = 0;
   let removed = 0;
   let modified = 0;
   let moved = 0;
 
-  next.forEach((b, idx) => {
+  // Survivors in next order (additions land at their next position).
+  const out: BlockDiff[] = next.map((b, idx) => {
     // splitFrom lineage: a split child matches its parent → reads as a modification, not an add.
     const p = prevById.get(b.id) ?? (b.splitFrom ? prevById.get(b.splitFrom) : undefined);
-    if (!p) { out.push({ id: b.id, kind: 'added', block: b }); added++; return; }
+    if (!p) { added++; return { id: b.id, kind: 'added', block: b }; }
     if (p.md !== b.md) {
-      out.push({ id: b.id, kind: 'modified', block: b, prevBlock: p, segments: wordDiff(p.md, b.md) });
       modified++;
-      return;
+      return { id: b.id, kind: 'modified', block: b, prevBlock: p, segments: wordDiff(p.md, b.md) };
     }
     // Same content; detect a move by relative order among the blocks common to both revisions.
     const prevIdx = prevOrder.indexOf(b.id);
+    if (prevIdx === -1) return { id: b.id, kind: 'unchanged', block: b }; // splitFrom match — not order-comparable
     const commonBefore = next.slice(0, idx).filter((x) => prevById.has(x.id)).length;
     const prevCommonBefore = prev.slice(0, prevIdx).filter((x) => nextById.has(x.id)).length;
-    if (commonBefore !== prevCommonBefore) { out.push({ id: b.id, kind: 'moved', block: b, prevBlock: p }); moved++; }
-    else out.push({ id: b.id, kind: 'unchanged', block: b });
+    if (commonBefore !== prevCommonBefore) { moved++; return { id: b.id, kind: 'moved', block: b, prevBlock: p }; }
+    return { id: b.id, kind: 'unchanged', block: b };
   });
 
-  // Removed blocks: in prev, claimed by no next block (by id or as a split parent).
-  const claimed = new Set(next.flatMap((b) => [b.id, b.splitFrom].filter(Boolean) as string[]));
-  prev.forEach((p) => {
-    if (!claimed.has(p.id)) { out.push({ id: p.id, kind: 'removed', prevBlock: p }); removed++; }
-  });
+  // Removed blocks: in prev, claimed by no next block. Interleave each at its original
+  // position — right after its nearest preceding surviving block — so "content removed
+  // here" shows WHERE content was cut, not appended at the section end.
+  for (const p of prev) {
+    if (claimed.has(p.id)) continue;
+    removed++;
+    const rd: BlockDiff = { id: p.id, kind: 'removed', prevBlock: p };
+    const pIdx = prevOrder.indexOf(p.id);
+    let anchorId: string | null = null;
+    for (let k = pIdx - 1; k >= 0; k--) { if (claimed.has(prev[k].id)) { anchorId = prev[k].id; break; } }
+    let at = anchorId === null ? 0 : out.findIndex((o) => o.id === anchorId || o.prevBlock?.id === anchorId) + 1;
+    while (at < out.length && out[at].kind === 'removed') at++; // keep multiple removals in prev order
+    out.splice(at, 0, rd);
+  }
 
   return { blocks: out, added, removed, modified, moved };
 }
@@ -105,7 +119,7 @@ export function diffRevisions(prev: DocRevision | undefined, next: DocRevision):
   const prevSecs = prev?.sections ?? [];
   const prevById = new Map(prevSecs.map((s) => [s.id, s]));
   const nextIds = new Set(next.sections.map((s) => s.id));
-  const counts = { added: 0, removed: 0, modified: 0, moved: 0, sectionsAdded: 0, sectionsRemoved: 0 };
+  const counts = { added: 0, removed: 0, modified: 0, moved: 0, sectionsAdded: 0, sectionsRemoved: 0, total: 0 };
   const sections: SectionDiff[] = [];
 
   for (const s of next.sections) {
@@ -114,17 +128,18 @@ export function diffRevisions(prev: DocRevision | undefined, next: DocRevision):
       const bd = s.blocks.map<BlockDiff>((b) => ({ id: b.id, kind: 'added', block: b }));
       counts.added += bd.length;
       counts.sectionsAdded++;
-      sections.push({ id: s.id, kind: 'added', section: s, blocks: bd });
+      sections.push({ id: s.id, kind: 'added', headingChanged: false, section: s, blocks: bd });
       continue;
     }
     const { blocks, added, removed, modified, moved } = diffBlocks(p.blocks, s.blocks);
     counts.added += added; counts.removed += removed; counts.modified += modified; counts.moved += moved;
     const blockChanged = blocks.some((b) => b.kind !== 'unchanged');
+    const headingChanged = p.number !== s.number || p.title !== s.title;
     let kind: SectionChange = 'unchanged';
     if (blockChanged) kind = 'modified';
     else if (p.number !== s.number) kind = 'renumbered';
     else if (p.title !== s.title) kind = 'retitled';
-    sections.push({ id: s.id, kind, section: s, blocks });
+    sections.push({ id: s.id, kind, headingChanged, section: s, blocks });
   }
 
   // Removed sections: present in prev, absent from next.
@@ -133,14 +148,16 @@ export function diffRevisions(prev: DocRevision | undefined, next: DocRevision):
       counts.sectionsRemoved++;
       counts.removed += p.blocks.length;
       sections.push({
-        id: p.id, kind: 'removed', prevSection: p,
+        id: p.id, kind: 'removed', headingChanged: false, prevSection: p,
         blocks: p.blocks.map<BlockDiff>((b) => ({ id: b.id, kind: 'removed', prevBlock: b })),
       });
     }
   }
 
-  const hasChanges =
-    counts.added + counts.removed + counts.modified + counts.moved + counts.sectionsAdded + counts.sectionsRemoved > 0
-    || sections.some((s) => s.kind === 'renumbered' || s.kind === 'retitled');
+  // Nav-stop / display count: every changed block + each heading-only section
+  // (renumbered/retitled with no block change gets one section-level stop).
+  const headingOnly = sections.filter((s) => s.kind === 'renumbered' || s.kind === 'retitled').length;
+  counts.total = counts.added + counts.removed + counts.modified + counts.moved + headingOnly;
+  const hasChanges = counts.total > 0;
   return { sections, counts, hasChanges };
 }

@@ -36,7 +36,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const allRevs = doc ? revisionsFor(doc.id, state.revisions) : [];
   const priorRev = doc && rev ? priorPublishedRevision(doc.id, state.revisions) : undefined;
   const diff = useMemo(() => (rev && priorRev ? diffRevisions(priorRev, rev) : null), [rev, priorRev]);
-  const changeCount = diff ? diff.counts.added + diff.counts.removed + diff.counts.modified : 0;
+  const changeCount = diff ? diff.counts.total : 0;
   const showingDiff = !!(diff?.hasChanges && showChanges);
 
   const gotoChange = (dir: 1 | -1) => {

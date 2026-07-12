@@ -120,6 +120,44 @@ describe('diffRevisions', () => {
     expect(d.sections[0].kind).toBe('added');
     expect(d.sections[0].blocks[0].kind).toBe('added');
   });
+
+  it('interleaves a removed block at its original position, not the section end', () => {
+    const prev = rev({ sections: [sec('D::a', 'A', [
+      { id: 'D::a::b0', md: 'A' }, { id: 'D::a::b1', md: 'B' }, { id: 'D::a::b2', md: 'C' },
+    ])] });
+    const next = rev({ sections: [sec('D::a', 'A', [{ id: 'D::a::b0', md: 'A' }, { id: 'D::a::b2', md: 'C' }])] });
+    const d = diffRevisions(prev, next);
+    // order must be A, (B removed), C — the removal sits between A and C, not after C
+    expect(d.sections[0].blocks.map((b) => `${b.kind}:${b.id}`)).toEqual([
+      'unchanged:D::a::b0', 'removed:D::a::b1', 'unchanged:D::a::b2',
+    ]);
+  });
+
+  it('counts a heading-only change and a move in the total (chip never reads 0 while changed)', () => {
+    // heading-only
+    const p1 = rev({ sections: [sec('D::a', 'Old', [{ id: 'D::a::b0', md: 'x' }], { number: '3.1' })] });
+    const n1 = rev({ sections: [sec('D::a', 'New', [{ id: 'D::a::b0', md: 'x' }], { number: '3.1' })] });
+    const d1 = diffRevisions(p1, n1);
+    expect(d1.counts.total).toBe(1);
+    expect(d1.sections[0].headingChanged).toBe(true);
+  });
+
+  it('reports headingChanged independently even when a block in the same section also changed', () => {
+    const prev = rev({ sections: [sec('D::a', 'Old', [{ id: 'D::a::b0', md: 'x' }], { number: '3.1' })] });
+    const next = rev({ sections: [sec('D::a', 'New', [{ id: 'D::a::b0', md: 'y' }], { number: '3.1' })] });
+    const d = diffRevisions(prev, next);
+    expect(d.sections[0].kind).toBe('modified');   // block changed
+    expect(d.sections[0].headingChanged).toBe(true); // AND heading changed — not masked
+  });
+
+  it('does not throw / misclassify when a split child shares its parent content (splitFrom guard)', () => {
+    const prev = rev({ sections: [sec('D::a', 'A', [{ id: 'D::a::b0', md: 'same text' }])] });
+    const next = rev({ sections: [sec('D::a', 'A', [{ id: 'D::a::b0', md: 'same text' }, { id: 'D::a::b9', md: 'same text' }])] });
+    next.sections[0].blocks[1].splitFrom = 'D::a::b0';
+    const d = diffRevisions(prev, next);
+    // b9 matched its parent by content via splitFrom → unchanged (no spurious 'moved' from slice(0,-1))
+    expect(d.sections[0].blocks.find((b) => b.id === 'D::a::b9')!.kind).toBe('unchanged');
+  });
 });
 
 describe('priorPublishedRevision', () => {

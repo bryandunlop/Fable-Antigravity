@@ -39,6 +39,7 @@ export function SuggestionDialog({
   const [rationale, setRationale] = useState('');
 
   const groups = rev.sections.map((s) => ({
+    id: s.id,
     label: sectionLabel(s.number, s.title),
     blocks: s.blocks.map((b) => ({ id: b.id, excerpt: excerptOf(b.md) || '(block)' })),
   }));
@@ -92,7 +93,7 @@ export function SuggestionDialog({
             >
               <option value="">General — the whole document</option>
               {groups.map((g) => (
-                <optgroup key={g.label} label={g.label}>
+                <optgroup key={g.id} label={g.label}>
                   {g.blocks.map((b) => (
                     <option key={b.id} value={b.id}>{b.excerpt}</option>
                   ))}

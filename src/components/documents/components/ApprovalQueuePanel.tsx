@@ -130,7 +130,7 @@ export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRol
             {isOpen && (() => {
               const published = currentRevision(rev.docId, state.revisions);
               const diff = diffRevisions(published, rev);
-              const changeCount = diff.counts.added + diff.counts.removed + diff.counts.modified;
+              const changeCount = diff.counts.total;
               return (
                 <div className="mt-3">
                   <div className="mb-2 flex items-center gap-1.5">
