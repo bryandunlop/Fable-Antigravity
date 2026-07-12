@@ -34,6 +34,8 @@ import {
   getStatusConfig,
   formatRelativeTime,
   getDeferralAlertStatus,
+  getDeferralDaysRemaining,
+  isDeferralExpired,
   formatHours
 } from './utils/maintenanceUtils';
 import LifecycleProgress from './LifecycleProgress';
@@ -72,13 +74,12 @@ export default function MaintenanceHub() {
   const activeDeferrals = squawks.filter(s => s.status === 'deferred' && s.deferral);
   const expiringDeferrals = activeDeferrals.filter(s => {
     if (!s.deferral) return false;
-    const expiryDate = new Date(s.deferral.expiryDate);
-    const daysRemaining = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    const daysRemaining = getDeferralDaysRemaining(s.deferral);
     return daysRemaining <= 5 && daysRemaining >= 0;
   });
   const expiredDeferrals = activeDeferrals.filter(s => {
     if (!s.deferral) return false;
-    return new Date(s.deferral.expiryDate) < new Date();
+    return isDeferralExpired(s.deferral);
   });
 
   // Pattern alerts

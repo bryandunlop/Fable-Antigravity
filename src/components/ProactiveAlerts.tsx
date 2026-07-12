@@ -14,7 +14,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { useMaintenanceContext } from './contexts/MaintenanceContext';
-import { formatRelativeTime } from './utils/maintenanceUtils';
+import { formatRelativeTime, getDeferralDaysRemaining, isDeferralExpired } from './utils/maintenanceUtils';
 
 interface ProactiveAlert {
   id: string;
@@ -39,15 +39,13 @@ export default function ProactiveAlerts() {
     // Check for expiring deferrals
     const expiringDeferrals = squawks.filter(s => {
       if (!s.deferral || s.status !== 'deferred') return false;
-      const daysRemaining = Math.ceil(
-        (new Date(s.deferral.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-      );
+      const daysRemaining = getDeferralDaysRemaining(s.deferral);
       return daysRemaining > 0 && daysRemaining <= 2;
     });
 
     const expiredDeferrals = squawks.filter(s => {
       if (!s.deferral || s.status !== 'deferred') return false;
-      return new Date(s.deferral.expiryDate) < new Date();
+      return isDeferralExpired(s.deferral);
     });
 
     if (expiredDeferrals.length > 0) {
