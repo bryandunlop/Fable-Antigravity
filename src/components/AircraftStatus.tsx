@@ -1,109 +1,32 @@
-import React, { useMemo } from 'react';
-import FleetStatusWidget from './FleetStatusWidget';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { Link } from 'react-router-dom';
-import { useSatcomDirect } from './hooks/useSatcomDirect';
+import { useUnifiedFleetStatus } from './hooks/useUnifiedFleetStatus';
+import { ServiceabilityChip } from './tech-log/components/ServiceabilityChip';
 import {
   Plane,
   Wrench,
   Sparkles,
   FileText,
-  Settings,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Fuel,
+  MapPin,
+  Gauge
 } from 'lucide-react';
 
+const FLIGHT_STATUS_LABEL: Record<string, string> = {
+  'in-flight': 'In Flight',
+  'taxi': 'Taxiing',
+  'on-ground': 'On Ground',
+  'parked': 'Parked',
+  'unknown': 'No position feed',
+};
+
 export default function AircraftStatus() {
-  const { aircraftPositions, aircraftStatuses, loading, isRefreshing, error } = useSatcomDirect();
-
-  // Filter flights by status (currently showing all)
-  const [filter, setFilter] = React.useState('all');
-
-  // Transform API data to display format
-  const aircraftData = useMemo(() => {
-    return aircraftPositions.map((position) => {
-      const status = aircraftStatuses.find(s => s.tailNumber === position.tailNumber);
-
-      return {
-        id: position.tailNumber,
-        type: 'Gulfstream G650', // Could be extended in API
-        status: position.flightPhase === 'Parked' ? 'Ground' :
-          position.flightPhase === 'Cruise' || position.flightPhase === 'Climb' || position.flightPhase === 'Descent' ? 'In Flight' :
-            status?.satcomStatus === 'Maintenance' ? 'Maintenance' : 'Available',
-        location: position.flightPhase === 'Parked'
-          ? `${position.departureAirport || 'Unknown'} Ramp`
-          : position.departureAirport && position.arrivalAirport
-            ? `En Route ${position.departureAirport}-${position.arrivalAirport}`
-            : 'In Flight',
-        altitude: `${position.altitude.toLocaleString()} ft`,
-        speed: `${position.groundSpeed} kts`,
-        eta: position.estimatedArrival
-          ? new Date(position.estimatedArrival).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : 'N/A',
-        fuel: position.fuelRemaining ? `${Math.round((position.fuelRemaining / 25000) * 100)}%` : 'N/A',
-        passengers: '0/180', // Would come from separate system
-        crew: '6',
-        issues: status?.alerts.filter(a => !a.acknowledged) || [],
-        nextMaintenance: '2025-02-15', // Would come from maintenance system
-        flightNumber: position.callSign || null
-      };
-    });
-  }, [aircraftPositions, aircraftStatuses]);
-
-  const filteredAircraft = aircraftData;  // Can add filtering logic later
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'in flight': return 'bg-green-100 text-green-800 border-green-200';
-      case 'ground': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'maintenance': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'available': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'in flight': return <Plane className="w-4 h-4" />;
-      case 'ground': return <Plane className="w-4 h-4" />;
-      case 'maintenance': return <Settings className="w-4 h-4" />;
-      case 'available': return <Plane className="w-4 h-4" />;
-      default: return <Plane className="w-4 h-4" />;
-    }
-  };
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="p-4 max-w-7xl mx-auto space-y-6">
-        <Card>
-          <CardContent className="p-8 flex items-center justify-center">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading aircraft status...
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="p-4 max-w-7xl mx-auto space-y-6">
-        <Card className="border-red-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="w-4 h-4" />
-              <span className="text-sm">Unable to load aircraft data: {error}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const { fleet, dispatchable, satcomLoading, satcomError, isRefreshing } = useUnifiedFleetStatus();
 
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-6">
@@ -115,13 +38,85 @@ export default function AircraftStatus() {
             {isRefreshing && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground ml-2" />}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Comprehensive fleet monitoring with flight, service, and cleaning status
+            Airworthiness derived from the tech log ({dispatchable}/{fleet.length} dispatchable), with live position overlay
           </p>
         </div>
       </div>
 
-      {/* Main Fleet Status Widget */}
-      <FleetStatusWidget compact={false} showDetailsLink={false} />
+      {satcomError && (
+        <div className="flex items-center gap-2 p-3 border border-amber-200 rounded-lg bg-amber-50 text-amber-800 text-sm">
+          <AlertTriangle className="w-4 h-4" />
+          Position feed unavailable — showing airworthiness only.
+        </div>
+      )}
+
+      {/* Per-tail airworthiness cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {fleet.map(ac => {
+          const aw = ac.airworthiness;
+          const reasonParts: string[] = [];
+          if (aw.openAffectingDefects > 0) {
+            reasonParts.push(`${aw.openAffectingDefects} open defect${aw.openAffectingDefects === 1 ? '' : 's'}`);
+          }
+          if (aw.activeDeferrals > 0) {
+            reasonParts.push(`${aw.activeDeferrals} active deferral${aw.activeDeferrals === 1 ? '' : 's'}`);
+          }
+          const reason = reasonParts.length > 0 ? reasonParts.join(' · ') : 'No open defects';
+
+          return (
+            <Card key={ac.tailNumber} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="text-lg">{ac.tailNumber}</CardTitle>
+                    <CardDescription>{ac.model}</CardDescription>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <ServiceabilityChip status={aw.status} />
+                    {aw.isProvisional && <Badge variant="outline">Provisional</Badge>}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">{reason}</p>
+
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="w-4 h-4 shrink-0" />
+                    {satcomLoading
+                      ? 'Connecting to position feed...'
+                      : ac.location ?? FLIGHT_STATUS_LABEL[ac.flightStatus]}
+                  </div>
+                  {ac.flightStatus === 'in-flight' && ac.position && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Gauge className="w-4 h-4 shrink-0" />
+                      {ac.position.altitude.toLocaleString()} ft · {ac.position.groundSpeed} kts
+                    </div>
+                  )}
+                  {ac.fuelRemaining !== undefined && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Fuel className="w-4 h-4 shrink-0" />
+                      {ac.fuelRemaining.toLocaleString()} lbs
+                    </div>
+                  )}
+                  {ac.unacknowledgedAlerts > 0 && (
+                    <div className="flex items-center gap-2 text-amber-700">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      {ac.unacknowledgedAlerts} unacknowledged alert{ac.unacknowledgedAlerts === 1 ? '' : 's'}
+                    </div>
+                  )}
+                </div>
+
+                <Link to={`/tech-log/fleet?filter=${aw.status}`}>
+                  <Button variant="outline" size="sm" className="w-full mt-1">
+                    Open in Tech Log
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Quick Access Links */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

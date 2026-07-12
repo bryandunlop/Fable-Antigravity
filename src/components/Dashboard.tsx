@@ -175,7 +175,7 @@ export default function Dashboard({ userRole }: DashboardProps) {
 
         {/* Top Left: Aircraft Status */}
         <div className="glass-premium rounded-lg p-6 flex flex-col overflow-hidden relative group transition-all duration-500 opacity-0 animate-slide-up [animation-delay:100ms]">
-          <FleetStatusWidget compact={true} showDetailsLink={true} transparent={true} className="flex-1" />
+          <FleetStatusWidget showDetailsLink={true} transparent={true} className="flex-1" />
         </div>
 
         {/* Top Right: NAS Impact */}
