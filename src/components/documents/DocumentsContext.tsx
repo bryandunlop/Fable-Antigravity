@@ -21,7 +21,7 @@ import { eventStore } from '../../notifications/events';
 
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
-export const DATA_VERSION = '2026-07-10-v1';
+export const DATA_VERSION = '2026-07-11-blocks-v1';
 
 /** Every login role — used to expand an 'all' audience for stored events. */
 export function allAudienceRoles(): string[] {
@@ -46,6 +46,15 @@ function nowUtc(): string {
 }
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** True when a persisted state predates the block model (a revision lacks `sections`)
+ * or is structurally unusable — in either case we discard it and re-seed. */
+export function documentsStateIsStale(parsed: unknown): boolean {
+  if (!parsed || typeof parsed !== 'object') return true;
+  const revs = (parsed as { revisions?: unknown }).revisions;
+  if (!Array.isArray(revs)) return true;
+  return revs.some((r) => !r || typeof r !== 'object' || !Array.isArray((r as { sections?: unknown }).sections));
 }
 
 function loadInitialState(): DocumentsState {
@@ -79,7 +88,10 @@ function loadInitialState(): DocumentsState {
       return promote(seedWithLegacy());
     }
     const raw = localStorage.getItem(STORAGE_KEY);
-    return promote(raw ? { ...getSeedState(), ...JSON.parse(raw) } : seedWithLegacy());
+    if (!raw) return promote(seedWithLegacy());
+    const parsed = JSON.parse(raw);
+    if (documentsStateIsStale(parsed)) return promote(seedWithLegacy());
+    return promote({ ...getSeedState(), ...parsed });
   } catch {
     return getSeedState();
   }
