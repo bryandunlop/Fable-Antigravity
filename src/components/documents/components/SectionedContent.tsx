@@ -9,7 +9,7 @@ const CALLOUT_STYLES: Record<NonNullable<DocBlock['calloutKind']>, string> = {
   warning: 'border-orange-300 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20',
 };
 
-function Block({ block }: { block: DocBlock }) {
+export function BlockBody({ block }: { block: DocBlock }) {
   if (block.type === 'callout') {
     const kind = block.calloutKind ?? 'note';
     // Strip the '> [!KIND]' marker line; render the remaining quoted text.
@@ -44,7 +44,7 @@ export function SectionedContent({ sections }: { sections: DocSection[] }) {
             ))}
           {section.blocks.map((block) => (
             <div key={block.id} data-block-id={block.id}>
-              <Block block={block} />
+              <BlockBody block={block} />
             </div>
           ))}
         </section>
