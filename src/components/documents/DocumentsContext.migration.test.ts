@@ -1,24 +1,57 @@
 import { describe, it, expect } from 'vitest';
-import { documentsStateIsStale, DATA_VERSION } from './DocumentsContext';
+import { migrateRevisionForward, documentsStateIsUnusable, DATA_VERSION } from './DocumentsContext';
 
-describe('documentsStateIsStale', () => {
-  it('flags a legacy revision that has content but no sections', () => {
-    const legacy = { revisions: [{ id: 'SOP-001-r1', content: '# Old blob' }] };
-    expect(documentsStateIsStale(legacy)).toBe(true);
+describe('migrateRevisionForward', () => {
+  it('splits a pre-block-model content blob into sections and drops content', () => {
+    const legacy = {
+      id: 'SOP-001-r1',
+      docId: 'SOP-001',
+      revision: '1.0',
+      status: 'published',
+      content: '# Title\n\n## Purpose\nDo the thing.',
+      mockChecksum: 'stale',
+    };
+    const out = migrateRevisionForward(legacy) as Record<string, unknown>;
+    expect(out.content).toBeUndefined();
+    expect(Array.isArray(out.sections)).toBe(true);
+    expect((out.sections as unknown[]).length).toBeGreaterThan(0);
+    expect(typeof out.mockChecksum).toBe('string');
+    expect(out.mockChecksum).not.toBe('stale'); // recomputed from the tree
+    // Non-content fields are preserved verbatim — the user's record is not lost.
+    expect(out.id).toBe('SOP-001-r1');
+    expect(out.revision).toBe('1.0');
+    expect(out.status).toBe('published');
   });
 
-  it('accepts a current-shape state with a sections array', () => {
-    const current = { revisions: [{ id: 'SOP-001-r1', sections: [] }] };
-    expect(documentsStateIsStale(current)).toBe(false);
+  it('passes an already-migrated revision through unchanged (idempotent)', () => {
+    const current = {
+      id: 'x',
+      docId: 'D',
+      sections: [{ id: 'D::s', level: 1, number: '', title: '', blocks: [] }],
+    };
+    expect(migrateRevisionForward(current)).toBe(current);
   });
 
-  it('flags non-object / missing-revisions payloads', () => {
-    expect(documentsStateIsStale(null)).toBe(true);
-    expect(documentsStateIsStale({})).toBe(true);
-    expect(documentsStateIsStale({ revisions: 'nope' })).toBe(true);
+  it('leaves a revision with neither content nor sections alone', () => {
+    const weird = { id: 'x', docId: 'D' };
+    expect(migrateRevisionForward(weird)).toBe(weird);
+  });
+});
+
+describe('documentsStateIsUnusable', () => {
+  it('is false for a state with a revisions array — even old-shaped (it gets migrated, not wiped)', () => {
+    expect(documentsStateIsUnusable({ revisions: [{ id: 'x', content: '# old' }] })).toBe(false);
   });
 
-  it('DATA_VERSION was bumped for this slice', () => {
+  it('is true for non-object / missing-revisions payloads', () => {
+    expect(documentsStateIsUnusable(null)).toBe(true);
+    expect(documentsStateIsUnusable({})).toBe(true);
+    expect(documentsStateIsUnusable({ revisions: 'nope' })).toBe(true);
+  });
+});
+
+describe('DATA_VERSION', () => {
+  it('was bumped for this slice', () => {
     expect(DATA_VERSION).toBe('2026-07-11-blocks-v1');
   });
 });

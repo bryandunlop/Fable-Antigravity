@@ -15,6 +15,7 @@ import { applyPublish, promoteScheduled, currentRevision } from './engine/revisi
 import { validateSubmit, validateDecision, validateDirectPublish } from './engine/lifecycle';
 import { computeNextReviewDate } from './engine/review';
 import { importLegacyBulletins, isBulletinClass } from './engine/bulletinCompat';
+import { contentFieldsFromMarkdown } from './engine/blocks';
 import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES, getRoleLabelByValue } from '../../lib/mockUsers';
 import { resolveUserId } from '../../notifications/identity';
 import { eventStore } from '../../notifications/events';
@@ -48,13 +49,26 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** True when a persisted state predates the block model (a revision lacks `sections`)
- * or is structurally unusable — in either case we discard it and re-seed. */
-export function documentsStateIsStale(parsed: unknown): boolean {
+/** Bring one persisted revision forward to the block model. A pre-block-model
+ * revision carries a `content` markdown blob and no `sections`; split it into a
+ * section tree (and recompute the checksum) rather than discarding the user's
+ * record. Idempotent: a revision that already has `sections` is returned as-is. */
+export function migrateRevisionForward(r: unknown): unknown {
+  if (!r || typeof r !== 'object') return r;
+  const rev = r as Record<string, unknown>;
+  if (Array.isArray(rev.sections)) return r;
+  if (typeof rev.content !== 'string') return r;
+  const docId = typeof rev.docId === 'string' ? rev.docId : typeof rev.id === 'string' ? rev.id : 'DOC';
+  const { content, ...rest } = rev;
+  return { ...rest, ...contentFieldsFromMarkdown(content as string, docId) };
+}
+
+/** True only when a persisted payload is structurally unusable (not an object, or
+ * no revisions array) and must be re-seeded. Old-shaped data is NOT unusable — it
+ * is migrated forward by {@link migrateRevisionForward}, never wiped. */
+export function documentsStateIsUnusable(parsed: unknown): boolean {
   if (!parsed || typeof parsed !== 'object') return true;
-  const revs = (parsed as { revisions?: unknown }).revisions;
-  if (!Array.isArray(revs)) return true;
-  return revs.some((r) => !r || typeof r !== 'object' || !Array.isArray((r as { sections?: unknown }).sections));
+  return !Array.isArray((parsed as { revisions?: unknown }).revisions);
 }
 
 function loadInitialState(): DocumentsState {
@@ -82,16 +96,18 @@ function loadInitialState(): DocumentsState {
   };
 
   try {
-    if (localStorage.getItem(VERSION_KEY) !== DATA_VERSION) {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.setItem(VERSION_KEY, DATA_VERSION);
-      return promote(seedWithLegacy());
-    }
+    localStorage.setItem(VERSION_KEY, DATA_VERSION);
     const raw = localStorage.getItem(STORAGE_KEY);
+    // No prior store → genuine first seed: import the legacy bulletins store ONCE.
     if (!raw) return promote(seedWithLegacy());
     const parsed = JSON.parse(raw);
-    if (documentsStateIsStale(parsed)) return promote(seedWithLegacy());
-    return promote({ ...getSeedState(), ...parsed });
+    // Structurally broken → re-seed rather than crash.
+    if (documentsStateIsUnusable(parsed)) return promote(seedWithLegacy());
+    // Existing user data → migrate revisions forward (transform, never wipe) and do
+    // NOT re-import legacy bulletins over edits (that only happens on a first seed,
+    // above) — otherwise every schema bump resurrects pre-migration bulletins.
+    const migrated = { ...parsed, revisions: (parsed.revisions as unknown[]).map(migrateRevisionForward) };
+    return promote({ ...getSeedState(), ...migrated });
   } catch {
     return getSeedState();
   }
