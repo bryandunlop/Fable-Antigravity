@@ -1,15 +1,19 @@
 // Seed content for the unified Document Compliance module. Realistic GFO
 // content; dates are computed relative to load time so the demo's review/ack
-// clocks stay meaningful (a DATA_VERSION bump re-seeds).
+// clocks stay meaningful (a DATA_VERSION bump migrates the stored state
+// forward — see engine/migrations.ts; only a fresh install re-seeds).
 import type { Doc, DocRevision, DocAcknowledgment, DocComment, DocSuggestion, DocumentsState } from './types';
 import type { Signature } from '../tech-log/types';
 import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
 import { mockSha256 } from '../tech-log/engine/signing';
+import { operatorTodayIso } from '../../lib/operatorDate';
 
 function daysFromNow(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
+  // Anchor seed dates to the operator calendar day (D24) so they agree with
+  // the app's effective/overdue comparisons near UTC midnight.
+  const d = new Date(`${operatorTodayIso()}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 

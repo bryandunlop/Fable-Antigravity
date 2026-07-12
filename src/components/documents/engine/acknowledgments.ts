@@ -24,12 +24,14 @@ export function isAcknowledged(
   return acks.some((a) => a.revisionId === rev.id && a.userId === userId);
 }
 
-/** Acknowledgments recorded against this revision. */
+/** Current acknowledgments recorded against this revision. Superseded records
+ * (replaced by a newer ack from the same user — C2 append-with-supersede) are
+ * audit history, not current evidence. */
 export function acknowledgedFor(
   rev: Pick<DocRevision, 'id'>,
   acks: DocAcknowledgment[],
 ): DocAcknowledgment[] {
-  return acks.filter((a) => a.revisionId === rev.id);
+  return acks.filter((a) => a.revisionId === rev.id && !a.superseded);
 }
 
 /** Readers who still owe a read on this revision. */

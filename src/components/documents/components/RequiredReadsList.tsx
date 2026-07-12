@@ -7,13 +7,14 @@ import { useDocuments, identityFor } from '../DocumentsContext';
 import { unacknowledgedRequiredReads, isOverdue } from '../engine/acknowledgments';
 import { classFor } from '../classes';
 import { DocIdentityLine } from './DocIdentity';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** "My required reads" — every published revision the current user still owes.
  * Used by the hub tab and re-pointed surfaces (Safety Center Documents tab). */
 export function RequiredReadsList({ userRole }: { userRole: string }) {
   const { state } = useDocuments();
   const { userId } = identityFor(userRole);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = operatorTodayIso();
   const outstanding = unacknowledgedRequiredReads(
     state.docs,
     state.revisions,

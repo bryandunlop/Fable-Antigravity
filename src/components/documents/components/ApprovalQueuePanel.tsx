@@ -11,6 +11,7 @@ import { useDocuments, identityFor, publishRequiredReadEvent } from '../Document
 import { classFor } from '../classes';
 import { canApprove, validateDecision } from '../engine/lifecycle';
 import { DocIdentityLine } from './DocIdentity';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** Pending-approval queue for approver roles. Own submissions are decision-
  * disabled (four-eyes) — the guard also lives in the reducer. */
@@ -22,7 +23,7 @@ export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRol
 
   const userRoles = [userRole, ...additionalRoles];
   const { userId } = identityFor(userRole);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = operatorTodayIso();
 
   const pending = state.revisions
     .filter((r) => r.status === 'pending-approval')

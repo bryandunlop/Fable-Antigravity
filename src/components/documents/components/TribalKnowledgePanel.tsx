@@ -13,13 +13,14 @@ import { suggestionCounts } from '../engine/suggestions';
 import { GFO_STATUS_CLASS } from '../../gfo/status';
 import { DocEditorDialog } from './DocEditorDialog';
 import { ReviewFlagBadge } from './ReviewFlagBadge';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** Curated tribal knowledge: curators add/edit; everyone reads and comments.
  * Entries carry an owner and a staleness (review) date so knowledge can't rot silently. */
 export function TribalKnowledgePanel({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { state } = useDocuments();
   const [creating, setCreating] = useState(false);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = operatorTodayIso();
   const curator = canAuthor(classFor('tribal-knowledge'), [userRole, ...additionalRoles]);
 
   const entries = state.docs

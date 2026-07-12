@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { documentsReducer, type DocumentsAction } from './DocumentsContext';
-import type { Doc, DocRevision, DocumentsState } from './types';
+import type { Doc, DocRevision, DocAcknowledgment, DocumentsState } from './types';
 
 const TODAY = '2026-07-10';
 const NOW = '2026-07-10T12:00:00.000Z';
@@ -132,46 +132,172 @@ describe('documentsReducer four-eyes guards (no-ops on invalid transitions)', ()
   });
 });
 
-describe('documentsReducer acknowledgments', () => {
-  it('ACKNOWLEDGE replaces a prior (revision, user) record — dedupe-replace', () => {
-    const base = {
-      docId: 'SOP-001',
-      revisionId: 'SOP-001-r1',
-      revision: '1.0',
-      userId: 'USR001',
-      userName: 'Captain John Smith',
-      role: 'pilot',
-      level: 'initials' as const,
-      initials: 'JS',
-      acknowledgedAtUtc: NOW,
-    };
-    let s = documentsReducer(state(), { type: 'ACKNOWLEDGE', payload: { ack: base } });
-    s = documentsReducer(s, { type: 'ACKNOWLEDGE', payload: { ack: { ...base, initials: 'JAS' } } });
-    expect(s.acknowledgments).toHaveLength(1);
-    expect(s.acknowledgments[0].initials).toBe('JAS');
+function ack(overrides: Partial<DocAcknowledgment> = {}): DocAcknowledgment {
+  return {
+    docId: 'SOP-001',
+    revisionId: 'SOP-001-r1',
+    revision: '1.0',
+    userId: 'USR001',
+    userName: 'Captain John Smith',
+    role: 'pilot',
+    level: 'initials',
+    initials: 'JS',
+    acknowledgedAtUtc: NOW,
+    ...overrides,
+  };
+}
+
+/** A published, initials-level revision for a pilot-audience doc — the valid ack target. */
+function ackableState(overrides: Partial<DocumentsState> = {}): DocumentsState {
+  return state({ revisions: [rev({ status: 'published', ackLevel: 'initials' })], ...overrides });
+}
+
+describe('documentsReducer acknowledgments (C2 — guarded, append-with-supersede)', () => {
+  it('a re-acknowledgment appends and flags the prior record superseded — never dropped', () => {
+    let s = documentsReducer(ackableState(), { type: 'ACKNOWLEDGE', payload: { ack: ack() } });
+    s = documentsReducer(s, { type: 'ACKNOWLEDGE', payload: { ack: ack({ initials: 'JAS' }) } });
+    expect(s.acknowledgments).toHaveLength(2);
+    expect(s.acknowledgments[0].initials).toBe('JS');
+    expect(s.acknowledgments[0].superseded).toBe(true);
+    expect(s.acknowledgments[1].initials).toBe('JAS');
+    expect(s.acknowledgments[1].superseded).toBeUndefined();
+  });
+
+  it('superseding an ack preserves the prior signature record', () => {
+    const sig = { id: 'sig-1', signedEntity: 'DOC_ACK', signedEntityId: 'SOP-001-r1' } as any;
+    const sigState = state({ revisions: [rev({ status: 'published', ackLevel: 'signature' })] });
+    let s = documentsReducer(sigState, {
+      type: 'ACKNOWLEDGE',
+      payload: { ack: ack({ level: 'signature', initials: undefined, signatureId: 'sig-1' }), signature: sig },
+    });
+    const sig2 = { ...sig, id: 'sig-2' };
+    s = documentsReducer(s, {
+      type: 'ACKNOWLEDGE',
+      payload: { ack: ack({ level: 'signature', initials: undefined, signatureId: 'sig-2' }), signature: sig2 },
+    });
+    expect(s.signatures).toHaveLength(2);
+    expect(s.acknowledgments.map((a) => a.signatureId)).toEqual(['sig-1', 'sig-2']);
+    expect(s.acknowledgments[0].superseded).toBe(true);
   });
 
   it('signature acks store the signature record', () => {
     const sig = { id: 'sig-1', signedEntity: 'DOC_ACK', signedEntityId: 'SOP-001-r1' } as any;
-    const s = documentsReducer(state(), {
+    const s = documentsReducer(state({ revisions: [rev({ status: 'published' })] }), {
       type: 'ACKNOWLEDGE',
-      payload: {
-        ack: {
-          docId: 'SOP-001',
-          revisionId: 'SOP-001-r1',
-          revision: '1.0',
-          userId: 'USR001',
-          userName: 'Captain John Smith',
-          role: 'pilot',
-          level: 'signature',
-          signatureId: 'sig-1',
-          acknowledgedAtUtc: NOW,
-        },
-        signature: sig,
-      },
+      payload: { ack: ack({ level: 'signature', initials: undefined, signatureId: 'sig-1' }), signature: sig },
     });
     expect(s.signatures).toHaveLength(1);
     expect(s.acknowledgments[0].signatureId).toBe('sig-1');
+  });
+
+  it('an ack against a non-published revision is a no-op', () => {
+    const s = documentsReducer(state(), { type: 'ACKNOWLEDGE', payload: { ack: ack() } }); // fixture rev is pending-approval
+    expect(s.acknowledgments).toHaveLength(0);
+  });
+
+  it('an ack from outside the doc audience is a no-op', () => {
+    const s = documentsReducer(ackableState(), {
+      type: 'ACKNOWLEDGE',
+      payload: { ack: ack({ role: 'maintenance', userId: 'USR003' }) },
+    });
+    expect(s.acknowledgments).toHaveLength(0);
+  });
+
+  it('an ack whose level does not match the revision ackLevel is a no-op', () => {
+    const sigLevel = state({ revisions: [rev({ status: 'published', ackLevel: 'signature' })] });
+    const s = documentsReducer(sigLevel, { type: 'ACKNOWLEDGE', payload: { ack: ack() } }); // initials vs signature
+    expect(s.acknowledgments).toHaveLength(0);
+  });
+
+  it('an initials-level ack with blank initials is a no-op', () => {
+    const s = documentsReducer(ackableState(), { type: 'ACKNOWLEDGE', payload: { ack: ack({ initials: '  ' }) } });
+    expect(s.acknowledgments).toHaveLength(0);
+  });
+
+  it('a signature-level ack without a signature record is a no-op', () => {
+    const sigLevel = state({ revisions: [rev({ status: 'published', ackLevel: 'signature' })] });
+    const s = documentsReducer(sigLevel, {
+      type: 'ACKNOWLEDGE',
+      payload: { ack: ack({ level: 'signature', initials: undefined, signatureId: undefined }) },
+    });
+    expect(s.acknowledgments).toHaveLength(0);
+  });
+
+  it("an 'all' audience accepts any role", () => {
+    const s = documentsReducer(
+      state({ docs: [doc({ roles: ['all'] })], revisions: [rev({ status: 'published', ackLevel: 'initials' })] }),
+      { type: 'ACKNOWLEDGE', payload: { ack: ack({ role: 'maintenance', userId: 'USR003' }) } },
+    );
+    expect(s.acknowledgments).toHaveLength(1);
+  });
+});
+
+describe('documentsReducer doc-meta guards (C1)', () => {
+  function metaAction(
+    docOverrides: Partial<Doc>,
+    actor: { userId?: string; roles?: string[] } = {},
+  ): DocumentsAction {
+    return {
+      type: 'UPDATE_DOC_META',
+      payload: {
+        doc: doc(docOverrides),
+        actorUserId: actor.userId ?? 'USR005',
+        actorRoles: actor.roles ?? ['document-manager'],
+      },
+    };
+  }
+
+  it('a non-authoring role cannot update doc meta', () => {
+    const s = documentsReducer(state(), metaAction({ title: 'Renamed' }, { roles: ['pilot'] }));
+    expect(s.docs[0].title).toBe('Test SOP');
+  });
+
+  it('identity fields of a published controlled doc do not change outside a revision', () => {
+    const live = state({ revisions: [rev({ status: 'published' })] });
+    const s = documentsReducer(live, metaAction({ title: 'Renamed' }));
+    expect(s.docs[0].title).toBe('Test SOP');
+  });
+
+  it('audience changes on a published controlled doc are rejected (compliance roster integrity)', () => {
+    const live = state({ revisions: [rev({ status: 'published' })] });
+    const s = documentsReducer(live, metaAction({ roles: ['pilot', 'maintenance'] }));
+    expect(s.docs[0].roles).toEqual(['pilot']);
+  });
+
+  it('non-identity fields (tags) still update on a published doc for an authoring role', () => {
+    const live = state({ revisions: [rev({ status: 'published' })] });
+    const s = documentsReducer(live, metaAction({ tags: ['ops', 'approach'] }));
+    expect(s.docs[0].tags).toEqual(['ops', 'approach']);
+  });
+
+  it('identity fields may change while the doc has never been published', () => {
+    const draftOnly = state({ revisions: [rev({ status: 'draft' })] });
+    const s = documentsReducer(draftOnly, metaAction({ title: 'Renamed' }));
+    expect(s.docs[0].title).toBe('Renamed');
+  });
+
+  it('classId is immutable', () => {
+    const draftOnly = state({ revisions: [rev({ status: 'draft' })] });
+    const s = documentsReducer(draftOnly, metaAction({ classId: 'tribal-knowledge' }));
+    expect(s.docs[0].classId).toBe('sop');
+  });
+
+  it('proposedMeta on an approved revision applies to the doc at publish (meta rides four-eyes)', () => {
+    const s = state({
+      revisions: [
+        rev({ id: 'r0', status: 'published' }),
+        rev({
+          id: 'SOP-001-r2',
+          changeSummary: 'Title + audience change',
+          proposedMeta: { title: 'Stabilized Approach & Go-Around', category: 'Flight Operations', roles: ['pilot', 'maintenance'], tags: ['approach'] },
+        }),
+      ],
+    });
+    const out = documentsReducer(s, decide({ revisionId: 'SOP-001-r2' }));
+    expect(out.revisions.find((r) => r.id === 'SOP-001-r2')?.status).toBe('published');
+    expect(out.docs[0].title).toBe('Stabilized Approach & Go-Around');
+    expect(out.docs[0].roles).toEqual(['pilot', 'maintenance']);
+    expect(out.docs[0].tags).toEqual(['approach']);
   });
 });
 

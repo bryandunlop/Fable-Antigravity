@@ -58,9 +58,11 @@ export function applyPublish(
   });
   const docs = state.docs.map((d) => {
     if (d.id !== target.docId) return d;
-    return d.reviewCycleDays
-      ? { ...d, nextReviewDate: computeNextReviewDate(todayIso, d.reviewCycleDays) }
-      : d;
+    // Doc-identity changes ride the revision through four-eyes (C1).
+    const next = target.proposedMeta ? { ...d, ...target.proposedMeta } : d;
+    return next.reviewCycleDays
+      ? { ...next, nextReviewDate: computeNextReviewDate(todayIso, next.reviewCycleDays) }
+      : next;
   });
   return { docs, revisions };
 }
