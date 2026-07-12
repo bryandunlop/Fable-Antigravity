@@ -40,7 +40,6 @@ import HazardReporting from './components/HazardReporting';
 import HazardWorkspace from './components/hazard/HazardWorkspace';
 import HazardDetailView from './components/hazard/HazardDetailView';
 import InternalAuditManagement from './components/InternalAuditManagement';
-// DocumentCompliance mock superseded by documents/ComplianceDashboard (kept in-tree, de-routed)
 import { ComplianceDashboard } from './components/documents/pages/ComplianceDashboard';
 import UserSafety from './components/UserSafety';
 import CateringTracker from './components/CateringTracker';
@@ -63,6 +62,7 @@ import AOGManagement from './components/AOGManagement';
 import LobbyDisplay from './components/LobbyDisplay';
 import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
+import FirRoutes from './components/fir/FirRoutes';
 import BookingProfile from './components/BookingProfile';
 import TripBuilder from './components/TripBuilder';
 import FlightFamily from './components/FlightFamily';
@@ -465,6 +465,7 @@ export default function App() {
                                 <Route path="/aog-management" element={<AOGManagement />} />
                                 <Route path="/upcoming-flights" element={userRole === 'inflight' ? <FlightAttendantFlights /> : <UpcomingFlights userRole={userRole} />} />
                                 <Route path="/tech-log/*" element={<TechLogRoutes userRole={userRole} />} />
+                                <Route path="/fir/*" element={<FirRoutes userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
                                   path="/flight-operations-center"
