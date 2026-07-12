@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users, GitCompareArrows, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
+import { DiffedContent } from '../components/DiffedContent';
 import { useDocuments } from '../DocumentsContext';
 import { classFor } from '../classes';
 import { canAuthor } from '../engine/lifecycle';
-import { currentRevision, revisionsFor } from '../engine/revisions';
+import { currentRevision, revisionsFor, priorPublishedRevision } from '../engine/revisions';
+import { diffRevisions } from '../engine/diff';
 import { canManageDocuments } from '../roles';
 import { documentsRoleUniverse } from '../roles';
 import { readersFor } from '../engine/compliance';
@@ -25,10 +27,27 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const { state } = useDocuments();
   const [editor, setEditor] = useState<EditorMode | null>(null);
   const [suggesting, setSuggesting] = useState(false);
+  const [showChanges, setShowChanges] = useState(true);
+  const articleRef = useRef<HTMLElement>(null);
+  const changeIdxRef = useRef(-1);
 
   const doc = state.docs.find((d) => d.id === docId);
   const rev = doc ? currentRevision(doc.id, state.revisions) : undefined;
   const allRevs = doc ? revisionsFor(doc.id, state.revisions) : [];
+  const priorRev = doc && rev ? priorPublishedRevision(doc.id, state.revisions) : undefined;
+  const diff = useMemo(() => (rev && priorRev ? diffRevisions(priorRev, rev) : null), [rev, priorRev]);
+  const changeCount = diff ? diff.counts.added + diff.counts.removed + diff.counts.modified : 0;
+  const showingDiff = !!(diff?.hasChanges && showChanges);
+
+  const gotoChange = (dir: 1 | -1) => {
+    const nodes = articleRef.current?.querySelectorAll<HTMLElement>('[data-changed]');
+    if (!nodes || nodes.length === 0) return;
+    changeIdxRef.current = (changeIdxRef.current + dir + nodes.length) % nodes.length;
+    const el = nodes[changeIdxRef.current];
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('ring-2', 'ring-amber-400', 'rounded');
+    window.setTimeout(() => el.classList.remove('ring-2', 'ring-amber-400', 'rounded'), 1200);
+  };
 
   const userRoles = [userRole, ...additionalRoles];
   const manager = canManageDocuments(userRole, additionalRoles);
@@ -57,6 +76,26 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
           <Link to="/documents"><ArrowLeft className="mr-1.5 h-4 w-4" /> Documents</Link>
         </Button>
         <div className="flex items-center gap-2">
+          {diff?.hasChanges && rev && (
+            <>
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                {changeCount} change{changeCount === 1 ? '' : 's'} in rev {rev.revision}
+              </span>
+              <Button size="sm" variant={showChanges ? 'secondary' : 'outline'} onClick={() => setShowChanges((v) => !v)}>
+                <GitCompareArrows className="mr-1.5 h-4 w-4" /> {showChanges ? 'Changes: on' : 'Changes: off'}
+              </Button>
+              {showingDiff && (
+                <div className="flex items-center">
+                  <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Previous change" onClick={() => gotoChange(-1)}>
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Next change" onClick={() => gotoChange(1)}>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
           {rev && (
             <Button size="sm" variant="outline" onClick={() => setSuggesting(true)}>
               <MessageSquarePlus className="mr-1.5 h-4 w-4" /> Suggest a change
@@ -92,8 +131,8 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
 
       {rev ? (
         <GfoPanel>
-          <article className="prose-bulletin">
-            <SectionedContent sections={rev.sections} />
+          <article ref={articleRef} className="prose-bulletin">
+            {showingDiff && diff ? <DiffedContent diff={diff} /> : <SectionedContent sections={rev.sections} />}
           </article>
           <AckPanel doc={doc} rev={rev} userRole={userRole} />
         </GfoPanel>

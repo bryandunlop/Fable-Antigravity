@@ -5,6 +5,7 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Textarea } from '../../ui/textarea';
 import { GfoEmptyState } from '../../gfo';
+import type { DocSuggestion, DocRevision } from '../types';
 import { useDocuments, identityFor } from '../DocumentsContext';
 import { openSuggestions, openSuggestionsForOwner } from '../engine/suggestions';
 import { currentRevision } from '../engine/revisions';
@@ -19,6 +20,23 @@ import {
 import { DocEditorDialog, type EditorMode } from './DocEditorDialog';
 
 const SEE_ALL_ROLES = ['document-manager', 'admin'];
+
+/** The reference to show for a suggestion: the anchored block (section + excerpt
+ * resolved from the revision it was filed against) or the legacy free-text ref. */
+function anchorLabel(s: DocSuggestion, revisions: DocRevision[]): string | undefined {
+  if (s.blockId) {
+    const rev = revisions.find((r) => r.id === s.revisionId);
+    for (const sec of rev?.sections ?? []) {
+      const b = sec.blocks.find((bl) => bl.id === s.blockId);
+      if (b) {
+        const sl = `${sec.number ? `${sec.number} ` : ''}${sec.title}`.trim() || 'Preamble';
+        const ex = b.md.replace(/[#>*`_|~-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+        return `${sl} · "${ex}"`;
+      }
+    }
+  }
+  return s.sectionRef;
+}
 
 /** Owner feedback queue. Accepting a suggestion opens a pre-filled draft
  * revision and records the decision only once that draft is actually persisted
@@ -77,7 +95,7 @@ export function SuggestionQueuePanel({ userRole, additionalRoles = [] }: { userR
                   <p className="text-sm">
                     <span className="font-medium">{s.docTitle}</span>
                     <span className="text-muted-foreground"> · {s.docId}</span>
-                    {s.sectionRef && <Badge variant="secondary" className="ml-2 px-1.5 text-[10px]">{s.sectionRef}</Badge>}
+                    {anchorLabel(s, state.revisions) && <Badge variant="secondary" className="ml-2 px-1.5 text-[10px]">{anchorLabel(s, state.revisions)}</Badge>}
                   </p>
                   <p className="mt-1 text-sm">{s.proposedChange}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">

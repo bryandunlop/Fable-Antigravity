@@ -10,6 +10,9 @@ import { classFor } from '../classes';
 import { canApprove, validateDecision } from '../engine/lifecycle';
 import { DocIdentityLine } from './DocIdentity';
 import { SectionedContent } from './SectionedContent';
+import { DiffedContent } from './DiffedContent';
+import { diffRevisions } from '../engine/diff';
+import { currentRevision } from '../engine/revisions';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** Pending-approval queue for approver roles. Own submissions are decision-
@@ -17,8 +20,16 @@ import { operatorTodayIso } from '../../../lib/operatorDate';
 export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { state, decideApproval } = useDocuments();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState<'changes' | 'content'>('changes');
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+
+  // Open a row's preview; default to the computed diff when a published baseline exists.
+  const openRow = (revId: string, docId: string) => {
+    if (expanded === revId) { setExpanded(null); return; }
+    setExpanded(revId);
+    setPreviewMode(currentRevision(docId, state.revisions) ? 'changes' : 'content');
+  };
 
   const userRoles = [userRole, ...additionalRoles];
   const { userId } = identityFor(userRole);
@@ -87,7 +98,7 @@ export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRol
                   </Button>
                 </div>
               )}
-              <Button size="sm" variant="ghost" onClick={() => setExpanded(isOpen ? null : rev.id)} aria-label="Preview content">
+              <Button size="sm" variant="ghost" onClick={() => openRow(rev.id, doc.id)} aria-label="Preview content">
                 {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </Button>
             </div>
@@ -116,11 +127,27 @@ export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRol
               </div>
             )}
 
-            {isOpen && (
-              <div className="prose-bulletin mt-3 max-h-96 overflow-y-auto rounded-md border border-border bg-muted/20 p-4">
-                <SectionedContent sections={rev.sections} />
-              </div>
-            )}
+            {isOpen && (() => {
+              const published = currentRevision(rev.docId, state.revisions);
+              const diff = diffRevisions(published, rev);
+              const changeCount = diff.counts.added + diff.counts.removed + diff.counts.modified;
+              return (
+                <div className="mt-3">
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <Button size="sm" variant={previewMode === 'changes' ? 'secondary' : 'ghost'} onClick={() => setPreviewMode('changes')}>
+                      Review changes{diff.hasChanges ? ` (${changeCount})` : ''}
+                    </Button>
+                    <Button size="sm" variant={previewMode === 'content' ? 'secondary' : 'ghost'} onClick={() => setPreviewMode('content')}>
+                      Full content
+                    </Button>
+                    {!published && <span className="text-xs text-muted-foreground">First revision — all content is new.</span>}
+                  </div>
+                  <div className="prose-bulletin max-h-96 overflow-y-auto rounded-md border border-border bg-muted/20 p-4">
+                    {previewMode === 'changes' ? <DiffedContent diff={diff} /> : <SectionedContent sections={rev.sections} />}
+                  </div>
+                </div>
+              );
+            })()}
           </li>
         );
       })}

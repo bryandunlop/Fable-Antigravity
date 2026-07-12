@@ -13,6 +13,20 @@ export function revisionsFor(docId: string, revisions: DocRevision[]): DocRevisi
   return revisions.filter((r) => r.docId === docId).slice().reverse();
 }
 
+/** The superseded revision immediately before the current published one — the
+ * baseline the reader diffs against. Ordered by the numeric '-rN' id suffix (so
+ * r10 outranks r2), newest first. Undefined when there is no prior. */
+export function priorPublishedRevision(docId: string, revisions: DocRevision[]): DocRevision | undefined {
+  const seq = (r: DocRevision): number => {
+    const m = /-r(\d+)$/.exec(r.id);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  return revisions
+    .filter((r) => r.docId === docId && r.status === 'superseded')
+    .slice()
+    .sort((a, b) => seq(b) - seq(a))[0];
+}
+
 /** '1.0' → '2.0' (major) | '1.1' (minor); undefined → '1.0'. Non-numeric labels restart at '1.0'. */
 export function nextRevisionLabel(prior: string | undefined, kind: 'major' | 'minor' = 'major'): string {
   if (!prior) return '1.0';
