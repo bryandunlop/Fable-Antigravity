@@ -11,7 +11,7 @@ describe('seeded fleet derives the intended colors', () => {
   };
 
   it('N5PG GREEN (clean)', () => expect(colorOf('N5PG')).toBe('GREEN'));
-  it('N2PG GREEN (clean)', () => expect(colorOf('N2PG')).toBe('GREEN'));
+  it('N2PG RED (fresh un-reported AOG — feeds the FIR §8 nudge)', () => expect(colorOf('N2PG')).toBe('RED'));
   it('N6PG AMBER (active deferral mid-clock)', () => expect(colorOf('N6PG')).toBe('AMBER'));
   it('N1PG RED (open airworthiness defect)', () => expect(colorOf('N1PG')).toBe('RED'));
 

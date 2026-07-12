@@ -13,8 +13,9 @@ import { DEFAULT_PREFLIGHT_CHECKLIST } from '../constants';
 /**
  * Builds the seeded demo world. Dates are RELATIVE to "now" so the AMBER aircraft
  * stays mid-clock and the RED aircraft stays grounded whenever the demo is run or reset.
- *   N5PG, N2PG -> GREEN   N6PG -> AMBER (active deferral mid-clock)   N1PG -> RED (open defect)
+ *   N5PG -> GREEN   N6PG -> AMBER (active deferral mid-clock)   N1PG, N2PG -> RED (open defects)
  *   N3PG -> provisional G800 (no MEL approved)
+ * N2PG's AOG is deliberately un-reported (no FIR) so the FIR §8 "Open an FIR?" nudge fires.
  */
 export function getDefaultState(referenceNowMs: number = Date.now()): TechLogState {
   const nowMs = referenceNowMs;
@@ -65,6 +66,17 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     placardRequired: false, mProcedureRequired: false, placardInstalled: true,
     placardLocation: melAmber.placardLocation, extensionUsed: false, riiRequired: false,
     melReviewAcknowledged: true, signedByOid: dom.oid, signatureId: sigDefrN6.id, status: 'ACTIVE',
+  });
+
+  // --- N2PG: RED (fresh, un-reported AOG — no FIR yet, so the FIR §8 "Open an FIR?" nudge fires) ---
+  const discN2 = iso(6 * H);
+  const sigN2 = makeSignature({ id: 'sig-seed-d-n2pg', signedEntity: 'DEFECT', signedEntityId: 'd-n2pg', signer: pilot, intentStatement: 'seed', signedAtUtc: discN2 });
+  signatures.push(sigN2);
+  defects.push({
+    id: 'd-n2pg', aircraftId: 'ac-n2pg', source: 'PIREP', ataChapter: '79',
+    description: 'No. 2 engine magnetic chip detector warning — metal found on inspection, borescope required.',
+    symptom: 'R ENG CHIP CAS in cruise', severity: 'CRITICAL', airworthinessAffecting: true,
+    status: 'OPEN', reportedByOid: pilot.oid, reportedAtUtc: discN2, signatureId: sigN2.id,
   });
 
   // ── Historical ledger (for Journey Log realism + Phase-4 analytics). None of this changes the
@@ -323,7 +335,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       createdByOid: pilot.oid, createdAtUtc: iso(26 * D),
     },
     {
-      id: 'trip-2', tripNumber: 'TRIP-2050', aircraftId: 'ac-n2pg', name: 'KLUK–KASE–KLUK round trip', status: 'OPEN',
+      id: 'trip-2', tripNumber: 'TRIP-2050', aircraftId: 'ac-n5pg', name: 'KLUK–KASE–KLUK round trip', status: 'OPEN',
       flightLogIds: [],
       legs: [
         { id: 'leg-2a', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'KASE', departureTimeUtc: '2026-06-23T14:30:00Z', arrivalTimeUtc: '2026-06-23T16:35:00Z', fratStatus: 'COMPLETED', fratScore: 14, airportReviewed: true },
