@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Search, ClipboardCheck, ShieldAlert } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
-import { computeClockStart, computeRepairDue } from '../../engine/pl25';
+import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../../engine/pl25';
 import { canDeferDefect } from '../../engine/disposition';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
@@ -15,10 +15,10 @@ import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
 import { Textarea } from '../../../ui/textarea';
 
-function dueFromCategory(mel: MelItem, clockStart: string, airframe: { hours: number; cycles: number }) {
+function dueFromCategory(mel: MelItem, clockStart: string, airframe: { hours: number; cycles: number }, zone: string) {
   if (mel.category === 'A') return { repairDueDateUtc: undefined, repairIntervalUnit: 'CALENDAR_DAY' as const, repairIntervalValue: 0 };
   const value = CATEGORY_DAYS[mel.category] ?? 0;
-  return computeRepairDue(mel.category, clockStart, { repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: value }, airframe);
+  return computeRepairDue(mel.category, clockStart, { repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: value }, airframe, zone);
 }
 
 /**
@@ -86,9 +86,13 @@ export function DeferralCreatePanel({
   const onSigned = (sig: { id: string }) => {
     if (!selectedMel) return;
     const now = new Date().toISOString();
-    const clockStart = computeClockStart(now);
+    // D24: anchor the PL-25 clock to the governing zone (default Eastern; a per-deferral override UI
+    // can later set a different operating-local zone + reason). The stored governingTimezone must be
+    // the same zone the clock was computed under.
+    const zone = DEFAULT_GOVERNING_TIMEZONE;
+    const clockStart = computeClockStart(now, zone);
     const airframe = { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles };
-    const due = dueFromCategory(selectedMel, clockStart, airframe);
+    const due = dueFromCategory(selectedMel, clockStart, airframe, zone);
     const mProcedureRequired = !!selectedMel.mProcedure?.trim();
     const placardRequired = !!selectedMel.placardText?.trim();
 
@@ -97,6 +101,7 @@ export function DeferralCreatePanel({
       id: pendingDeferralId, defectId: supDefect.id, aircraftId: aircraft.id, melItemId: selectedMel.id,
       governingMmelRevision: selectedMel.mmelRevision, governingEffectiveDate: selectedMel.effectiveDate,
       category: selectedMel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: clockStart,
+      governingTimezone: zone,
       repairDueDateUtc: due.repairDueDateUtc, repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
       restrictionText: restriction.trim() || selectedMel.provisos, placardRequired,
       mProcedureRequired, placardLocation: selectedMel.placardLocation, extensionUsed: false,

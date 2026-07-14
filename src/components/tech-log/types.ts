@@ -102,6 +102,8 @@ export interface Deferral {
   category: MelCategory;
   dayOfDiscoveryUtc: string;
   clockStartDateUtc: string;
+  governingTimezone: string;                 // D24: IANA zone the PL-25 clock is anchored to (default America/New_York)
+  governingTimezoneOverrideReason?: string;  // D24: set only when overriding the Eastern default to the operating-local zone
   repairDueDateUtc?: string;       // calendar units
   usageDueThreshold?: number;      // usage units
   repairIntervalUnit: RepairIntervalUnit;

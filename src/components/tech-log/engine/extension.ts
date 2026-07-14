@@ -64,6 +64,7 @@ export function buildExtension(
       d.category, d.clockStartDateUtc,
       { repairIntervalUnit: d.repairIntervalUnit, repairIntervalValue: doubled },
       { hours: 0, cycles: 0 }, // calendar path ignores airframe
+      d.governingTimezone, // D24: recompute in the deferral's own governing zone, not the default
     ).repairDueDateUtc;
   } else if (d.usageDueThreshold != null) {
     usageDueThreshold = d.usageDueThreshold + d.repairIntervalValue;
