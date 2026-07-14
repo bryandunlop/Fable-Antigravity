@@ -4,6 +4,7 @@ import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorksp
 import { useTechLog, useCurrentUser } from '../tech-log/TechLogContext';
 import { ReportDefectDialog } from '../tech-log/components/panels/ReportDefectDialog';
 import { AirportInfoPanel } from '../tech-log/components/AirportInfoPanel';
+import { BriefingPanel } from '../tech-log/components/BriefingPanel';
 import { markAirportReviewedOnLeg } from '../tech-log/preflightActions';
 import { newId } from '../tech-log/util/id';
 import { deriveTripReadiness } from '../tech-log/engine/readiness';
@@ -57,6 +58,9 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   const selectedIdx = selectedLegIndex(legs, searchParams.get('leg'), currentIdx);
   const selectedLeg = legs[selectedIdx];
   const airportLeg = legs.find((l) => l.id === searchParams.get('airport'));
+  // Maintenance handover accept lives in the URL too (?handover), so the pilot's place — including a
+  // half-completed accept — survives navigating away and back, exactly like the airport drawer.
+  const handoverOpen = !!searchParams.get('handover');
 
   const setParam = (key: string, value: string | null) =>
     setSearchParams((prev) => {
@@ -120,7 +124,7 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
             : <p className="text-sm text-muted-foreground">Not released to preflight yet.</p>}
         </ModuleCard>
         <ModuleCard status={handoverStatus}>
-          <HandoverCard trip={trip} />
+          <HandoverCard trip={trip} onOpenHandover={() => setParam('handover', '1')} />
         </ModuleCard>
         <ModuleCard status={schedulingStatus}>
           <TripBriefPanel trip={trip} userRole={userRole} />
@@ -153,6 +157,24 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
                   reviewed={airportLeg.airportReviewed}
                   onMarkReviewed={() => markAirportReviewedOnLeg({ dispatch, newId, trip: tlTrip, leg: airportLeg, actorOid: user.oid })}
                 />
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Maintenance handover accept — the same signed PIC ceremony as the tech-log trip page
+          (BriefingPanel), rendered in a slide-over so custody accept stays in the pilot workspace. */}
+      <Sheet open={handoverOpen && !!tlAc} onOpenChange={(o: boolean) => { if (!o) setParam('handover', null); }}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          {tlAc && (
+            <>
+              <SheetHeader>
+                <SheetTitle>Maintenance handover</SheetTitle>
+                <SheetDescription>{tlAc.tailNumber} · {trip.tripNumber} — accept &amp; sign as PIC</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4">
+                <BriefingPanel aircraft={tlAc} />
               </div>
             </>
           )}
