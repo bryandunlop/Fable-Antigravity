@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users, GitCompareArrows, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users, GitCompareArrows, ChevronUp, ChevronDown, Printer } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
@@ -31,6 +31,7 @@ import {
 } from '../engine/acceptFlow';
 import type { DocSuggestion } from '../types';
 import { toast } from 'sonner';
+import { printDocument } from '../util/printDocument';
 
 export function DocReader({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { docId } = useParams<{ docId: string }>();
@@ -162,6 +163,15 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
                 </div>
               )}
             </>
+          )}
+          {rev && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => { if (!printDocument(doc, rev)) toast.error('Allow pop-ups to export the PDF.'); }}
+            >
+              <Printer className="mr-1.5 h-4 w-4" /> Export PDF
+            </Button>
           )}
           {rev && (
             <Button size="sm" variant="outline" onClick={() => setSuggesting(true)}>
