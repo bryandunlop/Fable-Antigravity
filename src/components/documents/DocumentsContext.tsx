@@ -171,7 +171,8 @@ export type DocumentsAction =
       type: 'RESOLVE_SUGGESTION';
       payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string };
     }
-  | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string; actorRoles: string[] } };
+  | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string; actorRoles: string[] } }
+  | { type: 'PROMOTE_SCHEDULED'; payload: { atUtc: string; today: string } };
 
 function warnNoop(reason: string | undefined): void {
   if (typeof console !== 'undefined') console.warn(`[documents] action rejected: ${reason ?? 'invalid'}`);
@@ -474,6 +475,14 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         ),
       };
     }
+    case 'PROMOTE_SCHEDULED': {
+      // C3: publish 'approved' (scheduled) revisions whose effective date has
+      // arrived. Runs mid-session (not only at load) — see the provider effect.
+      const { atUtc, today } = action.payload;
+      const { docs, revisions } = promoteScheduled(state, atUtc, today);
+      if (docs === state.docs && revisions === state.revisions) return state;
+      return { ...state, docs, revisions };
+    }
     default:
       return state;
   }
@@ -537,6 +546,34 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     }, 300);
     return () => clearTimeout(t);
   }, [state]);
+
+  // C3: a scheduled ('approved', future-effective) revision must publish mid-session,
+  // not only at the next reload — and must fire its required-read announcement when it
+  // does. Re-check on tab-visible / window-focus and on a light interval; event ids
+  // dedupe, so a repeated fire is harmless. (The durable 'what you owe' feed is derived
+  // from state, so it also picks the revision up the moment it flips to published.)
+  useEffect(() => {
+    const check = () => {
+      const today = todayIso();
+      const due = state.revisions.filter((r) => r.status === 'approved' && r.effectiveDate <= today);
+      if (due.length === 0) return;
+      dispatch({ type: 'PROMOTE_SCHEDULED', payload: { atUtc: nowUtc(), today } });
+      for (const rev of due) {
+        const doc = state.docs.find((d) => d.id === rev.docId);
+        if (doc) publishRequiredReadEvent(doc, rev);
+      }
+    };
+    check();
+    const interval = setInterval(check, 60_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', check);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', check);
+    };
+  }, [state.revisions, state.docs]);
 
   const submitForApproval = useCallback((revisionId: string) => {
     dispatch({ type: 'SUBMIT_FOR_APPROVAL', payload: { revisionId, atUtc: nowUtc() } });

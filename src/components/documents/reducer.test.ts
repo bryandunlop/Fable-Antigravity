@@ -438,3 +438,18 @@ describe('documentsReducer authorization guards (C12 — reducer-enforced, not j
     expect(out.suggestions).toHaveLength(0);
   });
 });
+
+describe('documentsReducer scheduled publication (C3 — promotes mid-session, not just at load)', () => {
+  it('PROMOTE_SCHEDULED publishes an approved revision whose effectiveDate has arrived', () => {
+    const s = state({ revisions: [rev({ status: 'approved', effectiveDate: '2026-07-01' })] });
+    const out = documentsReducer(s, { type: 'PROMOTE_SCHEDULED', payload: { atUtc: NOW, today: TODAY } });
+    expect(out.revisions[0].status).toBe('published');
+  });
+
+  it('PROMOTE_SCHEDULED leaves a future-effective revision scheduled (no-op, same reference)', () => {
+    const s = state({ revisions: [rev({ status: 'approved', effectiveDate: '2026-12-01' })] });
+    const out = documentsReducer(s, { type: 'PROMOTE_SCHEDULED', payload: { atUtc: NOW, today: TODAY } });
+    expect(out.revisions[0].status).toBe('approved');
+    expect(out).toBe(s);
+  });
+});
