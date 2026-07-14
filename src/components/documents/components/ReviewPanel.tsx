@@ -11,7 +11,7 @@ import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** Periodic-review controls (managers). Completing a review advances the
  * doc's next-review date by its cycle; publishing a revision also resets it. */
-export function ReviewPanel({ doc, userRole }: { doc: Doc; userRole: string }) {
+export function ReviewPanel({ doc, userRole, additionalRoles = [] }: { doc: Doc; userRole: string; additionalRoles?: string[] }) {
   const { state, completeReview } = useDocuments();
   const [note, setNote] = useState('');
   const todayIso = operatorTodayIso();
@@ -49,7 +49,7 @@ export function ReviewPanel({ doc, userRole }: { doc: Doc; userRole: string }) {
           variant="secondary"
           className="shrink-0"
           onClick={() => {
-            completeReview(doc.id, 'reaffirmed', note.trim() || undefined, userRole);
+            completeReview(doc.id, 'reaffirmed', note.trim() || undefined, userRole, additionalRoles);
             setNote('');
             toast.success('Review recorded — content reaffirmed current.');
           }}

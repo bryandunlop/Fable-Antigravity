@@ -209,13 +209,13 @@ export function DocEditorDialog({
   const persistDraft = (records: { doc: Doc; rev: DocRevision; liveControlled: boolean }) => {
     const { doc, rev, liveControlled } = records;
     if (mode.kind === 'create') {
-      createDoc(doc, rev);
+      createDoc(doc, rev, userRoles);
     } else {
       // Meta edits on a never-published or uncontrolled doc apply directly
       // (role-gated in the reducer); on a live controlled doc they ride the
       // revision via proposedMeta instead — the published doc stays untouched.
       if (!liveControlled) updateDocMeta(doc, userRole, additionalRoles);
-      if (mode.kind === 'revise') createDraft(rev);
+      if (mode.kind === 'revise') createDraft(rev, userRoles);
       else updateDraft(rev);
     }
     onPersisted?.();

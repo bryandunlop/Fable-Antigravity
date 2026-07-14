@@ -47,10 +47,16 @@ export function nextDocId(cfg: Pick<DocumentClassConfig, 'idPrefix'>, docs: Pick
   return `${cfg.idPrefix}-${String(max + 1).padStart(3, '0')}`;
 }
 
-/** Next revision id for a doc: monotonic '-rN' suffix over ALL existing revisions of the doc. */
-export function nextRevisionId(docId: string, revisions: Pick<DocRevision, 'docId'>[]): string {
-  const n = revisions.filter((r) => r.docId === docId).length + 1;
-  return `${docId}-r${n}`;
+/** Next revision id for a doc: max existing '-rN' suffix + 1. Counting length instead
+ * would regenerate a live suffix after a revision is withdrawn (C8 collision). */
+export function nextRevisionId(docId: string, revisions: Pick<DocRevision, 'docId' | 'id'>[]): string {
+  const re = new RegExp(`^${docId}-r(\\d+)$`);
+  const max = revisions.reduce((acc, r) => {
+    if (r.docId !== docId) return acc;
+    const m = re.exec(r.id);
+    return m ? Math.max(acc, parseInt(m[1], 10)) : acc;
+  }, 0);
+  return `${docId}-r${max + 1}`;
 }
 
 /**

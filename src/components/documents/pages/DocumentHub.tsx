@@ -16,7 +16,7 @@ import { classFor, DOC_CLASS_LIST } from '../classes';
 import { canApprove, canAuthor } from '../engine/lifecycle';
 import { currentRevision } from '../engine/revisions';
 import { unacknowledgedRequiredReads } from '../engine/acknowledgments';
-import { readersFor, complianceSummary } from '../engine/compliance';
+import { readersFor, complianceSummary, overallCompliance } from '../engine/compliance';
 import { docsDueForReview } from '../engine/review';
 import { openSuggestions } from '../engine/suggestions';
 import { groupDocsByCategory, yearsFor, matchesYear } from '../engine/library';
@@ -91,16 +91,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
     state.docs, state.revisions, state.acknowledgments, userRole, userId,
   );
 
-  const overallCompliance = useMemo(() => {
-    const pcts: number[] = [];
-    for (const doc of state.docs) {
-      if (doc.isArchived) continue;
-      const rev = currentRevision(doc.id, state.revisions);
-      if (!rev || !rev.requireAcknowledgment || rev.ackLevel === 'none') continue;
-      pcts.push(complianceSummary(rev, readersFor(doc, universe), state.acknowledgments, todayIso).pct);
-    }
-    return pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 100;
-  }, [state.docs, state.revisions, state.acknowledgments, universe, todayIso]);
+  const overall = useMemo(
+    () => overallCompliance(state.docs, state.revisions, state.acknowledgments, universe),
+    [state.docs, state.revisions, state.acknowledgments, universe],
+  );
 
   const reviewDue = docsDueForReview(state.docs, todayIso).length;
   const openSugs = openSuggestions(state.suggestions).length;
@@ -165,7 +159,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <GfoStatCard label="My outstanding reads" value={myOutstanding.length} accent="sunrise" />
-        <GfoStatCard label="Overall compliance" value={overallCompliance} unit="%" accent="daylight" />
+        <GfoStatCard label="Overall compliance" value={overall.pct === null ? 'N/A' : overall.pct} unit={overall.pct === null ? undefined : '%'} accent="daylight" />
         {manager && <GfoStatCard label="Docs due for review" value={reviewDue} />}
         {manager && <GfoStatCard label="Open suggestions" value={openSugs} />}
       </div>

@@ -4,6 +4,7 @@ import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, 
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
+import { RevisionMedia } from '../components/RevisionMedia';
 import { DiffedContent } from '../components/DiffedContent';
 import { useDocuments } from '../DocumentsContext';
 import { classFor } from '../classes';
@@ -25,7 +26,7 @@ import { BlockSuggestGutter } from '../components/BlockSuggestGutter';
 import { InlineSuggestComposer } from '../components/InlineSuggestComposer';
 import { InlineSuggestionThread } from '../components/InlineSuggestionThread';
 import { openSuggestionsByBlock, canSeeSuggestion } from '../engine/suggestions';
-import { identityFor } from '../DocumentsContext';
+import { identityFor, publishWithdrawnEvent } from '../DocumentsContext';
 import {
   IDLE_ACCEPT_FLOW, beginAccept, acceptFlowOnPersisted, acceptFlowOnCancelled, acceptPrefill, type AcceptFlow,
 } from '../engine/acceptFlow';
@@ -37,7 +38,7 @@ import { SyncAgeChip } from '../components/SyncAgeChip';
 
 export function DocReader({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { docId } = useParams<{ docId: string }>();
-  const { state, resolveSuggestion } = useDocuments();
+  const { state, resolveSuggestion, withdrawDraft } = useDocuments();
   const [editor, setEditor] = useState<EditorMode | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [showChanges, setShowChanges] = useState(true);
@@ -100,7 +101,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
     const { resolveSuggestionId, flow } = acceptFlowOnPersisted(acceptFlow);
     setAcceptFlow(flow);
     if (resolveSuggestionId) {
-      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole);
+      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole, additionalRoles);
       toast.success('Suggestion accepted — draft created.');
     }
   };
@@ -129,6 +130,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
                 doc={doc}
                 rev={rev}
                 userRole={userRole}
+                additionalRoles={additionalRoles}
                 canManage={manager || author}
                 onAccept={acceptSuggestion}
                 onClose={() => setActiveBlock(null)}
@@ -241,6 +243,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
             ) : (
               <SectionedContent sections={rev.sections} renderBlockGutter={renderBlockGutter} />
             )}
+            <RevisionMedia rev={rev} />
           </article>
           <AckPanel doc={doc} rev={rev} userRole={userRole} />
         </GfoPanel>
@@ -254,7 +257,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
         </GfoPanel>
       )}
 
-      {manager && <ReviewPanel doc={doc} userRole={userRole} />}
+      {manager && <ReviewPanel doc={doc} userRole={userRole} additionalRoles={additionalRoles} />}
 
       {manager && rev && rev.requireAcknowledgment && rev.ackLevel !== 'none' && (
         <GfoPanel title="Read receipts" action={<Users className="h-4 w-4 text-muted-foreground" />}>
@@ -264,7 +267,18 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
 
       {(manager || author) && allRevs.length > 0 && (
         <GfoPanel title="Revision history" action={<History className="h-4 w-4 text-muted-foreground" />}>
-          <RevisionTimeline revisions={allRevs} />
+          <RevisionTimeline
+            revisions={allRevs}
+            canManage={manager || author}
+            onWithdraw={(revisionId, reason) => {
+              const target = allRevs.find((r) => r.id === revisionId);
+              withdrawDraft(revisionId, reason, userRole, additionalRoles);
+              // C7: tell the approver pool if we pulled something out of their queue.
+              if (target?.status === 'pending-approval') {
+                publishWithdrawnEvent(doc, target, identityFor(userRole).userName);
+              }
+            }}
+          />
         </GfoPanel>
       )}
 

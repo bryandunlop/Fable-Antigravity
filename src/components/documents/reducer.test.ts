@@ -323,17 +323,11 @@ describe('documentsReducer misc guards', () => {
       payload: {
         record: { id: 'r1', docId: 'SOP-001', reviewedByUserId: 'U', reviewedByName: 'N', reviewedAtUtc: NOW, outcome: 'reaffirmed' },
         today: TODAY,
+        actorRoles: ['document-manager'],
       },
     });
     expect(s.reviews).toHaveLength(1);
     expect(s.docs[0].nextReviewDate).toBe('2026-10-18');
-  });
-
-  it('WITHDRAW_DRAFT removes an orphaned doc with its last revision', () => {
-    const s = state({ revisions: [rev({ status: 'draft' })] });
-    const out = documentsReducer(s, { type: 'WITHDRAW_DRAFT', payload: 'SOP-001-r1' });
-    expect(out.revisions).toHaveLength(0);
-    expect(out.docs).toHaveLength(0);
   });
 
   it('RESOLVE_SUGGESTION only resolves open suggestions', () => {
@@ -344,7 +338,7 @@ describe('documentsReducer misc guards', () => {
     };
     const out = documentsReducer(state({ suggestions: [sug] }), {
       type: 'RESOLVE_SUGGESTION',
-      payload: { id: 's1', status: 'accepted', byUserId: 'U2', byName: 'N2', atUtc: NOW },
+      payload: { id: 's1', status: 'accepted', byUserId: 'U2', byName: 'N2', byRoles: ['document-manager'], atUtc: NOW },
     });
     expect(out.suggestions[0].status).toBe('declined'); // unchanged
   });
@@ -375,5 +369,172 @@ describe('documentsReducer misc guards', () => {
     };
     const out = documentsReducer(state({ suggestions: [sug] }), { type: 'ADD_SUGGESTION_REPLY', payload: reply });
     expect(out.suggestionReplies).toEqual([]);
+  });
+});
+
+describe('documentsReducer authorization guards (C12 — reducer-enforced, not just UI)', () => {
+  const newDoc = doc({ id: 'SOP-050', title: 'New SOP' });
+  const newRev = rev({ id: 'SOP-050-r1', docId: 'SOP-050', status: 'draft' });
+
+  it('CREATE_DOC by a non-authoring role is a no-op', () => {
+    const out = documentsReducer(state(), {
+      type: 'CREATE_DOC', payload: { doc: newDoc, revision: newRev, actorRoles: ['pilot'] },
+    });
+    expect(out.docs.some((d) => d.id === 'SOP-050')).toBe(false);
+  });
+
+  it('CREATE_DOC by an authoring role succeeds', () => {
+    const out = documentsReducer(state(), {
+      type: 'CREATE_DOC', payload: { doc: newDoc, revision: newRev, actorRoles: ['procedural-specialist'] },
+    });
+    expect(out.docs.some((d) => d.id === 'SOP-050')).toBe(true);
+  });
+
+  it('CREATE_DRAFT by a non-authoring role is a no-op', () => {
+    const out = documentsReducer(state(), {
+      type: 'CREATE_DRAFT', payload: { revision: rev({ id: 'SOP-001-r2', status: 'draft' }), actorRoles: ['pilot'] },
+    });
+    expect(out.revisions.some((r) => r.id === 'SOP-001-r2')).toBe(false);
+  });
+
+  it('COMPLETE_REVIEW by a non-manager is a no-op', () => {
+    const out = documentsReducer(state({ docs: [doc({ reviewCycleDays: 100, nextReviewDate: '2026-07-01' })] }), {
+      type: 'COMPLETE_REVIEW',
+      payload: {
+        record: { id: 'r1', docId: 'SOP-001', reviewedByUserId: 'U', reviewedByName: 'N', reviewedAtUtc: NOW, outcome: 'reaffirmed' },
+        today: TODAY, actorRoles: ['pilot'],
+      },
+    });
+    expect(out.reviews).toHaveLength(0);
+  });
+
+  it('RESOLVE_SUGGESTION by a non-manager, non-author is a no-op', () => {
+    const sug = {
+      id: 's1', docId: 'SOP-001', revisionId: 'SOP-001-r1', docTitle: 'T',
+      authorUserId: 'U', authorName: 'N', role: 'pilot',
+      proposedChange: 'x', rationale: 'y', status: 'open' as const, createdAtUtc: NOW,
+    };
+    const out = documentsReducer(state({ suggestions: [sug] }), {
+      type: 'RESOLVE_SUGGESTION',
+      payload: { id: 's1', status: 'accepted', byUserId: 'U2', byName: 'N2', byRoles: ['pilot'], atUtc: NOW },
+    });
+    expect(out.suggestions[0].status).toBe('open'); // unchanged — a pilot cannot resolve
+  });
+
+  it('ADD_SUGGESTION against a missing revision is a no-op (structural guard)', () => {
+    const sug = {
+      id: 's9', docId: 'SOP-001', revisionId: 'SOP-001-rX', docTitle: 'T',
+      authorUserId: 'U', authorName: 'N', role: 'pilot',
+      proposedChange: 'x', rationale: 'y', status: 'open' as const, createdAtUtc: NOW,
+    };
+    const out = documentsReducer(state(), { type: 'ADD_SUGGESTION', payload: sug });
+    expect(out.suggestions).toHaveLength(0);
+  });
+
+  // Pin/archive are library curation — shared with the bulletins surface, so the
+  // manage gate lives in the reducer (defense-in-depth behind the UI's canManage).
+  it('TOGGLE_PIN by a non-manager is a no-op', () => {
+    const out = documentsReducer(state(), { type: 'TOGGLE_PIN', payload: { docId: 'SOP-001', actorRoles: ['pilot'] } });
+    expect(out.docs[0].isPinned).toBe(false);
+  });
+
+  it('TOGGLE_PIN by a document manager flips isPinned', () => {
+    const out = documentsReducer(state(), { type: 'TOGGLE_PIN', payload: { docId: 'SOP-001', actorRoles: ['document-manager'] } });
+    expect(out.docs[0].isPinned).toBe(true);
+  });
+
+  it('TOGGLE_ARCHIVE by a non-manager is a no-op', () => {
+    const out = documentsReducer(state(), { type: 'TOGGLE_ARCHIVE', payload: { docId: 'SOP-001', actorRoles: ['pilot'] } });
+    expect(out.docs[0].isArchived).toBe(false);
+  });
+
+  it('TOGGLE_ARCHIVE by a document manager flips isArchived', () => {
+    const out = documentsReducer(state(), { type: 'TOGGLE_ARCHIVE', payload: { docId: 'SOP-001', actorRoles: ['document-manager'] } });
+    expect(out.docs[0].isArchived).toBe(true);
+  });
+});
+
+describe('documentsReducer scheduled publication (C3 — promotes mid-session, not just at load)', () => {
+  it('PROMOTE_SCHEDULED publishes an approved revision whose effectiveDate has arrived', () => {
+    const s = state({ revisions: [rev({ status: 'approved', effectiveDate: '2026-07-01' })] });
+    const out = documentsReducer(s, { type: 'PROMOTE_SCHEDULED', payload: { atUtc: NOW, today: TODAY } });
+    expect(out.revisions[0].status).toBe('published');
+  });
+
+  it('PROMOTE_SCHEDULED leaves a future-effective revision scheduled (no-op, same reference)', () => {
+    const s = state({ revisions: [rev({ status: 'approved', effectiveDate: '2026-12-01' })] });
+    const out = documentsReducer(s, { type: 'PROMOTE_SCHEDULED', payload: { atUtc: NOW, today: TODAY } });
+    expect(out.revisions[0].status).toBe('approved');
+    expect(out).toBe(s);
+  });
+});
+
+describe('documentsReducer WITHDRAW_DRAFT ceremony (C7 — tombstone, not hard-delete)', () => {
+  function withdraw(over: Partial<Extract<DocumentsAction, { type: 'WITHDRAW_DRAFT' }>['payload']> = {}): DocumentsAction {
+    return {
+      type: 'WITHDRAW_DRAFT',
+      payload: {
+        revisionId: 'SOP-001-r1',
+        reason: 'Superseded by a broader revision.',
+        byUserId: 'USR007',
+        byName: 'Emily Chen',
+        byRoles: ['procedural-specialist'],
+        atUtc: NOW,
+        ...over,
+      },
+    };
+  }
+
+  // --- Tombstone path: a revision of a doc that has already published ---
+  const livePlusPending = () =>
+    state({ revisions: [rev({ id: 'SOP-001-r1', status: 'published' }), rev({ id: 'SOP-001-r2', status: 'pending-approval' })] });
+
+  it('tombstones a revision of an already-published doc — status withdrawn, reason + who/when, revision retained', () => {
+    const out = documentsReducer(livePlusPending(), withdraw({ revisionId: 'SOP-001-r2' }));
+    expect(out.revisions).toHaveLength(2); // retained for audit, never deleted
+    const r = out.revisions.find((x) => x.id === 'SOP-001-r2')!;
+    expect(r.status).toBe('withdrawn');
+    expect(r.withdrawalReason).toBe('Superseded by a broader revision.');
+    expect(r.withdrawnByName).toBe('Emily Chen');
+    expect(r.withdrawnAtUtc).toBe(NOW);
+    expect(out.docs).toHaveLength(1); // doc kept
+    expect(out.revisions.find((x) => x.id === 'SOP-001-r1')!.status).toBe('published'); // live rev untouched
+  });
+
+  it('pulls a pending-approval revision from the queue on a live doc (tombstone)', () => {
+    const out = documentsReducer(livePlusPending(), withdraw({ revisionId: 'SOP-001-r2' }));
+    expect(out.revisions.find((x) => x.id === 'SOP-001-r2')!.status).toBe('withdrawn');
+  });
+
+  // --- Clean-remove path: a never-published doc's sole first draft (finding-2, Bryan 2026-07-14) ---
+  it('clean-removes a never-published sole first draft — doc and revision gone, no orphan', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw());
+    expect(out.revisions).toHaveLength(0);
+    expect(out.docs).toHaveLength(0);
+  });
+
+  it('keeps a never-published doc that still has another revision (tombstones the withdrawn one)', () => {
+    const s = state({ revisions: [rev({ id: 'SOP-001-r1', status: 'draft' }), rev({ id: 'SOP-001-r2', status: 'pending-approval' })] });
+    const out = documentsReducer(s, withdraw({ revisionId: 'SOP-001-r2' }));
+    expect(out.docs).toHaveLength(1);
+    expect(out.revisions.find((x) => x.id === 'SOP-001-r2')!.status).toBe('withdrawn');
+  });
+
+  // --- Guards fire before the remove-vs-tombstone decision ---
+  it('a blank reason is a no-op', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw({ reason: '  ' }));
+    expect(out.revisions[0].status).toBe('draft');
+    expect(out.docs).toHaveLength(1);
+  });
+
+  it('a non-author, non-manager cannot withdraw', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw({ byRoles: ['pilot'] }));
+    expect(out.revisions[0].status).toBe('draft');
+    expect(out.docs).toHaveLength(1);
+  });
+
+  it('a published revision cannot be withdrawn', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'published' })] }), withdraw());
+    expect(out.revisions[0].status).toBe('published');
   });
 });

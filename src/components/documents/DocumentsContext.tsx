@@ -14,6 +14,7 @@ import { classFor } from './classes';
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision } from './engine/revisions';
 import { canAuthor, validateSubmit, validateDecision, validateDirectPublish } from './engine/lifecycle';
+import { rolesCanManageDocuments } from './roles';
 import { computeNextReviewDate } from './engine/review';
 import { isTargetRole } from './engine/acknowledgments';
 import { migrateStoredState } from './engine/migrations';
@@ -140,13 +141,13 @@ function promote(state: DocumentsState): DocumentsState {
 }
 
 export type DocumentsAction =
-  | { type: 'CREATE_DOC'; payload: { doc: Doc; revision: DocRevision } }
+  | { type: 'CREATE_DOC'; payload: { doc: Doc; revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DOC_META'; payload: { doc: Doc; actorUserId: string; actorRoles: string[] } }
-  | { type: 'TOGGLE_PIN'; payload: string }
-  | { type: 'TOGGLE_ARCHIVE'; payload: string }
-  | { type: 'CREATE_DRAFT'; payload: DocRevision }
+  | { type: 'TOGGLE_PIN'; payload: { docId: string; actorRoles: string[] } }
+  | { type: 'TOGGLE_ARCHIVE'; payload: { docId: string; actorRoles: string[] } }
+  | { type: 'CREATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DRAFT'; payload: DocRevision }
-  | { type: 'WITHDRAW_DRAFT'; payload: string }
+  | { type: 'WITHDRAW_DRAFT'; payload: { revisionId: string; reason: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string } }
   | { type: 'SUBMIT_FOR_APPROVAL'; payload: { revisionId: string; atUtc: string } }
   | {
       type: 'DECIDE_APPROVAL';
@@ -168,9 +169,10 @@ export type DocumentsAction =
   | { type: 'ADD_SUGGESTION_REPLY'; payload: DocSuggestionReply }
   | {
       type: 'RESOLVE_SUGGESTION';
-      payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; atUtc: string };
+      payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string };
     }
-  | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string } };
+  | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string; actorRoles: string[] } }
+  | { type: 'PROMOTE_SCHEDULED'; payload: { atUtc: string; today: string } };
 
 function warnNoop(reason: string | undefined): void {
   if (typeof console !== 'undefined') console.warn(`[documents] action rejected: ${reason ?? 'invalid'}`);
@@ -179,7 +181,12 @@ function warnNoop(reason: string | undefined): void {
 export function documentsReducer(state: DocumentsState, action: DocumentsAction): DocumentsState {
   switch (action.type) {
     case 'CREATE_DOC': {
-      const { doc, revision } = action.payload;
+      const { doc, revision, actorRoles } = action.payload;
+      // C12: enforce the authoring gate in the reducer, not just the UI.
+      if (!canAuthor(classFor(doc.classId), actorRoles)) {
+        warnNoop(`creating a ${classFor(doc.classId).label} requires an authoring role`);
+        return state;
+      }
       if (state.docs.some((d) => d.id === doc.id)) {
         warnNoop(`doc ${doc.id} already exists`);
         return state;
@@ -218,20 +225,40 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       }
       return { ...state, docs: state.docs.map((d) => (d.id === next.id ? next : d)) };
     }
-    case 'TOGGLE_PIN':
+    case 'TOGGLE_PIN': {
+      // C12: pin/archive are library curation — shared with the bulletins surface,
+      // so the manage gate is enforced here in the reducer, not just the UI.
+      const { docId, actorRoles } = action.payload;
+      if (!rolesCanManageDocuments(actorRoles)) {
+        warnNoop('pinning a document requires a document manager');
+        return state;
+      }
       return {
         ...state,
-        docs: state.docs.map((d) => (d.id === action.payload ? { ...d, isPinned: !d.isPinned } : d)),
+        docs: state.docs.map((d) => (d.id === docId ? { ...d, isPinned: !d.isPinned } : d)),
       };
-    case 'TOGGLE_ARCHIVE':
+    }
+    case 'TOGGLE_ARCHIVE': {
+      const { docId, actorRoles } = action.payload;
+      if (!rolesCanManageDocuments(actorRoles)) {
+        warnNoop('archiving a document requires a document manager');
+        return state;
+      }
       return {
         ...state,
-        docs: state.docs.map((d) => (d.id === action.payload ? { ...d, isArchived: !d.isArchived } : d)),
+        docs: state.docs.map((d) => (d.id === docId ? { ...d, isArchived: !d.isArchived } : d)),
       };
+    }
     case 'CREATE_DRAFT': {
-      const rev = action.payload;
-      if (!state.docs.some((d) => d.id === rev.docId)) {
+      const { revision: rev, actorRoles } = action.payload;
+      const parent = state.docs.find((d) => d.id === rev.docId);
+      if (!parent) {
         warnNoop(`no doc ${rev.docId} for draft`);
+        return state;
+      }
+      // C12: a new revision may only be drafted by an author of the doc's class.
+      if (!canAuthor(classFor(parent.classId), actorRoles)) {
+        warnNoop(`drafting a ${classFor(parent.classId).label} revision requires an authoring role`);
         return state;
       }
       if (state.revisions.some((r) => r.id === rev.id)) {
@@ -254,18 +281,58 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       };
     }
     case 'WITHDRAW_DRAFT': {
-      const existing = state.revisions.find((r) => r.id === action.payload);
+      // C7 withdrawal ceremony: withdraw is a *tombstone*, not a hard delete — the
+      // revision is retained with status 'withdrawn' + who/when/reason, and the doc is
+      // never dropped. A reason is required, and only an author of the doc's class or a
+      // document manager may withdraw.
+      const p = action.payload;
+      const existing = state.revisions.find((r) => r.id === p.revisionId);
       if (!existing || (existing.status !== 'draft' && existing.status !== 'rejected' && existing.status !== 'pending-approval')) {
-        warnNoop('only a draft or pending revision can be withdrawn');
+        warnNoop('only a draft, rejected, or pending revision can be withdrawn');
         return state;
       }
-      const remaining = state.revisions.filter((r) => r.id !== action.payload);
-      // A doc with no remaining revisions disappears with its last draft.
-      const stillHasRevs = remaining.some((r) => r.docId === existing.docId);
+      if (!p.reason || !p.reason.trim()) {
+        warnNoop('a withdrawal reason is required');
+        return state;
+      }
+      const parent = state.docs.find((d) => d.id === existing.docId);
+      const authorized =
+        rolesCanManageDocuments(p.byRoles) || (!!parent && canAuthor(classFor(parent.classId), p.byRoles));
+      if (!authorized) {
+        warnNoop('withdrawing a revision requires a document manager or an author of the doc');
+        return state;
+      }
+      // finding-2 (Bryan 2026-07-14): a never-published doc whose SOLE revision is
+      // withdrawn was never a controlled record — remove it cleanly rather than leaving
+      // an uneditable tombstone. The tombstone ceremony below applies once the doc has
+      // published (or has other revisions to keep it reachable).
+      const neverPublished = !state.revisions.some(
+        (r) => r.docId === existing.docId && (r.status === 'published' || r.status === 'superseded'),
+      );
+      const isOnlyRevision = !state.revisions.some(
+        (r) => r.docId === existing.docId && r.id !== p.revisionId,
+      );
+      if (neverPublished && isOnlyRevision) {
+        return {
+          ...state,
+          revisions: state.revisions.filter((r) => r.id !== p.revisionId),
+          docs: state.docs.filter((d) => d.id !== existing.docId),
+        };
+      }
       return {
         ...state,
-        revisions: remaining,
-        docs: stillHasRevs ? state.docs : state.docs.filter((d) => d.id !== existing.docId),
+        revisions: state.revisions.map((r) =>
+          r.id === p.revisionId
+            ? {
+                ...r,
+                status: 'withdrawn' as const,
+                withdrawnAtUtc: p.atUtc,
+                withdrawnByUserId: p.byUserId,
+                withdrawnByName: p.byName,
+                withdrawalReason: p.reason.trim(),
+              }
+            : r,
+        ),
       };
     }
     case 'SUBMIT_FOR_APPROVAL': {
@@ -395,8 +462,18 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       }
       return { ...state, comments: [...state.comments, action.payload] };
     }
-    case 'ADD_SUGGESTION':
-      return { ...state, suggestions: [...state.suggestions, action.payload] };
+    case 'ADD_SUGGESTION': {
+      // Any reader may file a suggestion (no role gate), but it must target a
+      // real doc + revision — structural guard, C12.
+      const sug = action.payload;
+      const doc = state.docs.find((d) => d.id === sug.docId);
+      const revExists = state.revisions.some((r) => r.id === sug.revisionId && r.docId === sug.docId);
+      if (!doc || !revExists) {
+        warnNoop(`suggestion targets a missing doc/revision (${sug.docId}/${sug.revisionId})`);
+        return state;
+      }
+      return { ...state, suggestions: [...state.suggestions, sug] };
+    }
     case 'ADD_SUGGESTION_REPLY': {
       const target = state.suggestions.find((s) => s.id === action.payload.suggestionId);
       if (!target || target.status !== 'open') {
@@ -407,6 +484,17 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
     }
     case 'RESOLVE_SUGGESTION': {
       const p = action.payload;
+      const sug = state.suggestions.find((s) => s.id === p.id);
+      if (!sug) return state;
+      // C12: only a document manager or an author of the doc's class may accept/decline
+      // a suggestion — mirrors the reader UI's canManage={manager || author} gate.
+      const sugDoc = state.docs.find((d) => d.id === sug.docId);
+      const authorized =
+        rolesCanManageDocuments(p.byRoles) || (!!sugDoc && canAuthor(classFor(sugDoc.classId), p.byRoles));
+      if (!authorized) {
+        warnNoop('resolving a suggestion requires a document manager or an author of the doc');
+        return state;
+      }
       return {
         ...state,
         suggestions: state.suggestions.map((s) =>
@@ -424,9 +512,14 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       };
     }
     case 'COMPLETE_REVIEW': {
-      const { record, today } = action.payload;
+      const { record, today, actorRoles } = action.payload;
       const doc = state.docs.find((d) => d.id === record.docId);
       if (!doc) return state;
+      // C12: completing a periodic review is a manager action (UI shows it to managers only).
+      if (!rolesCanManageDocuments(actorRoles)) {
+        warnNoop('completing a review requires a document manager');
+        return state;
+      }
       const cycle = doc.reviewCycleDays ?? classFor(doc.classId).defaultReviewCycleDays;
       return {
         ...state,
@@ -436,6 +529,14 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         ),
       };
     }
+    case 'PROMOTE_SCHEDULED': {
+      // C3: publish 'approved' (scheduled) revisions whose effective date has
+      // arrived. Runs mid-session (not only at load) — see the provider effect.
+      const { atUtc, today } = action.payload;
+      const { docs, revisions } = promoteScheduled(state, atUtc, today);
+      if (docs === state.docs && revisions === state.revisions) return state;
+      return { ...state, docs, revisions };
+    }
     default:
       return state;
   }
@@ -443,13 +544,13 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
 
 interface Ctx {
   state: DocumentsState;
-  createDoc: (doc: Doc, revision: DocRevision) => void;
+  createDoc: (doc: Doc, revision: DocRevision, actorRoles: string[]) => void;
   updateDocMeta: (doc: Doc, userRole: string, additionalRoles?: string[]) => void;
-  togglePin: (docId: string) => void;
-  toggleArchive: (docId: string) => void;
-  createDraft: (revision: DocRevision) => void;
+  togglePin: (docId: string, actorRoles: string[]) => void;
+  toggleArchive: (docId: string, actorRoles: string[]) => void;
+  createDraft: (revision: DocRevision, actorRoles: string[]) => void;
   updateDraft: (revision: DocRevision) => void;
-  withdrawDraft: (revisionId: string) => void;
+  withdrawDraft: (revisionId: string, reason: string, userRole: string, additionalRoles?: string[]) => void;
   submitForApproval: (revisionId: string) => void;
   decideApproval: (input: {
     revisionId: string;
@@ -473,9 +574,9 @@ interface Ctx {
     rationale: string;
     userRole: string;
   }) => void;
-  resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string) => void;
+  resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
   addSuggestionReply: (suggestionId: string, text: string, userRole: string) => void;
-  completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string) => void;
+  completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
 }
 
 const DocumentsContext = createContext<Ctx | undefined>(undefined);
@@ -499,6 +600,34 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     }, 300);
     return () => clearTimeout(t);
   }, [state]);
+
+  // C3: a scheduled ('approved', future-effective) revision must publish mid-session,
+  // not only at the next reload — and must fire its required-read announcement when it
+  // does. Re-check on tab-visible / window-focus and on a light interval; event ids
+  // dedupe, so a repeated fire is harmless. (The durable 'what you owe' feed is derived
+  // from state, so it also picks the revision up the moment it flips to published.)
+  useEffect(() => {
+    const check = () => {
+      const today = todayIso();
+      const due = state.revisions.filter((r) => r.status === 'approved' && r.effectiveDate <= today);
+      if (due.length === 0) return;
+      dispatch({ type: 'PROMOTE_SCHEDULED', payload: { atUtc: nowUtc(), today } });
+      for (const rev of due) {
+        const doc = state.docs.find((d) => d.id === rev.docId);
+        if (doc) publishRequiredReadEvent(doc, rev);
+      }
+    };
+    check();
+    const interval = setInterval(check, 60_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', check);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', check);
+    };
+  }, [state.revisions, state.docs]);
 
   const submitForApproval = useCallback((revisionId: string) => {
     dispatch({ type: 'SUBMIT_FOR_APPROVAL', payload: { revisionId, atUtc: nowUtc() } });
@@ -614,15 +743,15 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const resolveSuggestion = useCallback<Ctx['resolveSuggestion']>((id, status, note, userRole) => {
+  const resolveSuggestion = useCallback<Ctx['resolveSuggestion']>((id, status, note, userRole, additionalRoles = []) => {
     const { userId, userName } = identityFor(userRole);
     dispatch({
       type: 'RESOLVE_SUGGESTION',
-      payload: { id, status, note, byUserId: userId, byName: userName, atUtc: nowUtc() },
+      payload: { id, status, note, byUserId: userId, byName: userName, byRoles: [userRole, ...additionalRoles], atUtc: nowUtc() },
     });
   }, []);
 
-  const completeReview = useCallback<Ctx['completeReview']>((docId, outcome, note, userRole) => {
+  const completeReview = useCallback<Ctx['completeReview']>((docId, outcome, note, userRole, additionalRoles = []) => {
     const { userId, userName } = identityFor(userRole);
     dispatch({
       type: 'COMPLETE_REVIEW',
@@ -637,13 +766,14 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
           note,
         },
         today: todayIso(),
+        actorRoles: [userRole, ...additionalRoles],
       },
     });
   }, []);
 
   const value: Ctx = {
     state,
-    createDoc: useCallback((doc, revision) => dispatch({ type: 'CREATE_DOC', payload: { doc, revision } }), []),
+    createDoc: useCallback((doc, revision, actorRoles) => dispatch({ type: 'CREATE_DOC', payload: { doc, revision, actorRoles } }), []),
     updateDocMeta: useCallback((doc, userRole, additionalRoles = []) => {
       const { userId } = identityFor(userRole);
       dispatch({
@@ -651,11 +781,17 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
         payload: { doc, actorUserId: userId, actorRoles: [userRole, ...additionalRoles] },
       });
     }, []),
-    togglePin: useCallback((id) => dispatch({ type: 'TOGGLE_PIN', payload: id }), []),
-    toggleArchive: useCallback((id) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: id }), []),
-    createDraft: useCallback((r) => dispatch({ type: 'CREATE_DRAFT', payload: r }), []),
+    togglePin: useCallback((id, actorRoles) => dispatch({ type: 'TOGGLE_PIN', payload: { docId: id, actorRoles } }), []),
+    toggleArchive: useCallback((id, actorRoles) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: { docId: id, actorRoles } }), []),
+    createDraft: useCallback((r, actorRoles) => dispatch({ type: 'CREATE_DRAFT', payload: { revision: r, actorRoles } }), []),
     updateDraft: useCallback((r) => dispatch({ type: 'UPDATE_DRAFT', payload: r }), []),
-    withdrawDraft: useCallback((id) => dispatch({ type: 'WITHDRAW_DRAFT', payload: id }), []),
+    withdrawDraft: useCallback((revisionId, reason, userRole, additionalRoles = []) => {
+      const { userId, userName } = identityFor(userRole);
+      dispatch({
+        type: 'WITHDRAW_DRAFT',
+        payload: { revisionId, reason, byUserId: userId, byName: userName, byRoles: [userRole, ...additionalRoles], atUtc: nowUtc() },
+      });
+    }, []),
     submitForApproval,
     decideApproval,
     publishDirect: useCallback((revisionId) => {
@@ -700,6 +836,19 @@ export function publishApprovalRequestedEvent(doc: Doc, rev: DocRevision): void 
     severity: 'info',
     title: `Approval requested: ${doc.title}`,
     detail: `${doc.id} rev ${rev.revision} submitted by ${rev.authorName}`,
+    module: 'Documents',
+    link: '/documents',
+    audienceRoles: classFor(doc.classId).approverRoles,
+  });
+}
+
+/** C7: tell the approver pool that a revision awaiting their decision was pulled. */
+export function publishWithdrawnEvent(doc: Doc, rev: DocRevision, byName: string): void {
+  eventStore.publish({
+    id: `doc-withdrawn:${rev.id}`,
+    severity: 'info',
+    title: `Approval request withdrawn: ${doc.title}`,
+    detail: `${doc.id} rev ${rev.revision} was withdrawn by ${byName}`,
     module: 'Documents',
     link: '/documents',
     audienceRoles: classFor(doc.classId).approverRoles,
