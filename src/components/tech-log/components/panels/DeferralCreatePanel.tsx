@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Search, ClipboardCheck, ShieldAlert } from 'lucide-react';
+import { Search, ClipboardCheck, ShieldAlert, Clock } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../../engine/pl25';
+import { GOVERNING_ZONE_OPTIONS, isOverride, validateGoverningOverride } from '../../util/governingZone';
+import { formatRegulatoryCompact } from '../../util/displayZone';
 import { canDeferDefect } from '../../engine/disposition';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
@@ -48,6 +50,10 @@ export function DeferralCreatePanel({
   const [restriction, setRestriction] = useState('');
   const [signOpen, setSignOpen] = useState(false);
   const [pendingDeferralId, setPendingDeferralId] = useState('');
+  // D24 governing-zone override (Eastern default; override to operating-local requires a reason).
+  const [governingZone, setGoverningZone] = useState(DEFAULT_GOVERNING_TIMEZONE);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [showOverride, setShowOverride] = useState(false);
 
   const melMatches = useMemo(() => {
     if (!aircraft) return [];
@@ -61,6 +67,19 @@ export function DeferralCreatePanel({
   const selectedMel = state.melItems.find(m => m.id === selectedMelId);
   const willGate = !!(selectedMel?.mProcedure?.trim() || selectedMel?.placardText?.trim());
   const cat = selectedMel?.category;
+
+  // D24: live preview of the PL-25 clock under the chosen governing zone, so the signer sees the
+  // effect of an override before signing. Advisory only (the real clock is re-stamped at signing).
+  const clockPreview = useMemo(() => {
+    if (!selectedMel) return null;
+    const cs = computeClockStart(new Date().toISOString(), governingZone);
+    const due = dueFromCategory(selectedMel, cs, { hours: 0, cycles: 0 }, governingZone);
+    return {
+      start: formatRegulatoryCompact(cs, 'GOVERNING', governingZone),
+      due: due.repairDueDateUtc ? formatRegulatoryCompact(due.repairDueDateUtc, 'GOVERNING', governingZone) : null,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMelId, governingZone]);
 
   if (!aircraft) return null;
 
@@ -79,6 +98,8 @@ export function DeferralCreatePanel({
     if (!selectedMel) return toast.error('Select a governing MEL item.');
     if (!ack) return toast.error('You must acknowledge the MEL review before signing.');
     if (!canDeferDefect(user, selectedMel)) return toast.error('You are not authorized to defer this MEL item.');
+    const ovr = validateGoverningOverride(governingZone, overrideReason);
+    if (!ovr.ok) return toast.error(ovr.error!);
     setPendingDeferralId(newId('df'));
     setSignOpen(true);
   };
@@ -86,10 +107,10 @@ export function DeferralCreatePanel({
   const onSigned = (sig: { id: string }) => {
     if (!selectedMel) return;
     const now = new Date().toISOString();
-    // D24: anchor the PL-25 clock to the governing zone (default Eastern; a per-deferral override UI
-    // can later set a different operating-local zone + reason). The stored governingTimezone must be
-    // the same zone the clock was computed under.
-    const zone = DEFAULT_GOVERNING_TIMEZONE;
+    // D24: anchor the PL-25 clock to the governing zone (Eastern default, or a per-deferral override
+    // to the aircraft operating-local zone). The stored governingTimezone must be the same zone the
+    // clock was computed under; an override also records its reason.
+    const zone = governingZone;
     const clockStart = computeClockStart(now, zone);
     const airframe = { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles };
     const due = dueFromCategory(selectedMel, clockStart, airframe, zone);
@@ -102,6 +123,7 @@ export function DeferralCreatePanel({
       governingMmelRevision: selectedMel.mmelRevision, governingEffectiveDate: selectedMel.effectiveDate,
       category: selectedMel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: clockStart,
       governingTimezone: zone,
+      governingTimezoneOverrideReason: isOverride(zone) ? overrideReason.trim() : undefined,
       repairDueDateUtc: due.repairDueDateUtc, repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
       restrictionText: restriction.trim() || selectedMel.provisos, placardRequired,
       mProcedureRequired, placardLocation: selectedMel.placardLocation, extensionUsed: false,
@@ -178,6 +200,31 @@ export function DeferralCreatePanel({
                 <Textarea className="mt-1" value={restriction} onChange={e => setRestriction(e.target.value)} />
               </div>
 
+              <div className="rounded-md border p-2">
+                {!showOverride ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-xs"><Clock className="h-3.5 w-3.5 text-muted-foreground" /> Governing timezone <span className="font-medium">Eastern (ET)</span></span>
+                    <Button variant="outline" className="h-7 text-xs" onClick={() => setShowOverride(true)}>Override</Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium">Governing timezone — override</span>
+                      <Button variant="outline" className="h-7 text-xs" onClick={() => { setShowOverride(false); setGoverningZone(DEFAULT_GOVERNING_TIMEZONE); setOverrideReason(''); }}>Use Eastern</Button>
+                    </div>
+                    <select className="w-full rounded-md border bg-background px-2 py-1 text-sm" value={governingZone} onChange={e => setGoverningZone(e.target.value)}>
+                      {GOVERNING_ZONE_OPTIONS.map(o => <option key={o.zone} value={o.zone}>{o.label}</option>)}
+                    </select>
+                    {isOverride(governingZone) && (
+                      <Textarea placeholder="Reason for override (required) — e.g. aircraft on deployment to KLAX; DOM directs local-day clock." value={overrideReason} onChange={e => setOverrideReason(e.target.value)} />
+                    )}
+                  </div>
+                )}
+                {clockPreview && (
+                  <p className="mt-2 text-xs text-muted-foreground">clock starts {clockPreview.start}{clockPreview.due ? ` · repair due ${clockPreview.due}` : ' · usage-based'}</p>
+                )}
+              </div>
+
               <label className="flex items-start gap-2">
                 <input type="checkbox" className="mt-1" checked={ack} onChange={e => setAck(e.target.checked)} />
                 <span className="text-xs">I have reviewed the governing MEL item (revision {selectedMel.mmelRevision}, eff. {selectedMel.effectiveDate}), its category, provisos, (O)/(M) procedures, and placard, and I authorize this deferral.</span>
@@ -185,7 +232,7 @@ export function DeferralCreatePanel({
 
               <div className="flex gap-2">
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>
-                <Button onClick={beginSign} disabled={!canDeferDefect(user, selectedMel) || !ack}>Sign deferral</Button>
+                <Button onClick={beginSign} disabled={!canDeferDefect(user, selectedMel) || !ack || !validateGoverningOverride(governingZone, overrideReason).ok}>Sign deferral</Button>
               </div>
               {!canDeferDefect(user, selectedMel) && <p className="text-xs text-[var(--gfo-error,#EF3340)]">{user.role === 'MAINTENANCE' ? '' : 'Crew may only defer flight-crew-deferrable (FC-deferrable) MEL items.'}</p>}
             </>
