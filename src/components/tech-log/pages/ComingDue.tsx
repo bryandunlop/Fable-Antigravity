@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AlertTriangle, Clock, CalendarClock, CalendarDays, ChevronRight, CheckCircle2, Cloud, CloudDownload, RefreshCw, ClipboardList, Hammer } from 'lucide-react';
-import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
+import { formatRegulatoryCompact, type DisplayZoneMode } from '../util/displayZone';
 import { useIntegration } from '../integration/useIntegration';
 import type { CampForecastItem } from '../integration/campClient';
 import { buildUpcomingBoard, createForecastCard, BUCKET_ORDER, type DueBucket, type UpcomingItem } from '../engine/upcomingBoard';
@@ -27,10 +28,14 @@ const SECTION: Record<DueBucket, { title: string; icon: React.ReactNode; accent?
   HORIZON: { title: 'On the horizon (≤90 days)', icon: <CalendarDays className="h-4 w-4" /> },
 };
 
-function dueLabel(it: UpcomingItem): string {
+function dueLabel(it: UpcomingItem, displayZone: DisplayZoneMode): string {
   const parts: string[] = [];
   if (it.dueDateUtc) {
-    const d = new Date(it.dueDateUtc).toLocaleDateString();
+    // D24: MEL repair-clock rows carry a governing zone and honor the display lens; CAMP/recurring
+    // rows are external dates with no governing zone, so they render as plain local dates.
+    const d = it.kind === 'DEFERRAL' && it.governingTimezone
+      ? formatRegulatoryCompact(it.dueDateUtc, displayZone, it.governingTimezone)
+      : new Date(it.dueDateUtc).toLocaleDateString();
     if (it.dueInDays != null && it.dueInDays < 0) parts.push(`${d} · overdue ${Math.abs(it.dueInDays)}d`);
     else if (it.dueInDays != null) parts.push(`${d} · ${it.dueInDays}d`);
     else parts.push(d);
@@ -41,6 +46,7 @@ function dueLabel(it: UpcomingItem): string {
 
 export default function ComingDue() {
   const { state, dispatch } = useTechLog();
+  const { displayZone } = useDisplayZone();
   const user = useCurrentUser();
   const navigate = useNavigate();
   const integration = useIntegration();
@@ -100,7 +106,7 @@ export default function ComingDue() {
           </div>
           <p className="mt-0.5 truncate text-sm">{it.title}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {dueLabel(it)}
+            {dueLabel(it, displayZone)}
             {it.kind === 'DEFERRAL' ? ' · MEL repair clock' : it.kind === 'RECURRING_CHECK' ? ' · recurring check' : ' · CAMP due list'}
           </p>
         </div>

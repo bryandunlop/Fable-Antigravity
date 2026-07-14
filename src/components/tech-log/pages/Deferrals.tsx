@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Wrench, Clock, TimerReset, Hammer } from 'lucide-react';
-import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
+import { formatRegulatoryCompact } from '../util/displayZone';
 import { currentRows } from '../engine/supersede';
 import { isDeferralExpired } from '../engine/pl25';
 import { useRaiseFixFromDeferral } from '../useRectify';
@@ -18,6 +19,7 @@ export default function Deferrals() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { state } = useTechLog();
+  const { displayZone } = useDisplayZone();
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
   const raiseFix = useRaiseFixFromDeferral();
@@ -80,7 +82,7 @@ export default function Deferrals() {
                   <p className="mt-1 text-sm text-muted-foreground">{mel?.title}</p>
                   {d.repairDueDateUtc && (
                     <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" /> due {new Date(d.repairDueDateUtc).toLocaleDateString()} · {ms != null && ms > 0 ? `${Math.floor(ms / 86400000)}d left` : 'overdue'}
+                      <Clock className="h-3.5 w-3.5" /> due {formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)} · {ms != null && ms > 0 ? `${Math.floor(ms / 86400000)}d left` : 'overdue'}
                       {d.extensionUsed && ' · extended'}
                     </div>
                   )}

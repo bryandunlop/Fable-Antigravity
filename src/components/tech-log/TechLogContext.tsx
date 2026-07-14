@@ -7,10 +7,12 @@ import { wouldFork, buildSupersedeConflict } from './engine/supersede';
 import { canRecordPostflight } from './engine/custody';
 import { isSelfApproval, applyApproval } from './engine/approvals';
 import { newId } from './util/id';
+import type { DisplayZoneMode } from './util/displayZone';
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-09-v11';
+export const DATA_VERSION = '2026-07-14-v12'; // D24: seeded deferrals gained governingTimezone — reseed so persisted rows carry it
+const DISPLAY_ZONE_KEY = 'tech-log-display-zone'; // D24 UI preference, separate from domain state (survives demo reset)
 
 function loadInitialState(): TechLogState {
   try {
@@ -214,6 +216,8 @@ interface Ctx {
   state: TechLogState;
   dispatch: React.Dispatch<TechLogAction>;
   loading: boolean;
+  displayZone: DisplayZoneMode;                       // D24: lens for regulatory times (default GOVERNING)
+  setDisplayZone: (mode: DisplayZoneMode) => void;
 }
 const TechLogContext = createContext<Ctx | undefined>(undefined);
 
@@ -234,6 +238,21 @@ function resolveFromLogin(userRole: string | undefined, personnel: Personnel[]):
 export function TechLogProvider({ children, userRole }: { children: ReactNode; userRole?: string }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadInitialState);
   const [loading] = useState(false);
+
+  // D24 display-zone preference — a UI lens for regulatory times, kept out of the domain state so it
+  // survives a demo reset. Never affects the grounding decision (that compares UTC instants).
+  const [displayZone, setDisplayZoneState] = useState<DisplayZoneMode>(() => {
+    try {
+      const v = localStorage.getItem(DISPLAY_ZONE_KEY);
+      return v === 'UTC' || v === 'LOCAL' ? v : 'GOVERNING';
+    } catch {
+      return 'GOVERNING';
+    }
+  });
+  const setDisplayZone = useCallback((mode: DisplayZoneMode) => {
+    setDisplayZoneState(mode);
+    try { localStorage.setItem(DISPLAY_ZONE_KEY, mode); } catch { /* ignore */ }
+  }, []);
 
   // Resolve the signed-in identity from the login role (overrides any persisted persona).
   useEffect(() => {
@@ -263,7 +282,13 @@ export function TechLogProvider({ children, userRole }: { children: ReactNode; u
     return () => clearTimeout(t);
   }, [state]);
 
-  return <TechLogContext.Provider value={{ state, dispatch, loading }}>{children}</TechLogContext.Provider>;
+  return <TechLogContext.Provider value={{ state, dispatch, loading, displayZone, setDisplayZone }}>{children}</TechLogContext.Provider>;
+}
+
+/** D24 display-zone lens for regulatory times + its setter. */
+export function useDisplayZone() {
+  const { displayZone, setDisplayZone } = useTechLog();
+  return { displayZone, setDisplayZone };
 }
 
 export function useTechLog(): Ctx {
