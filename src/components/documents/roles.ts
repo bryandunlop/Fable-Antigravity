@@ -14,6 +14,10 @@ export function documentsRoleUniverse(): Reader[] {
 /** Mirror of the bulletins-surface manage gate. */
 export const DOC_MANAGER_ROLES = ['admin', 'safety', 'lead', 'document-manager', 'procedural-specialist'];
 
+export function rolesCanManageDocuments(roles: string[]): boolean {
+  return roles.some((r) => DOC_MANAGER_ROLES.includes(r));
+}
+
 export function canManageDocuments(userRole: string, additionalRoles: string[] = []): boolean {
-  return [userRole, ...additionalRoles].some((r) => DOC_MANAGER_ROLES.includes(r));
+  return rolesCanManageDocuments([userRole, ...additionalRoles]);
 }

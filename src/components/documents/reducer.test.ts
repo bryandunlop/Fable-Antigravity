@@ -323,6 +323,7 @@ describe('documentsReducer misc guards', () => {
       payload: {
         record: { id: 'r1', docId: 'SOP-001', reviewedByUserId: 'U', reviewedByName: 'N', reviewedAtUtc: NOW, outcome: 'reaffirmed' },
         today: TODAY,
+        actorRoles: ['document-manager'],
       },
     });
     expect(s.reviews).toHaveLength(1);
@@ -344,7 +345,7 @@ describe('documentsReducer misc guards', () => {
     };
     const out = documentsReducer(state({ suggestions: [sug] }), {
       type: 'RESOLVE_SUGGESTION',
-      payload: { id: 's1', status: 'accepted', byUserId: 'U2', byName: 'N2', atUtc: NOW },
+      payload: { id: 's1', status: 'accepted', byUserId: 'U2', byName: 'N2', byRoles: ['document-manager'], atUtc: NOW },
     });
     expect(out.suggestions[0].status).toBe('declined'); // unchanged
   });
@@ -375,5 +376,65 @@ describe('documentsReducer misc guards', () => {
     };
     const out = documentsReducer(state({ suggestions: [sug] }), { type: 'ADD_SUGGESTION_REPLY', payload: reply });
     expect(out.suggestionReplies).toEqual([]);
+  });
+});
+
+describe('documentsReducer authorization guards (C12 — reducer-enforced, not just UI)', () => {
+  const newDoc = doc({ id: 'SOP-050', title: 'New SOP' });
+  const newRev = rev({ id: 'SOP-050-r1', docId: 'SOP-050', status: 'draft' });
+
+  it('CREATE_DOC by a non-authoring role is a no-op', () => {
+    const out = documentsReducer(state(), {
+      type: 'CREATE_DOC', payload: { doc: newDoc, revision: newRev, actorRoles: ['pilot'] },
+    });
+    expect(out.docs.some((d) => d.id === 'SOP-050')).toBe(false);
+  });
+
+  it('CREATE_DOC by an authoring role succeeds', () => {
+    const out = documentsReducer(state(), {
+      type: 'CREATE_DOC', payload: { doc: newDoc, revision: newRev, actorRoles: ['procedural-specialist'] },
+    });
+    expect(out.docs.some((d) => d.id === 'SOP-050')).toBe(true);
+  });
+
+  it('CREATE_DRAFT by a non-authoring role is a no-op', () => {
+    const out = documentsReducer(state(), {
+      type: 'CREATE_DRAFT', payload: { revision: rev({ id: 'SOP-001-r2', status: 'draft' }), actorRoles: ['pilot'] },
+    });
+    expect(out.revisions.some((r) => r.id === 'SOP-001-r2')).toBe(false);
+  });
+
+  it('COMPLETE_REVIEW by a non-manager is a no-op', () => {
+    const out = documentsReducer(state({ docs: [doc({ reviewCycleDays: 100, nextReviewDate: '2026-07-01' })] }), {
+      type: 'COMPLETE_REVIEW',
+      payload: {
+        record: { id: 'r1', docId: 'SOP-001', reviewedByUserId: 'U', reviewedByName: 'N', reviewedAtUtc: NOW, outcome: 'reaffirmed' },
+        today: TODAY, actorRoles: ['pilot'],
+      },
+    });
+    expect(out.reviews).toHaveLength(0);
+  });
+
+  it('RESOLVE_SUGGESTION by a non-manager, non-author is a no-op', () => {
+    const sug = {
+      id: 's1', docId: 'SOP-001', revisionId: 'SOP-001-r1', docTitle: 'T',
+      authorUserId: 'U', authorName: 'N', role: 'pilot',
+      proposedChange: 'x', rationale: 'y', status: 'open' as const, createdAtUtc: NOW,
+    };
+    const out = documentsReducer(state({ suggestions: [sug] }), {
+      type: 'RESOLVE_SUGGESTION',
+      payload: { id: 's1', status: 'accepted', byUserId: 'U2', byName: 'N2', byRoles: ['pilot'], atUtc: NOW },
+    });
+    expect(out.suggestions[0].status).toBe('open'); // unchanged — a pilot cannot resolve
+  });
+
+  it('ADD_SUGGESTION against a missing revision is a no-op (structural guard)', () => {
+    const sug = {
+      id: 's9', docId: 'SOP-001', revisionId: 'SOP-001-rX', docTitle: 'T',
+      authorUserId: 'U', authorName: 'N', role: 'pilot',
+      proposedChange: 'x', rationale: 'y', status: 'open' as const, createdAtUtc: NOW,
+    };
+    const out = documentsReducer(state(), { type: 'ADD_SUGGESTION', payload: sug });
+    expect(out.suggestions).toHaveLength(0);
   });
 });

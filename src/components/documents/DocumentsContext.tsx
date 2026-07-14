@@ -14,6 +14,7 @@ import { classFor } from './classes';
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision } from './engine/revisions';
 import { canAuthor, validateSubmit, validateDecision, validateDirectPublish } from './engine/lifecycle';
+import { rolesCanManageDocuments } from './roles';
 import { computeNextReviewDate } from './engine/review';
 import { isTargetRole } from './engine/acknowledgments';
 import { migrateStoredState } from './engine/migrations';
@@ -140,11 +141,11 @@ function promote(state: DocumentsState): DocumentsState {
 }
 
 export type DocumentsAction =
-  | { type: 'CREATE_DOC'; payload: { doc: Doc; revision: DocRevision } }
+  | { type: 'CREATE_DOC'; payload: { doc: Doc; revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DOC_META'; payload: { doc: Doc; actorUserId: string; actorRoles: string[] } }
   | { type: 'TOGGLE_PIN'; payload: string }
   | { type: 'TOGGLE_ARCHIVE'; payload: string }
-  | { type: 'CREATE_DRAFT'; payload: DocRevision }
+  | { type: 'CREATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DRAFT'; payload: DocRevision }
   | { type: 'WITHDRAW_DRAFT'; payload: string }
   | { type: 'SUBMIT_FOR_APPROVAL'; payload: { revisionId: string; atUtc: string } }
@@ -168,9 +169,9 @@ export type DocumentsAction =
   | { type: 'ADD_SUGGESTION_REPLY'; payload: DocSuggestionReply }
   | {
       type: 'RESOLVE_SUGGESTION';
-      payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; atUtc: string };
+      payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string };
     }
-  | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string } };
+  | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string; actorRoles: string[] } };
 
 function warnNoop(reason: string | undefined): void {
   if (typeof console !== 'undefined') console.warn(`[documents] action rejected: ${reason ?? 'invalid'}`);
@@ -179,7 +180,12 @@ function warnNoop(reason: string | undefined): void {
 export function documentsReducer(state: DocumentsState, action: DocumentsAction): DocumentsState {
   switch (action.type) {
     case 'CREATE_DOC': {
-      const { doc, revision } = action.payload;
+      const { doc, revision, actorRoles } = action.payload;
+      // C12: enforce the authoring gate in the reducer, not just the UI.
+      if (!canAuthor(classFor(doc.classId), actorRoles)) {
+        warnNoop(`creating a ${classFor(doc.classId).label} requires an authoring role`);
+        return state;
+      }
       if (state.docs.some((d) => d.id === doc.id)) {
         warnNoop(`doc ${doc.id} already exists`);
         return state;
@@ -229,9 +235,15 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         docs: state.docs.map((d) => (d.id === action.payload ? { ...d, isArchived: !d.isArchived } : d)),
       };
     case 'CREATE_DRAFT': {
-      const rev = action.payload;
-      if (!state.docs.some((d) => d.id === rev.docId)) {
+      const { revision: rev, actorRoles } = action.payload;
+      const parent = state.docs.find((d) => d.id === rev.docId);
+      if (!parent) {
         warnNoop(`no doc ${rev.docId} for draft`);
+        return state;
+      }
+      // C12: a new revision may only be drafted by an author of the doc's class.
+      if (!canAuthor(classFor(parent.classId), actorRoles)) {
+        warnNoop(`drafting a ${classFor(parent.classId).label} revision requires an authoring role`);
         return state;
       }
       if (state.revisions.some((r) => r.id === rev.id)) {
@@ -395,8 +407,18 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       }
       return { ...state, comments: [...state.comments, action.payload] };
     }
-    case 'ADD_SUGGESTION':
-      return { ...state, suggestions: [...state.suggestions, action.payload] };
+    case 'ADD_SUGGESTION': {
+      // Any reader may file a suggestion (no role gate), but it must target a
+      // real doc + revision — structural guard, C12.
+      const sug = action.payload;
+      const doc = state.docs.find((d) => d.id === sug.docId);
+      const revExists = state.revisions.some((r) => r.id === sug.revisionId && r.docId === sug.docId);
+      if (!doc || !revExists) {
+        warnNoop(`suggestion targets a missing doc/revision (${sug.docId}/${sug.revisionId})`);
+        return state;
+      }
+      return { ...state, suggestions: [...state.suggestions, sug] };
+    }
     case 'ADD_SUGGESTION_REPLY': {
       const target = state.suggestions.find((s) => s.id === action.payload.suggestionId);
       if (!target || target.status !== 'open') {
@@ -407,6 +429,17 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
     }
     case 'RESOLVE_SUGGESTION': {
       const p = action.payload;
+      const sug = state.suggestions.find((s) => s.id === p.id);
+      if (!sug) return state;
+      // C12: only a document manager or an author of the doc's class may accept/decline
+      // a suggestion — mirrors the reader UI's canManage={manager || author} gate.
+      const sugDoc = state.docs.find((d) => d.id === sug.docId);
+      const authorized =
+        rolesCanManageDocuments(p.byRoles) || (!!sugDoc && canAuthor(classFor(sugDoc.classId), p.byRoles));
+      if (!authorized) {
+        warnNoop('resolving a suggestion requires a document manager or an author of the doc');
+        return state;
+      }
       return {
         ...state,
         suggestions: state.suggestions.map((s) =>
@@ -424,9 +457,14 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       };
     }
     case 'COMPLETE_REVIEW': {
-      const { record, today } = action.payload;
+      const { record, today, actorRoles } = action.payload;
       const doc = state.docs.find((d) => d.id === record.docId);
       if (!doc) return state;
+      // C12: completing a periodic review is a manager action (UI shows it to managers only).
+      if (!rolesCanManageDocuments(actorRoles)) {
+        warnNoop('completing a review requires a document manager');
+        return state;
+      }
       const cycle = doc.reviewCycleDays ?? classFor(doc.classId).defaultReviewCycleDays;
       return {
         ...state,
@@ -443,11 +481,11 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
 
 interface Ctx {
   state: DocumentsState;
-  createDoc: (doc: Doc, revision: DocRevision) => void;
+  createDoc: (doc: Doc, revision: DocRevision, actorRoles: string[]) => void;
   updateDocMeta: (doc: Doc, userRole: string, additionalRoles?: string[]) => void;
   togglePin: (docId: string) => void;
   toggleArchive: (docId: string) => void;
-  createDraft: (revision: DocRevision) => void;
+  createDraft: (revision: DocRevision, actorRoles: string[]) => void;
   updateDraft: (revision: DocRevision) => void;
   withdrawDraft: (revisionId: string) => void;
   submitForApproval: (revisionId: string) => void;
@@ -618,7 +656,7 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     const { userId, userName } = identityFor(userRole);
     dispatch({
       type: 'RESOLVE_SUGGESTION',
-      payload: { id, status, note, byUserId: userId, byName: userName, atUtc: nowUtc() },
+      payload: { id, status, note, byUserId: userId, byName: userName, byRoles: [userRole], atUtc: nowUtc() },
     });
   }, []);
 
@@ -637,13 +675,14 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
           note,
         },
         today: todayIso(),
+        actorRoles: [userRole],
       },
     });
   }, []);
 
   const value: Ctx = {
     state,
-    createDoc: useCallback((doc, revision) => dispatch({ type: 'CREATE_DOC', payload: { doc, revision } }), []),
+    createDoc: useCallback((doc, revision, actorRoles) => dispatch({ type: 'CREATE_DOC', payload: { doc, revision, actorRoles } }), []),
     updateDocMeta: useCallback((doc, userRole, additionalRoles = []) => {
       const { userId } = identityFor(userRole);
       dispatch({
@@ -653,7 +692,7 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     }, []),
     togglePin: useCallback((id) => dispatch({ type: 'TOGGLE_PIN', payload: id }), []),
     toggleArchive: useCallback((id) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: id }), []),
-    createDraft: useCallback((r) => dispatch({ type: 'CREATE_DRAFT', payload: r }), []),
+    createDraft: useCallback((r, actorRoles) => dispatch({ type: 'CREATE_DRAFT', payload: { revision: r, actorRoles } }), []),
     updateDraft: useCallback((r) => dispatch({ type: 'UPDATE_DRAFT', payload: r }), []),
     withdrawDraft: useCallback((id) => dispatch({ type: 'WITHDRAW_DRAFT', payload: id }), []),
     submitForApproval,
