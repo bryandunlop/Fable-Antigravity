@@ -27,7 +27,7 @@ import { eventStore } from '../../notifications/events';
 
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
-export const DATA_VERSION = '2026-07-11-blocks-v1';
+export const DATA_VERSION = '2026-07-14-safety-reads-v1';
 /** Set once the legacy 'bulletins-state' store has been imported — a later
  * re-seed must never resurrect stale pre-migration bulletins (C5). */
 export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';

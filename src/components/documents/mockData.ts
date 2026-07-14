@@ -113,6 +113,20 @@ After an overnight cold-soak below −15°C, the APU can hang between 35–45% N
 - Log every hung start in the tech log with OAT — Maintenance is tracking a possible fuel-control trend with Gulfstream.
 - GPU-assisted starts mask the symptom; note on the work order if a GPU was used.`;
 
+const SMS_CONTENT = `# SMS Manual — Revision G
+
+## Purpose
+The Safety Management System (SMS) manual defines how the department identifies hazards, reports safety concerns, and manages operational risk across flight, cabin, and maintenance operations.
+
+## §4.3 Fatigue Reporting (revised)
+Any crew member who is too fatigued to safely perform a duty period must file a fatigue report before that period. Reports route directly to the Safety Manager and carry no penalty — the company's just-culture policy fully supports the call.
+
+## Appendix C — De-Ice Hold-Over Table (replaced)
+The hold-over time table has been replaced in full this revision. Discard any printed copy of the previous table and use only the Rev G table when determining hold-over limits.
+
+## Acknowledgement
+All crew must read and initial Revision G before their next duty period.`;
+
 // ── SOP-001: two revisions — r1 superseded, r2 published (signature-level ack) ──
 const sop1r1: DocRevision = {
   id: 'SOP-001-r1',
@@ -194,6 +208,49 @@ const gom3r1: DocRevision = {
   mockChecksum: checksumForSections(sectionsFromMarkdown(GOM3_CONTENT, 'GOM-3')),
   publishedAtUtc: daysFromNow(-30) + 'T12:00:00.000Z',
 };
+
+// ── SMS Manual Rev G: published, initials-level, crew-wide required read (TL-6 / D29).
+//    'manual' class → /documents reader route → DocReader/AckPanel (the verified ack path). ──
+const gomSmsR1: DocRevision = {
+  id: 'GOM-SMS-r1',
+  docId: 'GOM-SMS',
+  revision: 'G',
+  status: 'published',
+  sections: sectionsFromMarkdown(SMS_CONTENT, 'GOM-SMS'),
+  changeSummary: 'Rev G: fatigue-reporting flow (§4.3) updated; de-ice hold-over table replaced (Appendix C).',
+  effectiveDate: daysFromNow(-4),
+  authorUserId: 'role:document-manager',
+  authorName: 'Document Manager',
+  requireAcknowledgment: true,
+  ackLevel: 'initials',
+  ackDueDate: daysFromNow(3),
+  mockChecksum: checksumForSections(sectionsFromMarkdown(SMS_CONTENT, 'GOM-SMS')),
+  publishedAtUtc: daysFromNow(-4) + 'T12:00:00.000Z',
+};
+
+const gomSmsDoc: Doc = {
+  id: 'GOM-SMS',
+  classId: 'manual',
+  title: 'SMS Manual — Revision G',
+  category: 'General Operations',
+  roles: ['pilot', 'inflight', 'maintenance', 'lead', 'admin'],
+  ownerUserId: 'role:document-manager',
+  ownerName: 'Document Manager',
+  tags: ['sms', 'safety', 'manual'],
+  isPinned: false,
+  isArchived: false,
+  reviewCycleDays: 365,
+  nextReviewDate: daysFromNow(300),
+  createdDate: '2024-01-15',
+};
+
+/** The safety-specific required read (TL-6 / D29). Exported so the store
+ * migration can inject it into stores created before it was seeded — new seed
+ * content otherwise reaches only a fresh install (loadInitialState spreads a
+ * persisted state over the seeds). */
+export function safetyReadSeed(): { doc: Doc; rev: DocRevision } {
+  return { doc: gomSmsDoc, rev: gomSmsR1 };
+}
 
 // ── Tribal knowledge (curator direct-published, no ack requirement) ──
 const tk1r1: DocRevision = {
@@ -283,6 +340,7 @@ const SEED_DOCS: Doc[] = [
     nextReviewDate: daysFromNow(-9), // overdue for periodic review
     createdDate: '2024-05-01',
   },
+  gomSmsDoc,
   {
     id: 'TK-001',
     classId: 'tribal-knowledge',
@@ -315,7 +373,7 @@ const SEED_DOCS: Doc[] = [
   },
 ];
 
-const SEED_REVISIONS: DocRevision[] = [sop1r1, sop1r2, sop2r1, gom3r1, tk1r1, tk2r1];
+const SEED_REVISIONS: DocRevision[] = [sop1r1, sop1r2, sop2r1, gom3r1, gomSmsR1, tk1r1, tk2r1];
 
 // Seeded signature-level ack on SOP-001 r2 from the Lead reader (partial compliance;
 // the pilot login still owes the signature ceremony — the demo moment).
