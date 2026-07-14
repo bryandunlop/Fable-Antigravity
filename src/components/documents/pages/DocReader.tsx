@@ -23,16 +23,23 @@ import { RevisionTimeline } from '../components/RevisionTimeline';
 import { ReviewPanel } from '../components/ReviewPanel';
 import { BlockSuggestGutter } from '../components/BlockSuggestGutter';
 import { InlineSuggestComposer } from '../components/InlineSuggestComposer';
+import { InlineSuggestionThread } from '../components/InlineSuggestionThread';
 import { openSuggestionsByBlock, canSeeSuggestion } from '../engine/suggestions';
 import { identityFor } from '../DocumentsContext';
+import {
+  IDLE_ACCEPT_FLOW, beginAccept, acceptFlowOnPersisted, acceptFlowOnCancelled, acceptPrefill, type AcceptFlow,
+} from '../engine/acceptFlow';
+import type { DocSuggestion } from '../types';
+import { toast } from 'sonner';
 
 export function DocReader({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { docId } = useParams<{ docId: string }>();
-  const { state } = useDocuments();
+  const { state, resolveSuggestion } = useDocuments();
   const [editor, setEditor] = useState<EditorMode | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [showChanges, setShowChanges] = useState(true);
   const [activeBlock, setActiveBlock] = useState<{ id: string; mode: 'compose' | 'thread' } | null>(null);
+  const [acceptFlow, setAcceptFlow] = useState<AcceptFlow>(IDLE_ACCEPT_FLOW);
   const articleRef = useRef<HTMLElement>(null);
   const changeIdxRef = useRef(-1);
 
@@ -76,6 +83,25 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const priorRevisions = allRevs.filter((r) => r.id !== headerRev?.id && r.status === 'superseded');
   const showChangeSummary = rev && rev.changeSummary.trim() && priorRevisions.length > 0;
 
+  // Accepting a suggestion opens a pre-filled draft revision; the decision is only
+  // recorded once that draft actually persists (acceptFlow — the C4 invariant).
+  const acceptSuggestion = (s: DocSuggestion) => {
+    const baseRev = currentRevision(doc.id, state.revisions);
+    if (!baseRev) { toast.error('No published revision to revise — the suggestion stays open.'); return; }
+    setAcceptFlow(beginAccept(s.id));
+    setEditor({ kind: 'revise', doc, baseRev, prefill: acceptPrefill(s) });
+    setActiveBlock(null);
+  };
+
+  const onEditorPersisted = () => {
+    const { resolveSuggestionId, flow } = acceptFlowOnPersisted(acceptFlow);
+    setAcceptFlow(flow);
+    if (resolveSuggestionId) {
+      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole);
+      toast.success('Suggestion accepted — draft created.');
+    }
+  };
+
   // Inline suggestions: hover-to-suggest on the right gutter (any reader); pins on
   // blocks with open suggestions visible to owner/managers/author (spec S-1).
   const renderBlockGutter = rev
@@ -92,6 +118,17 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
           >
             {active && activeBlock?.mode === 'compose' && (
               <InlineSuggestComposer doc={doc} rev={rev} blockId={blockId} userRole={userRole} onDone={() => setActiveBlock(null)} />
+            )}
+            {active && activeBlock?.mode === 'thread' && visibleOpen.length > 0 && (
+              <InlineSuggestionThread
+                suggestions={visibleOpen}
+                doc={doc}
+                rev={rev}
+                userRole={userRole}
+                canManage={manager || author}
+                onAccept={acceptSuggestion}
+                onClose={() => setActiveBlock(null)}
+              />
             )}
           </BlockSuggestGutter>
         );
@@ -200,7 +237,8 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
       {editor && (
         <DocEditorDialog
           open={!!editor}
-          onOpenChange={(o) => { if (!o) setEditor(null); }}
+          onOpenChange={(o) => { if (!o) { setEditor(null); setAcceptFlow(acceptFlowOnCancelled(acceptFlow).flow); } }}
+          onPersisted={onEditorPersisted}
           mode={editor}
           userRole={userRole}
           additionalRoles={additionalRoles}
