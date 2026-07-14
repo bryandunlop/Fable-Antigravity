@@ -28,6 +28,7 @@ export interface UpcomingItem {
   workCardId?: string;        // open card already covering this item
   workCardNumber?: string;
   linkedDeferralId?: string;  // deferral rows deep-link to the aircraft deferrals tab
+  governingTimezone?: string; // D24: DEFERRAL (MEL repair-clock) rows carry the deferral's governing zone for display
 }
 
 export interface UpcomingBoard {
@@ -105,6 +106,7 @@ export function buildUpcomingBoard(
         ataChapter: defect?.ataChapter, category: `MEL ${d.category}`,
         bucket, dueDateUtc: d.repairDueDateUtc, dueInDays, dueHoursRemaining, grounding: expired,
         workCardId: card?.id, workCardNumber: card?.cardNumber, linkedDeferralId: d.id,
+        governingTimezone: d.governingTimezone,
       });
     }
 

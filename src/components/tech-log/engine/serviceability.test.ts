@@ -20,6 +20,7 @@ function deferral(p: Partial<Deferral> = {}): Deferral {
   return {
     id: 'df1', defectId: 'd1', aircraftId: 'ac1', melItemId: 'm', governingMmelRevision: 'Rev 1',
     governingEffectiveDate: NOW, category: 'C', dayOfDiscoveryUtc: NOW, clockStartDateUtc: NOW,
+    governingTimezone: 'America/New_York',
     repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10, placardRequired: false,
     mProcedureRequired: false, extensionUsed: false, riiRequired: false, melReviewAcknowledged: true,
     signedByOid: 'u', signatureId: 's', status: 'ACTIVE', ...p,

@@ -45,17 +45,6 @@ export const INTENT = {
     'I am escalating this watch-list item: it is reassessed as airworthiness-affecting and returns to open grounding status pending deferral or rectification.',
 } as const;
 
-// Standing maintenance preflight checklist (maintenance ticks these, then releases the briefing).
-export const DEFAULT_PREFLIGHT_CHECKLIST: { text: string; mandatory?: boolean }[] = [
-  { text: 'Walk-around / general external condition', mandatory: true },
-  { text: 'Tires, brakes & landing gear condition', mandatory: true },
-  { text: 'Engine & APU oil levels serviced', mandatory: true },
-  { text: 'Hydraulic & fluid levels serviced' },
-  { text: 'No new leaks or damage noted', mandatory: true },
-  { text: 'Required placards in place (active MEL items)', mandatory: true },
-  { text: 'Cabin & galley serviceable' },
-];
-
 // Function -> regulation traceability (mirrors docs/COMPLIANCE_TRACEABILITY.md §1) for the Audit > Compliance view.
 export const CFR_MATRIX: { capability: string; reg: string }[] = [
   { capability: 'Journey/flight log (OOOI, hours, cycles)', reg: '14 CFR 91.417(b); PIC airworthiness 91.7(b)/91.403(a)' },

@@ -8,11 +8,13 @@ import { isDeferralExpired } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
 import { campForecast } from '../integration/campClient';
 import { deferralsRequiringAck, canAcceptDispatch } from '../engine/handover';
-import { INTENT, DEFAULT_PREFLIGHT_CHECKLIST } from '../constants';
+import { INTENT } from '../constants';
+import { latestPublishedTemplate, isReleaseGated, buildInitialEntries } from '../engine/checklist';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { newId } from '../util/id';
 import type { Aircraft, FlightBriefing, Signature } from '../types';
 import { SignCeremonyDialog } from './SignCeremonyDialog';
+import { ChecklistRunner } from './checklist/ChecklistRunner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -55,22 +57,37 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
     .filter(i => i.dueDateUtc).sort((a, b) => (a.dueDateUtc ?? '').localeCompare(b.dueDateUtc ?? '')).slice(0, 3);
   const melOf = (id: string) => state.melItems.find(m => m.id === id);
 
+  const template = latestPublishedTemplate(state.checklistTemplates, aircraft.type, 'PREFLIGHT');
+  const instance = state.checklistInstances.find(i => i.id === briefing?.checklistInstanceId);
+  // Version-pinned template the instance was actually built from — NOT the latest published template,
+  // which may have drifted (a new version can be published while this briefing sits in DRAFT).
+  const instanceTemplate = instance && state.checklistTemplates.find(t => t.id === instance.templateId && t.version === instance.templateVersion);
+
   const createDraft = () => {
+    if (!template) return toast.error(`No published preflight checklist for ${aircraft.type} yet — ask a maintenance admin to publish one in Admin > Checklists.`);
+    const instanceId = newId('cli');
     const b: FlightBriefing = {
       id: newId('brief'), aircraftId: aircraft.id, preparedByOid: user.oid, createdAtUtc: new Date().toISOString(), status: 'DRAFT',
-      checklist: DEFAULT_PREFLIGHT_CHECKLIST.map((c, i) => ({ id: newId(`brc${i}`), text: c.text, mandatory: c.mandatory, done: false, source: 'TEMPLATE' as const })),
+      checklistInstanceId: instanceId,
     };
+    dispatch({
+      type: 'ADD_CHECKLIST_INSTANCE',
+      payload: {
+        id: instanceId, aircraftId: aircraft.id, phase: 'PREFLIGHT', templateId: template.id, templateVersion: template.version,
+        briefingId: b.id, entries: buildInitialEntries(template),
+        createdAtUtc: new Date().toISOString(),
+      },
+    });
     dispatch({ type: 'ADD_BRIEFING', payload: b });
     toast.success('Briefing started — complete the checklist, then release for flight.');
   };
 
   const patch = (b: FlightBriefing) => dispatch({ type: 'EDIT_BRIEFING', payload: b });
-  const toggleItem = (b: FlightBriefing, itemId: string) =>
-    patch({ ...b, checklist: b.checklist.map(c => (c.id === itemId ? { ...c, done: !c.done } : c)) });
 
   const beginRelease = (b: FlightBriefing) => {
-    const missing = b.checklist.filter(c => c.mandatory && !c.done);
-    if (missing.length) return toast.error(`Complete the mandatory checklist items first (${missing.length} remaining).`);
+    if (!instanceTemplate || !instance) return;
+    const gate = isReleaseGated(instance, instanceTemplate);
+    if (!gate.ok) return toast.error(`Complete the required checklist items first (${gate.missing.length} remaining).`);
     setPendingSigId(newId('sig'));
     setRelOpen(true);
   };
@@ -78,6 +95,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
     const nowIso = new Date().toISOString();
     dispatch({ type: 'ADD_SIGNATURE', payload: sig });
     dispatch({ type: 'EDIT_BRIEFING', payload: { ...b, status: 'RELEASED', serviceabilityAtRelease: sv.status, releasedAtUtc: nowIso, releaseSignatureId: sig.id } });
+    if (instance) dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: { ...instance, signatureId: sig.id } });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'BRIEFING_RELEASED', entityType: 'FlightBriefing', entityId: b.id, atUtc: nowIso, summary: `${aircraft.tailNumber} flight briefing released to crew` } });
     toast.success(`Briefing released — the crew has been notified.`);
   };
@@ -106,7 +124,14 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
         { heading: 'Active MEL deferrals', body: deferrals.length ? deferrals.map(d => `MEL ${melOf(d.melItemId)?.subItemNumber ?? '—'} (Cat ${d.category}) — ${d.restrictionText ?? melOf(d.melItemId)?.title ?? ''}`).join('\n') : 'None' },
         { heading: 'Open defects', body: openDefects.length ? openDefects.map(d => `ATA ${d.ataChapter} — ${d.description}`).join('\n') : 'None' },
         { heading: 'Coming due (CAMP)', body: comingDue.length ? comingDue.map(i => `${i.description} — ${i.dueDateUtc ? new Date(i.dueDateUtc).toLocaleDateString() : ''}`).join('\n') : 'None' },
-        { heading: 'Preflight checklist', body: b.checklist.map(c => `${c.done ? '☑' : '☐'} ${c.text}`).join('\n') },
+        { heading: 'Preflight checklist', body: (() => {
+          const t = state.checklistTemplates.find(t => t.id === instance?.templateId && t.version === instance?.templateVersion);
+          if (!t || !instance) return '—';
+          return t.sections.flatMap(s => s.items).map(def => {
+            const e = instance.entries.find(en => en.itemDefId === def.id);
+            return `${e?.state === 'DONE' || e?.state === 'NA' ? '☑' : '☐'} ${def.label}`;
+          }).join('\n');
+        })() },
       ],
       signatures: [relSig, ackSig].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.mockContentHash, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') })),
     });
@@ -136,19 +161,14 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
     if (!isMaint) {
       return <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Maintenance is preparing the flight briefing — you'll be notified when it's released.</CardContent></Card>;
     }
-    const doneCount = briefing.checklist.filter(c => c.done).length;
     return (
       <div className="space-y-4">
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardCheck className="h-4 w-4" /> Preflight checklist ({doneCount}/{briefing.checklist.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {briefing.checklist.map(c => (
-              <label key={c.id} className={`flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm ${c.done ? 'bg-[var(--gfo-success,#00B140)]/5' : ''}`}>
-                <input type="checkbox" className="mt-0.5" checked={c.done} onChange={() => toggleItem(briefing, c.id)} />
-                <span>{c.text}{c.mandatory && <Badge variant="outline" className="ml-2">required</Badge>}{c.source === 'CAMP' && <Badge variant="outline" className="ml-1">CAMP</Badge>}</span>
-              </label>
-            ))}
-            <p className="text-xs text-muted-foreground">Standing template items. In production these can be augmented with the aircraft's CAMP preflight tasks.</p>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardCheck className="h-4 w-4" /> Preflight checklist</CardTitle></CardHeader>
+          <CardContent>
+            {instanceTemplate && instance
+              ? <ChecklistRunner aircraft={aircraft} template={instanceTemplate} instance={instance} onChange={next => dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: next })} />
+              : <p className="text-sm text-muted-foreground">No checklist instance found for this briefing.</p>}
           </CardContent>
         </Card>
         <Card>
@@ -292,7 +312,15 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
           <div>
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preflight checklist</div>
             <div className="grid grid-cols-1 gap-0.5 md:grid-cols-2">
-              {b.checklist.map(c => <div key={c.id} className="text-xs">{c.done ? '☑' : '☐'} {c.text}</div>)}
+              {(() => {
+                const inst = state.checklistInstances.find(i => i.id === b.checklistInstanceId);
+                const t = inst && state.checklistTemplates.find(t => t.id === inst.templateId && t.version === inst.templateVersion);
+                if (!inst || !t) return <div className="text-muted-foreground">—</div>;
+                return t.sections.flatMap(s => s.items).map(def => {
+                  const e = inst.entries.find(en => en.itemDefId === def.id);
+                  return <div key={def.id} className="text-xs">{e?.state === 'DONE' || e?.state === 'NA' ? '☑' : '☐'} {def.label}</div>;
+                });
+              })()}
             </div>
           </div>
 

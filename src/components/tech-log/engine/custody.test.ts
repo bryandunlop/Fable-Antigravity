@@ -5,11 +5,11 @@ import type { FlightBriefing, Postflight } from '../types';
 const AC = 'ac1';
 const brief = (p: Partial<FlightBriefing> = {}): FlightBriefing => ({
   id: 'brief1', aircraftId: AC, preparedByOid: 'm', createdAtUtc: '2026-06-20T00:00:00Z',
-  status: 'DRAFT', checklist: [], ...p,
+  status: 'DRAFT', ...p,
 });
 const postflight = (p: Partial<Postflight> = {}): Postflight => ({
   id: 'pf1', aircraftId: AC, performedByOid: 'm', performedAtUtc: '2026-06-22T00:00:00Z',
-  checklist: [], gatheredDefectIds: [], signatureId: 's', ...p,
+  gatheredDefectIds: [], signatureId: 's', ...p,
 });
 
 describe('deriveCustody §E', () => {

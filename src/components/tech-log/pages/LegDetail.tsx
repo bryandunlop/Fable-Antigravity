@@ -13,7 +13,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { newId } from '../util/id';
 import { toast } from 'sonner';
-import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg, saveFratDraftOnLeg } from '../preflightActions';
+import { completeFratOnLeg, markAirportReviewedOnLeg, submitFuelOnLeg, saveFratDraftOnLeg, setPlannedFuelOnLeg, markFuelFinalOnLeg } from '../preflightActions';
 import { extractFratSelections } from '../util/fratDraft';
 
 const zulu = (utc?: string) => (utc ? `${utc.slice(11, 16)}Z` : '—');
@@ -41,6 +41,7 @@ export default function LegDetail() {
 
   const [fratOpen, setFratOpen] = useState(false);
   const [fuelLbs, setFuelLbs] = useState('14500');
+  const [plannedFuel, setPlannedFuel] = useState(String(leg.plannedFuelLb ?? ''));
 
   const completeFrat = (data: { totalScore?: number }) => {
     completeFratOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid, totalScore: data.totalScore });
@@ -65,6 +66,18 @@ export default function LegDetail() {
     const res = submitFuelOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid, lbs: Number(fuelLbs), nowMs: Date.now() });
     if (!res.ok) { toast.error(res.error); return; }
     toast.success(`Fuel submitted to ${leg.departureIcao} fuel farm`);
+  };
+
+  const savePlannedFuel = () => {
+    const lbs = Number(plannedFuel);
+    if (!Number.isFinite(lbs) || lbs <= 0) return toast.error('Enter a valid fuel quantity');
+    setPlannedFuelOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid, lbs });
+    toast.success('Planned fuel saved');
+  };
+
+  const markFinal = () => {
+    markFuelFinalOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid, nowUtc: new Date().toISOString() });
+    toast.success('Fuel plan marked final — maintenance can now load to this on postflight');
   };
 
   return (
@@ -120,6 +133,25 @@ export default function LegDetail() {
                 onClose={() => setFratOpen(false)}
                 onSave={(data: any) => { if (data.status === 'submitted') completeFrat(data); else if (data.status === 'draft') saveFratDraft(data); }}
               />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Fuel plan for the next departure — separate from the home-base fuel-farm order below */}
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Fuel plan for this leg</div>
+          {leg.fuelFinalizedAtUtc ? (
+            <div className="mt-1 text-sm">
+              Finalized · <span className="font-mono">{leg.plannedFuelLb?.toLocaleString()} lb</span> · {new Date(leg.fuelFinalizedAtUtc).toLocaleString()}
+            </div>
+          ) : (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Input value={plannedFuel} onChange={e => setPlannedFuel(e.target.value)} className="w-32" inputMode="numeric" aria-label="Planned fuel pounds" />
+              <span className="text-sm text-muted-foreground">lb</span>
+              <Button size="sm" variant="outline" onClick={savePlannedFuel}>Save</Button>
+              <Button size="sm" onClick={markFinal} disabled={!leg.plannedFuelLb}>Mark final</Button>
             </div>
           )}
         </CardContent>

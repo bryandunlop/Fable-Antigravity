@@ -16,6 +16,11 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
 
   const navItems = mobileNavItemsForRole(userRole);
   const domains = domainsForRole(userRole, additionalRoles);
+  // Same threshold as the desktop sidebar (Navigation.tsx) — only dense roles
+  // (in practice, just admin) are worth chunking into labeled sections.
+  const totalItems = domains.reduce((sum, d) => sum + d.primary.length + d.more.length, 0);
+  const showDomainLabels = totalItems > 30;
+  const flatEntries = domains.flatMap((d) => [...d.primary, ...d.more]);
 
   // Don't show on desktop
   return (
@@ -61,27 +66,46 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
             <SheetTitle>All pages</SheetTitle>
           </SheetHeader>
           <div className="mt-2 space-y-4">
-            {domains.map((d) => (
-              <div key={d.domain}>
-                <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{d.label}</p>
-                <div className="grid grid-cols-1 gap-0.5">
-                  {[...d.primary, ...d.more].map((e) => {
-                    const Icon = e.icon ?? FileText;
-                    return (
-                      <Link
-                        key={`${e.domain}:${e.label}`}
-                        to={e.href ?? e.path}
-                        onClick={() => setMoreOpen(false)}
-                        className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-accent"
-                      >
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                        {e.label}
-                      </Link>
-                    );
-                  })}
+            {showDomainLabels ? (
+              domains.map((d) => (
+                <div key={d.domain}>
+                  <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{d.label}</p>
+                  <div className="grid grid-cols-1 gap-0.5">
+                    {[...d.primary, ...d.more].map((e) => {
+                      const Icon = e.icon ?? FileText;
+                      return (
+                        <Link
+                          key={`${e.domain}:${e.label}`}
+                          to={e.href ?? e.path}
+                          onClick={() => setMoreOpen(false)}
+                          className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-accent"
+                        >
+                          <Icon className="w-4 h-4 text-muted-foreground" />
+                          {e.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="grid grid-cols-1 gap-0.5">
+                {flatEntries.map((e) => {
+                  const Icon = e.icon ?? FileText;
+                  return (
+                    <Link
+                      key={`${e.domain}:${e.label}`}
+                      to={e.href ?? e.path}
+                      onClick={() => setMoreOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-accent"
+                    >
+                      <Icon className="w-4 h-4 text-muted-foreground" />
+                      {e.label}
+                    </Link>
+                  );
+                })}
               </div>
-            ))}
+            )}
           </div>
         </SheetContent>
       </Sheet>

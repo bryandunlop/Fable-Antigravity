@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Check, UserCircle, Bell, X } from 'lucide-react';
 import { DemoBanner } from './DemoBanner';
 import { ResetDemoButton } from './ResetDemoButton';
-import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
+import type { DisplayZoneMode } from '../util/displayZone';
 import { deriveServiceability } from '../engine/serviceability';
 import { buildWorkQueue } from '../engine/workqueue';
 import { buildNotifications, type Notification } from '../engine/notifications';
@@ -60,6 +61,7 @@ export function TechLogShell({
           >
             <Check className="h-3 w-3" /> Synced
           </span>
+          <DisplayZoneToggle />
           <span
             className="hidden items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground sm:inline-flex"
             title="Identity comes from how you logged in (role-based)"
@@ -127,6 +129,41 @@ const DOT: Record<string, string> = {
   warn: 'bg-[var(--gfo-warning,#F1B434)]',
   info: 'bg-muted-foreground',
 };
+
+// D24: lens for regulatory times (MEL repair clocks / due dates). Display only — never changes when
+// an item is actually due (that is a UTC-instant comparison). Default ET = each deferral's governing zone.
+const ZONE_OPTS: { mode: DisplayZoneMode; label: string; title: string }[] = [
+  { mode: 'GOVERNING', label: 'ET', title: 'Show regulatory times in each deferral’s governing zone (Eastern by default)' },
+  { mode: 'UTC', label: 'UTC', title: 'Show regulatory times in UTC' },
+  { mode: 'LOCAL', label: 'Local', title: 'Show regulatory times in this device’s local zone' },
+];
+function DisplayZoneToggle() {
+  const { displayZone, setDisplayZone } = useDisplayZone();
+  return (
+    <span
+      className="hidden overflow-hidden rounded-md border text-xs sm:inline-flex"
+      role="group"
+      aria-label="Display timezone for regulatory times"
+      title="Time zone for MEL repair-clock and due dates (display only)"
+    >
+      {ZONE_OPTS.map(o => (
+        <button
+          key={o.mode}
+          type="button"
+          onClick={() => setDisplayZone(o.mode)}
+          title={o.title}
+          aria-pressed={displayZone === o.mode}
+          className={cn(
+            'px-2 py-1 transition-colors',
+            displayZone === o.mode ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:bg-accent/50',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </span>
+  );
+}
 
 function NotificationsBell({
   notifications,

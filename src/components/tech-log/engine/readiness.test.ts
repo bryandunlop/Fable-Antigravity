@@ -18,10 +18,10 @@ function mel(p: Partial<MelItem> = {}): MelItem {
   return { id: 'm1', aircraftType: 'G650ER', mmelRevision: 'Rev 1', effectiveDate: NOW, approvalState: 'APPROVED', ataReference: '24', itemNumber: '24-01', subItemNumber: '24-01-01', title: 'x', category: 'C', numberInstalled: null, numberRequired: null, ...p };
 }
 function ackDeferral(p: Partial<Deferral> = {}): Deferral {
-  return { id: 'df1', defectId: 'd1', aircraftId: 'ac1', melItemId: 'm1', governingMmelRevision: 'Rev 1', governingEffectiveDate: NOW, category: 'C', dayOfDiscoveryUtc: NOW, clockStartDateUtc: NOW, repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10, restrictionText: 'Day VMC only', placardRequired: false, mProcedureRequired: false, extensionUsed: false, riiRequired: false, melReviewAcknowledged: true, signedByOid: 'u', signatureId: 's', status: 'ACTIVE', ...p };
+  return { id: 'df1', defectId: 'd1', aircraftId: 'ac1', melItemId: 'm1', governingMmelRevision: 'Rev 1', governingEffectiveDate: NOW, category: 'C', dayOfDiscoveryUtc: NOW, clockStartDateUtc: NOW, governingTimezone: 'America/New_York', repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10, restrictionText: 'Day VMC only', placardRequired: false, mProcedureRequired: false, extensionUsed: false, riiRequired: false, melReviewAcknowledged: true, signedByOid: 'u', signatureId: 's', status: 'ACTIVE', ...p };
 }
 function briefing(p: Partial<FlightBriefing> = {}): FlightBriefing {
-  return { id: 'brief1', aircraftId: 'ac1', preparedByOid: 'm', createdAtUtc: NOW, status: 'ACKNOWLEDGED', checklist: [], ...p };
+  return { id: 'brief1', aircraftId: 'ac1', preparedByOid: 'm', createdAtUtc: NOW, status: 'ACKNOWLEDGED', ...p };
 }
 const clean = { aircraft: [ac], defects: [], deferrals: [] };
 

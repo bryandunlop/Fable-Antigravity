@@ -221,7 +221,6 @@ describe('summarizeTripLifecycle', () => {
       aircraftId: 'ac-n5pg',
       performedByOid: 'USR002',
       performedAtUtc: '2026-06-30T12:00:00Z',
-      checklist: [],
       gatheredDefectIds: [],
       signatureId: 'sig-2',
       ...overrides,
