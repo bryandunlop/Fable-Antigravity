@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users, GitCompareArrows, ChevronUp, ChevronDown, Printer } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users, GitCompareArrows, ChevronUp, ChevronDown, Printer, FileText } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
@@ -32,6 +32,7 @@ import {
 import type { DocSuggestion } from '../types';
 import { toast } from 'sonner';
 import { printDocument } from '../util/printDocument';
+import { buildReviewDocx } from '../engine/docxExport';
 
 export function DocReader({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { docId } = useParams<{ docId: string }>();
@@ -171,6 +172,28 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               onClick={() => { if (!printDocument(doc, rev)) toast.error('Allow pop-ups to export the PDF.'); }}
             >
               <Printer className="mr-1.5 h-4 w-4" /> Export PDF
+            </Button>
+          )}
+          {rev && (manager || author) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const blob = await buildReviewDocx(doc, rev);
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${doc.id}-rev${rev.revision}-review.docx`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('Review .docx exported — edit with tracked changes on.');
+                } catch {
+                  toast.error('Could not generate the .docx export.');
+                }
+              }}
+            >
+              <FileText className="mr-1.5 h-4 w-4" /> Export .docx
             </Button>
           )}
           {rev && (
