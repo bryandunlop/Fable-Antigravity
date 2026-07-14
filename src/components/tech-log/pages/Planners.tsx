@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
-import { transitionProject, prepReadiness, buildPlannerCalendar, aircraftAwayConflicts, type PlannerCampWo } from '../engine/planner';
+import { transitionProject, prepReadiness, buildPlannerCalendar, aircraftAwayConflicts, plannerMonthAnchor, PLANNER_ZONE, type PlannerCampWo } from '../engine/planner';
 import { newId } from '../util/id';
 import type { MaintenanceProject, ProjectPauseReason, ProjectStatus } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
@@ -47,7 +47,7 @@ export default function Planners() {
   const [showVacations, setShowVacations] = useState(true);
   const [showFlights, setShowFlights] = useState(true);
   const [showCampWos, setShowCampWos] = useState(true);
-  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString(); });
+  const [month, setMonth] = useState(() => plannerMonthAnchor(new Date().toISOString())); // first-of-month in the operator zone (D24/TL-4)
 
   // pause dialog
   const [pauseFor, setPauseFor] = useState<MaintenanceProject | null>(null);
@@ -125,8 +125,8 @@ export default function Planners() {
     }),
     [month, projects, state.trips, state.techVacations, tailFilter, campWos, showCampWos],
   );
-  const monthLabel = new Date(month).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  const shiftMonth = (dir: number) => { const d = new Date(month); setMonth(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + dir, 1)).toISOString()); };
+  const monthLabel = new Date(month).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: PLANNER_ZONE });
+  const shiftMonth = (dir: number) => setMonth(plannerMonthAnchor(month, dir));
 
   return (
     <TechLogShell
@@ -202,7 +202,7 @@ export default function Planners() {
                                 {p.campWoRefs?.map(r => <Badge key={r} variant="outline">CAMP {r}</Badge>)}
                               </div>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                {new Date(p.plannedStartUtc).toLocaleDateString(undefined, { timeZone: 'UTC' })} → {new Date(p.plannedEndUtc).toLocaleDateString(undefined, { timeZone: 'UTC' })}
+                                {new Date(p.plannedStartUtc).toLocaleDateString(undefined, { timeZone: PLANNER_ZONE })} → {new Date(p.plannedEndUtc).toLocaleDateString(undefined, { timeZone: PLANNER_ZONE })}
                                 {p.description ? ` · ${p.description}` : ''}
                               </p>
                               {p.pauseNote && <p className="mt-1 border-l-2 pl-2 text-xs italic text-muted-foreground">{p.pauseNote}</p>}
@@ -288,7 +288,7 @@ export default function Planners() {
                     </div>
                   ))}
                   {showFlights && day.legs.map((l, i) => (
-                    <div key={i} title={`${l.tripNumber} · ${new Date(l.atUtc).toLocaleTimeString()}`} className="flex items-center gap-1 truncate rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
+                    <div key={i} title={`${l.tripNumber} · ${new Date(l.atUtc).toLocaleTimeString(undefined, { timeZone: PLANNER_ZONE, hour: '2-digit', minute: '2-digit' })} ET`} className="flex items-center gap-1 truncate rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
                       <Plane className="h-2.5 w-2.5 shrink-0" /> {tailOf(l.aircraftId)} {l.label}
                     </div>
                   ))}

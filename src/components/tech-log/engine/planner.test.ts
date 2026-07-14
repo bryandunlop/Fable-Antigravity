@@ -85,8 +85,11 @@ const vacations: TechVacation[] = [
   { id: 'v1', techOid: 'm1', startUtc: '2026-08-09T00:00:00.000Z', endUtc: '2026-08-11T23:59:59.000Z' },
 ];
 
-describe('planning calendar (month grid + vacation/flight overlays)', () => {
-  const weeks = buildPlannerCalendar('2026-08-01T00:00:00.000Z', { projects: [project()], trips, techVacations: vacations });
+// TL-4 / D24: the planner month grid is anchored to the operator zone (America/New_York), so a
+// project/vacation/leg lands on its EASTERN calendar day. Anchors are first-of-month in Eastern
+// (…T04:00Z = Aug 1 00:00 EDT). Items whose UTC time is a UTC-midnight bleed into the prior Eastern day.
+describe('planning calendar (month grid + vacation/flight overlays) — Eastern-anchored', () => {
+  const weeks = buildPlannerCalendar('2026-08-01T04:00:00.000Z', { projects: [project()], trips, techVacations: vacations });
 
   it('builds full Sunday-start weeks covering the month', () => {
     expect(weeks.length).toBe(6);
@@ -100,7 +103,8 @@ describe('planning calendar (month grid + vacation/flight overlays)', () => {
   it('a project bar spans exactly its planned window', () => {
     const days = weeks.flat();
     const withPrj = days.filter(d => d.projects.some(p => p.id === 'prj-1')).map(d => d.iso);
-    expect(withPrj).toEqual(['2026-08-10', '2026-08-11', '2026-08-12']);
+    // plannedStart 2026-08-10T00:00Z = Aug 9 20:00 EDT -> Eastern day Aug 9 (the D24 fix).
+    expect(withPrj).toEqual(['2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12']);
   });
 
   it('a flight leg lands on its departure day (myairops overlay)', () => {
@@ -115,13 +119,14 @@ describe('planning calendar (month grid + vacation/flight overlays)', () => {
   it('a vacation range shades each covered day', () => {
     const days = weeks.flat();
     const off = days.filter(d => d.vacations.length > 0).map(d => d.iso);
-    expect(off).toEqual(['2026-08-09', '2026-08-10', '2026-08-11']);
+    // startUtc 2026-08-09T00:00Z = Aug 8 20:00 EDT -> covers Eastern day Aug 8 too.
+    expect(off).toEqual(['2026-08-08', '2026-08-09', '2026-08-10', '2026-08-11']);
   });
 });
 
 describe('CAMP WO overlay (scheduled in/out windows on the planning calendar)', () => {
   it('a mirrored CAMP WO renders across its scheduled window with service-center context', () => {
-    const weeks = buildPlannerCalendar('2026-08-01T00:00:00.000Z', {
+    const weeks = buildPlannerCalendar('2026-08-01T04:00:00.000Z', {
       projects: [], trips: [], techVacations: [],
       campWos: [{ woNumber: 'WO-24-0188', aircraftId: 'ac-n5pg', title: 'APU generator GCU inspection', startUtc: '2026-08-18T13:00:00.000Z', endUtc: '2026-08-19T22:00:00.000Z', icao: 'KSAV', serviceCenter: 'Gulfstream Savannah' }],
     });
@@ -132,7 +137,7 @@ describe('CAMP WO overlay (scheduled in/out windows on the planning calendar)', 
   });
 
   it('the overlay is optional — calendars built without campWos still work', () => {
-    const weeks = buildPlannerCalendar('2026-08-01T00:00:00.000Z', { projects: [], trips: [], techVacations: [] });
+    const weeks = buildPlannerCalendar('2026-08-01T04:00:00.000Z', { projects: [], trips: [], techVacations: [] });
     expect(weeks.flat().every(d => d.campWos.length === 0)).toBe(true);
   });
 });
