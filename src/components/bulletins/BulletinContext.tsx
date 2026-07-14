@@ -16,8 +16,8 @@ export const LEGACY_STORAGE_KEY = 'bulletins-state';
 
 interface Ctx {
   state: BulletinsState;
-  togglePin: (id: string) => void;
-  toggleArchive: (id: string) => void;
+  togglePin: (id: string, actorRoles: string[]) => void;
+  toggleArchive: (id: string, actorRoles: string[]) => void;
   /** Record a Read-and-Initial for the current user (resolved from their login role). */
   acknowledge: (bulletin: Pick<Bulletin, 'id' | 'version'>, initials: string, userRole: string) => void;
 }

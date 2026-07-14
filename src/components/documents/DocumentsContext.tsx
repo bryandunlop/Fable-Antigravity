@@ -143,8 +143,8 @@ function promote(state: DocumentsState): DocumentsState {
 export type DocumentsAction =
   | { type: 'CREATE_DOC'; payload: { doc: Doc; revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DOC_META'; payload: { doc: Doc; actorUserId: string; actorRoles: string[] } }
-  | { type: 'TOGGLE_PIN'; payload: string }
-  | { type: 'TOGGLE_ARCHIVE'; payload: string }
+  | { type: 'TOGGLE_PIN'; payload: { docId: string; actorRoles: string[] } }
+  | { type: 'TOGGLE_ARCHIVE'; payload: { docId: string; actorRoles: string[] } }
   | { type: 'CREATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DRAFT'; payload: DocRevision }
   | { type: 'WITHDRAW_DRAFT'; payload: { revisionId: string; reason: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string } }
@@ -225,16 +225,30 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       }
       return { ...state, docs: state.docs.map((d) => (d.id === next.id ? next : d)) };
     }
-    case 'TOGGLE_PIN':
+    case 'TOGGLE_PIN': {
+      // C12: pin/archive are library curation — shared with the bulletins surface,
+      // so the manage gate is enforced here in the reducer, not just the UI.
+      const { docId, actorRoles } = action.payload;
+      if (!rolesCanManageDocuments(actorRoles)) {
+        warnNoop('pinning a document requires a document manager');
+        return state;
+      }
       return {
         ...state,
-        docs: state.docs.map((d) => (d.id === action.payload ? { ...d, isPinned: !d.isPinned } : d)),
+        docs: state.docs.map((d) => (d.id === docId ? { ...d, isPinned: !d.isPinned } : d)),
       };
-    case 'TOGGLE_ARCHIVE':
+    }
+    case 'TOGGLE_ARCHIVE': {
+      const { docId, actorRoles } = action.payload;
+      if (!rolesCanManageDocuments(actorRoles)) {
+        warnNoop('archiving a document requires a document manager');
+        return state;
+      }
       return {
         ...state,
-        docs: state.docs.map((d) => (d.id === action.payload ? { ...d, isArchived: !d.isArchived } : d)),
+        docs: state.docs.map((d) => (d.id === docId ? { ...d, isArchived: !d.isArchived } : d)),
       };
+    }
     case 'CREATE_DRAFT': {
       const { revision: rev, actorRoles } = action.payload;
       const parent = state.docs.find((d) => d.id === rev.docId);
@@ -532,8 +546,8 @@ interface Ctx {
   state: DocumentsState;
   createDoc: (doc: Doc, revision: DocRevision, actorRoles: string[]) => void;
   updateDocMeta: (doc: Doc, userRole: string, additionalRoles?: string[]) => void;
-  togglePin: (docId: string) => void;
-  toggleArchive: (docId: string) => void;
+  togglePin: (docId: string, actorRoles: string[]) => void;
+  toggleArchive: (docId: string, actorRoles: string[]) => void;
   createDraft: (revision: DocRevision, actorRoles: string[]) => void;
   updateDraft: (revision: DocRevision) => void;
   withdrawDraft: (revisionId: string, reason: string, userRole: string, additionalRoles?: string[]) => void;
@@ -767,8 +781,8 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
         payload: { doc, actorUserId: userId, actorRoles: [userRole, ...additionalRoles] },
       });
     }, []),
-    togglePin: useCallback((id) => dispatch({ type: 'TOGGLE_PIN', payload: id }), []),
-    toggleArchive: useCallback((id) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: id }), []),
+    togglePin: useCallback((id, actorRoles) => dispatch({ type: 'TOGGLE_PIN', payload: { docId: id, actorRoles } }), []),
+    toggleArchive: useCallback((id, actorRoles) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: { docId: id, actorRoles } }), []),
     createDraft: useCallback((r, actorRoles) => dispatch({ type: 'CREATE_DRAFT', payload: { revision: r, actorRoles } }), []),
     updateDraft: useCallback((r) => dispatch({ type: 'UPDATE_DRAFT', payload: r }), []),
     withdrawDraft: useCallback((revisionId, reason, userRole, additionalRoles = []) => {

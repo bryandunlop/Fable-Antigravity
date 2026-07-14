@@ -311,10 +311,10 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
                       </Button>
                       {canManage && (
                         <>
-                          <Button variant="ghost" size="sm" onClick={() => togglePin(bulletin.id)}>
+                          <Button variant="ghost" size="sm" onClick={() => togglePin(bulletin.id, [userRole])}>
                             <Pin className={`w-4 h-4 ${bulletin.isPinned ? 'text-blue-600' : ''}`} />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => toggleArchive(bulletin.id)}>
+                          <Button variant="ghost" size="sm" onClick={() => toggleArchive(bulletin.id, [userRole])}>
                             <Archive className={`w-4 h-4 ${bulletin.isArchived ? 'text-orange-600' : ''}`} />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => handleEditClick(bulletin)}>
