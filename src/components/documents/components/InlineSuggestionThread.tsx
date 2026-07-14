@@ -11,12 +11,13 @@ import { repliesFor } from '../engine/suggestions';
 /** Inline thread for the open suggestions anchored to one block: proposal +
  * rationale, a short reply thread, and (for owner/managers) Accept→draft / Decline. */
 export function InlineSuggestionThread({
-  suggestions, doc, rev, userRole, canManage, onAccept, onClose,
+  suggestions, doc, rev, userRole, additionalRoles = [], canManage, onAccept, onClose,
 }: {
   suggestions: DocSuggestion[];
   doc: Doc;
   rev: DocRevision;
   userRole: string;
+  additionalRoles?: string[];
   canManage: boolean;
   onAccept: (sug: DocSuggestion) => void; // reuses DocReader's accept→draft flow
   onClose: () => void;
@@ -87,7 +88,7 @@ export function InlineSuggestionThread({
                   variant="destructive"
                   onClick={() => {
                     if (note.trim().length < 5) { toast.error('A decline note is required.'); return; }
-                    resolveSuggestion(s.id, 'declined', note.trim(), userRole);
+                    resolveSuggestion(s.id, 'declined', note.trim(), userRole, additionalRoles);
                     setDeclineFor(null); setNote('');
                     toast.success('Suggestion declined with note.');
                   }}

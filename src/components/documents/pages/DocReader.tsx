@@ -101,7 +101,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
     const { resolveSuggestionId, flow } = acceptFlowOnPersisted(acceptFlow);
     setAcceptFlow(flow);
     if (resolveSuggestionId) {
-      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole);
+      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole, additionalRoles);
       toast.success('Suggestion accepted — draft created.');
     }
   };
@@ -130,6 +130,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
                 doc={doc}
                 rev={rev}
                 userRole={userRole}
+                additionalRoles={additionalRoles}
                 canManage={manager || author}
                 onAccept={acceptSuggestion}
                 onClose={() => setActiveBlock(null)}
@@ -256,7 +257,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
         </GfoPanel>
       )}
 
-      {manager && <ReviewPanel doc={doc} userRole={userRole} />}
+      {manager && <ReviewPanel doc={doc} userRole={userRole} additionalRoles={additionalRoles} />}
 
       {manager && rev && rev.requireAcknowledgment && rev.ackLevel !== 'none' && (
         <GfoPanel title="Read receipts" action={<Users className="h-4 w-4 text-muted-foreground" />}>
@@ -271,7 +272,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
             canManage={manager || author}
             onWithdraw={(revisionId, reason) => {
               const target = allRevs.find((r) => r.id === revisionId);
-              withdrawDraft(revisionId, reason, userRole);
+              withdrawDraft(revisionId, reason, userRole, additionalRoles);
               // C7: tell the approver pool if we pulled something out of their queue.
               if (target?.status === 'pending-approval') {
                 publishWithdrawnEvent(doc, target, identityFor(userRole).userName);

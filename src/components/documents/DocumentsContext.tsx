@@ -519,7 +519,7 @@ interface Ctx {
   toggleArchive: (docId: string) => void;
   createDraft: (revision: DocRevision, actorRoles: string[]) => void;
   updateDraft: (revision: DocRevision) => void;
-  withdrawDraft: (revisionId: string, reason: string, userRole: string) => void;
+  withdrawDraft: (revisionId: string, reason: string, userRole: string, additionalRoles?: string[]) => void;
   submitForApproval: (revisionId: string) => void;
   decideApproval: (input: {
     revisionId: string;
@@ -543,9 +543,9 @@ interface Ctx {
     rationale: string;
     userRole: string;
   }) => void;
-  resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string) => void;
+  resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
   addSuggestionReply: (suggestionId: string, text: string, userRole: string) => void;
-  completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string) => void;
+  completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
 }
 
 const DocumentsContext = createContext<Ctx | undefined>(undefined);
@@ -712,15 +712,15 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const resolveSuggestion = useCallback<Ctx['resolveSuggestion']>((id, status, note, userRole) => {
+  const resolveSuggestion = useCallback<Ctx['resolveSuggestion']>((id, status, note, userRole, additionalRoles = []) => {
     const { userId, userName } = identityFor(userRole);
     dispatch({
       type: 'RESOLVE_SUGGESTION',
-      payload: { id, status, note, byUserId: userId, byName: userName, byRoles: [userRole], atUtc: nowUtc() },
+      payload: { id, status, note, byUserId: userId, byName: userName, byRoles: [userRole, ...additionalRoles], atUtc: nowUtc() },
     });
   }, []);
 
-  const completeReview = useCallback<Ctx['completeReview']>((docId, outcome, note, userRole) => {
+  const completeReview = useCallback<Ctx['completeReview']>((docId, outcome, note, userRole, additionalRoles = []) => {
     const { userId, userName } = identityFor(userRole);
     dispatch({
       type: 'COMPLETE_REVIEW',
@@ -735,7 +735,7 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
           note,
         },
         today: todayIso(),
-        actorRoles: [userRole],
+        actorRoles: [userRole, ...additionalRoles],
       },
     });
   }, []);
@@ -754,11 +754,11 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     toggleArchive: useCallback((id) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: id }), []),
     createDraft: useCallback((r, actorRoles) => dispatch({ type: 'CREATE_DRAFT', payload: { revision: r, actorRoles } }), []),
     updateDraft: useCallback((r) => dispatch({ type: 'UPDATE_DRAFT', payload: r }), []),
-    withdrawDraft: useCallback((revisionId, reason, userRole) => {
+    withdrawDraft: useCallback((revisionId, reason, userRole, additionalRoles = []) => {
       const { userId, userName } = identityFor(userRole);
       dispatch({
         type: 'WITHDRAW_DRAFT',
-        payload: { revisionId, reason, byUserId: userId, byName: userName, byRoles: [userRole], atUtc: nowUtc() },
+        payload: { revisionId, reason, byUserId: userId, byName: userName, byRoles: [userRole, ...additionalRoles], atUtc: nowUtc() },
       });
     }, []),
     submitForApproval,

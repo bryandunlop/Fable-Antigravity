@@ -77,7 +77,7 @@ export function SuggestionQueuePanel({ userRole, additionalRoles = [] }: { userR
     const { resolveSuggestionId, flow } = acceptFlowOnPersisted(acceptFlow);
     setAcceptFlow(flow);
     if (resolveSuggestionId) {
-      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole);
+      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole, additionalRoles);
       toast.success('Suggestion accepted — draft created.');
     }
   };
@@ -121,7 +121,7 @@ export function SuggestionQueuePanel({ userRole, additionalRoles = [] }: { userR
                       variant="destructive"
                       onClick={() => {
                         if (note.trim().length < 5) { toast.error('A decline note is required.'); return; }
-                        resolveSuggestion(s.id, 'declined', note.trim(), userRole);
+                        resolveSuggestion(s.id, 'declined', note.trim(), userRole, additionalRoles);
                         setDeclining(null);
                         setNote('');
                         toast.success('Suggestion declined with note.');
