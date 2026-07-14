@@ -11,13 +11,15 @@ import { Textarea } from '../../ui/textarea';
 import { Checkbox } from '../../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { ROLE_CATEGORIES } from '../../../lib/mockUsers';
-import type { AckLevel, Doc, DocRevision } from '../types';
+import type { AckLevel, Doc, DocRevision, DocSection } from '../types';
 import { DOC_CLASS_LIST, classFor, type DocumentClassConfig } from '../classes';
 import { useDocuments, identityFor, publishApprovalRequestedEvent, publishRequiredReadEvent } from '../DocumentsContext';
 import { canAuthor, validateSubmit, validateDirectPublish } from '../engine/lifecycle';
 import { nextDocId, nextRevisionId, nextRevisionLabel, currentRevision } from '../engine/revisions';
 import { computeNextReviewDate } from '../engine/review';
-import { sectionsToMarkdown, contentFieldsFromMarkdown } from '../engine/blocks';
+import { sectionsFromMarkdown, checksumForSections } from '../engine/blocks';
+import { SectionedEditor } from './SectionedEditor';
+import { emptySection } from '../engine/blockEditor';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
 export type EditorMode =
@@ -59,7 +61,7 @@ export function DocEditorDialog({
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
-  const [content, setContent] = useState('');
+  const [sections, setSections] = useState<DocSection[]>([]);
   const [changeSummary, setChangeSummary] = useState('');
   const [revisionLabel, setRevisionLabel] = useState('1.0');
   const [effectiveDate, setEffectiveDate] = useState(todayIso());
@@ -77,7 +79,8 @@ export function DocEditorDialog({
       setTitle(mode.prefill?.title ?? '');
       setCategory(cfg?.categories[0] ?? '');
       setRoles([]);
-      setContent(mode.prefill?.content ?? '');
+      // A .docx-import prefill (Slice 4a) seeds sections once; otherwise start blank.
+      setSections(mode.prefill?.content ? sectionsFromMarkdown(mode.prefill.content, 'new') : [emptySection()]);
       setChangeSummary('');
       setRevisionLabel('1.0');
       setEffectiveDate(todayIso());
@@ -98,7 +101,13 @@ export function DocEditorDialog({
       setTitle(meta.title);
       setCategory(meta.category);
       setRoles(meta.roles);
-      setContent(mode.kind === 'revise' ? (mode.prefill?.content ?? sectionsToMarkdown(rev.sections)) : sectionsToMarkdown(rev.sections));
+      // Deep-copy the base tree so editing never mutates a published revision (D-6);
+      // a suggestion-accept markdown prefill seeds sections once, then the editor owns identity.
+      setSections(
+        mode.kind === 'revise' && mode.prefill?.content
+          ? sectionsFromMarkdown(mode.prefill.content, doc.id)
+          : structuredClone(rev.sections),
+      );
       setChangeSummary(mode.kind === 'revise' ? (mode.prefill?.changeSummary ?? '') : rev.changeSummary);
       setRevisionLabel(mode.kind === 'revise' ? nextRevisionLabel(rev.revision, 'major') : rev.revision);
       setEffectiveDate(mode.kind === 'revise' ? todayIso() : rev.effectiveDate);
@@ -131,7 +140,8 @@ export function DocEditorDialog({
 
   const buildRecords = (): { doc: Doc; rev: DocRevision; liveControlled: boolean } | null => {
     if (!cfg) return null;
-    if (!title.trim() || !content.trim() || roles.length === 0) {
+    const hasContent = sections.some((s) => s.title.trim() || s.blocks.some((b) => b.md.trim()));
+    if (!title.trim() || !hasContent || roles.length === 0) {
       toast.error('Title, content, and at least one audience role are required.');
       return null;
     }
@@ -179,7 +189,8 @@ export function DocEditorDialog({
       docId: doc.id,
       revision: revisionLabel.trim() || '1.0',
       status: 'draft',
-      ...contentFieldsFromMarkdown(content, doc.id),
+      sections,
+      mockChecksum: checksumForSections(sections),
       changeSummary: changeSummary.trim(),
       effectiveDate,
       authorUserId: userId,
@@ -308,8 +319,10 @@ export function DocEditorDialog({
           </div>
 
           <div>
-            <Label htmlFor="docContent" className="text-xs">Content (markdown)</Label>
-            <Textarea id="docContent" value={content} onChange={(e) => setContent(e.target.value)} rows={12} className="mt-1 font-mono text-xs" />
+            <Label className="text-xs">Content</Label>
+            <div className="mt-1">
+              <SectionedEditor sections={sections} onChange={setSections} />
+            </div>
           </div>
 
           {hasPriorPublished && (
