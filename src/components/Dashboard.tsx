@@ -4,6 +4,7 @@ import NASImpactWidget from './NASImpactWidget';
 import DailyFlightsWidget from './DailyFlightsWidget';
 import DutyRosterWidget from './DutyRosterWidget';
 import WeatherWidget from './WeatherWidget';
+import { HOME_STATION } from '../config/station';
 import { ExternalLink, Edit2, Plus, Trash2, X, Check } from 'lucide-react';
 import { useState } from 'react';
 import { GfoPageHeader } from './gfo';
@@ -77,7 +78,7 @@ export default function Dashboard({ userRole }: DashboardProps) {
       />
 
       {/* Persistent Weather Widget */}
-      <WeatherWidget />
+      <WeatherWidget icaoId={HOME_STATION} />
 
       {/* Quick Links Card */}
       <div className="glass-premium rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
