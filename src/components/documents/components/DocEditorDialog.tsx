@@ -21,7 +21,7 @@ import { sectionsToMarkdown, contentFieldsFromMarkdown } from '../engine/blocks'
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
 export type EditorMode =
-  | { kind: 'create'; classId?: string }
+  | { kind: 'create'; classId?: string; prefill?: { content?: string; title?: string } }
   // 'content' is the interim textarea's markdown prefill — independent of DocRevision.sections.
   | { kind: 'revise'; doc: Doc; baseRev: DocRevision; prefill?: Partial<DocRevision> & { content?: string } }
   | { kind: 'edit-draft'; doc: Doc; rev: DocRevision };
@@ -74,10 +74,10 @@ export function DocEditorDialog({
       const initial = mode.classId ?? authorable[0]?.id ?? '';
       const cfg = initial ? classFor(initial) : undefined;
       setClassId(initial);
-      setTitle('');
+      setTitle(mode.prefill?.title ?? '');
       setCategory(cfg?.categories[0] ?? '');
       setRoles([]);
-      setContent('');
+      setContent(mode.prefill?.content ?? '');
       setChangeSummary('');
       setRevisionLabel('1.0');
       setEffectiveDate(todayIso());

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search } from 'lucide-react';
+import { toast } from 'sonner';
+import { BarChart3, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -28,6 +29,7 @@ import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
 import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
 import { DocEditorDialog } from '../components/DocEditorDialog';
+import { docxToImport } from '../engine/docxImport';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
 const LIBRARY_CLASSES = ['procedural-bulletin', 'flight-ops-bulletin', 'sop', 'manual'];
@@ -39,12 +41,43 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
   const [yearFilter, setYearFilter] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [importPrefill, setImportPrefill] = useState<{ content: string; title: string } | undefined>(undefined);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const todayIso = operatorTodayIso();
   const { userId } = identityFor(userRole);
   const userRoles = [userRole, ...additionalRoles];
   const manager = canManageDocuments(userRole, additionalRoles);
   const authorCapable = DOC_CLASS_LIST.some((c) => canAuthor(c, userRoles));
+
+  // Seed-import a .docx into a new draft: parse to markdown, open the create editor
+  // prefilled, then the author fills class/audience/ack and saves via four-eyes.
+  const handleImportFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('That file is too large to import (max 25 MB).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    setImporting(true);
+    try {
+      const { title, markdown, warnings } = await docxToImport(await file.arrayBuffer());
+      if (!markdown.trim()) {
+        toast.error('No readable content found in that file.');
+        return;
+      }
+      setImportPrefill({ content: markdown, title: title || file.name.replace(/\.docx$/i, '') });
+      setCreating(true);
+      if (warnings.length) toast.warning(`Imported with ${warnings.length} formatting note${warnings.length === 1 ? '' : 's'} — review the draft.`);
+      else toast.success('Imported — review and complete the draft.');
+    } catch {
+      toast.error('Could not read that .docx file.');
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
   const universe = useMemo(() => documentsRoleUniverse(), []);
 
   const pendingApprovals = state.revisions.filter((r) => {
@@ -110,9 +143,21 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
         description="Controlled publications, read-and-acknowledge compliance, and operational knowledge."
         actions={
           authorCapable ? (
-            <Button onClick={() => setCreating(true)}>
-              <FilePlus2 className="mr-1.5 h-4 w-4" /> New document
-            </Button>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+                onChange={(e) => handleImportFile(e.target.files?.[0])}
+              />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                <Upload className="mr-1.5 h-4 w-4" /> {importing ? 'Importing…' : 'Import .docx'}
+              </Button>
+              <Button onClick={() => { setImportPrefill(undefined); setCreating(true); }}>
+                <FilePlus2 className="mr-1.5 h-4 w-4" /> New document
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -275,8 +320,8 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
       <DocEditorDialog
         open={creating}
-        onOpenChange={setCreating}
-        mode={{ kind: 'create' }}
+        onOpenChange={(o) => { setCreating(o); if (!o) setImportPrefill(undefined); }}
+        mode={{ kind: 'create', prefill: importPrefill }}
         userRole={userRole}
         additionalRoles={additionalRoles}
       />

@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { useTechLog } from '../../tech-log/TechLogContext';
 import { deriveServiceability } from '../../tech-log/engine/serviceability';
 import { deriveCustody, type CustodyState } from '../../tech-log/engine/custody';
@@ -14,8 +13,9 @@ const CUSTODY: Record<CustodyState, { dot: string; label: string; strong: boolea
 };
 
 /** Maintenance-handover module body (board): serviceability (RAG) + custody (P&G-blue axis) + open
- *  deferrals, with a CTA into the tech-log accept ceremony. Bare — ModuleCard supplies the header. */
-export function HandoverCard({ trip }: { trip: TripRecord }) {
+ *  deferrals, with a CTA that opens the accept ceremony in-place (a slide-over within the pilot
+ *  workspace) rather than ejecting to the tech-log shell. Bare — ModuleCard supplies the header. */
+export function HandoverCard({ trip, onOpenHandover }: { trip: TripRecord; onOpenHandover: () => void }) {
   const { state } = useTechLog();
   const now = new Date().toISOString();
   // Handover is aircraft-keyed by tail — it shows the aircraft's real serviceability + custody even
@@ -46,12 +46,13 @@ export function HandoverCard({ trip }: { trip: TripRecord }) {
       </div>
       {tlTrip && (
         <div>
-          <Link
-            to={`/tech-log/trips/${tlTrip.id}`}
+          <button
+            type="button"
+            onClick={onOpenHandover}
             className="inline-flex items-center min-h-[44px] rounded border px-3 py-2 text-xs hover:bg-accent"
           >
-            {custody === 'WITH_CREW' ? 'View briefing ↗' : custody === 'OFFERED' ? 'Review & accept ↗' : 'Open in tech-log ↗'}
-          </Link>
+            {custody === 'WITH_CREW' ? 'View briefing' : custody === 'OFFERED' ? 'Review & accept' : 'Open handover'}
+          </button>
         </div>
       )}
     </div>
