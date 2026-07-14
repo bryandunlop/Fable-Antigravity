@@ -9,6 +9,7 @@ function emptyState(overrides: Partial<DocumentsState> = {}): DocumentsState {
     acknowledgments: [],
     comments: [],
     suggestions: [],
+    suggestionReplies: [],
     reviews: [],
     signatures: [],
     ...overrides,

@@ -5,6 +5,7 @@ import type {
   DocAcknowledgment,
   DocComment,
   DocSuggestion,
+  DocSuggestionReply,
   DocReviewRecord,
   DocumentsState,
 } from './types';
@@ -164,6 +165,7 @@ export type DocumentsAction =
   | { type: 'ACKNOWLEDGE'; payload: { ack: DocAcknowledgment; signature?: Signature } }
   | { type: 'ADD_COMMENT'; payload: DocComment }
   | { type: 'ADD_SUGGESTION'; payload: DocSuggestion }
+  | { type: 'ADD_SUGGESTION_REPLY'; payload: DocSuggestionReply }
   | {
       type: 'RESOLVE_SUGGESTION';
       payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; atUtc: string };
@@ -395,6 +397,14 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
     }
     case 'ADD_SUGGESTION':
       return { ...state, suggestions: [...state.suggestions, action.payload] };
+    case 'ADD_SUGGESTION_REPLY': {
+      const target = state.suggestions.find((s) => s.id === action.payload.suggestionId);
+      if (!target || target.status !== 'open') {
+        warnNoop('cannot reply to a missing or already-resolved suggestion');
+        return state;
+      }
+      return { ...state, suggestionReplies: [...state.suggestionReplies, action.payload] };
+    }
     case 'RESOLVE_SUGGESTION': {
       const p = action.payload;
       return {
@@ -464,6 +474,7 @@ interface Ctx {
     userRole: string;
   }) => void;
   resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string) => void;
+  addSuggestionReply: (suggestionId: string, text: string, userRole: string) => void;
   completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string) => void;
 }
 
@@ -587,6 +598,22 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'ADD_SUGGESTION', payload: suggestion });
   }, []);
 
+  const addSuggestionReply = useCallback<Ctx['addSuggestionReply']>((suggestionId, text, userRole) => {
+    const { userId, userName } = identityFor(userRole);
+    dispatch({
+      type: 'ADD_SUGGESTION_REPLY',
+      payload: {
+        id: localId('sgr'),
+        suggestionId,
+        authorUserId: userId,
+        authorName: userName,
+        role: userRole,
+        text: text.trim(),
+        createdAtUtc: nowUtc(),
+      },
+    });
+  }, []);
+
   const resolveSuggestion = useCallback<Ctx['resolveSuggestion']>((id, status, note, userRole) => {
     const { userId, userName } = identityFor(userRole);
     dispatch({
@@ -639,6 +666,7 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     addComment,
     addSuggestion,
     resolveSuggestion,
+    addSuggestionReply,
     completeReview,
   };
 

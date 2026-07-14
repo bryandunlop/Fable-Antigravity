@@ -47,6 +47,7 @@ function state(overrides: Partial<DocumentsState> = {}): DocumentsState {
     acknowledgments: [],
     comments: [],
     suggestions: [],
+    suggestionReplies: [],
     reviews: [],
     signatures: [],
     ...overrides,
@@ -346,5 +347,33 @@ describe('documentsReducer misc guards', () => {
       payload: { id: 's1', status: 'accepted', byUserId: 'U2', byName: 'N2', atUtc: NOW },
     });
     expect(out.suggestions[0].status).toBe('declined'); // unchanged
+  });
+
+  it('ADD_SUGGESTION_REPLY appends a reply to an open suggestion', () => {
+    const sug = {
+      id: 's1', docId: 'SOP-001', revisionId: 'SOP-001-r1', docTitle: 'T',
+      authorUserId: 'U', authorName: 'N', role: 'pilot',
+      proposedChange: 'x', rationale: 'y', status: 'open' as const, createdAtUtc: NOW,
+    };
+    const reply = {
+      id: 'sgr-1', suggestionId: 's1', authorUserId: 'U2', authorName: 'Owner',
+      role: 'chief-pilot', text: 'Good catch — will fold in.', createdAtUtc: NOW,
+    };
+    const out = documentsReducer(state({ suggestions: [sug] }), { type: 'ADD_SUGGESTION_REPLY', payload: reply });
+    expect(out.suggestionReplies).toEqual([reply]);
+  });
+
+  it('ADD_SUGGESTION_REPLY ignores a reply to a resolved suggestion', () => {
+    const sug = {
+      id: 's1', docId: 'SOP-001', revisionId: 'SOP-001-r1', docTitle: 'T',
+      authorUserId: 'U', authorName: 'N', role: 'pilot',
+      proposedChange: 'x', rationale: 'y', status: 'declined' as const, createdAtUtc: NOW,
+    };
+    const reply = {
+      id: 'sgr-2', suggestionId: 's1', authorUserId: 'U2', authorName: 'Owner',
+      role: 'chief-pilot', text: 'late reply', createdAtUtc: NOW,
+    };
+    const out = documentsReducer(state({ suggestions: [sug] }), { type: 'ADD_SUGGESTION_REPLY', payload: reply });
+    expect(out.suggestionReplies).toEqual([]);
   });
 });
