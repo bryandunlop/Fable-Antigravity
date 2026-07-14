@@ -52,6 +52,6 @@ describe('documentsStateIsUnusable', () => {
 
 describe('DATA_VERSION', () => {
   it('was bumped for this slice', () => {
-    expect(DATA_VERSION).toBe('2026-07-11-blocks-v1');
+    expect(DATA_VERSION).toBe('2026-07-14-safety-reads-v1');
   });
 });

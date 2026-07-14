@@ -228,6 +228,30 @@ const gomSmsR1: DocRevision = {
   publishedAtUtc: daysFromNow(-4) + 'T12:00:00.000Z',
 };
 
+const gomSmsDoc: Doc = {
+  id: 'GOM-SMS',
+  classId: 'manual',
+  title: 'SMS Manual — Revision G',
+  category: 'General Operations',
+  roles: ['pilot', 'inflight', 'maintenance', 'lead', 'admin'],
+  ownerUserId: 'role:document-manager',
+  ownerName: 'Document Manager',
+  tags: ['sms', 'safety', 'manual'],
+  isPinned: false,
+  isArchived: false,
+  reviewCycleDays: 365,
+  nextReviewDate: daysFromNow(300),
+  createdDate: '2024-01-15',
+};
+
+/** The safety-specific required read (TL-6 / D29). Exported so the store
+ * migration can inject it into stores created before it was seeded — new seed
+ * content otherwise reaches only a fresh install (loadInitialState spreads a
+ * persisted state over the seeds). */
+export function safetyReadSeed(): { doc: Doc; rev: DocRevision } {
+  return { doc: gomSmsDoc, rev: gomSmsR1 };
+}
+
 // ── Tribal knowledge (curator direct-published, no ack requirement) ──
 const tk1r1: DocRevision = {
   id: 'TK-001-r1',
@@ -316,21 +340,7 @@ const SEED_DOCS: Doc[] = [
     nextReviewDate: daysFromNow(-9), // overdue for periodic review
     createdDate: '2024-05-01',
   },
-  {
-    id: 'GOM-SMS',
-    classId: 'manual',
-    title: 'SMS Manual — Revision G',
-    category: 'General Operations',
-    roles: ['pilot', 'inflight', 'maintenance', 'lead', 'admin'],
-    ownerUserId: 'role:document-manager',
-    ownerName: 'Document Manager',
-    tags: ['sms', 'safety', 'manual'],
-    isPinned: false,
-    isArchived: false,
-    reviewCycleDays: 365,
-    nextReviewDate: daysFromNow(300),
-    createdDate: '2024-01-15',
-  },
+  gomSmsDoc,
   {
     id: 'TK-001',
     classId: 'tribal-knowledge',

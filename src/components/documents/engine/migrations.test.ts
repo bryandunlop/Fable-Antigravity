@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { DocumentsState } from '../types';
 import { migrateStoredState, STORED_STATE_MIGRATIONS, type StoredStateMigration } from './migrations';
+import { safetyReadSeed } from '../mockData';
 
 function emptyState(overrides: Partial<DocumentsState> = {}): DocumentsState {
   return {
@@ -43,5 +44,32 @@ describe('migrateStoredState (C5 — transform forward, never wipe)', () => {
   it('the live registry is ordered by target version', () => {
     const tos = STORED_STATE_MIGRATIONS.map((m) => m.to);
     expect([...tos].sort()).toEqual(tos);
+  });
+});
+
+describe('TL-6 / D29 — safety read injected into pre-existing stores', () => {
+  const OLD = '2026-07-11-blocks-v1';
+  const NEW = '2026-07-14-safety-reads-v1';
+
+  it('injects the SMS Manual doc + revision into an existing store that lacks it, preserving existing data', () => {
+    const stored = emptyState({ docs: [{ id: 'SOP-900' } as never] });
+    const out = migrateStoredState(stored, OLD);
+    expect(out.docs.some((d) => d.id === 'GOM-SMS')).toBe(true);
+    expect(out.revisions.some((r) => r.docId === 'GOM-SMS')).toBe(true);
+    expect(out.docs.some((d) => d.id === 'SOP-900')).toBe(true); // existing docs kept
+  });
+
+  it('is idempotent — a store already containing the safety read is unchanged (no duplicate)', () => {
+    const { doc, rev } = safetyReadSeed();
+    const stored = emptyState({ docs: [doc], revisions: [rev] });
+    const out = migrateStoredState(stored, OLD);
+    expect(out.docs.filter((d) => d.id === 'GOM-SMS')).toHaveLength(1);
+    expect(out).toEqual(stored);
+  });
+
+  it('does not inject when the store is already at the new version', () => {
+    const stored = emptyState({ docs: [{ id: 'SOP-900' } as never] });
+    const out = migrateStoredState(stored, NEW);
+    expect(out.docs.some((d) => d.id === 'GOM-SMS')).toBe(false);
   });
 });
