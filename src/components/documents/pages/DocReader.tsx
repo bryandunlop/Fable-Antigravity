@@ -115,6 +115,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
             active={active}
             onSuggest={() => setActiveBlock({ id: blockId, mode: 'compose' })}
             onOpenThread={() => setActiveBlock({ id: blockId, mode: 'thread' })}
+            onClose={() => setActiveBlock(null)}
           >
             {active && activeBlock?.mode === 'compose' && (
               <InlineSuggestComposer doc={doc} rev={rev} blockId={blockId} userRole={userRole} onDone={() => setActiveBlock(null)} />
