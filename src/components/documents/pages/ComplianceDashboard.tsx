@@ -43,7 +43,11 @@ export function ComplianceDashboard({ standalone = false }: { standalone?: boole
       const readers = readersFor(doc, universe);
       out.push({ doc, rev, summary: complianceSummary(rev, readers, state.acknowledgments, todayIso) });
     }
-    return out.sort((a, b) => a.summary.pct - b.summary.pct);
+    // Least-compliant first; docs with no target readers (N/A) sort to the end.
+    return out.sort((a, b) => {
+      if (a.summary.applicable !== b.summary.applicable) return a.summary.applicable ? -1 : 1;
+      return a.summary.pct - b.summary.pct;
+    });
   }, [state.docs, state.revisions, state.acknowledgments, universe, todayIso]);
 
   const chase = useMemo(
@@ -120,14 +124,16 @@ export function ComplianceDashboard({ standalone = false }: { standalone?: boole
                     )}
                     <div className="w-40 shrink-0">
                       <div className="flex items-center justify-between text-xs tabular-nums">
-                        <span>{summary.read}/{summary.total} read</span>
-                        <span className="font-semibold">{summary.pct}%</span>
+                        <span>{summary.applicable ? `${summary.read}/${summary.total} read` : 'no target readers'}</span>
+                        <span className="font-semibold">{summary.applicable ? `${summary.pct}%` : 'N/A'}</span>
                       </div>
                       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={`h-full rounded-full ${summary.pct === 100 ? 'bg-gfo-success' : 'bg-gfo-daylight'}`}
-                          style={{ width: `${summary.pct}%` }}
-                        />
+                        {summary.applicable && (
+                          <div
+                            className={`h-full rounded-full ${summary.pct === 100 ? 'bg-gfo-success' : 'bg-gfo-daylight'}`}
+                            style={{ width: `${summary.pct}%` }}
+                          />
+                        )}
                       </div>
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => setExpanded(isOpen ? null : rev.id)} aria-label="Expand roster">

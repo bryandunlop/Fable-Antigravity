@@ -30,6 +30,7 @@ import {
   readersFor,
   rosterFor,
   complianceSummary,
+  overallCompliance,
   overdueChaseList,
   complianceCsvRows,
   COMPLIANCE_CSV_HEADERS,
@@ -276,13 +277,35 @@ describe('compliance', () => {
   it('complianceSummary computes counts, pct, and overdue', () => {
     const readers = readersFor(doc({ roles: ['pilot', 'lead'] }), universe);
     const s = complianceSummary(rev({ ackDueDate: '2026-07-01' }), readers, [ack({ userId: 'USR001' })], TODAY);
-    expect(s).toEqual({ total: 2, read: 1, outstanding: 1, pct: 50, overdue: true });
+    expect(s).toEqual({ total: 2, read: 1, outstanding: 1, pct: 50, applicable: true, overdue: true });
   });
   it('fully-read doc is never overdue', () => {
     const readers: Reader[] = [{ role: 'pilot', userId: 'USR001' }];
     const s = complianceSummary(rev({ ackDueDate: '2026-07-01' }), readers, [ack({ userId: 'USR001' })], TODAY);
     expect(s.overdue).toBe(false);
     expect(s.pct).toBe(100);
+  });
+  it('an empty roster is N/A, not a false 100% (C9)', () => {
+    const s = complianceSummary(rev(), [], [], TODAY);
+    expect(s.applicable).toBe(false);
+    expect(s.total).toBe(0);
+    // display renders N/A off `applicable`; pct must never read as a compliant 100
+    expect(s.pct).toBe(0);
+  });
+  it('overallCompliance weights by roster size and ignores empty rosters (C9)', () => {
+    const docs = [
+      doc({ id: 'SOP-001', roles: ['pilot', 'lead'] }), // 2 readers
+      doc({ id: 'SOP-002', roles: ['pilot'] }),         // 1 reader
+      doc({ id: 'SOP-003', roles: ['nobody'] }),        // 0 readers — empty roster
+    ];
+    const revisions = [
+      rev({ id: 'SOP-001-r1', docId: 'SOP-001', status: 'published' }),
+      rev({ id: 'SOP-002-r1', docId: 'SOP-002', status: 'published' }),
+      rev({ id: 'SOP-003-r1', docId: 'SOP-003', status: 'published' }),
+    ];
+    const acks = [ack({ revisionId: 'SOP-001-r1', userId: 'USR001' })]; // 1 of docA's 2
+    // read 1 / total 3 = 33%. The unweighted mean (with N/A counted as 100) would read 50%.
+    expect(overallCompliance(docs, revisions, acks, universe)).toEqual({ read: 1, total: 3, pct: 33 });
   });
   it('overdueChaseList lists reader×doc rows past due only', () => {
     const docs = [doc({ id: 'A', roles: ['pilot', 'lead'] }), doc({ id: 'B', roles: ['pilot'] })];
