@@ -16,13 +16,17 @@ import {
   Search,
   GripVertical,
   RotateCcw,
-  ChevronDown,
-  ChevronRight,
 } from 'lucide-react';
 import {
-  domainsForRole, entriesForRoles, matchEntry, DEFAULT_OPEN_DOMAINS,
+  domainsForRole, entriesForRoles, matchEntry,
   type NavEntry,
 } from '../navigation/navConfig';
+
+// Above this many visible items, a role's sidebar is dense enough that quiet
+// (non-interactive) domain labels earn their keep as scroll anchors. Below it,
+// domain grouping is pure overhead — real data: admin=53 clears this, the next
+// largest role (lead=18) doesn't. See docs/superpowers/specs/2026-07-10-nav-flatten-design.md.
+const DENSE_ROLE_ITEM_THRESHOLD = 30;
 
 
 interface NavigationProps {
@@ -33,10 +37,10 @@ interface NavigationProps {
 }
 
 // Sidebar model: one domain per group, derived from the route manifest.
+// Everything the role can see is always visible — no collapse, no "More".
 interface NavigationGroup {
   label: string;
-  items: NavEntry[];      // primary — always visible when the domain is open
-  moreItems: NavEntry[];  // behind the "More" expander
+  items: NavEntry[];
 }
 
 // Draggable navigation group component — one manifest domain per group.
@@ -47,8 +51,7 @@ const DraggableNavigationGroup = ({
   isCustomizing,
   location,
   activePath,
-  isCollapsed,
-  onToggleCollapse,
+  showLabel,
 }: {
   group: NavigationGroup;
   index: number;
@@ -56,11 +59,8 @@ const DraggableNavigationGroup = ({
   isCustomizing: boolean;
   location: { pathname: string; search: string };
   activePath: string | undefined;
-  isCollapsed: boolean;
-  onToggleCollapse: (label: string) => void;
+  showLabel: boolean;
 }) => {
-  const [moreOpen, setMoreOpen] = useState(false); // not persisted — menus start short each session
-
   const [{ isDragging }, drag] = useDrag({
     type: 'navigation-group',
     item: { index },
@@ -116,45 +116,22 @@ const DraggableNavigationGroup = ({
       className={isCustomizing ? 'cursor-move' : ''}
     >
       <SidebarGroup>
-        {/* Typography lives on the Label's className (twMerge beats the base text color);
-            the child button only carries layout. */}
-        <SidebarGroupLabel asChild className="text-[10px] font-bold uppercase tracking-[0.16em] text-gfo-sunrise">
-          <button
-            type="button"
-            onClick={() => onToggleCollapse(group.label)}
-            className="flex w-full items-center gap-2 cursor-pointer"
-            aria-expanded={!isCollapsed}
-          >
-            {isCustomizing && <GripVertical className="w-4 h-4 text-gfo-sunrise/70" />}
-            <span className="flex-1 text-left">{group.label}</span>
-            {isCollapsed
-              ? <ChevronRight className="w-3.5 h-3.5 text-sidebar-foreground/70" />
-              : <ChevronDown className="w-3.5 h-3.5 text-sidebar-foreground/70" />}
-          </button>
-        </SidebarGroupLabel>
-        {!isCollapsed && (
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {group.items.map(renderEntry)}
-              {group.moreItems.length > 0 && (
-                <>
-                  {moreOpen && group.moreItems.map(renderEntry)}
-                  <SidebarMenuItem key={`${group.label}:more`}>
-                    <SidebarMenuButton
-                      onClick={() => setMoreOpen((o) => !o)}
-                      className="text-sidebar-foreground bg-transparent transition-colors duration-200 hover:bg-white/10 hover:text-white"
-                    >
-                      {moreOpen
-                        ? <ChevronDown className="w-4 h-4 text-sidebar-foreground/70" />
-                        : <ChevronRight className="w-4 h-4 text-sidebar-foreground/70" />}
-                      <span>{moreOpen ? 'Less' : `More (${group.moreItems.length})`}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
+        {/* Quiet, non-interactive — a scroll anchor for dense roles (or while
+            customizing, so there's something to grab), never a click target.
+            Narrow roles never render this at all: their items just run flat. */}
+        {showLabel && (
+          <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-[0.16em] text-gfo-sunrise">
+            <div className="flex w-full items-center gap-2">
+              {isCustomizing && <GripVertical className="w-4 h-4 text-gfo-sunrise/70" />}
+              <span className="flex-1 text-left">{group.label}</span>
+            </div>
+          </SidebarGroupLabel>
         )}
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {group.items.map(renderEntry)}
+          </SidebarMenu>
+        </SidebarGroupContent>
       </SidebarGroup>
     </div>
   );
@@ -207,22 +184,13 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   );
   const activePath = matchEntry(location.pathname, visibleEntries)?.path;
 
-  // Collapsed domains, persisted per role; first visit opens the role's home domain(s).
-  const [collapsedOverride, setCollapsedOverride] = useState<string[] | null>(() => {
-    try {
-      const saved = localStorage.getItem(`nav-collapsed-${userRole}`);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
   const navigationGroups = React.useMemo(() => {
-    // One group per manifest domain, filtered to the user's roles.
+    // One group per manifest domain, filtered to the user's roles. Primary and
+    // "More" entries are merged into one visible list — primary items lead,
+    // since that ordering was already curated; nothing is ever hidden.
     const filtered: NavigationGroup[] = domainsForRole(userRole, additionalRoles).map((d) => ({
       label: d.label,
-      items: d.primary,
-      moreItems: d.more,
+      items: [...d.primary, ...d.more],
     }));
 
     if (customOrderKeys) {
@@ -275,20 +243,11 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     localStorage.removeItem(`nav-order-${userRole}`);
   };
 
-  // Collapse model: no saved state → everything but the role's home domain(s) starts collapsed.
-  const defaultOpen = DEFAULT_OPEN_DOMAINS[userRole] ?? ['home'];
-  const collapsedLabels = collapsedOverride
-    ?? domainsForRole(userRole, additionalRoles)
-      .filter((d) => !defaultOpen.includes(d.domain))
-      .map((d) => d.label);
-
-  const toggleCollapse = (label: string) => {
-    const next = collapsedLabels.includes(label)
-      ? collapsedLabels.filter((l) => l !== label)
-      : [...collapsedLabels, label];
-    setCollapsedOverride(next);
-    localStorage.setItem(`nav-collapsed-${userRole}`, JSON.stringify(next));
-  };
+  // Quiet domain labels earn their keep only for dense roles, or while
+  // customizing (you need something to grab). Otherwise the sidebar is one
+  // flat, always-visible list — see DENSE_ROLE_ITEM_THRESHOLD above.
+  const totalVisibleItems = navigationGroups.reduce((sum, g) => sum + g.items.length, 0);
+  const showLabels = isCustomizing || totalVisibleItems > DENSE_ROLE_ITEM_THRESHOLD;
 
   const getRoleDisplayName = (role: string) => {
     const roleMap: Record<string, string> = {
@@ -375,8 +334,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
                 isCustomizing={isCustomizing}
                 location={location}
                 activePath={activePath}
-                isCollapsed={collapsedLabels.includes(group.label) && !isCustomizing}
-                onToggleCollapse={toggleCollapse}
+                showLabel={showLabels}
               />
             ))}
           </SidebarContent>
