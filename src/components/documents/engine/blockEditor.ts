@@ -107,6 +107,14 @@ export function setSectionHeading(sections: DocSection[], sectionId: string, num
   return sections.map((s) => (s.id === sectionId ? { ...s, number, title } : s));
 }
 
+/** G1: set the regulation-requirement ids a block satisfies (empty ⇒ cleared). */
+export function setBlockComplianceRefs(sections: DocSection[], blockId: string, refs: string[]): DocSection[] {
+  return mapSectionOf(sections, blockId, (s) => ({
+    ...s,
+    blocks: s.blocks.map((b) => (b.id === blockId ? { ...b, complianceRefs: refs.length ? refs : undefined } : b)),
+  }));
+}
+
 export function deleteSection(sections: DocSection[], sectionId: string): DocSection[] {
   if (sections.length <= 1) return sections;
   return sections.filter((s) => s.id !== sectionId);

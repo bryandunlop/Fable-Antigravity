@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   emptySection, editBlockMd, addBlockAfter, deleteBlock, moveBlock,
   splitBlock, mergeBlockUp, addSection, moveSection, setSectionHeading, deleteSection,
+  setBlockComplianceRefs,
 } from './blockEditor';
 import type { DocSection } from '../types';
 
@@ -90,5 +91,14 @@ describe('emptySection', () => {
     const s = emptySection(idGen);
     expect(s.blocks).toHaveLength(1);
     expect(s.blocks[0].md).toBe('');
+  });
+});
+
+describe('setBlockComplianceRefs', () => {
+  it('sets refs on the block, and clears when empty', () => {
+    const set = setBlockComplianceRefs(sections(), 'b1', ['far-91-175', 'opspec-c074']);
+    expect(set[0].blocks[0].complianceRefs).toEqual(['far-91-175', 'opspec-c074']);
+    const cleared = setBlockComplianceRefs(set, 'b1', []);
+    expect(cleared[0].blocks[0].complianceRefs).toBeUndefined();
   });
 });

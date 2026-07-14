@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { BlockDiff, DocDiff, WordSegment } from '../engine/diff';
 import { BlockBody } from './SectionedContent';
+import { ComplianceBadges } from './ComplianceBadges';
 
 // Change marks live on the amber/coral axis (spec D-11) — additions amber, removals
 // orange/coral. NEVER red/green/yellow (the CAMP RAG status palette) or the custody gold/blue.
@@ -47,6 +48,7 @@ function BlockRow({ bd, renderBlockGutter }: { bd: BlockDiff; renderBlockGutter?
       ) : bd.block ? (
         <BlockBody block={bd.block} />
       ) : null}
+      <ComplianceBadges refs={bd.block?.complianceRefs} />
       {renderBlockGutter?.(bd.id)}
     </div>
   );

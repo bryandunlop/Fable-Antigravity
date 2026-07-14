@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { DocSection, DocBlock } from '../types';
+import { ComplianceBadges } from './ComplianceBadges';
 
 const CALLOUT_STYLES: Record<NonNullable<DocBlock['calloutKind']>, string> = {
   // Amber/caution styling stays on document surfaces only — never the RAG status palette.
@@ -56,6 +57,7 @@ export function SectionedContent({
               className={renderBlockGutter ? 'group relative pr-10' : undefined}
             >
               <BlockBody block={block} />
+              <ComplianceBadges refs={block.complianceRefs} />
               {renderBlockGutter?.(block.id)}
             </div>
           ))}

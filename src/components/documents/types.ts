@@ -25,6 +25,9 @@ export interface DocBlock {
   splitFrom?: string;         // lineage when a block is split (set by the editor in Slice 3)
   effectivity?: string[];     // per-tail/type applicability — field now, UI later (spec D-12)
   figureRef?: string;         // image src for 'figure' blocks
+  /** Regulation requirement ids this block satisfies (into regCatalog) — G1
+   * compliance linking. Part of block content, so it rides the four-eyes revision. */
+  complianceRefs?: string[];
 }
 
 export interface DocSection {
