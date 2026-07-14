@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BarChart3, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload } from 'lucide-react';
+import { BarChart3, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -28,6 +28,7 @@ import { ApprovalQueuePanel } from '../components/ApprovalQueuePanel';
 import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
 import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
+import { ComplianceMatrix } from '../components/ComplianceMatrix';
 import { DocEditorDialog } from '../components/DocEditorDialog';
 import { docxToImport } from '../engine/docxImport';
 import { operatorTodayIso } from '../../../lib/operatorDate';
@@ -188,6 +189,11 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
               <BarChart3 className="h-4 w-4" /> Compliance
             </TabsTrigger>
           )}
+          {manager && (
+            <TabsTrigger value="coverage" className="gap-1.5">
+              <ShieldCheck className="h-4 w-4" /> Reg coverage
+            </TabsTrigger>
+          )}
           {pendingApprovals.length > 0 || manager ? (
             <TabsTrigger value="approvals" className="gap-1.5">
               <CheckSquare className="h-4 w-4" /> Approvals
@@ -307,6 +313,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
         <TabsContent value="compliance" className="mt-4">
           <ComplianceDashboard />
+        </TabsContent>
+
+        <TabsContent value="coverage" className="mt-4">
+          <ComplianceMatrix />
         </TabsContent>
 
         <TabsContent value="approvals" className="mt-4">

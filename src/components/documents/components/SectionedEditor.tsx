@@ -5,7 +5,7 @@ import type { DocSection } from '../types';
 import { BlockEditRow } from './BlockEditRow';
 import {
   editBlockMd, addBlockAfter, deleteBlock, moveBlock, splitBlock, mergeBlockUp,
-  addSection, moveSection, setSectionHeading, deleteSection,
+  addSection, moveSection, setSectionHeading, deleteSection, setBlockComplianceRefs,
 } from '../engine/blockEditor';
 
 /** Structured, ID-preserving content editor. Controlled: mutates via the pure
@@ -49,6 +49,7 @@ export function SectionedEditor({ sections, onChange }: { sections: DocSection[]
                 onMove={(dir) => onChange(moveBlock(sections, block.id, dir))}
                 onAddAfter={() => onChange(addBlockAfter(sections, block.id))}
                 onDelete={() => onChange(deleteBlock(sections, block.id))}
+                onSetRefs={(refs) => onChange(setBlockComplianceRefs(sections, block.id, refs))}
               />
             ))}
           </div>

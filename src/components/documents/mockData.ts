@@ -8,6 +8,7 @@ import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
 import { mockSha256 } from '../tech-log/engine/signing';
 import { sectionsFromMarkdown, checksumForSections } from './engine/blocks';
+import { applyComplianceRefs } from './engine/regCatalog';
 import { operatorTodayIso } from '../../lib/operatorDate';
 
 function daysFromNow(n: number): string {
@@ -134,7 +135,10 @@ const sop1r2: DocRevision = {
   docId: 'SOP-001',
   revision: '2.0',
   status: 'published',
-  sections: sectionsFromMarkdown(SOP1_R2_CONTENT, 'SOP-001'),
+  sections: applyComplianceRefs(sectionsFromMarkdown(SOP1_R2_CONTENT, 'SOP-001'), {
+    'Criteria (all must be met)': ['far-91-175', 'opspec-c074'],
+    'Go-Around Callout (standardized)': ['far-91-175'],
+  }),
   changeSummary:
     'Stabilized-approach gate raised from 500 ft to 1,000 ft AFE for circling approaches; go-around callout standardized ("GO AROUND", immediate execution).',
   effectiveDate: daysFromNow(-3),
@@ -175,7 +179,11 @@ const gom3r1: DocRevision = {
   docId: 'GOM-3',
   revision: '12.0',
   status: 'published',
-  sections: sectionsFromMarkdown(GOM3_CONTENT, 'GOM-3'),
+  sections: applyComplianceRefs(sectionsFromMarkdown(GOM3_CONTENT, 'GOM-3'), {
+    'Operational Control': ['far-91-403', 'opspec-a010'],
+    'Crew Qualification & Currency': ['far-91-409'],
+    'Weather Minimums': ['far-91-175'],
+  }),
   changeSummary: 'Fuel policy (§3.5) aligned with the new 45-minute reserve wording; international ops cross-references updated.',
   effectiveDate: daysFromNow(-30),
   authorUserId: 'role:document-manager',
