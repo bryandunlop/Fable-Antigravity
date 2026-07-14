@@ -5,7 +5,21 @@ import {
   canonicalizeSections,
   checksumForSections,
   sectionsPlainText,
+  classifyBlockMd,
 } from './blocks';
+
+describe('classifyBlockMd', () => {
+  it('classifies paragraph, list, callout, figure', () => {
+    expect(classifyBlockMd('Just a sentence.').type).toBe('paragraph');
+    expect(classifyBlockMd('- a\n- b').type).toBe('list');
+    const c = classifyBlockMd('> [!WARNING]\n> Do not exceed VMO.');
+    expect(c.type).toBe('callout');
+    expect(c.calloutKind).toBe('warning');
+    const f = classifyBlockMd('![diagram](/img/x.png)');
+    expect(f.type).toBe('figure');
+    expect(f.figureRef).toBe('/img/x.png');
+  });
+});
 
 const GOM = `# General Operations Manual — Chapter 3
 

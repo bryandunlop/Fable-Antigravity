@@ -71,6 +71,13 @@ function classify(chunk: string): { type: BlockType; calloutKind?: DocBlock['cal
   return { type: 'paragraph' };
 }
 
+/** Public re-classifier for the structured editor: given a block's edited
+ * markdown, return its type + callout/figure metadata (id/splitFrom are the
+ * editor's concern, not derived here). */
+export function classifyBlockMd(md: string): { type: BlockType; calloutKind?: DocBlock['calloutKind']; figureRef?: string } {
+  return classify(md.trim());
+}
+
 export function sectionsFromMarkdown(markdown: string, docId: string): DocSection[] {
   const raws = splitRawSections(markdown).map((raw) => ({ raw, chunks: chunkBody(raw.body) }));
   // Drop a fully empty leading preamble (e.g. a blank line before the first heading)
