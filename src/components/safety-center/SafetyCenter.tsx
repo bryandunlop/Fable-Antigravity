@@ -17,8 +17,9 @@ import { PublishedArea } from './PublishedArea';
 import { FormManager } from './FormManager';
 import { OperationsAudits, MyAudits, auditsForMe } from './AuditsArea';
 import { ReviewsArea } from './ReviewsArea';
-import { ReadAndInitialInbox } from './ReadAndSign';
-import { useRequiredReads, pendingForUser } from './requiredReads';
+import { RequiredReadsList } from '../documents/components/RequiredReadsList';
+import { useDocuments, identityFor } from '../documents/DocumentsContext';
+import { unacknowledgedRequiredReads } from '../documents/engine/acknowledgments';
 import { createAsap } from './asapReports';
 import { createCws } from './cwsRecognitions';
 import MyFRATSubmissions from '../MyFRATSubmissions';
@@ -49,10 +50,20 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const feed = useNotificationFeed(userRole, additionalRoles);
   const { submitHazard, updateHazard } = useHazards();
   const { audits } = useAudits();
-  const { reads, acks } = useRequiredReads();
+  // Read-and-sign is served by the one Documents compliance engine (TL-6 / D29),
+  // not a Safety-Center-local store. Required reads are role-targeted; the demo's
+  // crew user resolves to a representative id per role.
+  const { state: docsState } = useDocuments();
+  const { userId: docsUserId } = identityFor(userRole);
   const navigate = useNavigate();
 
-  const pendingInitials = pendingForUser(reads, acks, CURRENT_USER.name).length;
+  const pendingInitials = unacknowledgedRequiredReads(
+    docsState.docs,
+    docsState.revisions,
+    docsState.acknowledgments,
+    userRole,
+    docsUserId,
+  ).length;
   const auditsDue = auditsForMe(audits).filter((a) => a.status !== 'Complete').length;
   const needsYou = model.my.move.length + pendingInitials + auditsDue;
 
@@ -271,7 +282,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
               : (
                 <>
                   <SectionHeading>Needs you today</SectionHeading>
-                  <ReadAndInitialInbox currentUser={CURRENT_USER} bare />
+                  {pendingInitials > 0 && <RequiredReadsList userRole={userRole} />}
                   <div className="mt-2"><MyAudits dueOnly /></div>
                   <div className="mt-2"><MoveList items={model.my.move} view="my" heading={null} doneSet={doneSet} onToggle={toggleDone} onOpen={open} /></div>
                 </>

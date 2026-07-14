@@ -1,7 +1,7 @@
 // Published = the safety communications hub. Groups the de-identified reports
-// library, the read-and-initial bulletins (manager), the periodic Safety
-// Newsletter (new), and the CWS recognitions wall (new) under one sub-nav so we
-// don't add more top-level tabs.
+// library, the periodic Safety Newsletter, and the CWS recognitions wall under
+// one sub-nav so we don't add more top-level tabs. (Read-and-initial bulletins
+// moved to the unified Documents module — authoring is at /documents; TL-6 / D29.)
 
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
@@ -12,18 +12,16 @@ import { Label } from '../ui/label';
 import { Award, Newspaper, Send } from 'lucide-react';
 import { eventStore } from '../../notifications/events';
 import { PublishedReports } from './PublishedReports';
-import { BulletinsManager } from './ReadAndSign';
 import { useCws } from './cwsRecognitions';
 import { useNewsletters, type Newsletter } from './newsletters';
 import type { PublishedReport, SafetyView } from './types';
 
-type Sub = 'reports' | 'bulletins' | 'newsletters' | 'recognitions';
+type Sub = 'reports' | 'newsletters' | 'recognitions';
 
 export function PublishedArea({ view, reports }: { view: SafetyView; reports: PublishedReport[] }) {
   const isMgr = view === 'ops';
   const tabs: { key: Sub; label: string }[] = [
     { key: 'reports', label: 'Reports' },
-    ...(isMgr ? [{ key: 'bulletins' as Sub, label: 'Bulletins' }] : []),
     { key: 'newsletters', label: 'Newsletters' },
     { key: 'recognitions', label: 'Recognitions' },
   ];
@@ -40,7 +38,6 @@ export function PublishedArea({ view, reports }: { view: SafetyView; reports: Pu
         ))}
       </div>
       {sub === 'reports' && <PublishedReports reports={reports} />}
-      {sub === 'bulletins' && isMgr && <div className="mt-2"><BulletinsManager /></div>}
       {sub === 'newsletters' && <NewsletterPanel isMgr={isMgr} />}
       {sub === 'recognitions' && <RecognitionsWall />}
     </div>
