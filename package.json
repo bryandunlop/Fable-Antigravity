@@ -43,6 +43,7 @@
             "drizzle-orm": "^0.45.2",
             "embla-carousel-react": "^8.6.0",
             "hono": "*",
+            "idb": "^8.0.3",
             "input-otp": "^1.4.2",
             "js-confetti": "^0.13.1",
             "lucide-react": "^0.487.0",

@@ -4,21 +4,31 @@ import { Button } from '../../ui/button';
 import { Textarea } from '../../ui/textarea';
 import type { Doc, DocRevision } from '../types';
 import { useDocuments, publishSuggestionFiledEvent, identityFor } from '../DocumentsContext';
+import { useOffline } from '../hooks/useOffline';
+import { queueOutbox } from '../store/offlineController';
 
 /** Block-anchored suggestion composer, shown inline in the reader gutter. */
 export function InlineSuggestComposer({
   doc, rev, blockId, userRole, onDone,
 }: { doc: Doc; rev: DocRevision; blockId: string; userRole: string; onDone: () => void }) {
   const { addSuggestion } = useDocuments();
+  const { online } = useOffline();
   const [proposedChange, setProposedChange] = useState('');
   const [rationale, setRationale] = useState('');
 
   const submit = () => {
     if (proposedChange.trim().length < 10) { toast.error('Describe the change (at least a sentence).'); return; }
     if (rationale.trim().length < 5) { toast.error('A brief rationale is required.'); return; }
+    // Written durably to local state now (survives offline); if offline, also queued
+    // in the outbox to sync to the server/owner feed on reconnect (spec §8, D-9).
     addSuggestion({ doc, rev, blockId, proposedChange, rationale, userRole });
-    publishSuggestionFiledEvent(doc, identityFor(userRole).userName);
-    toast.success(`Suggestion filed — routed to ${doc.ownerName}.`);
+    if (online) {
+      publishSuggestionFiledEvent(doc, identityFor(userRole).userName);
+      toast.success(`Suggestion filed — routed to ${doc.ownerName}.`);
+    } else {
+      void queueOutbox('suggestion', `Suggestion on ${doc.id}`);
+      toast.success('Saved offline — queued; will sync when you reconnect.');
+    }
     onDone();
   };
 
