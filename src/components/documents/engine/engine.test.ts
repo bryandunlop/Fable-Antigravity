@@ -133,8 +133,14 @@ describe('revisions', () => {
     expect(nextDocId({ idPrefix: 'SOP' }, [{ id: 'SOP-001' }, { id: 'SOP-007' }, { id: 'PB-020' }])).toBe('SOP-008');
     expect(nextDocId({ idPrefix: 'TK' }, [])).toBe('TK-001');
   });
-  it('nextRevisionId is monotonic over all of the doc revisions', () => {
-    expect(nextRevisionId('SOP-001', [rev(), rev({ id: 'x' })])).toBe('SOP-001-r3');
+  it('nextRevisionId is max -rN suffix + 1, resilient to withdrawn gaps (C8)', () => {
+    // sequential revisions → next is one past the highest
+    expect(nextRevisionId('SOP-001', [rev({ id: 'SOP-001-r1' }), rev({ id: 'SOP-001-r2' })])).toBe('SOP-001-r3');
+    // r2 was withdrawn, leaving a gap (r1, r3): counting length would regenerate r3 and collide —
+    // the id must clear the highest existing suffix instead.
+    expect(nextRevisionId('SOP-001', [rev({ id: 'SOP-001-r1' }), rev({ id: 'SOP-001-r3' })])).toBe('SOP-001-r4');
+    // ids that don't match the -rN shape don't count toward the sequence
+    expect(nextRevisionId('SOP-001', [rev({ id: 'SOP-001-r1' }), rev({ id: 'x' })])).toBe('SOP-001-r2');
   });
   it('applyPublish supersedes the prior published revision — single-published invariant', () => {
     const state = {
