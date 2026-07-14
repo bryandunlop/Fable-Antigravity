@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { BlockDiff, DocDiff, WordSegment } from '../engine/diff';
 import { BlockBody } from './SectionedContent';
 
@@ -24,7 +25,7 @@ function WordSegments({ segments }: { segments: WordSegment[] }) {
   );
 }
 
-function BlockRow({ bd }: { bd: BlockDiff }) {
+function BlockRow({ bd, renderBlockGutter }: { bd: BlockDiff; renderBlockGutter?: (blockId: string) => ReactNode }) {
   if (bd.kind === 'removed') {
     return (
       <details data-block-id={bd.id} data-changed className="my-2 rounded border border-dashed border-orange-300 bg-orange-50/50 px-3 py-1.5 text-sm dark:border-orange-900 dark:bg-orange-950/20">
@@ -38,7 +39,7 @@ function BlockRow({ bd }: { bd: BlockDiff }) {
     <div
       data-block-id={bd.id}
       data-changed={changed || undefined}
-      className={`${changed ? CHANGE_BAR : ''} ${bd.kind === 'added' ? ADDED_TINT : ''}`}
+      className={`${changed ? CHANGE_BAR : ''} ${bd.kind === 'added' ? ADDED_TINT : ''} ${renderBlockGutter ? 'group relative pr-10' : ''}`}
     >
       {bd.kind === 'moved' && <span className={`${CHANGED_CHIP} mb-1 inline-block`}>Moved</span>}
       {bd.kind === 'modified' && bd.segments ? (
@@ -46,13 +47,20 @@ function BlockRow({ bd }: { bd: BlockDiff }) {
       ) : bd.block ? (
         <BlockBody block={bd.block} />
       ) : null}
+      {renderBlockGutter?.(bd.id)}
     </div>
   );
 }
 
 /** Renders the next-revision tree with computed change marks. `data-changed`
  * attributes let the reader's prev/next navigation find changed elements. */
-export function DiffedContent({ diff }: { diff: DocDiff }) {
+export function DiffedContent({
+  diff,
+  renderBlockGutter,
+}: {
+  diff: DocDiff;
+  renderBlockGutter?: (blockId: string) => ReactNode;
+}) {
   return (
     <>
       {diff.sections.map((sd) => {
@@ -77,7 +85,7 @@ export function DiffedContent({ diff }: { diff: DocDiff }) {
               </div>
             )}
             {sd.blocks.map((bd) => (
-              <BlockRow key={bd.id} bd={bd} />
+              <BlockRow key={bd.id} bd={bd} renderBlockGutter={renderBlockGutter} />
             ))}
           </section>
         );

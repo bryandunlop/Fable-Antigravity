@@ -2,7 +2,7 @@
 // content; dates are computed relative to load time so the demo's review/ack
 // clocks stay meaningful (a DATA_VERSION bump migrates the stored state
 // forward — see engine/migrations.ts; only a fresh install re-seeds).
-import type { Doc, DocRevision, DocAcknowledgment, DocComment, DocSuggestion, DocumentsState } from './types';
+import type { Doc, DocRevision, DocAcknowledgment, DocComment, DocSuggestion, DocSuggestionReply, DocumentsState } from './types';
 import type { Signature } from '../tech-log/types';
 import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
@@ -407,6 +407,8 @@ const SEED_SUGGESTIONS: DocSuggestion[] = [
   },
 ];
 
+const SEED_SUGGESTION_REPLIES: DocSuggestionReply[] = [];
+
 /** Default state: module seeds + the legacy bulletin seeds mapped into the unified model. */
 export function getSeedState(): DocumentsState {
   const bulletinDocs: Doc[] = [];
@@ -422,6 +424,7 @@ export function getSeedState(): DocumentsState {
     acknowledgments: SEED_ACKS,
     comments: SEED_COMMENTS,
     suggestions: SEED_SUGGESTIONS,
+    suggestionReplies: SEED_SUGGESTION_REPLIES,
     reviews: [],
     signatures: [seedSignature],
   };

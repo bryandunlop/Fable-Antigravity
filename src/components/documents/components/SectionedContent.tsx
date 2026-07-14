@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { DocSection, DocBlock } from '../types';
@@ -31,7 +32,13 @@ export function BlockBody({ block }: { block: DocBlock }) {
   return <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.md}</ReactMarkdown>;
 }
 
-export function SectionedContent({ sections }: { sections: DocSection[] }) {
+export function SectionedContent({
+  sections,
+  renderBlockGutter,
+}: {
+  sections: DocSection[];
+  renderBlockGutter?: (blockId: string) => ReactNode;
+}) {
   return (
     <>
       {sections.map((section) => (
@@ -43,8 +50,13 @@ export function SectionedContent({ sections }: { sections: DocSection[] }) {
               <h2>{section.number ? `${section.number} ` : ''}{section.title}</h2>
             ))}
           {section.blocks.map((block) => (
-            <div key={block.id} data-block-id={block.id}>
+            <div
+              key={block.id}
+              data-block-id={block.id}
+              className={renderBlockGutter ? 'group relative pr-10' : undefined}
+            >
               <BlockBody block={block} />
+              {renderBlockGutter?.(block.id)}
             </div>
           ))}
         </section>

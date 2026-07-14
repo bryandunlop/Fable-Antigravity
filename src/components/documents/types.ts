@@ -140,6 +140,19 @@ export interface DocSuggestion {
   createdAtUtc: string;
 }
 
+/** A reply on a suggestion's inline discussion thread. Working discussion, not a
+ * signed ledger record (mirrors DocComment); the accepted change still rides the
+ * four-eyes revision pipeline. */
+export interface DocSuggestionReply {
+  id: string;
+  suggestionId: string;
+  authorUserId: string;
+  authorName: string;
+  role: string;
+  text: string;
+  createdAtUtc: string;
+}
+
 /** Periodic-review completion without a new revision. */
 export interface DocReviewRecord {
   id: string;
@@ -157,6 +170,7 @@ export interface DocumentsState {
   acknowledgments: DocAcknowledgment[];
   comments: DocComment[];
   suggestions: DocSuggestion[];
+  suggestionReplies: DocSuggestionReply[];
   reviews: DocReviewRecord[];
   /** Signature-level ack records (tech-log Signature shape, shared e-sign component). */
   signatures: Signature[];
