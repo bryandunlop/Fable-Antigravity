@@ -26,7 +26,7 @@ import { BlockSuggestGutter } from '../components/BlockSuggestGutter';
 import { InlineSuggestComposer } from '../components/InlineSuggestComposer';
 import { InlineSuggestionThread } from '../components/InlineSuggestionThread';
 import { openSuggestionsByBlock, canSeeSuggestion } from '../engine/suggestions';
-import { identityFor } from '../DocumentsContext';
+import { identityFor, publishWithdrawnEvent } from '../DocumentsContext';
 import {
   IDLE_ACCEPT_FLOW, beginAccept, acceptFlowOnPersisted, acceptFlowOnCancelled, acceptPrefill, type AcceptFlow,
 } from '../engine/acceptFlow';
@@ -38,7 +38,7 @@ import { SyncAgeChip } from '../components/SyncAgeChip';
 
 export function DocReader({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { docId } = useParams<{ docId: string }>();
-  const { state, resolveSuggestion } = useDocuments();
+  const { state, resolveSuggestion, withdrawDraft } = useDocuments();
   const [editor, setEditor] = useState<EditorMode | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [showChanges, setShowChanges] = useState(true);
@@ -266,7 +266,18 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
 
       {(manager || author) && allRevs.length > 0 && (
         <GfoPanel title="Revision history" action={<History className="h-4 w-4 text-muted-foreground" />}>
-          <RevisionTimeline revisions={allRevs} />
+          <RevisionTimeline
+            revisions={allRevs}
+            canManage={manager || author}
+            onWithdraw={(revisionId, reason) => {
+              const target = allRevs.find((r) => r.id === revisionId);
+              withdrawDraft(revisionId, reason, userRole);
+              // C7: tell the approver pool if we pulled something out of their queue.
+              if (target?.status === 'pending-approval') {
+                publishWithdrawnEvent(doc, target, identityFor(userRole).userName);
+              }
+            }}
+          />
         </GfoPanel>
       )}
 

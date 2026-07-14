@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
 import { GFO_STATUS_CLASS, type GfoStatus } from '../../gfo/status';
 import type { DocRevision, RevisionStatus } from '../types';
 
@@ -9,6 +11,7 @@ const STATUS_TONE: Record<RevisionStatus, GfoStatus> = {
   published: 'success',
   superseded: 'neutral',
   rejected: 'error',
+  withdrawn: 'neutral',
 };
 
 const STATUS_LABEL: Record<RevisionStatus, string> = {
@@ -18,10 +21,34 @@ const STATUS_LABEL: Record<RevisionStatus, string> = {
   published: 'Published',
   superseded: 'Superseded',
   rejected: 'Rejected',
+  withdrawn: 'Withdrawn',
 };
 
-/** Manager-facing revision history: who wrote it, who decided, when it went live. */
-export function RevisionTimeline({ revisions }: { revisions: DocRevision[] }) {
+const WITHDRAWABLE: RevisionStatus[] = ['draft', 'pending-approval', 'rejected'];
+
+/** Manager-facing revision history: who wrote it, who decided, when it went live.
+ * When canManage + onWithdraw are provided, a not-yet-published revision can be
+ * withdrawn from here (reason required); withdrawn revisions stay in the history
+ * as a tombstone with their reason (C7). */
+export function RevisionTimeline({
+  revisions,
+  canManage = false,
+  onWithdraw,
+}: {
+  revisions: DocRevision[];
+  canManage?: boolean;
+  onWithdraw?: (revisionId: string, reason: string) => void;
+}) {
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+
+  const confirmWithdraw = (id: string) => {
+    if (!reason.trim() || !onWithdraw) return;
+    onWithdraw(id, reason.trim());
+    setWithdrawingId(null);
+    setReason('');
+  };
+
   return (
     <ol className="space-y-2">
       {revisions.map((r) => (
@@ -29,7 +56,7 @@ export function RevisionTimeline({ revisions }: { revisions: DocRevision[] }) {
           <Badge variant="outline" className={`${GFO_STATUS_CLASS[STATUS_TONE[r.status]]} mt-0.5 shrink-0 border px-1.5 text-[10px]`}>
             {STATUS_LABEL[r.status]}
           </Badge>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-medium">Rev {r.revision} <span className="font-normal text-muted-foreground">· effective {r.effectiveDate}</span></p>
             <p className="text-xs text-muted-foreground">
               Authored by {r.authorName}
@@ -41,8 +68,39 @@ export function RevisionTimeline({ revisions }: { revisions: DocRevision[] }) {
             {r.status === 'rejected' && r.rejectionReason && (
               <p className="mt-1 text-xs text-muted-foreground">Reason: {r.rejectionReason}</p>
             )}
+            {r.status === 'withdrawn' && r.withdrawalReason && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Withdrawn{r.withdrawnByName ? ` by ${r.withdrawnByName}` : ''}: {r.withdrawalReason}
+              </p>
+            )}
             {r.changeSummary.trim() && (
               <p className="mt-1 text-xs text-muted-foreground">What changed: {r.changeSummary}</p>
+            )}
+
+            {canManage && onWithdraw && WITHDRAWABLE.includes(r.status) && (
+              withdrawingId === r.id ? (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Reason for withdrawal (required)…"
+                    rows={2}
+                    className="w-full rounded-md border border-border bg-background p-2 text-xs"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" disabled={!reason.trim()} onClick={() => confirmWithdraw(r.id)}>
+                      Confirm withdrawal
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setWithdrawingId(null); setReason(''); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => { setWithdrawingId(r.id); setReason(''); }}>
+                  Withdraw…
+                </Button>
+              )
             )}
           </div>
         </li>

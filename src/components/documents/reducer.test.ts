@@ -330,13 +330,6 @@ describe('documentsReducer misc guards', () => {
     expect(s.docs[0].nextReviewDate).toBe('2026-10-18');
   });
 
-  it('WITHDRAW_DRAFT removes an orphaned doc with its last revision', () => {
-    const s = state({ revisions: [rev({ status: 'draft' })] });
-    const out = documentsReducer(s, { type: 'WITHDRAW_DRAFT', payload: 'SOP-001-r1' });
-    expect(out.revisions).toHaveLength(0);
-    expect(out.docs).toHaveLength(0);
-  });
-
   it('RESOLVE_SUGGESTION only resolves open suggestions', () => {
     const sug = {
       id: 's1', docId: 'SOP-001', revisionId: 'SOP-001-r1', docTitle: 'T',
@@ -451,5 +444,58 @@ describe('documentsReducer scheduled publication (C3 — promotes mid-session, n
     const out = documentsReducer(s, { type: 'PROMOTE_SCHEDULED', payload: { atUtc: NOW, today: TODAY } });
     expect(out.revisions[0].status).toBe('approved');
     expect(out).toBe(s);
+  });
+});
+
+describe('documentsReducer WITHDRAW_DRAFT ceremony (C7 — tombstone, not hard-delete)', () => {
+  function withdraw(over: Partial<Extract<DocumentsAction, { type: 'WITHDRAW_DRAFT' }>['payload']> = {}): DocumentsAction {
+    return {
+      type: 'WITHDRAW_DRAFT',
+      payload: {
+        revisionId: 'SOP-001-r1',
+        reason: 'Superseded by a broader revision.',
+        byUserId: 'USR007',
+        byName: 'Emily Chen',
+        byRoles: ['procedural-specialist'],
+        atUtc: NOW,
+        ...over,
+      },
+    };
+  }
+
+  it('withdraws to a tombstone — status withdrawn, reason + who/when recorded, revision retained', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw());
+    expect(out.revisions).toHaveLength(1); // retained for audit, never deleted
+    const r = out.revisions[0];
+    expect(r.status).toBe('withdrawn');
+    expect(r.withdrawalReason).toBe('Superseded by a broader revision.');
+    expect(r.withdrawnByName).toBe('Emily Chen');
+    expect(r.withdrawnAtUtc).toBe(NOW);
+  });
+
+  it('never drops the doc, even when the withdrawn revision was its last', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw());
+    expect(out.docs).toHaveLength(1);
+    expect(out.docs[0].id).toBe('SOP-001');
+  });
+
+  it('can withdraw a pending-approval revision (pulls it from the queue)', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'pending-approval' })] }), withdraw());
+    expect(out.revisions[0].status).toBe('withdrawn');
+  });
+
+  it('a blank reason is a no-op', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw({ reason: '  ' }));
+    expect(out.revisions[0].status).toBe('draft');
+  });
+
+  it('a non-author, non-manager cannot withdraw', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw({ byRoles: ['pilot'] }));
+    expect(out.revisions[0].status).toBe('draft');
+  });
+
+  it('a published revision cannot be withdrawn', () => {
+    const out = documentsReducer(state({ revisions: [rev({ status: 'published' })] }), withdraw());
+    expect(out.revisions[0].status).toBe('published');
   });
 });

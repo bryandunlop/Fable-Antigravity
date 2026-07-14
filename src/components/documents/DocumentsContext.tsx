@@ -147,7 +147,7 @@ export type DocumentsAction =
   | { type: 'TOGGLE_ARCHIVE'; payload: string }
   | { type: 'CREATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DRAFT'; payload: DocRevision }
-  | { type: 'WITHDRAW_DRAFT'; payload: string }
+  | { type: 'WITHDRAW_DRAFT'; payload: { revisionId: string; reason: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string } }
   | { type: 'SUBMIT_FOR_APPROVAL'; payload: { revisionId: string; atUtc: string } }
   | {
       type: 'DECIDE_APPROVAL';
@@ -267,18 +267,41 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       };
     }
     case 'WITHDRAW_DRAFT': {
-      const existing = state.revisions.find((r) => r.id === action.payload);
+      // C7 withdrawal ceremony: withdraw is a *tombstone*, not a hard delete — the
+      // revision is retained with status 'withdrawn' + who/when/reason, and the doc is
+      // never dropped. A reason is required, and only an author of the doc's class or a
+      // document manager may withdraw.
+      const p = action.payload;
+      const existing = state.revisions.find((r) => r.id === p.revisionId);
       if (!existing || (existing.status !== 'draft' && existing.status !== 'rejected' && existing.status !== 'pending-approval')) {
-        warnNoop('only a draft or pending revision can be withdrawn');
+        warnNoop('only a draft, rejected, or pending revision can be withdrawn');
         return state;
       }
-      const remaining = state.revisions.filter((r) => r.id !== action.payload);
-      // A doc with no remaining revisions disappears with its last draft.
-      const stillHasRevs = remaining.some((r) => r.docId === existing.docId);
+      if (!p.reason || !p.reason.trim()) {
+        warnNoop('a withdrawal reason is required');
+        return state;
+      }
+      const parent = state.docs.find((d) => d.id === existing.docId);
+      const authorized =
+        rolesCanManageDocuments(p.byRoles) || (!!parent && canAuthor(classFor(parent.classId), p.byRoles));
+      if (!authorized) {
+        warnNoop('withdrawing a revision requires a document manager or an author of the doc');
+        return state;
+      }
       return {
         ...state,
-        revisions: remaining,
-        docs: stillHasRevs ? state.docs : state.docs.filter((d) => d.id !== existing.docId),
+        revisions: state.revisions.map((r) =>
+          r.id === p.revisionId
+            ? {
+                ...r,
+                status: 'withdrawn' as const,
+                withdrawnAtUtc: p.atUtc,
+                withdrawnByUserId: p.byUserId,
+                withdrawnByName: p.byName,
+                withdrawalReason: p.reason.trim(),
+              }
+            : r,
+        ),
       };
     }
     case 'SUBMIT_FOR_APPROVAL': {
@@ -496,7 +519,7 @@ interface Ctx {
   toggleArchive: (docId: string) => void;
   createDraft: (revision: DocRevision, actorRoles: string[]) => void;
   updateDraft: (revision: DocRevision) => void;
-  withdrawDraft: (revisionId: string) => void;
+  withdrawDraft: (revisionId: string, reason: string, userRole: string) => void;
   submitForApproval: (revisionId: string) => void;
   decideApproval: (input: {
     revisionId: string;
@@ -731,7 +754,13 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     toggleArchive: useCallback((id) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: id }), []),
     createDraft: useCallback((r, actorRoles) => dispatch({ type: 'CREATE_DRAFT', payload: { revision: r, actorRoles } }), []),
     updateDraft: useCallback((r) => dispatch({ type: 'UPDATE_DRAFT', payload: r }), []),
-    withdrawDraft: useCallback((id) => dispatch({ type: 'WITHDRAW_DRAFT', payload: id }), []),
+    withdrawDraft: useCallback((revisionId, reason, userRole) => {
+      const { userId, userName } = identityFor(userRole);
+      dispatch({
+        type: 'WITHDRAW_DRAFT',
+        payload: { revisionId, reason, byUserId: userId, byName: userName, byRoles: [userRole], atUtc: nowUtc() },
+      });
+    }, []),
     submitForApproval,
     decideApproval,
     publishDirect: useCallback((revisionId) => {
@@ -776,6 +805,19 @@ export function publishApprovalRequestedEvent(doc: Doc, rev: DocRevision): void 
     severity: 'info',
     title: `Approval requested: ${doc.title}`,
     detail: `${doc.id} rev ${rev.revision} submitted by ${rev.authorName}`,
+    module: 'Documents',
+    link: '/documents',
+    audienceRoles: classFor(doc.classId).approverRoles,
+  });
+}
+
+/** C7: tell the approver pool that a revision awaiting their decision was pulled. */
+export function publishWithdrawnEvent(doc: Doc, rev: DocRevision, byName: string): void {
+  eventStore.publish({
+    id: `doc-withdrawn:${rev.id}`,
+    severity: 'info',
+    title: `Approval request withdrawn: ${doc.title}`,
+    detail: `${doc.id} rev ${rev.revision} was withdrawn by ${byName}`,
     module: 'Documents',
     link: '/documents',
     audienceRoles: classFor(doc.classId).approverRoles,

@@ -13,7 +13,8 @@ export type RevisionStatus =
   | 'approved' // approved with a future effectiveDate; promoted to 'published' when the date arrives
   | 'published'
   | 'superseded'
-  | 'rejected';
+  | 'rejected'
+  | 'withdrawn'; // author/manager pulled it before publication — kept as a tombstone (C7)
 
 export type BlockType = 'paragraph' | 'heading' | 'list' | 'table' | 'callout' | 'figure';
 
@@ -82,6 +83,11 @@ export interface DocRevision {
   decidedByName?: string;
   rejectionReason?: string;
   publishedAtUtc?: string;
+  // Withdrawal tombstone (C7): a draft/pending/rejected revision pulled before publication.
+  withdrawnAtUtc?: string;
+  withdrawnByUserId?: string;
+  withdrawnByName?: string;
+  withdrawalReason?: string;
   /** Doc-identity changes (title/audience/category/tags) riding this revision
    * through four-eyes; applied to the Doc when the revision publishes. A live
    * controlled doc's meta is never edited in place (C1). */
