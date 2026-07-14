@@ -50,3 +50,13 @@ export function submitFuelOnLeg(args: Base & { lbs: number; nowMs: number }): { 
     `${args.trip.tripNumber} leg ${args.leg.sequence} fuel ${args.lbs} lb submitted to ${args.leg.departureIcao} fuel farm`);
   return { ok: true };
 }
+
+export function setPlannedFuelOnLeg(args: Base & { lbs: number }): void {
+  patchLeg(args, { plannedFuelLb: args.lbs }, 'LEG_PLANNED_FUEL_SET',
+    `${args.trip.tripNumber} leg ${args.leg.sequence} planned fuel set to ${args.lbs} lb`);
+}
+
+export function markFuelFinalOnLeg(args: Base & { nowUtc: string }): void {
+  patchLeg(args, { fuelFinalizedByOid: args.actorOid, fuelFinalizedAtUtc: args.nowUtc }, 'LEG_FUEL_FINALIZED',
+    `${args.trip.tripNumber} leg ${args.leg.sequence} fuel finalized at ${args.leg.plannedFuelLb ?? '—'} lb`);
+}

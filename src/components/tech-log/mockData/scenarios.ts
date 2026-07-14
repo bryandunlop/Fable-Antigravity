@@ -6,9 +6,9 @@ import type {
 } from '../types';
 import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
+import { SEED_CHECKLIST_TEMPLATES } from './checklistTemplates';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { makeSignature } from '../engine/signing';
-import { DEFAULT_PREFLIGHT_CHECKLIST } from '../constants';
 
 /**
  * Builds the seeded demo world. Dates are RELATIVE to "now" so the AMBER aircraft
@@ -397,12 +397,22 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   const briefRelAt = iso(2 * H);
   const briefRelSig = makeSignature({ id: 'sig-brief-1', signedEntity: 'BRIEFING', signedEntityId: 'brief-1', signer: tech, intentStatement: 'seed', signedAtUtc: briefRelAt, certNumber: tech.apCertificateNumber });
   signatures.push(briefRelSig);
+  const g650erPreflight = SEED_CHECKLIST_TEMPLATES.find(t => t.aircraftType === 'G650ER' && t.phase === 'PREFLIGHT')!;
   const briefings: FlightBriefing[] = [
     {
       id: 'brief-1', aircraftId: 'ac-n2pg', preparedByOid: tech.oid, createdAtUtc: iso(3 * H), status: 'RELEASED',
-      checklist: DEFAULT_PREFLIGHT_CHECKLIST.map((c, i) => ({ id: `brc-${i}`, text: c.text, mandatory: c.mandatory, done: true, source: 'TEMPLATE' as const })),
+      checklistInstanceId: 'cli-seed-brief-1',
       fuelPlannedLb: 18000, notes: 'Ready for the morning KLUK–KTEB leg. No open items.',
       serviceabilityAtRelease: 'GREEN', releasedAtUtc: briefRelAt, releaseSignatureId: briefRelSig.id,
+    },
+  ];
+  const checklistInstances = [
+    {
+      id: 'cli-seed-brief-1', aircraftId: 'ac-n2pg', phase: 'PREFLIGHT' as const, templateId: g650erPreflight.id, templateVersion: g650erPreflight.version,
+      briefingId: 'brief-1', createdAtUtc: iso(3 * H), signatureId: briefRelSig.id,
+      entries: g650erPreflight.sections.flatMap(s => s.items).map(def => ({
+        itemDefId: def.id, state: 'DONE' as const, startedByOid: tech.oid, startedAtUtc: iso(3 * H), completedByOid: tech.oid, completedAtUtc: iso(3 * H),
+      })),
     },
   ];
 
@@ -436,6 +446,8 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     trips,
     briefings,
     postflights: [],
+    checklistTemplates: SEED_CHECKLIST_TEMPLATES,
+    checklistInstances,
     coordinationMessages: [
       { id: 'cm-seed-1', aircraftId: 'ac-n2pg', authorOid: tech.oid, text: 'Aircraft fueled and ready for the morning KLUK–KTEB leg.', atUtc: iso(3 * H) },
     ],

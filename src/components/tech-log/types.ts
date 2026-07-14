@@ -14,6 +14,7 @@ export interface Aircraft {
   homeBase: string;
   airframeTotalHours: number;
   airframeTotalCycles: number;
+  standbyFuelLoadLb?: number;
 }
 
 export type DefectSource = 'PIREP' | 'MAREP' | 'CABIN' | 'STRUCTURAL' | 'NEF';
@@ -367,6 +368,9 @@ export interface TripLeg {
   fratDraft?: FratDraft;            // saved-but-unsubmitted FRAT answers (mutable orchestration, not a signed record)
   airportReviewed: boolean;         // origin + destination airport info acknowledged
   fuelRequestId?: string;           // set when a home-base fuel-farm submission exists
+  plannedFuelLb?: number;
+  fuelFinalizedByOid?: string;
+  fuelFinalizedAtUtc?: string;
 }
 
 // A FRAT saved mid-entry: just the selection matrix (by section/item index against the
@@ -393,19 +397,12 @@ export interface Trip {
 // ── Preflight checklist → Flight Briefing (maintenance → pilot handoff) ──
 export type BriefingStatus = 'DRAFT' | 'RELEASED' | 'ACKNOWLEDGED';
 
-export interface BriefingChecklistItem {
-  id: string;
-  text: string;
-  done: boolean;
-  mandatory?: boolean;
-  source?: 'TEMPLATE' | 'CAMP'; // pulled from a CAMP task vs a standing template item
-}
-
 /**
- * A maintenance "release for flight" briefing sent to the crew. The checklist + fuel + notes are
- * captured here; the airworthiness content (serviceability, MELs, defects, coming-due) is derived
- * live for display, with the headline serviceability snapshotted at release. Release + acknowledge
- * are e-signed events (not a CRS — this is a dispatch briefing).
+ * A maintenance "release for flight" briefing sent to the crew. Fuel + notes are captured here;
+ * the preflight checklist is a separate ChecklistInstance referenced by checklistInstanceId; the
+ * airworthiness content (serviceability, MELs, defects, coming-due) is derived live for display,
+ * with the headline serviceability snapshotted at release. Release + acknowledge are e-signed
+ * events (not a CRS — this is a dispatch briefing).
  */
 export interface FlightBriefing {
   id: string;
@@ -413,7 +410,7 @@ export interface FlightBriefing {
   preparedByOid: string;
   createdAtUtc: string;
   status: BriefingStatus;
-  checklist: BriefingChecklistItem[];
+  checklistInstanceId?: string;
   fuelPlannedLb?: number;
   notes?: string;
   // snapshot at release
@@ -437,11 +434,96 @@ export interface Postflight {
   briefingId?: string;        // the dispatch this closes, if known
   performedByOid: string;     // maintenance
   performedAtUtc: string;
-  checklist: BriefingChecklistItem[];
+  checklistInstanceId?: string;
   notes?: string;
   gatheredDefectIds: string[]; // still-open squawks gathered for the work queue
   signatureId: string;
   supersedesId?: string;
+}
+
+// ── Maintenance servicing checklists (AOD preflight/postflight) ──
+export type ChecklistPhase = 'PREFLIGHT' | 'POSTFLIGHT';
+export type ChecklistItemKind = 'CHECK' | 'MEASUREMENT' | 'NOTE';
+export type TemplateStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+export interface MeasurementFieldDef {
+  id: string;
+  label: string;
+  unit: string;
+  target?: string;
+}
+
+export interface ChecklistItemDef {
+  id: string;
+  kind: ChecklistItemKind;
+  label: string;
+  reference?: string;
+  requiredToRelease: boolean;
+  fields?: MeasurementFieldDef[]; // MEASUREMENT only
+}
+
+export interface ChecklistSectionDef {
+  id: string;
+  title: string;
+  items: ChecklistItemDef[];
+}
+
+/** Versioned/published reference data — an editing session never mutates a PUBLISHED row; publishing
+ * always appends a new row (same id, version+1 for an edit; a new id, version 1 for a clone). */
+export interface ChecklistTemplate {
+  id: string;
+  aircraftType: AircraftType;
+  phase: ChecklistPhase;
+  aodReference?: string;
+  version: number;
+  status: TemplateStatus;
+  effectiveFrom?: string;
+  clonedFromTemplateId?: string;
+  clonedFromVersion?: number;
+  sections: ChecklistSectionDef[];
+  createdByOid: string;
+  createdAtUtc: string;
+}
+
+export type ChecklistItemState = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'NA';
+
+export interface ChecklistItemEntry {
+  itemDefId: string;
+  state: ChecklistItemState;
+  startedByOid?: string;
+  startedAtUtc?: string;
+  completedByOid?: string;
+  completedAtUtc?: string;
+  naReason?: string;
+  values?: Record<string, string>;
+  note?: string;
+}
+
+export type FuelLoadSource = 'NEXT_FLIGHT' | 'STANDBY';
+
+export interface FuelLoadEntry {
+  source: FuelLoadSource;
+  targetLb: number;
+  loadedLb?: number;
+  loadedGal?: number;
+  fuelRequestId?: string;
+  recordedByOid: string;
+}
+
+/** Mutable working state until `signatureId` is set (mirrors a DRAFT FlightBriefing) — then frozen;
+ * a post-signature correction is a superseding signed instance, never an in-place edit. */
+export interface ChecklistInstance {
+  id: string;
+  aircraftId: string;
+  phase: ChecklistPhase;
+  templateId: string;
+  templateVersion: number;
+  briefingId?: string;
+  postflightId?: string;
+  entries: ChecklistItemEntry[];
+  fuelLoad?: FuelLoadEntry; // POSTFLIGHT only
+  signatureId?: string;
+  createdAtUtc: string;
 }
 
 export type RecordNoteTarget = 'DEFECT' | 'DEFERRAL' | 'BRIEFING' | 'POSTFLIGHT';
@@ -618,6 +700,8 @@ export interface TechLogState {
   campCorrelation: CampCorrelation[];   // OFF-ledger integration state (§18.1)
   integrationEvents: IntegrationEvent[];
   aogAcks?: AogAck[];                    // OFF-ledger AOG acknowledgement / escalation log
+  checklistTemplates: ChecklistTemplate[];
+  checklistInstances: ChecklistInstance[];
   currentUserOid: string;
   nowOverrideUtc?: string; // optional demo clock
 }
@@ -668,4 +752,7 @@ export type TechLogAction =
   | { type: 'ACK_AOG'; payload: AogAck }
   | { type: 'PROPOSE_CHANGE'; payload: PendingApproval }
   | { type: 'DECIDE_APPROVAL'; payload: { id: string; approve: boolean; decidedByOid: string; decidedAtUtc: string; rejectionReason?: string } }
+  | { type: 'ADD_CHECKLIST_TEMPLATE'; payload: ChecklistTemplate }
+  | { type: 'ADD_CHECKLIST_INSTANCE'; payload: ChecklistInstance }
+  | { type: 'EDIT_CHECKLIST_INSTANCE'; payload: ChecklistInstance }
   | { type: 'RESET_STATE'; payload: TechLogState };

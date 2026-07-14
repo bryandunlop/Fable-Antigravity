@@ -21,7 +21,7 @@ function ackDeferral(p: Partial<Deferral> = {}): Deferral {
   return { id: 'df1', defectId: 'd1', aircraftId: 'ac1', melItemId: 'm1', governingMmelRevision: 'Rev 1', governingEffectiveDate: NOW, category: 'C', dayOfDiscoveryUtc: NOW, clockStartDateUtc: NOW, governingTimezone: 'America/New_York', repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10, restrictionText: 'Day VMC only', placardRequired: false, mProcedureRequired: false, extensionUsed: false, riiRequired: false, melReviewAcknowledged: true, signedByOid: 'u', signatureId: 's', status: 'ACTIVE', ...p };
 }
 function briefing(p: Partial<FlightBriefing> = {}): FlightBriefing {
-  return { id: 'brief1', aircraftId: 'ac1', preparedByOid: 'm', createdAtUtc: NOW, status: 'ACKNOWLEDGED', checklist: [], ...p };
+  return { id: 'brief1', aircraftId: 'ac1', preparedByOid: 'm', createdAtUtc: NOW, status: 'ACKNOWLEDGED', ...p };
 }
 const clean = { aircraft: [ac], defects: [], deferrals: [] };
 
