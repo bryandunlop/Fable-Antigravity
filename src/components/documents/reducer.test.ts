@@ -430,6 +430,28 @@ describe('documentsReducer authorization guards (C12 — reducer-enforced, not j
     const out = documentsReducer(state(), { type: 'ADD_SUGGESTION', payload: sug });
     expect(out.suggestions).toHaveLength(0);
   });
+
+  // Pin/archive are library curation — shared with the bulletins surface, so the
+  // manage gate lives in the reducer (defense-in-depth behind the UI's canManage).
+  it('TOGGLE_PIN by a non-manager is a no-op', () => {
+    const out = documentsReducer(state(), { type: 'TOGGLE_PIN', payload: { docId: 'SOP-001', actorRoles: ['pilot'] } });
+    expect(out.docs[0].isPinned).toBe(false);
+  });
+
+  it('TOGGLE_PIN by a document manager flips isPinned', () => {
+    const out = documentsReducer(state(), { type: 'TOGGLE_PIN', payload: { docId: 'SOP-001', actorRoles: ['document-manager'] } });
+    expect(out.docs[0].isPinned).toBe(true);
+  });
+
+  it('TOGGLE_ARCHIVE by a non-manager is a no-op', () => {
+    const out = documentsReducer(state(), { type: 'TOGGLE_ARCHIVE', payload: { docId: 'SOP-001', actorRoles: ['pilot'] } });
+    expect(out.docs[0].isArchived).toBe(false);
+  });
+
+  it('TOGGLE_ARCHIVE by a document manager flips isArchived', () => {
+    const out = documentsReducer(state(), { type: 'TOGGLE_ARCHIVE', payload: { docId: 'SOP-001', actorRoles: ['document-manager'] } });
+    expect(out.docs[0].isArchived).toBe(true);
+  });
 });
 
 describe('documentsReducer scheduled publication (C3 — promotes mid-session, not just at load)', () => {
@@ -463,35 +485,52 @@ describe('documentsReducer WITHDRAW_DRAFT ceremony (C7 — tombstone, not hard-d
     };
   }
 
-  it('withdraws to a tombstone — status withdrawn, reason + who/when recorded, revision retained', () => {
-    const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw());
-    expect(out.revisions).toHaveLength(1); // retained for audit, never deleted
-    const r = out.revisions[0];
+  // --- Tombstone path: a revision of a doc that has already published ---
+  const livePlusPending = () =>
+    state({ revisions: [rev({ id: 'SOP-001-r1', status: 'published' }), rev({ id: 'SOP-001-r2', status: 'pending-approval' })] });
+
+  it('tombstones a revision of an already-published doc — status withdrawn, reason + who/when, revision retained', () => {
+    const out = documentsReducer(livePlusPending(), withdraw({ revisionId: 'SOP-001-r2' }));
+    expect(out.revisions).toHaveLength(2); // retained for audit, never deleted
+    const r = out.revisions.find((x) => x.id === 'SOP-001-r2')!;
     expect(r.status).toBe('withdrawn');
     expect(r.withdrawalReason).toBe('Superseded by a broader revision.');
     expect(r.withdrawnByName).toBe('Emily Chen');
     expect(r.withdrawnAtUtc).toBe(NOW);
+    expect(out.docs).toHaveLength(1); // doc kept
+    expect(out.revisions.find((x) => x.id === 'SOP-001-r1')!.status).toBe('published'); // live rev untouched
   });
 
-  it('never drops the doc, even when the withdrawn revision was its last', () => {
+  it('pulls a pending-approval revision from the queue on a live doc (tombstone)', () => {
+    const out = documentsReducer(livePlusPending(), withdraw({ revisionId: 'SOP-001-r2' }));
+    expect(out.revisions.find((x) => x.id === 'SOP-001-r2')!.status).toBe('withdrawn');
+  });
+
+  // --- Clean-remove path: a never-published doc's sole first draft (finding-2, Bryan 2026-07-14) ---
+  it('clean-removes a never-published sole first draft — doc and revision gone, no orphan', () => {
     const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw());
+    expect(out.revisions).toHaveLength(0);
+    expect(out.docs).toHaveLength(0);
+  });
+
+  it('keeps a never-published doc that still has another revision (tombstones the withdrawn one)', () => {
+    const s = state({ revisions: [rev({ id: 'SOP-001-r1', status: 'draft' }), rev({ id: 'SOP-001-r2', status: 'pending-approval' })] });
+    const out = documentsReducer(s, withdraw({ revisionId: 'SOP-001-r2' }));
     expect(out.docs).toHaveLength(1);
-    expect(out.docs[0].id).toBe('SOP-001');
+    expect(out.revisions.find((x) => x.id === 'SOP-001-r2')!.status).toBe('withdrawn');
   });
 
-  it('can withdraw a pending-approval revision (pulls it from the queue)', () => {
-    const out = documentsReducer(state({ revisions: [rev({ status: 'pending-approval' })] }), withdraw());
-    expect(out.revisions[0].status).toBe('withdrawn');
-  });
-
+  // --- Guards fire before the remove-vs-tombstone decision ---
   it('a blank reason is a no-op', () => {
     const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw({ reason: '  ' }));
     expect(out.revisions[0].status).toBe('draft');
+    expect(out.docs).toHaveLength(1);
   });
 
   it('a non-author, non-manager cannot withdraw', () => {
     const out = documentsReducer(state({ revisions: [rev({ status: 'draft' })] }), withdraw({ byRoles: ['pilot'] }));
     expect(out.revisions[0].status).toBe('draft');
+    expect(out.docs).toHaveLength(1);
   });
 
   it('a published revision cannot be withdrawn', () => {

@@ -288,6 +288,23 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         warnNoop('withdrawing a revision requires a document manager or an author of the doc');
         return state;
       }
+      // finding-2 (Bryan 2026-07-14): a never-published doc whose SOLE revision is
+      // withdrawn was never a controlled record — remove it cleanly rather than leaving
+      // an uneditable tombstone. The tombstone ceremony below applies once the doc has
+      // published (or has other revisions to keep it reachable).
+      const neverPublished = !state.revisions.some(
+        (r) => r.docId === existing.docId && (r.status === 'published' || r.status === 'superseded'),
+      );
+      const isOnlyRevision = !state.revisions.some(
+        (r) => r.docId === existing.docId && r.id !== p.revisionId,
+      );
+      if (neverPublished && isOnlyRevision) {
+        return {
+          ...state,
+          revisions: state.revisions.filter((r) => r.id !== p.revisionId),
+          docs: state.docs.filter((d) => d.id !== existing.docId),
+        };
+      }
       return {
         ...state,
         revisions: state.revisions.map((r) =>
