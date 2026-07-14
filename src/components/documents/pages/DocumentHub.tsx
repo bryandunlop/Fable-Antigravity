@@ -55,6 +55,11 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
   // prefilled, then the author fills class/audience/ack and saves via four-eyes.
   const handleImportFile = async (file: File | undefined) => {
     if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('That file is too large to import (max 25 MB).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     setImporting(true);
     try {
       const { title, markdown, warnings } = await docxToImport(await file.arrayBuffer());
