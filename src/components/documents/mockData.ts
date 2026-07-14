@@ -210,6 +210,16 @@ const tk1r1: DocRevision = {
   ackLevel: 'none',
   mockChecksum: checksumForSections(sectionsFromMarkdown(TK1_CONTENT, 'TK-001')),
   publishedAtUtc: daysFromNow(-12) + 'T12:00:00.000Z',
+  // Sidecar media carried alongside the block body (as a migrated bulletin would carry it).
+  images: [
+    {
+      url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="260" height="80"><rect width="260" height="80" fill="%23e2e8f0"/><text x="130" y="46" font-family="sans-serif" font-size="14" text-anchor="middle" fill="%23334155">Duty-time worksheet</text></svg>',
+      caption: 'Figure 1 — duty/rest worksheet.',
+    },
+  ],
+  links: [
+    { url: 'https://my.gulfstream.com', title: 'G650ER duty-rest reference (myGulfstream online pubs)' },
+  ],
 };
 
 const tk2r1: DocRevision = {

@@ -4,6 +4,7 @@ import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, 
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
+import { RevisionMedia } from '../components/RevisionMedia';
 import { DiffedContent } from '../components/DiffedContent';
 import { useDocuments } from '../DocumentsContext';
 import { classFor } from '../classes';
@@ -241,6 +242,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
             ) : (
               <SectionedContent sections={rev.sections} renderBlockGutter={renderBlockGutter} />
             )}
+            <RevisionMedia rev={rev} />
           </article>
           <AckPanel doc={doc} rev={rev} userRole={userRole} />
         </GfoPanel>

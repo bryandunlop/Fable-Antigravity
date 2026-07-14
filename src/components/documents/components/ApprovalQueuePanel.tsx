@@ -10,6 +10,7 @@ import { classFor } from '../classes';
 import { canApprove, validateDecision } from '../engine/lifecycle';
 import { DocIdentityLine } from './DocIdentity';
 import { SectionedContent } from './SectionedContent';
+import { RevisionMedia } from './RevisionMedia';
 import { DiffedContent } from './DiffedContent';
 import { diffRevisions } from '../engine/diff';
 import { currentRevision } from '../engine/revisions';
@@ -144,6 +145,7 @@ export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRol
                   </div>
                   <div className="prose-bulletin max-h-96 overflow-y-auto rounded-md border border-border bg-muted/20 p-4">
                     {previewMode === 'changes' ? <DiffedContent diff={diff} /> : <SectionedContent sections={rev.sections} />}
+                    <RevisionMedia rev={rev} />
                   </div>
                 </div>
               );
