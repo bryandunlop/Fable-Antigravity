@@ -5,7 +5,8 @@ import {
   ArrowLeft, Wrench, FilePlus, Clock, ShieldAlert, CheckCircle2, CalendarClock, Plus,
   Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, CloudDownload,
 } from 'lucide-react';
-import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
+import { formatRegulatoryCompact } from '../util/displayZone';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
 import { deriveServiceability } from '../engine/serviceability';
@@ -72,6 +73,7 @@ export default function AircraftDetail() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { state, dispatch } = useTechLog();
+  const { displayZone } = useDisplayZone();
   const user = useCurrentUser();
   const integration = useIntegration();
   const rectifyToWorkCard = useRectifyToWorkCard();
@@ -482,7 +484,7 @@ export default function AircraftDetail() {
                     <p className="mt-1 text-sm text-muted-foreground">{mel?.title}</p>
                     {d.repairDueDateUtc && (
                       <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" /> due {new Date(d.repairDueDateUtc).toLocaleDateString()} · {ms != null && ms > 0 ? `${Math.floor(ms / 86400000)}d left` : 'overdue'}{d.extensionUsed && ' · extended'}
+                        <Clock className="h-3.5 w-3.5" /> due {formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)} · {ms != null && ms > 0 ? `${Math.floor(ms / 86400000)}d left` : 'overdue'}{d.extensionUsed && ' · extended'}
                       </div>
                     )}
                   </div>

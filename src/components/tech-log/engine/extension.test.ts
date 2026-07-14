@@ -12,6 +12,9 @@ const base: Deferral = {
   id: 'df-1', defectId: 'def-1', aircraftId: 'ac-1', melItemId: 'mel-1',
   governingMmelRevision: 'R5', governingEffectiveDate: '2026-01-01',
   category: 'C', dayOfDiscoveryUtc: '2026-01-26T10:00:00Z', clockStartDateUtc: '2026-01-27T00:00:00.000Z',
+  // Fixture uses round UTC-midnight values, so it is governed UTC — keeps these assertions about the
+  // extension doubling/supersede rails, not DST (DST math is covered in pl25.test.ts).
+  governingTimezone: 'UTC',
   repairDueDateUtc: '2026-02-06T00:00:00.000Z', repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10,
   placardRequired: false, mProcedureRequired: false, extensionUsed: false, riiRequired: false,
   melReviewAcknowledged: true, signedByOid: 'm1', signatureId: 'sig-1', status: 'ACTIVE',

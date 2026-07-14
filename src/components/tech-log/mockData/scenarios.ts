@@ -6,7 +6,7 @@ import type {
 } from '../types';
 import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
-import { computeClockStart, computeRepairDue } from '../engine/pl25';
+import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { makeSignature } from '../engine/signing';
 import { DEFAULT_PREFLIGHT_CHECKLIST } from '../constants';
 
@@ -60,6 +60,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     id: 'df-n6pg', defectId: 'd-n6pg', aircraftId: 'ac-n6pg', melItemId: melAmber.id,
     governingMmelRevision: melAmber.mmelRevision, governingEffectiveDate: melAmber.effectiveDate,
     category: melAmber.category, dayOfDiscoveryUtc: discN6, clockStartDateUtc: clockStart,
+    governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
     repairDueDateUtc: due.repairDueDateUtc, usageDueThreshold: due.usageDueThreshold,
     repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
     restrictionText: melAmber.provisos ?? 'Operate per MEL provisos.',

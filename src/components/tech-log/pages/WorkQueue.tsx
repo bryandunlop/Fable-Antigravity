@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Inbox, AlertTriangle, Wrench, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck, Eye } from 'lucide-react';
-import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
+import { formatRegulatoryCompact } from '../util/displayZone';
 import { currentRows } from '../engine/supersede';
 import { buildWorkQueue } from '../engine/workqueue';
 import { deriveServiceability } from '../engine/serviceability';
@@ -16,6 +17,7 @@ const STATUS_VARIANT: Record<string, 'destructive' | 'secondary' | 'outline'> = 
 
 export default function WorkQueue() {
   const { state } = useTechLog();
+  const { displayZone } = useDisplayZone();
   const user = useCurrentUser();
   const navigate = useNavigate();
   const isMaint = user.role === 'MAINTENANCE';
@@ -125,7 +127,7 @@ export default function WorkQueue() {
           {wq.deferralsDue.length === 0 ? empty : wq.deferralsDue.map(({ deferral: d, dueState }) => (
             <Row key={d.id} onClick={() => open(tailOf(d.aircraftId), '?tab=deferrals')}>
               <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {melOf(d.melItemId)?.subItemNumber ?? '—'}</Badge><Badge variant={dueState === 'EXPIRED' ? 'destructive' : 'secondary'}>{dueState === 'EXPIRED' ? 'OVERDUE' : 'DUE SOON'}</Badge></div>
-              <p className="mt-0.5 truncate text-muted-foreground">{d.repairDueDateUtc ? `due ${new Date(d.repairDueDateUtc).toLocaleDateString()}` : ''} · {melOf(d.melItemId)?.title}</p>
+              <p className="mt-0.5 truncate text-muted-foreground">{d.repairDueDateUtc ? `due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}` : ''} · {melOf(d.melItemId)?.title}</p>
             </Row>
           ))}
         </Section>

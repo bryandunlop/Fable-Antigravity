@@ -15,7 +15,7 @@ describe('golden path: report -> defer (M-gated) -> gating release', () => {
 
   const openDefect: Defect = { id: 'd1', aircraftId: ac.id, source: 'PIREP', ataChapter: mel.ataReference, description: 'x', severity: 'HIGH', airworthinessAffecting: null, status: 'OPEN', reportedByOid: 'USR001', reportedAtUtc: now, signatureId: 's1' };
   const deferredDefect: Defect = { ...openDefect, id: 'd1b', status: 'DEFERRED', supersedesId: 'd1' };
-  const deferralPP: Deferral = { id: 'df1', defectId: 'd1b', aircraftId: ac.id, melItemId: mel.id, governingMmelRevision: mel.mmelRevision, governingEffectiveDate: mel.effectiveDate, category: mel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: cs, repairDueDateUtc: due.repairDueDateUtc, repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10, placardRequired: false, mProcedureRequired: true, extensionUsed: false, riiRequired: false, melReviewAcknowledged: true, signedByOid: 'USR002', signatureId: 's2', status: 'PENDING_PLACARD' };
+  const deferralPP: Deferral = { id: 'df1', defectId: 'd1b', aircraftId: ac.id, melItemId: mel.id, governingMmelRevision: mel.mmelRevision, governingEffectiveDate: mel.effectiveDate, category: mel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: cs, governingTimezone: 'America/New_York', repairDueDateUtc: due.repairDueDateUtc, repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10, placardRequired: false, mProcedureRequired: true, extensionUsed: false, riiRequired: false, melReviewAcknowledged: true, signedByOid: 'USR002', signatureId: 's2', status: 'PENDING_PLACARD' };
   const deferralActive: Deferral = { ...deferralPP, id: 'df1b', supersedesId: 'df1', status: 'ACTIVE', gatingReleaseId: 'rel1' };
 
   it('1) N5PG starts GREEN', () => {

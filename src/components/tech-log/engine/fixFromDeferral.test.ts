@@ -12,7 +12,7 @@ const defect = (over: Partial<Defect> = {}): Defect => ({
 const deferral = (over: Partial<Deferral> = {}): Deferral => ({
   id: 'df-1', defectId: 'def-1', aircraftId: 'ac-1', melItemId: 'mel-1',
   governingMmelRevision: 'r1', governingEffectiveDate: 'now', category: 'C',
-  dayOfDiscoveryUtc: 'now', clockStartDateUtc: 'now',
+  dayOfDiscoveryUtc: 'now', clockStartDateUtc: 'now', governingTimezone: 'America/New_York',
   repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10,
   placardRequired: false, mProcedureRequired: false, extensionUsed: false,
   riiRequired: false, melReviewAcknowledged: true, signedByOid: 'U1',

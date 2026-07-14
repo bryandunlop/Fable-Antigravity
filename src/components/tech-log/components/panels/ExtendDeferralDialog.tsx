@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { TimerReset, UserCheck } from 'lucide-react';
-import { useTechLog, useCurrentUser } from '../../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone } from '../../TechLogContext';
+import { formatRegulatoryCompact } from '../../util/displayZone';
 import { useIntegration } from '../../integration/useIntegration';
 import { validateExtension, buildExtension } from '../../engine/extension';
 import { INTENT } from '../../constants';
@@ -30,6 +31,7 @@ export function ExtendDeferralDialog({
   onOpenChange: (o: boolean) => void;
 }) {
   const { state, dispatch } = useTechLog();
+  const { displayZone } = useDisplayZone();
   const user = useCurrentUser();
   const integration = useIntegration();
   const [justification, setJustification] = useState('');
@@ -45,10 +47,10 @@ export function ExtendDeferralDialog({
     if (!hardBlock.ok) return undefined;
     const { row } = buildExtension(deferral, user, 'preview', new Date().toISOString(), { rowId: 'preview', signatureId: 'preview' });
     return row.repairDueDateUtc
-      ? `new due date ${new Date(row.repairDueDateUtc).toLocaleDateString()}`
+      ? `new due date ${formatRegulatoryCompact(row.repairDueDateUtc, displayZone, row.governingTimezone)}`
       : `new usage limit ${row.usageDueThreshold} ${row.repairIntervalUnit === 'HOUR' ? 'airframe hours' : 'cycles'}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deferral.id, hardBlock.ok]);
+  }, [deferral.id, hardBlock.ok, displayZone]);
 
   const beginSign = () => {
     if (!validation.ok) return toast.error(validation.error ?? 'Extension blocked.');
