@@ -33,6 +33,7 @@ import type { DocSuggestion } from '../types';
 import { toast } from 'sonner';
 import { printDocument } from '../util/printDocument';
 import { buildReviewDocx } from '../engine/docxExport';
+import { SyncAgeChip } from '../components/SyncAgeChip';
 
 export function DocReader({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { docId } = useParams<{ docId: string }>();
@@ -140,11 +141,14 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <div className="flex items-center justify-between gap-2">
-        <Button variant="ghost" size="sm" asChild className="-ml-2">
-          <Link to="/documents"><ArrowLeft className="mr-1.5 h-4 w-4" /> Documents</Link>
-        </Button>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="ghost" size="sm" asChild className="-ml-2">
+            <Link to="/documents"><ArrowLeft className="mr-1.5 h-4 w-4" /> Documents</Link>
+          </Button>
+          <SyncAgeChip />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {diff?.hasChanges && rev && (
             <>
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
