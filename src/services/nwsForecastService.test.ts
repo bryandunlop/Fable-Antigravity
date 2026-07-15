@@ -145,6 +145,42 @@ describe('parseForecast', () => {
     expect(parseForecast({ properties: { periods: 'nope' } })).toEqual([]);
   });
 
+  it('returns null tempC when NWS omits the temperature — never a fabricated -18°C', () => {
+    const mk = (temperature: unknown) => ({
+      properties: {
+        periods: [{
+          number: 1, name: 'Today',
+          startTime: '2026-07-14T06:00:00-04:00', endTime: '2026-07-14T18:00:00-04:00',
+          isDaytime: true, temperature, temperatureUnit: 'F',
+          windSpeed: '10 mph', windDirection: 'SW',
+          shortForecast: 'Sunny', detailedForecast: '',
+          probabilityOfPrecipitation: { value: 0 }, icon: '',
+        }],
+      },
+    });
+    // 0°F would silently become -18°C and read as a real hard-freeze forecast.
+    expect(parseForecast(mk(null))[0].tempC).toBeNull();
+    expect(parseForecast(mk(undefined))[0].tempC).toBeNull();
+    expect(parseForecast(mk(''))[0].tempC).toBeNull();
+    expect(parseForecast(mk('not-a-number'))[0].tempC).toBeNull();
+  });
+
+  it('still reports a genuine zero temperature', () => {
+    const freezing = {
+      properties: {
+        periods: [{
+          number: 1, name: 'Today',
+          startTime: '2026-07-14T06:00:00-04:00', endTime: '2026-07-14T18:00:00-04:00',
+          isDaytime: true, temperature: 32, temperatureUnit: 'F',
+          windSpeed: '10 mph', windDirection: 'SW',
+          shortForecast: 'Snow', detailedForecast: '',
+          probabilityOfPrecipitation: { value: 0 }, icon: '',
+        }],
+      },
+    };
+    expect(parseForecast(freezing)[0].tempC).toBe(0);
+  });
+
   it('converts Celsius-native payloads without double-converting', () => {
     const celsius = {
       properties: {

@@ -89,7 +89,9 @@ export default function WeatherForecast({ icaoId }: WeatherForecastProps) {
                   loading="lazy"
                 />
               )}
-              <div className="text-xs font-medium text-foreground/90">{p.tempC}°C</div>
+              <div className="text-xs font-medium text-foreground/90">
+                {p.tempC != null ? `${p.tempC}°C` : '—'}
+              </div>
               {/* Knots, converted at the parse boundary — never render NWS mph
                   next to the METAR's knots. */}
               <div className="text-[10px] text-muted-foreground">

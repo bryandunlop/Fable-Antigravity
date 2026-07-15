@@ -23,8 +23,12 @@ export interface ForecastPeriod {
   number: number;
   name: string;
   startTime: string;
-  /** Normalized from NWS °F at the parse boundary. */
-  tempC: number;
+  /**
+   * Normalized from NWS °F at the parse boundary. Null when NWS omits a
+   * temperature — same reasoning as windKt: a fabricated 0°F would render as
+   * -18°C and read as a real forecast of hard freeze.
+   */
+  tempC: number | null;
   /** Normalized from NWS mph at the parse boundary. Null when NWS gives no parseable speed. */
   windKt: number | null;
   windDirection: string;
@@ -65,6 +69,23 @@ export function parseWindSpeedToKnots(speed: string | null | undefined): number 
 }
 
 /**
+ * Normalizes a period's temperature to whole °C, respecting temperatureUnit.
+ *
+ * Returns null (not 0) when NWS omits the value — a missing temperature
+ * coerced to 0°F renders as -18°C, which looks like a real forecast of a
+ * hard freeze. Same principle as parseWindSpeedToKnots.
+ */
+function parseTempC(period: any): number | null {
+  const raw = period?.temperature;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  return String(period.temperatureUnit).toUpperCase() === 'C'
+    ? Math.round(n)
+    : fahrenheitToCelsius(n);
+}
+
+/**
  * Parses an NWS /forecast payload into up to 7 daytime periods.
  *
  * NWS returns ~14 periods (day/night pairs) over 7 days; we keep the daytime
@@ -80,17 +101,11 @@ export function parseForecast(raw: any): ForecastPeriod[] {
     .filter((p: any) => p?.isDaytime === true)
     .slice(0, 7)
     .map((p: any) => {
-      const rawTemp = Number(p.temperature ?? 0);
-      // Respect temperatureUnit — don't blindly F→C a payload already in C.
-      const tempC = String(p.temperatureUnit).toUpperCase() === 'C'
-        ? Math.round(rawTemp)
-        : fahrenheitToCelsius(rawTemp);
-
       return {
         number: Number(p.number ?? 0),
         name: String(p.name ?? ''),
         startTime: String(p.startTime ?? ''),
-        tempC,
+        tempC: parseTempC(p),
         windKt: parseWindSpeedToKnots(p.windSpeed),
         windDirection: String(p.windDirection ?? ''),
         shortForecast: String(p.shortForecast ?? ''),

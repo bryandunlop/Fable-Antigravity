@@ -31,6 +31,18 @@ const NWS_USER_AGENT =
 const gridCache = new Map<string, { forecastUrl: string; at: number }>();
 const GRID_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Bounded. The key comes from a query param, and module state survives across
+ * warm invocations — an unbounded Map would grow for the instance's lifetime
+ * on varying input. We only ever serve a handful of stations; the cap is a
+ * backstop, not a tuning knob.
+ */
+const GRID_CACHE_MAX = 32;
+
+/** ICAO identifiers are exactly four alphanumerics. Reject anything else
+ *  before it reaches an upstream fetch or becomes a cache key. */
+const ICAO_RE = /^[A-Z0-9]{4}$/;
+
 export const weatherRoute = new Hono();
 
 // GET /api/weather?ids=KLUK  → { metar: [...], taf: [...] }
@@ -88,6 +100,12 @@ async function resolveForecastUrl(station: string): Promise<string> {
     throw new Error(`NWS returned no forecast URL for ${station}`);
   }
 
+  // Evict the oldest insertion once at the cap. Map preserves insertion order,
+  // so the first key is the oldest.
+  if (gridCache.size >= GRID_CACHE_MAX) {
+    const oldest = gridCache.keys().next().value;
+    if (oldest !== undefined) gridCache.delete(oldest);
+  }
   gridCache.set(station, { forecastUrl, at: Date.now() });
   return forecastUrl;
 }
@@ -96,6 +114,9 @@ async function resolveForecastUrl(station: string): Promise<string> {
 // Parsing/normalisation happens client-side, matching the METAR/TAF route.
 weatherRoute.get('/forecast', async (c) => {
   const station = (c.req.query('ids') || HOME_STATION).toUpperCase();
+  if (!ICAO_RE.test(station)) {
+    return c.json({ error: 'Invalid station identifier' }, 400);
+  }
 
   try {
     const forecastUrl = await resolveForecastUrl(station);
