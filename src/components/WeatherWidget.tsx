@@ -3,6 +3,8 @@ import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Clock, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import { RadarSpinner } from './ui/LoadingSpinners';
+import WeatherForecast from './WeatherForecast';
+import { HOME_STATION } from '../config/station';
 import {
   fetchWeather,
   formatWind,
@@ -19,11 +21,11 @@ import {
 const REFRESH_INTERVAL_SEC = 300; // 5 minutes
 
 interface WeatherWidgetProps {
-  /** ICAO airport identifier to display weather for. Defaults to KLUK. */
+  /** ICAO airport identifier to display weather for. Defaults to the home station. */
   icaoId?: string;
 }
 
-export default function WeatherWidget({ icaoId = 'KLUK' }: WeatherWidgetProps) {
+export default function WeatherWidget({ icaoId = HOME_STATION }: WeatherWidgetProps) {
   const [weather, setWeather] = useState<WeatherResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_SEC);
@@ -72,7 +74,9 @@ export default function WeatherWidget({ icaoId = 'KLUK' }: WeatherWidgetProps) {
 
   return (
     <Card className="mb-6 border-none shadow-sm bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm relative overflow-hidden">
-      <CardContent className="p-4 flex items-center justify-between min-h-[88px]">
+      {/* Vertical stack: the METAR/TAF row keeps its original horizontal
+          layout as a full-width child, with the outlook beneath it (D30). */}
+      <CardContent className="p-4 flex flex-col justify-center min-h-[88px]">
 
         {/* ── Loading ── */}
         {isLoading && (
@@ -209,6 +213,11 @@ export default function WeatherWidget({ icaoId = 'KLUK' }: WeatherWidgetProps) {
             </div>
           </div>
         )}
+
+        {/* ── 7-day outlook — only alongside a good METAR, so a failed
+             observation never leaves an orphaned forecast implying the
+             weather panel is healthy. ── */}
+        {!isLoading && !hasError && metar && <WeatherForecast icaoId={icaoId} />}
 
         {/* ── No data (valid response but airport not found) ── */}
         {!isLoading && !hasError && !metar && (
