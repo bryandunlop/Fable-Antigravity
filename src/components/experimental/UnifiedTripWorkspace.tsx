@@ -501,7 +501,7 @@ export default function UnifiedTripWorkspace() {
             disabled={hasBlocked}
             className={`h-12 px-8 font-black rounded-2xl shadow-lg transition-all hover:scale-[1.02] active:scale-95 text-sm ${
               isMissionConfirmed
-                ? 'bg-emerald-50 text-emerald-600 border-2 border-emerald-400 hover:bg-emerald-100 shadow-emerald-100'
+                ? 'bg-emerald-50 text-emerald-600 border-2 border-emerald-400 hover:bg-emerald-100'
                 : hasBlocked
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-slate-950 text-white hover:bg-slate-800'
@@ -537,11 +537,11 @@ export default function UnifiedTripWorkspace() {
     const isNew = item.status === 'requested';
 
     const statusIcon = isReady ? (
-      <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-200 flex-shrink-0">
+      <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shadow-md flex-shrink-0">
         <Check className="h-4 w-4 text-white" strokeWidth={3} />
       </div>
     ) : isBlocked ? (
-      <div className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center shadow-md shadow-rose-200 flex-shrink-0 animate-pulse">
+      <div className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center shadow-md flex-shrink-0 animate-pulse">
         <OctagonAlert className="h-4 w-4 text-white" />
       </div>
     ) : isInWork ? (
@@ -559,7 +559,7 @@ export default function UnifiedTripWorkspace() {
         isReady
           ? 'bg-emerald-50/30 border-emerald-100 opacity-60 hover:opacity-90'
           : isBlocked
-            ? 'bg-rose-50 border-rose-200 shadow-md shadow-rose-100/50'
+            ? 'bg-rose-50 border-rose-200 shadow-md'
             : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-md'
       }`}>
         {statusIcon}
@@ -1255,7 +1255,7 @@ export default function UnifiedTripWorkspace() {
 
           {/* ── NON-SCHEDULING LENSES: Shared Readiness Dashboard ── */}
           {activeRole !== 'scheduling' && (
-            <div className="mb-12 p-10 bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden group/readiness">
+            <div className="mb-12 p-10 bg-white rounded-[3.5rem] shadow-2xl border border-slate-100 relative overflow-hidden group/readiness">
                <div className="flex items-center justify-between mb-10 relative z-10">
                   <div>
                      <h3 className="text-3xl font-black text-slate-950 tracking-tighter">Unified Mission Readiness</h3>

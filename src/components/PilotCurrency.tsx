@@ -450,7 +450,7 @@ function generateMockData(): { pilots: CrewMember[]; fas: CrewMember[]; logs: Fl
 
 const StatusDot = ({ status }: { status: CurrencyStatus }) => {
   const colors = {
-    current: 'bg-emerald-500 shadow-emerald-500/50',
+    current: 'bg-emerald-500',
     warning: 'bg-amber-500',
     expired: 'bg-red-500 animate-pulse',
   };

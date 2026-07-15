@@ -7,9 +7,16 @@
    palette/geometry/elevation; gfo-tokens is the GFO sub-brand layered on top
    (it reads --pg-white / --pg-black from pg-tokens, so pg must come first).
    Neither carries @font-face — see pg-tokens.css for why the faces in
-   colors_and_type.css are deliberately not wired. */
-@import "./styles/brand/pg-tokens.css";
-@import "./styles/brand/gfo-tokens.css";
+   colors_and_type.css are deliberately not wired.
+
+   layer(base) is load-bearing, not decoration. These files declare :root
+   UNLAYERED by default, and an unlayered declaration outranks every cascade
+   layer regardless of specificity — so `.dark { --pg-shadow-* }` below (which
+   lives in @layer base) silently lost to them and the dark-mode shadows never
+   applied at all. Pulling the imports into the same layer restores a normal
+   specificity/source-order contest, which .dark wins by being declared later. */
+@import "./styles/brand/pg-tokens.css" layer(base);
+@import "./styles/brand/gfo-tokens.css" layer(base);
 
 @font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Light.ttf') format('truetype'); font-weight: 300; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
@@ -63,7 +70,6 @@
        itself IS a namespace and lives in @theme as --ease-gfo. */
     --dur-press: 80ms;    /* under the finger — must feel instant */
     --dur-fast: 150ms;    /* hover, colour, the default */
-    --dur-base: 250ms;    /* larger surfaces entering or leaving */
 
     /* Chrome is brand-constant: Midnight sidebar in BOTH modes (only the canvas flips). */
     --sidebar: #142D7E;
@@ -169,10 +175,13 @@
 /* The named motion utilities. @utility is v4's supported way to add a utility,
    and unlike a bogus @theme namespace it actually emits — which is the whole
    reason these exist as real classes rather than three more dead tokens.
-   Variants compose normally, so active:duration-press works. */
+   Variants compose normally, so active:duration-press works.
+
+   Only the two that are USED are defined. duration-base existed here with zero
+   call sites — a dead token created by a change whose entire thesis is that
+   dead tokens are the sin. Add it back the moment something needs it. */
 @utility duration-press { transition-duration: var(--dur-press); }
 @utility duration-fast  { transition-duration: var(--dur-fast); }
-@utility duration-base  { transition-duration: var(--dur-base); }
 
 @theme {
   --font-sans: 'Montserrat', Arial, ui-sans-serif, system-ui, sans-serif;
@@ -219,15 +228,30 @@
   /* ---- Elevation ----------------------------------------------------
      Tailwind's six-tier black-drop-shadow ramp is remapped onto the three
      P&G tiers, tinted PMS 293 rather than neutral black. Every existing
-     shadow-sm / shadow-lg / shadow-2xl call site (~309 of them) inherits
-     this without being touched — which is the point of a token.
+     shadow-* call site (~309) inherits this untouched — the point of a token.
 
        2xs, xs, sm  -> flat    resting surface
-       md, lg       -> soft    raised / hovered
-       xl, 2xl      -> strong  floating (dialog, popover, sheet)
+       md, lg       -> soft
+       xl, 2xl      -> strong
 
-     Collapsing six perceived tiers to three physical ones preserves the
-     hierarchy the call sites already assume while ending the arms race. */
+     Deliberately NOT described by role. An earlier version of this comment
+     claimed xl/2xl were "dialog, popover, sheet" — false: ui/dialog and
+     ui/sheet use shadow-lg, ui/popover uses shadow-md (all three land on
+     `soft`), while `strong` is consumed by ~41 ordinary components. So the
+     app's elevation is inverted — a DraggableWidget (shadow-xl) out-shadows
+     a modal (shadow-lg). That inversion PREDATES this change and is faithfully
+     preserved here (on main: xl = 0 20px 25px vs lg = 0 10px 15px). Worth
+     fixing; not silently, and not in a motion pass.
+
+     TRADE-OFF, known and accepted: Tailwind's stock ramp parameterises its
+     colour (`0 10px 15px -3px var(--tw-shadow-color, #0000001a)`), which is
+     what makes `shadow-lg shadow-red-500/40` composable. The P&G tokens are
+     complete box-shadow values, so substituting them drops that hook and every
+     `shadow-<colour>` utility becomes inert. That is intended — coloured glows
+     are off-system — but it is SILENT, which is the objectionable part: a
+     future `shadow-red-500/40` will simply never appear. Decomposing the brand
+     tokens into geometry + colour would restore the hook at the cost of no
+     longer consuming --pg-shadow-* as the brand ships them. Flagged in D33. */
   --shadow-2xs: var(--pg-shadow-flat);
   --shadow-xs:  var(--pg-shadow-flat);
   --shadow-sm:  var(--pg-shadow-flat);
