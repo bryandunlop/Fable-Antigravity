@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { fetchForecast, type ForecastResult } from '../services/nwsForecastService';
+import { conditionFromForecastPeriod } from '../services/weatherConditions';
+import { WeatherIcon } from './ui/WeatherIcons';
+import { WeatherDemoChip } from './WeatherDemoChip';
 
 interface WeatherForecastProps {
   /** ICAO identifier. Pass explicitly — see src/config/station.ts. */
@@ -15,6 +18,12 @@ interface WeatherForecastProps {
  * a deliberate mitigation, not decoration — it sits directly beneath METAR/TAF,
  * which ARE official products, and the two must not be confused. DOM ruling on
  * the adjacency is pending (vault Q14); D30 elected to label and ship.
+ *
+ * The column glyph used to be <img src={period.icon}> — a hotlink to
+ * api.weather.gov/icons, which is a deprecated NWS endpoint and a third-party
+ * request on every dashboard load. It now renders locally from a condition
+ * token derived off the forecast text, so the glyph and the tooltip can't
+ * contradict each other. See weatherConditions.ts.
  */
 export default function WeatherForecast({ icaoId }: WeatherForecastProps) {
   const [result, setResult] = useState<ForecastResult | null>(null);
@@ -36,7 +45,14 @@ export default function WeatherForecast({ icaoId }: WeatherForecastProps) {
   return (
     <div className="border-t border-border/50 pt-3 mt-3">
       <div className="flex items-baseline justify-between mb-2">
-        <div className="text-muted-foreground font-medium text-xs">7-DAY OUTLOOK</div>
+        <div className="flex items-baseline gap-2">
+          <div className="text-muted-foreground font-medium text-xs">7-DAY OUTLOOK</div>
+          {/* Sits BESIDE the Q14 advisory rather than replacing it — they say
+              different things ("this isn't aviation weather" vs "this isn't
+              real weather") and the outlook can be demo while the METAR above
+              is live, or vice versa. */}
+          {result?.isDemo && <WeatherDemoChip reason={result.demoReason} />}
+        </div>
         {/* The mitigation on file for Q14 — do not remove without a DOM ruling. */}
         <div className="text-[10px] text-muted-foreground/70 italic">
           Planning outlook — not for flight planning
@@ -81,14 +97,13 @@ export default function WeatherForecast({ icaoId }: WeatherForecastProps) {
               <div className="text-[10px] text-muted-foreground truncate w-full text-center">
                 {p.name}
               </div>
-              {p.icon && (
-                <img
-                  src={p.icon}
-                  alt={p.shortForecast}
-                  className="w-7 h-7 rounded"
-                  loading="lazy"
-                />
-              )}
+              <WeatherIcon
+                condition={conditionFromForecastPeriod(p)}
+                size={28}
+                title={p.shortForecast}
+              />
+              {/* Daytime periods only (parseForecast filters isDaytime), so the
+                  glyph is always the day variant — isDay defaults true. */}
               <div className="text-xs font-medium text-foreground/90">
                 {p.tempC != null ? `${p.tempC}°C` : '—'}
               </div>

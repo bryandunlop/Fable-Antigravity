@@ -377,6 +377,33 @@
     100% { transform: translate(200%, -100%) scale(0.5) rotate(45deg); opacity: 0; }
   }
 
+  /* ── Weather icon motion (WeatherIcons.tsx) ──────────────────────────────
+     Every one of these animates ONLY transform or opacity, so each stays on
+     the compositor and never triggers layout or paint — up to 8 of them run
+     forever at once (7 outlook columns + the observation), and any property
+     that hit layout would be a battery bill on the iPad.
+
+     Amplitudes are deliberately small and the periods long. This set exists
+     because the alternative was static art; it is not licence to make the
+     dashboard busy. Every call site pairs these with motion-reduce:animate-none. */
+  @keyframes wx-spin  { to { transform: rotate(360deg); } }
+  @keyframes wx-fall  {
+    0%   { transform: translateY(-4px); opacity: 0; }
+    25%  { opacity: 1; }
+    100% { transform: translateY(7px);  opacity: 0; }
+  }
+  @keyframes wx-gust  { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+  @keyframes wx-drift { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+  @keyframes wx-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  /* steps(1) — lightning snaps, it does not crossfade. */
+  @keyframes wx-flicker {
+    0%, 88% { opacity: 1; }
+    90%     { opacity: 0.25; }
+    92%     { opacity: 1; }
+    94%     { opacity: 0.3; }
+    96%     { opacity: 1; }
+  }
+
   --animate-fade-in: fade-in 0.6s ease-out forwards;
   --animate-slide-up: slide-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-pulse-subtle: pulse-subtle 3s ease-in-out infinite;
@@ -385,6 +412,14 @@
   --animate-list-stagger: list-stagger 0.4s ease-out forwards;
   --animate-spin-slow: spin-slow 3s linear infinite;
   --animate-pulse-slow: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  --animate-wx-spin: wx-spin 22s linear infinite;
+  --animate-wx-fall: wx-fall 1.1s linear infinite;
+  --animate-wx-fall-slow: wx-fall 2.2s linear infinite;
+  --animate-wx-gust: wx-gust 3s ease-in-out infinite;
+  --animate-wx-drift: wx-drift 4s ease-in-out infinite;
+  --animate-wx-twinkle: wx-twinkle 3s ease-in-out infinite;
+  --animate-wx-flicker: wx-flicker 2.4s steps(1) infinite;
 }
 
 @layer base {

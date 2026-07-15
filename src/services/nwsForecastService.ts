@@ -13,6 +13,8 @@
  * this one exists because the call is physically impossible client-side.
  */
 
+import { getDemoForecast } from './weatherMockData';
+
 const PROXY_URL = '/api/weather/forecast';
 
 /** NWS reports °F and mph; the rest of the weather UI is °C and knots. */
@@ -43,6 +45,10 @@ export interface ForecastResult {
   periods: ForecastPeriod[];
   fetchedAt: string;
   error?: string;
+  /** True when periods came from the demo seed. Must be disclosed wherever rendered. */
+  isDemo?: boolean;
+  /** Why the live fetch failed, when isDemo is true. See WeatherResult.demoReason. */
+  demoReason?: string;
 }
 
 /** Converts °F to whole °C for display. */
@@ -117,23 +123,33 @@ export function parseForecast(raw: any): ForecastPeriod[] {
 }
 
 /**
- * Fetches the outlook via our proxy. Never throws — returns an error field,
- * matching fetchWeather() in aviationWeatherService.
+ * Fetches the outlook via our proxy. Never throws.
+ *
+ * Degrades to the demo seed on failure, flagged isDemo — same contract and same
+ * reasoning as fetchWeather(). Unlike fetchWeather, a non-ok status falls back
+ * too: an outlook is planning colour, and there is no equivalent of "this
+ * airport does not exist" to protect here (a bad ICAO already failed at the
+ * METAR before this ever runs).
  */
 export async function fetchForecast(icaoId: string): Promise<ForecastResult> {
   const fetchedAt = new Date().toISOString();
+  const demo = (reason: string): ForecastResult => ({
+    periods: getDemoForecast(),
+    fetchedAt,
+    isDemo: true,
+    demoReason: reason,
+  });
+
   try {
     const res = await fetch(`${PROXY_URL}?ids=${encodeURIComponent(icaoId)}`);
     if (!res.ok) {
-      return { periods: [], fetchedAt, error: `Forecast unavailable (${res.status})` };
+      return demo(`Forecast unavailable (${res.status})`);
     }
     const body = await res.json();
-    return { periods: parseForecast(body), fetchedAt };
+    const periods = parseForecast(body);
+    // A 200 that parses to nothing is a broken upstream, not an empty forecast.
+    return periods.length ? { periods, fetchedAt } : demo('Forecast returned no periods');
   } catch (err) {
-    return {
-      periods: [],
-      fetchedAt,
-      error: err instanceof Error ? err.message : 'Forecast unavailable',
-    };
+    return demo(err instanceof Error ? err.message : 'Forecast unavailable');
   }
 }

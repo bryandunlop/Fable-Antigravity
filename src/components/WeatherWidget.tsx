@@ -4,7 +4,10 @@ import { Badge } from './ui/badge';
 import { Clock, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import { RadarSpinner } from './ui/LoadingSpinners';
 import WeatherForecast from './WeatherForecast';
+import { WeatherDemoChip } from './WeatherDemoChip';
+import { WeatherIcon } from './ui/WeatherIcons';
 import { HOME_STATION } from '../config/station';
+import { conditionFromMetar } from '../services/weatherConditions';
 import {
   fetchWeather,
   formatWind,
@@ -112,35 +115,16 @@ export default function WeatherWidget({ icaoId = HOME_STATION }: WeatherWidgetPr
 
             {/* Left: identity + obs time */}
             <div className="flex items-center gap-4">
-              {/* Weather icon (cloud colour reflects flight category) */}
-              <div className="relative w-12 h-12 flex-shrink-0 animate-[pulse-subtle_4s_ease-in-out_infinite]">
-                <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-md">
-                  {isDay ? (
-                    /* Sun */
-                    <>
-                      <circle cx="32" cy="24" r="14" fill="#fbbf24" />
-                      <path d="M32 4L32 8M32 40L32 44M52 24L48 24M16 24L12 24M46.1421 9.85786L43.3137 12.6863M20.6863 35.3137L17.8579 38.1421M46.1421 38.1421L43.3137 35.3137M20.6863 12.6863L17.8579 9.85786"
-                        stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
-                    </>
-                  ) : (
-                    /* Moon (crescent carved from a disc) + stars */
-                    <>
-                      <defs>
-                        <mask id="wx-moon-mask">
-                          <rect width="64" height="64" fill="white" />
-                          <circle cx="40" cy="19" r="13" fill="black" />
-                        </mask>
-                      </defs>
-                      <circle cx="32" cy="24" r="14" fill="#e2e8f0" mask="url(#wx-moon-mask)" />
-                      <circle cx="48" cy="10" r="1.3" fill="#e2e8f0" />
-                      <circle cx="43" cy="18" r="1" fill="#cbd5e1" />
-                      <circle cx="52" cy="20" r="0.9" fill="#cbd5e1" />
-                    </>
-                  )}
-                  <path d="M44 48H20C15.5817 48 12 44.4183 12 40C12 35.5817 15.5817 32 20 32C20.6548 32 21.2885 32.083 21.8953 32.2384C23.6358 27.536 28.3262 24 34 24C40.6274 24 46 29.3726 46 36C46 36.6342 45.95 37.2568 45.854 37.8633C49.3361 38.4552 52 41.5031 52 45.1429C52 49.4821 48.4183 53 44 53"
-                    fill="currentColor" className="text-white dark:text-slate-200 drop-shadow-sm" />
-                </svg>
-              </div>
+              {/* The glyph now reads the observation. The old inline SVG branched
+                  on isDay alone and drew its cloud unconditionally — so a clear
+                  day rendered a cloud, and its comment claimed the cloud colour
+                  tracked flight category, which it never did. */}
+              <WeatherIcon
+                condition={conditionFromMetar(metar)}
+                isDay={isDay}
+                size={48}
+                className="flex-shrink-0 drop-shadow-sm"
+              />
 
               <div>
                 <a
@@ -165,6 +149,11 @@ export default function WeatherWidget({ icaoId = HOME_STATION }: WeatherWidgetPr
                   </Badge>
                 </a>
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  {/* Next to the obs time on purpose: "4 min ago" is the claim
+                      the chip qualifies. A reader checking how fresh the
+                      observation is has to meet the disclosure in the same
+                      glance. */}
+                  {weather?.isDemo && <WeatherDemoChip reason={weather.demoReason} />}
                   <Clock className="w-3 h-3" />
                   <span>{obsTimeLabel(metar.obsTime)}</span>
                   <span className="text-border">·</span>
