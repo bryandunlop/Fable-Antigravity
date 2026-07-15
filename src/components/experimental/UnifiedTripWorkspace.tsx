@@ -1405,7 +1405,7 @@ export default function UnifiedTripWorkspace() {
 
       {/* Nudge Dialog (Pilot → Scheduling) */}
       <Dialog open={isNudgeDialogOpen} onOpenChange={setIsNudgeDialogOpen}>
-         <DialogContent className="sm:max-w-xl rounded-[3rem] border-none p-12 shadow-lg">
+         <DialogContent className="sm:max-w-xl rounded-[3rem] border-none p-12">
             <DialogHeader>
                <div className="w-20 h-20 bg-amber-100 rounded-[2rem] flex items-center justify-center mb-8 text-amber-600 shadow-inner">
                   <Bell className="h-10 w-10" />

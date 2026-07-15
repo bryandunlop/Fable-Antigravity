@@ -893,7 +893,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
 
     return (
       <Dialog open={activeAssignmentType !== null} onOpenChange={(open) => !open && setActiveAssignmentType(null)}>
-        <DialogContent className="max-w-2xl bg-white shadow-lg border-0 overflow-hidden">
+        <DialogContent className="max-w-2xl bg-white border-0 overflow-hidden">
           <div className={`absolute top-0 left-0 w-full h-2 ${activeAssignmentType === 'processOwner' ? 'bg-purple-500' : 'bg-blue-500'}`} />
           <DialogHeader className="pt-6 px-6">
             <DialogTitle className="flex items-center gap-2 text-2xl">

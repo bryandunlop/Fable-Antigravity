@@ -392,7 +392,7 @@ export default function LiveFleetMap() {
 
       {/* Top Left Overlay - Title & Status */}
       <div className="absolute top-4 left-4 z-[5000] pointer-events-auto">
-        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl shadow-lg flex items-center gap-6">
+        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl shadow-xl flex items-center gap-6">
           <div>
             <h2 className="text-white font-bold text-lg leading-none tracking-tight">GLOBAL FLEET</h2>
             <div className="text-zinc-400 text-[10px] uppercase tracking-widest mt-1 font-medium">Live Tracking Operations</div>
@@ -414,7 +414,7 @@ export default function LiveFleetMap() {
       {/* Top Right Overlay - Controls */}
       <div className="absolute top-4 right-4 z-[5000] pointer-events-auto flex flex-col gap-2 items-end">
         {/* Auto Tour Toggle */}
-        <div className="bg-zinc-900 border border-zinc-800 p-1 rounded-lg shadow-lg">
+        <div className="bg-zinc-900 border border-zinc-800 p-1 rounded-lg shadow-xl">
           <Button
             variant="ghost"
             size="sm"
@@ -430,7 +430,7 @@ export default function LiveFleetMap() {
         </div>
 
         {/* Map Layers */}
-        <div className="bg-zinc-900 border border-zinc-800 p-1 rounded-lg flex gap-1 shadow-lg">
+        <div className="bg-zinc-900 border border-zinc-800 p-1 rounded-lg flex gap-1 shadow-xl">
           {MAP_LAYERS.map(layer => (
             <button
               key={layer.id}
@@ -446,7 +446,7 @@ export default function LiveFleetMap() {
         </div>
 
         {/* Refresh Button */}
-        <div className="bg-zinc-900 border border-zinc-800 p-1 rounded-lg shadow-lg">
+        <div className="bg-zinc-900 border border-zinc-800 p-1 rounded-lg shadow-xl">
           <Button
             variant="ghost"
             size="icon"
@@ -464,7 +464,7 @@ export default function LiveFleetMap() {
       {/* Aircraft Detail Panel */}
       <div className={`absolute top-24 bottom-6 right-4 w-96 z-[1000] transition-transform duration-500 ease-in-out ${selectedAircraft ? 'translate-x-0' : 'translate-x-[120%]'}`}>
         {selectedAircraftData && selectedAircraftStatus && (
-          <div className="h-full bg-zinc-900 border border-zinc-800 rounded-xl shadow-lg overflow-hidden flex flex-col text-white">
+          <div className="h-full bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl overflow-hidden flex flex-col text-white">
             <div className="p-5 border-b border-zinc-800 bg-gradient-to-r from-blue-900/20 to-transparent">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-3">

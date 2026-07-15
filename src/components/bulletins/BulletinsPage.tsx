@@ -348,7 +348,7 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
 
       {/* View Bulletin Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-900 shadow-lg">
+        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-900">
           {selectedBulletin && (() => {
             const mustAck = selectedBulletin.requireAcknowledgment && isTargetRole(selectedBulletin, userRole);
             const acked = isAcknowledged(selectedBulletin, acks, currentUserId);
