@@ -635,7 +635,7 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
           <div className="flex justify-center mt-2 lg:mt-0 max-w-sm mx-auto">
             <Button
               size="lg"
-              variant="outline"
+              variant="secondary"
               className="gap-3 px-8 py-6 text-base w-full"
               onClick={() => setShowDevSpec(!showDevSpec)}
             >
