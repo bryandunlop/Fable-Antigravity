@@ -1,15 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { buildOpsBoard, type OpsSnapshot, type BoardRow, type WaitingItem } from './opsBoard';
+import { Input } from '../ui/input';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  buildOpsBoard,
+  type OpsSnapshot,
+  type BoardRow,
+  type WaitingItem,
+  type OpsGap,
+} from './opsBoard';
 
 /**
- * /ops — the window (myGFO Work Ledger design §7).
+ * /ops — the window (myGFO Work Ledger design §7; v2 layout Bryan picked
+ * 2026-07-15: PM-workspace presentation — bottleneck timeline + one grouped,
+ * expandable table — over the same read-only snapshot).
  *
- * Read-only project board over the committed vault snapshot. Not linked from
- * any nav surface: the door is the "Created by Bryan Dunlop" credit on the
- * login screen. Registered hidden in NAV_ENTRIES so the route audit knows it
- * exists (finding #14's lesson: unregistered routes drift invisibly).
+ * Not linked from any nav surface: the door is the "Created by Bryan Dunlop"
+ * credit on the login screen. Registered hidden in NAV_ENTRIES so the route
+ * audit knows it exists.
  */
 
 function AgeLabel({ minutes }: { minutes: number }) {
@@ -31,73 +40,197 @@ function IdChip({ id }: { id: string }) {
   );
 }
 
-function WaitingCard({ item }: { item: WaitingItem }) {
-  const isBryan = item.who === 'Bryan';
+function WhoPill({ who }: { who: string }) {
+  const isBryan = who === 'Bryan';
   return (
-    <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3 shadow-sm">
-      <div className="flex min-w-0 items-start gap-2">
-        <IdChip id={item.id} />
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">{item.title}</p>
-          {item.since ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              waiting {item.daysWaiting} {item.daysWaiting === 1 ? 'day' : 'days'} · since {item.since}
+    <span
+      className={
+        'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ' +
+        (isBryan
+          ? 'bg-gfo-sunrise/15 text-gfo-sunrise-deep dark:text-gfo-sunrise'
+          : 'bg-muted text-muted-foreground')
+      }
+    >
+      {who}
+    </span>
+  );
+}
+
+function SeverityBadge({ severity }: { severity?: string }) {
+  return (
+    <span
+      className={
+        'status-badge shrink-0 ' +
+        (severity === 'high' ? 'status-error' : severity === 'med' ? 'status-warning' : 'status-info')
+      }
+    >
+      {severity ?? '?'}
+    </span>
+  );
+}
+
+/** The bottleneck timeline: who has been the constraint, and for how long. */
+function TimelineStrip({
+  people,
+  maxWaitDays,
+}: {
+  people: { who: string; items: WaitingItem[] }[];
+  maxWaitDays: number;
+}) {
+  return (
+    <Card className="border-gfo-sunrise/40 shadow-md">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <span className="h-2 w-2 rounded-full bg-gfo-sunrise" />
+          Waiting on a human — days as the bar
+          <span className="ml-auto font-normal text-muted-foreground">
+            {people.reduce((n, p) => n + p.items.length, 0)}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 pt-0">
+        {people.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Nobody is the bottleneck. Rare — enjoy it.</p>
+        ) : (
+          people.map((lane) => (
+            <div key={lane.who} className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3">
+              <WhoPill who={lane.who} />
+              <div className="min-w-0 space-y-1.5">
+                {lane.items.map((item) => (
+                  <div key={item.id} className="flex min-w-0 items-center gap-2" title={item.title}>
+                    <div
+                      className={
+                        'h-3 min-w-[3px] shrink-0 rounded-sm ' +
+                        (lane.who === 'Bryan'
+                          ? 'bg-gfo-sunrise-deep dark:bg-gfo-sunrise'
+                          : 'bg-gfo-daylight-deep dark:bg-gfo-daylight-light')
+                      }
+                      style={{ width: `${Math.max(2, Math.round((item.daysWaiting / maxWaitDays) * 60))}%` }}
+                    />
+                    <span className="shrink-0 whitespace-nowrap font-mono text-[11px] text-muted-foreground">
+                      {item.id} · {item.daysWaiting}d
+                    </span>
+                    <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{item.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface TableItem {
+  id: string;
+  title: string;
+  who: string;
+  detail: string;
+  age: string;
+  refs: string[];
+  capturedFrom: string;
+  body: string;
+  severity?: string;
+}
+
+const rowToItem = (r: BoardRow, detail = ''): TableItem => ({
+  id: r.id,
+  title: r.title,
+  who: '',
+  detail,
+  age: r.since ? `${r.daysWaiting}d` : '',
+  refs: r.refs,
+  capturedFrom: r.capturedFrom,
+  body: r.body,
+});
+
+function ExpandableRow({ item }: { item: TableItem }) {
+  const [open, setOpen] = useState(false);
+  const hasMore = !!(item.refs.length || item.capturedFrom || item.body);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => hasMore && setOpen(!open)}
+        aria-expanded={hasMore ? open : undefined}
+        className={
+        'grid w-full grid-cols-[20px_minmax(0,3fr)_minmax(0,1fr)_56px] items-center gap-2 border-t border-border px-2 py-2 text-left text-sm ' +
+          (hasMore ? 'cursor-pointer hover:bg-accent/50' : 'cursor-default')
+        }
+      >
+        <span className="text-muted-foreground">
+          {hasMore ? (open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />) : null}
+        </span>
+        <span className="flex min-w-0 items-center gap-2">
+          <IdChip id={item.id} />
+          <span className="truncate text-foreground">{item.title}</span>
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          {item.who ? <WhoPill who={item.who} /> : null}
+          {item.severity ? <SeverityBadge severity={item.severity} /> : null}
+          {item.detail ? (
+            <span className="truncate font-mono text-[11px] text-muted-foreground">{item.detail}</span>
+          ) : null}
+        </span>
+        <span className="text-right text-xs text-muted-foreground">{item.age}</span>
+      </button>
+      {open ? (
+        <div className="border-t border-dashed border-border bg-muted/30 px-9 py-3 text-sm">
+          {item.capturedFrom ? (
+            <p className="mb-2 text-muted-foreground">
+              <span className="text-xs uppercase tracking-wide">captured as</span> “{item.capturedFrom}”
+            </p>
+          ) : null}
+          {item.body ? <p className="mb-2 whitespace-pre-line text-foreground">{item.body}</p> : null}
+          {item.refs.length ? (
+            <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              became
+              {item.refs.map((r) => (
+                <IdChip key={r} id={r} />
+              ))}
             </p>
           ) : null}
         </div>
-      </div>
-      <span
-        className={
-          'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ' +
-          (isBryan
-            ? 'bg-gfo-sunrise/15 text-gfo-sunrise-deep dark:text-gfo-sunrise'
-            : 'bg-muted text-muted-foreground')
-        }
-      >
-        {item.who}
-      </span>
-    </div>
+      ) : null}
+    </>
   );
 }
 
-function LaneRow({ row, detail }: { row: BoardRow; detail?: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
-      <div className="flex items-start gap-2">
-        <IdChip id={row.id} />
-        <p className="min-w-0 text-sm text-foreground">{row.title}</p>
-      </div>
-      {detail ? <p className="mt-1.5 pl-0.5 font-mono text-[11px] text-muted-foreground">{detail}</p> : null}
-    </div>
-  );
-}
-
-function Lane({
+function Section({
   title,
   dotClass,
-  count,
-  children,
+  items,
+  total,
   empty,
 }: {
   title: string;
   dotClass: string;
-  count: number;
-  children: React.ReactNode;
-  empty: string;
+  items: TableItem[];
+  total: number;
+  empty?: string;
 }) {
+  // `empty` copy describes REALITY (total === 0), never a filter miss —
+  // "The inbox is drained" must not appear just because the query matched
+  // nothing in this section.
+  if (total === 0 && !empty) return null;
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-          <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-          {title}
-          <span className="ml-auto font-normal text-muted-foreground">{count}</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 pt-0">
-        {count === 0 ? <p className="text-xs text-muted-foreground">{empty}</p> : children}
-      </CardContent>
-    </Card>
+    <div>
+      <div className="flex items-center gap-2 px-2 py-2 text-sm font-semibold">
+        <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+        {title}
+        <span className="font-normal text-muted-foreground">
+          {items.length === total ? total : `${items.length} of ${total}`}
+        </span>
+      </div>
+      {items.length ? (
+        items.map((i) => <ExpandableRow key={i.id} item={i} />)
+      ) : (
+        <p className="border-t border-border px-9 py-2 text-xs text-muted-foreground">
+          {total === 0 ? empty : 'No matches for the current filter.'}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -105,6 +238,7 @@ export default function OpsBoardPage() {
   const [snap, setSnap] = useState<OpsSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -122,6 +256,8 @@ export default function OpsBoardPage() {
     };
   }, []);
 
+  const board = useMemo(() => (snap ? buildOpsBoard(snap, now) : null), [snap, now]);
+
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
@@ -137,15 +273,49 @@ export default function OpsBoardPage() {
       </div>
     );
   }
-  if (!snap) {
+  if (!board) {
     return <div className="min-h-screen bg-background" />;
   }
 
-  const board = buildOpsBoard(snap, now);
+  const q = query.trim().toLowerCase();
+  const hit = (i: TableItem) =>
+    !q || `${i.id} ${i.title} ${i.who} ${i.detail}`.toLowerCase().includes(q);
+
+  const waitingItems = board.waiting
+    .map((w) => ({
+      id: w.id,
+      title: w.title,
+      who: w.who,
+      detail: '',
+      age: w.since ? `${w.daysWaiting}d` : '',
+      refs: w.refs,
+      capturedFrom: w.capturedFrom,
+      body: w.body,
+    }))
+    .filter(hit);
+  const inFlightItems = board.inFlight
+    .map((r) => rowToItem(r, `${r.branch}${r.session ? ` · ${r.session}` : ''}`))
+    .filter(hit);
+  const capturedItems = board.captured.map((r) => rowToItem(r, `via ${r.source}`)).filter(hit);
+  const backlogItems = board.backlog.map((r) => rowToItem(r)).filter(hit);
+  const landedItems = board.landed.map((r) => rowToItem(r, `merge ${r.landedBy}`)).filter(hit);
+  const gapItems = board.gaps
+    .map((g: OpsGap & { area?: string }) => ({
+      id: g.id,
+      title: g.title,
+      who: '',
+      detail: g.area ?? '',
+      age: '',
+      refs: [],
+      capturedFrom: '',
+      body: '',
+      severity: g.severity,
+    }))
+    .filter(hit);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-6xl space-y-6 p-6">
+      <div className="mx-auto max-w-5xl space-y-6 p-6">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold tracking-tight">Ops Ledger</h1>
@@ -158,71 +328,42 @@ export default function OpsBoardPage() {
           </Link>
         </header>
 
-        <Card className="border-gfo-sunrise/40 shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-              <span className="h-2 w-2 rounded-full bg-gfo-sunrise" />
-              Waiting on a human
-              <span className="ml-auto font-normal text-muted-foreground">{board.waiting.length}</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2 pt-0 sm:grid-cols-2">
-            {board.waiting.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Nobody is the bottleneck. Rare — enjoy it.</p>
-            ) : (
-              board.waiting.map((w) => <WaitingCard key={w.id} item={w} />)
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Lane title="In flight" dotClass="bg-gfo-daylight" count={board.inFlight.length} empty="No session holds a branch.">
-            {board.inFlight.map((r) => (
-              <LaneRow key={r.id} row={r} detail={`${r.branch}${r.session ? ` · ${r.session}` : ''} · ${r.daysWaiting}d`} />
-            ))}
-          </Lane>
-          <Lane title="Captured" dotClass="bg-muted-foreground/60" count={board.captured.length} empty="The inbox is drained.">
-            {board.captured.map((r) => (
-              <LaneRow key={r.id} row={r} detail={`via ${r.source} · ${r.since}`} />
-            ))}
-          </Lane>
-          <Lane title="Backlog (triaged)" dotClass="bg-gfo-midnight/50 dark:bg-gfo-daylight/50" count={board.backlog.length} empty="Nothing triaged and unclaimed.">
-            {board.backlog.map((r) => (
-              <LaneRow key={r.id} row={r} detail={r.refs.length ? `→ ${r.refs.join(', ')}` : undefined} />
-            ))}
-          </Lane>
-          <Lane title="Landed" dotClass="bg-gfo-success" count={board.landed.length} empty="Nothing proven merged yet.">
-            {board.landed.map((r) => (
-              <LaneRow key={r.id} row={r} detail={`merge ${r.landedBy}`} />
-            ))}
-          </Lane>
-        </div>
+        <TimelineStrip people={board.people} maxWaitDays={board.maxWaitDays} />
 
         <Card className="shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-              <span className="h-2 w-2 rounded-full bg-gfo-warning" />
-              Open gaps (register)
-              <span className="ml-auto font-normal text-muted-foreground">{board.gaps.length}</span>
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between gap-3 pb-1">
+            <CardTitle className="text-sm font-semibold">Everything, one list</CardTitle>
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter by id, title, who…"
+              className="h-8 max-w-56 text-sm"
+            />
           </CardHeader>
-          <CardContent className="grid gap-2 pt-0 sm:grid-cols-2">
-            {board.gaps.map((g) => (
-              <div key={g.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3 shadow-sm">
-                <div className="flex min-w-0 items-start gap-2">
-                  <IdChip id={g.id} />
-                  <p className="min-w-0 text-sm text-foreground">{g.title}</p>
-                </div>
-                <span
-                  className={
-                    'status-badge shrink-0 ' +
-                    (g.severity === 'high' ? 'status-error' : g.severity === 'med' ? 'status-warning' : 'status-info')
-                  }
-                >
-                  {g.severity ?? '?'}
-                </span>
-              </div>
-            ))}
+          <CardContent className="pt-2">
+            <Section title="Waiting on a human" dotClass="bg-gfo-sunrise" items={waitingItems} total={board.waiting.length} />
+            <Section
+              title="In flight"
+              dotClass="bg-gfo-daylight"
+              items={inFlightItems}
+              total={board.inFlight.length}
+              empty="No session holds a branch."
+            />
+            <Section
+              title="Captured"
+              dotClass="bg-muted-foreground/60"
+              items={capturedItems}
+              total={board.captured.length}
+              empty="The inbox is drained."
+            />
+            <Section
+              title="Backlog (triaged)"
+              dotClass="bg-gfo-midnight/50 dark:bg-gfo-daylight/50"
+              items={backlogItems}
+              total={board.backlog.length}
+            />
+            <Section title="Landed" dotClass="bg-gfo-success" items={landedItems} total={board.landed.length} />
+            <Section title="Open gaps (register)" dotClass="bg-gfo-warning" items={gapItems} total={board.gaps.length} />
           </CardContent>
         </Card>
 

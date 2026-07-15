@@ -139,3 +139,64 @@ describe('buildOpsBoard — lanes (Work Ledger design §7)', () => {
     expect(board.snapshotAgeMinutes).toBe(30);
   });
 });
+
+describe('buildOpsBoard — the bottleneck timeline (board v2)', () => {
+  it('groups waiting items per person, Bryan first, then by longest wait', () => {
+    const board = buildOpsBoard(
+      snap({
+        rows: [
+          row('LG-1', 'triaged', { blocked_on: 'dom', captured_on: '2026-06-30' }),
+          row('LG-2', 'triaged', { blocked_on: 'dom', captured_on: '2026-07-10' }),
+          row('LG-3', 'captured', { blocked_on: 'bryan', captured_on: '2026-07-14' }),
+          row('LG-4', 'triaged', { blocked_on: 'camp', captured_on: '2026-07-04' }),
+        ],
+      }),
+      NOW,
+    );
+    expect(board.people.map((p) => p.who)).toEqual(['Bryan', 'DOM', 'CAMP']);
+    expect(board.people[1].items.map((i) => i.id)).toEqual(['LG-1', 'LG-2']);
+    expect(board.people[1].maxDays).toBe(15);
+  });
+
+  it('exposes the global maxDays so bars share one scale across lanes', () => {
+    const board = buildOpsBoard(
+      snap({
+        rows: [
+          row('LG-1', 'triaged', { blocked_on: 'dom', captured_on: '2026-06-30' }),
+          row('LG-2', 'triaged', { blocked_on: 'bryan', captured_on: '2026-07-14' }),
+        ],
+      }),
+      NOW,
+    );
+    expect(board.maxWaitDays).toBe(15);
+  });
+
+  it('questions with no ledger mirror join their owner lane', () => {
+    const board = buildOpsBoard(
+      snap({ questions: [{ id: 'Q6', title: 'Cutover', owner: 'DOM', status: 'open' }] }),
+      NOW,
+    );
+    expect(board.people).toHaveLength(1);
+    expect(board.people[0].who).toBe('DOM');
+    expect(board.people[0].items[0].id).toBe('Q6');
+  });
+
+  it('nobody waiting → no lanes, and maxWaitDays never divides by zero', () => {
+    const board = buildOpsBoard(snap({ rows: [row('LG-1', 'captured')] }), NOW);
+    expect(board.people).toEqual([]);
+    expect(board.maxWaitDays).toBeGreaterThan(0);
+  });
+});
+
+describe('buildOpsBoard — expandable detail passthrough (board v2)', () => {
+  it('rows carry captured_from and body for the drill-down', () => {
+    const board = buildOpsBoard(
+      snap({
+        rows: [row('LG-1', 'captured', { captured_from: 'as Bryan said it', body: 'Longer context.' })],
+      }),
+      NOW,
+    );
+    expect(board.captured[0].capturedFrom).toBe('as Bryan said it');
+    expect(board.captured[0].body).toBe('Longer context.');
+  });
+});

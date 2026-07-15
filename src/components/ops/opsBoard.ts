@@ -21,11 +21,13 @@ export interface OpsRow {
   status: string;
   source: string;
   captured_on: string;
+  captured_from?: string;
   blocked_on: string;
   branch: string;
   session: string;
   landed_by: string;
   refs: string[];
+  body?: string;
 }
 
 export interface OpsQuestion {
@@ -40,6 +42,7 @@ export interface OpsGap {
   title: string;
   severity?: string;
   status: string;
+  area?: string;
 }
 
 export interface OpsSnapshot {
@@ -57,6 +60,8 @@ export interface WaitingItem {
   since: string;
   daysWaiting: number;
   refs: string[];
+  capturedFrom: string;
+  body: string;
 }
 
 export interface BoardRow {
@@ -69,10 +74,21 @@ export interface BoardRow {
   session: string;
   landedBy: string;
   refs: string[];
+  capturedFrom: string;
+  body: string;
+}
+
+/** One human's queue of waits — a swimlane on the bottleneck timeline. */
+export interface PersonLane {
+  who: string;
+  items: WaitingItem[];
+  maxDays: number;
 }
 
 export interface OpsBoard {
   waiting: WaitingItem[];
+  people: PersonLane[];
+  maxWaitDays: number;
   inFlight: BoardRow[];
   captured: BoardRow[];
   backlog: BoardRow[];
@@ -115,6 +131,8 @@ function toBoardRow(r: OpsRow, nowMs: number): BoardRow {
     session: r.session,
     landedBy: r.landed_by ? r.landed_by.slice(0, 7) : '',
     refs: r.refs ?? [],
+    capturedFrom: r.captured_from ?? '',
+    body: r.body ?? '',
   };
 }
 
@@ -139,6 +157,8 @@ export function buildOpsBoard(snap: OpsSnapshot, nowMs: number): OpsBoard {
         since: r.captured_on,
         daysWaiting: daysSince(r.captured_on, nowMs),
         refs: r.refs ?? [],
+        capturedFrom: r.captured_from ?? '',
+        body: r.body ?? '',
       })),
     ...(snap.questions ?? [])
       .filter((q) => !mirrored.has(q.id))
@@ -150,6 +170,8 @@ export function buildOpsBoard(snap: OpsSnapshot, nowMs: number): OpsBoard {
         since: '',
         daysWaiting: 0,
         refs: [],
+        capturedFrom: '',
+        body: '',
       })),
   ].sort((a, b) => {
     const aB = a.who === 'Bryan' ? 0 : 1;
@@ -157,6 +179,25 @@ export function buildOpsBoard(snap: OpsSnapshot, nowMs: number): OpsBoard {
     if (aB !== bB) return aB - bB;
     return (a.since || '9999').localeCompare(b.since || '9999');
   });
+
+  // The bottleneck timeline: one swimlane per human, Bryan pinned first,
+  // then whoever has waited longest. All bars share maxWaitDays as the scale
+  // (floored at 1 so a fresh board never divides by zero).
+  const laneMap = new Map<string, WaitingItem[]>();
+  for (const w of waiting) {
+    const list = laneMap.get(w.who) ?? [];
+    list.push(w);
+    laneMap.set(w.who, list);
+  }
+  const people: PersonLane[] = [...laneMap.entries()]
+    .map(([who, items]) => ({ who, items, maxDays: Math.max(...items.map((i) => i.daysWaiting)) }))
+    .sort((a, b) => {
+      const aB = a.who === 'Bryan' ? 0 : 1;
+      const bB = b.who === 'Bryan' ? 0 : 1;
+      if (aB !== bB) return aB - bB;
+      return b.maxDays - a.maxDays;
+    });
+  const maxWaitDays = Math.max(1, ...people.map((p) => p.maxDays));
 
   // A live row blocked on a human belongs to the hero lane alone — listing it
   // again under Captured/Backlog would double-count the same wait.
@@ -169,6 +210,8 @@ export function buildOpsBoard(snap: OpsSnapshot, nowMs: number): OpsBoard {
 
   return {
     waiting,
+    people,
+    maxWaitDays,
     inFlight: byStatus('in-flight'),
     captured: byStatus('captured'),
     backlog: rows
