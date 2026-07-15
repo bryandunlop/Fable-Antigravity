@@ -43,8 +43,20 @@ export default function LegDetail() {
   const [fuelLbs, setFuelLbs] = useState('14500');
   const [plannedFuel, setPlannedFuel] = useState(String(leg.plannedFuelLb ?? ''));
 
-  const completeFrat = (data: { totalScore?: number }) => {
-    completeFratOnLeg({ dispatch, newId, trip, leg, actorOid: user.oid, totalScore: data.totalScore });
+  const completeFrat = (data: {
+    totalScore?: number;
+    items?: { title: string; items: { id: string; label: string; score: number; selected: boolean }[] }[];
+    mitigationNotes?: string;
+    additionalNotes?: string;
+  }) => {
+    completeFratOnLeg({
+      dispatch, newId, trip, leg, actorOid: user.oid,
+      totalScore: data.totalScore,
+      assessment: data.items,
+      mitigationNotes: data.mitigationNotes,
+      additionalNotes: data.additionalNotes,
+      nowUtc: new Date().toISOString(),
+    });
     setFratOpen(false);
   };
 

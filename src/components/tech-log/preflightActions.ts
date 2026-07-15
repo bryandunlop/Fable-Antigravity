@@ -1,4 +1,22 @@
-import type { Trip, TripLeg, TechLogAction } from './types';
+import type { Trip, TripLeg, TechLogAction, FratRecord, FratRecordSection } from './types';
+
+/** The submitted assessment as the form hands it over — the template's `icon` is ignored. */
+export interface FratAssessmentSection {
+  title: string;
+  items: { id: string; label: string; score: number; selected: boolean }[];
+}
+
+/**
+ * Freeze the assessment as the pilot saw it: labels and scores as literals, never indices
+ * into a template the builder can later edit. Drops anything else the caller passed
+ * (notably `icon`, a React component reference).
+ */
+function freezeAssessment(sections: FratAssessmentSection[]): FratRecordSection[] {
+  return sections.map((s) => ({
+    title: s.title,
+    items: s.items.map(({ id, label, score, selected }) => ({ id, label, score, selected })),
+  }));
+}
 
 interface Base {
   dispatch: (a: TechLogAction) => void;
@@ -22,9 +40,44 @@ function patchLeg(
   } });
 }
 
-export function completeFratOnLeg(args: Base & { totalScore?: number }): void {
-  patchLeg(args, { fratStatus: 'COMPLETED', fratScore: args.totalScore, fratDraft: undefined }, 'LEG_FRAT_COMPLETED',
-    `${args.trip.tripNumber} leg ${args.leg.sequence} FRAT score ${args.totalScore ?? '—'}`);
+export function completeFratOnLeg(
+  args: Base & {
+    totalScore?: number;
+    /** Omit and the leg keeps only a score — the pre-2026-07-14 behaviour, retained for older call sites. */
+    assessment?: FratAssessmentSection[];
+    mitigationNotes?: string;
+    additionalNotes?: string;
+    nowUtc?: string;
+  },
+): void {
+  // Appends rather than replaces: a resubmitted FRAT ("22 at 0600, 14 once the weather
+  // cleared") must leave the earlier assessment readable. (Bryan, 2026-07-14)
+  const records: FratRecord[] = [...(args.leg.fratRecords ?? [])];
+  if (args.assessment) {
+    records.push({
+      score: args.totalScore ?? 0,
+      sections: freezeAssessment(args.assessment),
+      mitigationNotes: args.mitigationNotes,
+      additionalNotes: args.additionalNotes,
+      submittedAtUtc: args.nowUtc ?? new Date().toISOString(),
+      submittedByOid: args.actorOid,
+    });
+  }
+
+  patchLeg(
+    args,
+    {
+      fratStatus: 'COMPLETED',
+      fratScore: args.totalScore,
+      // The draft is transient scratch; the record above is what survives. Before the
+      // record existed, this line was the erasure — it wiped the only copy of the ticked
+      // items and the mandatory mitigation plan. (TL-17)
+      fratDraft: undefined,
+      ...(records.length ? { fratRecords: records } : {}),
+    },
+    'LEG_FRAT_COMPLETED',
+    `${args.trip.tripNumber} leg ${args.leg.sequence} FRAT score ${args.totalScore ?? '—'}`,
+  );
 }
 
 export function saveFratDraftOnLeg(

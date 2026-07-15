@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { readDeferralClock, type ClockTone } from '../engine/deferralClock';
+import type { MelCategory } from '../types';
 import { cn } from '../../ui/utils';
 
 /**
@@ -28,9 +29,9 @@ function useNow(intervalMs = 60_000): number {
  * licence to put RAG hues on other non-RAG axes: the custody axis retired gold
  * precisely for colliding with amber (index.css:521-525).
  *
- * Known wart, accepted: with an absolute URGENT window (below), a Cat B (3-day)
- * deferral reads amber for most of its life, where the ring adds little over the chip.
- * That is a symptom of the absolute-vs-proportional question, which is a DOM call.
+ * The URGENT threshold is scaled per MEL category (URGENT_WINDOW_DAYS in the engine) —
+ * Bryan, 2026-07-14. It was previously a flat 2 days, which made a Cat B (3-day)
+ * deferral amber for two-thirds of its life, where the ring added nothing over the chip.
  */
 const TONE: Record<ClockTone, { stroke: string; text: string }> = {
   NORMAL: { stroke: 'var(--muted-foreground)', text: 'text-muted-foreground' },
@@ -44,16 +45,19 @@ const CIRCUMFERENCE = 2 * Math.PI * R;
 export function DeferralClock({
   clockStartUtc,
   repairDueUtc,
+  category,
   className,
   showLabel = true,
 }: {
   clockStartUtc: string;
   repairDueUtc?: string;
+  /** Selects the urgency threshold — a Cat B and a Cat D do not go amber at the same remaining time. */
+  category: MelCategory;
   className?: string;
   showLabel?: boolean;
 }) {
   const now = useNow();
-  const reading = readDeferralClock(clockStartUtc, repairDueUtc, now);
+  const reading = readDeferralClock(clockStartUtc, repairDueUtc, now, category);
 
   // Usage-based or unparseable: nothing calendar-based to drain. Render nothing rather
   // than an empty ring implying a calendar interval that does not exist.

@@ -17,11 +17,25 @@ export function LegDayOfSection({ tlTrip, leg, tripNumber, onOpenAirport }: { tl
   const user = useCurrentUser();
   const [fratOpen, setFratOpen] = useState(false);
 
-  const submitFrat = (totalScore?: number) => {
+  type FratSubmission = {
+    totalScore?: number;
+    items?: { title: string; items: { id: string; label: string; score: number; selected: boolean }[] }[];
+    mitigationNotes?: string;
+    additionalNotes?: string;
+  };
+
+  const submitFrat = (data: FratSubmission) => {
     if (fratEarlySubmitWarning(new Date().toISOString(), leg.departureTimeUtc)) {
       if (!window.confirm('This FRAT is being submitted well before departure — conditions may change. Submit anyway?')) return;
     }
-    completeFratOnLeg({ dispatch, newId, trip: tlTrip, leg, actorOid: user.oid, totalScore });
+    completeFratOnLeg({
+      dispatch, newId, trip: tlTrip, leg, actorOid: user.oid,
+      totalScore: data.totalScore,
+      assessment: data.items,
+      mitigationNotes: data.mitigationNotes,
+      additionalNotes: data.additionalNotes,
+      nowUtc: new Date().toISOString(),
+    });
     setFratOpen(false);
   };
 
@@ -50,9 +64,9 @@ export function LegDayOfSection({ tlTrip, leg, tripNumber, onOpenAirport }: { tl
                 date: leg.departureTimeUtc.slice(0, 10), time: leg.departureTimeUtc.slice(11, 16), pic: user.displayName,
                 selections: leg.fratDraft?.selections, mitigationNotes: leg.fratDraft?.mitigationNotes }}
               onClose={() => setFratOpen(false)}
-              onSave={(data: { status?: string; totalScore?: number; mitigationNotes?: string; items?: { items: { selected: boolean }[] }[] }) => {
+              onSave={(data: FratSubmission & { status?: string }) => {
                 if (data.status === 'submitted') {
-                  submitFrat(data.totalScore);
+                  submitFrat(data);
                 } else if (data.status === 'draft') {
                   saveFratDraftOnLeg({ dispatch, newId, trip: tlTrip, leg, actorOid: user.oid,
                     selections: extractFratSelections(data.items ?? []), mitigationNotes: data.mitigationNotes,

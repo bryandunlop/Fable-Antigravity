@@ -12,7 +12,9 @@
  * It exists so a human can see the clock draining instead of date-diffing a string.
  */
 
-/** Action urgency, not proportion — see `URGENT_WINDOW_MS`. */
+import type { MelCategory } from '../types';
+
+/** Action urgency, not proportion — see `URGENT_WINDOW_DAYS`. */
 export type ClockTone = 'NORMAL' | 'URGENT' | 'EXPIRED';
 
 export interface ClockReading {
@@ -29,13 +31,22 @@ const HOUR_MS = 3600000;
 const DAY_MS = 86400000;
 
 /**
- * Absolute, not proportional. Two days left is equally urgent to act on whether the
- * interval was Cat B (3 days) or Cat D (120). The drain ring carries proportion; the
- * tone carries time-to-act. Inherited from the previous `urgent: days < 2` threshold —
- * whether the operator wants urgency scaled per category is a DOM question, not a
- * UI default (see D31).
+ * How much runway is left before the clock demands action — scaled per MEL category
+ * (Bryan, 2026-07-14; see D31). Replaces a flat 2 days for every category, which made a
+ * Cat B (3-day) deferral read amber for two-thirds of its life, where the ring told you
+ * nothing the serviceability chip hadn't already.
+ *
+ * Cat A is "per proviso" — no calendar interval (`CATEGORY_DAYS.A` is null), so such a
+ * deferral carries no `repairDueDateUtc` and never produces a reading at all.
+ *
+ * These are display thresholds, NOT regulatory boundaries. The repair interval itself
+ * lives in `constants.ts` CATEGORY_DAYS (B=3, C=10, D=120) and the due date is computed
+ * by `pl25.ts`. Changing a number here changes when the ring turns amber — it can never
+ * change when a deferral actually expires.
  */
-const URGENT_WINDOW_MS = 2 * DAY_MS;
+export const URGENT_WINDOW_DAYS: Record<MelCategory, number | null> = {
+  A: null, B: 1, C: 2, D: 7,
+};
 
 function labelFor(msRemaining: number): string {
   if (msRemaining <= 0) return 'overdue';
@@ -50,12 +61,15 @@ function labelFor(msRemaining: number): string {
  *                       which expire on a usage threshold and have no calendar span to drain.
  * @param nowMs          Injected rather than read from the clock, so this stays pure and
  *                       the caller controls the tick cadence.
+ * @param category       Deferral.category — selects the urgency threshold. A short Cat B
+ *                       and a long Cat D do not become urgent at the same remaining time.
  * @returns null when there is nothing calendar-based to show.
  */
 export function readDeferralClock(
   clockStartIso: string,
   repairDueIso: string | undefined,
   nowMs: number,
+  category: MelCategory,
 ): ClockReading | null {
   if (!repairDueIso) return null;
 
@@ -71,8 +85,15 @@ export function readDeferralClock(
   const fractionElapsed =
     span > 0 ? Math.min(1, Math.max(0, (nowMs - start) / span)) : 1;
 
+  // A category with no calendar interval (Cat A) has no urgency window either — it can
+  // still expire, it just never pre-warns.
+  const windowDays = URGENT_WINDOW_DAYS[category];
   const tone: ClockTone =
-    msRemaining <= 0 ? 'EXPIRED' : msRemaining < URGENT_WINDOW_MS ? 'URGENT' : 'NORMAL';
+    msRemaining <= 0
+      ? 'EXPIRED'
+      : windowDays != null && msRemaining < windowDays * DAY_MS
+        ? 'URGENT'
+        : 'NORMAL';
 
   return { fractionElapsed, msRemaining, tone, label: labelFor(msRemaining) };
 }
