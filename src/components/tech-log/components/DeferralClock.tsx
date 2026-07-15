@@ -16,11 +16,21 @@ function useNow(intervalMs = 60_000): number {
 }
 
 /**
- * Deliberately NOT the `status-*` classes and NOT a pill: those belong to the
- * airworthiness RAG axis (ServiceabilityChip), and this is a clock, not a
- * serviceability claim. An aircraft with an ACTIVE Cat D deferral is AMBER on day 1
- * while this ring is still neutral — the ring reports the repair interval, the chip
- * reports dispatchability. Keeping them visually distinct is the point.
+ * These ARE the RAG hues (`--gfo-warning` / `--gfo-error` — the same values behind
+ * ServiceabilityChip's `status-*` classes), used here deliberately. Ratified by Bryan
+ * 2026-07-14 (see D31): the ring and the chip *agree* rather than compete — an ACTIVE
+ * deferral is AMBER and its clock running out is amber; an expired deferral re-grounds
+ * the aircraft, so red is literally true at EXPIRED.
+ *
+ * What separates the two axes here is SHAPE, not hue: this is a thin ring, the
+ * serviceability claim is a filled pill. Do not "fix" this into `status-*` classes —
+ * that would make it a serviceability claim, which it is not. And do not read this as
+ * licence to put RAG hues on other non-RAG axes: the custody axis retired gold
+ * precisely for colliding with amber (index.css:521-525).
+ *
+ * Known wart, accepted: with an absolute URGENT window (below), a Cat B (3-day)
+ * deferral reads amber for most of its life, where the ring adds little over the chip.
+ * That is a symptom of the absolute-vs-proportional question, which is a DOM call.
  */
 const TONE: Record<ClockTone, { stroke: string; text: string }> = {
   NORMAL: { stroke: 'var(--muted-foreground)', text: 'text-muted-foreground' },
