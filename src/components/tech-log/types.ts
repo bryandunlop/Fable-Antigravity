@@ -437,6 +437,9 @@ export interface Postflight {
   checklistInstanceId?: string;
   notes?: string;
   gatheredDefectIds: string[]; // still-open squawks gathered for the work queue
+  // WATCHLISTED items present at reclaim. Recorded separately so the signed postflight never asserts
+  // a non-airworthiness cabin/NEF item is an open squawk. Optional: pre-existing records predate it.
+  gatheredWatchItemIds?: string[];
   signatureId: string;
   supersedesId?: string;
 }

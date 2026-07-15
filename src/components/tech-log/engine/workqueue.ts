@@ -1,5 +1,6 @@
 import type { Defect, Deferral, WorkCard, RecurringCheck, TechLogState } from '../types';
 import { currentRows } from './supersede';
+import { watchItemsFor } from './watchlist';
 import { isDeferralExpired } from './pl25';
 import { expiredChecksFor } from './recurringChecks';
 
@@ -68,9 +69,7 @@ export function buildWorkQueue(state: Slice, asOfUtc: string, soonDays = 3): Wor
     .filter(w => w.status !== 'COMPLETED')
     .sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc));
 
-  const watchItems = defects
-    .filter(d => d.status === 'WATCHLISTED')
-    .sort((a, b) => b.reportedAtUtc.localeCompare(a.reportedAtUtc));
+  const watchItems = watchItemsFor(state.defects);
 
   const expiredDue = deferralsDue.filter(d => d.dueState === 'EXPIRED').length;
   return {

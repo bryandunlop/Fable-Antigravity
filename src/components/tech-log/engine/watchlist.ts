@@ -1,4 +1,15 @@
 import type { Defect, Personnel } from '../types';
+import { currentRows } from './supersede';
+
+/** Current watch items, newest-reported first — the single definition of the watch bucket, shared by
+ *  the maintenance work queue (`buildWorkQueue().watchItems`, fleet-wide) and the crew-facing briefing
+ *  and postflight (per-aircraft), so a watch item cannot be shown on one surface and hidden on another.
+ *  Omit `aircraftId` for the whole fleet. */
+export function watchItemsFor(defects: Defect[], aircraftId?: string): Defect[] {
+  return currentRows(defects)
+    .filter(d => d.status === 'WATCHLISTED' && (aircraftId === undefined || d.aircraftId === aircraftId))
+    .sort((a, b) => b.reportedAtUtc.localeCompare(a.reportedAtUtc));
+}
 
 /** WATCH disposition (mirrors CAMP's DEFERRED-WATCHLIST discrepancy type): a non-airworthiness
  *  cabin/NEF item maintenance wants tracked without an MEL deferral. Maintenance-only, from OPEN

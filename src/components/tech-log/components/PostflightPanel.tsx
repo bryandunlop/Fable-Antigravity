@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ClipboardCheck, PlaneLanding } from 'lucide-react';
+import { ClipboardCheck, PlaneLanding, Eye } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
+import { watchItemsFor } from '../engine/watchlist';
 import { deriveCustody } from '../engine/custody';
 import { latestBriefing } from './BriefingPanel';
 import { latestPublishedTemplate, isReleaseGated } from '../engine/checklist';
@@ -37,6 +38,9 @@ export function PostflightPanel({ aircraft }: { aircraft: Aircraft }) {
   const [pendingId, setPendingId] = useState('');
 
   const openSquawks = currentRows(state.defects).filter(d => d.aircraftId === aircraft.id && (d.status === 'OPEN' || d.status === 'DEFERRED'));
+  // Gathered alongside the open squawks, but kept apart: a watch item is outstanding at reclaim
+  // without being an airworthiness squawk, and the signed postflight must not conflate the two.
+  const watchItems = watchItemsFor(state.defects, aircraft.id);
   const briefing = latestBriefing(state.briefings, aircraft.id);
 
   const startChecklist = () => {
@@ -63,12 +67,13 @@ export function PostflightPanel({ aircraft }: { aircraft: Aircraft }) {
     const nowIso = new Date().toISOString();
     const pf: Postflight = {
       id: pendingId, aircraftId: aircraft.id, briefingId: briefing?.id, performedByOid: user.oid, performedAtUtc: nowIso,
-      checklistInstanceId: instance?.id, notes: notes || undefined, gatheredDefectIds: openSquawks.map(d => d.id), signatureId: sig.id,
+      checklistInstanceId: instance?.id, notes: notes || undefined, gatheredDefectIds: openSquawks.map(d => d.id),
+      gatheredWatchItemIds: watchItems.map(d => d.id), signatureId: sig.id,
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig });
     dispatch({ type: 'ADD_POSTFLIGHT', payload: pf });
     if (instance) dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: { ...instance, signatureId: sig.id, fuelLoad } });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'POSTFLIGHT_COMPLETED', entityType: 'Postflight', entityId: pf.id, atUtc: nowIso, summary: `${aircraft.tailNumber} postflight — reclaimed to maintenance; ${pf.gatheredDefectIds.length} open squawk(s) gathered` } });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'POSTFLIGHT_COMPLETED', entityType: 'Postflight', entityId: pf.id, atUtc: nowIso, summary: `${aircraft.tailNumber} postflight — reclaimed to maintenance; ${pf.gatheredDefectIds.length} open squawk(s)${pf.gatheredWatchItemIds?.length ? `, ${pf.gatheredWatchItemIds.length} watch item(s)` : ''} gathered` } });
     toast.success(`${aircraft.tailNumber} postflight signed — back in maintenance custody.`);
   };
 
@@ -103,12 +108,16 @@ export function PostflightPanel({ aircraft }: { aircraft: Aircraft }) {
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Open squawks gathered for the work queue ({openSquawks.length})</div>
             {openSquawks.length ? <ul className="list-disc pl-5">{openSquawks.map(d => <li key={d.id}>ATA {d.ataChapter} — {d.description}</li>)}</ul> : <p className="text-muted-foreground">None</p>}
           </div>
+          <div>
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Eye className="h-3.5 w-3.5" /> Watch items carried ({watchItems.length})</div>
+            {watchItems.length ? <ul className="list-disc pl-5">{watchItems.map(d => <li key={d.id}>ATA {d.ataChapter} — {d.description}</li>)}</ul> : <p className="text-muted-foreground">None</p>}
+          </div>
           <Textarea placeholder="Postflight notes / new findings" value={notes} onChange={e => setNotes(e.target.value)} />
           <Button onClick={begin}><ClipboardCheck className="mr-1.5 h-4 w-4" /> Sign postflight &amp; reclaim</Button>
         </CardContent>
       </Card>
       <SignCeremonyDialog open={open} onOpenChange={setOpen} signer={user} signedEntity="POSTFLIGHT" signedEntityId={pendingId}
-        intentStatement={INTENT.POSTFLIGHT} payloadSummary={`${aircraft.tailNumber} postflight — ${openSquawks.length} open squawk(s) gathered.`}
+        intentStatement={INTENT.POSTFLIGHT} payloadSummary={`${aircraft.tailNumber} postflight — ${openSquawks.length} open squawk(s) gathered${watchItems.length ? `, ${watchItems.length} watch item(s) carried` : ''}.`}
         onSigned={onSigned} title="Sign postflight (maintenance)" />
     </div>
   );

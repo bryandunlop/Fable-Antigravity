@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ClipboardCheck, Send, CheckCircle2, Printer, Plane, Wrench, AlertTriangle, Fuel, CalendarClock, FileSignature, ArrowRight, Lock, ChevronDown, ChevronRight } from 'lucide-react';
+import { ClipboardCheck, Send, CheckCircle2, Printer, Plane, Wrench, AlertTriangle, Eye, Fuel, CalendarClock, FileSignature, ArrowRight, Lock, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
+import { watchItemsFor } from '../engine/watchlist';
 import { isDeferralExpired } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
 import { campForecast } from '../integration/campClient';
@@ -49,6 +50,10 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   // live briefing content
   const deferrals = currentRows(state.deferrals).filter(d => d.aircraftId === aircraft.id && d.status !== 'CLEARED');
   const openDefects = currentRows(state.defects).filter(d => d.aircraftId === aircraft.id && (d.status === 'OPEN' || d.status === 'DEFERRED'));
+  // Watch items are non-grounding, but they are on the aircraft the PIC accepts — disclosed here in
+  // their own section rather than folded into "Open defects", which would mis-state a cabin/NEF item
+  // as an airworthiness defect on a signed brief.
+  const watchItems = watchItemsFor(state.defects, aircraft.id);
   const checksDue = state.recurringChecks
     .filter(c => c.aircraftId === aircraft.id)
     .map(c => projectCheck(c, state.recurringAccomplishments, now, { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles }))
@@ -123,6 +128,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
         ], body: b.notes },
         { heading: 'Active MEL deferrals', body: deferrals.length ? deferrals.map(d => `MEL ${melOf(d.melItemId)?.subItemNumber ?? '—'} (Cat ${d.category}) — ${d.restrictionText ?? melOf(d.melItemId)?.title ?? ''}`).join('\n') : 'None' },
         { heading: 'Open defects', body: openDefects.length ? openDefects.map(d => `ATA ${d.ataChapter} — ${d.description}`).join('\n') : 'None' },
+        { heading: 'Watch items — tracked, non-airworthiness', body: watchItems.length ? watchItems.map(d => `ATA ${d.ataChapter} — ${d.description}`).join('\n') : 'None' },
         { heading: 'Coming due (CAMP)', body: comingDue.length ? comingDue.map(i => `${i.description} — ${i.dueDateUtc ? new Date(i.dueDateUtc).toLocaleDateString() : ''}`).join('\n') : 'None' },
         { heading: 'Preflight checklist', body: (() => {
           const t = state.checklistTemplates.find(t => t.id === instance?.templateId && t.version === instance?.templateVersion);
@@ -178,7 +184,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
               <div><Label className="flex items-center gap-1.5"><Fuel className="h-3.5 w-3.5" /> Fuel planned (lb)</Label><Input type="number" className="mt-1" value={briefing.fuelPlannedLb ?? ''} onChange={e => patch({ ...briefing, fuelPlannedLb: e.target.value ? Number(e.target.value) : undefined })} /></div>
             </div>
             <div><Label>Notes to crew</Label><Textarea className="mt-1" value={briefing.notes ?? ''} onChange={e => patch({ ...briefing, notes: e.target.value || undefined })} placeholder="Anything the crew should know before the flight…" /></div>
-            <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">On release, the briefing snapshots current serviceability ({sv.status}) and is sent to the crew with active MELs, open defects, fuel, and coming-due maintenance.</div>
+            <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">On release, the briefing snapshots current serviceability ({sv.status}) and is sent to the crew with active MELs, open defects, watch items, fuel, and coming-due maintenance.</div>
             <Button onClick={() => beginRelease(briefing)}><Send className="mr-1.5 h-4 w-4" /> Release for flight</Button>
           </CardContent>
         </Card>
@@ -296,6 +302,16 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
               <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><AlertTriangle className="h-3.5 w-3.5" /> Open defects</div>
               {openDefects.length === 0 ? <p className="text-muted-foreground">None.</p> : openDefects.map(d => <div key={d.id} className="border-b py-1 last:border-0 text-xs">ATA {d.ataChapter} — {d.description}</div>)}
             </div>
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Eye className="h-3.5 w-3.5" /> Watch items — tracked, non-airworthiness</div>
+            {watchItems.length === 0 ? <p className="text-muted-foreground">None.</p> : watchItems.map(d => (
+              <div key={d.id} className="flex items-center gap-2 border-b py-1 last:border-0 text-xs">
+                <Badge variant="secondary" className="shrink-0 text-[10px]">WATCH</Badge>
+                <span>ATA {d.ataChapter} — {d.description}</span>
+              </div>
+            ))}
           </div>
 
           <div>
