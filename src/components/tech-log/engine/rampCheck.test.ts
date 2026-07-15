@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildRampView } from './rampCheck';
-import type { Aircraft, Deferral, MelItem } from '../types';
+import { deriveServiceability } from './serviceability';
+import type { Aircraft, Defect, Deferral, MelItem } from '../types';
 
 const AC: Aircraft = {
   id: 'ac-1', tailNumber: 'N512GF', type: 'G650ER', serialNumber: '6289',
@@ -25,29 +26,39 @@ function deferral(over: Partial<Deferral> = {}): Deferral {
   };
 }
 
+function defect(over: Partial<Defect> = {}): Defect {
+  return {
+    id: 'def-1', aircraftId: 'ac-1', source: 'PIREP', ataChapter: '24',
+    description: 'APU generator inoperative', severity: 'MEDIUM',
+    airworthinessAffecting: true, status: 'DEFERRED',
+    reportedByOid: 'oid-1', reportedAtUtc: '2026-07-05T18:00:00Z', signatureId: 'sig-0',
+    ...over,
+  };
+}
+
 const NOW = '2026-07-10T12:00:00Z';
 
 describe('buildRampView — header, per FAA Order 8900.1 ¶6-101F5(a)', () => {
   it('carries tail and serial, which is exactly what the inspector matches the MEL against', () => {
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()], defects: [defect()] }, NOW)!;
     expect(v.tailNumber).toBe('N512GF');
     expect(v.serialNumber).toBe('6289');
     expect(v.type).toBe('G650ER');
   });
 
   it('reports the LOA as not held — TL-25 is a visible gap on the screen, not a silent omission', () => {
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [], defects: [] }, NOW)!;
     expect(v.loaHeld).toBe(false);
   });
 
   it('returns null for an unknown tail rather than throwing at a regulator', () => {
-    expect(buildRampView('nope', { aircraft: [AC], deferrals: [] }, NOW)).toBeNull();
+    expect(buildRampView('nope', { aircraft: [AC], deferrals: [], defects: [] }, NOW)).toBeNull();
   });
 });
 
 describe('buildRampView — point-in-time MEL identity (the reason this engine exists)', () => {
   it('reads MEL number and title from the frozen Deferral row', () => {
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()], defects: [defect()] }, NOW)!;
     expect(v.deferrals[0].melSubItemNumber).toBe('24-02-02');
     expect(v.deferrals[0].melTitle).toBe('APU generator inoperative');
     expect(v.deferrals[0].governingMmelRevision).toBe('14');
@@ -67,7 +78,7 @@ describe('buildRampView — point-in-time MEL identity (the reason this engine e
       title: 'REVISED UNDER REV 15 — MUST NOT APPEAR', category: 'B',
       numberInstalled: 1, numberRequired: 0,
     };
-    const state = { aircraft: [AC], deferrals: [deferral()], melItems: [revised] };
+    const state = { aircraft: [AC], deferrals: [deferral()], defects: [defect()], melItems: [revised] };
     const v = buildRampView('ac-1', state, NOW)!;
 
     expect(v.deferrals[0].melSubItemNumber).toBe('24-02-02');
@@ -78,7 +89,7 @@ describe('buildRampView — point-in-time MEL identity (the reason this engine e
 
   it('reports a missing snapshot as null rather than falling back to a join', () => {
     const legacy = deferral({ melSubItemNumber: undefined, melTitle: undefined });
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [legacy] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [legacy], defects: [defect()] }, NOW)!;
     expect(v.deferrals[0].melSubItemNumber).toBeNull();
     expect(v.deferrals[0].melTitle).toBeNull();
   });
@@ -86,10 +97,10 @@ describe('buildRampView — point-in-time MEL identity (the reason this engine e
 
 describe('buildRampView — expiry, the finding a ramp check is looking for', () => {
   it('flags a calendar deferral past its due boundary as expired', () => {
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()] }, '2026-07-18T00:00:00Z')!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()], defects: [defect()] }, '2026-07-18T00:00:00Z')!;
     expect(v.deferrals[0].status).toBe('EXPIRED');
     expect(v.deferrals[0].isExpired).toBe(true);
-    expect(v.hasFinding).toBe(true);
+    expect(v.hasMelFinding).toBe(true);
   });
 
   it('flags a usage-based deferral past its threshold, read against live airframe totals', () => {
@@ -97,29 +108,78 @@ describe('buildRampView — expiry, the finding a ramp check is looking for', ()
       repairDueDateUtc: undefined, usageDueThreshold: 4200,
       repairIntervalUnit: 'HOUR', category: 'A',
     });
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [usage] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [usage], defects: [defect()] }, NOW)!;
     expect(v.deferrals[0].isExpired).toBe(true);
   });
 
   it('leaves an in-clock deferral active and raises no finding', () => {
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()], defects: [defect()] }, NOW)!;
     expect(v.deferrals[0].status).toBe('ACTIVE');
     expect(v.deferrals[0].isExpired).toBe(false);
-    expect(v.hasFinding).toBe(false);
+    expect(v.hasMelFinding).toBe(false);
   });
 
   it('treats a placard-pending deferral as a finding — the aircraft is RED, not dispatchable', () => {
     const pending = deferral({ status: 'PENDING_PLACARD', placardInstalled: false });
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [pending] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [pending], defects: [defect()] }, NOW)!;
     expect(v.deferrals[0].status).toBe('PENDING_PLACARD');
-    expect(v.hasFinding).toBe(true);
+    expect(v.hasMelFinding).toBe(true);
+  });
+});
+
+// Two independent fresh reviewers caught this on 2026-07-15 and it reproduced live: N1PG is seeded
+// RED by an open airworthiness defect with ZERO deferrals, and the ramp screen read completely clean
+// ("No inoperative equipment is carried under the MEL", neutral header, no warning) while the fleet
+// board said Grounded. buildRampView could not see `defects`, so its dispatchability signal was
+// computed from a fraction of the inputs that decide it. The "Default-RED on open defect" invariant
+// is explicit that absence of a status is RED, never GREEN — a blank screen implying "fine" in front
+// of an inspector is exactly what it forbids.
+describe('buildRampView — serviceability must never read clean on a grounded aircraft', () => {
+  it('reports RED when an open airworthiness defect grounds the aircraft, even with no deferrals', () => {
+    const v = buildRampView('ac-1', {
+      aircraft: [AC], deferrals: [], defects: [defect({ status: 'OPEN' })],
+    }, NOW)!;
+    expect(v.deferrals).toHaveLength(0);
+    expect(v.serviceability).toBe('RED');
+  });
+
+  it('agrees with deriveServiceability — the fleet board and the ramp screen cannot diverge', () => {
+    const state = { aircraft: [AC], deferrals: [deferral()], defects: [defect()] };
+    expect(buildRampView('ac-1', state, NOW)!.serviceability)
+      .toBe(deriveServiceability('ac-1', state, NOW).status);
+
+    const grounded = { aircraft: [AC], deferrals: [], defects: [defect({ status: 'OPEN' })] };
+    expect(buildRampView('ac-1', grounded, NOW)!.serviceability)
+      .toBe(deriveServiceability('ac-1', grounded, NOW).status);
+  });
+
+  it('reads AMBER when a deferral is active and covering its defect', () => {
+    const v = buildRampView('ac-1', {
+      aircraft: [AC], deferrals: [deferral()], defects: [defect()],
+    }, NOW)!;
+    expect(v.serviceability).toBe('AMBER');
+  });
+
+  it('reads GREEN only when nothing is open and nothing is deferred', () => {
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [], defects: [] }, NOW)!;
+    expect(v.serviceability).toBe('GREEN');
+  });
+
+  it('scopes the MEL finding flag to deferrals, and keeps it separate from serviceability', () => {
+    // A grounding defect is NOT a MEL finding — the two signals answer different questions and
+    // conflating them is what produced the original bug.
+    const v = buildRampView('ac-1', {
+      aircraft: [AC], deferrals: [], defects: [defect({ status: 'OPEN' })],
+    }, NOW)!;
+    expect(v.serviceability).toBe('RED');
+    expect(v.hasMelFinding).toBe(false);
   });
 });
 
 describe('buildRampView — which rows an inspector is shown', () => {
   it('excludes cleared deferrals — "deferred items" means currently deferred', () => {
     const v = buildRampView('ac-1', {
-      aircraft: [AC],
+      aircraft: [AC], defects: [defect()],
       deferrals: [deferral({ id: 'df-1', status: 'CLEARED' }), deferral({ id: 'df-2' })],
     }, NOW)!;
     expect(v.deferrals.map(d => d.deferralId)).toEqual(['df-2']);
@@ -128,14 +188,14 @@ describe('buildRampView — which rows an inspector is shown', () => {
   it('excludes superseded rows so a corrected deferral is not double-counted', () => {
     const original = deferral({ id: 'df-1' });
     const correction = deferral({ id: 'df-2', supersedesId: 'df-1', melTitle: 'Corrected title' });
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [original, correction] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [original, correction], defects: [defect()] }, NOW)!;
     expect(v.deferrals).toHaveLength(1);
     expect(v.deferrals[0].melTitle).toBe('Corrected title');
   });
 
   it('shows only the requested tail — a ramp check is about the aircraft in front of the inspector', () => {
     const other = deferral({ id: 'df-9', aircraftId: 'ac-2' });
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral(), other] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral(), other], defects: [defect()] }, NOW)!;
     expect(v.deferrals).toHaveLength(1);
     expect(v.deferrals[0].deferralId).toBe('df-1');
   });
@@ -144,25 +204,25 @@ describe('buildRampView — which rows an inspector is shown', () => {
     const far = deferral({ id: 'far', repairDueDateUtc: '2026-10-01T04:00:00Z', category: 'D' });
     const soon = deferral({ id: 'soon', repairDueDateUtc: '2026-07-12T04:00:00Z' });
     const dead = deferral({ id: 'dead', repairDueDateUtc: '2026-07-01T04:00:00Z' });
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [far, soon, dead] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [far, soon, dead], defects: [defect()] }, NOW)!;
     expect(v.deferrals.map(d => d.deferralId)).toEqual(['dead', 'soon', 'far']);
   });
 });
 
 describe('buildRampView — placard, per ¶6-101G6 "present and legible"', () => {
   it('carries the placard location so the inspector knows where to physically look', () => {
-    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()] }, NOW)!;
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()], defects: [defect()] }, NOW)!;
     expect(v.deferrals[0].placardRequired).toBe(true);
     expect(v.deferrals[0].placardInstalled).toBe(true);
     expect(v.deferrals[0].placardLocation).toBe('Overhead panel, adj. APU GEN');
   });
 
   it('carries whether the once-only extension is spent — it moved the due date the inspector reads', () => {
-    const plain = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()] }, NOW)!;
+    const plain = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()], defects: [defect()] }, NOW)!;
     expect(plain.deferrals[0].extensionUsed).toBe(false);
 
     const extended = buildRampView('ac-1', {
-      aircraft: [AC], deferrals: [deferral({ extensionUsed: true, extensionJustification: 'part on order' })],
+      aircraft: [AC], deferrals: [deferral({ extensionUsed: true, extensionJustification: 'part on order' })], defects: [defect()],
     }, NOW)!;
     expect(extended.deferrals[0].extensionUsed).toBe(true);
     // The justification prose is deliberately not surfaced — not asked for by ¶6-101F5.
@@ -171,7 +231,7 @@ describe('buildRampView — placard, per ¶6-101G6 "present and legible"', () =>
 
   it('reports an uninstalled required placard as not installed', () => {
     const v = buildRampView('ac-1', {
-      aircraft: [AC], deferrals: [deferral({ placardInstalled: undefined })],
+      aircraft: [AC], deferrals: [deferral({ placardInstalled: undefined })], defects: [defect()],
     }, NOW)!;
     expect(v.deferrals[0].placardInstalled).toBe(false);
   });

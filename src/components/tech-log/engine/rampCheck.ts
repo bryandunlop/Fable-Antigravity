@@ -14,25 +14,42 @@
  * the D36 vault note.
  *
  * NOTE ON THE STATE PARAMETER — this is the load-bearing design choice, not an oversight.
- * `state` is Pick<TechLogState, 'aircraft' | 'deferrals'>. It has no `melItems` and no
- * `personnel`, so a live foreign-key join into either is a compile error rather than
- * something a reviewer has to notice. Every MEL field below is read from the frozen Deferral
- * row. That matters because EDIT_MEL_ITEM (TechLogContext.tsx) replaces a MelItem in place
- * under the same id: joining would let a rev-15 edit repaint a rev-14 deferral while its
- * governingMmelRevision still read '14' — showing a regulator the wrong provision under a
- * correct-looking label, and breaking the point-in-time MEL invariant ("a deferral signed
- * under revision N must read correctly after revision N+1 ships"). Widening this signature
- * reopens that hole; rampCheck.test.ts guards it.
+ * `state` excludes `melItems` and `personnel`, so a live foreign-key join into either is a
+ * compile error rather than something a reviewer has to notice. Every MEL field below is read
+ * from the frozen Deferral row. That matters because EDIT_MEL_ITEM (TechLogContext.tsx)
+ * replaces a MelItem in place under the same id: joining would let a rev-15 edit repaint a
+ * rev-14 deferral while its governingMmelRevision still read '14' — showing a regulator the
+ * wrong provision under a correct-looking label, and breaking the point-in-time MEL invariant
+ * ("a deferral signed under revision N must read correctly after revision N+1 ships").
+ * Widening the signature to include either table reopens that hole; rampCheck.test.ts guards
+ * it. `defects` is in, and must be — see below. `aircraft` is read live and that is correct:
+ * tail, serial and airframe totals describe the physical aircraft in front of the inspector,
+ * not a historical assertion.
  *
- * `aircraft` IS read live, and that is correct: tail, serial and airframe totals describe the
- * physical aircraft standing in front of the inspector, not a historical assertion.
+ * WHY `defects` IS IN THE SIGNATURE. It was not, and that was a serious bug (found by two
+ * independent reviewers, 2026-07-15, reproduced live). Serviceability is decided by open
+ * defects and recurring checks as much as by deferrals: N1PG is seeded RED by an open
+ * airworthiness defect with zero deferrals, and a deferral-only view rendered it completely
+ * clean — "No inoperative equipment is carried under the MEL", no warning — to an inspector
+ * standing at a grounded aircraft. The "Default-RED on open defect" invariant says absence of
+ * a status is RED, never GREEN; a blank screen implying "fine" is precisely what it forbids.
+ * So this calls `deriveServiceability` — the same projection the fleet board reads — rather
+ * than deciding anything itself. Calling it, not re-implementing it, is what makes divergence
+ * impossible; a test asserts the two agree.
+ *
+ * Note the two signals are kept separate and are NOT the same question:
+ *   `serviceability`  — is this aircraft airworthy? (whole-aircraft, all inputs)
+ *   `hasMelFinding`   — is something wrong with a DEFERRED item? (MEL-scoped)
+ * Collapsing them is what produced the original bug.
  */
 
 import type {
-  AircraftType, Deferral, DeferralStatus, MelCategory, RepairIntervalUnit, TechLogState,
+  AircraftType, Deferral, DeferralStatus, MelCategory, RepairIntervalUnit, Serviceability,
+  TechLogState,
 } from '../types';
 import { currentRows } from './supersede';
 import { isDeferralExpired } from './pl25';
+import { deriveServiceability } from './serviceability';
 
 export interface RampDeferralRow {
   deferralId: string;
@@ -77,14 +94,27 @@ export interface RampView {
    */
   loaHeld: boolean;
   deferrals: RampDeferralRow[];
-  /** True when any presented deferral is not cleanly ACTIVE — i.e. something an inspector would write up. */
-  hasFinding: boolean;
+  /**
+   * myGFO's authoritative whole-aircraft serviceability, from `deriveServiceability` — the same
+   * projection the fleet board and the aircraft page read. NOT recomputed here.
+   */
+  serviceability: Serviceability;
+  /**
+   * MEL-scoped: some presented deferral is not cleanly ACTIVE (expired, placard outstanding, or
+   * unsigned). Deliberately narrower than `serviceability` — a grounding defect is not a MEL
+   * finding, and an aircraft can be RED with this false. Never use it as a dispatch signal.
+   */
+  hasMelFinding: boolean;
   computedAtUtc: string;
 }
 
+/** Everything the ramp view may see — note the absence of `melItems` and `personnel`. */
+export type RampState = Pick<TechLogState, 'aircraft' | 'deferrals' | 'defects'> &
+  Partial<Pick<TechLogState, 'recurringChecks' | 'recurringAccomplishments'>>;
+
 export function buildRampView(
   aircraftId: string,
-  state: Pick<TechLogState, 'aircraft' | 'deferrals'>,
+  state: RampState,
   asOfUtc: string,
 ): RampView | null {
   const ac = state.aircraft.find(a => a.id === aircraftId);
@@ -139,10 +169,12 @@ export function buildRampView(
     type: ac.type,
     loaHeld: false,
     deferrals: rows,
-    // Anything still presented that is not ACTIVE is a finding: EXPIRED is out of time,
-    // PENDING_PLACARD means the (M)/placard release is unsigned so the deferral never became
-    // active and the aircraft is RED, and PROPOSED is not yet signed at all.
-    hasFinding: rows.some(r => r.status !== 'ACTIVE'),
+    serviceability: deriveServiceability(aircraftId, state, asOfUtc).status,
+    // MEL-scoped only. Anything still presented that is not ACTIVE is a finding on a deferred
+    // item: EXPIRED is out of time, PENDING_PLACARD means the (M)/placard release is unsigned so
+    // the deferral never became active, and PROPOSED is not yet signed at all. This says nothing
+    // about defects or recurring checks — `serviceability` above is the airworthiness answer.
+    hasMelFinding: rows.some(r => r.status !== 'ACTIVE'),
     computedAtUtc: asOfUtc,
   };
 }

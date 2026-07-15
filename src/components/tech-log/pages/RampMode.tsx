@@ -21,6 +21,7 @@ import { useTechLog } from '../TechLogContext';
 import { buildRampView, type RampDeferralRow } from '../engine/rampCheck';
 import { formatRegulatoryCompact } from '../util/displayZone';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
+import { ServiceabilityChip } from '../components/ServiceabilityChip';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { cn } from '../../ui/utils';
@@ -37,12 +38,22 @@ export default function RampMode() {
 
   const ac = state.aircraft.find(a => a.tailNumber === tail);
 
-  // asOf is captured once per mount rather than ticking: an inspector is reading a fixed moment,
-  // and a row silently flipping to EXPIRED mid-conversation would be worse than useless.
+  // Captured once per mount, in a useState initialiser rather than inside the memo: an inspector
+  // is reading a fixed moment, and a row flipping to EXPIRED mid-conversation would be worse than
+  // useless. A memo would re-run `new Date()` on any dispatch, so the "fixed moment" would have
+  // been a claim the code did not actually keep.
+  const [asOfUtc] = useState(() => new Date().toISOString());
+
   const view = useMemo(
-    () => (ac ? buildRampView(ac.id, { aircraft: state.aircraft, deferrals: state.deferrals }, new Date().toISOString()) : null),
+    () => (ac ? buildRampView(ac.id, {
+      aircraft: state.aircraft,
+      deferrals: state.deferrals,
+      defects: state.defects,
+      recurringChecks: state.recurringChecks,
+      recurringAccomplishments: state.recurringAccomplishments,
+    }, asOfUtc) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ac?.id, state.aircraft, state.deferrals],
+    [ac?.id, state.aircraft, state.deferrals, state.defects, state.recurringChecks, state.recurringAccomplishments, asOfUtc],
   );
 
   if (!ac || !view) {
@@ -97,7 +108,11 @@ export default function RampMode() {
         ? [{ role: sig.signerRole, name: sig.signerName, cert: sig.certNumber, hash: sig.mockContentHash, signedAtUtc: sig.signedAtUtc, amr: sig.amr.join('+') }]
         : [],
       pdfBlobUri: mockPdfBlobUri('deferral', r.deferralId),
-      footnote: 'Presented under 14 CFR 91.213(a). Governing MMEL revision and MEL identity are frozen as signed.',
+      // Says what this document IS (91.213(a)(4)'s required entry describing inoperative equipment),
+      // not that any rule compels its presentation. No FAA text mandates a display or print
+      // capability for Part 91 e-records — see the ref-ac120-78b-electronic-record-presentation
+      // note. This footnote is printed and handed to a regulator; it must not overclaim.
+      footnote: 'Record of inoperative equipment per 14 CFR 91.213(a)(4). Governing MMEL revision and MEL identity are frozen as signed.',
     });
   };
 
@@ -105,7 +120,7 @@ export default function RampMode() {
     <div className="min-h-screen bg-background">
       <div className={cn(
         'flex items-center justify-between gap-3 px-4 py-2.5 text-sm',
-        view.hasFinding ? 'bg-[var(--gfo-error,#EF3340)]/10 text-[var(--gfo-error,#EF3340)]' : 'bg-muted',
+        view.serviceability === 'RED' ? 'bg-[var(--gfo-error,#EF3340)]/10 text-[var(--gfo-error,#EF3340)]' : 'bg-muted',
       )}>
         <span className="flex items-center gap-2 font-medium">
           <ShieldCheck className="h-4 w-4" />
@@ -118,9 +133,18 @@ export default function RampMode() {
 
       <div className="mx-auto max-w-3xl space-y-5 p-4 sm:p-6">
         <header className="space-y-3">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h1 className="text-3xl font-semibold tracking-tight">{view.tailNumber}</h1>
             <p className="text-sm text-muted-foreground">Gulfstream {view.type} · S/N {view.serialNumber}</p>
+            {/*
+              The whole-aircraft answer, from deriveServiceability — the same projection the fleet
+              board reads. It must be here and it must be prominent: a deferral-only screen rendered
+              a grounded N1PG completely clean, and "Default-RED on open defect" is explicit that
+              the absence of a status reads RED, never GREEN. Showing the status is not volunteering
+              material — it is myGFO's own control working, and it is on every other screen already.
+              What stays off is the defect narrative behind it.
+            */}
+            <ServiceabilityChip status={view.serviceability} />
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
@@ -149,9 +173,14 @@ export default function RampMode() {
         <section className="space-y-2">
           <div className="flex items-baseline justify-between">
             <h2 className="text-sm font-medium">Deferred items · {view.deferrals.length}</h2>
-            {view.hasFinding && (
+            {/*
+              MEL-scoped wording. This said "Not dispatchable" — a whole-aircraft claim computed
+              from deferrals alone, which read silent on a RED aircraft. Dispatchability is the
+              chip's job now; this says only what it actually knows.
+            */}
+            {view.hasMelFinding && (
               <span className="flex items-center gap-1 text-xs font-medium text-[var(--gfo-error,#EF3340)]">
-                <AlertTriangle className="h-3.5 w-3.5" /> Not dispatchable
+                <AlertTriangle className="h-3.5 w-3.5" /> Finding on a deferred item
               </span>
             )}
           </div>
