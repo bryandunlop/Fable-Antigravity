@@ -448,7 +448,7 @@ export default function UnifiedTripWorkspace() {
     };
 
     return (
-      <div className="mb-8 p-6 bg-white rounded-[2rem] shadow-xl border border-slate-100 relative overflow-hidden">
+      <div className="mb-8 p-6 bg-white rounded-[2rem] shadow-lg border border-slate-100 relative overflow-hidden">
         <div className="flex items-center justify-between gap-6">
           {/* Left: Progress Ring + Fraction */}
           <div className="flex items-center gap-6">
@@ -905,7 +905,7 @@ export default function UnifiedTripWorkspace() {
     );
 
     return (
-      <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-8">
+      <Card className="rounded-[2.5rem] border-none shadow-lg bg-white p-8">
         <h4 className="text-xl font-black text-slate-900 tracking-tight mb-6">Verified Logistics Feed</h4>
         <div className="space-y-4">
           {readyItems.map(item => (
@@ -943,7 +943,7 @@ export default function UnifiedTripWorkspace() {
     const nudgedItems = missionItems.filter(item => item.nudged && item.status !== 'ready');
 
     return (
-      <Card className="rounded-[2.5rem] border-none shadow-2xl bg-slate-900 text-white p-8">
+      <Card className="rounded-[2.5rem] border-none shadow-lg bg-slate-900 text-white p-8">
         <div className="flex items-center justify-between mb-6">
           <h4 className="text-xl font-black tracking-tight">Pending Coordination</h4>
           <Badge className="bg-amber-500 text-white font-black">{nudgedItems.length} Active</Badge>
@@ -977,7 +977,7 @@ export default function UnifiedTripWorkspace() {
 
   const SafetyOversightDashboard = () => {
     return (
-      <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-8">
+      <Card className="rounded-[2.5rem] border-none shadow-lg bg-white p-8">
         <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-8">Safety & Compliance Oversight</h4>
         <div className="grid grid-cols-2 gap-8">
            <div className="space-y-6">
@@ -1050,7 +1050,7 @@ export default function UnifiedTripWorkspace() {
               {isMissionConfirmed ? 'GO' : 'PLAN'}
             </Badge>
           </div>
-          <Card className="bg-slate-900 border-slate-800 text-white shadow-xl rounded-2xl relative overflow-hidden">
+          <Card className="bg-slate-900 border-slate-800 text-white shadow-lg rounded-2xl relative overflow-hidden">
              
             <CardContent className="p-4 relative z-10">
                <div className="space-y-3 text-xs">
@@ -1142,7 +1142,7 @@ export default function UnifiedTripWorkspace() {
                     onClick={() => setActiveRole(role)}
                     className={`px-6 py-2.5 text-xs rounded-xl transition-all font-black uppercase tracking-widest ${
                       activeRole === role 
-                        ? 'bg-white shadow-xl text-slate-900 scale-105 ring-1 ring-slate-200/50' 
+                        ? 'bg-white shadow-lg text-slate-900 scale-105 ring-1 ring-slate-200/50' 
                         : 'text-slate-400 hover:text-slate-700 hover:bg-white/50'
                     }`}
                   >
@@ -1189,7 +1189,7 @@ export default function UnifiedTripWorkspace() {
                       </div>
                    </div>
                    {!acknowledged && (
-                     <Button onClick={() => acknowledgeLateChange(change.id)} size="lg" className="bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black px-8 h-14 text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-95 relative z-10">
+                     <Button onClick={() => acknowledgeLateChange(change.id)} size="lg" className="bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black px-8 h-14 text-sm shadow-lg transition-all hover:scale-[1.02] active:scale-95 relative z-10">
                         <CheckCircle2 className="h-5 w-5 mr-2 text-emerald-400" />
                         ACKNOWLEDGE
                      </Button>
@@ -1255,7 +1255,7 @@ export default function UnifiedTripWorkspace() {
 
           {/* ── NON-SCHEDULING LENSES: Shared Readiness Dashboard ── */}
           {activeRole !== 'scheduling' && (
-            <div className="mb-12 p-10 bg-white rounded-[3.5rem] shadow-2xl border border-slate-100 relative overflow-hidden group/readiness">
+            <div className="mb-12 p-10 bg-white rounded-[3.5rem] shadow-lg border border-slate-100 relative overflow-hidden group/readiness">
                <div className="flex items-center justify-between mb-10 relative z-10">
                   <div>
                      <h3 className="text-3xl font-black text-slate-950 tracking-tighter">Unified Mission Readiness</h3>
@@ -1297,7 +1297,7 @@ export default function UnifiedTripWorkspace() {
           {activeRole === 'pilot' && (
              <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 grid grid-cols-2 gap-12">
                 <div className="space-y-12">
-                   <Card className="rounded-[3.5rem] border-none shadow-2xl bg-gradient-to-br from-blue-800 to-slate-950 text-white p-12 relative overflow-hidden group/efb">
+                   <Card className="rounded-[3.5rem] border-none shadow-lg bg-gradient-to-br from-blue-800 to-slate-950 text-white p-12 relative overflow-hidden group/efb">
                       <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 transition-transform group-hover/efb:scale-175 duration-1000">
                         <Plane className="h-64 w-64" />
                       </div>
@@ -1313,12 +1313,12 @@ export default function UnifiedTripWorkspace() {
                            </div>
                         ))}
                       </div>
-                      <Button className="w-full h-20 rounded-[2rem] bg-white text-slate-950 font-black text-2xl shadow-2xl hover:bg-blue-50 transition-all active:scale-95">
+                      <Button className="w-full h-20 rounded-[2rem] bg-white text-slate-950 font-black text-2xl shadow-lg hover:bg-blue-50 transition-all active:scale-95">
                          PUSH TO COCKPIT
                       </Button>
                    </Card>
                    
-                   <Card className="rounded-[3.5rem] border-none shadow-2xl bg-white p-12">
+                   <Card className="rounded-[3.5rem] border-none shadow-lg bg-white p-12">
                       <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-8">Safety Documentation</h4>
                       <div className="space-y-6">
                         {docs.filter(d => d.type === 'Safety' || d.type === 'Crew').map(doc => (
@@ -1354,7 +1354,7 @@ export default function UnifiedTripWorkspace() {
           {/* ── INFLIGHT LENS ── */}
           {activeRole === 'inflight' && (
              <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 grid grid-cols-2 gap-12">
-                <Card className="rounded-[3.5rem] border-none shadow-2xl bg-white p-12">
+                <Card className="rounded-[3.5rem] border-none shadow-lg bg-white p-12">
                    <div className="flex items-center gap-6 mb-10">
                       <div className="w-16 h-16 rounded-[1.5rem] bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-lg">
                          <Utensils className="h-8 w-8" />
@@ -1374,7 +1374,7 @@ export default function UnifiedTripWorkspace() {
                 </Card>
                 <div className="space-y-12">
                    <VerifiedLogisticsList filter={['catering', 'other']} />
-                   <Card className="rounded-[3.5rem] border-none shadow-2xl bg-indigo-950 text-white p-12 overflow-hidden relative">
+                   <Card className="rounded-[3.5rem] border-none shadow-lg bg-indigo-950 text-white p-12 overflow-hidden relative">
                       <div className="absolute bottom-0 right-0 p-12 opacity-10">
                          <Users className="h-40 w-40" />
                       </div>
@@ -1405,7 +1405,7 @@ export default function UnifiedTripWorkspace() {
 
       {/* Nudge Dialog (Pilot → Scheduling) */}
       <Dialog open={isNudgeDialogOpen} onOpenChange={setIsNudgeDialogOpen}>
-         <DialogContent className="sm:max-w-xl rounded-[3rem] border-none p-12 shadow-2xl">
+         <DialogContent className="sm:max-w-xl rounded-[3rem] border-none p-12">
             <DialogHeader>
                <div className="w-20 h-20 bg-amber-100 rounded-[2rem] flex items-center justify-center mb-8 text-amber-600 shadow-inner">
                   <Bell className="h-10 w-10" />
@@ -1424,7 +1424,7 @@ export default function UnifiedTripWorkspace() {
                />
             </div>
             <DialogFooter className="flex-col gap-4">
-               <Button onClick={triggerNudge} disabled={!nudgeComment.trim()} className="w-full bg-slate-950 text-white rounded-[2rem] font-black h-20 shadow-2xl text-2xl hover:bg-slate-800 transition-all">
+               <Button onClick={triggerNudge} disabled={!nudgeComment.trim()} className="w-full bg-slate-950 text-white rounded-[2rem] font-black h-20 shadow-lg text-2xl hover:bg-slate-800 transition-all">
                   SEND PRIORITY NUDGE
                </Button>
                <Button variant="ghost" onClick={() => setIsNudgeDialogOpen(false)} className="w-full rounded-2xl font-black text-slate-400 uppercase tracking-widest h-10">

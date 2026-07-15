@@ -348,7 +348,7 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
 
       {/* View Bulletin Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-900 shadow-2xl">
+        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-900">
           {selectedBulletin && (() => {
             const mustAck = selectedBulletin.requireAcknowledgment && isTargetRole(selectedBulletin, userRole);
             const acked = isAcknowledged(selectedBulletin, acks, currentUserId);
@@ -405,7 +405,7 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
 
                 {/* Document Content - Paper Style */}
                 <div className="flex-1 bg-slate-50 dark:bg-slate-900 p-4 md:p-8">
-                  <div className="max-w-3xl mx-auto bg-white dark:bg-slate-950 p-8 md:p-12 shadow-xl border border-slate-200 dark:border-slate-800 rounded-sm relative overflow-hidden">
+                  <div className="max-w-3xl mx-auto bg-white dark:bg-slate-950 p-8 md:p-12 shadow-lg border border-slate-200 dark:border-slate-800 rounded-sm relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50/50 dark:bg-slate-900/10 pointer-events-none rotate-45 transform translate-x-16 -translate-y-16" />
                     <div className="prose-bulletin mb-12">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedBulletin.content}</ReactMarkdown>

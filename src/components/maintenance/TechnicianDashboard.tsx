@@ -119,7 +119,7 @@ export default function TechnicianDashboard() {
                 {jobs.map((job) => (
                     <Card
                         key={job.id}
-                        className="group cursor-pointer hover:shadow-xl transition-all duration-300 border-l-4 border-l-transparent hover:border-l-blue-500 overflow-hidden relative"
+                        className="group cursor-pointer hover:shadow-lg transition-all duration-300 border-l-4 border-l-transparent hover:border-l-blue-500 overflow-hidden relative"
                         onClick={() => setActiveJobId(job.id)}
                     >
                         {job.priority === 'AOG' && (

@@ -39,7 +39,7 @@ export default function JobCard({ job, onUpdateStatus }: JobCardProps) {
         <div className="max-w-4xl mx-auto space-y-6 pb-20">
 
             {/* Header - High Contrast for Mechanics */}
-            <div className="bg-slate-900 rounded-xl p-6 text-white shadow-xl border border-slate-700">
+            <div className="bg-slate-900 rounded-xl p-6 text-white shadow-lg border border-slate-700">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
