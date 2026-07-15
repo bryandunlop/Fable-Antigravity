@@ -53,6 +53,7 @@ import { toast } from 'sonner';
 import { useHazards, WORKFLOW_STAGES } from '../contexts/HazardContext';
 import ProgressTracker, { PHASES } from './HazardWorkflow/ProgressTracker';
 import { SYSTEM_USERS } from '../lib/mockUsers';
+import { isRiskAssessed, riskScore, UNASSESSED, type RiskAxis } from './hazard/riskAssessment';
 
 
 
@@ -79,8 +80,12 @@ export default function HazardWorkflow() {
   const [includeNotes, setIncludeNotes] = useState(false);
 
   // Data States (Risk, RCA, Mitigation)
-  const [riskSeverity, setRiskSeverity] = useState(3);
-  const [riskLikelihood, setRiskLikelihood] = useState(3);
+  // UNASSESSED (null), not 3: there must be a value meaning "nobody has answered yet",
+  // distinct from a real answer of 0 (the likelihood scale starts at "0 Rarely"). See riskAssessment.ts / TL-17.
+  const [riskSeverity, setRiskSeverity] = useState<RiskAxis>(UNASSESSED);
+  const [riskLikelihood, setRiskLikelihood] = useState<RiskAxis>(UNASSESSED);
+  const assessed = isRiskAssessed(riskSeverity, riskLikelihood);
+  const score = riskScore(riskSeverity, riskLikelihood);
   const [whyAnalysis, setWhyAnalysis] = useState(['', '', '', '', '']);
   const [investigationNotes, setInvestigationNotes] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]); // New state for uploads
@@ -128,7 +133,7 @@ ${hazard?.description}
 ---
 
 ## 2. Risk Assessment
-**Pre-Mitigation Risk Score:** ${riskSeverity + riskLikelihood} (${riskLikelihood} Likelihood + ${riskSeverity} Severity)
+**Pre-Mitigation Risk Score:** ${assessed ? `${score} (${riskLikelihood} Likelihood + ${riskSeverity} Severity)` : 'not yet assessed'}
 
 ---
 
@@ -395,14 +400,17 @@ The mitigation has been implemented and verified for effectiveness over the moni
               <div className="bg-blue-50 p-4 rounded border flex-1">
                 <h3 className="font-bold text-sm mb-2">Current Selection</h3>
                 <div className="text-center py-4">
-                  <div className={`text-4xl font-bold mb-2 ${(riskSeverity + riskLikelihood) >= 7 ? 'text-red-700' :
-                    (riskSeverity + riskLikelihood) >= 6 ? 'text-orange-600' :
-                      (riskSeverity + riskLikelihood) >= 4 ? 'text-yellow-600' : 'text-green-600'
+                  <div className={`text-4xl font-bold mb-2 ${!assessed ? 'text-gray-400' :
+                    (score ?? 0) >= 7 ? 'text-red-700' :
+                      (score ?? 0) >= 6 ? 'text-orange-600' :
+                        (score ?? 0) >= 4 ? 'text-yellow-600' : 'text-green-600'
                     }`}>
-                    {riskSeverity + riskLikelihood}
+                    {assessed ? score : '—'}
                   </div>
                   <div className="text-xs font-semibold">
-                    Likelihood: {riskLikelihood} + Severity: {riskSeverity}
+                    {assessed
+                      ? `Likelihood: ${riskLikelihood} + Severity: ${riskSeverity}`
+                      : 'Not yet assessed — select a cell'}
                   </div>
                 </div>
                 <Button className="w-full" onClick={() => setShowRiskWizard(false)}>Confirm</Button>
@@ -657,9 +665,9 @@ The mitigation has been implemented and verified for effectiveness over the moni
                     <Badge variant="outline" className={`${getRiskBadgeColor(riskLevel)} text-sm px-3 py-1`}>
                       {riskLevel} Risk
                     </Badge>
-                    {(riskSeverity + riskLikelihood) > 0 && (
+                    {assessed && (
                       <span className="ml-2 text-xs text-gray-500">
-                        (Score: {riskSeverity + riskLikelihood})
+                        (Score: {score})
                       </span>
                     )}
                   </div>
@@ -868,7 +876,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
         }
         
         if (includeRisk) {
-          draft += `**Risk Assessment:**\nScore: ${riskSeverity + riskLikelihood} (Severity: ${riskSeverity}, Likelihood: ${riskLikelihood})\n\n`;
+          draft += `**Risk Assessment:**\n${assessed ? `Score: ${score} (Severity: ${riskSeverity}, Likelihood: ${riskLikelihood})` : 'Not yet assessed.'}\n\n`;
         }
         
         if (includeRCA) {
@@ -1201,7 +1209,10 @@ The mitigation has been implemented and verified for effectiveness over the moni
 
     updateHazard(id, {
       workflowStage: stageOverride || currentStage,
-      riskAnalysis: { severity: riskSeverity, likelihood: riskLikelihood },
+      // riskAnalysis is optional, so ABSENT is how "not yet assessed" is stored. Spread
+      // conditionally rather than writing a placeholder — writing the key unconditionally
+      // would either fabricate an assessment or clobber a real one saved earlier. (TL-17)
+      ...(assessed ? { riskAnalysis: { severity: riskSeverity as number, likelihood: riskLikelihood as number } } : {}),
       whyAnalysis,
       investigationNotes,
       mitigationAssignments: mitigationAssignments as any,
@@ -1223,7 +1234,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
         break;
 
       case WORKFLOW_STAGES.SM_INVESTIGATION:
-        if (!riskSeverity || !riskLikelihood) {
+        if (!assessed) {
           toast.error("Please complete the Risk Assessment first.");
           return;
         }
@@ -1481,25 +1492,25 @@ The mitigation has been implemented and verified for effectiveness over the moni
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Risk Matrix Card */}
                   <div
-                    className={`p-6 rounded-lg border-2 border-dashed cursor-pointer transition-all hover:border-purple-400 hover:bg-purple-50 group ${riskSeverity + riskLikelihood > 0 ? 'bg-purple-50 border-solid border-purple-200' : 'bg-gray-50 border-gray-200'}`}
+                    className={`p-6 rounded-lg border-2 border-dashed cursor-pointer transition-all hover:border-purple-400 hover:bg-purple-50 group ${assessed ? 'bg-purple-50 border-solid border-purple-200' : 'bg-gray-50 border-gray-200'}`}
                     onClick={() => setShowRiskWizard(true)}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="p-3 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                        <AlertTriangle className={`w-8 h-8 ${riskSeverity + riskLikelihood > 0 ? 'text-orange-500' : 'text-gray-400'}`} />
+                        <AlertTriangle className={`w-8 h-8 ${assessed ? 'text-orange-500' : 'text-gray-400'}`} />
                       </div>
-                      {(riskSeverity + riskLikelihood) > 0 && <CheckCircle className="w-6 h-6 text-green-500" />}
+                      {assessed && <CheckCircle className="w-6 h-6 text-green-500" />}
                     </div>
                     <h3 className="font-bold text-lg mb-1">Risk Assessment</h3>
                     <p className="text-sm text-gray-500 mb-3">Assess Severity & Likelihood (5x5 Matrix)</p>
 
-                    {(riskSeverity + riskLikelihood) > 0 ? (
+                    {assessed ? (
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge className={(riskSeverity + riskLikelihood) >= 6 ? 'bg-red-500' : 'bg-yellow-500'}>
-                          Score: {riskSeverity + riskLikelihood}
+                        <Badge className={(score ?? 0) >= 6 ? 'bg-red-500' : 'bg-yellow-500'}>
+                          Score: {score}
                         </Badge>
                         <span className="text-xs font-medium text-gray-600">
-                          ({['Low', 'Medium', 'High', 'Critical'][Math.min(3, Math.floor((riskSeverity + riskLikelihood) / 3))]})
+                          ({['Low', 'Medium', 'High', 'Critical'][Math.min(3, Math.floor((score ?? 0) / 3))]})
                         </span>
                       </div>
                     ) : (
@@ -1881,7 +1892,7 @@ The mitigation has been implemented and verified for effectiveness over the moni
                   >
                     <AlertTriangle className="w-4 h-4 mr-2 text-orange-500" />
                     Perform Risk Assessment
-                    {(riskSeverity + riskLikelihood) > 0 && <CheckCircle className="w-4 h-4 ml-auto text-green-500" />}
+                    {assessed && <CheckCircle className="w-4 h-4 ml-auto text-green-500" />}
                   </Button>
                   <Button
                     variant="outline"
