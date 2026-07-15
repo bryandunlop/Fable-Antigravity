@@ -184,7 +184,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
               <div><Label className="flex items-center gap-1.5"><Fuel className="h-3.5 w-3.5" /> Fuel planned (lb)</Label><Input type="number" className="mt-1" value={briefing.fuelPlannedLb ?? ''} onChange={e => patch({ ...briefing, fuelPlannedLb: e.target.value ? Number(e.target.value) : undefined })} /></div>
             </div>
             <div><Label>Notes to crew</Label><Textarea className="mt-1" value={briefing.notes ?? ''} onChange={e => patch({ ...briefing, notes: e.target.value || undefined })} placeholder="Anything the crew should know before the flight…" /></div>
-            <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">On release, the briefing snapshots current serviceability ({sv.status}) and is sent to the crew with active MELs, open defects, fuel, and coming-due maintenance.</div>
+            <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">On release, the briefing snapshots current serviceability ({sv.status}) and is sent to the crew with active MELs, open defects, watch items, fuel, and coming-due maintenance.</div>
             <Button onClick={() => beginRelease(briefing)}><Send className="mr-1.5 h-4 w-4" /> Release for flight</Button>
           </CardContent>
         </Card>

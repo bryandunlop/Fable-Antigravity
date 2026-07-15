@@ -48,6 +48,11 @@ describe('watchItemsFor', () => {
     expect(watchItemsFor([row({ id: 'd2', aircraftId: 'ac2' })], 'ac1')).toEqual([]);
   });
 
+  it('spans the fleet when no aircraft is given — the work queue\'s bucket', () => {
+    const items = watchItemsFor([row(), row({ id: 'd2', aircraftId: 'ac2' })]);
+    expect(items.map(d => d.id).sort()).toEqual(['d1', 'd2']);
+  });
+
   it('excludes every non-WATCHLISTED status', () => {
     for (const status of ['OPEN', 'DEFERRED', 'RECTIFIED', 'CLOSED'] as DefectStatus[]) {
       expect(watchItemsFor([row({ status })], 'ac1')).toEqual([]);

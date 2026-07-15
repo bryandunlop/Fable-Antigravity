@@ -1,12 +1,13 @@
 import type { Defect, Personnel } from '../types';
 import { currentRows } from './supersede';
 
-/** Current watch items for an aircraft, newest-reported first — the same bucket the work queue
- *  shows maintenance (`buildWorkQueue().watchItems`), reused by the crew-facing briefing and
- *  postflight so a watch item cannot be disclosed on one surface and hidden on another. */
-export function watchItemsFor(defects: Defect[], aircraftId: string): Defect[] {
+/** Current watch items, newest-reported first — the single definition of the watch bucket, shared by
+ *  the maintenance work queue (`buildWorkQueue().watchItems`, fleet-wide) and the crew-facing briefing
+ *  and postflight (per-aircraft), so a watch item cannot be shown on one surface and hidden on another.
+ *  Omit `aircraftId` for the whole fleet. */
+export function watchItemsFor(defects: Defect[], aircraftId?: string): Defect[] {
   return currentRows(defects)
-    .filter(d => d.aircraftId === aircraftId && d.status === 'WATCHLISTED')
+    .filter(d => d.status === 'WATCHLISTED' && (aircraftId === undefined || d.aircraftId === aircraftId))
     .sort((a, b) => b.reportedAtUtc.localeCompare(a.reportedAtUtc));
 }
 
