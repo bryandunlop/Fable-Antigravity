@@ -8,6 +8,7 @@ import type { Aircraft, AircraftType, Serviceability, Trip, TripLeg, TechLogStat
 import { getDefaultState } from './mockData/scenarios';
 import { deriveServiceability } from './engine/serviceability';
 import { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './TechLogContext';
+import { HOME_STATION } from '../../config/station';
 
 export interface PreflightTripInput {
   tripNumber: string;
@@ -68,7 +69,7 @@ export function projectTripIntoTechLogState(
       serialNumber: 'UNSPEC-' + input.tail,
       status: 'ACTIVE',
       isProvisional: false,
-      homeBase: input.legs[0]?.departureIcao ?? 'KLUK',
+      homeBase: input.legs[0]?.departureIcao ?? HOME_STATION,
       airframeTotalHours: 0,
       airframeTotalCycles: 0,
     };
