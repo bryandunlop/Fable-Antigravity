@@ -8,6 +8,8 @@
  * which fetches AWC server-side and returns the raw { metar, taf } JSON arrays.
  */
 
+import { getDemoMetar, getDemoTaf } from './weatherMockData';
+
 const PROXY_URL = '/api/weather';
 
 /** Converts an AWC obsTime (Unix seconds OR ISO string) to an ISO 8601 string. */
@@ -114,6 +116,21 @@ export interface WeatherResult {
   taf: TafData | null;
   fetchedAt: Date;
   error?: string;
+  /**
+   * True when metar/taf came from the demo seed rather than a live observation.
+   * Every surface that renders this result MUST disclose it — see the rules at
+   * the top of weatherMockData.ts.
+   */
+  isDemo?: boolean;
+  /**
+   * Why the live fetch failed, when isDemo is true.
+   *
+   * Deliberately not `error`: `error` drives the "Weather Unavailable" state and
+   * we are no longer in it. But a fallback that hides an outage completely is
+   * worse than the outage — this keeps the reason reachable for the DEMO chip's
+   * tooltip, so a dead /api is still diagnosable from the dashboard.
+   */
+  demoReason?: string;
 }
 
 // ─── Flight category helpers ──────────────────────────────────────────────────
@@ -247,6 +264,17 @@ export function parseTaf(d: any): TafData {
 /**
  * Fetches both METAR and TAF for a single airport via our `/api/weather` proxy.
  * Returns nulls on error rather than throwing, suitable for UI use.
+ *
+ * On a transport/parse failure this degrades to the demo seed (flagged isDemo)
+ * rather than the error state, so the design build always has something to show.
+ * It self-heals: the moment /api answers, live data wins again with no flag to
+ * flip. Note the failure mode this exists for is NOT a clean 404 — Vite's dev
+ * server answers /api/weather with index.html and a 200, so it is res.json()
+ * that throws, not the res.ok guard.
+ *
+ * A *successful* response carrying no observation is left alone: that means AWC
+ * has nothing for this airport, and inventing weather for an airport that may
+ * not exist is a different and worse thing than covering for a dead proxy.
  */
 export async function fetchWeather(icaoId: string): Promise<WeatherResult> {
   try {
@@ -266,10 +294,11 @@ export async function fetchWeather(icaoId: string): Promise<WeatherResult> {
     };
   } catch (err) {
     return {
-      metar: null,
-      taf: null,
+      metar: getDemoMetar(icaoId),
+      taf: getDemoTaf(icaoId),
       fetchedAt: new Date(),
-      error: err instanceof Error ? err.message : 'Unknown error fetching weather',
+      isDemo: true,
+      demoReason: err instanceof Error ? err.message : 'Unknown error fetching weather',
     };
   }
 }
