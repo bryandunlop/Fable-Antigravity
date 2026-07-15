@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { ClipboardCheck, PlaneLanding } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
+import { watchItemsFor } from '../engine/watchlist';
 import { deriveCustody } from '../engine/custody';
 import { latestBriefing } from './BriefingPanel';
 import { latestPublishedTemplate, isReleaseGated } from '../engine/checklist';
@@ -37,6 +38,9 @@ export function PostflightPanel({ aircraft }: { aircraft: Aircraft }) {
   const [pendingId, setPendingId] = useState('');
 
   const openSquawks = currentRows(state.defects).filter(d => d.aircraftId === aircraft.id && (d.status === 'OPEN' || d.status === 'DEFERRED'));
+  // Gathered alongside the open squawks, but kept apart: a watch item is outstanding at reclaim
+  // without being an airworthiness squawk, and the signed postflight must not conflate the two.
+  const watchItems = watchItemsFor(state.defects, aircraft.id);
   const briefing = latestBriefing(state.briefings, aircraft.id);
 
   const startChecklist = () => {
@@ -63,12 +67,13 @@ export function PostflightPanel({ aircraft }: { aircraft: Aircraft }) {
     const nowIso = new Date().toISOString();
     const pf: Postflight = {
       id: pendingId, aircraftId: aircraft.id, briefingId: briefing?.id, performedByOid: user.oid, performedAtUtc: nowIso,
-      checklistInstanceId: instance?.id, notes: notes || undefined, gatheredDefectIds: openSquawks.map(d => d.id), signatureId: sig.id,
+      checklistInstanceId: instance?.id, notes: notes || undefined, gatheredDefectIds: openSquawks.map(d => d.id),
+      gatheredWatchItemIds: watchItems.map(d => d.id), signatureId: sig.id,
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig });
     dispatch({ type: 'ADD_POSTFLIGHT', payload: pf });
     if (instance) dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: { ...instance, signatureId: sig.id, fuelLoad } });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'POSTFLIGHT_COMPLETED', entityType: 'Postflight', entityId: pf.id, atUtc: nowIso, summary: `${aircraft.tailNumber} postflight — reclaimed to maintenance; ${pf.gatheredDefectIds.length} open squawk(s) gathered` } });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'POSTFLIGHT_COMPLETED', entityType: 'Postflight', entityId: pf.id, atUtc: nowIso, summary: `${aircraft.tailNumber} postflight — reclaimed to maintenance; ${pf.gatheredDefectIds.length} open squawk(s)${pf.gatheredWatchItemIds?.length ? `, ${pf.gatheredWatchItemIds.length} watch item(s)` : ''} gathered` } });
     toast.success(`${aircraft.tailNumber} postflight signed — back in maintenance custody.`);
   };
 
