@@ -1,6 +1,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Light.ttf') format('truetype'); font-weight: 300; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
@@ -243,6 +244,17 @@
     to { stroke-dashoffset: 0; }
   }
 
+  /* Self-contained rather than reusing core `spin`/`pulse`: those keyframes are only
+     emitted while some element still uses animate-spin/animate-pulse, so borrowing
+     them would make these break silently the day that last usage goes. */
+  @keyframes spin-slow {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes pulse-slow {
+    50% { opacity: 0.5; }
+  }
+
   @keyframes takeoff-arc {
     0%   { opacity: 0; transform: translate(-20px, 20px) rotate(-30deg) scale(0.5); }
     20%  { opacity: 1; }
@@ -262,6 +274,8 @@
   --animate-pulse-glow: pulse-glow 3s ease-in-out infinite;
   --animate-gradient-x: gradient-x 15s ease infinite;
   --animate-list-stagger: list-stagger 0.4s ease-out forwards;
+  --animate-spin-slow: spin-slow 3s linear infinite;
+  --animate-pulse-slow: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @layer base {
