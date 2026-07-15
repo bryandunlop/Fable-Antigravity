@@ -269,7 +269,10 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
       items: fratSections,
       totalScore,
       status: newStatus,
-      mitigationNotes
+      mitigationNotes,
+      // Was bound to the Textarea but omitted here, so anything the pilot typed was
+      // silently dropped on submit. StandaloneGRATForm has always included it. (TL-17)
+      additionalNotes
     };
 
     if (newStatus === 'submitted') {
