@@ -216,7 +216,7 @@ Add navigation items for the new components:
 - Inspection checkpoint requirements
 - Sign-off data capture
 - Prevents completion without required inspections
-- Uses existing DigitalSignature component
+- Signing is performed by `tech-log/components/SignCeremonyDialog.tsx`
 
 ### ✅ Document Center Links
 - Automatic linking by ATA chapter
