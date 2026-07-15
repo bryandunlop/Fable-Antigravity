@@ -70,7 +70,7 @@ export default function RampMode() {
             { label: 'MEL item', value: r.melSubItemNumber ?? 'not recorded' },
             { label: 'Description', value: r.melTitle ?? 'not recorded' },
             { label: 'Category', value: `${r.category} — ${CATEGORY_DAYS_LABEL[r.category] ?? ''}` },
-            { label: 'Governing MMEL', value: `Rev ${r.governingMmelRevision} · eff ${r.governingEffectiveDate}` },
+            { label: 'Governing MMEL', value: `${r.governingMmelRevision} · eff ${r.governingEffectiveDate}` },
             { label: 'Status', value: r.status },
           ],
         },
@@ -88,6 +88,7 @@ export default function RampMode() {
             { label: 'Clock start', value: formatRegulatoryCompact(r.clockStartDateUtc, 'GOVERNING', r.governingTimezone) },
             { label: 'Due', value: r.repairDueDateUtc ? formatRegulatoryCompact(r.repairDueDateUtc, 'GOVERNING', r.governingTimezone) : `${r.usageDueThreshold ?? '—'} ${r.repairIntervalUnit}` },
             { label: 'Governing timezone', value: r.governingTimezone },
+            { label: 'Extension', value: r.extensionUsed ? 'Used — once-only allowance spent' : 'Not used' },
           ],
         },
         ...(r.restrictionText ? [{ heading: 'Restriction', body: r.restrictionText }] : []),
@@ -230,10 +231,11 @@ function RampRow({
       {open && (
         <div className="space-y-3 border-t px-3 py-3 text-xs">
           <div className="grid gap-2 sm:grid-cols-2">
-            <Field label="Governing MMEL" value={`Rev ${row.governingMmelRevision} · eff ${row.governingEffectiveDate}`} />
+            {/* mmelRevision already reads "Rev 1" — prefixing it renders "Rev Rev 1". */}
+            <Field label="Governing MMEL" value={`${row.governingMmelRevision} · eff ${row.governingEffectiveDate}`} />
             <Field label="Repair interval" value={CATEGORY_DAYS_LABEL[row.category] ?? '—'} />
             <Field label="Regulatory clock zone" value={row.governingTimezone} />
-            <Field label="Extension used" value={row.status === 'EXPIRED' ? 'see record' : '—'} />
+            <Field label="Extension" value={row.extensionUsed ? 'Used — once-only allowance spent' : 'Not used'} />
           </div>
 
           {row.restrictionText && <Field label="Restriction" value={row.restrictionText} />}

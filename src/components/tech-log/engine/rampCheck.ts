@@ -49,6 +49,12 @@ export interface RampDeferralRow {
   placardInstalled: boolean;
   placardLocation?: string;
   restrictionText?: string;
+  /**
+   * An extension moves the due date, and ¶6-101F5(b) has the inspector checking dates — so the
+   * fact of it is checklist material and is shown. The justification prose is not: it is a
+   * maintenance-judgement narrative nobody asked for, and it stays in the full record.
+   */
+  extensionUsed: boolean;
   clockStartDateUtc: string;
   repairDueDateUtc?: string;
   usageDueThreshold?: number;
@@ -116,6 +122,7 @@ export function buildRampView(
       placardInstalled: d.placardInstalled ?? false,
       placardLocation: d.placardLocation,
       restrictionText: d.restrictionText,
+      extensionUsed: d.extensionUsed,
       clockStartDateUtc: d.clockStartDateUtc,
       repairDueDateUtc: d.repairDueDateUtc,
       usageDueThreshold: d.usageDueThreshold,

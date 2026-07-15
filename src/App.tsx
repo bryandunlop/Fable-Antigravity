@@ -63,6 +63,7 @@ import AOGManagement from './components/AOGManagement';
 import LobbyDisplay from './components/LobbyDisplay';
 import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
+import RampMode from './components/tech-log/pages/RampMode';
 import FirRoutes from './components/fir/FirRoutes';
 import BookingProfile from './components/BookingProfile';
 import TripBuilder from './components/TripBuilder';
@@ -196,6 +197,22 @@ export default function App() {
                         </InventoryRouteWrapper>
                       }
                     />
+
+                    {/* D36 ramp mode — authenticated, but mounted OUT here, above the <Navigation>
+                        wrapper, for the same reason /commissary-kiosk is: the whole point of the
+                        screen is that an inspector holding the iPad cannot navigate off it. Inside
+                        the protected /* branch it inherits the global sidebar, breadcrumb and
+                        Logout, and the lockdown is decorative. Its own TechLogProvider instance
+                        hydrates from the same persisted state (TechLogContext STORAGE_KEY). */}
+                    <Route path="/tech-log/aircraft/:tail/ramp" element={
+                      !isAuthenticated ? (
+                        <Navigate to="/login" replace />
+                      ) : (
+                        <TechLogProvider userRole={userRole}>
+                          <RampMode />
+                        </TechLogProvider>
+                      )
+                    } />
 
                     {/* Login Route — lands each role at its workspace front door */}
                     <Route path="/login" element={

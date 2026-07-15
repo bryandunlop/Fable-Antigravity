@@ -3,7 +3,6 @@ import { TechLogProvider } from './TechLogContext';
 import PilotHome from './pages/PilotHome';
 import FleetStatus from './pages/FleetStatus';
 import AircraftDetail from './pages/AircraftDetail';
-import RampMode from './pages/RampMode';
 import WorkQueue from './pages/WorkQueue';
 import Defects from './pages/Defects';
 import Deferrals from './pages/Deferrals';
@@ -39,8 +38,6 @@ export default function TechLogRoutes({ userRole }: { userRole?: string }) {
         <Route path="/" element={<PilotHome />} />
         <Route path="fleet" element={<FleetStatus />} />
         <Route path="aircraft/:tail" element={<AircraftDetail />} />
-        {/* D36 — its own route, outside TechLogShell: ramp mode has no navigation by design. */}
-        <Route path="aircraft/:tail/ramp" element={<RampMode />} />
         <Route path="work-queue" element={<WorkQueue />} />
         <Route path="journey" element={<JourneyLog />} />
         <Route path="defects" element={<Defects />} />

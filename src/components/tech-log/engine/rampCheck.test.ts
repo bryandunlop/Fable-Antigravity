@@ -157,6 +157,18 @@ describe('buildRampView — placard, per ¶6-101G6 "present and legible"', () =>
     expect(v.deferrals[0].placardLocation).toBe('Overhead panel, adj. APU GEN');
   });
 
+  it('carries whether the once-only extension is spent — it moved the due date the inspector reads', () => {
+    const plain = buildRampView('ac-1', { aircraft: [AC], deferrals: [deferral()] }, NOW)!;
+    expect(plain.deferrals[0].extensionUsed).toBe(false);
+
+    const extended = buildRampView('ac-1', {
+      aircraft: [AC], deferrals: [deferral({ extensionUsed: true, extensionJustification: 'part on order' })],
+    }, NOW)!;
+    expect(extended.deferrals[0].extensionUsed).toBe(true);
+    // The justification prose is deliberately not surfaced — not asked for by ¶6-101F5.
+    expect(Object.keys(extended.deferrals[0])).not.toContain('extensionJustification');
+  });
+
   it('reports an uninstalled required placard as not installed', () => {
     const v = buildRampView('ac-1', {
       aircraft: [AC], deferrals: [deferral({ placardInstalled: undefined })],
