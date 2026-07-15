@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plane, ChevronRight, Clock, AlertTriangle, Wrench } from 'lucide-react';
+import { Plane, ChevronRight, AlertTriangle, Wrench } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
+import { DeferralClock } from '../components/DeferralClock';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -12,15 +13,6 @@ import { cn } from '../../ui/utils';
 import type { Serviceability } from '../types';
 
 type Filter = 'ALL' | 'RED' | 'AMBER' | 'GREEN' | 'PROV';
-
-function countdown(dueIso?: string): { label: string; urgent: boolean } | null {
-  if (!dueIso) return null;
-  const ms = new Date(dueIso).getTime() - Date.now();
-  if (ms <= 0) return { label: 'overdue', urgent: true };
-  const days = Math.floor(ms / 86400000);
-  const hours = Math.floor((ms % 86400000) / 3600000);
-  return { label: days >= 1 ? `${days}d ${hours}h left` : `${hours}h left`, urgent: days < 2 };
-}
 
 const RING: Record<Serviceability, string> = {
   RED: 'border-l-4 border-l-[var(--gfo-error,#EF3340)]',
@@ -48,13 +40,16 @@ export default function FleetStatus() {
       const activeDeferrals = currentRows(state.deferrals).filter(
         d => d.aircraftId === ac.id && (d.status === 'ACTIVE' || d.status === 'PENDING_PLACARD'),
       );
-      const dueDates = activeDeferrals.map(d => d.repairDueDateUtc).filter(Boolean) as string[];
-      const nearestDue = dueDates.sort()[0];
+      // Keep the deferral itself, not just its due date: the clock needs its start to
+      // know how much of the repair interval has drained.
+      const nearestDeferral = activeDeferrals
+        .filter(d => d.repairDueDateUtc)
+        .sort((a, b) => a.repairDueDateUtc!.localeCompare(b.repairDueDateUtc!))[0];
       // AOG escalation (folded in from the former AOG tab): downtime since the oldest open defect.
       const since = openDefects.map(d => d.reportedAtUtc).sort()[0];
       const downHours = since ? Math.floor((Date.now() - new Date(since).getTime()) / 3600000) : 0;
       const esc = downHours >= 24 ? 'CRITICAL' : downHours >= 4 ? 'ELEVATED' : 'MONITOR';
-      return { ac, sv, openDefects, activeDeferrals, nearestDue, since, downHours, esc };
+      return { ac, sv, openDefects, activeDeferrals, nearestDeferral, since, downHours, esc };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
@@ -119,8 +114,7 @@ export default function FleetStatus() {
       )}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {visible.map(({ ac, sv, openDefects, activeDeferrals, nearestDue, since, downHours, esc }) => {
-          const cd = countdown(nearestDue);
+        {visible.map(({ ac, sv, openDefects, activeDeferrals, nearestDeferral, since, downHours, esc }) => {
           const showAog = filter === 'RED' && !ac.isProvisional && sv === 'RED';
           return (
             <button
@@ -150,12 +144,14 @@ export default function FleetStatus() {
               )}
 
               <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" />{openDefects.length} open</span>
-                <span className="inline-flex items-center gap-1"><Wrench className="h-3.5 w-3.5" />{activeDeferrals.length} MEL</span>
-                {cd && (
-                  <span className={cn('ml-auto inline-flex items-center gap-1', cd.urgent && 'text-[var(--gfo-error,#EF3340)]')}>
-                    <Clock className="h-3.5 w-3.5" />{cd.label}
-                  </span>
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"><AlertTriangle className="h-3.5 w-3.5" />{openDefects.length} open</span>
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"><Wrench className="h-3.5 w-3.5" />{activeDeferrals.length} MEL</span>
+                {nearestDeferral && (
+                  <DeferralClock
+                    className="ml-auto"
+                    clockStartUtc={nearestDeferral.clockStartDateUtc}
+                    repairDueUtc={nearestDeferral.repairDueDateUtc}
+                  />
                 )}
                 <ChevronRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
               </div>
