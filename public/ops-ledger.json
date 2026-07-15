@@ -1,0 +1,340 @@
+{
+  "generated_at": "2026-07-15T15:06:52.646Z",
+  "rows": [
+    {
+      "id": "LG-1",
+      "title": "RII ATA-chapter list (operator-defined required inspection items)",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-06-30",
+      "blocked_on": "dom",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q3"
+      ]
+    },
+    {
+      "id": "LG-10",
+      "title": "Signed flight briefing must render what the PIC signed, not live content",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-14",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "TL-16"
+      ]
+    },
+    {
+      "id": "LG-11",
+      "title": "Standing regulatory & vendor intelligence agent",
+      "status": "parked",
+      "source": "session",
+      "captured_on": "2026-07-13",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "myGFO Loop — System Design"
+      ]
+    },
+    {
+      "id": "LG-12",
+      "title": "Decide whether the ledger subsumes handoffs' unfinished/next_actions",
+      "status": "captured",
+      "source": "session",
+      "captured_on": "2026-07-14",
+      "blocked_on": "bryan",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "myGFO Work Ledger — System Design"
+      ]
+    },
+    {
+      "id": "LG-13",
+      "title": "Decide whether /ops belongs in the demo or a separate tiny app",
+      "status": "parked",
+      "source": "session",
+      "captured_on": "2026-07-14",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "myGFO Work Ledger — System Design"
+      ]
+    },
+    {
+      "id": "LG-14",
+      "title": "Work Ledger Slice 3 — the /ops window",
+      "status": "in-flight",
+      "source": "session",
+      "captured_on": "2026-07-15",
+      "blocked_on": "nobody",
+      "branch": "feat/ops-board",
+      "session": "Outstanding-tasks-review-slice-3",
+      "landed_by": "",
+      "refs": []
+    },
+    {
+      "id": "LG-2",
+      "title": "Supersede authorization model (who may correct whose record)",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-06-30",
+      "blocked_on": "chief-pilot",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q5"
+      ]
+    },
+    {
+      "id": "LG-3",
+      "title": "Cutover source & migration method",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-06-30",
+      "blocked_on": "dom",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q6"
+      ]
+    },
+    {
+      "id": "LG-4",
+      "title": "Retention durations & AC currency",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-06-30",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q8"
+      ]
+    },
+    {
+      "id": "LG-5",
+      "title": "Maintenance check flight (14 CFR 91.407(b))",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-03",
+      "blocked_on": "dom",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q10"
+      ]
+    },
+    {
+      "id": "LG-6",
+      "title": "CAMP work-order & publications API depth",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-04",
+      "blocked_on": "camp",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q11"
+      ]
+    },
+    {
+      "id": "LG-7",
+      "title": "Non-aviation 7-day NWS forecast adjacent to METAR/TAF?",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-14",
+      "blocked_on": "dom",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q14",
+        "D30"
+      ]
+    },
+    {
+      "id": "LG-8",
+      "title": "Fable demo polish — elevation & variants pass",
+      "status": "landed",
+      "source": "session",
+      "captured_on": "2026-07-14",
+      "blocked_on": "nobody",
+      "branch": "fix/elevation-and-variants",
+      "session": "Fable-polish",
+      "landed_by": "98f58614714dc880e52b16abd5aa80b35b359d5b",
+      "refs": []
+    },
+    {
+      "id": "LG-9",
+      "title": "Watchlist–Scheduling board review debt (findings 6–31 on merged prod, #22 next)",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-08",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Watchlist-Scheduling Board Code Review"
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q10",
+      "title": "Maintenance check flight (14 CFR 91.407(b))",
+      "owner": "DOM",
+      "status": "open"
+    },
+    {
+      "id": "Q11",
+      "title": "CAMP work-order & publications API depth",
+      "owner": "CAMP",
+      "status": "open"
+    },
+    {
+      "id": "Q14",
+      "title": "May a non-aviation 7-day NWS forecast sit adjacent to METAR/TAF on the dashboard?",
+      "owner": "DOM",
+      "status": "open"
+    },
+    {
+      "id": "Q3",
+      "title": "RII ATA-chapter list (operator-defined required inspection items)",
+      "owner": "DOM",
+      "status": "open"
+    },
+    {
+      "id": "Q5",
+      "title": "Supersede authorization model (who may correct whose record)",
+      "owner": "Chief Pilot",
+      "status": "blocked"
+    },
+    {
+      "id": "Q6",
+      "title": "Cutover source & migration method",
+      "owner": "DOM",
+      "status": "open"
+    },
+    {
+      "id": "Q8",
+      "title": "Retention durations & AC currency",
+      "owner": "dev",
+      "status": "open"
+    }
+  ],
+  "gaps": [
+    {
+      "id": "TL-12",
+      "title": "NWS_USER_AGENT is a placeholder — must be a real contact before the outlook ships to prod",
+      "severity": "high",
+      "status": "open"
+    },
+    {
+      "id": "TL-15",
+      "title": "The API cannot run locally — no /api proxy, and DB middleware blocks DB-free routes",
+      "severity": "high",
+      "status": "open"
+    },
+    {
+      "id": "TL-16",
+      "title": "A signed flight briefing renders live defect/deferral/watch content, not what the PIC actually signed",
+      "severity": "high",
+      "status": "open"
+    },
+    {
+      "id": "TL-18",
+      "title": "Production API is broken — every route 500s (DATABASE_URL unset) and nested /api paths never route (404)",
+      "severity": "high",
+      "status": "open"
+    },
+    {
+      "id": "TL-21",
+      "title": "MEL clock (D24/TL-2) rests on unconfirmed evidence — primary FAA PL-25 text never read",
+      "severity": "high",
+      "status": "open"
+    },
+    {
+      "id": "TL-5",
+      "title": "D24 production ledger columns + canonical_payload snapshot (before schema freeze)",
+      "severity": "high",
+      "status": "open"
+    },
+    {
+      "id": "TL-11",
+      "title": "vitest excludes .tsx — component behaviour, incl. the Q14 advisory label, cannot be tested",
+      "severity": "med",
+      "status": "open"
+    },
+    {
+      "id": "TL-14",
+      "title": "Live code stamps a hardcoded IP into AuditEntry, and the deleted signature component's data contract survives in MaintenanceContext",
+      "severity": "med",
+      "status": "open"
+    },
+    {
+      "id": "TL-20",
+      "title": "The --input token is invisible as a border in BOTH themes, because it is overloaded as a fill",
+      "severity": "med",
+      "status": "open"
+    },
+    {
+      "id": "TL-22",
+      "title": "validate_vault.py does not know reference `class` exists — a missing or misspelled class still PASSes",
+      "severity": "med",
+      "status": "open"
+    },
+    {
+      "id": "TL-3",
+      "title": "Cat-A MEL \"next due\" computation",
+      "severity": "med",
+      "status": "open"
+    },
+    {
+      "id": "TL-9",
+      "title": "CLAUDE.md documents a Next.js stack; the repo is actually Vite + Hono",
+      "severity": "med",
+      "status": "open"
+    },
+    {
+      "id": "TL-10",
+      "title": "type-check script exists but main carries 163 TS errors — nothing gates it",
+      "severity": "low",
+      "status": "open"
+    },
+    {
+      "id": "TL-19",
+      "title": "Work-ledger allocator/sweep — two edges found while dogfooding slice 1",
+      "severity": "low",
+      "status": "open"
+    },
+    {
+      "id": "TL-23",
+      "title": "Weather condition mapping keys off NWS's deprecated icon field + free-text regex; gridpoint weather enum is the contracted replacement",
+      "severity": "low",
+      "status": "open"
+    },
+    {
+      "id": "TL-7",
+      "title": "Pre-existing setState-in-render warning in the Planners page",
+      "severity": "low",
+      "status": "open"
+    }
+  ]
+}

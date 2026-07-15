@@ -55,6 +55,7 @@ import CriticalFunctionsPlan from './components/CriticalFunctionsPlan';
 import PilotCurrency from './components/PilotCurrency';
 import PassengerForms from './components/PassengerForms';
 import PublicPassengerForm from './components/PublicPassengerForm';
+import OpsBoardPage from './components/ops/OpsBoardPage';
 import AirportEvaluation from './components/AirportEvaluation';
 import AirportEvaluations from './components/AirportEvaluations';
 import FuelLoadRequest from './components/FuelLoadRequest';
@@ -188,6 +189,10 @@ export default function App() {
                   <Routes>
                     {/* Public Routes - No Authentication Required */}
                     <Route path="/public/passenger-form" element={<PublicPassengerForm />} />
+                    {/* The Work Ledger window — read-only project board, reached only via the
+                        login-footer credit (design §7). Public outer route so the pre-login
+                        door works; the demo's real gate is Vercel SSO. */}
+                    <Route path="/ops" element={<OpsBoardPage />} />
                     <Route
                       path="/commissary-kiosk"
                       element={

@@ -50,6 +50,10 @@ export interface NavEntry {
   sidebar?: boolean;      // false = never a sidebar item (breadcrumbs/⌘K only)
   searchable?: boolean;   // false = excluded from the command-palette page index
   detailLabel?: string;   // breadcrumb leaf for sub-paths (e.g. trip detail)
+  hidden?: boolean;       // true = render NO link anywhere (sidebar + ⌘K), but the
+                          // route stays registered and audited. "Hidden means render
+                          // no link; it does not mean unknown to the system."
+                          // (Work Ledger design §7 — the finding-#14 lesson.)
 }
 
 // Where each role lands right after login. Everyone else lands on '/' (Dashboard).
@@ -175,6 +179,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/admin/airport-evaluation-officer', label: 'Airport Evaluation Officer', domain: 'admin', icon: MapPin, primary: false, roles: ['airport-evaluator', 'admin'] },
   { path: '/foreflight-test-upload', label: 'ForeFlight Test Upload', domain: 'admin', icon: Upload, primary: false, keywords: ['foreflight'], roles: ['admin'] },
   { path: '/foreflight-diagnostics', label: 'ForeFlight Sync Diagnostics', domain: 'admin', icon: Database, primary: false, keywords: ['foreflight', 'sync'], roles: ['admin'] },
+  // The Work Ledger window (design §7). Hidden: the only door is the "Created by
+  // Bryan Dunlop" credit on the login screen — project plumbing, not product.
+  // It sits OUTSIDE the authenticated shell (public outer route) so the door
+  // works pre-login; exposure is bounded by Vercel SSO, the demo's real gate.
+  { path: '/ops', label: 'Ops Ledger', domain: 'admin', icon: Activity, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
 ];
 
 /** Entries visible to a user, by role. Same semantics as Navigation.tsx filtering. */
@@ -193,7 +202,7 @@ export interface DomainGroup {
 
 /** Sidebar model: the role's visible entries grouped into ordered domains. */
 export function domainsForRole(userRole: string, additionalRoles: string[] = []): DomainGroup[] {
-  const visible = entriesForRoles(userRole, additionalRoles).filter((e) => e.sidebar !== false);
+  const visible = entriesForRoles(userRole, additionalRoles).filter((e) => e.sidebar !== false && !e.hidden);
   return DOMAIN_ORDER.map((domain) => {
     const in_ = visible.filter((e) => e.domain === domain);
     return {
