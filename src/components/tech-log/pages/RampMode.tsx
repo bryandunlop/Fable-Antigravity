@@ -14,7 +14,7 @@
  * through a live foreign key.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { X, ShieldCheck, AlertTriangle, MapPin, Printer, FileWarning } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
@@ -38,11 +38,17 @@ export default function RampMode() {
 
   const ac = state.aircraft.find(a => a.tailNumber === tail);
 
-  // Captured once per mount, in a useState initialiser rather than inside the memo: an inspector
-  // is reading a fixed moment, and a row flipping to EXPIRED mid-conversation would be worse than
-  // useless. A memo would re-run `new Date()` on any dispatch, so the "fixed moment" would have
-  // been a claim the code did not actually keep.
-  const [asOfUtc] = useState(() => new Date().toISOString());
+  // Ticks. This was frozen at mount, on the reasoning that a row flipping mid-conversation would be
+  // worse than useless — which had the asymmetry backwards. Flipping TO expired fails safe; staying
+  // ACTIVE past an ET midnight boundary fails UNSAFE, on the exact row the inspector is looking for,
+  // with unbounded staleness for as long as the screen is open. Expiry is derived and
+  // server-authoritative ("reads EXPIRED ... whenever it is computed"), so the truthful reading is
+  // the current one. 30s is well inside any ramp conversation and far coarser than the boundary.
+  const [asOfUtc, setAsOfUtc] = useState(() => new Date().toISOString());
+  useEffect(() => {
+    const t = setInterval(() => setAsOfUtc(new Date().toISOString()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const view = useMemo(
     () => (ac ? buildRampView(ac.id, {
@@ -144,13 +150,24 @@ export default function RampMode() {
               material — it is myGFO's own control working, and it is on every other screen already.
               What stays off is the defect narrative behind it.
             */}
-            <ServiceabilityChip status={view.serviceability} />
+            {view.melProvisional
+              ? <Badge variant="outline" className="border-[var(--gfo-error,#EF3340)]/50 text-[var(--gfo-error,#EF3340)]">MEL provisional</Badge>
+              : <ServiceabilityChip status={view.serviceability} />}
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-lg bg-muted/60 px-3 py-2">
               <p className="text-xs text-muted-foreground">Minimum equipment list</p>
-              <p className="text-sm font-medium">D195 · {view.type}</p>
+              {/* Never state the MEL as governing when the FSDO has not approved it — ¶6-101F5(b)
+                  is literally the inspector's LOA check, so an unqualified "D195 · G800" here is
+                  the worst possible place to overstate. */}
+              {view.melProvisional ? (
+                <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--gfo-error,#EF3340)]">
+                  <FileWarning className="h-3.5 w-3.5" /> D195 · {view.type} — pending FSDO approval
+                </p>
+              ) : (
+                <p className="text-sm font-medium">D195 · {view.type}</p>
+              )}
             </div>
             <div className="rounded-lg bg-muted/60 px-3 py-2">
               <p className="text-xs text-muted-foreground">Letter of authorization</p>
@@ -186,8 +203,13 @@ export default function RampMode() {
           </div>
 
           {view.deferrals.length === 0 ? (
+            // On a provisional aircraft "no inoperative equipment is carried under the MEL" is true
+            // but reads as reassurance, when the real reason the list is empty is that no deferral
+            // may be taken at all. Say that instead.
             <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-              No deferred items. No inoperative equipment is carried under the MEL.
+              {view.melProvisional
+                ? 'No deferred items — none may be taken. This aircraft’s D195 is not FSDO-approved.'
+                : 'No deferred items. No inoperative equipment is carried under the MEL.'}
             </p>
           ) : (
             view.deferrals.map(r => (

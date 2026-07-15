@@ -1,7 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { buildRampView } from './rampCheck';
+import { buildRampView as build, type RampState } from './rampCheck';
 import { deriveServiceability } from './serviceability';
 import type { Aircraft, Defect, Deferral, MelItem } from '../types';
+
+/**
+ * Defaults the recurring-check arrays so each test states only what it is about. `RampState` requires
+ * them deliberately — omitting them silently downgrades RED to GREEN — so this helper supplies empty
+ * ones rather than the type going Partial. The production call site (RampMode.tsx) still has to pass
+ * the real arrays, and tsc enforces that.
+ */
+const buildRampView = (
+  aircraftId: string,
+  s: Omit<RampState, 'recurringChecks' | 'recurringAccomplishments'> & Partial<RampState>,
+  now: string,
+) => build(aircraftId, { recurringChecks: [], recurringAccomplishments: [], ...s }, now);
 
 const AC: Aircraft = {
   id: 'ac-1', tailNumber: 'N512GF', type: 'G650ER', serialNumber: '6289',
@@ -172,6 +184,56 @@ describe('buildRampView — serviceability must never read clean on a grounded a
       aircraft: [AC], deferrals: [], defects: [defect({ status: 'OPEN' })],
     }, NOW)!;
     expect(v.serviceability).toBe('RED');
+    expect(v.hasMelFinding).toBe(false);
+  });
+});
+
+// An adversarial verifier refuted the first serviceability fix with this, 2026-07-15. N3PG (G800) is
+// seeded provisional — its D195 is PENDING_FSDO — and ramp mode rendered GREEN "Serviceable" plus
+// "Minimum equipment list: D195 · G800", presenting an FSDO-unapproved MEL as the governing MEL to an
+// inspector whose ¶6-101F5(b) job is literally to check the LOA. deriveServiceability has no concept
+// of isProvisional (it returns GREEN, rule 5); every OTHER consumer gates on it —
+// AircraftDetail.tsx:276 renders a "Provisional" badge INSTEAD of the chip. Ramp mode was the only
+// unconditional render, on the only regulator-facing screen. An omission had become an assertion.
+describe('buildRampView — a provisional MEL may never read as an approved one', () => {
+  const PROV: Aircraft = { ...AC, id: 'ac-g800', tailNumber: 'N3PG', type: 'G800', isProvisional: true, status: 'PROVISIONAL' };
+
+  it('flags the MEL as provisional rather than asserting it governs', () => {
+    const v = buildRampView('ac-g800', { aircraft: [PROV], deferrals: [], defects: [], recurringChecks: [], recurringAccomplishments: [] }, NOW)!;
+    expect(v.melProvisional).toBe(true);
+  });
+
+  it('never reports GREEN for a provisional aircraft, even with nothing else wrong', () => {
+    const v = buildRampView('ac-g800', { aircraft: [PROV], deferrals: [], defects: [], recurringChecks: [], recurringAccomplishments: [] }, NOW)!;
+    expect(v.serviceability).not.toBe('GREEN');
+  });
+
+  it('leaves a normal aircraft unflagged', () => {
+    const v = buildRampView('ac-1', { aircraft: [AC], deferrals: [], defects: [], recurringChecks: [], recurringAccomplishments: [] }, NOW)!;
+    expect(v.melProvisional).toBe(false);
+    expect(v.serviceability).toBe('GREEN');
+  });
+});
+
+// ¶6-101G6: "Inspect to determine that all required placards are present and legible." An uninstalled
+// required placard is the inspector's own check failing — but hasMelFinding keyed on status alone, so
+// an ACTIVE row with placardRequired && !placardInstalled printed "Placard NOT installed" in red in
+// the row body while the header said nothing. (Adversarial verifier, 2026-07-15.)
+describe('buildRampView — an uninstalled required placard is a finding (¶6-101G6)', () => {
+  it('raises a MEL finding when a required placard is not installed, even on an ACTIVE row', () => {
+    const v = buildRampView('ac-1', {
+      aircraft: [AC], defects: [defect()], recurringChecks: [], recurringAccomplishments: [],
+      deferrals: [deferral({ status: 'ACTIVE', placardRequired: true, placardInstalled: false })],
+    }, NOW)!;
+    expect(v.deferrals[0].status).toBe('ACTIVE');
+    expect(v.hasMelFinding).toBe(true);
+  });
+
+  it('does not raise one when no placard is required', () => {
+    const v = buildRampView('ac-1', {
+      aircraft: [AC], defects: [defect()], recurringChecks: [], recurringAccomplishments: [],
+      deferrals: [deferral({ status: 'ACTIVE', placardRequired: false, placardInstalled: false })],
+    }, NOW)!;
     expect(v.hasMelFinding).toBe(false);
   });
 });

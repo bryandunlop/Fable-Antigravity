@@ -101,16 +101,33 @@ export interface RampView {
   serviceability: Serviceability;
   /**
    * MEL-scoped: some presented deferral is not cleanly ACTIVE (expired, placard outstanding, or
-   * unsigned). Deliberately narrower than `serviceability` — a grounding defect is not a MEL
-   * finding, and an aircraft can be RED with this false. Never use it as a dispatch signal.
+   * unsigned), OR carries a required placard that is not installed. Deliberately narrower than
+   * `serviceability` — a grounding defect is not a MEL finding, and an aircraft can be RED with
+   * this false. Never use it as a dispatch signal.
    */
   hasMelFinding: boolean;
+  /**
+   * The aircraft's D195 is not FSDO-approved (`Aircraft.isProvisional` — the G800 case). The screen
+   * must NOT present the MEL as governing, and must not read Serviceable. See the note in
+   * `buildRampView`.
+   */
+  melProvisional: boolean;
   computedAtUtc: string;
 }
 
-/** Everything the ramp view may see — note the absence of `melItems` and `personnel`. */
-export type RampState = Pick<TechLogState, 'aircraft' | 'deferrals' | 'defects'> &
-  Partial<Pick<TechLogState, 'recurringChecks' | 'recurringAccomplishments'>>;
+/**
+ * Everything the ramp view may see — note the absence of `melItems` and `personnel`.
+ *
+ * `recurringChecks`/`recurringAccomplishments` are REQUIRED here even though `deriveServiceability`
+ * takes them optionally. An expired recurring check grounds an aircraft (its Rule 3), so omitting
+ * them silently downgrades RED to GREEN — and with `Partial` that omission is a type-clean call an
+ * adversarial verifier proved reachable. On the one screen shown to a regulator, under-reporting
+ * must be a compile error.
+ */
+export type RampState = Pick<
+  TechLogState,
+  'aircraft' | 'deferrals' | 'defects' | 'recurringChecks' | 'recurringAccomplishments'
+>;
 
 export function buildRampView(
   aircraftId: string,
@@ -169,12 +186,22 @@ export function buildRampView(
     type: ac.type,
     loaHeld: false,
     deferrals: rows,
-    serviceability: deriveServiceability(aircraftId, state, asOfUtc).status,
-    // MEL-scoped only. Anything still presented that is not ACTIVE is a finding on a deferred
-    // item: EXPIRED is out of time, PENDING_PLACARD means the (M)/placard release is unsigned so
-    // the deferral never became active, and PROPOSED is not yet signed at all. This says nothing
-    // about defects or recurring checks — `serviceability` above is the airworthiness answer.
-    hasMelFinding: rows.some(r => r.status !== 'ACTIVE'),
+    // `deriveServiceability` has no concept of isProvisional — legitimately, since it answers
+    // "what do the records say about this airframe", and a pending FSDO approval is not a defect.
+    // But it therefore returns GREEN for a provisional aircraft, and this screen must never print
+    // "Serviceable" beside a D195 the FSDO has not approved. Every other consumer already refuses
+    // that combination (AircraftDetail.tsx:276 shows a Provisional badge INSTEAD of the chip); ramp
+    // mode was the sole exception, on the sole regulator-facing screen. Resolved conservatively —
+    // consistent with "absence of an explicit status is RED, never GREEN".
+    serviceability: ac.isProvisional ? 'RED' : deriveServiceability(aircraftId, state, asOfUtc).status,
+    melProvisional: ac.isProvisional,
+    // MEL-scoped only. A presented row that is not ACTIVE is a finding — EXPIRED is out of time,
+    // PENDING_PLACARD means the (M)/placard release is unsigned so the deferral never became
+    // active, PROPOSED is not yet signed at all — and so is an ACTIVE row whose required placard
+    // is missing, because ¶6-101G6 ("all required placards are present and legible") is precisely
+    // the check the inspector performs. Says nothing about defects or recurring checks;
+    // `serviceability` above is the airworthiness answer.
+    hasMelFinding: rows.some(r => r.status !== 'ACTIVE' || (r.placardRequired && !r.placardInstalled)),
     computedAtUtc: asOfUtc,
   };
 }
