@@ -42,7 +42,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 <SelectTrigger className="h-14 text-base bg-muted/50 border-input hover:bg-muted transition-colors rounded-xl">
                   <SelectValue placeholder="Choose your role to access the system" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-border/50 shadow-2xl max-h-[500px]">
+                <SelectContent className="rounded-xl border-border/50 shadow-lg max-h-[500px]">
                   {Object.entries(ROLE_CATEGORIES).map(([category, roles]) => (
                     <React.Fragment key={category}>
                       <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase bg-muted/30">

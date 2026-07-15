@@ -20,8 +20,14 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+        // `dark:border-input` painted the border --input (#0D1F5C) — which IS the dark
+        // page background. The app's most-used variant (1,159 call sites) had a border
+        // you could not see on any dark surface; measured 1.37:1 against the page.
+        // Dropping the override falls back to --border, which in dark resolves to
+        // --pg-rule-on-brand (white @18%) and is visible. The bg-input/30 wash stays —
+        // it's the fill; the border was always meant to be the affordance.
         outline:
-          "border bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+          "border bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:hover:bg-input/50",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:

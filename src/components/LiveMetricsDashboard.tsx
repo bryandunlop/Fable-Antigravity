@@ -285,7 +285,7 @@ export default function LiveMetricsDashboard() {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-xl">
+        <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-lg">
           <p className="text-slate-300 text-sm mb-2">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm font-mono" style={{ color: entry.color }}>

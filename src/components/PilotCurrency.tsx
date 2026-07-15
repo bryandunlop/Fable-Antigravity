@@ -37,10 +37,6 @@ import {
   Shield,
   Compass,
   Timer,
-  FileText,
-  X,
-  Sparkles,
-  Info,
   Users,
   CircleDot
 } from 'lucide-react';
@@ -509,7 +505,6 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedPilotNotes, setExpandedPilotNotes] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pilots' | 'flight-attendants'>('pilots');
-  const [showDevSpec, setShowDevSpec] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
@@ -604,16 +599,12 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
   return (
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
 
-      {/* ══════ HEADER — NEW BUILD BANNER ══════ */}
+      {/* A "V2 — NEW BUILD" badge and a "Massive Developer CTA" (its own comment)
+          used to sit here — dev scaffolding on a pilot-facing screen. Removed
+          2026-07-15 (Bryan, D33): a pilot checking currency does not need a build
+          banner or a spec link. The spec content itself is untouched in the repo. */}
       <div className="relative">
-        <div className="absolute -top-2 -right-2 z-10">
-          <div className="bg-gfo-midnight text-white px-4 py-1.5 rounded-full text-xs font-medium tracking-wider shadow-sm flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" />
-            V2 — NEW BUILD
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
           {/* Left: Title */}
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-3">
@@ -627,22 +618,6 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
             </p>
           </div>
 
-          {/* Developer scaffolding on a pilot-facing screen — the three-stop
-              violet/indigo gradient, font-extrabold and white sweep-on-hover
-              were a "Massive Developer CTA". De-flashed onto the brand here;
-              whether it belongs in front of pilots at all is a separate call
-              (flagged 2026-07-14, D33). */}
-          <div className="flex justify-center mt-2 lg:mt-0 max-w-sm mx-auto">
-            <Button
-              size="lg"
-              variant="secondary"
-              className="gap-3 px-8 py-6 text-base w-full"
-              onClick={() => setShowDevSpec(!showDevSpec)}
-            >
-              <FileText className="w-5 h-5" />
-              <span>Developer Readme &amp; Spec</span>
-            </Button>
-          </div>
 
           {/* Right: Sync Controls */}
           <div className="flex items-center lg:justify-end gap-3 flex-wrap mt-2 lg:mt-0 lg:pr-6">
@@ -661,69 +636,12 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
       </div>
 
       {/* ══════ DEV SPEC DRAWER ══════ */}
-      {showDevSpec && (
-        <Card className="border-indigo-500/40 bg-indigo-50/50 dark:bg-indigo-950/20 shadow-lg mb-6 animate-in slide-in-from-top-2 duration-300">
-          <CardHeader className="pb-3 border-b border-indigo-500/10 mb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
-                <FileText className="w-5 h-5" />
-                Backend Developer Handoff Readme
-              </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setShowDevSpec(false)}><X className="w-4 h-4" /></Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-             <div className="flex flex-col md:flex-row gap-4">
-               <div className="flex-1 space-y-4">
-                 <Alert className="border-indigo-200 dark:border-indigo-800 bg-white/50 dark:bg-slate-900/50">
-                    <Info className="w-4 h-4 text-indigo-600" />
-                    <AlertDescription className="text-sm leading-relaxed">
-                      <p className="font-semibold mb-1 text-foreground">1. Frontend Math Reference</p>
-                      This layout contains live math parsing for 90-day, 6-month, and 12-month calendar windows. 
-                      You can use functions inside <code className="bg-indigo-100 dark:bg-indigo-900/50 px-1.5 py-0.5 rounded text-xs text-indigo-800 dark:text-indigo-300">PilotCurrency.tsx</code> as direct pseudocode to replicate the exact interval logic on the server.
-                    </AlertDescription>
-                 </Alert>
-                 
-                 <Alert className="border-indigo-200 dark:border-indigo-800 bg-white/50 dark:bg-slate-900/50">
-                    <Database className="w-4 h-4 text-indigo-600" />
-                    <AlertDescription className="text-sm leading-relaxed">
-                      <p className="font-semibold mb-1 text-foreground">2. Formal API Specification</p>
-                      The complete backend schema, OData table integration strategy from MyAirOps, and exact JSON request/response mappings are fully documented.
-                      
-                      <div className="mt-4">
-                        <a 
-                          href="https://github.com/bryandunlop/Antigravity-Aviation-Management-System/blob/main/backend_designs/PilotCurrencyApiSpec.md" 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-xs font-bold transition-all shadow-sm hover:shadow-md"
-                        >
-                          <FileText className="w-4 h-4" />
-                          View PilotCurrencyApiSpec.md on GitHub
-                        </a>
-                      </div>
-                    </AlertDescription>
-                 </Alert>
-               </div>
-               
-               <div className="flex-1">
-                 <div className="bg-slate-950 rounded-xl p-5 border border-slate-800 h-full flex flex-col justify-center shadow-inner">
-                   <h4 className="text-slate-300 text-xs font-bold mb-4 flex items-center justify-between border-b border-slate-800 pb-2">
-                     <span className="uppercase tracking-wider">Crucial Math Intervals (Part 91)</span>
-                     <span className="bg-slate-800 px-2 py-0.5 rounded text-[10px]">Reference</span>
-                   </h4>
-                   <ul className="space-y-3 text-slate-400 text-xs font-mono">
-                     <li className="flex justify-between items-center"><span className="text-emerald-400">General / Night</span> <span className="bg-slate-900 px-2 py-1 rounded">Rolling 90 Days</span></li>
-                     <li className="flex justify-between items-center"><span className="text-amber-400">Inst. Approaches</span> <span className="bg-slate-900 px-2 py-1 rounded">6 Calendar Months Lookback</span></li>
-                     <li className="flex justify-between items-center"><span className="text-amber-400">Holds</span> <span className="bg-slate-900 px-2 py-1 rounded">6 Calendar Months Lookback</span></li>
-                     <li className="flex justify-between items-center"><span className="text-blue-400">Alternate Night</span> <span className="bg-slate-900 px-2 py-1 rounded">6 / 12 Month Target</span></li>
-                     <li className="flex justify-between items-center"><span className="text-violet-400">61.58 PIC Check</span> <span className="bg-slate-900 px-2 py-1 rounded">End of 12th Calendar Month</span></li>
-                   </ul>
-                 </div>
-               </div>
-             </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* A 63-line "Backend Developer Handoff Readme" panel lived here, opened by a
+          "Massive Developer CTA" (its own comment) on this pilot-facing screen.
+          Removed 2026-07-15 (Bryan, D33). Nothing is lost: it was a signpost to
+          backend_designs/PilotCurrencyApiSpec.md, which is still in this repo. Its
+          "View on GitHub" link pointed at Antigravity-Aviation-Management-System —
+          the frozen legacy repo — so it was also stale. */}
 
       {/* ══════ CREW TYPE TABS & SUMMARY STATS ══════ */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

@@ -424,7 +424,7 @@ export default function PassengerMobileApp({ onLogout }: PassengerMobileAppProps
   };
 
   return (
-    <div className="relative mx-auto w-[430px] bg-black rounded-[3rem] shadow-2xl overflow-hidden" style={{ height: '932px' }}>
+    <div className="relative mx-auto w-[430px] bg-black rounded-[3rem] shadow-lg overflow-hidden" style={{ height: '932px' }}>
       {/* iOS Notch */}
       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-40 h-8 bg-black rounded-b-3xl z-50" />
       
@@ -521,7 +521,7 @@ export default function PassengerMobileApp({ onLogout }: PassengerMobileAppProps
                       <Badge className="bg-blue-500 text-white">Upcoming</Badge>
                     </div>
                     <div 
-                      className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl shadow-xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+                      className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl shadow-lg overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
                       onClick={() => setSelectedFlight(upcomingFlights[0].id)}
                     >
                       <div className="p-6 space-y-4 text-white">
@@ -752,7 +752,7 @@ export default function PassengerMobileApp({ onLogout }: PassengerMobileAppProps
               <>
                 {/* Header */}
                 <div className="text-center space-y-4">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-3xl mx-auto shadow-xl">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-3xl mx-auto shadow-lg">
                     {passengerInfo.avatar}
                   </div>
                   <div>

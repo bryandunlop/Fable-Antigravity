@@ -103,7 +103,7 @@ export default function Dashboard({ userRole }: DashboardProps) {
           {links.map(link => (
             <div key={link.id} className="relative shrink-0 group flex items-center">
               {editingId === link.id ? (
-                <div className="flex items-center gap-1 bg-muted border border-border rounded-lg p-1 z-10 shadow-xl">
+                <div className="flex items-center gap-1 bg-muted border border-border rounded-lg p-1 z-10 shadow-lg">
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
