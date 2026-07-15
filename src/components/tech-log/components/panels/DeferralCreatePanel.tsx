@@ -121,6 +121,10 @@ export function DeferralCreatePanel({
     const deferral: Deferral = {
       id: pendingDeferralId, defectId: supDefect.id, aircraftId: aircraft.id, melItemId: selectedMel.id,
       governingMmelRevision: selectedMel.mmelRevision, governingEffectiveDate: selectedMel.effectiveDate,
+      // D36: freeze the MEL's display identity here, with the revision. MelItem is updatable in
+      // place, so anything read back through melItemId later shows the CURRENT text — which on a
+      // ramp screen means showing a regulator the wrong provision under a right-looking revision.
+      melSubItemNumber: selectedMel.subItemNumber, melTitle: selectedMel.title,
       category: selectedMel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: clockStart,
       governingTimezone: zone,
       governingTimezoneOverrideReason: isOverride(zone) ? overrideReason.trim() : undefined,

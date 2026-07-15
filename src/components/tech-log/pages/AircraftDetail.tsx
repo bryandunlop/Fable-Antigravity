@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Wrench, FilePlus, Clock, ShieldAlert, CheckCircle2, CalendarClock, Plus,
-  Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, CloudDownload,
+  Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, CloudDownload, ShieldCheck,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
 import { formatRegulatoryCompact } from '../util/displayZone';
@@ -260,6 +260,10 @@ export default function AircraftDetail() {
       actions={
         <>
           <Button variant="outline" size="sm" onClick={() => navigate('/tech-log')}><ArrowLeft className="mr-1.5 h-4 w-4" /> Fleet</Button>
+          {/* D36 — one tap from the aircraft the inspector is standing next to. */}
+          <Button variant="outline" size="sm" onClick={() => navigate(`/tech-log/aircraft/${ac.tailNumber}/ramp`)}>
+            <ShieldCheck className="mr-1.5 h-4 w-4" /> Ramp check
+          </Button>
           <Button size="sm" onClick={() => setReportOpen(true)}><FilePlus className="mr-1.5 h-4 w-4" /> Report defect</Button>
         </>
       }

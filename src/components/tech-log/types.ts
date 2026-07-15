@@ -100,6 +100,13 @@ export interface Deferral {
   melItemId: string;
   governingMmelRevision: string;
   governingEffectiveDate: string;
+  // D36: the MEL's display identity, frozen at signing alongside the revision above. MelItem is an
+  // updatable row (EDIT_MEL_ITEM replaces it in place under the same id), so resolving these through
+  // melItemId at render time lets a later revision repaint a signed deferral — the point-in-time MEL
+  // invariant's exact failure. Nullable per the ledger rule that added columns must be nullable, so
+  // rows predating this snapshot read null rather than silently falling back to a join.
+  melSubItemNumber?: string;
+  melTitle?: string;
   category: MelCategory;
   dayOfDiscoveryUtc: string;
   clockStartDateUtc: string;
