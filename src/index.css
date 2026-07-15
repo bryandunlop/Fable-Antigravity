@@ -3,6 +3,21 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* The brand is a build input, not a comment. pg-tokens is the P&G VIS ID
+   palette/geometry/elevation; gfo-tokens is the GFO sub-brand layered on top
+   (it reads --pg-white / --pg-black from pg-tokens, so pg must come first).
+   Neither carries @font-face — see pg-tokens.css for why the faces in
+   colors_and_type.css are deliberately not wired.
+
+   layer(base) is load-bearing, not decoration. These files declare :root
+   UNLAYERED by default, and an unlayered declaration outranks every cascade
+   layer regardless of specificity — so `.dark { --pg-shadow-* }` below (which
+   lives in @layer base) silently lost to them and the dark-mode shadows never
+   applied at all. Pulling the imports into the same layer restores a normal
+   specificity/source-order contest, which .dark wins by being declared later. */
+@import "./styles/brand/pg-tokens.css" layer(base);
+@import "./styles/brand/gfo-tokens.css" layer(base);
+
 @font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Light.ttf') format('truetype'); font-weight: 300; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat/Montserrat-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
@@ -35,13 +50,26 @@
     --destructive: #EF3340;
     --destructive-foreground: #ffffff;
 
-    --border: #E5E7EB;
+    --border: var(--pg-rule);      /* hairline divider on white, per VIS ID */
     --input: transparent;
     --input-background: #F4F6FA;
     --switch-background: #cbced4;
     --ring: #0096FC;
 
-    --radius: 0.625rem;
+    /* The VIS ID specifies --pg-radius-card: 0 ("crisp rectangles, not rounded
+       cards"). 4px is the ratified reading of that for internal-tool UI
+       (Bryan, 2026-07-14 — see D33): crisp enough to read as P&G, soft enough
+       that dense touch targets don't look like spreadsheet cells. Pills and
+       circles are unaffected — the VIS ID keeps those round. */
+    --radius: 0.25rem;
+
+    /* Motion durations. These live here rather than in @theme because
+       --duration-* is not a Tailwind v4 namespace — declaring them there
+       emitted precisely nothing (verified in the built CSS). Consume them as
+       duration-(--dur-press) etc., which v4 compiles to var(). The curve
+       itself IS a namespace and lives in @theme as --ease-gfo. */
+    --dur-press: 80ms;    /* under the finger — must feel instant */
+    --dur-fast: 150ms;    /* hover, colour, the default */
 
     /* Chrome is brand-constant: Midnight sidebar in BOTH modes (only the canvas flips). */
     --sidebar: #142D7E;
@@ -63,6 +91,15 @@
   }
 
   .dark {
+    /* A PMS 293 shadow is invisible on a Midnight card — the tint and the
+       surface are the same colour. Dark mode falls back to black, deeper,
+       because there is no ambient light to model. Overriding the P&G tier
+       here (rather than the Tailwind ramp) reaches every shadow-* call site
+       through the same indirection the light theme uses. */
+    --pg-shadow-flat:   0 1px 0 rgba(0, 0, 0, 0.24);
+    --pg-shadow-soft:   0 4px 12px rgba(0, 0, 0, 0.32);
+    --pg-shadow-strong: 0 12px 32px rgba(0, 0, 0, 0.48);
+
     --background: #0D1F5C;
     --foreground: #ffffff;
 
@@ -87,7 +124,7 @@
     --destructive: #EF3340;
     --destructive-foreground: #ffffff;
 
-    --border: rgba(255, 255, 255, 0.14);
+    --border: var(--pg-rule-on-brand);   /* was 0.14 — the VIS ID says 0.18 on PMS293 */
     --input: #0D1F5C;
     --input-background: #0D1F5C;
     --ring: #0096FC;
@@ -111,24 +148,40 @@
   }
 
   :root, .dark {
-    /* Canonical source: src/styles/brand/gfo-tokens.css (GFO VIS ID, 2026) */
-    --gfo-midnight: #142D7E;
-    --gfo-midnight-deep: #0D1F5C;
-    --gfo-midnight-light: #2A3F96;
-    --gfo-daylight: #0096FC;
-    --gfo-daylight-deep: #0077CC;
-    --gfo-daylight-light: #7FCCFE;
-    --gfo-custody-crew: #003DA5;   /* P&G corporate blue (PMS 293) — crew holds custody */
-    --gfo-sunrise: #D1AC6B;
-    --gfo-sunrise-deep: #B8913D;
-    --gfo-sunrise-light: #EDD9A9;
-    --gfo-success: #00B140;
-    --gfo-warning: #F1B434;
-    --gfo-error: #EF3340;
-    --gfo-info: #0096FC;
-    --gfo-sphere: radial-gradient(circle at 30% 30%, #4FAEE5 0%, #1F66C2 38%, #003DA5 70%, #012169 100%);
+    /* Midnight / Daylight / Sunrise and their tints now come from the real
+       brand files imported at the top — they used to be hand-copied here and
+       drifted out of any relationship with their source.
+
+       What stays below is genuinely app-specific: the tokens myGFO adds on top
+       of the brand. Each resolves to a P&G corporate colour rather than
+       repeating its hex, so the provenance is checkable instead of folkloric.
+       The values are unchanged — every one of these was already exactly the
+       PMS colour it now names. */
+    --gfo-custody-crew: var(--pg-blue);    /* PMS 293 C — crew holds custody */
+
+    /* RAG serviceability. Load-bearing per CLAUDE.md: this axis must stay
+       distinct from the brand (Midnight/Daylight) and custody (blue) axes.
+       It reads as P&G secondary palette, which the VIS ID permits for
+       internal-tool status but never for corporate type or backgrounds. */
+    --gfo-success: var(--pg-green);        /* PMS 354 C */
+    --gfo-warning: var(--pg-amber);        /* PMS 143 C */
+    --gfo-error:   var(--pg-red);          /* PMS 032 C */
+    --gfo-info:    var(--gfo-daylight);
+
+    --gfo-sphere: radial-gradient(circle at 30% 30%, #4FAEE5 0%, #1F66C2 38%, var(--pg-blue) 70%, var(--pg-navy) 100%);
   }
 }
+
+/* The named motion utilities. @utility is v4's supported way to add a utility,
+   and unlike a bogus @theme namespace it actually emits — which is the whole
+   reason these exist as real classes rather than three more dead tokens.
+   Variants compose normally, so active:duration-press works.
+
+   Only the two that are USED are defined. duration-base existed here with zero
+   call sites — a dead token created by a change whose entire thesis is that
+   dead tokens are the sin. Add it back the moment something needs it. */
+@utility duration-press { transition-duration: var(--dur-press); }
+@utility duration-fast  { transition-duration: var(--dur-fast); }
 
 @theme {
   --font-sans: 'Montserrat', Arial, ui-sans-serif, system-ui, sans-serif;
@@ -141,15 +194,71 @@
   --text-lg: 1.1875rem;
   --text-xl: 1.3125rem;
 
-  --radius: 0.625rem;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 8px);
+  /* Keep in step with --radius in :root above. 4px — see D33.
+     rounded-lg is the app's de-facto card/control corner (706 uses vs 256
+     rounded-md and 110 rounded-xl), so --radius-lg is the value that actually
+     shows up on screen — it lands on --radius exactly.
+     2xl/3xl are declared here on purpose: they were NOT in @theme before, so
+     they silently kept Tailwind's 16px/24px defaults and would now sit beside
+     4px cards looking like a different product. 44 call sites join the ramp. */
+  --radius: 0.25rem;
+  --radius-sm: calc(var(--radius) - 2px);   /*  2px */
+  --radius-md: calc(var(--radius) - 1px);   /*  3px */
+  --radius-lg: var(--radius);               /*  4px — the card corner */
+  --radius-xl: calc(var(--radius) * 2);     /*  8px */
+  --radius-2xl: calc(var(--radius) * 3);    /* 12px */
+  --radius-3xl: calc(var(--radius) * 4);    /* 16px */
 
-  --animate-duration-fast: 200ms;
-  --animate-duration-normal: 300ms;
-  --animate-duration-slow: 500ms;
+  /* ---- Motion -------------------------------------------------------
+     The VIS ID specifies no motion at all — no easing, no durations. This
+     scale is a GFO extension authored for myGFO (D33), not brand fact;
+     saying so beats implying the brand book blessed it.
+
+     One curve. It decelerates hard and settles without overshoot — nothing
+     in an airworthiness tool should bounce.
+
+     --ease-* IS a v4 theme namespace, so this generates `ease-gfo`.
+     --duration-* is NOT — despite what the transition-duration docs imply, the
+     namespace table in theme.mdx is the accurate list. Declaring durations here
+     emitted literally nothing (verified in the built CSS, twice). The named
+     durations are therefore real utilities defined via @utility below, reading
+     the --dur-* values from :root. */
+  --ease-gfo: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---- Elevation ----------------------------------------------------
+     Tailwind's six-tier black-drop-shadow ramp is remapped onto the three
+     P&G tiers, tinted PMS 293 rather than neutral black. Every existing
+     shadow-* call site (~309) inherits this untouched — the point of a token.
+
+       2xs, xs, sm  -> flat    resting surface
+       md, lg       -> soft
+       xl, 2xl      -> strong
+
+     Deliberately NOT described by role. An earlier version of this comment
+     claimed xl/2xl were "dialog, popover, sheet" — false: ui/dialog and
+     ui/sheet use shadow-lg, ui/popover uses shadow-md (all three land on
+     `soft`), while `strong` is consumed by ~41 ordinary components. So the
+     app's elevation is inverted — a DraggableWidget (shadow-xl) out-shadows
+     a modal (shadow-lg). That inversion PREDATES this change and is faithfully
+     preserved here (on main: xl = 0 20px 25px vs lg = 0 10px 15px). Worth
+     fixing; not silently, and not in a motion pass.
+
+     TRADE-OFF, known and accepted: Tailwind's stock ramp parameterises its
+     colour (`0 10px 15px -3px var(--tw-shadow-color, #0000001a)`), which is
+     what makes `shadow-lg shadow-red-500/40` composable. The P&G tokens are
+     complete box-shadow values, so substituting them drops that hook and every
+     `shadow-<colour>` utility becomes inert. That is intended — coloured glows
+     are off-system — but it is SILENT, which is the objectionable part: a
+     future `shadow-red-500/40` will simply never appear. Decomposing the brand
+     tokens into geometry + colour would restore the hook at the cost of no
+     longer consuming --pg-shadow-* as the brand ships them. Flagged in D33. */
+  --shadow-2xs: var(--pg-shadow-flat);
+  --shadow-xs:  var(--pg-shadow-flat);
+  --shadow-sm:  var(--pg-shadow-flat);
+  --shadow-md:  var(--pg-shadow-soft);
+  --shadow-lg:  var(--pg-shadow-soft);
+  --shadow-xl:  var(--pg-shadow-strong);
+  --shadow-2xl: var(--pg-shadow-strong);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

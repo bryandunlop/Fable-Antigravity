@@ -130,7 +130,7 @@ export default function InternalAuditManagement() {
           </h1>
           <p className="text-sm text-muted-foreground">Annual audit planning &amp; management</p>
         </div>
-        <Button onClick={() => handleAddAudit()} className="bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/20">
+        <Button onClick={() => handleAddAudit()} className="bg-blue-600 hover:bg-blue-700 shadow-sm">
           <Plus className="w-4 h-4 mr-2" />
           Schedule New Audit
         </Button>

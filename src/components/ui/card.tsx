@@ -7,7 +7,16 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20",
+        // Every card in the app used to lift 4px off the page on hover
+        // (hover:-translate-y-1) over 300ms of transition-all. That is a
+        // marketing-site treatment: it animates layout, it repaints surfaces
+        // that often sit in 40-row lists, and on the iPad — the primary device
+        // — there is no hover at all, so it was desktop-only decoration.
+        // A card now rests, and deepens when pointed at. Naming the two
+        // properties keeps the transition off layout entirely.
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-lg border shadow-sm",
+        "transition-[box-shadow,border-color] duration-fast ease-gfo",
+        "hover:shadow-md hover:border-primary/20",
         className,
       )}
       {...props}

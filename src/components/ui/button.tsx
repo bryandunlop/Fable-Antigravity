@@ -4,8 +4,16 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "./utils";
 
+// Motion notes, since this one string reaches ~1,535 call sites:
+//  - transition-all animated every property, layout included. Naming the ones
+//    that actually change keeps a press off the layout path.
+//  - scale-95 is a 5% shrink, which reads bouncy. 97% reads like a real key.
+//  - the press is FASTER than the release (duration-press 80ms in, duration-fast
+//    150ms out). Feedback under a finger has to feel instant; the return can
+//    afford to be seen. Equal timings in both directions feel laggy.
+//  - motion-reduce kills both, per prefers-reduced-motion.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[background-color,box-shadow,transform,border-color,color] duration-fast ease-gfo active:scale-[0.97] active:duration-press motion-reduce:transition-none motion-reduce:active:scale-100 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {

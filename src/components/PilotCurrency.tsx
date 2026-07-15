@@ -450,9 +450,9 @@ function generateMockData(): { pilots: CrewMember[]; fas: CrewMember[]; logs: Fl
 
 const StatusDot = ({ status }: { status: CurrencyStatus }) => {
   const colors = {
-    current: 'bg-emerald-500 shadow-emerald-500/50',
-    warning: 'bg-amber-500 shadow-amber-500/50',
-    expired: 'bg-red-500 shadow-red-500/50 animate-pulse',
+    current: 'bg-emerald-500',
+    warning: 'bg-amber-500',
+    expired: 'bg-red-500 animate-pulse',
   };
   return <div className={`w-2.5 h-2.5 rounded-full shadow-lg ${colors[status]}`} />;
 };
@@ -607,7 +607,7 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
       {/* ══════ HEADER — NEW BUILD BANNER ══════ */}
       <div className="relative">
         <div className="absolute -top-2 -right-2 z-10">
-          <div className="bg-gradient-to-r from-violet-600 to-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-wider shadow-lg shadow-violet-500/30 flex items-center gap-1.5 animate-pulse">
+          <div className="bg-gfo-midnight text-white px-4 py-1.5 rounded-full text-xs font-medium tracking-wider shadow-sm flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" />
             V2 — NEW BUILD
           </div>
@@ -617,7 +617,7 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
           {/* Left: Title */}
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+              <div className="w-10 h-10 rounded-lg bg-gfo-midnight flex items-center justify-center shadow-sm">
                 <UserCheck className="w-5 h-5 text-white" />
               </div>
               <span className="text-aviation-gradient">Currency Dashboard</span>
@@ -627,16 +627,20 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
             </p>
           </div>
 
-          {/* Center: Massive Developer CTA */}
-          <div className="flex justify-center mt-2 lg:mt-0 shadow-lg shadow-indigo-500/20 rounded-full max-w-sm mx-auto">
-            <Button 
-              size="lg" 
-              className="gap-3 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 text-white border-0 shadow-xl shadow-violet-500/40 font-extrabold px-8 py-6 text-base w-full group relative overflow-hidden" 
+          {/* Developer scaffolding on a pilot-facing screen — the three-stop
+              violet/indigo gradient, font-extrabold and white sweep-on-hover
+              were a "Massive Developer CTA". De-flashed onto the brand here;
+              whether it belongs in front of pilots at all is a separate call
+              (flagged 2026-07-14, D33). */}
+          <div className="flex justify-center mt-2 lg:mt-0 max-w-sm mx-auto">
+            <Button
+              size="lg"
+              variant="secondary"
+              className="gap-3 px-8 py-6 text-base w-full"
               onClick={() => setShowDevSpec(!showDevSpec)}
             >
-              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
-              <FileText className="w-5 h-5 relative z-10" />
-              <span className="relative z-10">Developer Readme & Spec</span>
+              <FileText className="w-5 h-5" />
+              <span>Developer Readme &amp; Spec</span>
             </Button>
           </div>
 
@@ -953,7 +957,7 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
                                         <p className="text-sm text-muted-foreground italic">No historical notes found.</p>
                                       )}
                                       {pilot.notes.map(note => (
-                                        <div key={note.id} className={`p-3 rounded-lg border text-sm ${note.isUrgent ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20 shadow-sm shadow-red-500/5' : 'border-border bg-card'}`}>
+                                        <div key={note.id} className={`p-3 rounded-lg border text-sm ${note.isUrgent ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20 shadow-sm' : 'border-border bg-card'}`}>
                                           <div className="flex items-start justify-between gap-2">
                                             <div className="flex-1">
                                               {note.isUrgent && (
@@ -1166,7 +1170,7 @@ export default function PilotCurrency({ userRole, pilotId }: PilotCurrencyProps)
                                       )}
                                       {/* Mapping logic similar to pilots */}
                                       {fa.notes.map(note => (
-                                        <div key={note.id} className={`p-3 rounded-lg border text-sm ${note.isUrgent ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20 shadow-sm shadow-red-500/5' : 'border-border bg-card'}`}>
+                                        <div key={note.id} className={`p-3 rounded-lg border text-sm ${note.isUrgent ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20 shadow-sm' : 'border-border bg-card'}`}>
                                           <div className="flex items-start justify-between gap-2">
                                             <div className="flex-1">
                                               {note.isUrgent && (

@@ -103,7 +103,7 @@ function TapTile({
     >
       {/* Usage badge */}
       {usage > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1 shadow-lg shadow-blue-500/30 z-10">
+        <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1 shadow-lg z-10">
           {usage}
         </span>
       )}
