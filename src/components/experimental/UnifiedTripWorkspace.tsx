@@ -545,7 +545,7 @@ export default function UnifiedTripWorkspace() {
         <OctagonAlert className="h-4 w-4 text-white" />
       </div>
     ) : isInWork ? (
-      <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center shadow-md shadow-blue-200 flex-shrink-0">
+      <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center shadow-md flex-shrink-0">
         <Loader2 className="h-4 w-4 text-white animate-spin" />
       </div>
     ) : (
@@ -1225,7 +1225,7 @@ export default function UnifiedTripWorkspace() {
                 };
 
                 return showAction && urgentItem && (
-                   <div className="mb-6 p-6 bg-amber-50 border-2 border-amber-400 rounded-[2rem] shadow-lg shadow-amber-500/10 transition-colors">
+                   <div className="mb-6 p-6 bg-amber-50 border-2 border-amber-400 rounded-[2rem] shadow-lg transition-colors">
                       <div className="flex items-center gap-3 mb-2">
                          <span className="flex h-3 w-3 relative">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>

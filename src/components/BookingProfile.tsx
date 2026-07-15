@@ -890,7 +890,7 @@ export default function BookingProfile() {
             return (
               <Card
                 key={trip.id}
-                className="relative cursor-pointer hover:shadow-lg hover:shadow-blue-100 transition-all transform hover:scale-[1.02] border-l-4 border-l-transparent hover:border-l-blue-500"
+                className="relative cursor-pointer hover:shadow-lg transition-all transform hover:scale-[1.02] border-l-4 border-l-transparent hover:border-l-blue-500"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleTripClick(trip);

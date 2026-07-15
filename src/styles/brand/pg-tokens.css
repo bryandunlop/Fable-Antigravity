@@ -1,0 +1,93 @@
+/* ============================================================
+   P&G Corporate VIS ID — token block ONLY
+   Extracted verbatim from ./colors_and_type.css (2026 VIS ID).
+
+   Why this file exists: colors_and_type.css is the brand
+   reference document. Its 18 @font-face rules point at
+   ./fonts/*.ttf — a directory that does not exist — and declare
+   weights (Thin, ExtraLight, ExtraBold, Black, + italics) that
+   this app does not ship. Importing that file would 404 on every
+   face. The app loads its own 5 Montserrat weights from
+   /fonts/montserrat/ in index.css.
+
+   So: the tokens live here and ARE imported; colors_and_type.css
+   stays as the untouched archive of the brand doc (palette +
+   type spec + logo geometry, in prose). If the VIS ID is
+   reissued, re-extract this block from it — do not hand-edit.
+   ============================================================ */
+
+:root {
+  /* ---- Primary Palette ---------------------------------- */
+  --pg-blue:           #003DA5;   /* PMS 293 C — corporate blue */
+  --pg-cyan:           #00A3E0;   /* PMS 299 C — secondary blue */
+  --pg-yellow:         #FEDB00;   /* PMS 108 C — optimism / energy */
+  --pg-white:          #FFFFFF;
+  --pg-black:          #000000;
+
+  /* ---- Secondary Palette -------------------------------- */
+  --pg-navy:           #012169;   /* PMS 280 C */
+  --pg-magenta:        #AF1685;   /* PMS 241 C — also Recruiting */
+  --pg-pink:           #F277C6;   /* PMS 231 C */
+  --pg-light-blue:     #9ADBE8;   /* PMS 304 C — Citizenship accent */
+  --pg-red:            #EF3340;   /* PMS 032 C */
+  --pg-orange:         #E87722;   /* PMS 158 C */
+  --pg-amber:          #F1B434;   /* PMS 143 C */
+  --pg-green:          #00B140;   /* PMS 354 C */
+  --pg-lime:           #97D700;   /* PMS 375 C */
+
+  /* ---- Semantic Colors ---------------------------------- *
+   * Corporate text rule: PMS 293, black, and white only for
+   * type. Body copy is BLACK or WHITE only. Headlines may add
+   * PMS 293. Secondary palette is NEVER used as a background
+   * or type color in master corporate work.                 */
+  --pg-bg:             var(--pg-white);
+  --pg-bg-brand:       var(--pg-blue);
+  --pg-bg-accent:      var(--pg-yellow);
+  --pg-bg-cyan:        var(--pg-cyan);
+
+  --pg-fg:             var(--pg-black);          /* body on light */
+  --pg-fg-on-brand:    var(--pg-white);          /* body on PMS293 */
+  --pg-fg-muted:       #4A4A4A;                  /* secondary copy */
+  --pg-fg-accent:      var(--pg-blue);           /* link / headline accent */
+
+  --pg-rule:           #E5E7EB;                  /* hairline divider on white */
+  --pg-rule-on-brand:  rgba(255,255,255,0.18);   /* divider on PMS293 */
+
+  /* ---- Geometry & Spacing ------------------------------- */
+  --pg-radius-pill:    9999px;
+  --pg-radius-card:    0;          /* P&G prefers crisp rectangles & circles, not rounded cards */
+  --pg-radius-circle:  50%;
+
+  --pg-space-1:        4px;
+  --pg-space-2:        8px;
+  --pg-space-3:        12px;
+  --pg-space-4:        16px;
+  --pg-space-5:        24px;
+  --pg-space-6:        32px;
+  --pg-space-8:        48px;
+  --pg-space-10:       64px;
+  --pg-space-12:       96px;
+
+  --pg-x:              24px;       /* P&G logo unit — clear space is .5x each side */
+
+  /* ---- Elevation ----------------------------------------
+   * P&G corporate work is FLAT — shadows are not part of the
+   * system. Tokens here exist for internal-tool UI (dashboards)
+   * only and should not be used on marketing / slide work.
+   * myGFO is that internal tool, so it consumes these.       */
+  --pg-shadow-flat:    0 1px 0 rgba(0, 61, 165, 0.06);
+  --pg-shadow-soft:    0 4px 12px rgba(0, 61, 165, 0.08);
+  --pg-shadow-strong:  0 12px 32px rgba(0, 61, 165, 0.14);
+
+  /* ---- Type ---------------------------------------------- */
+  --pg-font:           'Montserrat', Arial, system-ui, sans-serif;
+  --pg-font-display:   'Montserrat', Arial, sans-serif;
+
+  --pg-fs-display:     72px;       /* hero headline (1920 canvas) */
+  --pg-fs-h1:          48px;
+  --pg-fs-h2:          36px;
+  --pg-fs-h3:          24px;
+  --pg-fs-subhead:     20px;
+  --pg-fs-title:       14px;       /* ALL CAPS eyebrow */
+  --pg-fs-body:        16px;
+}

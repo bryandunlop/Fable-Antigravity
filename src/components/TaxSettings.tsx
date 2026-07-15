@@ -89,7 +89,7 @@ export default function TaxSettings() {
 
             <PassengerProfileManager />
 
-            <Card className="glass-panel border-blue-500/20 shadow-blue-500/5">
+            <Card className="glass-panel border-blue-500/20">
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <div>
