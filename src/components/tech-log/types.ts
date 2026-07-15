@@ -364,8 +364,9 @@ export interface TripLeg {
   departureTimeUtc: string;
   arrivalTimeUtc: string;
   fratStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-  fratScore?: number;               // cumulative FRAT points; >= 25 is a no-go
+  fratScore?: number;               // the LATEST assessment's score; >= 25 is a no-go
   fratDraft?: FratDraft;            // saved-but-unsubmitted FRAT answers (mutable orchestration, not a signed record)
+  fratRecords?: FratRecord[];       // submitted assessments, append-only per leg — latest is current
   airportReviewed: boolean;         // origin + destination airport info acknowledged
   fuelRequestId?: string;           // set when a home-base fuel-farm submission exists
   plannedFuelLb?: number;
@@ -380,6 +381,48 @@ export interface FratDraft {
   selections: boolean[][];
   mitigationNotes?: string;
   savedAtUtc: string;
+}
+
+/**
+ * One FRAT item exactly as the pilot saw it, frozen at submission.
+ *
+ * Deliberately NOT an index into the live template. The FRAT template is editable in the
+ * builder, so `selections[3][1]` means a later template edit silently changes what a
+ * historical record says. Same discipline as `governingMmelRevision` on a deferral:
+ * snapshot the meaningful value, never resolve it by live reference. (Bryan, 2026-07-14)
+ */
+export interface FratRecordItem {
+  id: string;
+  label: string;
+  score: number;
+  selected: boolean;
+}
+
+/** Title only — the template's `icon` is a React component reference, not a record. */
+export interface FratRecordSection {
+  title: string;
+  items: FratRecordItem[];
+}
+
+/**
+ * What a submitted FRAT retains. Before this existed, completion kept `fratScore` and
+ * nothing else — `completeFratOnLeg` actively wiped `fratDraft`, erasing the ticked items
+ * and the mitigation plan the form hard-requires at 20-24. The pilot was compelled to
+ * write a plan that was then discarded at the moment of submission. (TL-17)
+ *
+ * Lives on the leg (mutable orchestration) — a FRAT is not one of CLAUDE.md's signed
+ * append-only ledger records. But it is append-per-leg by intent: a resubmission adds an
+ * entry and never replaces an earlier one, so "22 at 0600, 14 once the weather cleared"
+ * stays answerable.
+ */
+export interface FratRecord {
+  score: number;
+  sections: FratRecordSection[];
+  /** Mandatory at 20-24 per StandaloneFRATForm's submit gate. */
+  mitigationNotes?: string;
+  additionalNotes?: string;
+  submittedAtUtc: string;
+  submittedByOid: string;
 }
 
 export interface Trip {

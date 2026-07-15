@@ -114,3 +114,100 @@ describe('markFuelFinalOnLeg', () => {
     expect(patched.fuelFinalizedAtUtc).toBe('2026-07-10T18:00:00.000Z');
   });
 });
+
+describe('completeFratOnLeg — the submitted record (Bryan, 2026-07-14)', () => {
+  // Previously a COMPLETED FRAT retained fratStatus + fratScore and NOTHING else — the
+  // submit actively wiped fratDraft, so the ticked items and the mitigation plan the form
+  // hard-requires at 20-24 were erased at the moment of submission.
+  const assessment = [
+    {
+      title: 'Flight/Duty',
+      items: [
+        { id: 'fd3', label: 'First leg today', score: 1, selected: true },
+        { id: 'fd4', label: '2nd leg today', score: 2, selected: true },
+        { id: 'fd8', label: 'Flight during Window of Circadian Low (WOCL)', score: 3, selected: false },
+      ],
+    },
+  ];
+
+  const complete = (over: Record<string, unknown> = {}) => {
+    const { dispatch, actions } = collect();
+    completeFratOnLeg({
+      dispatch, newId: (p) => `${p}-1`, trip, leg, actorOid: 'oid-pic',
+      totalScore: 3, assessment, mitigationNotes: 'Second-in-command to fly the approach.',
+      additionalNotes: 'Ramp construction at KTEB.', nowUtc: '2026-07-10T12:00:00.000Z',
+      ...over,
+    });
+    const edit = actions.find((a) => a.type === 'EDIT_TRIP') as Extract<TechLogAction, { type: 'EDIT_TRIP' }>;
+    return edit.payload.legs!.find((l) => l.id === 'leg-1')!;
+  };
+
+  it('keeps the mitigation plan the form forced the pilot to write', () => {
+    expect(complete().fratRecords![0].mitigationNotes).toBe('Second-in-command to fly the approach.');
+  });
+
+  it('keeps the additional notes', () => {
+    expect(complete().fratRecords![0].additionalNotes).toBe('Ramp construction at KTEB.');
+  });
+
+  it('freezes each item as the pilot saw it — label and score, not an index', () => {
+    // The FRAT template is editable in the builder. Storing selections[3][1] means a later
+    // template edit silently changes what a historical record says. Same rule as the
+    // point-in-time MEL revision: snapshot the value, never resolve it live.
+    const items = complete().fratRecords![0].sections[0].items;
+    expect(items).toContainEqual({ id: 'fd4', label: '2nd leg today', score: 2, selected: true });
+  });
+
+  it('records unticked items too, so "not selected" is distinguishable from "not asked"', () => {
+    const wocl = complete().fratRecords![0].sections[0].items.find((i) => i.id === 'fd8');
+    expect(wocl!.selected).toBe(false);
+  });
+
+  it('does not carry the template icon into the record', () => {
+    const withIcon = [{ title: 'Flight/Duty', icon: () => null, items: assessment[0].items }];
+    const section = complete({ assessment: withIcon }).fratRecords![0].sections[0];
+    expect(section).not.toHaveProperty('icon');
+  });
+
+  it('stamps who submitted it and when', () => {
+    const rec = complete().fratRecords![0];
+    expect(rec.submittedByOid).toBe('oid-pic');
+    expect(rec.submittedAtUtc).toBe('2026-07-10T12:00:00.000Z');
+    expect(rec.score).toBe(3);
+  });
+
+  it('APPENDS on resubmission rather than replacing — both assessments stay readable', () => {
+    const { dispatch, actions } = collect();
+    const already: TripLeg = {
+      ...leg,
+      fratStatus: 'COMPLETED',
+      fratScore: 22,
+      fratRecords: [{
+        score: 22, sections: [], mitigationNotes: 'Original plan.',
+        submittedAtUtc: '2026-07-10T06:00:00.000Z', submittedByOid: 'oid-pic',
+      }],
+    };
+    completeFratOnLeg({
+      dispatch, newId: (p) => `${p}-2`, trip, leg: already, actorOid: 'oid-pic',
+      totalScore: 14, assessment, mitigationNotes: 'Weather cleared.',
+      nowUtc: '2026-07-10T12:00:00.000Z',
+    });
+    const edit = actions.find((a) => a.type === 'EDIT_TRIP') as Extract<TechLogAction, { type: 'EDIT_TRIP' }>;
+    const patched = edit.payload.legs!.find((l) => l.id === 'leg-1')!;
+    expect(patched.fratRecords).toHaveLength(2);
+    expect(patched.fratRecords![0].score).toBe(22);
+    expect(patched.fratRecords![1].score).toBe(14);
+    // fratScore tracks the latest assessment
+    expect(patched.fratScore).toBe(14);
+  });
+
+  it('still works when the caller supplies no assessment (older call sites)', () => {
+    const { dispatch, actions } = collect();
+    completeFratOnLeg({ dispatch, newId: (p) => `${p}-1`, trip, leg, actorOid: 'oid-pic', totalScore: 12 });
+    const edit = actions.find((a) => a.type === 'EDIT_TRIP') as Extract<TechLogAction, { type: 'EDIT_TRIP' }>;
+    const patched = edit.payload.legs!.find((l) => l.id === 'leg-1')!;
+    expect(patched.fratStatus).toBe('COMPLETED');
+    expect(patched.fratScore).toBe(12);
+    expect(patched.fratRecords ?? []).toHaveLength(0);
+  });
+});
