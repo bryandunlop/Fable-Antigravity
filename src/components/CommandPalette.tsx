@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Search, FileText, Clock, Package, Plane, ClipboardCheck, Send } from 'lucide-react';
+import { Search, FileText, Clock, Package, Plane, ClipboardCheck, Send, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { entriesForRoles, DOMAIN_LABELS } from '../navigation/navConfig';
 import type { NavEntry } from '../navigation/navConfig';
 import type { LucideIcon } from 'lucide-react';
 import { api } from './inventory-v2/api-client';
+import { useQuickLinks, searchLinks } from '../utils/quickLinks';
 
-type Section = 'recent' | 'pages' | 'inventory';
+type Section = 'recent' | 'pages' | 'links' | 'inventory';
 
 interface PaletteResult {
   id: string;
@@ -19,6 +20,7 @@ interface PaletteResult {
   category: string;
   icon: LucideIcon;
   section: Section;
+  external?: boolean;
 }
 
 interface CommandPaletteProps {
@@ -31,6 +33,7 @@ interface CommandPaletteProps {
 const SECTION_HEADINGS: Record<Section, string> = {
   recent: 'Recent',
   pages: 'Pages',
+  links: 'Links',
   inventory: 'Inventory',
 };
 
@@ -86,6 +89,7 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [inventory, setInventory] = useState<InventoryData | null>(null);
   const navigate = useNavigate();
+  const { org, personal } = useQuickLinks();
 
   const hasInventoryAccess =
     INVENTORY_ROLES.includes(userRole) || additionalRoles.some(r => INVENTORY_ROLES.includes(r));
@@ -174,10 +178,37 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
       }));
   }
 
-  const filteredResults: PaletteResult[] = [...recentResults, ...pageResults, ...inventoryResults];
+  // External quick links (shared store with the dashboard card). A short list
+  // when browsing; more room when the user is actually searching.
+  const linkResults: PaletteResult[] = searchLinks([...org, ...personal], searchTerm)
+    .slice(0, searchTerm ? 6 : 4)
+    .map(l => {
+      let host = l.url;
+      try {
+        host = new URL(l.url).hostname;
+      } catch {
+        // unparseable stored url — show it raw
+      }
+      return {
+        id: `link-${l.id}`,
+        title: l.name,
+        description: host,
+        href: l.url,
+        category: l.scope === 'org' ? 'Org link' : 'Personal',
+        icon: ExternalLink,
+        section: 'links' as const,
+        external: true,
+      };
+    });
 
-  const handleSelect = (href: string) => {
-    navigate(href);
+  const filteredResults: PaletteResult[] = [...recentResults, ...pageResults, ...linkResults, ...inventoryResults];
+
+  const handleSelect = (result: PaletteResult) => {
+    if (result.external) {
+      window.open(result.href, '_blank', 'noopener,noreferrer');
+    } else {
+      navigate(result.href);
+    }
     onClose();
     setQuery('');
   };
@@ -194,7 +225,7 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (filteredResults.length > 0 && filteredResults[selectedIndex]) {
-        handleSelect(filteredResults[selectedIndex].href);
+        handleSelect(filteredResults[selectedIndex]);
       }
     }
   };
@@ -217,14 +248,14 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
           Global Search
         </DialogTitle>
         <DialogDescription id="command-palette-description" className="sr-only">
-          Search pages and inventory records. Use arrow keys to navigate and Enter to select.
+          Search pages, inventory records, and quick links. Use arrow keys to navigate and Enter to select.
         </DialogDescription>
 
         <div className="border-b">
           <div className="flex items-center px-4 py-3">
             <Search className="w-4 h-4 text-muted-foreground mr-3" />
             <Input
-              placeholder="Search pages, items, trips, inspections..."
+              placeholder="Search pages, links, items, trips..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -254,7 +285,7 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
                     <div
                       className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${index === selectedIndex ? 'bg-accent' : 'hover:bg-accent/50'
                         }`}
-                      onClick={() => handleSelect(result.href)}
+                      onClick={() => handleSelect(result)}
                     >
                       <div className="p-2 bg-primary/10 rounded-lg">
                         <Icon className="w-4 h-4 text-primary" />
