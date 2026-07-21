@@ -5,55 +5,137 @@ import DailyFlightsWidget from './DailyFlightsWidget';
 import DutyRosterWidget from './DutyRosterWidget';
 import WeatherWidget from './WeatherWidget';
 import { HOME_STATION } from '../config/station';
-import { ExternalLink, Edit2, Plus, Trash2, X, Check } from 'lucide-react';
+import { ExternalLink, Edit2, Plus, Trash2, X, Check, User, Building2 } from 'lucide-react';
 import { useState } from 'react';
 import { GfoPageHeader } from './gfo';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { FirLeadershipChip } from './fir/components/FirLeadershipChip';
+import {
+  useQuickLinks,
+  saveOrgLinks,
+  savePersonalLinks,
+  normalizeUrl,
+  newLinkId,
+  type QuickLink,
+} from '../utils/quickLinks';
 
-const DEFAULT_LINKS = [
-  { id: '1', name: 'FltPlan.com', url: 'https://www.fltplan.com/' },
-  { id: '2', name: 'ForeFlight', url: 'https://plan.foreflight.com/' },
-  { id: '3', name: 'ARINCDirect', url: 'https://www.arincdirect.com/' },
-  { id: '4', name: 'FAA NOTAMs', url: 'https://notams.aim.faa.gov/notamSearch/' },
-  { id: '5', name: 'Aviation Weather', url: 'https://aviationweather.gov/' }
-];
+const DRAFT_ID = '__draft__';
 
 interface DashboardProps {
   userRole: string;
 }
 export default function Dashboard({ userRole }: DashboardProps) {
-  const [links, setLinks] = useState(DEFAULT_LINKS);
+  const { org, personal } = useQuickLinks();
   const [isEditingLinks, setIsEditingLinks] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editUrl, setEditUrl] = useState('');
+  const [editScope, setEditScope] = useState<QuickLink['scope']>('personal');
+  const [nameInvalid, setNameInvalid] = useState(false);
+  const [urlInvalid, setUrlInvalid] = useState(false);
 
   const isAdmin = userRole === 'admin';
+  const allLinks = [...org, ...personal];
+  // Admin manages org links; everyone manages their own personal links.
+  const canManage = (link: QuickLink) => isAdmin || link.scope === 'personal';
 
-  const handleAddNewLink = () => {
-    const newId = Math.random().toString(36).substr(2, 9);
-    setLinks([...links, { id: newId, name: 'New Link', url: 'https://' }]);
-    startEditing(newId, 'New Link', 'https://');
+  const closeEdit = () => {
+    setEditingId(null);
+    setNameInvalid(false);
+    setUrlInvalid(false);
   };
 
-  const startEditing = (id: string, name: string, url: string) => {
-    setEditingId(id);
-    setEditName(name);
-    setEditUrl(url);
+  const handleAddNewLink = () => {
+    setEditName('');
+    setEditUrl('');
+    setEditScope(isAdmin ? 'org' : 'personal');
+    setNameInvalid(false);
+    setUrlInvalid(false);
+    setEditingId(DRAFT_ID);
+  };
+
+  const startEditing = (link: QuickLink) => {
+    setEditName(link.name);
+    setEditUrl(link.url);
+    setEditScope(link.scope);
+    setNameInvalid(false);
+    setUrlInvalid(false);
+    setEditingId(link.id);
   };
 
   const saveEdit = () => {
     if (!editingId) return;
-    setLinks(links.map(l => l.id === editingId ? { ...l, name: editName, url: editUrl } : l));
-    setEditingId(null);
+    const name = editName.trim();
+    const url = normalizeUrl(editUrl);
+    setNameInvalid(!name);
+    setUrlInvalid(!url);
+    if (!name || !url) return;
+    const scope = isAdmin ? editScope : 'personal';
+    if (editingId === DRAFT_ID) {
+      const link: QuickLink = { id: newLinkId(), name, url, scope };
+      if (scope === 'org') saveOrgLinks([...org, link]);
+      else savePersonalLinks([...personal, link]);
+    } else {
+      const original = allLinks.find(l => l.id === editingId);
+      if (!original || !canManage(original)) return;
+      const updated: QuickLink = { ...original, name, url, scope };
+      if (original.scope === scope) {
+        if (scope === 'org') saveOrgLinks(org.map(l => (l.id === editingId ? updated : l)));
+        else savePersonalLinks(personal.map(l => (l.id === editingId ? updated : l)));
+      } else if (scope === 'org') {
+        savePersonalLinks(personal.filter(l => l.id !== editingId));
+        saveOrgLinks([...org, updated]);
+      } else {
+        saveOrgLinks(org.filter(l => l.id !== editingId));
+        savePersonalLinks([...personal, updated]);
+      }
+    }
+    closeEdit();
   };
 
-  const deleteLink = (id: string) => {
-    setLinks(links.filter(l => l.id !== id));
-    if (editingId === id) setEditingId(null);
+  const deleteLink = (link: QuickLink) => {
+    if (!canManage(link)) return;
+    if (link.scope === 'org') saveOrgLinks(org.filter(l => l.id !== link.id));
+    else savePersonalLinks(personal.filter(l => l.id !== link.id));
+    if (editingId === link.id) closeEdit();
   };
+
+  const editRow = (
+    <div className="flex items-center gap-1 bg-muted border border-border rounded-lg p-1 z-10 shadow-lg">
+      <Input
+        value={editName}
+        onChange={(e) => setEditName(e.target.value)}
+        placeholder="Name"
+        aria-invalid={nameInvalid}
+        className={`h-7 w-24 text-xs bg-transparent border-none px-2 ${nameInvalid ? 'ring-1 ring-destructive focus-visible:ring-1 focus-visible:ring-destructive' : 'focus-visible:ring-1 focus-visible:ring-ring'}`}
+      />
+      <Input
+        value={editUrl}
+        onChange={(e) => setEditUrl(e.target.value)}
+        placeholder="URL"
+        aria-invalid={urlInvalid}
+        className={`h-7 w-40 text-xs bg-transparent border-none px-2 ${urlInvalid ? 'ring-1 ring-destructive focus-visible:ring-1 focus-visible:ring-destructive' : 'focus-visible:ring-1 focus-visible:ring-ring'}`}
+      />
+      {isAdmin && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
+          title={editScope === 'org' ? 'Org link — everyone sees it. Click to make personal.' : 'Personal link — only this browser. Click to make org.'}
+          onClick={() => setEditScope(editScope === 'org' ? 'personal' : 'org')}
+        >
+          {editScope === 'org' ? <Building2 className="w-3 h-3" /> : <User className="w-3 h-3" />}
+        </Button>
+      )}
+      <Button size="icon" variant="ghost" className="h-6 w-6 text-gfo-success hover:text-gfo-success hover:bg-muted" onClick={saveEdit}>
+        <Check className="w-3 h-3" />
+      </Button>
+      <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={closeEdit}>
+        <X className="w-3 h-3" />
+      </Button>
+    </div>
+  );
 
   // Helper to get current greeting
   const getCurrentGreeting = () => {
@@ -87,64 +169,49 @@ export default function Dashboard({ userRole }: DashboardProps) {
             <ExternalLink className="w-4 h-4" />
             <span className="text-sm font-semibold tracking-wide uppercase">Quick Links</span>
           </div>
-          {isAdmin && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsEditingLinks(!isEditingLinks)}
-              className={`h-7 px-2 text-xs transition-colors ${isEditingLinks ? 'bg-primary/20 text-primary hover:bg-primary/30' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              {isEditingLinks ? 'Done' : <span className="flex items-center gap-1"><Edit2 className="w-3 h-3" /> Edit</span>}
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (isEditingLinks) closeEdit();
+              setIsEditingLinks(!isEditingLinks);
+            }}
+            className={`h-7 px-2 text-xs transition-colors ${isEditingLinks ? 'bg-primary/20 text-primary hover:bg-primary/30' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            {isEditingLinks ? 'Done' : <span className="flex items-center gap-1"><Edit2 className="w-3 h-3" /> Edit</span>}
+          </Button>
         </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto scroolbar-hide flex-1 pb-1 md:pb-0">
-          {links.map(link => (
+        <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide flex-1 pb-1 md:pb-0">
+          {allLinks.map(link => (
             <div key={link.id} className="relative shrink-0 group flex items-center">
               {editingId === link.id ? (
-                <div className="flex items-center gap-1 bg-muted border border-border rounded-lg p-1 z-10 shadow-lg">
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Name"
-                    className="h-7 w-24 text-xs bg-transparent border-none focus-visible:ring-1 focus-visible:ring-ring px-2"
-                  />
-                  <Input
-                    value={editUrl}
-                    onChange={(e) => setEditUrl(e.target.value)}
-                    placeholder="URL"
-                    className="h-7 w-40 text-xs bg-transparent border-none focus-visible:ring-1 focus-visible:ring-ring px-2"
-                  />
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-gfo-success hover:text-gfo-success hover:bg-muted" onClick={saveEdit}>
-                    <Check className="w-3 h-3" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => setEditingId(null)}>
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
+                editRow
               ) : (
                 <div className="flex items-center">
                   <a
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`text-sm px-4 py-2 rounded-lg bg-muted border border-border hover:bg-secondary hover:border-primary/30 text-foreground transition-all flex items-center gap-2 ${isEditingLinks ? 'rounded-r-none border-r-0' : ''}`}
+                    className={`text-sm px-4 py-2 rounded-lg bg-muted border border-border hover:bg-secondary hover:border-primary/30 text-foreground transition-all flex items-center gap-2 ${isEditingLinks && canManage(link) ? 'rounded-r-none border-r-0' : ''}`}
                     onClick={(e) => isEditingLinks && e.preventDefault()}
                   >
                     {link.name}
+                    {link.scope === 'personal' && (
+                      <User className="w-3 h-3 text-muted-foreground opacity-60" aria-label="Personal link" />
+                    )}
                     {!isEditingLinks && <ExternalLink className="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors opacity-50 group-hover:opacity-100" />}
                   </a>
-                  {isEditingLinks && (
+                  {isEditingLinks && canManage(link) && (
                     <div className="flex items-center h-full border border-border border-l-0 rounded-r-lg bg-muted overflow-hidden">
                       <button
-                        onClick={() => startEditing(link.id, link.name, link.url)}
+                        onClick={() => startEditing(link)}
                         className="px-2 h-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors border-r border-border"
                       >
                         <Edit2 className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={() => deleteLink(link.id)}
+                        onClick={() => deleteLink(link)}
                         className="px-2 h-full hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition-colors"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -155,7 +222,10 @@ export default function Dashboard({ userRole }: DashboardProps) {
               )}
             </div>
           ))}
-          {isEditingLinks && (
+          {isEditingLinks && editingId === DRAFT_ID && (
+            <div className="relative shrink-0 flex items-center">{editRow}</div>
+          )}
+          {isEditingLinks && editingId !== DRAFT_ID && (
             <Button
               variant="outline"
               size="sm"
