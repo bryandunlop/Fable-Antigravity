@@ -112,8 +112,8 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
 
   // Values arrive keyed by the template's field ids. Well-known ids map onto
   // real store columns (KNOWN_IDS); anything the safety manager added to the
-  // template is appended to the description via describeWithExtras, so no
-  // answer is dropped just because the store lacks a column for it.
+  // template is appended to the description via describeWithExtras. Holds for
+  // hazard/asap/cws; the waiver branch still has no store and only notifies.
   function handleFiled(kind: Kind, values: Record<string, string>) {
     const template = templateForKind(getFormTemplates(), kind);
     const withExtras = (base: string) => (template ? describeWithExtras(template, values, kind, base) : base);

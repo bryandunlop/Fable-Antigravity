@@ -12,14 +12,17 @@ export function FormManager() {
   // back to the persisted store the crew Report dialog renders from.
   const [templates, setTemplates] = useState<FormTemplate[]>(() => getFormTemplates().map((t) => ({ ...t, fields: t.fields.map((f) => ({ ...f })) })));
   const [selectedId, setSelectedId] = useState<string>(templates[0]?.id ?? '');
-  const [dirty, setDirty] = useState(false);
+  // Dirty is tracked PER template — a shared flag would let "Save changes" on
+  // template B silently strand template A's unsaved draft.
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [savedFlash, setSavedFlash] = useState(false);
 
   const selected = templates.find((t) => t.id === selectedId)!;
+  const dirty = dirtyIds.has(selectedId);
 
   function mutate(fn: (t: FormTemplate) => FormTemplate) {
     setTemplates((prev) => prev.map((t) => (t.id === selectedId ? fn(t) : t)));
-    setDirty(true);
+    setDirtyIds((prev) => new Set(prev).add(selectedId));
   }
   function updateField(id: string, patch: Partial<FormField>) {
     mutate((t) => ({
@@ -50,8 +53,12 @@ export function FormManager() {
     mutate((t) => ({ ...t, fields: [...t.fields, { id: `f${Date.now()}`, label: 'New field', type: 'text', required: false }] }));
   }
   function save() {
-    saveFormTemplate(selected);
-    setDirty(false);
+    // The store sanitizes (a choice field never persists with zero options);
+    // mirror the cleaned version back into the draft so the editor shows
+    // exactly what was saved.
+    const clean = saveFormTemplate(selected);
+    setTemplates((prev) => prev.map((t) => (t.id === clean.id ? clean : t)));
+    setDirtyIds((prev) => { const n = new Set(prev); n.delete(selectedId); return n; });
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1800);
   }
@@ -66,7 +73,8 @@ export function FormManager() {
             className={`text-left rounded-[10px] px-3 py-2.5 border transition-colors ${t.id === selectedId ? 'bg-accent/10 border-accent' : 'bg-card border-border hover:border-muted-foreground/40'}`}>
             <div className="flex items-center gap-2">
               <span className={`text-[14px] font-medium ${t.id === selectedId ? 'text-accent' : 'text-foreground'}`}>{t.name}</span>
-              {t.scored && <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 ml-auto">scored</span>}
+              {dirtyIds.has(t.id) && <span className="text-[9px] font-bold uppercase tracking-wide text-[color:var(--gfo-warning)] ml-auto">unsaved</span>}
+              {t.scored && !dirtyIds.has(t.id) && <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 ml-auto">scored</span>}
             </div>
             <div className="text-[11.5px] text-muted-foreground mt-0.5">{t.fields.length} fields</div>
           </button>

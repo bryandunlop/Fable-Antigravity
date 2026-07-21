@@ -8,8 +8,9 @@
 // Well-known field ids (the KNOWN_IDS maps below) are the contract between a
 // template and the typed stores (HazardContext, asapReports, cwsRecognitions):
 // those ids map onto real store columns; any OTHER field the manager adds is
-// preserved as "Label: value" lines appended to the record's description, so
-// nothing a template asks for is ever dropped.
+// preserved as "Label: value" lines appended to the record's description.
+// That no-answer-dropped guarantee holds for hazard/asap/cws — NOT waiver,
+// which still has no store (filing a waiver only raises a notification).
 
 import { useEffect, useReducer } from 'react';
 import type { FormField, FormTemplate } from './types';
@@ -118,9 +119,26 @@ function persist(templates: FormTemplate[]) {
 
 export function getFormTemplates(): FormTemplate[] { return load(); }
 
-export function saveFormTemplate(t: FormTemplate) {
-  persist(load().map((x) => (x.id === t.id ? t : x)));
+const OPTION_FIELD_TYPES = ['select', 'radio', 'multiselect'];
+
+/** A choice field saved with zero options would make a required field
+ *  unsatisfiable and the whole form unsubmittable — restore defaults. */
+export function sanitizeTemplate(t: FormTemplate): FormTemplate {
+  return {
+    ...t,
+    fields: t.fields.map((f) =>
+      OPTION_FIELD_TYPES.includes(f.type) && !f.options?.length
+        ? { ...f, options: ['Option 1', 'Option 2'] }
+        : f,
+    ),
+  };
+}
+
+export function saveFormTemplate(t: FormTemplate): FormTemplate {
+  const clean = sanitizeTemplate(t);
+  persist(load().map((x) => (x.id === clean.id ? clean : x)));
   emit();
+  return clean;
 }
 
 export function useFormTemplates() {

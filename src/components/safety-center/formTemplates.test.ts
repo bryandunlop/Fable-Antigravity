@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SEED_TEMPLATES, templateForKind, missingRequired, extraFields, extraLines,
-  describeWithExtras, KNOWN_IDS, MULTI_SEP,
+  describeWithExtras, sanitizeTemplate, KNOWN_IDS, MULTI_SEP,
 } from './formTemplates';
 import type { FormTemplate } from './types';
 
@@ -81,6 +81,27 @@ describe('extras — manager-added fields are never dropped', () => {
 
   it('extraLines joins multiple extras line-per-field', () => {
     expect(extraLines([{ label: 'A', value: '1' }, { label: 'B', value: '2' }])).toBe('A: 1\nB: 2');
+  });
+});
+
+describe('sanitizeTemplate — a choice field never persists with zero options', () => {
+  it('restores default options on an emptied select/radio/multiselect field', () => {
+    const broken: FormTemplate = {
+      ...hazardTpl,
+      fields: [
+        { id: 'a', label: 'Choice', type: 'select', required: true, options: [] },
+        { id: 'b', label: 'Multi', type: 'multiselect', required: false },
+        { id: 'c', label: 'Free text', type: 'text', required: true },
+      ],
+    };
+    const clean = sanitizeTemplate(broken);
+    expect(clean.fields[0].options).toEqual(['Option 1', 'Option 2']);
+    expect(clean.fields[1].options).toEqual(['Option 1', 'Option 2']);
+    expect(clean.fields[2].options).toBeUndefined();
+  });
+
+  it('leaves populated options untouched', () => {
+    expect(sanitizeTemplate(hazardTpl)).toEqual(hazardTpl);
   });
 });
 
