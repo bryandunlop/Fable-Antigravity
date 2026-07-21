@@ -140,7 +140,14 @@ function hazardToWaitingItem(h: Hazard): SafetyItem {
 }
 
 export function buildSafetyModel(hazards: Hazard[], extraMove: SafetyItem[] = []): SafetyModel {
-  const live = (hazards || []).filter((h) => !h.isDeleted);
+  // Dedup by id defensively — the persisted hazard store can carry duplicate
+  // rows after a multi-instance localStorage race (see HazardContext load/merge).
+  const seen = new Set<string>();
+  const live = (hazards || []).filter((h) => {
+    if (h.isDeleted || seen.has(h.id)) return false;
+    seen.add(h.id);
+    return true;
+  });
   const hz = live.map(hazardToItem);
   const hzMove = hz.filter((i) => i.bucket === 'move');
   const hzTrack = hz.filter((i) => i.bucket === 'track');

@@ -22,6 +22,7 @@ import { useDocuments, identityFor } from '../documents/DocumentsContext';
 import { unacknowledgedRequiredReads } from '../documents/engine/acknowledgments';
 import { createAsap } from './asapReports';
 import { createCws } from './cwsRecognitions';
+import { getFormTemplates, templateForKind, describeWithExtras, MULTI_SEP } from './formTemplates';
 import MyFRATSubmissions from '../MyFRATSubmissions';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
 
@@ -109,22 +110,31 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   }
   function openReport(kind: Kind | null = null) { setReportKind(kind); setReportOpen(true); }
 
+  // Values arrive keyed by the template's field ids. Well-known ids map onto
+  // real store columns (KNOWN_IDS); anything the safety manager added to the
+  // template is appended to the description via describeWithExtras, so no
+  // answer is dropped just because the store lacks a column for it.
   function handleFiled(kind: Kind, values: Record<string, string>) {
+    const template = templateForKind(getFormTemplates(), kind);
+    const withExtras = (base: string) => (template ? describeWithExtras(template, values, kind, base) : base);
+
     if (kind === 'hazard') {
       // Persist a real hazard — it lands in the reporter's My reports and the
       // manager's New reports queue; submitHazard itself notifies safety staff.
-      const desc = (values.what || '').trim();
-      const severity = values.risk === 'high' ? 'High' : values.risk === 'low' ? 'Low' : 'Medium';
+      const desc = (values.description || '').trim();
+      const anonymous = values.anonymous === 'true';
       submitHazard({
-        title: desc ? desc.slice(0, 60) : 'Reported hazard',
-        description: desc || '(no description provided)',
-        location: (values.where || '').trim() || 'Unspecified',
-        category: 'Other',
-        severity,
-        reportedBy: 'Capt. Dunlop',
-        immediateActions: '',
-        potentialConsequences: '',
-        isAnonymous: false,
+        title: (values.title || '').trim() || (desc ? desc.slice(0, 60) : 'Reported hazard'),
+        description: withExtras(desc || '(no description provided)'),
+        location: (values.location || '').trim() || 'Unspecified',
+        category: (values.category || '').trim() || 'Other',
+        severity: (values.severity || '').trim() || 'Medium',
+        reportedBy: anonymous ? 'Anonymous' : 'Capt. Dunlop',
+        immediateActions: (values.immediate || '').trim(),
+        potentialConsequences: (values.consequences || '').trim(),
+        suggestedCorrectiveAction: (values.corrective || '').trim() || undefined,
+        riskFactors: values.riskFactors ? values.riskFactors.split(MULTI_SEP) : undefined,
+        isAnonymous: anonymous,
       });
       return;
     }
@@ -133,9 +143,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
       createAsap({
         phase: values.phase || 'Approach',
         airport: (values.airport || '').trim() || '—',
-        description: (values.what || '').trim() || '(no description provided)',
-        contributing: (values.contributing || '').trim(),
-        severity: 'Medium',
+        description: withExtras((values.description || '').trim() || '(no description provided)'),
+        contributing: (values.contributingFactors || '').trim(),
+        severity: (values.severity || '').trim() || 'Medium',
       });
       eventStore.publish({
         id: `asap-file-${Date.now()}`,
@@ -146,7 +156,11 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     }
     if (kind === 'cws') {
       // Persist a recognition — it appears on the Recognitions wall.
-      createCws({ recognized: (values.who || '').trim(), forWhat: (values.forWhat || '').trim(), submittedBy: CURRENT_USER.name });
+      createCws({
+        recognized: (values.who || '').trim(),
+        forWhat: withExtras((values.description || '').trim()),
+        submittedBy: CURRENT_USER.name,
+      });
       eventStore.publish({
         id: `cws-file-${Date.now()}`, severity: 'info',
         title: `Recognition logged: ${(values.who || 'a colleague').trim()}`, detail: 'Caught Working Safely',

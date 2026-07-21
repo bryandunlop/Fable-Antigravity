@@ -89,7 +89,9 @@ export interface FormDef {
 }
 
 // ---- Form templates (SM management) ----
-export type FieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'number' | 'date';
+// 'checkbox' is a single yes/no toggle; 'multiselect' is a check-all-that-apply
+// group (risk factors, event types, contributing factors on the intake forms).
+export type FieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'multiselect' | 'number' | 'date';
 
 export interface FormField {
   id: string;

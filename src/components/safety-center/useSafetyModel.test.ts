@@ -128,6 +128,15 @@ describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
     expect(m.my.done).toHaveLength(1);
   });
 
+  it('dedups duplicate hazard ids from a corrupted persisted store', () => {
+    const m = buildSafetyModel([
+      makeHazard({ id: 'HZ-010', reportedBy: REPORTER }),
+      makeHazard({ id: 'HZ-010', reportedBy: REPORTER }),
+    ]);
+    expect(m.ops.move).toHaveLength(1);
+    expect(m.submissions.filter((s) => s.sourceId === 'HZ-010')).toHaveLength(1);
+  });
+
   it('skips deleted hazards everywhere', () => {
     const m = buildSafetyModel([
       makeHazard({ id: 'H-4', reportedBy: REPORTER, isDeleted: true } as Partial<Hazard>),
