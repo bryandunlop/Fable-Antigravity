@@ -123,7 +123,7 @@ export function ReportDialog({
               <div className="w-14 h-14 rounded-full grid place-items-center mx-auto mb-3.5 sc-green"><Check className="w-7 h-7" /></div>
               <h4 className="text-[17px] font-semibold mb-1.5">Report filed</h4>
               <p className="text-[13.5px] text-muted-foreground leading-relaxed max-w-[340px] mx-auto">
-                Routed to the safety team. Track it under <b className="text-foreground font-medium">Waiting</b> — you'll be notified when it's triaged and when it's closed. No need to chase anyone.
+                Routed to the safety team. Track it under <b className="text-foreground font-medium">My reports</b> — you'll be notified when it's triaged and when it's closed. No need to chase anyone.
               </p>
             </div>
           )}

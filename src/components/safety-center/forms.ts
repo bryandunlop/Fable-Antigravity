@@ -1,17 +1,10 @@
-// Seed data for the four new Safety Center areas: the crew Forms catalog, the SM
-// Form-manager templates, the Submissions archive supplements, and the Published
-// reports library. Hazard-derived records come from HazardContext via useSafetyModel;
-// these fill out the item types the app doesn't yet model as first-class data.
+// Seed data for the Safety Center: the SM Form-manager templates, the
+// Submissions archive history supplements, and the Published reports library.
+// Hazard-derived records come from HazardContext via useSafetyModel; these fill
+// out the item types the app doesn't yet model as first-class data. They are
+// archive/library HISTORY only — never blended into live work lists (D38).
 
-import type { FormDef, FormTemplate, PublishedReport, SafetyItem } from './types';
-
-// ---- Crew Forms catalog (reports only; FRAT/GRAT stay on the trip) ----
-export const FORM_CATALOG: FormDef[] = [
-  { key: 'hazard', name: 'Report a hazard', blurb: 'An unsafe condition — FOD, a broken fixture, a risky procedure.', icon: 'triangle-alert', tone: 'amber', time: '~2 min' },
-  { key: 'asap', name: 'File an ASAP report', blurb: 'A confidential flight safety event — deviation, TCAS RA, unstable approach.', icon: 'plane', tone: 'red', time: '~3 min' },
-  { key: 'cws', name: 'Log a Caught-Working-Safely', blurb: 'Recognize someone who did the right thing.', icon: 'thumbs-up', tone: 'gold', time: '~1 min' },
-  { key: 'waiver', name: 'Request a waiver', blurb: 'Ask for an exception — duty-time extension, a procedure deviation.', icon: 'file-check', tone: 'accent', time: '~2 min' },
-];
+import type { FormTemplate, PublishedReport, SafetyItem } from './types';
 
 // ---- SM Form-manager templates (mirrors the shape in FormFieldManager) ----
 export const FORM_TEMPLATES: FormTemplate[] = [

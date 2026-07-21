@@ -34,7 +34,6 @@ import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
 import VacationRequest from './components/VacationRequest';
 import FuelFarmTracker from './components/FuelFarmTracker';
-import SafetyDashboard from './components/SafetyDashboard';
 import { SafetyCenter } from './components/safety-center';
 import WaiverManagement from './components/WaiverManagement';
 import HazardReporting from './components/HazardReporting';
@@ -42,7 +41,6 @@ import HazardWorkspace from './components/hazard/HazardWorkspace';
 import HazardDetailView from './components/hazard/HazardDetailView';
 import InternalAuditManagement from './components/InternalAuditManagement';
 import { ComplianceDashboard } from './components/documents/pages/ComplianceDashboard';
-import UserSafety from './components/UserSafety';
 import CateringTracker from './components/CateringTracker';
 import CateringOrders from './components/CateringOrders';
 import RestaurantDatabase from './components/RestaurantDatabase';
@@ -333,9 +331,7 @@ export default function App() {
                                 <Route path="/maintenance-dashboard" element={<MaintenanceDashboard />} />
                                 <Route path="/vacation-request" element={<VacationRequest userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/fuel-farm" element={<FuelFarmTracker />} />
-                                <Route path="/user-safety" element={<UserSafety userRole={userRole} />} />
                                 <Route path="/safety" element={<SafetyCenter userRole={userRole} additionalRoles={additionalRoles} />} />
-                                <Route path="/safety/classic" element={<SafetyDashboard userRole={userRole} />} />
                                 <Route path="/safety/waivers" element={<WaiverManagement />} />
                                 <Route path="/safety/hazards" element={<HazardWorkspace userRole={userRole} />} />
                                 <Route path="/safety/hazards/:id" element={<HazardDetailView userRole={userRole} />} />
