@@ -128,6 +128,12 @@ describe('normalizeUrl', () => {
     expect(normalizeUrl('https://example.com/a')).toBe('https://example.com/a');
   });
 
+  it('treats bare host:port as a host, not a scheme', () => {
+    expect(normalizeUrl('localhost:3000')).toBe('https://localhost:3000/');
+    expect(normalizeUrl('grafana.internal:8443')).toBe('https://grafana.internal:8443/');
+    expect(normalizeUrl('http://localhost:5215/aircraft')).toBe('http://localhost:5215/aircraft');
+  });
+
   it('trims whitespace', () => {
     expect(normalizeUrl('  aviationweather.gov  ')).toBe('https://aviationweather.gov/');
   });

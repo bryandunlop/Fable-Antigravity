@@ -75,10 +75,12 @@ export function subscribeQuickLinks(fn: Listener): () => void {
 }
 
 // Only http(s) destinations are allowed; a bare domain gets https:// prepended.
+// Scheme detection requires "://" — a colon alone would misread host:port
+// input ("localhost:3000") as a scheme, and http(s) always uses the // form.
 export function normalizeUrl(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
     const url = new URL(withScheme);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
