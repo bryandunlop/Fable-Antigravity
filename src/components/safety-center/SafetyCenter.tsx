@@ -76,7 +76,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     userRole,
     docsUserId,
   ).length;
-  const auditsDue = auditsForMe(audits).filter((a) => a.status !== 'Complete').length;
+  const myAudits = auditsForMe(audits);
+  const hasAudits = myAudits.length > 0;
+  const auditsDue = myAudits.filter((a) => a.status !== 'Complete').length;
   const openReports = model.my.waiting.length + model.my.move.length;
   const needsYou = model.my.move.length + pendingInitials + auditsDue;
 
@@ -109,8 +111,8 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
 
   function handleFiled(kind: Kind, values: Record<string, string>) {
     if (kind === 'hazard') {
-      // Persist a real hazard — it lands in My reports / Open cases and
-      // submitHazard itself notifies safety staff.
+      // Persist a real hazard — it lands in the reporter's My reports and the
+      // manager's New reports queue; submitHazard itself notifies safety staff.
       const desc = (values.what || '').trim();
       const severity = values.risk === 'high' ? 'High' : values.risk === 'low' ? 'Low' : 'Medium';
       submitHazard({
@@ -240,11 +242,18 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
             ? <div className="text-[14px] text-muted-foreground mb-4 px-0.5">Nothing needs you right now.</div>
             : <div className="text-[14px] text-foreground mb-4 px-0.5 font-medium">{needsYou} {needsYou === 1 ? 'thing needs' : 'things need'} you — the doors below show where.</div>}
 
-          {auditsDue > 0 && (
+          {/* Audits keep a persistent entry point whenever the user has any —
+              due ones get the amber banner, otherwise a quiet row — so audit
+              history stays reachable when nothing is due. */}
+          {hasAudits && (
             <button onClick={() => openDoor('audits')}
-              className="w-full text-left flex items-center gap-3 bg-card border border-[color:var(--gfo-warning)]/50 rounded-[12px] px-4 py-3.5 min-h-[56px] mb-4 cursor-pointer hover:border-[color:var(--gfo-warning)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1">
-              <ClipboardCheck className="w-5 h-5 text-[color:var(--gfo-warning)] shrink-0" />
-              <div className="flex-1 text-[14.5px] text-foreground">Audits assigned to you — <span className="font-semibold">{auditsDue} due</span></div>
+              className={`w-full text-left flex items-center gap-3 bg-card border rounded-[12px] px-4 py-3.5 min-h-[56px] mb-4 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${auditsDue > 0 ? 'border-[color:var(--gfo-warning)]/50 hover:border-[color:var(--gfo-warning)]' : 'border-border hover:border-muted-foreground/40'}`}>
+              <ClipboardCheck className={`w-5 h-5 shrink-0 ${auditsDue > 0 ? 'text-[color:var(--gfo-warning)]' : 'text-muted-foreground'}`} />
+              <div className="flex-1 text-[14.5px] text-foreground">
+                {auditsDue > 0
+                  ? <>Audits assigned to you — <span className="font-semibold">{auditsDue} due</span></>
+                  : <>My audits — <span className="text-muted-foreground">all complete</span></>}
+              </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
             </button>
           )}
