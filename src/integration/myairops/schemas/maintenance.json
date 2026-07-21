@@ -1,0 +1,3967 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "myairops Maintenance API",
+    "version": "v1.0"
+  },
+  "paths": {
+    "/api/Airports/handlingAgents": {
+      "get": {
+        "tags": [
+          "Reference"
+        ],
+        "summary": "list handling agents at airport",
+        "parameters": [
+          {
+            "name": "icao",
+            "in": "query",
+            "description": "optional ICAO to identify airport",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "iata",
+            "in": "query",
+            "description": "optional IATA to identify airport",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "faa",
+            "in": "query",
+            "description": "optional FAA to identify airport",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "list of handling agents at airport",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.HandlingAgent"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "no matching airport found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Airports/maintenanceProviders": {
+      "get": {
+        "tags": [
+          "Reference"
+        ],
+        "summary": "list of maintenance providers at airport",
+        "parameters": [
+          {
+            "name": "icao",
+            "in": "query",
+            "description": "optional ICAO to identify airport",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "iata",
+            "in": "query",
+            "description": "optional IATA to identify airport",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "faa",
+            "in": "query",
+            "description": "optional FAA to identify airport",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "list of maintenance providers at airport",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceProvider"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "no matching airport found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/CriticalDues": {
+      "get": {
+        "tags": [
+          "Critical Dues"
+        ],
+        "summary": "list critical dues",
+        "parameters": [
+          {
+            "name": "aircraft",
+            "in": "query",
+            "description": "optional param to filter by aircraft",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "number of records to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "maximum number of records to return",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "description": "optional param to list hidden items, defaults to false",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "search results matching criteria",
+            "headers": {
+              "X-Total-Count": {
+                "description": "total number of results available",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad input parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Critical Dues"
+        ],
+        "summary": "add a critical due",
+        "description": "Adds a new critical due",
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "critical due created",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "URI of new item",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/CriticalDues/{id}": {
+      "get": {
+        "tags": [
+          "Critical Dues"
+        ],
+        "summary": "get critical due by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Critical Due",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Critical Dues"
+        ],
+        "summary": "update critical due",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "critical due",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.CriticalDueModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "concurrency error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/CriticalDues/{id}/softdelete": {
+      "post": {
+        "tags": [
+          "Critical Dues"
+        ],
+        "summary": "soft delete a critical due",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "soft deleted"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/CriticalDues/{id}/restore": {
+      "post": {
+        "tags": [
+          "Critical Dues"
+        ],
+        "summary": "restore a soft deleted critical due",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "restored"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefectRestrictions": {
+      "get": {
+        "tags": [
+          "Deferred Defect Restrictions"
+        ],
+        "summary": "list of deferred defect restrictions",
+        "parameters": [
+          {
+            "name": "aircraftType",
+            "in": "query",
+            "description": "optional param to filter by aircraft type",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "number of records to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "maximum number of records to return",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "description": "optional param to list hidden items, defaults to false",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "search results matching criteria",
+            "headers": {
+              "X-Total-Count": {
+                "description": "total number of results available",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad input parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Deferred Defect Restrictions"
+        ],
+        "summary": "adds a deferred defect restriction",
+        "description": "Adds a new deferred defect restriction",
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "deferred defect restriction created",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "URI of new item",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefectRestrictions/{id}": {
+      "get": {
+        "tags": [
+          "Deferred Defect Restrictions"
+        ],
+        "summary": "get deferred defect restriction by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "deferred defect restriction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Deferred Defect Restrictions"
+        ],
+        "summary": "update deferred defect restriction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "deferred defect restriction",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "concurrency error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefectRestrictions/code/{code}": {
+      "get": {
+        "tags": [
+          "Deferred Defect Restrictions"
+        ],
+        "summary": "get deferred defect restriction by code",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "deferred defect restriction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefectRestrictions/{id}/softdelete": {
+      "post": {
+        "tags": [
+          "Deferred Defect Restrictions"
+        ],
+        "summary": "soft delete a deferred defect restriction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "soft deleted"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefectRestrictions/{id}/restore": {
+      "post": {
+        "tags": [
+          "Deferred Defect Restrictions"
+        ],
+        "summary": "restore a soft deleted deferred defect restriction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "restored"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefects": {
+      "get": {
+        "tags": [
+          "Deferred Defects"
+        ],
+        "summary": "list deferred defects",
+        "parameters": [
+          {
+            "name": "aircraft",
+            "in": "query",
+            "description": "optional param to filter by aircraft",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "number of records to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "maximum number of records to return",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "description": "optional param to list hidden items, defaults to false",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "search results matching criteria",
+            "headers": {
+              "X-Total-Count": {
+                "description": "total number of results available",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad input parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Deferred Defects"
+        ],
+        "summary": "add a deferred defect",
+        "description": "Add a deferred defect",
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "deferred defect created",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "URI of new item",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefects/{id}": {
+      "get": {
+        "tags": [
+          "Deferred Defects"
+        ],
+        "summary": "get deferred defect by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deferred Defect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Deferred Defects"
+        ],
+        "summary": "update deferred defect",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deferred Defect",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "concurrency error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefects/{id}/softdelete": {
+      "post": {
+        "tags": [
+          "Deferred Defects"
+        ],
+        "summary": "soft delete a deferred defect",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "soft deleted"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/DeferredDefects/{id}/restore": {
+      "post": {
+        "tags": [
+          "Deferred Defects"
+        ],
+        "summary": "restore a soft deleted deferred defect",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "restored"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceEntries": {
+      "get": {
+        "tags": [
+          "Maintenance Entries"
+        ],
+        "summary": "list maintenance entries",
+        "parameters": [
+          {
+            "name": "aircraft",
+            "in": "query",
+            "description": "optional param to filter by aircraft",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "number of records to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "maximum number of records to return",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "description": "optional param to list hidden items, defaults to false",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "search results matching criteria",
+            "headers": {
+              "X-Total-Count": {
+                "description": "total number of results available",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad input parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Maintenance Entries"
+        ],
+        "summary": "add a maintenance entry",
+        "description": "Adds a new maintenance entry",
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "maintenance entry created",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "URI of new item",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceEntries/{id}": {
+      "get": {
+        "tags": [
+          "Maintenance Entries"
+        ],
+        "summary": "get maintenance entry by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Maintenance Entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Maintenance Entries"
+        ],
+        "summary": "update maintenance entry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Maintenance Entry",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "concurrency error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceEntries/{id}/release": {
+      "post": {
+        "tags": [
+          "Maintenance Entries"
+        ],
+        "summary": "release a maintenance entry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Maintenance Entry",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceEntries/{id}/cancelRelease": {
+      "post": {
+        "tags": [
+          "Maintenance Entries"
+        ],
+        "summary": "cancel the release of a maintenance entry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryReleaseCancellationModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryReleaseCancellationModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryReleaseCancellationModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Maintenance Entry",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceEntries/{id}/softdelete": {
+      "post": {
+        "tags": [
+          "Maintenance Entries"
+        ],
+        "summary": "soft delete a maintenance entry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "soft deleted"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceEntries/{id}/restore": {
+      "post": {
+        "tags": [
+          "Maintenance Entries"
+        ],
+        "summary": "restore a soft deleted maintenance entry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "restored"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceEntries/{id}/logs": {
+      "get": {
+        "tags": [
+          "Maintenance Entries",
+          "Maintenance Logs"
+        ],
+        "summary": "get maintenance entry logs by maintenance entry id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "get maintenance entry logs by maintenance entry id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Maintenance Entries",
+          "Maintenance Logs"
+        ],
+        "summary": "add a maintenance entry log",
+        "description": "add a maintenance entry log",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceLogModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceLogModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceLogModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "maintenance entry log created",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "URI of new item",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceEntryModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceTypes": {
+      "get": {
+        "tags": [
+          "Maintenance Types"
+        ],
+        "summary": "list maintenance types",
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "number of records to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "maximum number of records to return",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "description": "optional param to list hidden items, defaults to false",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "search results matching criteria",
+            "headers": {
+              "X-Total-Count": {
+                "description": "total number of results available",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad input parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Maintenance Types"
+        ],
+        "summary": "adds a maintenance type",
+        "description": "Adds a new maintenance type",
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "maintenance type created",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "URI of new item",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceTypes/{id}": {
+      "get": {
+        "tags": [
+          "Maintenance Types"
+        ],
+        "summary": "get a maintenance type by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Maintenance Type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Maintenance Types"
+        ],
+        "summary": "update maintenance type",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "maintenance type updated",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceTypeModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "concurrency error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceTypes/{id}/softdelete": {
+      "post": {
+        "tags": [
+          "Maintenance Types"
+        ],
+        "summary": "soft delete a maintenance type",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "soft deleted"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/MaintenanceTypes/{id}/restore": {
+      "post": {
+        "tags": [
+          "Maintenance Types"
+        ],
+        "summary": "restore a soft deleted maintenance type",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "restored"
+          },
+          "404": {
+            "description": "invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unable to complete operation due to an invalid state e.g. record locked by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Airops.Framework.Exceptions.ExternalApiError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid data model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApiError",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Airops.Flight.Maintenance.Models.AirportModel": {
+        "title": "Airport",
+        "type": "object",
+        "properties": {
+          "icao": {
+            "type": "string",
+            "nullable": true
+          },
+          "iata": {
+            "type": "string",
+            "nullable": true
+          },
+          "faa": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.CriticalDueModel": {
+        "title": "CriticalDue",
+        "required": [
+          "aircraft",
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aircraft": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "aircraftName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ataChapter": {
+            "type": "string",
+            "nullable": true
+          },
+          "sequenceNumber": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "serialNumber": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "workOrderNumber": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "position": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "taskNumber": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "taskType": {
+            "enum": [
+              "Part",
+              "Inspection",
+              "AirworthinessDirective",
+              "Package",
+              "ServiceBulletin",
+              "Snag",
+              "MajorAssembly"
+            ],
+            "type": "string",
+            "nullable": true
+          },
+          "nextDueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nextDueLandings": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "nextDueCycles": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "nextDueHours": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "estimatedDueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "currentLandings": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "currentCycles": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "currentHours": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "externalNote": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "taskCategory": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "techPubSource": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "estimatedCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedCostCurrency": {
+            "maxLength": 3,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "estimatedManHours": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "description": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "isHidden": {
+            "type": "boolean"
+          },
+          "isAutoUpdate": {
+            "type": "boolean"
+          },
+          "isCyclesMxTracked": {
+            "type": "boolean"
+          },
+          "isLandingsMxTracked": {
+            "type": "boolean"
+          },
+          "isHoursMxTracked": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "modifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "externalReference": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "externalReferenceLastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.DeferredDefectExtensionHistoryModel": {
+        "title": "DeferredDefectExtensionHistoryModel",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deferredDefectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "previousDueDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extendedDueDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.DeferredDefectModel": {
+        "title": "DeferredDefect",
+        "required": [
+          "aircraft",
+          "description",
+          "dueDate",
+          "id",
+          "reportedDate"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aircraft": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "restrictionCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          },
+          "reportedDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reportedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "extendedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "extendedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "completedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "isHidden": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "approvedOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "approvedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "opsBoardRemark": {
+            "type": "string",
+            "nullable": true
+          },
+          "operationsCompleted": {
+            "type": "boolean"
+          },
+          "operationsCompletedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "maintenanceCompleted": {
+            "type": "boolean"
+          },
+          "maintenanceCompletedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "placardCompleted": {
+            "type": "boolean"
+          },
+          "placardCompletedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "deferredDefectExtensionHistory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectExtensionHistoryModel"
+            },
+            "nullable": true
+          },
+          "externalReference": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "externalReferenceLastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.DeferredDefectRestrictionAircraftModel": {
+        "title": "DeferredDefectRestrictionAircraft",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aircraftRegistration": {
+            "type": "string",
+            "nullable": true
+          },
+          "aircraftSerialNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "numberInstalled": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "numberRequired": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.DeferredDefectRestrictionModel": {
+        "title": "DeferredDefectRestriction",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicableAircraftTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "deferredDefectRestrictionAircraft": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.DeferredDefectRestrictionAircraftModel"
+            },
+            "nullable": true
+          },
+          "ataChapter": {
+            "type": "string",
+            "nullable": true
+          },
+          "systemSequenceNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "classification": {
+            "type": "string",
+            "nullable": true
+          },
+          "restriction": {
+            "type": "string",
+            "nullable": true
+          },
+          "repairCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "repairInterval": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "repairIntervalType": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "restrictionNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "maintenanceProcedures": {
+            "type": "string",
+            "nullable": true
+          },
+          "operationsProcedures": {
+            "type": "string",
+            "nullable": true
+          },
+          "placardProcedures": {
+            "type": "string",
+            "nullable": true
+          },
+          "numberInstalled": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "numberRequired": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "isHidden": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "modifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.HandlingAgent": {
+        "title": "HandlingAgent",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.MaintenanceEntryModel": {
+        "title": "MaintenanceEntry",
+        "required": [
+          "aircraft",
+          "id",
+          "maintenanceType",
+          "scheduledEndUtc",
+          "scheduledStartUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isHidden": {
+            "type": "boolean"
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "actualStartUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "actualStartLocal": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "actualEndUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "actualEndLocal": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "aircraft": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "airport": {
+            "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.AirportModel"
+          },
+          "description": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "handlingAgent": {
+            "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.HandlingAgent"
+          },
+          "cancelled": {
+            "type": "boolean"
+          },
+          "released": {
+            "type": "boolean"
+          },
+          "maintenanceType": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scheduledStartUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scheduledStartLocal": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scheduledEndUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scheduledEndLocal": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "vendor": {
+            "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.MaintenanceProvider"
+          },
+          "vendorContactInfo": {
+            "type": "string",
+            "nullable": true
+          },
+          "partsShippingInfo": {
+            "type": "string",
+            "nullable": true
+          },
+          "woNumber": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "repeatHistory": {
+            "type": "boolean"
+          },
+          "historySent": {
+            "type": "boolean"
+          },
+          "engineeringStartDateTimeUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "engineeringStartDateTimeLocal": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "engineeringEndDateTimeUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "engineeringEndDateTimeLocal": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "modifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.MaintenanceEntryReleaseCancellationModel": {
+        "title": "MaintenanceEntryReleaseCancellation",
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.MaintenanceLogModel": {
+        "title": "MaintenanceLog",
+        "required": [
+          "action",
+          "actionBy",
+          "logDate"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "logDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "action": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "actionBy": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string"
+          },
+          "isHidden": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "modifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.MaintenanceProvider": {
+        "title": "MaintenanceProvider",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.MaintenanceTypeModel": {
+        "title": "MaintenanceType",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "opsBoardConfiguration": {
+            "$ref": "#/components/schemas/Airops.Flight.Maintenance.Models.OpsBoardConfigurationModel"
+          },
+          "defaultDuration": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requiresLocation": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Flight.Maintenance.Models.OpsBoardConfigurationModel": {
+        "title": "MaintenanceEntryOpsBoardConfiguration",
+        "type": "object",
+        "properties": {
+          "blockColour": {
+            "type": "string",
+            "nullable": true
+          },
+          "badge": {
+            "type": "string",
+            "nullable": true
+          },
+          "showInContextMenu": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Airops.Framework.Exceptions.ExternalApiError": {
+        "title": "ApiError",
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "description": "Authorization by x-api-key in request header",
+        "name": "x-api-key",
+        "in": "header"
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKey": [ ]
+    }
+  ]
+}
