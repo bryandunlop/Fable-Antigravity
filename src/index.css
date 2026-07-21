@@ -183,15 +183,6 @@
 @utility duration-press { transition-duration: var(--dur-press); }
 @utility duration-fast  { transition-duration: var(--dur-fast); }
 
-/* Horizontal strips (dashboard quick links) scroll without a visible bar.
-   The class predates this rule — it was referenced (misspelled) but never
-   defined, so the strip always showed a scrollbar. */
-@utility scrollbar-hide {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  &::-webkit-scrollbar { display: none; }
-}
-
 @theme {
   --font-sans: 'Montserrat', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
