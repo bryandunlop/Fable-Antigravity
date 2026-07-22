@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Check, X, MessageSquarePlus, Clock, ChevronRight, ChevronDown, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/button';
-import { eventStore } from '../../notifications/events';
 import {
   useApprovalRequests, pendingForRoles, requestedByName, currentApproverRole, roleLabel,
   type ApprovalRequest,
 } from '../safety-center/approvalRequests';
+import { decideAndNotify } from './decide';
+import { timeAgo } from './format';
 
 const CURRENT_USER = { name: 'Capt. Dunlop' };
 
@@ -16,26 +17,16 @@ interface Props { userRole: string; additionalRoles?: string[] }
 // workspace — not inside the safety console.
 export default function ApprovalsInbox({ userRole, additionalRoles = [] }: Props) {
   const roles = useMemo(() => [userRole, ...additionalRoles], [userRole, additionalRoles]);
-  const { requests, decideRequest } = useApprovalRequests();
+  const { requests } = useApprovalRequests();
 
   const awaiting = pendingForRoles(requests, roles);
   const mine = requestedByName(requests, CURRENT_USER.name);
 
   function decide(req: ApprovalRequest, decision: 'approve' | 'deny', comment?: string) {
-    const note = comment?.trim();
-    const updated = decideRequest(req.id, decision, `${roleLabel(userRole)}`, comment);
-    if (!updated) return;
-    // Tell the requester what happened; if it advanced, ping the next approver.
-    eventStore.publish({
-      id: `approval-decided-${req.id}-${Date.now()}`,
-      severity: decision === 'deny' ? 'warn' : 'info',
-      title: decision === 'deny' ? `Waiver denied: ${req.subjectTitle}` : (updated.status === 'approved' ? `Waiver approved: ${req.subjectTitle}` : `${req.subjectTitle}: ${roleLabel(userRole)} approved`),
-      detail: decision === 'deny'
-        ? (note ? `${roleLabel(userRole)}: “${note}”` : `Denied by ${roleLabel(userRole)}`)
-        : (updated.status === 'approved' ? 'Fully approved' : `Now with ${roleLabel(currentApproverRole(updated) || '')}`),
-      module: 'Safety', link: '/approvals',
-      audienceRoles: [req.requestedByRole, ...(updated.status === 'pending' && currentApproverRole(updated) ? [currentApproverRole(updated) as string] : [])],
-    });
+    // Shared decision path (D40): the Safety-Center waiver console actions
+    // through this same helper, so both surfaces walk the chain and notify
+    // identically.
+    decideAndNotify(req, decision, userRole, comment);
   }
 
   return (
@@ -156,16 +147,4 @@ function SectionHeading({ children, className = '' }: { children: React.ReactNod
 }
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="text-[13.5px] text-muted-foreground bg-card border border-border rounded-[12px] px-4 py-5 text-center">{children}</div>;
-}
-
-function timeAgo(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (isNaN(then)) return 'recently';
-  const mins = Math.round((Date.now() - then) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.round(hrs / 24);
-  return `${days}d ago`;
 }

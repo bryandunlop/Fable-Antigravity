@@ -1,649 +1,282 @@
-import React, { useState } from 'react';
-import WaiverRequestForm from './safety/WaiverRequestForm';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+// Waiver register — the safety manager's fleet-wide view of REAL filed waivers
+// (D40). Before this, the console held its own hardcoded mock array (WV-001…),
+// so a waiver a crew member actually filed could never appear here; after D39
+// real waivers live in the shared approvalRequests store and are actioned in the
+// global /approvals inbox.
+//
+// This surface reads that SAME store and actions through the SAME decide helper
+// (approvals/decide). There is no second waiver record. The difference from
+// /approvals is scope, not data: the inbox is per-approver ("what's on my
+// desk"), this is every waiver and where each one sits in its chain — the view
+// a manager needs and the inbox deliberately does not provide.
+//
+// Actioning is gated to the role currently on-step: a manager sees everything
+// but can only decide what is genuinely theirs to decide.
+
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  FileCheck,
-  Plus,
-  Search,
-  Filter,
-  User,
-  Calendar,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  FileText,
-  UserCheck
+  Check, X, Clock, MessageSquarePlus, ChevronRight, ChevronDown,
+  FileCheck, Search, AlertTriangle, ArrowUpRight, Circle,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Button } from './ui/button';
+import {
+  useApprovalRequests, currentApproverRole, roleLabel,
+  type ApprovalRequest, type ApprovalStep,
+} from './safety-center/approvalRequests';
+import { waiversOnly, waiverStats, isAwaitingRoles, OVERDUE_AFTER_MS } from './safety-center/waiverConsole';
+import { decideAndNotify } from './approvals/decide';
+import { timeAgo, formatDuration } from './approvals/format';
 
-export default function WaiverManagement() {
-  interface Approval {
-    tier: number;
-    role: string;
-    assignedTo?: string;
-    status: 'Pending' | 'Approved' | 'Approved with Comments' | 'Denied';
-    comments?: string;
-    actionDate?: string;
+type StatusFilter = 'all' | 'pending' | 'approved' | 'denied';
+
+const FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'In progress' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'denied', label: 'Denied' },
+];
+
+const OVERDUE_DAYS = Math.round(OVERDUE_AFTER_MS / 86_400_000);
+
+interface Props { userRole: string; additionalRoles?: string[] }
+
+export default function WaiverManagement({ userRole, additionalRoles = [] }: Props) {
+  const roles = useMemo(() => [userRole, ...additionalRoles], [userRole, additionalRoles]);
+  const { requests } = useApprovalRequests();
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('all');
+
+  const now = Date.now();
+  const stats = waiverStats(requests, now);
+  const all = waiversOnly(requests);
+  const awaitingMe = all.filter((r) => isAwaitingRoles(r, roles)).length;
+
+  const q = search.trim().toLowerCase();
+  const visible = all
+    .filter((r) => (status === 'all' ? true : r.status === status))
+    .filter((r) => !q
+      || r.subjectTitle.toLowerCase().includes(q)
+      || r.requestedByName.toLowerCase().includes(q)
+      || r.id.toLowerCase().includes(q))
+    // Still-open waivers first, oldest at the top (those are the ones aging);
+    // settled ones after, most recently filed first.
+    .sort((a, b) => {
+      const aOpen = a.status === 'pending', bOpen = b.status === 'pending';
+      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+      const at = new Date(a.requestedAt).getTime(), bt = new Date(b.requestedAt).getTime();
+      return aOpen ? at - bt : bt - at;
+    });
+
+  function decide(req: ApprovalRequest, decision: 'approve' | 'deny', comment?: string) {
+    decideAndNotify(req, decision, userRole, comment);
   }
-
-  interface Waiver {
-    id: string;
-    title: string;
-    type: string;
-    priority: string;
-    status: string;
-    submittedBy: string;
-    submittedDate: string;
-    expirationDate: string;
-    description: string;
-    justification: string;
-    riskAssessment: string;
-    assignedTo: string;
-    approvals: Approval[];
-    currentTier: number;
-    duties: { id: number; task: string; assignedTo: string; status: string; }[];
-  }
-
-  const [filter, setFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showNewWaiverDialog, setShowNewWaiverDialog] = useState(false);
-  const [showReviewDialog, setShowReviewDialog] = useState(false);
-  const [selectedWaiver, setSelectedWaiver] = useState<Waiver | null>(null);
-
-  // Mock data - in real app this would come from backend
-  const [waiverStore, setWaiverStore] = useState<Waiver[]>([
-    {
-      id: 'WV-001',
-      title: 'Night Flying Operations - N123AB',
-      type: 'Operational',
-      priority: 'High',
-      status: 'Pending Review',
-      submittedBy: 'John Smith',
-      submittedDate: '2024-02-06',
-      expirationDate: '2024-03-06',
-      description: 'Request for night flying operations approval for aircraft N123AB on route LAX-DEN',
-      justification: 'Urgent passenger medical transport required outside normal operating hours',
-      riskAssessment: 'Medium risk - experienced crew, good weather conditions, familiar route',
-      assignedTo: 'Unassigned',
-      currentTier: 1,
-      approvals: [
-        { tier: 1, role: 'Safety Manager', status: 'Pending' },
-        { tier: 2, role: 'Line Manager/VP', status: 'Pending' }
-      ],
-      duties: []
-    },
-    {
-      id: 'WV-002',
-      title: 'Minimum Weather Deviation - N456CD',
-      type: 'Weather',
-      priority: 'Critical',
-      status: 'Tier 2 Review',
-      submittedBy: 'Sarah Wilson',
-      submittedDate: '2024-02-05',
-      expirationDate: '2024-02-07',
-      description: 'Request to operate below standard weather minimums for emergency medical evacuation',
-      justification: 'Life-threatening medical emergency requiring immediate transport',
-      riskAssessment: 'High risk - marginal weather, but life safety priority',
-      assignedTo: 'Mike Johnson',
-      currentTier: 2,
-      approvals: [
-        { tier: 1, role: 'Safety Manager', status: 'Approved', comments: 'Risk is justified by medical emergency.', actionDate: '2024-02-05' },
-        { tier: 2, role: 'Operations Manager', status: 'Pending', assignedTo: 'Mike Johnson' }
-      ],
-      duties: [
-        { id: 1, task: 'Weather monitoring every 15 minutes', assignedTo: 'Dispatch', status: 'Pending' },
-        { id: 2, task: 'Alternate airport confirmation', assignedTo: 'Operations', status: 'Complete' }
-      ]
-    },
-    {
-      id: 'WV-003',
-      title: 'Extended Duty Time - Crew 404',
-      type: 'Crew Rest',
-      priority: 'Medium',
-      status: 'Approved',
-      submittedBy: 'David Brown',
-      submittedDate: '2024-02-04',
-      expirationDate: '2024-02-05',
-      description: 'Extension of flight duty period for crew due to mechanical delay',
-      justification: 'Mechanical issue caused extended ground time, crew requests duty extension',
-      riskAssessment: 'Low risk - crew well rested, short extension requested',
-      assignedTo: 'Emily Davis',
-      currentTier: 2,
-      approvals: [
-        { tier: 1, role: 'Safety Manager', status: 'Approved', actionDate: '2024-02-04' },
-        { tier: 2, role: 'Chief Pilot', status: 'Approved', assignedTo: 'Emily Davis', actionDate: '2024-02-04' }
-      ],
-      duties: [
-        { id: 3, task: 'Crew fatigue monitoring', assignedTo: 'Chief Pilot', status: 'Complete' }
-      ]
-    }
-  ]);
-
-  const [approvalComment, setApprovalComment] = useState('');
-  const [selectedNextApprover, setSelectedNextApprover] = useState('');
-  const [selectedNextRole, setSelectedNextRole] = useState('Line Manager');
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'pending review': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'tier 2 review': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
-      case 'approved with comments': return 'bg-teal-100 text-teal-800 border-teal-200';
-      case 'denied': return 'bg-red-100 text-red-800 border-red-200';
-      case 'expired': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case 'critical': return 'bg-red-100 text-red-800 border-red-200';
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const filteredWaivers = waiverStore.filter(waiver => {
-    const matchesFilter = filter === 'all' || waiver.status.toLowerCase().replace(' ', '') === filter;
-    const matchesSearch = waiver.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      waiver.submittedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      waiver.id.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
-
-  const handleApproveWaiver = (waiverId: string, tier: number, withComments: boolean) => {
-    setWaiverStore(prev => prev.map(w => {
-      if (w.id === waiverId) {
-        const newApprovals = [...w.approvals];
-        const currentApproval = newApprovals.find(a => a.tier === tier);
-        if (currentApproval) {
-          currentApproval.status = withComments ? 'Approved with Comments' : 'Approved';
-          currentApproval.comments = approvalComment;
-          currentApproval.actionDate = new Date().toISOString().split('T')[0];
-          
-          if (tier === 1) {
-            // Advance to Tier 2
-            w.currentTier = 2;
-            w.status = 'Tier 2 Review';
-            // Set Tier 2 details if selected
-            const t2 = newApprovals.find(a => a.tier === 2);
-            if (t2) {
-              t2.role = selectedNextRole;
-              t2.assignedTo = selectedNextApprover;
-            }
-          } else {
-            // Final Approval
-            w.status = withComments ? 'Approved with Comments' : 'Approved';
-          }
-        }
-        return { ...w, approvals: newApprovals };
-      }
-      return w;
-    }));
-    toast.success(`Waiver ${waiverId} Tier ${tier} approved`);
-    setApprovalComment('');
-    setShowReviewDialog(false);
-  };
-
-  const handleDenyWaiver = (waiverId: string, tier: number) => {
-    if (!approvalComment) {
-      toast.error('Comments are required for denial');
-      return;
-    }
-    setWaiverStore(prev => prev.map(w => {
-      if (w.id === waiverId) {
-        const newApprovals = [...w.approvals];
-        const currentApproval = newApprovals.find(a => a.tier === tier);
-        if (currentApproval) {
-          currentApproval.status = 'Denied';
-          currentApproval.comments = approvalComment;
-          currentApproval.actionDate = new Date().toISOString().split('T')[0];
-        }
-        return { ...w, status: 'Denied', approvals: newApprovals };
-      }
-      return w;
-    }));
-    toast.success(`Waiver ${waiverId} denied`);
-    setApprovalComment('');
-    setShowReviewDialog(false);
-  };
-
-  const handleAssignDuty = (waiverIndex: number, dutyIndex: number, assignee: string) => {
-    toast.success(`Duty assigned to ${assignee}`);
-  };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
-        <div>
-          <h1 className="flex items-center gap-2">
-            <FileCheck className="w-6 h-6" />
-            Waiver Request Management
-          </h1>
-          <p className="text-muted-foreground">Review and approve operational waiver requests</p>
+    <div className="max-w-[1000px] mx-auto px-6 py-6" style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-1">
+        <div className="flex items-center gap-2.5">
+          <FileCheck className="w-6 h-6 text-accent" />
+          <h1 className="text-[22px] font-semibold tracking-tight m-0">Waiver register</h1>
         </div>
-
-        <Dialog open={showNewWaiverDialog} onOpenChange={setShowNewWaiverDialog}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              New Waiver Request
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Submit New Waiver Request</DialogTitle>
-            </DialogHeader>
-            <WaiverRequestForm
-              onSuccess={(data: any) => {
-                const newWaiver: Waiver = {
-                  id: `WV-00${waiverStore.length + 1}`,
-                  title: data.title,
-                  type: data.type,
-                  priority: data.priority,
-                  status: 'Pending Review',
-                  submittedBy: 'Current User', // Mocked
-                  submittedDate: new Date().toISOString().split('T')[0],
-                  expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days
-                  description: data.description,
-                  justification: data.justification,
-                  riskAssessment: data.mitigation,
-                  assignedTo: 'Unassigned',
-                  currentTier: 1,
-                  approvals: [
-                    { tier: 1, role: 'Safety Manager', status: 'Pending' },
-                    { tier: 2, role: 'Line Manager/VP', status: 'Pending' }
-                  ],
-                  duties: []
-                };
-                setWaiverStore([...waiverStore, newWaiver]);
-                setShowNewWaiverDialog(false);
-              }}
-              onCancel={() => setShowNewWaiverDialog(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <Link to="/approvals"
+          className="text-[13px] font-medium text-accent hover:underline flex items-center gap-1 mt-1">
+          My approvals inbox <ArrowUpRight className="w-4 h-4" />
+        </Link>
+      </div>
+      <div className="text-[13.5px] text-muted-foreground mb-5">
+        Every waiver filed, and where each one sits in its approval chain. You’re acting as {roleLabel(userRole)} —
+        you can decide the steps assigned to you here; the rest are read-only.
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-yellow-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Pending Review</p>
-                <p className="text-2xl">
-                  {waiverStore.filter(w => w.status === 'Pending Review').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Tier 2 Review</p>
-                <p className="text-2xl">
-                  {waiverStore.filter(w => w.status === 'Tier 2 Review').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Approved</p>
-                <p className="text-2xl">
-                  {waiverStore.filter(w => w.status.includes('Approved')).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <XCircle className="w-4 h-4 text-red-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Denied</p>
-                <p className="text-2xl">
-                  {waiverStore.filter(w => w.status === 'Denied').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* tiles, computed from the real store */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+        <Tile label="In progress" value={stats.pending} icon={<Clock className="w-4 h-4" />} />
+        <Tile label="Awaiting you" value={awaitingMe} icon={<Check className="w-4 h-4" />} accent />
+        <Tile label="Approved" value={stats.approved} icon={<Check className="w-4 h-4" />} />
+        <Tile label="Denied" value={stats.denied} icon={<X className="w-4 h-4" />} />
       </div>
 
-      {/* Filters and Search */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by title, ID, or submitter..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+      <div className="text-[12.5px] text-muted-foreground mb-5 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span>
+          Average time to clear:{' '}
+          <span className="text-foreground font-medium">
+            {stats.avgClearMs == null ? 'nothing cleared yet' : formatDuration(stats.avgClearMs)}
+          </span>
+        </span>
+        {stats.overdue > 0 && (
+          <span className="flex items-center gap-1.5 text-[color:var(--gfo-warning)]">
+            <AlertTriangle className="w-4 h-4" />
+            {stats.overdue} open longer than {OVERDUE_DAYS} days
+          </span>
+        )}
+      </div>
+
+      {/* search + status filter */}
+      <div className="flex flex-col md:flex-row gap-2.5 mb-4">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by subject, requester, or id…"
+            className="w-full bg-background border border-border rounded-[9px] pl-9 pr-3 py-2 text-[13.5px] outline-none focus:border-accent" />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {FILTERS.map((f) => (
+            <button key={f.key} onClick={() => setStatus(f.key)}
+              className={`text-[13px] font-medium px-3.5 py-2 min-h-[40px] rounded-full border transition-colors ${status === f.key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="text-[13.5px] text-muted-foreground bg-card border border-border rounded-[12px] px-4 py-6 text-center">
+          {all.length === 0
+            ? 'No waivers have been filed yet. Crew file them from the Safety Center — they arrive here as soon as they’re submitted.'
+            : 'No waivers match this search or filter.'}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {visible.map((r) => (
+            <WaiverCard key={r.id} req={r} canAct={isAwaitingRoles(r, roles)} now={now} onDecide={decide} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WaiverCard({ req, canAct, now, onDecide }: {
+  req: ApprovalRequest; canAct: boolean; now: number;
+  onDecide: (r: ApprovalRequest, d: 'approve' | 'deny', c?: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [commenting, setCommenting] = useState(false);
+  const [comment, setComment] = useState('');
+
+  const filed = new Date(req.requestedAt).getTime();
+  const overdue = req.status === 'pending' && !isNaN(filed) && now - filed > OVERDUE_AFTER_MS;
+
+  return (
+    <div className="bg-card border border-border rounded-[12px] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[15px] font-medium text-foreground">{req.subjectTitle}</div>
+          <div className="text-[12.5px] text-muted-foreground mt-0.5">
+            {req.formLabel} · {req.id} · requested by {req.requestedByName} · filed {timeAgo(req.requestedAt, now)}
+          </div>
+        </div>
+        <StatusPill req={req} />
+      </div>
+
+      {overdue && (
+        <div className="text-[12.5px] text-[color:var(--gfo-warning)] mt-2 flex items-center gap-1.5">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          Open longer than {OVERDUE_DAYS} days
+        </div>
+      )}
+
+      {/* the multi-tier chain view, preserved from the old console but now real */}
+      <div className="mt-2.5 flex flex-col gap-1.5">
+        {req.chain.map((s, i) => (
+          <StepRow key={i} step={s} isCurrent={req.status === 'pending' && i === req.currentStep} />
+        ))}
+      </div>
+
+      <button onClick={() => setOpen((v) => !v)}
+        className="mt-2.5 flex items-center gap-1 text-[13px] font-medium text-accent hover:underline">
+        {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        {open ? 'Hide' : 'View'} what was requested
+      </button>
+      {open && (
+        <div className="mt-2 border border-border rounded-[9px] divide-y divide-border">
+          {Object.entries(req.values).filter(([, v]) => (v || '').trim()).map(([id, v]) => (
+            <div key={id} className="px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                {req.fieldLabels[id] || id}
               </div>
+              <div className="text-[13.5px] text-foreground mt-0.5 whitespace-pre-wrap">{v}</div>
             </div>
+          ))}
+        </div>
+      )}
 
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-48">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pendingreview">Pending Review</SelectItem>
-                <SelectItem value="underreview">Under Review</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="denied">Denied</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Waivers Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Waiver Requests</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Submitted By</TableHead>
-                  <TableHead>Submitted Date</TableHead>
-                  <TableHead>Expiration</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWaivers.map((waiver) => (
-                  <TableRow key={waiver.id}>
-                    <TableCell className="font-medium">{waiver.id}</TableCell>
-                    <TableCell className="max-w-xs truncate">{waiver.title}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{waiver.type}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getPriorityColor(waiver.priority)}>
-                        {waiver.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Badge className={getStatusColor(waiver.status)}>
-                          {waiver.status}
-                        </Badge>
-                        {waiver.status !== 'Approved' && waiver.status !== 'Denied' && (
-                          <span className="text-[10px] text-muted-foreground font-medium uppercase">
-                            Tier {waiver.currentTier}: {waiver.approvals.find(a => a.tier === waiver.currentTier)?.role}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        {waiver.submittedBy}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        {new Date(waiver.submittedDate).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(waiver.expirationDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {waiver.assignedTo === 'Unassigned' ? (
-                        <Badge variant="outline">Unassigned</Badge>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <UserCheck className="w-4 h-4 text-muted-foreground" />
-                          {waiver.assignedTo}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" onClick={() => setSelectedWaiver(waiver)}>
-                              Review
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl">
-                            <DialogHeader>
-                              <DialogTitle>Waiver Request Review - {waiver.id}</DialogTitle>
-                            </DialogHeader>
-                            <Tabs defaultValue="details">
-                              <TabsList>
-                                <TabsTrigger value="details">Details</TabsTrigger>
-                                <TabsTrigger value="duties">Duties</TabsTrigger>
-                                <TabsTrigger value="approvals">Approvals</TabsTrigger>
-                              </TabsList>
-
-                              <TabsContent value="details" className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <Label>Title</Label>
-                                    <p className="font-medium">{waiver.title}</p>
-                                  </div>
-                                  <div>
-                                    <Label>Type</Label>
-                                    <Badge variant="outline">{waiver.type}</Badge>
-                                  </div>
-                                  <div>
-                                    <Label>Priority</Label>
-                                    <Badge className={getPriorityColor(waiver.priority)}>
-                                      {waiver.priority}
-                                    </Badge>
-                                  </div>
-                                  <div>
-                                    <Label>Status</Label>
-                                    <Badge className={getStatusColor(waiver.status)}>
-                                      {waiver.status}
-                                    </Badge>
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <Label>Description</Label>
-                                  <p>{waiver.description}</p>
-                                </div>
-
-                                <div>
-                                  <Label>Justification</Label>
-                                  <p>{waiver.justification}</p>
-                                </div>
-
-                                <div>
-                                  <Label>Risk Assessment</Label>
-                                  <p>{waiver.riskAssessment}</p>
-                                </div>
-
-                                <div className="space-y-4 pt-4 border-t">
-                                  <h4 className="text-sm font-bold uppercase text-gray-500">Tier {waiver.currentTier} Review ({waiver.currentTier === 1 ? 'Safety Manager' : 'Line Manager/VP'})</h4>
-                                  
-                                  <div className="space-y-2">
-                                    <Label>Comments</Label>
-                                    <Textarea 
-                                      placeholder="Enter approval or denial comments..."
-                                      value={approvalComment}
-                                      onChange={(e) => setApprovalComment(e.target.value)}
-                                    />
-                                  </div>
-
-                                  {waiver.currentTier === 1 && (
-                                    <div className="grid grid-cols-2 gap-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                      <div className="space-y-2">
-                                        <Label>Tier 2 Approver Role</Label>
-                                        <Select value={selectedNextRole} onValueChange={setSelectedNextRole}>
-                                          <SelectTrigger><SelectValue /></SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="Line Manager">Line Manager</SelectItem>
-                                            <SelectItem value="VP">VP</SelectItem>
-                                            <SelectItem value="Operations Manager">Operations Manager</SelectItem>
-                                            <SelectItem value="Chief Pilot">Chief Pilot</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label>Assign To (User)</Label>
-                                        <Input 
-                                          placeholder="Enter name..." 
-                                          value={selectedNextApprover}
-                                          onChange={(e) => setSelectedNextApprover(e.target.value)}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  <div className="flex gap-2">
-                                    <Button onClick={() => handleApproveWaiver(waiver.id, waiver.currentTier, false)} className="bg-green-600 hover:bg-green-700 flex-1">
-                                      <CheckCircle className="w-4 h-4 mr-2" />
-                                      Approve
-                                    </Button>
-                                    <Button onClick={() => handleApproveWaiver(waiver.id, waiver.currentTier, true)} className="bg-blue-600 hover:bg-blue-700 flex-1">
-                                      <CheckCircle className="w-4 h-4 mr-2" />
-                                      Approve with Comments
-                                    </Button>
-                                    <Button onClick={() => handleDenyWaiver(waiver.id, waiver.currentTier)} variant="destructive" className="flex-1">
-                                      <XCircle className="w-4 h-4 mr-2" />
-                                      Deny with Comments
-                                    </Button>
-                                  </div>
-                                </div>
-                              </TabsContent>
-
-                              <TabsContent value="duties" className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                  <h3>Assigned Duties</h3>
-                                  <Button size="sm">
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Duty
-                                  </Button>
-                                </div>
-
-                                {waiver.duties.length > 0 ? (
-                                  <div className="space-y-3">
-                                    {waiver.duties.map((duty: any) => (
-                                      <div key={duty.id} className="border rounded-lg p-4">
-                                        <div className="flex items-start justify-between">
-                                          <div className="flex-1">
-                                            <p className="font-medium">{duty.task}</p>
-                                            <div className="flex items-center gap-2 mt-2">
-                                              <span className="text-sm text-muted-foreground">Assigned to:</span>
-                                              <Badge variant="outline">{duty.assignedTo}</Badge>
-                                              <Badge className={duty.status === 'Complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                                                {duty.status}
-                                              </Badge>
-                                            </div>
-                                          </div>
-                                          <Button variant="outline" size="sm">
-                                            Edit
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="text-center py-8">
-                                    <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                                    <p className="text-muted-foreground">No duties assigned yet</p>
-                                  </div>
-                                )}
-                              </TabsContent>
-
-                              <TabsContent value="approvals" className="space-y-4">
-                                <div>
-                                  <h3 className="text-sm font-bold uppercase text-gray-400 mb-4">Approval History</h3>
-                                  <div className="space-y-4">
-                                    {waiver.approvals.map((approval, index) => (
-                                      <div key={index} className={`p-4 border rounded-lg ${approval.status !== 'Pending' ? 'bg-gray-50' : 'bg-white'}`}>
-                                        <div className="flex items-center justify-between mb-2">
-                                          <div className="flex items-center gap-2">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${approval.status.includes('Approved') ? 'bg-green-100 text-green-700' : approval.status === 'Denied' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
-                                              {approval.tier}
-                                            </div>
-                                            <div>
-                                              <p className="font-bold text-sm">{approval.role}</p>
-                                              {approval.assignedTo && <p className="text-xs text-gray-500">Assigned: {approval.assignedTo}</p>}
-                                            </div>
-                                          </div>
-                                          <Badge className={getStatusColor(approval.status)}>
-                                            {approval.status}
-                                          </Badge>
-                                        </div>
-                                        {approval.comments && (
-                                          <div className="mt-2 p-2 bg-white border italic text-sm rounded">
-                                            "{approval.comments}"
-                                          </div>
-                                        )}
-                                        {approval.actionDate && (
-                                          <p className="text-[10px] text-gray-400 mt-2">Actioned on: {approval.actionDate}</p>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </TabsContent>
-                            </Tabs>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {filteredWaivers.length === 0 && (
-            <div className="text-center py-8">
-              <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No waiver requests match the current filters.</p>
-            </div>
+      {canAct ? (
+        <>
+          {commenting && (
+            <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} autoFocus
+              placeholder="Add a note for the requester and next approver…"
+              className="w-full mt-3 bg-background border border-border rounded-[9px] px-3 py-2 text-[13.5px] outline-none focus:border-accent" />
           )}
-        </CardContent>
-      </Card>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <Button onClick={() => onDecide(req, 'approve', commenting ? comment : undefined)} className="h-10 gap-1.5">
+              <Check className="w-4 h-4" /> Approve{commenting && comment.trim() ? ' with note' : ''}
+            </Button>
+            {!commenting && (
+              <Button variant="outline" onClick={() => setCommenting(true)} className="h-10 gap-1.5">
+                <MessageSquarePlus className="w-4 h-4" /> Add a comment
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => onDecide(req, 'deny', commenting ? comment : undefined)}
+              className="h-10 gap-1.5 text-[color:var(--gfo-error)] border-[color:var(--gfo-error)]/40 hover:bg-[color:var(--gfo-error)]/5">
+              <X className="w-4 h-4" /> Deny
+            </Button>
+          </div>
+        </>
+      ) : req.status === 'pending' ? (
+        <div className="text-[12.5px] text-muted-foreground mt-3 pt-3 border-t border-border">
+          Waiting on {roleLabel(currentApproverRole(req) || '')} — not your step to decide.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** One step of the chain with the reviewer's note — the "approval history" the
+ *  old console showed, now read from the real request. */
+function StepRow({ step, isCurrent }: { step: ApprovalStep; isCurrent: boolean }) {
+  const meta =
+    step.status === 'approved'
+      ? { icon: <Check className="w-4 h-4" />, tone: 'text-[color:var(--gfo-success)]', verb: 'approved' }
+      : step.status === 'denied'
+        ? { icon: <X className="w-4 h-4" />, tone: 'text-[color:var(--gfo-error)]', verb: 'denied' }
+        : isCurrent
+          ? { icon: <Clock className="w-4 h-4" />, tone: 'text-[color:var(--gfo-warning)]', verb: 'deciding now' }
+          : { icon: <Circle className="w-3 h-3" />, tone: 'text-muted-foreground', verb: 'queued' };
+
+  return (
+    <div className={`text-[12.5px] flex items-start gap-1.5 ${meta.tone}`}>
+      <span className="mt-px shrink-0">{meta.icon}</span>
+      <span className="min-w-0">
+        {roleLabel(step.role)} {meta.verb}
+        {step.decidedByName ? ` · ${step.decidedByName}` : ''}
+        {step.comment ? <span className="text-muted-foreground"> — “{step.comment}”</span> : null}
+      </span>
+    </div>
+  );
+}
+
+function StatusPill({ req }: { req: ApprovalRequest }) {
+  const p =
+    req.status === 'approved'
+      ? { text: 'Approved', cls: 'text-[color:var(--gfo-success)] bg-[color:var(--gfo-success)]/10' }
+      : req.status === 'denied'
+        ? { text: 'Denied', cls: 'text-[color:var(--gfo-error)] bg-[color:var(--gfo-error)]/10' }
+        : { text: `With ${roleLabel(currentApproverRole(req) || '')}`, cls: 'text-[color:var(--gfo-warning)] bg-[color:var(--gfo-warning)]/10' };
+  return <span className={`text-[11px] px-2 py-1 rounded-[8px] whitespace-nowrap shrink-0 font-medium ${p.cls}`}>{p.text}</span>;
+}
+
+function Tile({ label, value, icon, accent }: {
+  label: string; value: number; icon: React.ReactNode; accent?: boolean;
+}) {
+  const lit = accent && value > 0;
+  return (
+    <div className={`bg-card border rounded-[12px] px-3.5 py-3 ${lit ? 'border-accent' : 'border-border'}`}>
+      <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+        <span className="shrink-0">{icon}</span>{label}
+      </div>
+      <div className={`text-[24px] leading-tight mt-0.5 ${lit ? 'text-accent font-semibold' : 'text-foreground'}`}>{value}</div>
     </div>
   );
 }
