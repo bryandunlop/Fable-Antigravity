@@ -5,55 +5,136 @@ import DailyFlightsWidget from './DailyFlightsWidget';
 import DutyRosterWidget from './DutyRosterWidget';
 import WeatherWidget from './WeatherWidget';
 import { HOME_STATION } from '../config/station';
-import { ExternalLink, Edit2, Plus, Trash2, X, Check } from 'lucide-react';
+import { ExternalLink, Edit2, Plus, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import { GfoPageHeader } from './gfo';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { FirLeadershipChip } from './fir/components/FirLeadershipChip';
-
-const DEFAULT_LINKS = [
-  { id: '1', name: 'FltPlan.com', url: 'https://www.fltplan.com/' },
-  { id: '2', name: 'ForeFlight', url: 'https://plan.foreflight.com/' },
-  { id: '3', name: 'ARINCDirect', url: 'https://www.arincdirect.com/' },
-  { id: '4', name: 'FAA NOTAMs', url: 'https://notams.aim.faa.gov/notamSearch/' },
-  { id: '5', name: 'Aviation Weather', url: 'https://aviationweather.gov/' }
-];
+import LinkFavicon from './LinkFavicon';
+import QuickLinkEditor from './QuickLinkEditor';
+import { hostLabel } from '../utils/favicon';
+import {
+  useQuickLinks,
+  saveOrgLinks,
+  savePersonalLinks,
+  newLinkId,
+  type QuickLink,
+} from '../utils/quickLinks';
 
 interface DashboardProps {
   userRole: string;
 }
 export default function Dashboard({ userRole }: DashboardProps) {
-  const [links, setLinks] = useState(DEFAULT_LINKS);
+  const { org, personal } = useQuickLinks();
   const [isEditingLinks, setIsEditingLinks] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editUrl, setEditUrl] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
+  // The link being edited, or null when the editor is adding a new one.
+  const [editingLink, setEditingLink] = useState<QuickLink | null>(null);
 
   const isAdmin = userRole === 'admin';
+  // Admin manages org links; everyone manages their own personal links.
+  const canManage = (link: QuickLink) => isAdmin || link.scope === 'personal';
 
-  const handleAddNewLink = () => {
-    const newId = Math.random().toString(36).substr(2, 9);
-    setLinks([...links, { id: newId, name: 'New Link', url: 'https://' }]);
-    startEditing(newId, 'New Link', 'https://');
+  const openAdd = () => {
+    setEditingLink(null);
+    setEditorOpen(true);
   };
 
-  const startEditing = (id: string, name: string, url: string) => {
-    setEditingId(id);
-    setEditName(name);
-    setEditUrl(url);
+  const openEdit = (link: QuickLink) => {
+    if (!canManage(link)) return;
+    setEditingLink(link);
+    setEditorOpen(true);
   };
 
-  const saveEdit = () => {
-    if (!editingId) return;
-    setLinks(links.map(l => l.id === editingId ? { ...l, name: editName, url: editUrl } : l));
-    setEditingId(null);
+  const closeEditor = () => setEditorOpen(false);
+
+  const handleSave = (name: string, url: string, scope: QuickLink['scope']) => {
+    if (editingLink === null) {
+      const link: QuickLink = { id: newLinkId(), name, url, scope };
+      if (scope === 'org') saveOrgLinks([...org, link]);
+      else savePersonalLinks([...personal, link]);
+    } else {
+      const original = editingLink;
+      if (!canManage(original)) return;
+      const updated: QuickLink = { ...original, name, url, scope };
+      if (original.scope === scope) {
+        if (scope === 'org') saveOrgLinks(org.map(l => (l.id === original.id ? updated : l)));
+        else savePersonalLinks(personal.map(l => (l.id === original.id ? updated : l)));
+      } else if (scope === 'org') {
+        savePersonalLinks(personal.filter(l => l.id !== original.id));
+        saveOrgLinks([...org, updated]);
+      } else {
+        saveOrgLinks(org.filter(l => l.id !== original.id));
+        savePersonalLinks([...personal, updated]);
+      }
+    }
+    closeEditor();
   };
 
-  const deleteLink = (id: string) => {
-    setLinks(links.filter(l => l.id !== id));
-    if (editingId === id) setEditingId(null);
+  const deleteLink = (link: QuickLink) => {
+    if (!canManage(link)) return;
+    if (link.scope === 'org') saveOrgLinks(org.filter(l => l.id !== link.id));
+    else savePersonalLinks(personal.filter(l => l.id !== link.id));
   };
+
+  const tile = (link: QuickLink) => {
+    const manageable = isEditingLinks && canManage(link);
+    const body = (
+      <>
+        <LinkFavicon name={link.name} url={link.url} size={40} />
+        <div className="text-sm font-medium leading-tight line-clamp-1 w-full">{link.name}</div>
+        <div className="text-xs text-muted-foreground line-clamp-1 w-full">{hostLabel(link.url)}</div>
+      </>
+    );
+    return (
+      <div key={link.id} className="relative group">
+        {manageable ? (
+          <div className="flex flex-col items-center text-center gap-2 p-3 rounded-xl bg-muted/40 border border-border">
+            {body}
+          </div>
+        ) : (
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center text-center gap-2 p-3 rounded-xl bg-muted/40 border border-border hover:bg-secondary hover:border-primary/30 transition-all"
+          >
+            {body}
+          </a>
+        )}
+
+        {link.scope === 'personal' && !manageable && (
+          <span
+            className="absolute top-1.5 left-1.5 text-muted-foreground/70"
+            title="Personal link — only on this device"
+          >
+            <User className="w-3 h-3" />
+          </span>
+        )}
+
+        {manageable && (
+          <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+            <button
+              onClick={() => openEdit(link)}
+              aria-label={`Edit ${link.name}`}
+              className="p-1 rounded-md bg-background/90 border border-border text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Edit2 className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => deleteLink(link)}
+              aria-label={`Delete ${link.name}`}
+              className="p-1 rounded-md bg-background/90 border border-border text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const gridClass = 'grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3';
 
   // Helper to get current greeting
   const getCurrentGreeting = () => {
@@ -80,93 +161,56 @@ export default function Dashboard({ userRole }: DashboardProps) {
       {/* Persistent Weather Widget */}
       <WeatherWidget icaoId={HOME_STATION} />
 
-      {/* Quick Links Card */}
-      <div className="glass-premium rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center justify-between w-full md:w-auto gap-4 md:border-r border-border md:pr-4">
-          <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+      {/* Quick Links launcher */}
+      <div className="glass-premium rounded-lg p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <ExternalLink className="w-4 h-4" />
             <span className="text-sm font-semibold tracking-wide uppercase">Quick Links</span>
           </div>
-          {isAdmin && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsEditingLinks(!isEditingLinks)}
-              className={`h-7 px-2 text-xs transition-colors ${isEditingLinks ? 'bg-primary/20 text-primary hover:bg-primary/30' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              {isEditingLinks ? 'Done' : <span className="flex items-center gap-1"><Edit2 className="w-3 h-3" /> Edit</span>}
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsEditingLinks(v => !v)}
+            className={`h-7 px-2 text-xs transition-colors ${isEditingLinks ? 'bg-primary/20 text-primary hover:bg-primary/30' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            {isEditingLinks ? 'Done' : <span className="flex items-center gap-1"><Edit2 className="w-3 h-3" /> Edit</span>}
+          </Button>
         </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto scroolbar-hide flex-1 pb-1 md:pb-0">
-          {links.map(link => (
-            <div key={link.id} className="relative shrink-0 group flex items-center">
-              {editingId === link.id ? (
-                <div className="flex items-center gap-1 bg-muted border border-border rounded-lg p-1 z-10 shadow-lg">
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Name"
-                    className="h-7 w-24 text-xs bg-transparent border-none focus-visible:ring-1 focus-visible:ring-ring px-2"
-                  />
-                  <Input
-                    value={editUrl}
-                    onChange={(e) => setEditUrl(e.target.value)}
-                    placeholder="URL"
-                    className="h-7 w-40 text-xs bg-transparent border-none focus-visible:ring-1 focus-visible:ring-ring px-2"
-                  />
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-gfo-success hover:text-gfo-success hover:bg-muted" onClick={saveEdit}>
-                    <Check className="w-3 h-3" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => setEditingId(null)}>
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`text-sm px-4 py-2 rounded-lg bg-muted border border-border hover:bg-secondary hover:border-primary/30 text-foreground transition-all flex items-center gap-2 ${isEditingLinks ? 'rounded-r-none border-r-0' : ''}`}
-                    onClick={(e) => isEditingLinks && e.preventDefault()}
-                  >
-                    {link.name}
-                    {!isEditingLinks && <ExternalLink className="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors opacity-50 group-hover:opacity-100" />}
-                  </a>
-                  {isEditingLinks && (
-                    <div className="flex items-center h-full border border-border border-l-0 rounded-r-lg bg-muted overflow-hidden">
-                      <button
-                        onClick={() => startEditing(link.id, link.name, link.url)}
-                        className="px-2 h-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors border-r border-border"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => deleteLink(link.id)}
-                        className="px-2 h-full hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-          {isEditingLinks && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAddNewLink}
-              className="h-[38px] rounded-lg border-dashed border-border bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 gap-1"
-            >
-              <Plus className="w-4 h-4" /> Add Link
-            </Button>
-          )}
-        </div>
+        {org.length > 0 && (
+          <div className="space-y-2">
+            {personal.length > 0 && (
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">Shared</p>
+            )}
+            <div className={gridClass}>{org.map(tile)}</div>
+          </div>
+        )}
+
+        {personal.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">Personal</p>
+            <div className={gridClass}>{personal.map(tile)}</div>
+          </div>
+        )}
+
+        {isEditingLinks && (
+          <button
+            onClick={openAdd}
+            className="flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Add link
+          </button>
+        )}
       </div>
+
+      <QuickLinkEditor
+        open={editorOpen}
+        link={editingLink}
+        isAdmin={isAdmin}
+        onSave={handleSave}
+        onClose={closeEditor}
+      />
 
       {/* Leadership-only: FIRs in progress (renders nothing for other roles) */}
       <FirLeadershipChip roles={[userRole]} className="mb-6" />

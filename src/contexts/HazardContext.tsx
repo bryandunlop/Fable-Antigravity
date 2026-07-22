@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { eventStore } from '../notifications/events';
+import { dedupeHazardsById, loadStoredHazards } from './hazardPersistence';
 
 // Define types based on existing components
 export const WORKFLOW_STAGES = {
@@ -412,7 +413,10 @@ const INITIAL_HAZARDS: Hazard[] = [
         submitterId: 'legacy_user'
     },
     {
-        id: 'HZ-010',
+        // HZ-010 was accidentally reused here and by 'Loose Tooling Found Near APU'
+        // above — a fresh seed then stored a duplicate id. Loose Tooling keeps
+        // HZ-010 (what dedup-repaired stores already resolve to); this is HZ-011.
+        id: 'HZ-011',
         title: 'New Published Safety Bulletin - Ramp Speeding',
         category: 'Ground Operations',
         severity: 'High',
@@ -434,33 +438,35 @@ export const HazardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [hazards, setHazards] = useState<Hazard[]>([]);
     const [currentUserId] = useState<string>(getStoredUserId());
 
-    // Load from local storage on mount
+    // Load from local storage on mount. loadStoredHazards repairs the stored
+    // list (duplicate ids from concurrent instances interleaving this
+    // read-merge-write cycle, malformed entries) and merges in any missing
+    // INITIAL_HAZARDS; only write back when the repair actually changed it.
     useEffect(() => {
-        const storedHazards = localStorage.getItem('aviation_hazards');
-        if (storedHazards) {
-            const parsedStored = JSON.parse(storedHazards);
-            // Merge any missing INITIAL_HAZARDS (helpful during development/demo)
-            const missingInitialHazards = INITIAL_HAZARDS.filter(
-                initial => !parsedStored.some((stored: Hazard) => stored.id === initial.id)
-            );
-
-            if (missingInitialHazards.length > 0) {
-                const combined = [...missingInitialHazards, ...parsedStored];
-                setHazards(combined);
-                localStorage.setItem('aviation_hazards', JSON.stringify(combined));
-            } else {
-                setHazards(parsedStored);
-            }
-        } else {
-            setHazards(INITIAL_HAZARDS);
-            localStorage.setItem('aviation_hazards', JSON.stringify(INITIAL_HAZARDS));
+        const { hazards: loaded, changed } = loadStoredHazards(
+            localStorage.getItem('aviation_hazards'),
+            INITIAL_HAZARDS
+        );
+        setHazards(loaded);
+        if (changed) {
+            localStorage.setItem('aviation_hazards', JSON.stringify(loaded));
         }
+
+        // Converge concurrent instances on the same origin: adopt writes made
+        // by other tabs (the storage event only fires in non-writing tabs).
+        const onStorage = (e: StorageEvent) => {
+            if (e.key !== 'aviation_hazards' || e.newValue === null) return;
+            setHazards(loadStoredHazards(e.newValue, INITIAL_HAZARDS).hazards);
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
     }, []);
 
-    // Save to local storage whenever hazards change
+    // Save to local storage whenever hazards change, deduped by id so a bad
+    // in-memory state can never re-corrupt the store.
     useEffect(() => {
         if (hazards.length > 0) {
-            localStorage.setItem('aviation_hazards', JSON.stringify(hazards));
+            localStorage.setItem('aviation_hazards', JSON.stringify(dedupeHazardsById(hazards)));
         }
     }, [hazards]);
 
