@@ -1,24 +1,68 @@
-// Serviceability alerts strip for the scheduling hub: upcoming trips × the
-// tech-log DERIVED GREEN/AMBER/RED projection (engine/tripAlerts, via the
-// bridge). Pure presentation — all logic + tests live in tripAlerts.ts.
+// Serviceability alerts for the scheduling hub — one card per aircraft-cause
+// (LG-27, option C). Grouping logic + tests live in alertGroups.ts; the alert
+// derivation + tests in tech-log/engine/tripAlerts.ts. Pure presentation here.
 // Red/amber here IS aircraft RAG status semantics (never brand accents).
 
-import { useState } from 'react';
 import { AlertTriangle, OctagonAlert } from 'lucide-react';
-import type { TripServiceabilityAlert, TripAlertKind } from '../tech-log/bridge';
+import type { TripServiceabilityAlert } from '../tech-log/bridge';
+import { groupAlertsByAircraft, type AircraftAlertGroup } from './alertGroups';
 
-const COLLAPSED_COUNT = 8;
-
-const KIND_LABEL: Record<TripAlertKind, string> = {
-  RED_AT_ETD: 'Aircraft RED at departure',
-  DEFERRAL_EXPIRES_MID_TRIP: 'MEL clock runs out mid-trip',
-  ACTIVE_DEFERRAL_INFO: 'Departing on active deferral',
-};
+const CHIP_LIMIT = 6;
 
 function fmtUtc(iso: string): string {
   return `${new Date(iso).toLocaleString('en-US', {
     timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
   })}Z`;
+}
+
+function fmtUtcDay(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
+}
+
+function GroupCard({ group, onOpenTrip }: { group: AircraftAlertGroup; onOpenTrip: (tripId: string) => void }) {
+  const red = group.severity === 'red';
+  const visibleChips = group.trips.slice(0, CHIP_LIMIT);
+  const hiddenCount = group.trips.length - visibleChips.length;
+
+  return (
+    <div className="rounded-lg border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {red
+          ? <OctagonAlert className="h-4 w-4 shrink-0 text-red-600" aria-label="Grounding" />
+          : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" aria-label="Caution" />}
+        <span className="text-sm font-mono font-medium">{group.tail}</span>
+        <span className={`text-sm font-medium ${red ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+          {group.headline}
+        </span>
+        <span className="ml-auto text-xs text-muted-foreground">
+          {group.trips.length} trip{group.trips.length === 1 ? '' : 's'} through {fmtUtcDay(group.lastEtdUtc)}
+          {group.dueUtc ? ` · clock expires ${fmtUtc(group.dueUtc)}` : ''}
+        </span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {visibleChips.map(chip => (
+          <button
+            key={chip.tripId}
+            type="button"
+            onClick={() => onOpenTrip(chip.tripId)}
+            className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors hover:bg-muted/60 ${
+              chip.kind === 'DEFERRAL_EXPIRES_MID_TRIP'
+                ? 'border-amber-500 text-amber-800 dark:text-amber-300'
+                : 'border-border text-foreground'
+            }`}
+          >
+            {chip.tripNumber} · {fmtUtcDay(chip.etdUtc)}
+            {chip.kind === 'DEFERRAL_EXPIRES_MID_TRIP' ? ' · mid-trip' : ''}
+          </button>
+        ))}
+        {hiddenCount > 0 && (
+          <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground">
+            +{hiddenCount}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function OpsAlertsPanel({
@@ -28,56 +72,21 @@ export function OpsAlertsPanel({
   alerts: TripServiceabilityAlert[];
   onOpenTrip: (tripId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   if (alerts.length === 0) return null;
-  const redCount = alerts.filter(a => a.severity === 'red').length;
-  const visible = expanded ? alerts : alerts.slice(0, COLLAPSED_COUNT);
-  const hidden = alerts.length - visible.length;
+  const groups = groupAlertsByAircraft(alerts);
+  const redGroups = groups.filter(g => g.severity === 'red').length;
+  const tripCount = alerts.length;
 
   return (
-    <div className="rounded-lg border border-border bg-card">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b">
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 px-1">
         <OctagonAlert className="h-4 w-4 text-red-600" />
         <span className="text-sm font-semibold">Serviceability alerts</span>
         <span className="text-xs text-muted-foreground">
-          {redCount > 0 ? `${redCount} grounding · ` : ''}{alerts.length} total — derived from tech-log status at each departure time
+          {redGroups > 0 ? `${redGroups} aircraft grounding trips · ` : ''}{tripCount} trip{tripCount === 1 ? '' : 's'} affected — derived from tech-log status at each departure time
         </span>
       </div>
-      <ul className="divide-y">
-        {visible.map(a => (
-          <li key={`${a.tripId}-${a.kind}`}>
-            <button
-              type="button"
-              onClick={() => onOpenTrip(a.tripId)}
-              className="w-full text-left px-4 py-2.5 hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                {a.severity === 'red'
-                  ? <OctagonAlert className="h-4 w-4 shrink-0 text-red-600" aria-label="Grounding" />
-                  : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" aria-label="Caution" />}
-                <span className="text-sm font-medium">{a.tripNumber}</span>
-                <span className="text-xs font-mono text-muted-foreground">{a.tail}</span>
-                <span className={`text-xs font-medium ${a.severity === 'red' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
-                  {KIND_LABEL[a.kind]}
-                </span>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  ETD {fmtUtc(a.etdUtc)}{a.dueUtc ? ` · clock expires ${fmtUtc(a.dueUtc)}` : ''}
-                </span>
-              </div>
-              <p className="mt-0.5 pl-6 text-xs text-muted-foreground line-clamp-1">{a.detail}</p>
-            </button>
-          </li>
-        ))}
-      </ul>
-      {(hidden > 0 || expanded) && (
-        <button
-          type="button"
-          onClick={() => setExpanded(e => !e)}
-          className="w-full px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border-t transition-colors"
-        >
-          {expanded ? 'Show fewer' : `Show all ${alerts.length} alerts (+${hidden} more)`}
-        </button>
-      )}
+      {groups.map(g => <GroupCard key={g.tail} group={g} onOpenTrip={onOpenTrip} />)}
     </div>
   );
 }
