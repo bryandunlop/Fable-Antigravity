@@ -22,14 +22,17 @@ export default function ApprovalsInbox({ userRole, additionalRoles = [] }: Props
   const mine = requestedByName(requests, CURRENT_USER.name);
 
   function decide(req: ApprovalRequest, decision: 'approve' | 'deny', comment?: string) {
+    const note = comment?.trim();
     const updated = decideRequest(req.id, decision, `${roleLabel(userRole)}`, comment);
     if (!updated) return;
     // Tell the requester what happened; if it advanced, ping the next approver.
     eventStore.publish({
-      id: `approval-decida-${req.id}-${Date.now()}`,
+      id: `approval-decided-${req.id}-${Date.now()}`,
       severity: decision === 'deny' ? 'warn' : 'info',
       title: decision === 'deny' ? `Waiver denied: ${req.subjectTitle}` : (updated.status === 'approved' ? `Waiver approved: ${req.subjectTitle}` : `${req.subjectTitle}: ${roleLabel(userRole)} approved`),
-      detail: decision === 'deny' ? (comment?.trim() || 'See the approver’s note') : (updated.status === 'approved' ? 'Fully approved' : `Now with ${roleLabel(currentApproverRole(updated) || '')}`),
+      detail: decision === 'deny'
+        ? (note ? `${roleLabel(userRole)}: “${note}”` : `Denied by ${roleLabel(userRole)}`)
+        : (updated.status === 'approved' ? 'Fully approved' : `Now with ${roleLabel(currentApproverRole(updated) || '')}`),
       module: 'Safety', link: '/approvals',
       audienceRoles: [req.requestedByRole, ...(updated.status === 'pending' && currentApproverRole(updated) ? [currentApproverRole(updated) as string] : [])],
     });
@@ -127,13 +130,23 @@ function MineRow({ req }: { req: ApprovalRequest }) {
     req.status === 'approved' ? { text: 'Approved', tone: 'text-[color:var(--gfo-success)]', icon: <Check className="w-4 h-4" /> }
       : req.status === 'denied' ? { text: 'Denied', tone: 'text-[color:var(--gfo-error)]', icon: <X className="w-4 h-4" /> }
         : { text: `With ${roleLabel(currentApproverRole(req) || '')}`, tone: 'text-[color:var(--gfo-warning)]', icon: <Clock className="w-4 h-4" /> };
+  // The outcome you most want to see on your own request is the deciding
+  // approver's note — surface the last actioned step's comment (esp. a denial).
+  const lastDecided = [...req.chain].reverse().find((s) => s.status !== 'pending');
   return (
-    <div className="flex items-center justify-between gap-3 bg-card border border-border rounded-[12px] px-4 py-3">
-      <div className="min-w-0">
-        <div className="text-[14px] text-foreground truncate">{req.subjectTitle}</div>
-        <div className="text-[12px] text-muted-foreground mt-0.5">{req.formLabel} · filed {timeAgo(req.requestedAt)}</div>
+    <div className="bg-card border border-border rounded-[12px] px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[14px] text-foreground truncate">{req.subjectTitle}</div>
+          <div className="text-[12px] text-muted-foreground mt-0.5">{req.formLabel} · filed {timeAgo(req.requestedAt)}</div>
+        </div>
+        <span className={`text-[12.5px] font-medium flex items-center gap-1.5 whitespace-nowrap ${label.tone}`}>{label.icon}{label.text}</span>
       </div>
-      <span className={`text-[12.5px] font-medium flex items-center gap-1.5 whitespace-nowrap ${label.tone}`}>{label.icon}{label.text}</span>
+      {lastDecided?.comment && (
+        <div className="text-[12.5px] text-muted-foreground mt-2 pt-2 border-t border-border">
+          {roleLabel(lastDecided.role)}: “{lastDecided.comment}”
+        </div>
+      )}
     </div>
   );
 }

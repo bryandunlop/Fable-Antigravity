@@ -9,8 +9,8 @@
 // template and the typed stores (HazardContext, asapReports, cwsRecognitions):
 // those ids map onto real store columns; any OTHER field the manager adds is
 // preserved as "Label: value" lines appended to the record's description.
-// That no-answer-dropped guarantee holds for hazard/asap/cws — NOT waiver,
-// which still has no store (filing a waiver only raises a notification).
+// Waiver has no dedicated store — its filed answers are snapshotted onto the
+// ApprovalRequest it creates (D39 / approvalRequests.ts), so nothing is dropped.
 
 import { useEffect, useReducer } from 'react';
 import type { FormField, FormTemplate } from './types';

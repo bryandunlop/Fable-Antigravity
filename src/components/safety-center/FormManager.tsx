@@ -55,8 +55,22 @@ export function FormManager() {
   }
 
   // ── approval routing (D39) ──
+  // Only storeless forms (waiver) use the generic chain engine. Forms that
+  // already have their own destination — hazard's workflow, ASAP's confidential
+  // review, the recognitions wall, trip-side FRAT/GRAT — would get a SECOND,
+  // disconnected record if routed here, so the chain editor is replaced by a
+  // note pointing at where that form actually goes.
   const chain = selected.approvalChain ?? [];
-  const isHazard = selected.kind === 'Hazard';
+  const OWN_FLOW_NOTE: Partial<Record<FormTemplate['kind'], string>> = {
+    Hazard: 'Hazard approvals run through the hazard workflow (Manager → Accountable Executive review), not this chain.',
+    ASAP: 'ASAP reports route through the confidential ASAP review queue (Reviews → ASAP), not this chain.',
+    CWS: 'Recognitions post to the Recognitions wall and need no approval step.',
+    FRAT: 'Flight Risk Assessments are reviewed on the trip (Reviews → FRAT), not through this chain.',
+    GRAT: 'Ground Risk Assessments are reviewed on the trip (Reviews → GRAT), not through this chain.',
+    Audit: 'Audits are managed in the Audits console, not through this chain.',
+  };
+  const ownFlowNote = OWN_FLOW_NOTE[selected.kind];
+  const isRoutable = !ownFlowNote;
   function setChain(next: string[]) { mutate((t) => ({ ...t, approvalChain: next })); }
   function addApprover() {
     // Default to a role not already in the chain, else the first role.
@@ -157,9 +171,9 @@ export function FormManager() {
         {/* Approval routing (D39): who a filed form goes to, in order. */}
         <div className="mt-6 pt-5 border-t border-border">
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Approval routing</div>
-          {isHazard ? (
+          {!isRoutable ? (
             <div className="text-[12.5px] text-muted-foreground bg-muted/40 border border-border rounded-[9px] px-3 py-2.5">
-              Hazard approvals run through the hazard workflow (Manager → Accountable Executive review), not this chain.
+              {ownFlowNote}
             </div>
           ) : chain.length === 0 ? (
             <>
@@ -198,7 +212,7 @@ export function FormManager() {
         </div>
 
         <div className="mt-5 pt-4 border-t border-border text-[11.5px] text-muted-foreground">
-          Saving updates the live form — crew see these fields the next time they open <b className="text-foreground font-medium">Report</b>. Answers to fields you add are kept on the record even though the archive has no dedicated column for them.{!isHazard && ' Filed forms route to each approver above, in order, in their own Approvals inbox.'} {selected.scored && 'Scoring rules for this risk form are configured in the FRAT/GRAT builders, not here.'}
+          Saving updates the live form — crew see these fields the next time they open <b className="text-foreground font-medium">Report</b>. Answers to fields you add are kept on the record even though the archive has no dedicated column for them.{isRoutable && chain.length > 0 && ' Filed forms route to each approver above, in order, in their own Approvals inbox.'} {selected.scored && 'Scoring rules for this risk form are configured in the FRAT/GRAT builders, not here.'}
         </div>
       </div>
     </div>
