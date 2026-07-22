@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Plus, Trash2, ArrowUp, ArrowDown, GripVertical, Check } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, GripVertical, Check, ArrowDownRight } from 'lucide-react';
 import { Button } from '../ui/button';
 import { getFormTemplates, saveFormTemplate } from './formTemplates';
+import { APPROVER_ROLES } from './approvalRequests';
 import type { FieldType, FormField, FormTemplate } from './types';
 
 const FIELD_TYPES: FieldType[] = ['text', 'textarea', 'select', 'radio', 'checkbox', 'multiselect', 'number', 'date'];
@@ -51,6 +52,25 @@ export function FormManager() {
   function remove(id: string) { mutate((t) => ({ ...t, fields: t.fields.filter((f) => f.id !== id) })); }
   function addField() {
     mutate((t) => ({ ...t, fields: [...t.fields, { id: `f${Date.now()}`, label: 'New field', type: 'text', required: false }] }));
+  }
+
+  // ── approval routing (D39) ──
+  const chain = selected.approvalChain ?? [];
+  const isHazard = selected.kind === 'Hazard';
+  function setChain(next: string[]) { mutate((t) => ({ ...t, approvalChain: next })); }
+  function addApprover() {
+    // Default to a role not already in the chain, else the first role.
+    const unused = APPROVER_ROLES.find((r) => !chain.includes(r.value)) ?? APPROVER_ROLES[0];
+    setChain([...chain, unused.value]);
+  }
+  function setApprover(i: number, role: string) { setChain(chain.map((r, j) => (j === i ? role : r))); }
+  function removeApprover(i: number) { setChain(chain.filter((_, j) => j !== i)); }
+  function moveApprover(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= chain.length) return;
+    const next = chain.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    setChain(next);
   }
   function save() {
     // The store sanitizes (a choice field never persists with zero options);
@@ -134,8 +154,51 @@ export function FormManager() {
           <Plus className="w-4 h-4" /> Add field
         </button>
 
+        {/* Approval routing (D39): who a filed form goes to, in order. */}
+        <div className="mt-6 pt-5 border-t border-border">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Approval routing</div>
+          {isHazard ? (
+            <div className="text-[12.5px] text-muted-foreground bg-muted/40 border border-border rounded-[9px] px-3 py-2.5">
+              Hazard approvals run through the hazard workflow (Manager → Accountable Executive review), not this chain.
+            </div>
+          ) : chain.length === 0 ? (
+            <>
+              <div className="text-[12.5px] text-muted-foreground mb-2.5">No approval step — a filed {selected.name.toLowerCase()} is recorded and the safety team is notified, with no sign-off gate.</div>
+              <button onClick={addApprover} className="flex items-center gap-2 text-[13px] font-medium text-accent hover:underline">
+                <Plus className="w-4 h-4" /> Add an approver
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2">
+                {chain.map((role, i) => (
+                  <div key={i}>
+                    {i > 0 && <div className="flex items-center gap-1 text-muted-foreground/60 pl-2.5 py-0.5"><ArrowDownRight className="w-3.5 h-3.5" /></div>}
+                    <div className="flex items-center gap-2 bg-muted/40 border border-border rounded-[9px] px-2.5 py-2">
+                      <span className="w-[22px] h-[22px] rounded-full bg-accent/15 text-accent text-[12px] font-semibold grid place-items-center shrink-0">{i + 1}</span>
+                      <select value={role} onChange={(e) => setApprover(i, e.target.value)}
+                        className="flex-1 min-w-0 text-[13.5px] bg-card border border-border rounded-md px-2 py-1.5 text-foreground">
+                        {APPROVER_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                      <span className="text-[11px] text-muted-foreground shrink-0">{i === chain.length - 1 ? 'final' : `then step ${i + 2}`}</span>
+                      <div className="flex shrink-0">
+                        <button onClick={() => moveApprover(i, -1)} disabled={i === 0} className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => moveApprover(i, 1)} disabled={i === chain.length - 1} className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => removeApprover(i)} className="p-1 text-muted-foreground hover:text-[color:var(--gfo-error)]"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={addApprover} className="mt-2.5 flex items-center gap-2 text-[13px] font-medium text-accent hover:underline">
+                <Plus className="w-4 h-4" /> Add approver
+              </button>
+            </>
+          )}
+        </div>
+
         <div className="mt-5 pt-4 border-t border-border text-[11.5px] text-muted-foreground">
-          Saving updates the live form — crew see these fields the next time they open <b className="text-foreground font-medium">Report</b>. Answers to fields you add are kept on the record even though the archive has no dedicated column for them. {selected.scored && 'Scoring rules for this risk form are configured in the FRAT/GRAT builders, not here.'}
+          Saving updates the live form — crew see these fields the next time they open <b className="text-foreground font-medium">Report</b>. Answers to fields you add are kept on the record even though the archive has no dedicated column for them.{!isHazard && ' Filed forms route to each approver above, in order, in their own Approvals inbox.'} {selected.scored && 'Scoring rules for this risk form are configured in the FRAT/GRAT builders, not here.'}
         </div>
       </div>
     </div>

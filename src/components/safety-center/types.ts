@@ -110,6 +110,10 @@ export interface FormTemplate {
   description: string;
   scored: boolean;      // risk-scored forms (FRAT/GRAT) vs plain
   fields: FormField[];
+  // Ordered approver role ids (D39). A filed form with a non-empty chain
+  // creates an ApprovalRequest routed through these roles in turn. Undefined /
+  // empty = no approval step. Not honored for Hazard (its own workflow governs).
+  approvalChain?: string[];
 }
 
 // ---- Published reports (everyone) ----

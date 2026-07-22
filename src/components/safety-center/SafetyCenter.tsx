@@ -23,6 +23,7 @@ import { unacknowledgedRequiredReads } from '../documents/engine/acknowledgments
 import { createAsap } from './asapReports';
 import { createCws } from './cwsRecognitions';
 import { getFormTemplates, templateForKind, describeWithExtras, MULTI_SEP } from './formTemplates';
+import { createApprovalRequest, roleLabel } from './approvalRequests';
 import MyFRATSubmissions from '../MyFRATSubmissions';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
 
@@ -110,10 +111,41 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   }
   function openReport(kind: Kind | null = null) { setReportKind(kind); setReportOpen(true); }
 
+  const KIND_LABEL: Record<Kind, string> = { hazard: 'Hazard', asap: 'ASAP', cws: 'Recognition', waiver: 'Waiver' };
+  function subjectTitleFor(kind: Kind, values: Record<string, string>): string {
+    if (kind === 'waiver') return (values.request || '').trim().slice(0, 70) || 'Waiver request';
+    if (kind === 'asap') return `ASAP — ${(values.airport || 'event').trim()}`;
+    if (kind === 'cws') return `Recognition — ${(values.who || 'a colleague').trim()}`;
+    return (values.title || 'Report').trim();
+  }
+
+  // If the template carries an approval chain (D39), create an ApprovalRequest
+  // and ping the first approver's inbox. Hazard is excluded (own workflow).
+  // Returns true when the form was routed for approval.
+  function routeForApproval(kind: Kind, values: Record<string, string>, template: ReturnType<typeof templateForKind>, subjectTitle: string): boolean {
+    const chain = template?.approvalChain ?? [];
+    if (kind === 'hazard' || !chain.length) return false;
+    const fieldLabels = Object.fromEntries((template!.fields).map((f) => [f.id, f.label]));
+    createApprovalRequest({
+      formKind: kind, formLabel: KIND_LABEL[kind], subjectTitle,
+      values, fieldLabels,
+      requestedByRole: userRole, requestedByName: CURRENT_USER.name,
+      chainRoles: chain,
+    });
+    const first = chain[0];
+    eventStore.publish({
+      id: `approval-${kind}-${Date.now()}`,
+      severity: 'info', title: `Approval needed: ${subjectTitle}`, detail: `Awaiting ${roleLabel(first)}`,
+      module: 'Safety', link: '/approvals', audienceRoles: [first, 'admin'],
+    });
+    return true;
+  }
+
   // Values arrive keyed by the template's field ids. Well-known ids map onto
   // real store columns (KNOWN_IDS); anything the safety manager added to the
-  // template is appended to the description via describeWithExtras. Holds for
-  // hazard/asap/cws; the waiver branch still has no store and only notifies.
+  // template is appended to the description via describeWithExtras. A form whose
+  // template has an approval chain is additionally routed for sign-off; waivers
+  // have no store, so the approval request IS their record.
   function handleFiled(kind: Kind, values: Record<string, string>) {
     const template = templateForKind(getFormTemplates(), kind);
     const withExtras = (base: string) => (template ? describeWithExtras(template, values, kind, base) : base);
@@ -138,6 +170,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
       });
       return;
     }
+
+    const subjectTitle = subjectTitleFor(kind, values);
+
     if (kind === 'asap') {
       // Persist a confidential ASAP report — it lands in the ASAP reviewer queue.
       createAsap({
@@ -152,9 +187,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         severity: 'info', title: 'New ASAP report filed', detail: 'Confidential — awaiting review',
         module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin'],
       });
-      return;
-    }
-    if (kind === 'cws') {
+    } else if (kind === 'cws') {
       // Persist a recognition — it appears on the Recognitions wall.
       createCws({
         recognized: (values.who || '').trim(),
@@ -166,14 +199,18 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         title: `Recognition logged: ${(values.who || 'a colleague').trim()}`, detail: 'Caught Working Safely',
         module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin', 'lead'],
       });
-      return;
     }
-    // Waiver doesn't have a store wired yet (later phase) — notify for now.
-    eventStore.publish({
-      id: `safety-file-${kind}-${Date.now()}`,
-      severity: 'info', title: 'New waiver request', detail: 'Awaiting review',
-      module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin'],
-    });
+
+    const routed = routeForApproval(kind, values, template, subjectTitle);
+
+    // Waiver with no chain configured has no store at all — fall back to a notice.
+    if (!routed && kind === 'waiver') {
+      eventStore.publish({
+        id: `safety-file-${kind}-${Date.now()}`,
+        severity: 'info', title: 'New waiver request', detail: 'Awaiting review',
+        module: 'Safety', link: '/safety', audienceRoles: ['safety', 'admin'],
+      });
+    }
   }
 
   const STAGE_ORDER = Object.values(WORKFLOW_STAGES);

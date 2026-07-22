@@ -18,8 +18,9 @@ import type { Kind } from './ReportDialog';
 
 const KEY = 'sc_form_templates_v1';
 // Bumping SEED_VERSION replaces stored templates with the new seeds — demo
-// semantics: a seed upgrade wins over saved manager edits.
-const SEED_VERSION = 2;
+// semantics: a seed upgrade wins over saved manager edits. v3 adds the waiver
+// approvalChain (D39).
+const SEED_VERSION = 3;
 
 export const SEED_TEMPLATES: FormTemplate[] = [
   {
@@ -69,6 +70,9 @@ export const SEED_TEMPLATES: FormTemplate[] = [
   },
   {
     id: 'tpl-waiver', kind: 'Waiver', name: 'Waiver request', description: 'Request an exception or extension.', scored: false,
+    // Flagship of the D39 routing engine: a filed waiver walks Safety Manager
+    // then Chief Pilot, each deciding from their own Approvals inbox.
+    approvalChain: ['safety', 'chief-pilot'],
     fields: [
       { id: 'request', label: 'What are you requesting?', type: 'textarea', required: true },
       { id: 'justification', label: 'Reason / justification', type: 'textarea', required: true },
