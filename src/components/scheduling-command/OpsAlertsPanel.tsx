@@ -3,8 +3,11 @@
 // bridge). Pure presentation — all logic + tests live in tripAlerts.ts.
 // Red/amber here IS aircraft RAG status semantics (never brand accents).
 
+import { useState } from 'react';
 import { AlertTriangle, OctagonAlert } from 'lucide-react';
 import type { TripServiceabilityAlert, TripAlertKind } from '../tech-log/bridge';
+
+const COLLAPSED_COUNT = 8;
 
 const KIND_LABEL: Record<TripAlertKind, string> = {
   RED_AT_ETD: 'Aircraft RED at departure',
@@ -25,8 +28,11 @@ export function OpsAlertsPanel({
   alerts: TripServiceabilityAlert[];
   onOpenTrip: (tripId: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (alerts.length === 0) return null;
   const redCount = alerts.filter(a => a.severity === 'red').length;
+  const visible = expanded ? alerts : alerts.slice(0, COLLAPSED_COUNT);
+  const hidden = alerts.length - visible.length;
 
   return (
     <div className="rounded-lg border border-border bg-card">
@@ -38,7 +44,7 @@ export function OpsAlertsPanel({
         </span>
       </div>
       <ul className="divide-y">
-        {alerts.map(a => (
+        {visible.map(a => (
           <li key={`${a.tripId}-${a.kind}`}>
             <button
               type="button"
@@ -63,6 +69,15 @@ export function OpsAlertsPanel({
           </li>
         ))}
       </ul>
+      {(hidden > 0 || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded(e => !e)}
+          className="w-full px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border-t transition-colors"
+        >
+          {expanded ? 'Show fewer' : `Show all ${alerts.length} alerts (+${hidden} more)`}
+        </button>
+      )}
     </div>
   );
 }
