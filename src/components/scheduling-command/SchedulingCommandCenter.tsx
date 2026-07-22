@@ -12,6 +12,7 @@ import type { TaskAction } from '../../scheduling/engine/tasks';
 import { boardTripOf, toBoardTask, type BoardTrip, type BoardTask } from './adapter';
 import { readFleetServiceability, readTripServiceabilityAlerts, type TripForAlerts } from '../tech-log/bridge';
 import { OpsAlertsPanel } from './OpsAlertsPanel';
+import { toTripsForAlerts } from './alertTrips';
 import { fleetRowsFor } from './fleet';
 import { deriveTripStatus } from './tripStatus';
 import { PlanBoard } from './PlanBoard';
@@ -81,18 +82,7 @@ export default function SchedulingCommandCenter({
       if (!cancelled) {
         setTrips(board);
         // Raw legs feed the serviceability-alert join (BoardTrip drops them).
-        setAlertTrips(rows
-          .filter(t => t.status !== 'cancelled' && t.status !== 'completed')
-          .map(t => ({
-            tripId: t.id,
-            tripNumber: t.tripNumber,
-            tail: t.tail,
-            legs: t.legs.map(l => ({
-              legId: l.id,
-              departureTimeUtc: l.departureTimeUtc,
-              ...(l.arrivalTimeUtc ? { arrivalTimeUtc: l.arrivalTimeUtc } : {}),
-            })),
-          })));
+        setAlertTrips(toTripsForAlerts(rows));
       }
     })();
     return () => { cancelled = true; };

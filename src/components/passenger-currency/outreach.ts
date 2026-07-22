@@ -35,6 +35,17 @@ function read(): OutreachMap {
 let cache: OutreachMap = read();
 const listeners = new Set<() => void>();
 
+// Cross-tab sync: another tab's write invalidates this tab's cache (review
+// finding — without this, a stale tab's mark() could clobber a newer write).
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', e => {
+    if (e.key === STORAGE_KEY) {
+      cache = read();
+      listeners.forEach(l => l());
+    }
+  });
+}
+
 function write(next: OutreachMap) {
   cache = next;
   try {

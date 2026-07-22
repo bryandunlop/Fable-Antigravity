@@ -51,6 +51,9 @@ const SEVERITY_RANK: Record<TripAlertKind, number> = {
   ACTIVE_DEFERRAL_INFO: 2,
 };
 
+/** Window extension when a final leg has no confirmed arrival time. */
+export const UNKNOWN_ARRIVAL_GRACE_MS = 24 * 60 * 60 * 1000;
+
 export function deriveTripServiceabilityAlerts(
   state: TechLogState,
   trips: TripForAlerts[],
@@ -65,8 +68,14 @@ export function deriveTripServiceabilityAlerts(
 
     const legs = [...trip.legs].sort((a, b) => a.departureTimeUtc.localeCompare(b.departureTimeUtc));
     const lastLeg = legs[legs.length - 1];
-    const tripEndUtc = lastLeg.arrivalTimeUtc ?? lastLeg.departureTimeUtc;
-    if (tripEndUtc < nowUtc) continue; // fully in the past
+    // No confirmed arrival on the final leg (the "+ New Trip" dialog never sets
+    // one): the trip is NOT over just because its last departure passed — the
+    // aircraft may be airborne with a clock running. Cover it with a deliberate
+    // 24h over-estimate (longer than any fleet leg) rather than a guessed
+    // duration; erring long only extends the alert window, never shrinks it.
+    const tripEndUtc = lastLeg.arrivalTimeUtc
+      ?? new Date(new Date(lastLeg.departureTimeUtc).getTime() + UNKNOWN_ARRIVAL_GRACE_MS).toISOString();
+    if (tripEndUtc < nowUtc) continue; // past its known (or grace-extended) end
 
     const remaining = legs.filter(l => l.departureTimeUtc >= nowUtc);
     const firstEtd = remaining[0]?.departureTimeUtc ?? legs[0].departureTimeUtc;
@@ -101,6 +110,15 @@ export function deriveTripServiceabilityAlerts(
     if (remaining.length > 0 &&
         deriveServiceability(ac.id, state, firstEtd).status === 'RED') {
       alerts.push(redAlertFor(remaining[0].legId, firstEtd));
+      continue;
+    }
+
+    // Ongoing trip (every leg departed, still inside its known/grace window):
+    // evaluate at NOW — a RED aircraft mid-trip is exactly the away-from-base
+    // case the scheduler must see. Non-RED ongoing trips fall through so a
+    // deferral boundary landing before the trip's end still raises mid-trip.
+    if (remaining.length === 0 && deriveServiceability(ac.id, state, nowUtc).status === 'RED') {
+      alerts.push(redAlertFor(lastLeg.legId, nowUtc));
       continue;
     }
 

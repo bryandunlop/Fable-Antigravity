@@ -103,4 +103,39 @@ describe('deriveTripServiceabilityAlerts unit behaviours', () => {
     expect(alerts[0].kind).toBe('RED_AT_ETD');
     expect(alerts[0].drivingDeferralId).toBe('df-n6pg');
   });
+
+  // Review-finding regressions: a final leg with NO arrival time (the "+ New
+  // Trip" dialog never sets one) must not shrink or drop the alert window.
+
+  it('still alerts on a RED aircraft whose no-arrival leg departed hours ago (airborne/ongoing trip)', () => {
+    const ongoing: TripForAlerts = {
+      tripId: 't-ongoing', tripNumber: 'T-ONGOING', tail: 'N1PG',
+      legs: [{ legId: 'l1', departureTimeUtc: day(0, -3) }], // departed 3h ago, no arrival known
+    };
+    const alerts = deriveTripServiceabilityAlerts(state, [ongoing], NOW);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].kind).toBe('RED_AT_ETD');
+    expect(alerts[0].drivingDefectId).toBe('d-n1pg');
+  });
+
+  it('catches a deferral clock expiring during a no-arrival final leg (24h grace window)', () => {
+    // N6PG due ≈ +8d16h. Single leg departs +8d12h with no arrival time: the
+    // due boundary falls inside departure+24h, so the mid-trip alert must fire.
+    const noArrival: TripForAlerts = {
+      tripId: 't-noarr', tripNumber: 'T-NOARR', tail: 'N6PG',
+      legs: [{ legId: 'l1', departureTimeUtc: day(8, 12) }],
+    };
+    const alerts = deriveTripServiceabilityAlerts(state, [noArrival], NOW);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].kind).toBe('DEFERRAL_EXPIRES_MID_TRIP');
+    expect(alerts[0].drivingDeferralId).toBe('df-n6pg');
+  });
+
+  it('still skips a no-arrival trip once it is beyond the grace window', () => {
+    const longGone: TripForAlerts = {
+      tripId: 't-gone', tripNumber: 'T-GONE', tail: 'N1PG',
+      legs: [{ legId: 'l1', departureTimeUtc: day(-3) }], // departed 3 days ago
+    };
+    expect(deriveTripServiceabilityAlerts(state, [longGone], NOW)).toHaveLength(0);
+  });
 });
