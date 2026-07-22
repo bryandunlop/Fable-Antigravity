@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { InMemorySchedulingStore, SchedulingService, seedTemplates, seedDemoTrips, seedVolumeTrips } from '../../scheduling/store';
 import { defaultPilotVisibleDefs } from '../../scheduling/engine';
+import { seedMyairopsBookingTrips } from '../../integration/myairops/seedMyairops';
 
 interface SchedulingWorkspaceContextValue {
   service: SchedulingService;
@@ -45,6 +46,10 @@ function ensureSeeded(): Promise<void> {
       // Month-scale deterministic volume (real checklists, proximity-worked) so the
       // command-center plan/run boards demonstrate dozens-of-trips scale.
       await seedVolumeTrips(service, new Date().toISOString());
+      // Booking-API fixture trips through the real myairops adapter — the exact
+      // path a Phase-2 pull takes. These carry the serviceability-alert and
+      // passenger-currency demo scenarios (MAO-7301/7305/7310).
+      await seedMyairopsBookingTrips(service, new Date().toISOString());
     })();
   }
   return seedPromise;
