@@ -82,6 +82,7 @@
             "autoprefixer": "^10.4.22",
             "dotenv": "^17.4.2",
             "drizzle-kit": "^0.31.10",
+            "openapi-typescript": "^7.13.0",
             "postcss": "^8.5.6",
             "tailwindcss": "^4.1.17",
             "terser": "^5.44.1",
@@ -101,6 +102,7 @@
             "db:seed": "tsx src/server/db/seed.ts",
             "db:studio": "drizzle-kit studio",
             "test": "vitest run",
-            "test:watch": "vitest"
+            "test:watch": "vitest",
+            "gen:myairops": "openapi-typescript src/integration/myairops/schemas/crm.json -o src/integration/myairops/gen/crm.ts && openapi-typescript src/integration/myairops/schemas/booking.json -o src/integration/myairops/gen/booking.ts && openapi-typescript src/integration/myairops/schemas/maintenance.json -o src/integration/myairops/gen/maintenance.ts"
       }
 }

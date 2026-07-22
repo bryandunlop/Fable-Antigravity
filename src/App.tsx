@@ -86,6 +86,7 @@ import FlightAttendantFlights from './components/inflight/FlightAttendantFlights
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 import UnifiedTripWorkspace from './components/experimental/UnifiedTripWorkspace';
 import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
+import PassengerCurrencyDashboard from './components/passenger-currency/PassengerCurrencyDashboard';
 
 import ForeFlightSyncProvider from './components/ForeFlightSyncProvider';
 import ForeFlightTestUpload from './components/ForeFlightTestUpload';
@@ -446,6 +447,14 @@ export default function App() {
                                 />
                                 {/* Retired: the tabbed workspace folded into the command-center hub. */}
                                 <Route path="/scheduling-workspace" element={<Navigate to="/scheduling-command" replace />} />
+                                <Route
+                                  path="/passenger-currency"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin']}>
+                                      <PassengerCurrencyDashboard />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route
                                   path="/pilot-workspace/*"
                                   element={

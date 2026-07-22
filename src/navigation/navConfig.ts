@@ -112,6 +112,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', domain: 'scheduling', icon: Calendar, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: MapPin, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: FileText, primary: false, roles: ['scheduling', 'admin'] },
+  { path: '/passenger-currency', label: 'Passenger Data Currency', domain: 'scheduling', icon: UserCheck, primary: false, keywords: ['passport', 'stale', 'outreach', 'manifest', 'crm'], roles: ['scheduling', 'admin'] },
 
   // ── Inflight ──────────────────────────────────────────────────────────────
   { path: '/upcoming-flights', label: 'Upcoming Trips', domain: 'inflight', icon: Calendar, primary: true, keywords: ['flights', 'manifest'], roles: ['inflight', 'admin'] },
