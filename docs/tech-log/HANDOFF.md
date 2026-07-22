@@ -125,3 +125,9 @@ Bryan has a screen recording (`ScreenRecording_06-19-2026 23-53-38_1.MP4` in `~/
 
 ## 8. Definition of done (per item)
 Types + reducer + seed updated · feature renders under `/tech-log` in the right persona · regulatory logic (if any) has a vitest test · `tech-log` tsc clean · `npx vitest run src/components/tech-log` green · `npx vite build` green · conventional commit. Verify visually with `npm run dev`.
+
+## 9. Future additions (requested, not yet scheduled)
+
+> Items Bryan has asked for that are not part of the §5 backlog. Capture them here as they come in; scope/spec them before building.
+
+**F1. Sapphire ramp checks — crew visibility.** (Requested 2026-07-22.) Sapphire ramp-check items live in CAMP today; sync/surface them into myGFO somehow so the pilot/crew can see them (natural homes: the Airworthiness coming-due view and/or the Flight Briefing panel). Open before building: (a) exact CAMP source — which record type holds these and which read function returns them is undocumented, so per the NEVER rule do not invent an endpoint; confirm with CAMP (same situation as the AD/SB read). (b) Read-only pull only — CAMP stays system of record. (c) Confirm the "Sapphire" naming/scope with Bryan (which checks, per-tail vs fleet-wide, and whether they should feed dispatch gating or stay informational).
