@@ -14,8 +14,8 @@
 // Tails match the tech-log seed fleet (src/components/tech-log/mockData/fleet.ts) so the
 // pilot Flight Hub's Aircraft & acceptance and preflight-by-leg panels populate on a
 // cold-open demo — before any scheduler "Release to preflight" — with each aircraft's
-// real serviceability/custody/deferral state: N2PG G650ER = GREEN, N1PG G650ER = RED
-// (open defect), N6PG G500 = AMBER (active deferral). The international trip is left on a
+// real serviceability/custody/deferral state: N1PG and N2PG (G650ER) = RED (open
+// defects), N6PG G500 = AMBER (active deferral). The international trip is left on a
 // NON-fleet tail (N650GS) so the release -> placeholder-aircraft path (tech-log/bridge.ts)
 // stays demonstrable.
 //
