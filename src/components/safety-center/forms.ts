@@ -1,73 +1,11 @@
-// Seed data for the four new Safety Center areas: the crew Forms catalog, the SM
-// Form-manager templates, the Submissions archive supplements, and the Published
-// reports library. Hazard-derived records come from HazardContext via useSafetyModel;
-// these fill out the item types the app doesn't yet model as first-class data.
+// Seed data for the Safety Center: the Submissions archive history supplements
+// and the Published reports library. (Form templates moved to formTemplates.ts —
+// a persisted store the Report dialog renders from and Form setup edits.)
+// Hazard-derived records come from HazardContext via useSafetyModel; these fill
+// out the item types the app doesn't yet model as first-class data. They are
+// archive/library HISTORY only — never blended into live work lists (D38).
 
-import type { FormDef, FormTemplate, PublishedReport, SafetyItem } from './types';
-
-// ---- Crew Forms catalog (reports only; FRAT/GRAT stay on the trip) ----
-export const FORM_CATALOG: FormDef[] = [
-  { key: 'hazard', name: 'Report a hazard', blurb: 'An unsafe condition — FOD, a broken fixture, a risky procedure.', icon: 'triangle-alert', tone: 'amber', time: '~2 min' },
-  { key: 'asap', name: 'File an ASAP report', blurb: 'A confidential flight safety event — deviation, TCAS RA, unstable approach.', icon: 'plane', tone: 'red', time: '~3 min' },
-  { key: 'cws', name: 'Log a Caught-Working-Safely', blurb: 'Recognize someone who did the right thing.', icon: 'thumbs-up', tone: 'gold', time: '~1 min' },
-  { key: 'waiver', name: 'Request a waiver', blurb: 'Ask for an exception — duty-time extension, a procedure deviation.', icon: 'file-check', tone: 'accent', time: '~2 min' },
-];
-
-// ---- SM Form-manager templates (mirrors the shape in FormFieldManager) ----
-export const FORM_TEMPLATES: FormTemplate[] = [
-  {
-    id: 'tpl-hazard', kind: 'Hazard', name: 'Hazard report', description: 'General safety hazard / unsafe condition.', scored: false,
-    fields: [
-      { id: 'f1', label: 'What did you see?', type: 'textarea', required: true },
-      { id: 'f2', label: 'Location', type: 'text', required: true },
-      { id: 'f3', label: 'Aircraft', type: 'text', required: false },
-      { id: 'f4', label: 'Category', type: 'select', required: true, options: ['Flight Operations', 'Ground Operations', 'Maintenance', 'Cabin/Inflight', 'Equipment', 'Other'] },
-      { id: 'f5', label: 'How risky?', type: 'radio', required: true, options: ['Low', 'Medium', 'High', 'Critical'] },
-      { id: 'f6', label: 'Immediate actions taken', type: 'textarea', required: false },
-    ],
-  },
-  {
-    id: 'tpl-asap', kind: 'ASAP', name: 'ASAP report', description: 'Confidential aviation safety action report.', scored: false,
-    fields: [
-      { id: 'f1', label: 'Phase of flight', type: 'select', required: true, options: ['Taxi', 'Takeoff', 'Climb', 'Cruise', 'Approach', 'Landing'] },
-      { id: 'f2', label: 'Airport / area', type: 'text', required: true },
-      { id: 'f3', label: 'What happened', type: 'textarea', required: true },
-      { id: 'f4', label: 'Contributing factors', type: 'textarea', required: false },
-    ],
-  },
-  {
-    id: 'tpl-cws', kind: 'CWS', name: 'Caught Working Safely', description: 'Positive-recognition observation.', scored: false,
-    fields: [
-      { id: 'f1', label: 'Who', type: 'text', required: true },
-      { id: 'f2', label: 'For what', type: 'textarea', required: true },
-    ],
-  },
-  {
-    id: 'tpl-waiver', kind: 'Waiver', name: 'Waiver request', description: 'Request an exception or extension.', scored: false,
-    fields: [
-      { id: 'f1', label: 'What are you requesting?', type: 'textarea', required: true },
-      { id: 'f2', label: 'Reason / justification', type: 'textarea', required: true },
-      { id: 'f3', label: 'Trip / date', type: 'text', required: false },
-    ],
-  },
-  {
-    id: 'tpl-frat', kind: 'FRAT', name: 'Flight Risk Assessment', description: 'Scored pre-flight risk assessment (lives on the trip).', scored: true,
-    fields: [
-      { id: 'f1', label: 'Crew duty day', type: 'select', required: true, options: ['< 10h', '10–12h', '12–14h', '> 14h'] },
-      { id: 'f2', label: 'Weather at destination', type: 'select', required: true, options: ['VMC', 'MVMC', 'IMC', 'Below mins'] },
-      { id: 'f3', label: 'Terrain / airport', type: 'select', required: true, options: ['Standard', 'Elevated', 'Special-qual'] },
-      { id: 'f4', label: 'Night operation', type: 'checkbox', required: false },
-    ],
-  },
-  {
-    id: 'tpl-grat', kind: 'GRAT', name: 'Ground Risk Assessment', description: 'Scored maintenance/ground task assessment.', scored: true,
-    fields: [
-      { id: 'f1', label: 'Task', type: 'text', required: true },
-      { id: 'f2', label: 'Task complexity', type: 'select', required: true, options: ['Routine', 'Non-routine', 'Critical'] },
-      { id: 'f3', label: 'Requires RII', type: 'checkbox', required: false },
-    ],
-  },
-];
+import type { PublishedReport, SafetyItem } from './types';
 
 // ---- Submissions archive — non-hazard records (hazards merge in from real data) ----
 export const MOCK_SUBMISSIONS: SafetyItem[] = [
