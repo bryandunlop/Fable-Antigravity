@@ -139,7 +139,7 @@ export default function MaintenanceHub() {
 
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/tech-log'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/tech-log')}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -158,7 +158,7 @@ export default function MaintenanceHub() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/work-orders'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/work-orders')}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -177,7 +177,7 @@ export default function MaintenanceHub() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/mel-cdl'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/mel-cdl')}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -196,7 +196,7 @@ export default function MaintenanceHub() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/mttr-dashboard'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/mttr-dashboard')}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -236,7 +236,7 @@ export default function MaintenanceHub() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
-                <Card className="bg-blue-50 border-blue-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/tech-log'}>
+                <Card className="bg-blue-50 border-blue-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/tech-log')}>
                   <CardContent className="p-4 text-center">
                     <div className="text-3xl font-bold text-blue-600 mb-2">{workflowPipeline.reported}</div>
                     <div className="text-sm font-medium text-blue-700">Reported</div>
@@ -244,7 +244,7 @@ export default function MaintenanceHub() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-indigo-50 border-indigo-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/work-orders'}>
+                <Card className="bg-indigo-50 border-indigo-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/work-orders')}>
                   <CardContent className="p-4 text-center">
                     <div className="text-3xl font-bold text-indigo-600 mb-2">{workflowPipeline.woCreated}</div>
                     <div className="text-sm font-medium text-indigo-700">WO Created</div>
@@ -252,7 +252,7 @@ export default function MaintenanceHub() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-violet-50 border-violet-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/work-orders'}>
+                <Card className="bg-violet-50 border-violet-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/work-orders')}>
                   <CardContent className="p-4 text-center">
                     <div className="text-3xl font-bold text-violet-600 mb-2">{workflowPipeline.assigned}</div>
                     <div className="text-sm font-medium text-violet-700">Assigned</div>
@@ -260,7 +260,7 @@ export default function MaintenanceHub() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-purple-50 border-purple-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/work-orders'}>
+                <Card className="bg-purple-50 border-purple-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/work-orders')}>
                   <CardContent className="p-4 text-center">
                     <div className="text-3xl font-bold text-purple-600 mb-2">{workflowPipeline.inProgress}</div>
                     <div className="text-sm font-medium text-purple-700">In Progress</div>
@@ -271,7 +271,7 @@ export default function MaintenanceHub() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-amber-50 border-amber-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/work-orders'}>
+                <Card className="bg-amber-50 border-amber-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/work-orders')}>
                   <CardContent className="p-4 text-center">
                     <div className="text-3xl font-bold text-amber-600 mb-2">{workflowPipeline.inspection}</div>
                     <div className="text-sm font-medium text-amber-700">Inspection</div>
@@ -279,7 +279,7 @@ export default function MaintenanceHub() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-green-50 border-green-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/tech-work-analytics'}>
+                <Card className="bg-green-50 border-green-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/tech-work-analytics')}>
                   <CardContent className="p-4 text-center">
                     <div className="text-3xl font-bold text-green-600 mb-2">{workflowPipeline.completed}</div>
                     <div className="text-sm font-medium text-green-700">Completed</div>
@@ -539,7 +539,7 @@ export default function MaintenanceHub() {
 
         <TabsContent value="quick-actions" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => window.location.href = '/tech-log'}>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigate('/tech-log')}>
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
@@ -553,7 +553,7 @@ export default function MaintenanceHub() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => window.location.href = '/work-orders'}>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigate('/work-orders')}>
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-violet-100 rounded-lg group-hover:bg-violet-200 transition-colors">
@@ -567,7 +567,7 @@ export default function MaintenanceHub() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => window.location.href = '/mttr-dashboard'}>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigate('/mttr-dashboard')}>
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
@@ -581,7 +581,7 @@ export default function MaintenanceHub() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => window.location.href = '/mel-cdl'}>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigate('/mel-cdl')}>
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-amber-100 rounded-lg group-hover:bg-amber-200 transition-colors">
@@ -609,7 +609,7 @@ export default function MaintenanceHub() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => window.location.href = '/tech-work-analytics'}>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" onClick={() => navigate('/tech-work-analytics')}>
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
