@@ -65,7 +65,7 @@ import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
 import FirRoutes from './components/fir/FirRoutes';
 import BookingProfile from './components/BookingProfile';
-import TripBuilder from './components/TripBuilder';
+import TripBuilderRoute from './components/trips/TripBuilderRoute';
 import FlightFamily from './components/FlightFamily';
 import ASAPReport from './components/ASAPReport';
 import PartsInventory from './components/PartsInventory';
@@ -517,10 +517,10 @@ export default function App() {
                                   path="/trip-builder/:tripId?"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'admin', 'lead']}>
-                                      <TripBuilder
-                                        onSave={() => { }}
-                                        onCancel={() => window.history.back()}
-                                      />
+                                      {/* onSave was an empty function and onCancel used
+                                          window.history.back(), which exits the app when the
+                                          builder was reached by deep link (LG-19). */}
+                                      <TripBuilderRoute />
                                     </ProtectedRoute>
                                   }
                                 />
