@@ -21,7 +21,12 @@ export default function TripBuilderRoute() {
   const { tripId } = useParams<{ tripId?: string }>();
 
   const persist = (trip: BuiltTripPayload) => {
-    const id = tripId ?? `trip-${Date.now()}`;
+    // TripBuilder accepts tripId but does not load that trip — it always starts
+    // from its own blank state. Reusing the id here would let opening
+    // /trip-builder/<existing-id> overwrite a real saved trip with an empty one on
+    // the first Save. Until the builder can hydrate, a save always creates a new
+    // record and the existing trip is left intact.
+    const id = `trip-${Date.now()}`;
     saveTrip({
       id,
       tripName: trip?.tripData?.tripName ?? 'Untitled trip',

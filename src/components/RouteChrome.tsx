@@ -27,9 +27,12 @@ export default function RouteChrome({ userRole, additionalRoles = [] }: RouteChr
   }, [pathname, userRole, additionalRoles]);
 
   useEffect(() => {
-    // 'instant' — an animated scroll races the route's enter transition and can be
-    // cancelled by a user's own scroll mid-flight, leaving the page part-way down.
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    // Two-arg form deliberately: it is always instant (no animation racing the
+    // route's enter transition) and is supported everywhere. The options form with
+    // behavior:'instant' throws a TypeError on iOS Safari before 15.4 — inside an
+    // effect that reaches the ErrorBoundary and blanks the app on every
+    // navigation, which on the Capacitor iPad build would be the whole product.
+    window.scrollTo(0, 0);
   }, [pathname]);
 
   return null;

@@ -28,7 +28,13 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
       {/* MAX_VISIBLE_TABS tabs + the More cell. The cap comes from the manifest
           module so the render-side slice and the data-side budget cannot drift —
           when they did, roles silently lost their last tabs. */}
-      <div className="grid gap-1 px-2 py-2" style={{ gridTemplateColumns: `repeat(${MAX_VISIBLE_TABS + 1}, minmax(0, 1fr))` }}>
+      {/* Columns follow the tabs a role actually has, +1 for More. A fixed
+          MAX_VISIBLE_TABS + 1 leaves an empty cell for roles with fewer tabs
+          (document-manager has three) and pushes More off-centre. */}
+      <div
+        className="grid gap-1 px-2 py-2"
+        style={{ gridTemplateColumns: `repeat(${Math.min(navItems.length, MAX_VISIBLE_TABS) + 1}, minmax(0, 1fr))` }}
+      >
         {navItems.slice(0, MAX_VISIBLE_TABS).map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;

@@ -225,7 +225,7 @@ export function VacationRequestSystem() {
       setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '', selectedPbstDays: [] });
       setEditingId(null);
       setActiveTab('my-requests');
-      toast.success('Request updated and resubmitted to Scheduling.');
+      toast.success('Request updated.', { description: 'It goes back to Scheduling for review.' });
       return;
     }
 
@@ -256,7 +256,9 @@ export function VacationRequestSystem() {
     // Land the user on the request they just made, so "where did it go?" never
     // comes up — the audit found submit gave an alert() and no destination.
     setActiveTab('my-requests');
-    toast.success('Request submitted. Scheduling has been notified.');
+    // See the withdraw handler: the approver queues are a separate store, so this
+    // says what actually happened rather than promising a notification.
+    toast.success('Request submitted.', { description: 'Track it under My Requests.' });
   };
 
   /** Take a request back off the approvers' desks. Confirmed first. */
@@ -274,7 +276,11 @@ export function VacationRequestSystem() {
       lastModified: new Date(),
     } : r));
     setPendingWithdrawal(null);
-    toast.success('Request withdrawn. Scheduling has been notified.');
+    // Deliberately does not claim Scheduling was notified: the approver queues
+    // (VacationSchedulingApprovals / VacationManagerReview) are still fed by a
+    // separate in-memory array, so no such notification happens. Claiming it would
+    // be the same false-success the audit is about. Tracked for wiring.
+    toast.success('Request withdrawn.', { description: 'It stays in your history with a note.' });
   };
 
   /** Load an existing request back into the form for correction / resubmission. */

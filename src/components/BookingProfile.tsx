@@ -42,7 +42,39 @@ import {
   Maximize2,
   Minimize2
 } from 'lucide-react';
+import { loadTrips } from './trips/builtTripStore';
 import { format, addDays, differenceInDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
+
+/**
+ * Trips the builder saved, shaped for this calendar. Kept deliberately small: the
+ * builder owns its own payload, and this view only needs enough to list, open, and
+ * distinguish a draft from one submitted for review.
+ */
+function builtTripsAsTrips(): Trip[] {
+  return loadTrips().map((t) => {
+    const data = (t.tripData ?? {}) as { departureDate?: string | Date; returnDate?: string | Date; notes?: string };
+    const departure = data.departureDate ? new Date(data.departureDate) : t.savedAt;
+    const back = data.returnDate ? new Date(data.returnDate) : departure;
+    return {
+      id: t.id,
+      tripName: t.tripName,
+      clientName: t.clientName,
+      // This calendar's status union has no 'draft', so both builder states map to
+      // 'requested'; the note below is what actually distinguishes them.
+      status: 'requested',
+      requestedDate: t.submittedAt ?? t.savedAt,
+      departureDate: departure,
+      returnDate: back,
+      passengers: (Array.isArray(t.passengers) ? t.passengers : []) as Passenger[],
+      itinerary: (Array.isArray(t.itinerary) ? t.itinerary : []) as ItineraryItem[],
+      messages: [],
+      priority: 'medium',
+      notes: t.status === 'submitted' ? 'Submitted for review from the trip builder.' : 'Draft saved from the trip builder.',
+      lockoutDays: 3,
+      isLocked: false,
+    } satisfies Trip;
+  });
+}
 
 interface Trip {
   id: string;
@@ -265,7 +297,10 @@ export default function BookingProfile() {
         isLocked: true
       }
     ];
-    setTrips(mockTrips);
+    // Trips saved by the trip builder appear alongside the demo trips. Without
+    // this, the builder's "saved — reopen it from Booking Profile" toast was a
+    // false promise: the store was written and never read (LG-19 / D37).
+    setTrips([...mockTrips, ...builtTripsAsTrips()]);
 
     // Mock Outlook events
     const mockOutlookEvents: OutlookEvent[] = [
