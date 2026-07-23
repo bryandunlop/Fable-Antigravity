@@ -10,18 +10,37 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readRouteTable, resolvesToRoute } from '../navigation/routeAudit';
+import { readRouteTable, resolvesToRoute, findDynamicLinks } from '../navigation/routeAudit';
 
 const DIR = 'src/notifications/contributors';
 
-function linkLiterals(file: string): { link: string; line: number }[] {
-  const out: { link: string; line: number }[] = [];
-  readFileSync(join(DIR, file), 'utf8').split('\n').forEach((text, i) => {
-    // link: '/path' or link: `/path/${id}` — template holes become a ':param' segment
-    const m = text.match(/\blink:\s*['"`]([^'"`]+)['"`]/) ?? text.match(/\blink:\s*`([^`]+)`/);
-    if (m) out.push({ link: m[1].replace(/\$\{[^}]*\}/g, ':param'), line: i + 1 });
+// Contributors that hand through a link built elsewhere. A literal scan cannot see
+// these, so each must name the source file whose literals ARE audited below —
+// otherwise the deepest, most parameterised links in the app (tech-log query deep
+// links, per-document reader routes) would be silently unprotected while the test
+// for that file reported green.
+const DYNAMIC_LINK_SOURCES: Record<string, string> = {
+  'techLog.ts': 'src/components/tech-log/engine/notifications.ts',
+  'documents.ts': 'src/notifications/contributors/documents.ts',
+};
+
+/**
+ * Every route-looking literal on a `link:` line. Taking all of them (not just the
+ * first) matters: a ternary picks between two literal routes, and auditing only
+ * the first would leave the other branch unchecked. Template holes become a
+ * ':param' segment.
+ */
+export function linkLiteralsIn(source: string): { link: string; line: number }[] {
+  return source.split('\n').flatMap((text, i) => {
+    if (!/\blink:/.test(text)) return [];
+    const after = text.slice(text.indexOf('link:'));
+    return [...after.matchAll(/['"`](\/[^'"`]*)['"`]/g)]
+      .map((m) => ({ link: m[1].replace(/\$\{[^}]*\}/g, ':param'), line: i + 1 }));
   });
-  return out;
+}
+
+function linkLiterals(file: string): { link: string; line: number }[] {
+  return linkLiteralsIn(readFileSync(join(DIR, file), 'utf8'));
 }
 
 describe('notification deep links resolve to registered routes', () => {
@@ -35,6 +54,31 @@ describe('notification deep links resolve to registered routes', () => {
   it.each(files)('%s', (file) => {
     for (const { link, line } of linkLiterals(file)) {
       expect(resolvesToRoute(link, table), `${file}:${line} link "${link}" has no registered route`).toBe(true);
+    }
+  });
+
+  // Guards against this suite quietly becoming decorative: a contributor whose
+  // links are all expressions passes the loop above having checked nothing.
+  it.each(files)('%s: any non-literal link is accounted for', (file) => {
+    const source = readFileSync(join(DIR, file), 'utf8');
+    const literalLines = new Set(linkLiteralsIn(source).map((l) => l.line));
+    // Only a link line yielding NO route literal is unauditable — a ternary
+    // between two literal routes is fully covered by the loop above.
+    const dynamic = findDynamicLinks(source).filter((d) => !literalLines.has(d.line));
+    if (dynamic.length === 0) return;
+    expect(
+      DYNAMIC_LINK_SOURCES[file],
+      `${file} builds links dynamically (${dynamic.map((d) => `line ${d.line}: ${d.expression}`).join('; ')}) ` +
+      `but names no audited source — add it to DYNAMIC_LINK_SOURCES so its links are actually checked`,
+    ).toBeTruthy();
+  });
+
+  // The literals behind those pass-throughs, audited for real.
+  it.each(Object.entries(DYNAMIC_LINK_SOURCES))('%s links resolve (built in %s)', (_contributor, sourceFile) => {
+    const links = linkLiteralsIn(readFileSync(sourceFile, 'utf8'));
+    expect(links.length, `${sourceFile} produced no auditable links — has it moved?`).toBeGreaterThan(0);
+    for (const { link, line } of links) {
+      expect(resolvesToRoute(link, table), `${sourceFile}:${line} link "${link}" has no registered route`).toBe(true);
     }
   });
 });

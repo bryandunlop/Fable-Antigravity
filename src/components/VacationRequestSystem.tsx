@@ -8,11 +8,20 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, AlertTriangle, CheckCircle, XCircle, MessageSquare, Bell, Plane, Plus, Edit2 } from 'lucide-react';
+import { Calendar, Clock, AlertTriangle, CheckCircle, XCircle, MessageSquare, Bell, Plane, Plus, Edit2, Undo2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { VacationMasterCalendar } from './VacationMasterCalendar';
+import { canWithdraw, canEdit, lifecycleNote, RESUBMIT_STATUS } from './vacation/lifecycle';
+import { useVacationRequests, saveRequests, type VacationRequestRecord } from './vacation/store';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type RequestType = 'Vacation' | 'Payback Stop' | 'Off' | 'Medical' | 'PBST Accrual';
-type RequestStatus = 'pending_scheduling' | 'denied_by_scheduling' | 'tentative_scheduling' | 'pending_manager' | 'denied_by_manager' | 'tentative_manager' | 'approved_awaiting_confirmation' | 'confirmed';
+// Single source of truth — the lifecycle rules and this UI must agree on the set,
+// or a status the rules can produce ('withdrawn') crashes the badge lookup.
+import type { RequestStatus } from './vacation/lifecycle';
 
 interface Comment {
   id: string;
@@ -85,7 +94,9 @@ export function VacationRequestSystem() {
     ]
   });
 
-  const [requests, setRequests] = useState<VacationRequest[]>([
+  // Seeds only — the persisted store takes over from the user's first write, so a
+  // submitted or withdrawn request survives navigation instead of evaporating.
+  const SEED_REQUESTS: VacationRequest[] = [
     {
       id: 'req1',
       submitterId: 'user1',
@@ -138,7 +149,10 @@ export function VacationRequestSystem() {
       submittedDate: new Date('2024-12-02T14:00:00'),
       lastModified: new Date('2024-12-03T09:00:00')
     }
-  ]);
+  ];
+
+  const requests = useVacationRequests(SEED_REQUESTS as VacationRequestRecord[]) as unknown as VacationRequest[];
+  const setRequests = (next: VacationRequest[]) => saveRequests(next as unknown as VacationRequestRecord[]);
 
   const [newRequest, setNewRequest] = useState({
     requestType: '' as RequestType | '',
@@ -157,16 +171,61 @@ export function VacationRequestSystem() {
     return diffDays;
   };
 
+  // The request being withdrawn, held while the confirmation dialog is open.
+  // Withdrawing takes work off an approver's desk — it gets a confirm, not a
+  // one-tap surprise (the audit found this whole module had no confirmations).
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<VacationRequest | null>(null);
+  // The request being edited; the submit form doubles as the edit form.
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const handleSubmitRequest = () => {
     if (!newRequest.requestType || !newRequest.startDate || !newRequest.endDate) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in the request type and both dates.');
       return;
     }
 
     const daysRequested = calculateDays(newRequest.startDate, newRequest.endDate);
 
+    if (new Date(newRequest.endDate) < new Date(newRequest.startDate)) {
+      toast.error('The end date is before the start date.');
+      return;
+    }
+
     if (newRequest.selectedPbstDays.length > daysRequested) {
-      alert('You selected more PBST days than the total number of vacation days requested.');
+      toast.error('You selected more PBST days than the total number of days requested.');
+      return;
+    }
+
+    // Editing an existing request: replace it in place and send it back to
+    // Scheduling. An approver's earlier "tentative" was for the old dates.
+    if (editingId) {
+      const existing = requests.find((r) => r.id === editingId);
+      const verdict = canEdit((existing?.status ?? 'confirmed') as never);
+      if (!existing || !verdict.allowed) {
+        toast.error(verdict.reason ?? 'This request can no longer be edited.');
+        setEditingId(null);
+        return;
+      }
+      const note = lifecycleNote(
+        'edited', currentUser.name, 'submitter',
+        `Now ${new Date(newRequest.startDate).toLocaleDateString()}–${new Date(newRequest.endDate).toLocaleDateString()}.`,
+      );
+      setRequests(requests.map((r) => r.id === editingId ? {
+        ...r,
+        requestType: newRequest.requestType as RequestType,
+        startDate: newRequest.startDate,
+        endDate: newRequest.endDate,
+        daysRequested,
+        status: RESUBMIT_STATUS,
+        schedulingApproval: undefined,
+        managerApproval: undefined,
+        comments: [...r.comments, note as never],
+        lastModified: new Date(),
+      } : r));
+      setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '', selectedPbstDays: [] });
+      setEditingId(null);
+      setActiveTab('my-requests');
+      toast.success('Request updated and resubmitted to Scheduling.');
       return;
     }
 
@@ -193,9 +252,47 @@ export function VacationRequestSystem() {
 
     setRequests([...requests, request]);
     setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '', selectedPbstDays: [] });
-    
-    // Would trigger notification to scheduling here
-    alert('Request submitted! Scheduling has been notified.');
+
+    // Land the user on the request they just made, so "where did it go?" never
+    // comes up — the audit found submit gave an alert() and no destination.
+    setActiveTab('my-requests');
+    toast.success('Request submitted. Scheduling has been notified.');
+  };
+
+  /** Take a request back off the approvers' desks. Confirmed first. */
+  const handleWithdraw = (request: VacationRequest) => {
+    const verdict = canWithdraw(request.status as never);
+    if (!verdict.allowed) {
+      toast.error(verdict.reason ?? 'This request can no longer be withdrawn.');
+      return;
+    }
+    const note = lifecycleNote('withdrawn', currentUser.name, 'submitter');
+    setRequests(requests.map((r) => r.id === request.id ? {
+      ...r,
+      status: 'withdrawn' as RequestStatus,
+      comments: [...r.comments, note as never],
+      lastModified: new Date(),
+    } : r));
+    setPendingWithdrawal(null);
+    toast.success('Request withdrawn. Scheduling has been notified.');
+  };
+
+  /** Load an existing request back into the form for correction / resubmission. */
+  const handleStartEdit = (request: VacationRequest) => {
+    const verdict = canEdit(request.status as never);
+    if (!verdict.allowed) {
+      toast.error(verdict.reason ?? 'This request can no longer be edited.');
+      return;
+    }
+    setNewRequest({
+      requestType: request.requestType,
+      startDate: request.startDate,
+      endDate: request.endDate,
+      comments: '',
+      selectedPbstDays: [],
+    });
+    setEditingId(request.id);
+    setActiveTab('submit');
   };
 
   const getStatusBadge = (status: RequestStatus) => {
@@ -208,10 +305,16 @@ export function VacationRequestSystem() {
       tentative_manager: { label: 'Tentative - Manager', variant: 'secondary' as const, color: 'bg-orange-500' },
       approved_awaiting_confirmation: { label: 'Approved - Awaiting Confirmation', variant: 'outline' as const, color: 'bg-green-400' },
       confirmed: { label: 'Confirmed', variant: 'default' as const, color: 'bg-green-500' },
+      withdrawn: { label: 'Withdrawn', variant: 'outline' as const, color: 'bg-gray-400' },
       pending_accrual: { label: 'Pending Accrual', variant: 'secondary' as const, color: 'bg-orange-400' }
     };
 
-    return <Badge variant={statusConfig[status].variant}>{statusConfig[status].label}</Badge>;
+    // Unknown status renders the raw value rather than throwing on `.variant` of
+    // undefined — a status the map has not caught up with should look wrong, not
+    // take the whole page down.
+    const config = statusConfig[status as keyof typeof statusConfig];
+    if (!config) return <Badge variant="outline">{String(status)}</Badge>;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const getExpirationAlert = (daysRemaining: number) => {
@@ -308,8 +411,12 @@ export function VacationRequestSystem() {
           {/* Submit New Request Form */}
           <Card>
             <CardHeader>
-              <CardTitle>Submit New Request</CardTitle>
-              <CardDescription>Choose request type and provide details</CardDescription>
+              <CardTitle>{editingId ? 'Edit Request' : 'Submit New Request'}</CardTitle>
+              <CardDescription>
+                {editingId
+                  ? 'Changing the dates sends this back to Scheduling for review.'
+                  : 'Choose request type and provide details'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -404,12 +511,20 @@ export function VacationRequestSystem() {
               )}
 
               <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '', selectedPbstDays: [] })}>
-                  Clear
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setNewRequest({ requestType: '', startDate: '', endDate: '', comments: '', selectedPbstDays: [] });
+                    // Leaving edit mode must also drop the edit target, or the next
+                    // plain submit would silently overwrite the request being edited.
+                    if (editingId) { setEditingId(null); setActiveTab('my-requests'); }
+                  }}
+                >
+                  {editingId ? 'Cancel edit' : 'Clear'}
                 </Button>
                 <Button onClick={handleSubmitRequest}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Submit Request
+                  {editingId ? <Edit2 className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                  {editingId ? 'Save & Resubmit' : 'Submit Request'}
                 </Button>
               </div>
             </CardContent>
@@ -444,12 +559,28 @@ export function VacationRequestSystem() {
                         ({request.daysRequested} days)
                       </CardDescription>
                     </div>
-                    {request.status.includes('denied') && (
-                      <Button size="sm" variant="outline">
-                        <Edit2 className="h-4 w-4 mr-2" />
-                        Modify & Resubmit
-                      </Button>
-                    )}
+                    {/* Lifecycle controls. Shown when the action is available and
+                        explained when it is not — a request whose controls simply
+                        vanish reads as a broken page, not as a closed record. */}
+                    <div className="flex items-center gap-2">
+                      {canEdit(request.status as never).allowed && (
+                        <Button size="sm" variant="outline" onClick={() => handleStartEdit(request)}>
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          {request.status.includes('denied') ? 'Modify & Resubmit' : 'Edit'}
+                        </Button>
+                      )}
+                      {canWithdraw(request.status as never).allowed && (
+                        <Button size="sm" variant="ghost" onClick={() => setPendingWithdrawal(request)}>
+                          <Undo2 className="h-4 w-4 mr-2" />
+                          Withdraw
+                        </Button>
+                      )}
+                      {!canEdit(request.status as never).allowed && !canWithdraw(request.status as never).allowed && (
+                        <span className="text-xs text-muted-foreground max-w-[16rem] text-right">
+                          {canWithdraw(request.status as never).reason}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -614,6 +745,33 @@ export function VacationRequestSystem() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Withdrawing pulls a request an approver may already be working on, so it
+          names what will happen instead of just asking "are you sure?". */}
+      <AlertDialog open={pendingWithdrawal !== null} onOpenChange={(open: boolean) => !open && setPendingWithdrawal(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Withdraw this request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingWithdrawal && (
+                <>
+                  Your {pendingWithdrawal.requestType.toLowerCase()} request for{' '}
+                  {new Date(pendingWithdrawal.startDate).toLocaleDateString()} –{' '}
+                  {new Date(pendingWithdrawal.endDate).toLocaleDateString()} will be taken off
+                  Scheduling's list. The request stays in your history with a note that you
+                  withdrew it, and you can submit a new one at any time.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={() => pendingWithdrawal && handleWithdraw(pendingWithdrawal)}>
+              Withdraw request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
