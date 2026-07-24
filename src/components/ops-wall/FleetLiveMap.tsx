@@ -33,37 +33,57 @@ interface Plotted {
 }
 
 const isDark = () => document.documentElement.classList.contains('dark');
+const STATUS_RANK: Record<string, number> = { GREEN: 0, AMBER: 1, RED: 2 };
 
-/**
- * Nudge apart aircraft that resolve to the exact same coordinate (e.g. three
- * tails parked at KLUK) so none hides another. A small demo-only fan in degrees;
- * a production integration would cluster/spiderfy instead of moving the point.
- */
-function fanColocated(points: Plotted[]): Plotted[] {
-  const groups = new Map<string, number[]>();
-  points.forEach((p, i) => {
+/** Group aircraft that resolve to the same coordinate (e.g. tails parked at one base). */
+function groupColocated(points: Plotted[]): Plotted[][] {
+  const groups = new Map<string, Plotted[]>();
+  for (const p of points) {
     const key = `${p.point.lat.toFixed(3)}:${p.point.lon.toFixed(3)}`;
     const g = groups.get(key);
-    if (g) g.push(i);
-    else groups.set(key, [i]);
-  });
-
-  const out = points.map(p => ({ ...p }));
-  const radius = 0.5; // degrees
-  for (const idxs of groups.values()) {
-    if (idxs.length < 2) continue;
-    idxs.forEach((i, k) => {
-      const angle = -Math.PI / 2 + (k / idxs.length) * 2 * Math.PI;
-      out[i] = {
-        ...out[i],
-        point: {
-          lat: out[i].point.lat + radius * Math.sin(angle),
-          lon: out[i].point.lon + radius * Math.cos(angle),
-        },
-      };
-    });
+    if (g) g.push(p);
+    else groups.set(key, [p]);
   }
-  return out;
+  return [...groups.values()];
+}
+
+/** Fan a co-located group out around its shared point so each is separately visible. */
+function fanGroup(members: Plotted[]): Plotted[] {
+  if (members.length < 2) return members;
+  const radius = 0.5; // degrees
+  return members.map((p, k) => {
+    const angle = -Math.PI / 2 + (k / members.length) * 2 * Math.PI;
+    return {
+      ...p,
+      point: {
+        lat: p.point.lat + radius * Math.sin(angle),
+        lon: p.point.lon + radius * Math.cos(angle),
+      },
+    };
+  });
+}
+
+/** The most severe RAG status in a group (RED > AMBER > GREEN). */
+function worstStatus(members: Plotted[]): string {
+  return members.reduce(
+    (worst, p) => ((STATUS_RANK[p.status] ?? 0) > (STATUS_RANK[worst] ?? 0) ? p.status : worst),
+    'GREEN'
+  );
+}
+
+/** A cluster badge: count, ringed by the worst RAG so a grounded tail can't hide inside. */
+function clusterHtml(members: Plotted[]): string {
+  const color = RAG_HEX[worstStatus(members)] ?? '#7c7c7c';
+  const hint = (members[0].location ?? '').split(/[\s-]/)[0] || '';
+  const label = hint
+    ? `<span style="background:var(--background,#fff);color:var(--foreground,#111);border:1px solid var(--border,#ddd);border-radius:4px;padding:0 4px;font:500 10px ui-monospace,monospace;white-space:nowrap;">${hint}</span>`
+    : '';
+  return (
+    `<div style="display:flex;align-items:center;gap:4px;cursor:pointer">` +
+    `<span style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--background,#fff);border:2px solid ${color};color:var(--foreground,#111);font:600 11px ui-sans-serif,system-ui;box-shadow:0 0 0 1px rgba(0,0,0,.12)">${members.length}</span>` +
+    label +
+    `</div>`
+  );
 }
 
 function markerHtml(p: Plotted): string {
@@ -85,6 +105,7 @@ export default function FleetLiveMap({ fleet, homeBase = HOME_STATION, className
   const mapRef = useRef<L.Map | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const overlayRef = useRef<L.LayerGroup | null>(null);
+  const didFitRef = useRef(false);
 
   // Init once.
   useEffect(() => {
@@ -146,7 +167,6 @@ export default function FleetLiveMap({ fleet, homeBase = HOME_STATION, className
     // The fleet populates ~500ms after mount (satcom fetch), by which point the
     // panel has its final size — re-measure so fitBounds tiles the whole width.
     map.invalidateSize({ animate: false });
-    overlay.clearLayers();
 
     const plotted: Plotted[] = [];
     for (const ac of fleet) {
@@ -173,49 +193,92 @@ export default function FleetLiveMap({ fleet, homeBase = HOME_STATION, className
       });
     }
 
-    const spread = fanColocated(plotted);
-    const latlngs: L.LatLngExpression[] = [];
+    const groups = groupColocated(plotted);
+    // Below this zoom a co-located group is one badge; at or above it, the
+    // group's fan is wide enough to read, so show the individuals.
+    const CLUSTER_ZOOM = 7;
 
-    // Draw RED last so a grounded tail sits on top of any overlap.
-    const order = [...spread].sort(
-      (a, b) =>
-        ({ GREEN: 0, AMBER: 1, RED: 2 }[a.status] ?? 0) - ({ GREEN: 0, AMBER: 1, RED: 2 }[b.status] ?? 0)
-    );
+    // Redraw for the current zoom. Runs on fleet change and on every zoomend, so
+    // clusters collapse when you zoom out and expand when you zoom in.
+    const draw = () => {
+      overlay.clearLayers();
+      const zoom = map.getZoom();
+      const individuals: Plotted[] = [];
 
-    for (const p of order) {
-      const latlng: L.LatLngExpression = [p.point.lat, p.point.lon];
-      latlngs.push(latlng);
-
-      if (p.inFlight && p.dest) {
-        L.polyline([latlng, [p.dest.lat, p.dest.lon]], {
-          color: RAG_HEX[p.status] ?? '#888',
-          weight: 1.5,
-          opacity: 0.5,
-          dashArray: '4 4',
-        }).addTo(overlay);
+      for (const group of groups) {
+        if (group.length > 1 && zoom < CLUSTER_ZOOM) {
+          const center = group[0].point;
+          L.marker([center.lat, center.lon], {
+            icon: L.divIcon({
+              html: clusterHtml(group),
+              className: 'fleet-cluster',
+              iconSize: [0, 0],
+              iconAnchor: [11, 11],
+            }),
+            keyboard: false,
+          })
+            .bindTooltip(group.map(p => `${p.tail} · ${p.status}`).join('<br>'), {
+              direction: 'top',
+              offset: [0, -10],
+            })
+            .on('click', () => map.setView([center.lat, center.lon], CLUSTER_ZOOM))
+            .addTo(overlay);
+        } else if (group.length > 1) {
+          individuals.push(...fanGroup(group));
+        } else {
+          individuals.push(group[0]);
+        }
       }
 
-      L.marker(latlng, {
-        icon: L.divIcon({
-          html: markerHtml(p),
-          className: 'fleet-marker',
-          iconSize: [0, 0],
-          iconAnchor: [6, 6],
-        }),
-        keyboard: false,
-      })
-        .bindTooltip(
-          `${p.tail} · ${p.status}${p.location ? ` · ${p.location}` : ''}`,
-          { direction: 'top', offset: [0, -6] }
-        )
-        .addTo(overlay);
+      // RED last so a grounded tail sits on top of any residual overlap.
+      individuals.sort((a, b) => (STATUS_RANK[a.status] ?? 0) - (STATUS_RANK[b.status] ?? 0));
+      for (const p of individuals) {
+        const latlng: L.LatLngExpression = [p.point.lat, p.point.lon];
+        if (p.inFlight && p.dest) {
+          L.polyline([latlng, [p.dest.lat, p.dest.lon]], {
+            color: RAG_HEX[p.status] ?? '#888',
+            weight: 1.5,
+            opacity: 0.5,
+            dashArray: '4 4',
+          }).addTo(overlay);
+        }
+        L.marker(latlng, {
+          icon: L.divIcon({
+            html: markerHtml(p),
+            className: 'fleet-marker',
+            iconSize: [0, 0],
+            iconAnchor: [6, 6],
+          }),
+          keyboard: false,
+        })
+          .bindTooltip(`${p.tail} · ${p.status}${p.location ? ` · ${p.location}` : ''}`, {
+            direction: 'top',
+            offset: [0, -6],
+          })
+          .addTo(overlay);
+      }
+    };
+
+    draw();
+    map.on('zoomend', draw);
+
+    // Frame the fleet to its TRUE positions ONCE, on first load — then leave the
+    // view alone. Position refreshes (~30s) redraw markers but must not re-fit, or
+    // they'd yank a zoomed-in user straight back to the overview.
+    if (!didFitRef.current) {
+      const truePoints = plotted.map(p => [p.point.lat, p.point.lon] as L.LatLngExpression);
+      if (truePoints.length > 1) {
+        map.fitBounds(L.latLngBounds(truePoints).pad(0.25), { maxZoom: 7 });
+        didFitRef.current = true;
+      } else if (truePoints.length === 1) {
+        map.setView(truePoints[0], 6);
+        didFitRef.current = true;
+      }
     }
 
-    if (latlngs.length > 1) {
-      map.fitBounds(L.latLngBounds(latlngs).pad(0.25), { maxZoom: 7 });
-    } else if (latlngs.length === 1) {
-      map.setView(latlngs[0], 6);
-    }
+    return () => {
+      map.off('zoomend', draw);
+    };
   }, [fleet, homeBase]);
 
   return (
