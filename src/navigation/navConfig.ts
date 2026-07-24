@@ -60,6 +60,7 @@ export const FRONT_DOORS: Record<string, string> = {
   'maintenance': '/tech-log',
   'maintenance-coordinator': '/tech-log',
   'dom': '/tech-log',
+  'reg-comp': '/tech-log',
   'maintenance-workflow': '/maintenance-workflow',
 };
 
@@ -136,7 +137,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/inventory-v2/inspection', label: 'Inspection', domain: 'inventory', icon: ClipboardCheck, sidebar: false, searchable: false, detailLabel: 'Review', roles: ['inflight', 'admin'] },
 
   // ── Maintenance — trim-hard (2026-07-02): Tech Log + Parts primary; hub/dash/mel-cdl out of nav ──
-  { path: '/tech-log', label: 'Tech Log', domain: 'maintenance', icon: FileText, primary: true, keywords: ['squawk', 'defect', 'deferral', 'mel', 'release', 'work card'], roles: ['pilot', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+  { path: '/tech-log', label: 'Tech Log', domain: 'maintenance', icon: FileText, primary: true, keywords: ['squawk', 'defect', 'deferral', 'mel', 'release', 'work card', 'safa'], roles: ['pilot', 'maintenance', 'admin', 'maintenance-coordinator', 'dom', 'reg-comp'] },
   { path: '/parts-inventory', label: 'Parts Inventory', domain: 'maintenance', icon: Boxes, primary: true, keywords: ['mycmp', 'procurement', 'stock'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/tech-work-analytics', label: 'Work Analytics', domain: 'maintenance', icon: BarChart3, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/mttr-dashboard', label: 'MTTR Dashboard', domain: 'maintenance', icon: Activity, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
