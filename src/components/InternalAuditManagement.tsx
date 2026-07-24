@@ -16,12 +16,16 @@ import {
   CheckCircle,
   AlertTriangle,
   Package,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAudits, Audit, AUDIT_TEMPLATES } from '../contexts/AuditContext';
 import AuditCalendar from './audit/AuditCalendar';
 import AuditPool from './audit/AuditPool';
 import AuditDetailDrawer from './audit/AuditDetailDrawer';
+import UnassignedAuditsTray from './audit/UnassignedAuditsTray';
+import { AUDITORS } from './audit/auditors';
+import { suggestAuditor } from './audit/assignSuggestion';
 
 export default function InternalAuditManagement() {
   const { audits, addAudit, getPoolAudits } = useAudits();
@@ -47,8 +51,18 @@ export default function InternalAuditManagement() {
     description: '',
     useTemplate: true,
   });
+  // Assign-at-create: default on, suggestion follows the chosen category.
+  const [assignOnCreate, setAssignOnCreate] = useState(true);
 
   const poolAudits = getPoolAudits();
+
+  // Suggested auditor for the category currently selected in the create dialog.
+  const createSuggestion = suggestAuditor(
+    { category: newAuditForm.category },
+    AUDITORS,
+    audits,
+    new Date().getFullYear(),
+  );
 
   // When opening the "Add Audit" dialog from a calendar cell, prefill the date
   const handleAddAudit = (month?: number, year?: number) => {
@@ -75,6 +89,10 @@ export default function InternalAuditManagement() {
       ? (AUDIT_TEMPLATES[newAuditForm.category as keyof typeof AUDIT_TEMPLATES] || [])
       : [];
 
+    // Assign at creation when the manager left the suggestion on; otherwise the
+    // audit lands Unassigned and shows up in the tray.
+    const assignNow = assignOnCreate && createSuggestion ? createSuggestion : null;
+
     addAudit({
       title: newAuditForm.title || `${newAuditForm.category} Audit`,
       type: newAuditForm.type,
@@ -86,9 +104,9 @@ export default function InternalAuditManagement() {
       dueDate: saveToPool ? undefined : (newAuditForm.dueDate || new Date().toISOString().split('T')[0]),
       expirationDate: newAuditForm.expirationDate || undefined,
       protocolLink: newAuditForm.protocolLink || undefined,
-      assignedTo: 'Unassigned',
-      assignedRole: '',
-      assignmentType: 'None',
+      assignedTo: assignNow ? assignNow.name : 'Unassigned',
+      assignedRole: assignNow ? assignNow.role : '',
+      assignmentType: assignNow ? 'Suggested' : 'None',
       description: newAuditForm.description,
       checklist: templateItems.map((item, idx) => ({
         id: Date.now() + idx,
@@ -100,7 +118,11 @@ export default function InternalAuditManagement() {
       completionRate: 0,
     });
 
-    toast.success(saveToPool ? 'Audit saved to Pool' : 'Audit scheduled');
+    toast.success(
+      assignNow
+        ? `Audit ${saveToPool ? 'saved to pool' : 'scheduled'} · assigned to ${assignNow.name}`
+        : saveToPool ? 'Audit saved to Pool' : 'Audit scheduled',
+    );
     setShowNewAuditDialog(false);
     // Reset form
     setNewAuditForm({
@@ -108,6 +130,7 @@ export default function InternalAuditManagement() {
       isbaoPart: '', scheduledDate: '', dueDate: '', expirationDate: '',
       protocolLink: '', description: '', useTemplate: true,
     });
+    setAssignOnCreate(true);
   };
 
   // Summary stats
@@ -152,6 +175,9 @@ export default function InternalAuditManagement() {
           </Card>
         ))}
       </div>
+
+      {/* Unassigned audits tray — one place to assign everything that needs an auditor */}
+      <UnassignedAuditsTray onAuditClick={handleAuditClick} />
 
       {/* Audit Pool (Drafts) Banner */}
       {poolAudits.length > 0 && (
@@ -277,11 +303,32 @@ export default function InternalAuditManagement() {
               />
             </div>
 
+            {/* Assign-at-create — optional; leave off and it lands in the tray */}
+            {createSuggestion && (
+              <div className={`flex items-center justify-between border rounded-lg p-3 transition-colors ${assignOnCreate ? 'border-blue-300 bg-blue-50/60' : 'bg-muted/20'}`}>
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className={`w-4 h-4 shrink-0 ${assignOnCreate ? 'text-blue-600' : 'text-muted-foreground'}`} />
+                  <div>
+                    <p className="text-sm font-medium">
+                      {assignOnCreate ? <>Assign to <span className="text-blue-700">{createSuggestion.name}</span></> : 'Assign an auditor now'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Suggested for {newAuditForm.category} · lightest load. Uncheck to leave for the tray.
+                    </p>
+                  </div>
+                </div>
+                <Checkbox
+                  checked={assignOnCreate}
+                  onCheckedChange={(v: boolean) => setAssignOnCreate(!!v)}
+                />
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex gap-2 pt-2 border-t">
               <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={() => handleCreateAudit(false)}>
                 <Calendar className="w-4 h-4 mr-2" />
-                Schedule Audit
+                {assignOnCreate && createSuggestion ? 'Schedule + assign' : 'Schedule Audit'}
               </Button>
               <Button variant="outline" className="flex-1" onClick={() => handleCreateAudit(true)}>
                 <Package className="w-4 h-4 mr-2" />
