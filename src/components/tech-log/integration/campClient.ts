@@ -5,6 +5,7 @@ import {
   CAMP_BASE_URLS, CAMP_ERROR, hoursToCampMinutes, campMinutesToHours, DUE_LIST_CAP_MONTHS,
 } from './campTaxonomy';
 import type { IntegrateMode, DiscrepancyType, MelFlag } from './campTaxonomy';
+import type { SafaCheckStatus } from '../types';
 
 export interface CampResult<T> { ok: boolean; data?: T; errorCode?: number | string; errorMsg?: string; }
 
@@ -442,5 +443,27 @@ export function campAdSb(serial: string): CampAdSbItem[] {
     { id: 'AD-2023-08-11', kind: 'AD', subject: 'Fuel boost-pump wiring inspection', recurrence: 'ONE_TIME', status: 'COMPLIED', ata: '28' },
     { id: 'SB-650-32-117', kind: 'SB', subject: 'MLG actuator seal upgrade', recurrence: 'ONE_TIME', status: 'OPEN', ata: '32', nextDueUtc: at(40 + (s % 30)) },
     { id: 'SB-650-21-090', kind: 'SB', subject: 'Pack controller software load', recurrence: 'ONE_TIME', status: 'COMPLIED', ata: '21' },
+  ];
+}
+
+export const CAMP_SAFA_OPEN_QUESTION =
+  'OQ: the CAMP read function for SAFA ramp-check status is NOT in the GEN/STA/WRK docs — confirm under sandbox; do not invent an endpoint.';
+
+/** Mock SAFA ramp-check status per aircraft, keyed to the compliance-owned SAFA item `code`s
+ * (mockData/safa.ts). ⚠ Undocumented CAMP read — see CAMP_SAFA_OPEN_QUESTION (Open Question; no
+ * invented endpoint). myGFO presents this read-only; CAMP stays the system of record. */
+export function campSafaStatus(serial: string): SafaCheckStatus[] {
+  const now = Date.now();
+  const s = Math.abs(hashStr(serial));
+  const at = (days: number) => new Date(now + days * _D).toISOString();
+  return [
+    { code: 'A-COFA', status: 'READY' },
+    { code: 'A-REG', status: 'READY' },
+    { code: 'A-MEL', status: 'READY' },
+    { code: 'A-CREW', status: 'DUE_SOON', expiryUtc: at(18 + (s % 12)), note: 'PIC medical renewal approaching' },
+    { code: 'B-ELT', status: 'ACTION', expiryUtc: at(-3 - (s % 5)), note: 'ELT battery replacement overdue' },
+    { code: 'B-EQUIP', status: 'READY' },
+    { code: 'C-COND', status: 'READY' },
+    { code: 'E-INSURANCE', status: 'DUE_SOON', expiryUtc: at(9 + (s % 6)) },
   ];
 }

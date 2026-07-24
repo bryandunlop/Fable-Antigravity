@@ -6,7 +6,7 @@ const aircraft: Aircraft = { id: 'ac1', tailNumber: 'N1PG', type: 'G800', serial
 const personnel: Personnel = { oid: 'USR008', displayName: 'Tom Parker', role: 'MAINTENANCE', apCertificateNumber: 'AP-2810773', riiAuthorized: false, riiAuthorizedAta: [], active: true };
 const melA: MelItem = { id: 'mel1', aircraftType: 'G800', mmelRevision: 'r1', effectiveDate: '2026-01-01', approvalState: 'PENDING_FSDO', ataReference: '24', itemNumber: '24-02', subItemNumber: '24-02-02', title: 'APU', category: 'C', numberInstalled: 1, numberRequired: 0 };
 const melB: MelItem = { ...melA, id: 'mel2', subItemNumber: '24-02-03' };
-const tables: ReferenceTables = { aircraft: [aircraft], personnel: [personnel], melItems: [melA, melB] };
+const tables: ReferenceTables = { aircraft: [aircraft], personnel: [personnel], melItems: [melA, melB], safaCheckItems: [] };
 
 describe('isSelfApproval', () => {
   it('is true when the decider is the proposer', () => {

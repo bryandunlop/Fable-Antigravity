@@ -2,7 +2,7 @@
 // MelItem) require a proposer + a SEPARATE approver before a change takes effect. Pure + unit-tested;
 // the reducer in TechLogContext.tsx is the sole caller and the final authority — pages never apply
 // these mutations directly, only PROPOSE_CHANGE.
-import type { Aircraft, MelItem, Personnel, PendingApproval } from '../types';
+import type { Aircraft, MelItem, Personnel, PendingApproval, SafaCheckItem } from '../types';
 
 /** A proposer may never decide their own proposal — checked here as defense-in-depth even though the
  * UI already hides the approve/reject buttons for the proposer (never trust a single call site). */
@@ -14,6 +14,7 @@ export interface ReferenceTables {
   aircraft: Aircraft[];
   personnel: Personnel[];
   melItems: MelItem[];
+  safaCheckItems: SafaCheckItem[];
 }
 
 /** Applies an APPROVED pending change to the reference tables. Caller must have already rejected
@@ -34,5 +35,8 @@ export function applyApproval(tables: ReferenceTables, pending: PendingApproval)
     }
     case 'MEL_ITEM_APPROVAL':
       return { ...tables, melItems: tables.melItems.map(m => (m.id === pending.melItemId ? { ...m, approvalState: 'APPROVED' } : m)) };
+    case 'SAFA_CHECKLIST_EDIT':
+      // Whole-definition replace (the proposal snapshots before/after of the full item list).
+      return { ...tables, safaCheckItems: pending.after };
   }
 }

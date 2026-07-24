@@ -637,7 +637,31 @@ export interface Personnel {
   crewDeferralAuthorized?: boolean; // may defer flightCrewDeferral MEL items (en-route crew lane)
   placardAuthorized?: boolean;      // may sign a placard-only (non-(M)) discharge
   isSupervisor?: boolean;  // Chief Pilot / DOM / Chief Inspector — may file third-party corrections (SE-1)
+  regComplianceAuthorized?: boolean; // Reg & Comp — may curate the SAFA ramp-check definition (four-eyes)
   active: boolean;
+}
+
+export type SafaArea = 'A' | 'B' | 'C' | 'D' | 'E';
+/** A SAFA (Safety Assessment of Foreign Aircraft) ramp-check line item — compliance-owned reference
+ * data curated by Reg & Comp under four-eyes. `code` joins each item to the read-only CAMP status
+ * overlay (integration/campClient.campSafaStatus). Areas follow the SAFA inspection areas:
+ * A flight deck · B safety/cabin · C aircraft condition · D cargo · E general. */
+export interface SafaCheckItem {
+  id: string;
+  code: string;
+  area: SafaArea;
+  areaLabel: string;
+  title: string;
+  guidance?: string;
+  active: boolean;
+}
+export type SafaReadinessStatus = 'READY' | 'DUE_SOON' | 'ACTION';
+/** Per-aircraft SAFA status pulled read-only from CAMP (mock; the real CAMP read is an Open Question). */
+export interface SafaCheckStatus {
+  code: string;
+  status: SafaReadinessStatus;
+  expiryUtc?: string;
+  note?: string;
 }
 
 export interface AuditEntry {
@@ -685,6 +709,7 @@ export type PendingApproval = PendingApprovalBase &
     | { kind: 'PERSONNEL_EDIT'; before: Personnel; after: Personnel }
     | { kind: 'MEL_TYPE_ACTIVATION'; aircraftId: string; aircraftType: AircraftType; melItemIds: string[]; evidenceRef: string }
     | { kind: 'MEL_ITEM_APPROVAL'; melItemId: string; evidenceRef: string }
+    | { kind: 'SAFA_CHECKLIST_EDIT'; before: SafaCheckItem[]; after: SafaCheckItem[] }
   );
 
 // ── Phase-2 integration correlation (OFF-ledger, per spec §18.1) ──
@@ -748,6 +773,7 @@ export interface TechLogState {
   aogAcks?: AogAck[];                    // OFF-ledger AOG acknowledgement / escalation log
   checklistTemplates: ChecklistTemplate[];
   checklistInstances: ChecklistInstance[];
+  safaCheckItems: SafaCheckItem[];       // SAFA ramp-check definition (compliance-owned, four-eyes)
   currentUserOid: string;
   nowOverrideUtc?: string; // optional demo clock
 }

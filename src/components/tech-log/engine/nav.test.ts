@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { resolveNav, GROUPS_PILOT } from './nav';
 
 describe('nav model', () => {
-  it('pilot nav is trip-first: Trips, then Fleet, then Work Queue', () => {
-    expect(GROUPS_PILOT.map(g => g.key)).toEqual(['trips', 'fleet', 'workqueue']);
+  it('pilot nav is trip-first: Trips, then Fleet, then Work Queue, then SAFA', () => {
+    expect(GROUPS_PILOT.map(g => g.key)).toEqual(['trips', 'fleet', 'workqueue', 'safa']);
   });
   it('pilot root resolves to the Trips group', () => {
     expect(resolveNav('PILOT', '/tech-log').activeGroup.key).toBe('trips');

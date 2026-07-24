@@ -14,6 +14,7 @@ import WorkCardDetail from './pages/WorkCardDetail';
 import Analytics from './pages/Analytics';
 import Airworthiness from './pages/Airworthiness';
 import ComingDue from './pages/ComingDue';
+import Safa from './pages/Safa';
 import IntermittentFaults from './pages/IntermittentFaults';
 import Trips from './pages/Trips';
 import TripWorkspace from './pages/TripWorkspace';
@@ -51,6 +52,7 @@ export default function TechLogRoutes({ userRole }: { userRole?: string }) {
         <Route path="airworthiness/times" element={<Airworthiness view="times" />} />
         <Route path="airworthiness/adsb" element={<Airworthiness view="adsb" />} />
         <Route path="airworthiness/workorders" element={<Airworthiness view="workorders" />} />
+        <Route path="safa" element={<Safa />} />
         <Route path="intermittent" element={<IntermittentFaults />} />
         <Route path="trips" element={<Trips />} />
         <Route path="trips/:tripId" element={<TripWorkspace />} />

@@ -13,7 +13,9 @@ import { Button } from '../../ui/button';
 export function PendingApprovalsPanel({ kinds }: { kinds: PendingApproval['kind'][] }) {
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
-  const canDecide = user.role === 'MAINTENANCE';
+  // Maintenance approves any reference change; a Reg & Comp user may approve SAFA-definition changes
+  // proposed by a DIFFERENT compliance user (the reducer still blocks self-approval — isSelfApproval).
+  const canDecide = user.role === 'MAINTENANCE' || (!!user.regComplianceAuthorized && kinds.every(k => k === 'SAFA_CHECKLIST_EDIT'));
   const pending = state.pendingApprovals.filter(p => p.status === 'PENDING' && kinds.includes(p.kind));
 
   if (pending.length === 0) return null;

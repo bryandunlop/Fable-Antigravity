@@ -11,7 +11,7 @@ import type { DisplayZoneMode } from './util/displayZone';
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-14-v13'; // D24 governingTimezone + servicing checklist seeds — reseed so persisted rows carry both
+export const DATA_VERSION = '2026-07-24-v14'; // F1 SAFA ramp-check definition seed — reseed so persisted state carries safaCheckItems
 const DISPLAY_ZONE_KEY = 'tech-log-display-zone'; // D24 UI preference, separate from domain state (survives demo reset)
 
 function loadInitialState(): TechLogState {
@@ -187,6 +187,7 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
           case 'AIRCRAFT_EDIT': return pending.after.id;
           case 'PERSONNEL_EDIT': return pending.after.oid;
           case 'MEL_ITEM_APPROVAL': return pending.melItemId;
+          case 'SAFA_CHECKLIST_EDIT': return 'safa-checklist';
         }
       })();
       const audit: AuditEntry = {
@@ -204,7 +205,7 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
         audit: [audit, ...state.audit].slice(0, 500),
       };
       if (!approve) return next;
-      const applied = applyApproval({ aircraft: next.aircraft, personnel: next.personnel, melItems: next.melItems }, pending);
+      const applied = applyApproval({ aircraft: next.aircraft, personnel: next.personnel, melItems: next.melItems, safaCheckItems: next.safaCheckItems }, pending);
       return { ...next, ...applied };
     }
     case 'RESET_STATE':
@@ -231,6 +232,12 @@ const TechLogContext = createContext<Ctx | undefined>(undefined);
 const MAINT_ROLES = ['maintenance', 'chief-inspector', 'shift-lead', 'maintenance-coordinator', 'dom'];
 function resolveFromLogin(userRole: string | undefined, personnel: Personnel[]): { oid: string; ensure?: Personnel } {
   if (!userRole) return { oid: personnel[0]?.oid ?? 'USR001' };
+  // Reg & Comp has no SYSTEM_USER record; resolve straight to the seeded compliance persona so the
+  // login carries the regComplianceAuthorized capability (SAFA editor) instead of a synthesized pilot.
+  if (userRole === 'reg-comp') {
+    const rc = personnel.find(p => p.regComplianceAuthorized);
+    if (rc) return { oid: rc.oid };
+  }
   const sys = SYSTEM_USERS.find((u: { id: string; roles?: string[] }) => u.roles?.includes(userRole));
   if (!sys) return { oid: personnel[0]?.oid ?? 'USR001' };
   if (personnel.some(p => p.oid === sys.id)) return { oid: sys.id };

@@ -126,6 +126,7 @@ export function useIntegration() {
       const t = camp.campComponentTimes(ac.serialNumber, ac.airframeTotalHours, ac.airframeTotalCycles);
       logEvent('CAMP', 'GetLatestAircraftTimes', 'OK', `${ac.tailNumber}: AF ${t.airframe.hours}h · E1 ${t.eng1.hours}h · E2 ${t.eng2.hours}h · APU ${t.apu.hours}h`);
       logEvent('CAMP', 'GetAdSbStatus (TBC fn)', 'OK', `${ac.tailNumber}: ${camp.campAdSb(ac.serialNumber).filter(x => x.status === 'OPEN').length} open AD/SB`);
+      logEvent('CAMP', 'GetSafaReadiness (TBC fn)', 'OK', `${ac.tailNumber}: ${camp.campSafaStatus(ac.serialNumber).filter(x => x.status !== 'READY').length} SAFA item(s) needing attention`);
       toast.success(`Airworthiness refreshed from CAMP (sandbox) for ${ac.tailNumber}`);
     } finally {
       camp.campLogoff();
@@ -297,6 +298,10 @@ export function useIntegration() {
     const ac = state.aircraft.find(a => a.id === aircraftId);
     return ac ? (camp.getClosedWorkOrders(ac.serialNumber).data ?? []) : [];
   }
+  function readSafaStatus(aircraftId: string) {
+    const ac = state.aircraft.find(a => a.id === aircraftId);
+    return { items: ac ? camp.campSafaStatus(ac.serialNumber) : [], unconfirmed: true, openQuestion: camp.CAMP_SAFA_OPEN_QUESTION };
+  }
 
-  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushContactHeartbeat, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook, readForecast, readComponentTimes, readAdSb, readClosedWorkOrders };
+  return { pushDiscrepancy, refreshCampReads, refreshAirworthiness, prefillFlight, listWorkOrders, pullWorkOrder, pushContactHeartbeat, pushUtilization, reconcile, demoErrorHandling, campEnv, promoteToProduction, revertToSandbox, receiveWebhook, readForecast, readComponentTimes, readAdSb, readClosedWorkOrders, readSafaStatus };
 }

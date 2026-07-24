@@ -20,6 +20,7 @@ export const GROUPS_PILOT: NavGroup[] = [
   },
   { key: 'fleet', label: 'Fleet', to: '/tech-log/fleet', match: pilotFleetMatch, badge: 'red' },
   { key: 'workqueue', label: 'Work Queue', to: '/tech-log/work-queue', match: sw('/tech-log/work-queue'), badge: 'urgent' },
+  { key: 'safa', label: 'SAFA', to: '/tech-log/safa', match: sw('/tech-log/safa') },
 ];
 
 export const GROUPS_MAINT: NavGroup[] = [
@@ -30,12 +31,13 @@ export const GROUPS_MAINT: NavGroup[] = [
   { key: 'planners', label: 'Planners', to: '/tech-log/planners', match: sw('/tech-log/planners') },
   {
     key: 'airworthiness', label: 'Airworthiness', to: '/tech-log/airworthiness/forecast',
-    match: (p) => p.startsWith('/tech-log/airworthiness'),
+    match: (p) => p.startsWith('/tech-log/airworthiness') || p.startsWith('/tech-log/safa'),
     sub: [
       { label: 'Coming due', to: '/tech-log/airworthiness/forecast' },
       { label: 'Times', to: '/tech-log/airworthiness/times' },
       { label: 'AD / SB', to: '/tech-log/airworthiness/adsb' },
       { label: 'Work Orders', to: '/tech-log/airworthiness/workorders' },
+      { label: 'SAFA', to: '/tech-log/safa' },
     ],
   },
   {

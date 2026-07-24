@@ -19,6 +19,10 @@ export const SEED_PERSONNEL: Personnel[] = [
   { oid: 'USR008', displayName: 'Tom Parker', role: 'MAINTENANCE', apCertificateNumber: 'AP-2810773', riiAuthorized: false, riiAuthorizedAta: [], active: true },
   { oid: 'USR009', displayName: 'Kevin Miller', role: 'MAINTENANCE', apCertificateNumber: 'AP-3155902', riiAuthorized: false, riiAuthorizedAta: [], active: true },
   { oid: 'USR010', displayName: 'Amanda Brooks (Chief Insp.)', role: 'MAINTENANCE', apCertificateNumber: 'IA-7781234', riiAuthorized: true, riiAuthorizedAta: ['24', '27', '32', '49', '52'], isSupervisor: true, active: true },
+  // Regulatory & Compliance — curate the SAFA ramp-check definition (four-eyes). Not maintenance/crew:
+  // domain role REG_COMP falls into the pilot nav lane and is excluded from crew/maintenance pickers.
+  { oid: 'USR-RC1', displayName: 'Dana Reyes (Reg & Comp)', role: 'REG_COMP', riiAuthorized: false, riiAuthorizedAta: [], regComplianceAuthorized: true, active: true },
+  { oid: 'USR-RC2', displayName: 'Priya Shah (Reg & Comp)', role: 'REG_COMP', riiAuthorized: false, riiAuthorizedAta: [], regComplianceAuthorized: true, active: true },
 ];
 
 export const PILOT_OIDS = ['USR001', 'USR007'];

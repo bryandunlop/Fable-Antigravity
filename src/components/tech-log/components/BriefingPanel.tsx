@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ClipboardCheck, Send, CheckCircle2, Printer, Plane, Wrench, AlertTriangle, Eye, Fuel, CalendarClock, FileSignature, ArrowRight, Lock, ChevronDown, ChevronRight } from 'lucide-react';
+import { ClipboardCheck, Send, CheckCircle2, Printer, Plane, Wrench, AlertTriangle, Eye, Fuel, CalendarClock, FileSignature, ArrowRight, Lock, ChevronDown, ChevronRight, ShieldCheck } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
 import { watchItemsFor } from '../engine/watchlist';
 import { isDeferralExpired } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
-import { campForecast } from '../integration/campClient';
+import { campForecast, campSafaStatus } from '../integration/campClient';
+import { deriveSafaReadiness, safaAttentionRows } from '../engine/safa';
 import { deferralsRequiringAck, canAcceptDispatch } from '../engine/handover';
 import { INTENT } from '../constants';
 import { latestPublishedTemplate, isReleaseGated, buildInitialEntries } from '../engine/checklist';
@@ -60,6 +61,8 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
     .filter(p => p.state !== 'CURRENT');
   const comingDue = campForecast(aircraft.serialNumber, { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles })
     .filter(i => i.dueDateUtc).sort((a, b) => (a.dueDateUtc ?? '').localeCompare(b.dueDateUtc ?? '')).slice(0, 3);
+  // SAFA ramp-check readiness (advisory) — compliance-owned items × read-only CAMP status.
+  const safaAttention = safaAttentionRows(deriveSafaReadiness(state.safaCheckItems, campSafaStatus(aircraft.serialNumber)));
   const melOf = (id: string) => state.melItems.find(m => m.id === id);
 
   const template = latestPublishedTemplate(state.checklistTemplates, aircraft.type, 'PREFLIGHT');
@@ -130,6 +133,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
         { heading: 'Open defects', body: openDefects.length ? openDefects.map(d => `ATA ${d.ataChapter} — ${d.description}`).join('\n') : 'None' },
         { heading: 'Watch items — tracked, non-airworthiness', body: watchItems.length ? watchItems.map(d => `ATA ${d.ataChapter} — ${d.description}`).join('\n') : 'None' },
         { heading: 'Coming due (CAMP)', body: comingDue.length ? comingDue.map(i => `${i.description} — ${i.dueDateUtc ? new Date(i.dueDateUtc).toLocaleDateString() : ''}`).join('\n') : 'None' },
+        { heading: 'SAFA ramp-check readiness', body: safaAttention.length ? safaAttention.map(r => `${r.item.title}${r.expiryUtc ? ` — ${new Date(r.expiryUtc).toLocaleDateString()}` : ''}`).join('\n') : 'Ready for ramp inspection' },
         { heading: 'Preflight checklist', body: (() => {
           const t = state.checklistTemplates.find(t => t.id === instance?.templateId && t.version === instance?.templateVersion);
           if (!t || !instance) return '—';
@@ -317,6 +321,16 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
           <div>
             <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><CalendarClock className="h-3.5 w-3.5" /> Coming due (CAMP)</div>
             {comingDue.length === 0 ? <p className="text-muted-foreground">Nothing imminent.</p> : comingDue.map((i, idx) => <div key={idx} className="text-xs text-muted-foreground">{i.description} — {i.dueDateUtc ? new Date(i.dueDateUtc).toLocaleDateString() : ''}</div>)}
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><ShieldCheck className="h-3.5 w-3.5" /> SAFA ramp-check readiness</div>
+            {safaAttention.length === 0 ? <p className="text-muted-foreground">Ready for ramp inspection.</p> : (
+              <>
+                <p className="text-xs text-[var(--gfo-warning,#F1B434)]">{safaAttention.length} item(s) to resolve before an international leg.</p>
+                {safaAttention.map(r => <div key={r.item.id} className="text-xs text-muted-foreground">{r.item.title}{r.expiryUtc ? ` — ${new Date(r.expiryUtc).toLocaleDateString()}` : ''}</div>)}
+              </>
+            )}
           </div>
 
           {checksDue.length > 0 && (

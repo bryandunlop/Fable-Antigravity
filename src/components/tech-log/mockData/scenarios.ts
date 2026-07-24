@@ -7,6 +7,7 @@ import type {
 import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
 import { SEED_CHECKLIST_TEMPLATES } from './checklistTemplates';
+import { SEED_SAFA_CHECK_ITEMS } from './safa';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { makeSignature } from '../engine/signing';
 
@@ -448,6 +449,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     postflights: [],
     checklistTemplates: SEED_CHECKLIST_TEMPLATES,
     checklistInstances,
+    safaCheckItems: SEED_SAFA_CHECK_ITEMS,
     coordinationMessages: [
       { id: 'cm-seed-1', aircraftId: 'ac-n2pg', authorOid: tech.oid, text: 'Aircraft fueled and ready for the morning KLUK–KTEB leg.', atUtc: iso(3 * H) },
     ],

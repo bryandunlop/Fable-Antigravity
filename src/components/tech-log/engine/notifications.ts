@@ -3,6 +3,8 @@ import { currentRows } from './supersede';
 import { deriveServiceability } from './serviceability';
 import { isDeferralExpired } from './pl25';
 import { expiredChecksFor } from './recurringChecks';
+import { deriveSafaReadiness } from './safa';
+import { campSafaStatus } from '../integration/campClient';
 import { latestBriefing } from '../components/BriefingPanel';
 
 const DAY = 86400000;
@@ -80,6 +82,13 @@ export function buildNotifications(
     for (const ac of state.aircraft.filter(a => !a.isProvisional)) {
       if (deriveServiceability(ac.id, state, nowUtc).status === 'RED') {
         out.push({ id: `red:${ac.id}`, severity: 'warn', title: `${ac.tailNumber} is grounded (RED)`, tail: ac.tailNumber, link: `/tech-log/aircraft/${ac.tailNumber}` });
+      }
+    }
+    // SAFA ramp-check readiness (advisory — never a dispatch gate): surface items CAMP flags as ACTION.
+    for (const ac of state.aircraft.filter(a => !a.isProvisional)) {
+      const action = deriveSafaReadiness(state.safaCheckItems, campSafaStatus(ac.serialNumber)).filter(r => r.status === 'ACTION');
+      if (action.length > 0) {
+        out.push({ id: `safa:${ac.id}`, severity: 'warn', title: `SAFA item needs attention — ${ac.tailNumber}`, detail: action.map(r => r.item.title).join('; '), tail: ac.tailNumber, link: '/tech-log/safa' });
       }
     }
   }
