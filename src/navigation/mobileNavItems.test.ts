@@ -4,9 +4,10 @@ import { readRouteTable, resolvesToRoute } from './routeAudit';
 
 // H1: every mobile "Documents" entry must point at the real /documents hub —
 // never the dead legacy /document-management surface (no-op upload forms).
-// (safety and admin-assistant dropped their Documents tab in the LG-19 four-tab
-// rebudget — their own work surfaces outrank the library; Documents stays in More.)
-const DOCUMENT_ROLES = ['pilot', 'document-manager', 'unknown-role-falls-to-default'];
+// (pilot, safety and admin-assistant dropped their Documents tab in the four-tab
+// rebudget — pilot in Bryan's 2026-07-24 picks, the others in the LG-19 pass —
+// their own work surfaces outrank the library; Documents stays in More.)
+const DOCUMENT_ROLES = ['document-manager', 'unknown-role-falls-to-default'];
 
 describe('mobileNavItemsForRole (H1 — mobile nav routes to the real Documents hub)', () => {
   it.each(DOCUMENT_ROLES)('%s: Documents points to /documents', (role) => {

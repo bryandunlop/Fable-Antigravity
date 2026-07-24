@@ -1,19 +1,27 @@
-// Pure role → tab mapping for the mobile bottom nav. H1: every "Documents"
-// tab targets the real /documents hub — the legacy /document-management
-// surface is a dead mock whose upload forms silently discard files.
+// Pure role → tab mapping for the mobile bottom nav. This bar is phone-only
+// (MobileBottomNav is md:hidden); iPad (≥768px) renders the full desktop sidebar,
+// so the four-tab budget only bites for the phone-primary roles. Per Bryan
+// (2026-07-24, D37 Wave-1 Q1): phone users are pilots, flight attendants
+// (inflight), and maintenance — those three get hand-picked tab sets; every other
+// role keeps the generic Home + Tasks + role default (their phone view is a
+// fallback, they work on desktop).
+// H1: every "Documents" tab targets the real /documents hub — the legacy
+// /document-management surface is a dead mock whose upload forms silently discard
+// files.
 import {
   Home,
   Plane,
   Users,
   Shield,
   Calendar,
-  Wrench,
   FileText,
   AlertTriangle,
   BookOpen,
   Target,
   ClipboardCheck,
-  Boxes,
+  ClipboardList,
+  Fuel,
+  Utensils,
   MapPin,
   type LucideIcon,
 } from 'lucide-react';
@@ -32,18 +40,14 @@ export const MOBILE_NAV_ROLES = [
   'document-manager', 'admin-assistant', 'scheduling',
 ] as const;
 
-// MobileBottomNav renders navItems.slice(0, 4) — the fifth grid cell is the "More"
-// sheet. Any tab a role defines beyond the fourth is silently dropped, which is how
-// the safety role's Safety and Hazards tabs became invisible while Documents and
-// Tasks took their slots. Tabs are therefore capped and ordered most-specific-first;
+// MobileBottomNav renders navItems.slice(0, MAX_VISIBLE_TABS) — the next grid cell
+// is the "More" sheet. Any tab a role defines beyond the fourth is silently
+// dropped, so every role's array is capped at four and ordered most-important-first;
 // everything else stays reachable through More. (LG-19 / D37 Wave 1)
 export const MAX_VISIBLE_TABS = 4;
 
-// LG-19: 'Messages' pointed at /flight-family, whose route is commented out in
-// App.tsx — a permanent 404 tab on every phone, and worse, it consumed one of the
-// four visible slots while the role's own last tab fell off the end. Removed: there
-// is no messaging surface to re-point it at. That leaves two shared tabs plus two
-// role tabs — exactly the four that render.
+// Generic default for roles that are not phone-primary: Home + Tasks + two role
+// tabs. The three phone-primary roles below override this with explicit sets.
 const BASE_ITEMS: MobileNavItem[] = [
   { name: 'Home', href: '/', icon: Home },
   { name: 'Tasks', href: '/tasks-action-items', icon: Target },
@@ -51,27 +55,33 @@ const BASE_ITEMS: MobileNavItem[] = [
 
 export function mobileNavItemsForRole(userRole: string): MobileNavItem[] {
   switch (userRole) {
+    // ── Phone-primary roles: explicit four tabs (Bryan, 2026-07-24, D37 Wave-1 Q1) ──
     case 'pilot':
       return [
-        ...BASE_ITEMS,
-        { name: 'Documents', href: '/documents', icon: FileText },
-        { name: 'Aircraft', href: '/aircraft', icon: Plane },
+        { name: 'Dashboard', href: '/', icon: Home },
+        { name: 'Workspace', href: '/pilot-workspace', icon: ClipboardCheck },
+        { name: 'Tech Log', href: '/tech-log', icon: FileText },
+        { name: 'Fuel', href: '/fuel-load-request', icon: Fuel },
       ];
 
     case 'inflight':
       return [
-        ...BASE_ITEMS,
-        { name: 'Calendar', href: '/upcoming-flights', icon: Calendar },
+        { name: 'Dashboard', href: '/', icon: Home },
         { name: 'Passengers', href: '/passenger-database', icon: Users },
+        { name: 'Trips', href: '/upcoming-flights', icon: Calendar },
+        { name: 'Catering', href: '/catering-tracker', icon: Utensils },
       ];
 
+    // Maintenance drops Home/Tasks entirely — Bryan's four are all role work.
     case 'maintenance':
       return [
-        ...BASE_ITEMS,
-        { name: 'Tech Log', href: '/tech-log', icon: Wrench },
-        { name: 'Parts', href: '/parts-inventory', icon: Boxes },
+        { name: 'Tech Log', href: '/tech-log', icon: FileText },
+        { name: 'Turndown', href: '/turndown-form', icon: ClipboardList },
+        { name: 'Fuel Farm', href: '/fuel-farm', icon: Fuel },
+        { name: 'GRAT', href: '/grat/standalone', icon: Shield },
       ];
 
+    // ── Desktop-primary roles: generic Home + Tasks + role tabs ──
     // Safety previously listed six tabs; only the first four render, so its two
     // most important surfaces (Safety, Hazards) never appeared. Documents drops to
     // the More sheet — a safety officer's own board outranks the document library.
