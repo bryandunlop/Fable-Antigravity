@@ -5,9 +5,9 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Audit, useAudits } from '../../contexts/AuditContext';
-import { toast } from 'sonner';
 import { AUDITORS, ROLE_COLORS, initialsOf } from './auditors';
 import { auditLoadByPerson, suggestAuditor } from './assignSuggestion';
+import { useAssignAudit } from './useAssignAudit';
 
 interface AssignAuditorPopoverProps {
   audit: Audit;
@@ -15,25 +15,13 @@ interface AssignAuditorPopoverProps {
 }
 
 export default function AssignAuditorPopover({ audit, children }: AssignAuditorPopoverProps) {
-  const { updateAudit, audits } = useAudits();
+  const { audits } = useAudits();
+  const assignAudit = useAssignAudit();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
 
   const assign = (name: string, role: string, method: string) => {
-    // Snapshot the prior assignment so the toast can offer a real Undo — no
-    // assignment is silent or irreversible (this replaces the old no-undo Random).
-    const prev = {
-      assignedTo: audit.assignedTo,
-      assignedRole: audit.assignedRole,
-      assignmentType: audit.assignmentType,
-    };
-    updateAudit(audit.id, { assignedTo: name, assignedRole: role, assignmentType: method });
-    toast.success(`${audit.id} assigned to ${name}`, {
-      action: {
-        label: 'Undo',
-        onClick: () => updateAudit(audit.id, prev),
-      },
-    });
+    assignAudit(audit, name, role, method);
     setOpen(false);
     setSearch('');
   };

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Badge } from '../ui/badge';
-import { BookOpen, UserCheck, AlertCircle } from 'lucide-react';
+import { BookOpen, UserCheck, UserPlus } from 'lucide-react';
 import { Audit } from '../../contexts/AuditContext';
+import AssignAuditorPopover from './AssignAuditorPopover';
 
 interface AuditCardProps {
   audit: Audit;
@@ -28,10 +29,20 @@ export default function AuditCard({ audit, onClick, compact = false }: AuditCard
   const statusStyle = STATUS_STYLES[audit.status] ?? 'bg-gray-100 text-gray-600 border-gray-200';
   const priorityDot = PRIORITY_DOT[audit.priority] ?? 'bg-gray-400';
 
+  // The card is a role=button div (not a <button>) so the inline assign chip —
+  // itself an interactive popover trigger — can nest without invalid markup.
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onClick(audit)}
-      className="w-full text-left group relative bg-white border border-gray-200 rounded-xl p-3 hover:border-blue-400 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick(audit);
+        }
+      }}
+      className="w-full text-left group relative bg-white border border-gray-200 rounded-xl p-3 hover:border-blue-400 hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30"
     >
       {/* Priority stripe on left edge */}
       <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-full ${priorityDot}`} />
@@ -52,23 +63,39 @@ export default function AuditCard({ audit, onClick, compact = false }: AuditCard
           </div>
         )}
 
-        {/* Status + Auditor row */}
+        {/* Status + inline Assign row */}
         <div className="flex items-center justify-between mt-2 gap-2">
           <Badge className={`${statusStyle} text-[9px] h-4 px-1.5 border shrink-0`} variant="outline">
             {audit.status}
           </Badge>
 
-          {isUnassigned ? (
-            <span className="flex items-center gap-1 text-[10px] text-red-600 font-semibold">
-              <AlertCircle className="w-3 h-3" />
-              Unassigned
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-[10px] text-gray-500 truncate">
-              <UserCheck className="w-3 h-3 shrink-0 text-gray-400" />
-              <span className="truncate">{audit.assignedTo}</span>
-            </span>
-          )}
+          {/* Inline assign — opens the roster popover in place, no drawer needed.
+              stopPropagation keeps the card's own click (open drawer) from firing. */}
+          <AssignAuditorPopover audit={audit}>
+            <button
+              type="button"
+              onClick={e => e.stopPropagation()}
+              onKeyDown={e => e.stopPropagation()}
+              title={isUnassigned ? 'Assign an auditor' : `Assigned to ${audit.assignedTo} — click to reassign`}
+              className={
+                isUnassigned
+                  ? 'flex items-center gap-1 text-[10px] font-semibold text-red-600 border border-dashed border-red-300 rounded-full px-1.5 py-0.5 hover:bg-red-50 transition-colors'
+                  : 'flex items-center gap-1 text-[10px] text-gray-600 max-w-[110px] border border-transparent rounded-full px-1.5 py-0.5 hover:border-gray-300 hover:bg-gray-50 transition-colors'
+              }
+            >
+              {isUnassigned ? (
+                <>
+                  <UserPlus className="w-3 h-3 shrink-0" />
+                  Assign
+                </>
+              ) : (
+                <>
+                  <UserCheck className="w-3 h-3 shrink-0 text-gray-400" />
+                  <span className="truncate">{audit.assignedTo}</span>
+                </>
+              )}
+            </button>
+          </AssignAuditorPopover>
         </div>
 
         {/* Progress bar (only if in progress or complete) */}
@@ -84,6 +111,6 @@ export default function AuditCard({ audit, onClick, compact = false }: AuditCard
           </div>
         )}
       </div>
-    </button>
+    </div>
   );
 }
