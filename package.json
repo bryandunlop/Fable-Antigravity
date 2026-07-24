@@ -103,6 +103,8 @@
             "build": "vite build",
             "preview": "vite preview",
             "type-check": "tsc --noEmit",
+            "type-check:baseline": "node scripts/typecheck-baseline.mjs",
+            "prepare": "git config core.hooksPath .githooks || true",
             "db:generate": "drizzle-kit generate",
             "db:push": "drizzle-kit push",
             "db:seed": "tsx src/server/db/seed.ts",
