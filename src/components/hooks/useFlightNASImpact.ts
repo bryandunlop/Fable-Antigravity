@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { TODAY_LEGS } from '../../services/todaysOpsMock';
 
 interface Flight {
   id: string;
@@ -80,106 +81,59 @@ export const useFlightNASImpact = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Mock flight schedule data - in real app this would come from flight planning system
+  // Our real flights today, from todaysOpsMock. Airport codes are IATA (LUK/MIA/TEB)
+  // to match the NAS event codes below.
   const getScheduledFlights = (): Flight[] => {
-    return [
-      {
-        id: 'FO001',
-        departure: '08:00',
-        arrival: '11:30',
-        route: 'LAX → JFK',
-        status: 'On Time',
-        aircraft: 'N123AB',
-        departureAirport: 'LAX',
-        arrivalAirport: 'JFK',
-        scheduledDeparture: new Date('2025-02-05T08:00:00'),
-        scheduledArrival: new Date('2025-02-05T11:30:00')
-      },
-      {
-        id: 'FO002',
-        departure: '14:15',
-        arrival: '17:45',
-        route: 'JFK → MIA',
-        status: 'Scheduled',
-        aircraft: 'N456CD',
-        departureAirport: 'JFK',
-        arrivalAirport: 'MIA',
-        scheduledDeparture: new Date('2025-02-05T14:15:00'),
-        scheduledArrival: new Date('2025-02-05T17:45:00')
-      },
-      {
-        id: 'FO003',
-        departure: '19:30',
-        arrival: '22:00',
-        route: 'MIA → LAX',
-        status: 'Scheduled',
-        aircraft: 'N789EF',
-        departureAirport: 'MIA',
-        arrivalAirport: 'LAX',
-        scheduledDeparture: new Date('2025-02-05T19:30:00'),
-        scheduledArrival: new Date('2025-02-05T22:00:00')
-      },
-      {
-        id: 'FO004',
-        departure: '12:00',
-        arrival: '15:30',
-        route: 'ORD → LGA',
-        status: 'Scheduled',
-        aircraft: 'N234CD',
-        departureAirport: 'ORD',
-        arrivalAirport: 'LGA',
-        scheduledDeparture: new Date('2025-02-05T12:00:00'),
-        scheduledArrival: new Date('2025-02-05T15:30:00')
-      },
-      {
-        id: 'FO005',
-        departure: '16:45',
-        arrival: '20:15',
-        route: 'EWR → ATL',
-        status: 'Scheduled',
-        aircraft: 'N567EF',
-        departureAirport: 'EWR',
-        arrivalAirport: 'ATL',
-        scheduledDeparture: new Date('2025-02-05T16:45:00'),
-        scheduledArrival: new Date('2025-02-05T20:15:00')
-      }
-    ];
+    return TODAY_LEGS.map(leg => ({
+      id: leg.id,
+      departure: leg.schedDep,
+      arrival: leg.schedArr,
+      route: `${leg.depIata} → ${leg.arrIata}`,
+      status: leg.status,
+      aircraft: leg.tail,
+      departureAirport: leg.depIata,
+      arrivalAirport: leg.arrIata,
+      scheduledDeparture: new Date(),
+      scheduledArrival: new Date(),
+    }));
   };
 
-  // Mock NAS data - this would normally come from the NAS Status service
+  // Mock NAS data - this would normally come from the NAS Status service. Airports
+  // are chosen so some events touch our own flights (TEB via N6PG, MIA via N5PG/N3PG)
+  // and the rest are national noise (JFK/ORD/LGA/EWR), making "affect you" real.
   const getNASData = () => {
     return {
       groundStops: [
         {
-          airport: 'LGA',
+          airport: 'TEB',
           reason: 'Thunderstorms in area',
-          startTime: '14:30',
-          endTime: '16:45',
-          affectedFlights: 47,
+          startTime: '10:30',
+          endTime: '12:15',
+          affectedFlights: 31,
           severity: 'High' as const
         },
         {
           airport: 'EWR',
           reason: 'ATC staffing shortage',
-          startTime: '13:15',
+          startTime: '09:15',
           affectedFlights: 23,
           severity: 'Medium' as const
         }
       ],
       groundDelays: [
         {
+          airport: 'MIA',
+          averageDelay: 40,
+          reason: 'Volume/Weather',
+          trend: 'Increasing' as const,
+          affectedFlights: 62
+        },
+        {
           airport: 'JFK',
           averageDelay: 45,
           reason: 'Volume/Weather',
           trend: 'Decreasing' as const,
           affectedFlights: 156
-        },
-        {
-          airport: 'LAX',
-          averageDelay: 22,
-          reason: 'Volume',
-          trend: 'Stable' as const,
-          affectedFlights: 89
         },
         {
           airport: 'ORD',
@@ -189,11 +143,11 @@ export const useFlightNASImpact = () => {
           affectedFlights: 203
         },
         {
-          airport: 'ATL',
-          averageDelay: 18,
+          airport: 'LGA',
+          averageDelay: 28,
           reason: 'Volume',
           trend: 'Stable' as const,
-          affectedFlights: 124
+          affectedFlights: 88
         }
       ],
       airspaceFlowPrograms: [
@@ -207,10 +161,10 @@ export const useFlightNASImpact = () => {
           impact: 'High' as const
         },
         {
-          name: 'SoCal AFP',
+          name: 'Midwest AFP',
           type: 'Airspace Flow Program' as const,
-          affectedAirports: ['LAX', 'SAN', 'BUR', 'LGB'],
-          reason: 'High volume and marine layer',
+          affectedAirports: ['ORD', 'MDW', 'MKE'],
+          reason: 'Convective activity across the Great Lakes',
           startTime: '11:30',
           estimatedEndTime: '15:30',
           impact: 'Medium' as const
