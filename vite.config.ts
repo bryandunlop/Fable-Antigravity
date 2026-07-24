@@ -94,5 +94,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     open: true,
+    // Allow cloud/preview proxies (e.g. Claude Code web preview) that reach the
+    // dev server via a non-localhost Host header, which Vite blocks by default.
+    allowedHosts: true,
   },
 });
