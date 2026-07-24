@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from './ui/sidebar';
 import NotificationCenter from './NotificationCenter';
 import { ThemeToggle } from './ThemeToggle';
+import { ResetDemoDataButton } from './ResetDemoDataButton';
 import BreadcrumbNav from './BreadcrumbNav';
 import CommandPalette from './CommandPalette';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
@@ -379,6 +380,9 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               <NotificationCenter userRole={userRole} additionalRoles={additionalRoles} />
 
               <ThemeToggle />
+
+              {/* Global "Reset demo data" — the one factory reset (D37 Wave-1 Q3) */}
+              <ResetDemoDataButton />
 
               {/* Logout button */}
               <Button
