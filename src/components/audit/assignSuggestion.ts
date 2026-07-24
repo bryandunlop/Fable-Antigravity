@@ -53,15 +53,24 @@ export function auditLoadByPerson(
 // year, with an alphabetical tie-break so the choice is stable and testable.
 // Falls back to the whole roster when no role matches. Returns null if the
 // roster is empty.
+//
+// `extraLoad` lets a batch (Auto-assign all) add picks already handed out in the
+// same run to each person's load, so the batch stays balanced even for pool
+// drafts that carry no scheduledDate and therefore never count via
+// auditLoadByPerson. Empty for a single suggestion.
 export function suggestAuditor(
   audit: AuditLike,
   roster: Auditor[],
   audits: AuditLike[],
   year: number,
+  extraLoad: Record<string, number> = {},
 ): Auditor | null {
   if (roster.length === 0) return null;
 
   const load = auditLoadByPerson(audits, year);
+  for (const [name, n] of Object.entries(extraLoad)) {
+    load[name] = (load[name] || 0) + n;
+  }
   const wantRole = audit.category ? CATEGORY_ROLE[audit.category] : undefined;
 
   const roleMatched = wantRole

@@ -31,16 +31,17 @@ export default function UnassignedAuditsTray({
     return 'Due ' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
-  // Batch assign: fold over the unassigned set so each pick accounts for the
-  // ones already handed out in this run (proper round-robin balancing, not the
-  // same person N times). One Undo restores the whole batch.
+  // Batch assign: hand out to each unassigned audit in turn, tallying picks in
+  // extraLoad so every subsequent suggestion counts the ones already handed out
+  // this run — balanced even for pool drafts that carry no scheduledDate (which
+  // never register via auditLoadByPerson). One Undo restores the whole batch.
   const autoAssignAll = () => {
-    const working = audits.map(a => ({ ...a }));
+    const extraLoad: Record<string, number> = {};
     const applied: { id: string; prev: Partial<Audit> }[] = [];
 
-    for (const target of working) {
+    for (const target of audits) {
       if (target.assignedTo && target.assignedTo !== 'Unassigned') continue;
-      const pick = suggestAuditor(target, AUDITORS, working, currentYear);
+      const pick = suggestAuditor(target, AUDITORS, audits, currentYear, extraLoad);
       if (!pick) continue;
       applied.push({
         id: target.id,
@@ -50,9 +51,7 @@ export default function UnassignedAuditsTray({
           assignmentType: target.assignmentType,
         },
       });
-      target.assignedTo = pick.name;
-      target.assignedRole = pick.role;
-      target.assignmentType = 'Suggested';
+      extraLoad[pick.name] = (extraLoad[pick.name] || 0) + 1;
       updateAudit(target.id, {
         assignedTo: pick.name,
         assignedRole: pick.role,

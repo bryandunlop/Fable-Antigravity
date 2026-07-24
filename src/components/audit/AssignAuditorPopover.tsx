@@ -46,7 +46,17 @@ export default function AssignAuditorPopover({ audit, children }: AssignAuditorP
   return (
     <Popover open={open} onOpenChange={(v: boolean) => { setOpen(v); if (!v) setSearch(''); }}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent className="w-72 p-0 shadow-xl" align="start" sideOffset={8}>
+      {/* stopPropagation on the content itself: the popover renders through a
+          Radix Portal, and React synthetic events bubble through the COMPONENT
+          tree, not the DOM tree — so a click on a roster row would otherwise
+          reach an ancestor card's onClick (opening the drawer). Trigger-only
+          stopPropagation does not cover the picks made inside the popover. */}
+      <PopoverContent
+        className="w-72 p-0 shadow-xl"
+        align="start"
+        sideOffset={8}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="px-3 py-2.5 border-b bg-muted/30">
           <p className="text-xs font-bold text-foreground">Assign Auditor</p>

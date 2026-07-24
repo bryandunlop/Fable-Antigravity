@@ -70,7 +70,10 @@ export default function AuditCard({ audit, onClick, compact = false }: AuditCard
           </Badge>
 
           {/* Inline assign — opens the roster popover in place, no drawer needed.
-              stopPropagation keeps the card's own click (open drawer) from firing. */}
+              Two stopPropagation layers are needed: this trigger's onClick stops
+              the OPEN click from reaching the card, and PopoverContent's own
+              onClick stops the pick clicks (which bubble through the React tree
+              from the portal) — see AssignAuditorPopover. */}
           <AssignAuditorPopover audit={audit}>
             <button
               type="button"

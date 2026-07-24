@@ -98,6 +98,40 @@ describe('suggestAuditor', () => {
     expect(suggestAuditor(aud({}), [], [], 2026)).toBeNull();
   });
 
+  it('shifts the pick when extraLoad marks the natural choice as already handed out', () => {
+    // Safety Management → Safety. With everyone at 0, Amanda Foster wins on the
+    // alphabetical tie-break. Mark Amanda as already picked once this batch and
+    // the next Safety pick moves on (Lisa Chen — next alphabetically at load 0).
+    const pick = suggestAuditor(
+      aud({ category: 'Safety Management' }),
+      ROSTER,
+      [],
+      2026,
+      { 'Amanda Foster': 1 },
+    );
+    expect(pick).toEqual({ name: 'Lisa Chen', role: 'Safety' });
+  });
+
+  it('balances a batch of dateless pool drafts via extraLoad (no repeat auditor)', () => {
+    // Two dateless drafts of the same category would otherwise get the identical
+    // suggestion, because auditLoadByPerson never counts date-free audits. The
+    // batch tally in extraLoad is what keeps them distinct.
+    const extraLoad: Record<string, number> = {};
+    const picks: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const pick = suggestAuditor(
+        aud({ category: 'Safety Management', scheduledDate: undefined }),
+        ROSTER,
+        [],
+        2026,
+        extraLoad,
+      )!;
+      picks.push(pick.name);
+      extraLoad[pick.name] = (extraLoad[pick.name] || 0) + 1;
+    }
+    expect(picks).toEqual(['Amanda Foster', 'Lisa Chen']);
+  });
+
   it('maps Ground Operations and Training to their expected roles', () => {
     expect(CATEGORY_ROLE['Ground Operations']).toBe('Maintenance');
     expect(CATEGORY_ROLE['Training']).toBe('Pilot');
