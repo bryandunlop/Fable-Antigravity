@@ -5,7 +5,7 @@ import { useUnifiedFleetStatus } from './hooks/useUnifiedFleetStatus';
 import { FirLeadershipChip } from './fir/components/FirLeadershipChip';
 import DailyFlightsWidget from './DailyFlightsWidget';
 import DutyRosterWidget from './DutyRosterWidget';
-import FleetSchematicMap from './ops-wall/FleetSchematicMap';
+import FleetMapPanel from './ops-wall/FleetMapPanel';
 import NasImpactTile from './ops-wall/NasImpactTile';
 import StationWeatherStrip from './ops-wall/StationWeatherStrip';
 import QuickLinksBar from './ops-wall/QuickLinksBar';
@@ -130,7 +130,7 @@ export default function FleetOpsWall({ userRole }: { userRole: string }) {
           </p>
         </section>
 
-        <FleetSchematicMap fleet={fleet} homeBase={HOME_STATION} className="min-h-[300px]" />
+        <FleetMapPanel fleet={fleet} homeBase={HOME_STATION} className="min-h-[300px]" />
       </div>
 
       {/* Dock */}
