@@ -10,13 +10,7 @@ import {
   resolveAircraftPoint,
   type GeoPoint,
 } from '../../services/fleetGeo';
-
-/** Same RAG tokens FleetStatusWidget uses — airworthiness colour is one vocabulary. */
-const RAG_DOT: Record<string, string> = {
-  GREEN: 'var(--gfo-success, #00B140)',
-  AMBER: 'var(--gfo-warning, #F1B434)',
-  RED: 'var(--gfo-error, #EF3340)',
-};
+import { RAG_DOT } from './ragColors';
 
 interface FleetSchematicMapProps {
   fleet: UnifiedFleetAircraft[];

@@ -3,8 +3,8 @@
  *
  * Before this module, airport coordinates were hard-coded per-file (LiveFleetMap
  * carried its own 11-entry `airportCoords` literal), so nothing else could plot an
- * airport. This is the shared table: the fleet schematic and the Leaflet map read
- * the same coordinates.
+ * airport. This is the shared table the ops-wall map reads; the older
+ * LiveFleetMap still has its own copy and could be migrated onto this later.
  *
  * Both code systems are indexed on purpose — the satcom feed reports IATA
  * ('LAX', 'JFK') while the fleet roster reports ICAO ('KLUK').

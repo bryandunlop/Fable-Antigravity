@@ -39,7 +39,7 @@ export default function NasImpactTile({ className = '' }: { className?: string }
   const { impactData, loading } = useFlightNASImpact();
   const [expanded, setExpanded] = useState(false);
 
-  const { relevant, totalActive, affectingUs, nationalOnly, nationalBreakdown } = useMemo(() => {
+  const { relevant, totalActive, affectingUs } = useMemo(() => {
     const nas = impactData.nasData;
     const total = nas
       ? nas.groundStops.length +
@@ -48,7 +48,9 @@ export default function NasImpactTile({ className = '' }: { className?: string }
         nas.facilityOutages.length
       : 0;
 
-    // One row per airport+type, however many of our flights it hits.
+    // One row per airport+type, however many of our flights it hits. Note this
+    // can exceed `total` — a single flow program spanning five airports becomes
+    // five airport rows here — so these two counts are not subtractable.
     const seen = new Set<string>();
     const ours = impactData.impactedFlights
       .flatMap(f => f.impacts)
@@ -60,29 +62,17 @@ export default function NasImpactTile({ className = '' }: { className?: string }
       })
       .sort((a, b) => (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9));
 
-    const breakdown = nas
-      ? [
-          nas.groundStops.length && `${nas.groundStops.length} ground stop`,
-          nas.groundDelays.length && `${nas.groundDelays.length} ground delay`,
-          nas.airspaceFlowPrograms.length && `${nas.airspaceFlowPrograms.length} flow program`,
-          nas.facilityOutages.length && `${nas.facilityOutages.length} outage`,
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      : '';
-
     return {
       relevant: ours,
       totalActive: total,
       affectingUs: impactData.totalImpacted,
-      nationalOnly: Math.max(0, total - ours.length),
-      nationalBreakdown: breakdown,
     };
   }, [impactData]);
 
   const visible = expanded ? relevant : relevant.slice(0, VISIBLE_EVENTS);
-  const hiddenRelevant = relevant.length - visible.length;
-  const rollupCount = hiddenRelevant + nationalOnly;
+  // Everything the roll-up hides is still a relevant impact on our flights —
+  // never label it "national", which is what the summary count already conveys.
+  const hidden = relevant.length - visible.length;
 
   return (
     <section className={`rounded-lg border border-border bg-card p-3 ${className}`}>
@@ -113,19 +103,13 @@ export default function NasImpactTile({ className = '' }: { className?: string }
         ))}
       </ul>
 
-      {expanded && nationalBreakdown && (
-        <p className="mt-2 text-[11px] text-muted-foreground/80">
-          National: {nationalBreakdown}
-        </p>
-      )}
-
-      {!loading && (rollupCount > 0 || expanded) && (
+      {!loading && (hidden > 0 || (expanded && relevant.length > VISIBLE_EVENTS)) && (
         <button
           type="button"
           onClick={() => setExpanded(v => !v)}
           className="mt-2 text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
         >
-          {expanded ? 'Show less' : `+${rollupCount} national · show all`}
+          {expanded ? 'Show less' : `+${hidden} more · show all`}
         </button>
       )}
     </section>

@@ -11,12 +11,7 @@ import StationWeatherStrip from './ops-wall/StationWeatherStrip';
 import QuickLinksBar from './ops-wall/QuickLinksBar';
 import { HOME_STATION } from '../config/station';
 import { lookupAirport } from '../services/airportCoords';
-
-const RAG_DOT: Record<string, string> = {
-  GREEN: 'var(--gfo-success, #00B140)',
-  AMBER: 'var(--gfo-warning, #F1B434)',
-  RED: 'var(--gfo-error, #EF3340)',
-};
+import { RAG_DOT } from './ops-wall/ragColors';
 
 /** Stations shown alongside home. Kept short so the strip stays one line. */
 const MAX_DESTINATION_STATIONS = 3;
