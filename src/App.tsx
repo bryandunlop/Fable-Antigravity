@@ -9,7 +9,7 @@ import { PassengerFormProvider } from './components/contexts/PassengerFormContex
 import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
 import PasswordGate from './components/PasswordGate';
-import Dashboard from './components/Dashboard';
+import FleetOpsWall from './components/FleetOpsWall';
 import NotFound from './components/NotFound';
 import { FRONT_DOORS } from './navigation/navConfig';
 import Navigation from './components/Navigation';
@@ -220,11 +220,11 @@ export default function App() {
                           <Navigation userRole={userRole} additionalRoles={additionalRoles} onLogout={handleLogout}>
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out h-full">
                               <Routes>
-                                {/* Front doors moved to the login redirect — Dashboard stays reachable for every role
-                                    (maintenance-workflow keeps its redirect: its persona can't use the Dashboard). */}
+                                {/* Front doors moved to the login redirect — the ops wall stays reachable for every role
+                                    (maintenance-workflow keeps its redirect: its persona can't use the home screen). */}
                                 <Route path="/" element={
                                   userRole === 'maintenance-workflow' ? <Navigate to="/maintenance-workflow" replace />
-                                    : <Dashboard userRole={userRole} />
+                                    : <FleetOpsWall userRole={userRole} />
                                 } />
                                 <Route path="/aircraft" element={<AircraftStatus />} />
                                 <Route path="/fleet-map" element={<LiveFleetMap />} />
