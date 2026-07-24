@@ -126,6 +126,53 @@ export function boundsForPoints(points: GeoPoint[], padDeg = 4): BoundingBox {
   });
 }
 
+export interface PlacedPoint {
+  xPct: number;
+  yPct: number;
+}
+
+/**
+ * Fan out points that project to the same spot so none hides another.
+ *
+ * Aircraft parked at one airport share identical coordinates; without this a
+ * grounded (RED) tail vanishes under a serviceable one on the same ramp — the
+ * one thing a fleet-status display must never do. Points are bucketed by
+ * proximity and any cluster of two or more is spread evenly around its centroid.
+ * Deterministic in input order, so the layout does not jump between renders.
+ */
+export function declutterPoints(
+  points: PlacedPoint[],
+  opts: { radiusPct?: number; bucketPct?: number } = {}
+): PlacedPoint[] {
+  const radiusPct = opts.radiusPct ?? 4;
+  const bucketPct = opts.bucketPct ?? 2.5;
+
+  const groups = new Map<string, number[]>();
+  points.forEach((p, i) => {
+    const key = `${Math.round(p.xPct / bucketPct)}:${Math.round(p.yPct / bucketPct)}`;
+    const group = groups.get(key);
+    if (group) group.push(i);
+    else groups.set(key, [i]);
+  });
+
+  const out: PlacedPoint[] = points.map(p => ({ xPct: p.xPct, yPct: p.yPct }));
+
+  for (const idxs of groups.values()) {
+    if (idxs.length < 2) continue;
+    const cx = idxs.reduce((sum, i) => sum + points[i].xPct, 0) / idxs.length;
+    const cy = idxs.reduce((sum, i) => sum + points[i].yPct, 0) / idxs.length;
+    idxs.forEach((i, k) => {
+      const angle = -Math.PI / 2 + (k / idxs.length) * 2 * Math.PI;
+      out[i] = {
+        xPct: clamp(cx + radiusPct * Math.cos(angle), 0, 100),
+        yPct: clamp(cy + radiusPct * Math.sin(angle), 0, 100),
+      };
+    });
+  }
+
+  return out;
+}
+
 function widen(box: BoundingBox): BoundingBox {
   const out = { ...box };
 

@@ -4,6 +4,7 @@ import {
   resolveAircraftPoint,
   projectToBox,
   boundsForPoints,
+  declutterPoints,
   type BoundingBox,
 } from './fleetGeo';
 
@@ -147,5 +148,69 @@ describe('boundsForPoints', () => {
     const b = boundsForPoints([]);
     expect(b.maxLat).toBeGreaterThan(b.minLat);
     expect(b.maxLon).toBeGreaterThan(b.minLon);
+  });
+});
+
+describe('declutterPoints', () => {
+  const dist = (a: { xPct: number; yPct: number }, b: { xPct: number; yPct: number }) =>
+    Math.hypot(a.xPct - b.xPct, a.yPct - b.yPct);
+
+  it('leaves a lone point untouched', () => {
+    const out = declutterPoints([{ xPct: 50, yPct: 50 }]);
+    expect(out).toEqual([{ xPct: 50, yPct: 50 }]);
+  });
+
+  it('leaves well-separated points untouched', () => {
+    const input = [
+      { xPct: 10, yPct: 10 },
+      { xPct: 80, yPct: 70 },
+    ];
+    expect(declutterPoints(input)).toEqual(input);
+  });
+
+  it('separates two co-located aircraft so neither hides the other', () => {
+    // N2PG (RED) and N5PG (GREEN) both parked at MIA — the live bug.
+    const out = declutterPoints([
+      { xPct: 52.3, yPct: 83.4 },
+      { xPct: 52.3, yPct: 83.4 },
+    ]);
+    expect(dist(out[0], out[1])).toBeGreaterThan(3);
+    for (const p of out) {
+      expect(p.xPct).toBeGreaterThanOrEqual(0);
+      expect(p.xPct).toBeLessThanOrEqual(100);
+      expect(p.yPct).toBeGreaterThanOrEqual(0);
+      expect(p.yPct).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('spreads three co-located aircraft to three distinct spots', () => {
+    const out = declutterPoints([
+      { xPct: 40, yPct: 40 },
+      { xPct: 40, yPct: 40 },
+      { xPct: 40, yPct: 40 },
+    ]);
+    expect(dist(out[0], out[1])).toBeGreaterThan(3);
+    expect(dist(out[0], out[2])).toBeGreaterThan(3);
+    expect(dist(out[1], out[2])).toBeGreaterThan(3);
+  });
+
+  it('is deterministic across calls', () => {
+    const input = [
+      { xPct: 30, yPct: 30 },
+      { xPct: 30, yPct: 30 },
+    ];
+    expect(declutterPoints(input)).toEqual(declutterPoints(input));
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [
+      { xPct: 30, yPct: 30 },
+      { xPct: 30, yPct: 30 },
+    ];
+    declutterPoints(input);
+    expect(input).toEqual([
+      { xPct: 30, yPct: 30 },
+      { xPct: 30, yPct: 30 },
+    ]);
   });
 });

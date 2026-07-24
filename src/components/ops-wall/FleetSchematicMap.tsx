@@ -5,6 +5,7 @@ import { HOME_STATION } from '../../config/station';
 import { lookupAirport } from '../../services/airportCoords';
 import {
   boundsForPoints,
+  declutterPoints,
   projectToBox,
   resolveAircraftPoint,
   type GeoPoint,
@@ -97,12 +98,26 @@ export default function FleetSchematicMap({
       });
     }
 
+    // Fan out aircraft that resolved to the same point (e.g. two tails on one
+    // ramp) so a grounded tail can't hide under a serviceable one.
+    const spread = declutterPoints(plottedList.map(p => ({ xPct: p.xPct, yPct: p.yPct })));
+    plottedList.forEach((p, i) => {
+      p.xPct = spread[i].xPct;
+      p.yPct = spread[i].yPct;
+    });
+
     return {
       plotted: plottedList,
       unplotted: missing,
       homeTick: home ? projectToBox({ lat: home.lat, lon: home.lon }, bounds) : undefined,
     };
   }, [fleet, homeBase]);
+
+  // Draw RED last so a grounded aircraft always sits on top of any overlap.
+  const RENDER_ORDER: Record<string, number> = { GREEN: 0, AMBER: 1, RED: 2 };
+  const drawOrder = [...plotted].sort(
+    (a, b) => (RENDER_ORDER[a.status] ?? 0) - (RENDER_ORDER[b.status] ?? 0)
+  );
 
   return (
     <div
@@ -153,7 +168,7 @@ export default function FleetSchematicMap({
         </span>
       )}
 
-      {plotted.map(p => (
+      {drawOrder.map(p => (
         <div
           key={p.tail}
           className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1"
