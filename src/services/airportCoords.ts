@@ -3,8 +3,8 @@
  *
  * Before this module, airport coordinates were hard-coded per-file (LiveFleetMap
  * carried its own 11-entry `airportCoords` literal), so nothing else could plot an
- * airport. This is the shared table the ops-wall map reads; the older
- * LiveFleetMap still has its own copy and could be migrated onto this later.
+ * airport. This is now the app's only coordinate table — LiveFleetMap was migrated
+ * onto it and its literal deleted (LG-43).
  *
  * Both code systems are indexed on purpose — the satcom feed reports IATA
  * ('LAX', 'JFK') while the fleet roster reports ICAO ('KLUK').
@@ -42,6 +42,12 @@ const SEED: AirportCoord[] = [
   { icao: 'KLGB', iata: 'LGB', lat: 33.8177, lon: -118.1516, name: 'Long Beach' },
   { icao: 'MYNN', iata: 'NAS', lat: 25.039, lon: -77.4662, name: 'Nassau Lynden Pindling' },
   { icao: 'EGLL', iata: 'LHR', lat: 51.4706, lon: -0.4619, name: 'London Heathrow' },
+  // Carried over from LiveFleetMap's deleted literal (LG-43) so that migration lost no
+  // coverage. Nothing in the app's data feeds these yet — they are long-haul destinations
+  // the old map could draw a path to, and dropping them silently would have narrowed it.
+  { icao: 'LFPG', iata: 'CDG', lat: 49.0097, lon: 2.5479, name: 'Paris Charles de Gaulle' },
+  { icao: 'OMDB', iata: 'DXB', lat: 25.2532, lon: 55.3657, name: 'Dubai' },
+  { icao: 'RJTT', iata: 'HND', lat: 35.5494, lon: 139.7798, name: 'Tokyo Haneda' },
 ];
 
 const BY_CODE = new Map<string, AirportCoord>();

@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { useSatcomDirect } from './hooks/useSatcomDirect';
+import { lookupAirport } from '../services/airportCoords';
 import {
   Plane,
   MapPin,
@@ -65,7 +66,12 @@ const MAP_LAYERS: MapLayer[] = [
   }
 ];
 
+// Short label for the map pin. Deliberately NOT airportCoords' `name` — that field is the
+// full field name ('New York JFK', 'Chicago O’Hare'), too long for a pin. Coordinates come
+// from the shared table (LG-43); only this display string is local.
 const CITY_NAMES: { [key: string]: string } = {
+  'LUK': 'Cincinnati',
+  'TEB': 'Teterboro',
   'LAX': 'Los Angeles',
   'JFK': 'New York',
   'MIA': 'Miami',
@@ -264,14 +270,14 @@ export default function LiveFleetMap() {
 
       // Handle Flight Path & City Labels
       if (aircraft.flightPhase !== 'Parked' && aircraft.departureAirport && aircraft.arrivalAirport) {
-        const airportCoords: { [key: string]: [number, number] } = {
-          'LAX': [33.9416, -118.4085], 'JFK': [40.6413, -73.7781], 'MIA': [25.7959, -80.2870],
-          'ORD': [41.9742, -87.9073], 'LGA': [40.7769, -73.8740], 'EWR': [40.6895, -74.1745],
-          'ATL': [33.6407, -84.4277], 'LHR': [51.4700, -0.4543], 'CDG': [49.0097, 2.5479],
-          'DXB': [25.2532, 55.3657], 'HND': [35.5494, 139.7798]
-        };
-        const depCoords = airportCoords[aircraft.departureAirport];
-        const arrCoords = airportCoords[aircraft.arrivalAirport];
+        // Coordinates come from the shared table (LG-43). This block used to carry its own
+        // 11-entry literal, which — critically — did not include LUK or TEB, the two codes
+        // the satcom feed actually reports, so no flight path or city label has ever drawn
+        // on this map. The shared table covers them, so they now do.
+        const dep = lookupAirport(aircraft.departureAirport);
+        const arr = lookupAirport(aircraft.arrivalAirport);
+        const depCoords: [number, number] | undefined = dep ? [dep.lat, dep.lon] : undefined;
+        const arrCoords: [number, number] | undefined = arr ? [arr.lat, arr.lon] : undefined;
 
         if (depCoords && arrCoords) {
           const pathCoords = [depCoords, [aircraft.latitude, aircraft.longitude], arrCoords];
