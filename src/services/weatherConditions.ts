@@ -121,7 +121,20 @@ const GRIDPOINT_WEATHER_TO_CONDITION: Record<string, WeatherCondition> = {
  */
 const STORM_ATTRIBUTES = new Set(['tornadoes', 'large_hail', 'dry_thunderstorms']);
 
-/** One entry of `properties.weather.values[].value[]`. Field names are the spec's. */
+/**
+ * One entry of `properties.weather.values[].value[]`. Field names are the spec's.
+ *
+ * `coverage` and `intensity` are declared but deliberately NOT read, which is a
+ * decision rather than an oversight. Reading `coverage` would mean deciding that
+ * a `slight_chance` of thunderstorms is not worth a storm glyph — and both the
+ * legacy path this replaces (`/thunder/` matches "Slight Chance Showers And
+ * Thunderstorms" → storm) and this module's own stated principle (understating
+ * the weather is the dangerous direction to be wrong in) say it is. Filtering on
+ * probability is a product call about what an outlook glyph MEANS, not a
+ * mechanical part of the enum migration, so it stays out of TL-23. If it is ever
+ * taken, note that the strip already prints precipitation probability as its own
+ * numeric row — the glyph is not the only place a reader learns the odds.
+ */
 export interface GridpointWeatherEntry {
   coverage?: string | null;
   weather?: string | null;
@@ -304,11 +317,17 @@ export function conditionFromShortForecast(text: string): WeatherCondition | nul
  * of the three. It stays optional because the gridpoint fetch fails independently
  * of /forecast, and because the demo seed has no gridpoint behind it.
  *
- * Then text, then icon. That order is inverted from what you'd expect, for two
- * reasons. The strip's tooltip shows the TEXT, so keying off the text guarantees
- * the glyph and the words agree; keying off the icon lets them contradict each
- * other on screen, which live NWS data does. And `icon` is the deprecated field of
- * the two, so leading with it would put the removable one on the critical path.
+ * Then text, then icon — text first because `icon` is the deprecated one of the
+ * two, so leading with it would put the removable field on the critical path.
+ *
+ * ⚠ The glyph and the tooltip can now disagree, and that is the cost of the
+ * migration. Text-first used to be justified partly by the tooltip showing
+ * `shortForecast`, so keying off the text kept picture and words in step. Putting
+ * the contracted field on top gives that up: NWS's own prose and its own gridpoint
+ * contradict each other in live data (the "Partly Sunny" period whose icon slug
+ * read `bkn`, sampled 2026-07-26), and this now believes the contract. The right
+ * follow-up is to show the DERIVED condition's label next to the NWS text so a
+ * reader sees both, rather than to reintroduce the free-text regex as arbiter.
  *
  * Falls back to `cloudy`, never `clear`: when we don't know, we don't get to
  * imply good weather. Same instinct as parseTempC returning null rather than a

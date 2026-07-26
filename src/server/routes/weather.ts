@@ -43,6 +43,9 @@ const GRID_TTL_MS = 24 * 60 * 60 * 1000;
  */
 const GRID_CACHE_MAX = 32;
 
+/** Deadline for the optional gridpoint leg of /forecast. See its call site. */
+const GRIDPOINT_TIMEOUT_MS = 4000;
+
 /** ICAO identifiers are exactly four alphanumerics. Reject anything else
  *  before it reaches an upstream fetch or becomes a cache key. */
 const ICAO_RE = /^[A-Z0-9]{4}$/;
@@ -148,16 +151,30 @@ weatherRoute.get('/forecast', async (c) => {
     const [res, gridRes] = await Promise.all([
       fetch(forecastUrl, { headers: nwsHeaders }),
       gridpointUrl
-        ? fetch(gridpointUrl, { headers: nwsHeaders }).catch(() => null)
+        ? fetch(gridpointUrl, {
+            headers: nwsHeaders,
+            // The gridpoint is the optional half, so it does not get to hold the
+            // outlook hostage. .catch() covers a REJECTED fetch; only a deadline
+            // covers one that simply never answers, and Promise.all waits for
+            // both. Budget is generous — this is a cache-warming path, not a
+            // keystroke.
+            signal: AbortSignal.timeout(GRIDPOINT_TIMEOUT_MS),
+          }).catch(() => null)
         : Promise.resolve(null),
     ]);
     if (!res.ok) {
+      // Release the gridpoint body we are about to abandon.
+      gridRes?.body?.cancel().catch(() => {});
       return c.json({ error: `NWS forecast failed (${res.status})` }, 502);
     }
 
     let gridpoint: { weather: unknown; skyCover: unknown } | null = null;
     if (gridRes?.ok) {
-      const props = (await gridRes.json())?.properties;
+      // .catch here, not just on the fetch: a 200 with a truncated or non-JSON
+      // body rejects at parse time, and letting that reach the outer catch would
+      // turn the OPTIONAL half into a 502 for the whole outlook — the exact
+      // opposite of the degradation this route promises.
+      const props = (await gridRes.json().catch(() => null))?.properties;
       if (props) gridpoint = { weather: props.weather ?? null, skyCover: props.skyCover ?? null };
     }
 
