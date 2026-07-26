@@ -38,7 +38,9 @@ export function deriveTripReadiness(
   // (3) An ACTIVE deferral requiring PIC acknowledgement (restriction/placard/(O) procedure) that
   // hasn't actually been acknowledged via the latest briefing — must agree with the BriefingPanel
   // acceptance gate (handover.ts) rather than being silently invisible to trip dispatch.
-  const ackRequired = deferralsRequiringAck(trip.aircraftId, { deferrals: state.deferrals, melItems: state.melItems ?? [] }, asOfUtc);
+  // TL-16: no `melItems` — the (O) procedure is read from the frozen deferral, so trip dispatch and
+  // the briefing acceptance gate cannot diverge when a MelItem is edited underneath them.
+  const ackRequired = deferralsRequiringAck(trip.aircraftId, { deferrals: state.deferrals }, asOfUtc);
   if (ackRequired.length) {
     const latestBriefing = (state.briefings ?? [])
       .filter(b => b.aircraftId === trip.aircraftId && b.status === 'ACKNOWLEDGED')

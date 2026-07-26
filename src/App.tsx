@@ -187,6 +187,15 @@ export default function App() {
                 <DocumentsProvider>
                 <BulletinProvider>
                 <PassengerProvider>
+                {/* TL-26 — ONE TechLogProvider, hoisted here with the other cross-cutting stores.
+                    It used to be mounted four times on sibling route subtrees (/tech-log/*, /fir/*,
+                    /pilot-workspace/*, and ramp mode in the outer tree), so every crossing between
+                    them fully unmounted one instance and mounted another: the outgoing provider's
+                    cleanup cancelled its pending 300 ms write, and the incoming one re-read the now
+                    stale blob during render and wrote it back — silently losing a just-signed
+                    record. Hoisting removes the remount entirely. Ramp mode's route STAYS in the
+                    outer chrome-less tree (its lockdown is the point); only the provider moved. */}
+                <TechLogProvider userRole={userRole}>
                 <Router>
                   <Routes>
                     {/* Public Routes - No Authentication Required */}
@@ -208,16 +217,11 @@ export default function App() {
                         wrapper, for the same reason /commissary-kiosk is: the whole point of the
                         screen is that an inspector holding the iPad cannot navigate off it. Inside
                         the protected /* branch it inherits the global sidebar, breadcrumb and
-                        Logout, and the lockdown is decorative. Its own TechLogProvider instance
-                        hydrates from the same persisted state (TechLogContext STORAGE_KEY). */}
+                        Logout, and the lockdown is decorative. It reads the single hoisted
+                        TechLogProvider above <Router> (TL-26) — it used to mount its own, which
+                        meant a read-only screen could still clobber the tab that did the signing. */}
                     <Route path="/tech-log/aircraft/:tail/ramp" element={
-                      !isAuthenticated ? (
-                        <Navigate to="/login" replace />
-                      ) : (
-                        <TechLogProvider userRole={userRole}>
-                          <RampMode />
-                        </TechLogProvider>
-                      )
+                      !isAuthenticated ? <Navigate to="/login" replace /> : <RampMode />
                     } />
 
                     {/* Login Route — lands each role at its workspace front door */}
@@ -485,9 +489,8 @@ export default function App() {
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['pilot', 'chief-pilot', 'admin']}>
                                       <SchedulingWorkspaceProvider>
-                                        <TechLogProvider userRole={userRole}>
-                                          <PilotWorkspace userRole={userRole} additionalRoles={additionalRoles} />
-                                        </TechLogProvider>
+                                        {/* TL-26: reads the hoisted TechLogProvider. */}
+                                        <PilotWorkspace userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }
@@ -498,7 +501,7 @@ export default function App() {
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
                                 <Route path="/aog-management" element={<AOGManagement />} />
                                 <Route path="/upcoming-flights" element={userRole === 'inflight' ? <FlightAttendantFlights /> : <UpcomingFlights userRole={userRole} />} />
-                                <Route path="/tech-log/*" element={<TechLogRoutes userRole={userRole} />} />
+                                <Route path="/tech-log/*" element={<TechLogRoutes />} />
                                 <Route path="/fir/*" element={<FirRoutes userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
@@ -606,6 +609,7 @@ export default function App() {
                     } />
                   </Routes>
                 </Router>
+                </TechLogProvider>
                 </PassengerProvider>
                 </BulletinProvider>
                 </DocumentsProvider>

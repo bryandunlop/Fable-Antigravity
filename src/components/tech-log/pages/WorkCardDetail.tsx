@@ -133,7 +133,8 @@ export default function WorkCardDetail() {
     if (!lhours || !ldesc.trim()) return toast.error('Hours and description are required.');
     if (needsWhyNote && !lnote.trim()) return toast.error('This work ran long — add a why-note (what drove the time: troubleshooting path, parts wait, tech-ops call…).');
     const entry: LaborEntry = {
-      id: newId('lb'), workCardId: card.id, techOid: ltech, hours: pendingHours,
+      // TL-16: freeze the technician's name — these lines print on the work-card CRS.
+      id: newId('lb'), workCardId: card.id, techOid: ltech, techName: nameOf(ltech), hours: pendingHours,
       dateUtc: new Date().toISOString(), description: ldesc.trim(),
       category: lcat, note: lnote.trim() || undefined,
     };
@@ -262,7 +263,8 @@ export default function WorkCardDetail() {
         ], body: card.title },
         { heading: 'Steps', body: card.steps.map(s => `${s.done ? '☑' : '☐'} ${s.text}`).join('\n') },
         { heading: 'Parts', body: parts.length ? parts.map(p => `${p.partNumber} (${p.description}) ×${p.qty}${p.serialNumber ? ` S/N ${p.serialNumber}` : ''}${p.removedPartNumber ? ` — removed ${p.removedPartNumber}${p.removedSerialNumber ? `/${p.removedSerialNumber}` : ''}` : ''}`).join('\n') : 'None' },
-        { heading: 'Labor', body: labor.length ? labor.map(l => `${nameOf(l.techOid)} — ${l.hours} h — ${l.description}`).join('\n') + `\nTotal: ${totalLabor} h` : 'None' },
+        // Frozen at entry (TL-16) — never a live Personnel join on a signed release.
+        { heading: 'Labor', body: labor.length ? labor.map(l => `${l.techName ?? 'not recorded'} — ${l.hours} h — ${l.description}`).join('\n') + `\nTotal: ${totalLabor} h` : 'None' },
         { heading: 'Return to service', body: release.returnToServiceStatement },
       ],
       signatures: [perf, rii].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.mockContentHash, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') })),
@@ -343,7 +345,7 @@ export default function WorkCardDetail() {
                 </span>
                 {s.riiRequired && (
                   s.riiSignatureId
-                    ? <Badge variant="secondary" className="shrink-0 self-center text-[10px]"><CheckCircle2 className="mr-1 h-3 w-3" />RII {nameOf(s.riiInspectorOid ?? '')}</Badge>
+                    ? <Badge variant="secondary" className="shrink-0 self-center text-[10px]"><CheckCircle2 className="mr-1 h-3 w-3" />RII {state.signatures.find(sig => sig.id === s.riiSignatureId)?.signerName ?? 'not recorded'}</Badge>
                     : !completed && (s.done
                         ? <Button size="sm" variant="outline" className="h-7 shrink-0" disabled={!isMaint || !inspector} onClick={() => beginStepRii(s.id)}>RII sign</Button>
                         : <span className="shrink-0 self-center text-[10px] text-muted-foreground">complete step</span>)
@@ -370,7 +372,7 @@ export default function WorkCardDetail() {
             {labor.map(l => (
               <div key={l.id} className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
                 <div>
-                  <span className="font-medium">{nameOf(l.techOid)}</span> · {l.hours} h
+                  <span className="font-medium">{l.techName ?? 'not recorded'}</span> · {l.hours} h
                   <Badge variant="outline" className="ml-2 text-[10px]">{LABOR_CATEGORY_LABELS[l.category ?? 'WRENCH']}</Badge>
                   <div className="text-xs text-muted-foreground">{l.description}</div>
                   {l.note && <div className="mt-0.5 border-l-2 pl-2 text-xs italic text-muted-foreground">why: {l.note}</div>}

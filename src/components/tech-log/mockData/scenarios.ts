@@ -9,6 +9,8 @@ import { SEED_MEL } from './mel';
 import { SEED_CHECKLIST_TEMPLATES } from './checklistTemplates';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { makeSignature } from '../engine/signing';
+import { buildBriefingDisclosure } from '../engine/briefingDisclosure';
+import { campForecast } from '../integration/campClient';
 
 /**
  * Builds the seeded demo world. Dates are RELATIVE to "now" so the AMBER aircraft
@@ -60,6 +62,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     id: 'df-n6pg', defectId: 'd-n6pg', aircraftId: 'ac-n6pg', melItemId: melAmber.id,
     governingMmelRevision: melAmber.mmelRevision, governingEffectiveDate: melAmber.effectiveDate,
     melSubItemNumber: melAmber.subItemNumber, melTitle: melAmber.title, // D36 — frozen at signing
+    melOProcedure: melAmber.oProcedure, // TL-16 — decides whether the PIC must acknowledge this item
     category: melAmber.category, dayOfDiscoveryUtc: discN6, clockStartDateUtc: clockStart,
     governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
     repairDueDateUtc: due.repairDueDateUtc, usageDueThreshold: due.usageDueThreshold,
@@ -105,6 +108,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       outUtc: outT, offUtc: offT, onUtc: onT, inUtc: inT,
       blockTime: Math.round((ftHours + 0.2) * 10) / 10, flightTime: ftHours,
       landings: 1, cycles: 1, picOid: pilot.oid, sicOid: fo.oid,
+      picName: pilot.displayName, sicName: fo.displayName,   // TL-16: frozen crew names
       fuelUplift: 12000, airframeTotalHours: snapHours, airframeTotalCycles: ac.airframeTotalCycles - daysAgo,
       pdfBlobUri: `blob://mygfo-worm/journey/fl-seed-${i}.pdf`, signatureId: sig.id, ...opts,
     });
@@ -187,8 +191,8 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       installedAtUtc: completedAt, addedByOid: tech.oid,
     });
     laborEntries.push(
-      { id: 'lb-1', workCardId: 'wc-1', techOid: tech.oid, hours: 3.5, dateUtc: completedAt, description: 'R&R flow control valve' },
-      { id: 'lb-2', workCardId: 'wc-1', techOid: chiefInsp.oid, hours: 0.5, dateUtc: completedAt, description: 'Ops check verification' },
+      { id: 'lb-1', workCardId: 'wc-1', techOid: tech.oid, techName: tech.displayName, hours: 3.5, dateUtc: completedAt, description: 'R&R flow control valve' },
+      { id: 'lb-2', workCardId: 'wc-1', techOid: chiefInsp.oid, techName: chiefInsp.displayName, hours: 0.5, dateUtc: completedAt, description: 'Ops check verification' },
     );
   }
 
@@ -221,8 +225,8 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     ],
   });
   laborEntries.push(
-    { id: 'lb-3', workCardId: 'wc-3', techOid: tech.oid, hours: 1.5, dateUtc: iso(1 * H), description: 'Fault isolation — MAU history + harness continuity', category: 'TROUBLESHOOTING', note: 'Intermittent only under gear load; 1.5 h isolating to the uplock prox sensor with tech ops on the line' },
-    { id: 'lb-4', workCardId: 'wc-3', techOid: tech.oid, hours: 0.5, dateUtc: iso(1 * H), description: 'Sourced replacement sensor, raised purchase order', category: 'PARTS_ORDERING' },
+    { id: 'lb-3', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 1.5, dateUtc: iso(1 * H), description: 'Fault isolation — MAU history + harness continuity', category: 'TROUBLESHOOTING', note: 'Intermittent only under gear load; 1.5 h isolating to the uplock prox sensor with tech ops on the line' },
+    { id: 'lb-4', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 0.5, dateUtc: iso(1 * H), description: 'Sourced replacement sensor, raised purchase order', category: 'PARTS_ORDERING' },
   );
 
   // ── D28 maintenance planners: packages of work per tail, staged while the aircraft is away. ──
@@ -424,6 +428,34 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     { id: 'aud-seed-3', actorOid: dom.oid, action: 'DEFERRAL_SIGNED', entityType: 'Deferral', entityId: 'df-n6pg', atUtc: iso(2 * D + 6 * H), summary: `Deferred N6PG under MEL ${melAmber.subItemNumber} (Cat ${melAmber.category})` },
     { id: 'aud-seed-4', actorOid: tech.oid, action: 'WORKCARD_COMPLETED', entityType: 'WorkCard', entityId: 'wc-1', atUtc: iso(15 * D), summary: 'N5PG WO-21-0231 complied with — pack valve replaced (RTS)' },
   ];
+
+  // TL-16: the seeded RELEASED briefing carries a real disclosure snapshot, built from the state
+  // assembled above at its release instant — so the demo exercises the frozen-content path rather
+  // than the legacy "predates snapshotting" caveat.
+  {
+    const n2pg = SEED_AIRCRAFT.find(a => a.id === 'ac-n2pg')!;
+    briefings[0].disclosureAtRelease = buildBriefingDisclosure(
+      'ac-n2pg',
+      { aircraft: SEED_AIRCRAFT, deferrals, defects, recurringChecks, recurringAccomplishments },
+      briefRelAt,
+      campForecast(n2pg.serialNumber, { hours: n2pg.airframeTotalHours, cycles: n2pg.airframeTotalCycles }, referenceNowMs)
+        .filter(i => i.dueDateUtc)
+        .sort((a, b) => (a.dueDateUtc ?? '').localeCompare(b.dueDateUtc ?? ''))
+        .slice(0, 3)
+        .map(i => ({ ref: i.ref, description: i.description, dueDateUtc: i.dueDateUtc ?? null })),
+      // TL-16: the checklist is the body of a signed printed document, so it is frozen too.
+      (() => {
+        const inst = checklistInstances.find(i => i.id === briefings[0].checklistInstanceId);
+        const t = inst && SEED_CHECKLIST_TEMPLATES.find(x => x.id === inst.templateId && x.version === inst.templateVersion);
+        if (!inst || !t) return [];
+        return t.sections.flatMap(sec => sec.items).map(def => {
+          const e = inst.entries.find(en => en.itemDefId === def.id);
+          return { label: def.label, done: e?.state === 'DONE' || e?.state === 'NA' };
+        });
+      })(),
+    ) ?? undefined;
+    briefings[0].preparedByName = tech.displayName;
+  }
 
   return {
     aircraft: SEED_AIRCRAFT,

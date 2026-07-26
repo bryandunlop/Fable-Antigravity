@@ -63,7 +63,6 @@ export default function Deferrals() {
         {openDeferrals.length === 0 && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No open deferrals. Defer a defect from an aircraft's workspace.</CardContent></Card>}
         {openDeferrals.map(d => {
           const ac = state.aircraft.find(a => a.id === d.aircraftId)!;
-          const mel = state.melItems.find(m => m.id === d.melItemId);
           const expired = isDeferralExpired(d, new Date().toISOString(), { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles });
           const effective = expired ? 'EXPIRED' : d.status;
           const ms = d.repairDueDateUtc ? new Date(d.repairDueDateUtc).getTime() - Date.now() : null;
@@ -74,12 +73,16 @@ export default function Deferrals() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold">{tailOf(d.aircraftId)}</span>
-                    <Badge variant="outline">MEL {mel?.subItemNumber ?? '—'}</Badge>
+                    {/* TL-16: the MEL identity frozen on the signed deferral (D36), never a live
+                        MelItem join — EDIT_MEL_ITEM replaces a row in place under the same id, so a
+                        later revision would repaint this signed row. Absent snapshot reads as
+                        absent; it is never backfilled from melItems. */}
+                    <Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge>
                     <Badge variant="outline">Cat {d.category}</Badge>
                     <Badge variant={effective === 'ACTIVE' ? 'secondary' : 'destructive'}>{effective}</Badge>
                     {corr?.campDiscrepancyRef && <Badge variant="outline">CAMP {corr.campDiscrepancyRef}</Badge>}
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{mel?.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'}</p>
                   {d.repairDueDateUtc && (
                     <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3.5 w-3.5" /> due {formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)} · {ms != null && ms > 0 ? `${Math.floor(ms / 86400000)}d left` : 'overdue'}
