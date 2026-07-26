@@ -386,7 +386,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
           <div className="mt-2">
             {tab === 'inbox' && <MoveList items={model.ops.move} heading="Decisions waiting on you" doneSet={doneSet} onToggle={toggleDone} onOpen={open} />}
             {tab === 'track' && <TrackBoard items={model.ops.track} onOpen={open} />}
-            {tab === 'reviews' && <ReviewsArea />}
+            {tab === 'reviews' && <ReviewsArea userRole={userRole} additionalRoles={additionalRoles} />}
             {tab === 'audits' && <OperationsAudits />}
             {tab === 'manage' && <ManageArea submissions={model.submissions} published={model.published} onOpen={open} />}
           </div>

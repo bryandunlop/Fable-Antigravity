@@ -338,7 +338,7 @@ export default function App() {
                                 <Route path="/fuel-farm" element={<FuelFarmTracker />} />
                                 <Route path="/safety" element={<SafetyCenter userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/approvals" element={<ApprovalsInbox userRole={userRole} additionalRoles={additionalRoles} />} />
-                                <Route path="/safety/waivers" element={<WaiverManagement />} />
+                                <Route path="/safety/waivers" element={<WaiverManagement userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/safety/hazards" element={<HazardWorkspace userRole={userRole} />} />
                                 <Route path="/safety/hazards/:id" element={<HazardDetailView userRole={userRole} />} />
                                 <Route path="/safety/audits" element={<InternalAuditManagement />} />
