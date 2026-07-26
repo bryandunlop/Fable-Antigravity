@@ -191,7 +191,12 @@ export function VacationSchedulingApprovals({ requests, onUpdateRequests }: Vaca
       confirmed: { label: 'Confirmed', variant: 'default' as const }
     };
 
-    return <Badge variant={statusConfig[status].variant}>{statusConfig[status].label}</Badge>;
+    // Defensive: a status this map has not caught up with (e.g. 'withdrawn', which
+    // the crew-side lifecycle can now produce) must render oddly, not crash the
+    // whole scheduling queue on `.variant` of undefined.
+    const config = statusConfig[status as keyof typeof statusConfig];
+    if (!config) return <Badge variant="outline">{String(status)}</Badge>;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const pendingRequests = requests.filter(r => r.status === 'pending_scheduling');

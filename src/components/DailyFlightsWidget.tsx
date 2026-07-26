@@ -3,49 +3,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Badge } from './ui/badge';
 import { Plane, MapPin, Clock, Calendar, ChevronRight, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { TODAY_LEGS } from '../services/todaysOpsMock';
 
 export default function DailyFlightsWidget() {
-    // Mock data - in a real app this would come from an API (MyAirOps/Satcom)
+    // Sourced from todaysOpsMock so the tails and routes match the fleet map and
+    // NAS analysis rather than telling a different story per panel.
     const today = new Date();
 
-    const flights = useMemo(() => [
-        {
-            id: 'LEG001',
-            flightNumber: 'PG101',
-            aircraft: 'N1PG',
-            route: 'KTEB - EGLL',
-            departureTime: '08:00',
-            arrivalTime: '20:00',
-            estimatedArrival: '19:45', // Early
-            etaStatus: 'early', // early, late, on-time
-            status: 'In Flight',
-            passengers: 4
-        },
-        {
-            id: 'LEG002',
-            flightNumber: 'PG404',
-            aircraft: 'N5PG',
-            route: 'KSFO - KPHX',
-            departureTime: '14:30',
-            arrivalTime: '16:00',
-            estimatedArrival: '16:10', // Delayed
-            etaStatus: 'late',
-            status: 'Scheduled',
-            passengers: 2
-        },
-        {
-            id: 'LEG003',
-            flightNumber: 'PG991',
-            aircraft: 'G650',
-            route: 'KOPF - MYNN',
-            departureTime: '10:00',
-            arrivalTime: '11:15',
-            estimatedArrival: '11:15', // On time
-            etaStatus: 'on-time',
-            status: 'Departed',
-            passengers: 6
-        }
-    ], []);
+    const flights = useMemo(
+        () =>
+            TODAY_LEGS.map(leg => ({
+                id: leg.id,
+                flightNumber: leg.flightNumber,
+                aircraft: leg.tail,
+                route: `${leg.depIcao} - ${leg.arrIcao}`,
+                departureTime: leg.schedDep,
+                arrivalTime: leg.schedArr,
+                estimatedArrival: leg.eta,
+                etaStatus: leg.etaStatus,
+                status: leg.status,
+                passengers: leg.pax,
+            })),
+        []
+    );
 
     const getStatusColor = (status: string) => {
         switch (status) {

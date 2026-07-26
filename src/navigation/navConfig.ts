@@ -85,6 +85,8 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // ── Home ──────────────────────────────────────────────────────────────────
   { path: '/', label: 'Dashboard', domain: 'home', icon: Home, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/tasks-action-items', label: 'Tasks & Action Items', domain: 'home', icon: Target, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  // Per-approver inbox (D39): requests awaiting your role's sign-off, plus what you filed.
+  { path: '/approvals', label: 'Approvals', domain: 'home', icon: ClipboardCheck, primary: true, keywords: ['approve', 'waiver', 'sign-off', 'request'], roles: ['pilot', 'chief-pilot', 'inflight', 'fa-manager', 'maintenance', 'chief-inspector', 'shift-lead', 'safety', 'lead', 'scheduling', 'document-manager', 'admin', 'dom'] },
   { path: '/procedural-bulletins', label: 'Procedural Bulletins', domain: 'home', icon: BookOpen, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/currency-dashboard', label: 'Currency Dashboard', domain: 'home', icon: UserCheck, primary: true, keywords: ['currency', 'compliance', 'landings', '61.58'], roles: ['pilot', 'admin', 'lead', 'scheduling'] },
   { path: '/aog-management', label: 'AOG Management', domain: 'home', icon: AlertOctagon, primary: true, keywords: ['aog', 'aircraft on ground', 'emergency'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
@@ -114,6 +116,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', domain: 'scheduling', icon: Calendar, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: MapPin, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: FileText, primary: false, roles: ['scheduling', 'admin'] },
+  { path: '/passenger-currency', label: 'Passenger Data Currency', domain: 'scheduling', icon: UserCheck, primary: false, keywords: ['passport', 'stale', 'outreach', 'manifest', 'crm'], roles: ['scheduling', 'admin'] },
 
   // ── Inflight ──────────────────────────────────────────────────────────────
   { path: '/upcoming-flights', label: 'Upcoming Trips', domain: 'inflight', icon: Calendar, primary: true, keywords: ['flights', 'manifest'], roles: ['inflight', 'admin'] },
@@ -160,9 +163,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/grat/review', label: 'GRAT Review', domain: 'maintenance', icon: Shield, sidebar: false, searchable: false, roles: ['safety', 'admin'] },
 
   // ── Safety ────────────────────────────────────────────────────────────────
-  { path: '/safety', label: 'Safety Center', domain: 'safety', icon: Shield, primary: true, keywords: ['sms', 'hazard', 'asap', 'audit', 'waiver'], roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
-  { path: '/safety', href: '/safety?tab=my-activity', label: 'My Safety Activity', domain: 'safety', icon: UserCheck, primary: true, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
-  { path: '/user-safety', label: 'My Safety Participation', domain: 'safety', icon: UserCheck, sidebar: false, keywords: ['cws', 'caught working safely', 'waiver request'], roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
+  // One Safety entry (D38). The former "My Safety Activity" (dead ?tab= link) and
+  // "My Safety Participation" (/user-safety) surfaces are retired.
+  { path: '/safety', label: 'Safety', domain: 'safety', icon: Shield, primary: true, keywords: ['sms', 'hazard', 'asap', 'audit', 'waiver', 'cws', 'caught working safely', 'safety center'], roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling', 'document-manager', 'admin-assistant'] },
   { path: '/asap-report', label: 'ASAP Report', domain: 'safety', icon: FileText, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'maintenance', 'safety', 'admin', 'lead', 'scheduling'] },
   { path: '/safety/form-fields', label: 'Form Field Manager', domain: 'safety', icon: Sliders, sidebar: false, keywords: ['frat', 'grat', 'customize', 'scoring'], roles: ['safety', 'admin'] },
 

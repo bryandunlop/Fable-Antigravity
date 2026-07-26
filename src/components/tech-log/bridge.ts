@@ -7,6 +7,7 @@
 import type { Aircraft, AircraftType, Serviceability, Trip, TripLeg, TechLogState } from './types';
 import { getDefaultState } from './mockData/scenarios';
 import { deriveServiceability } from './engine/serviceability';
+import { deriveTripServiceabilityAlerts, type TripForAlerts, type TripServiceabilityAlert, type TripAlertKind } from './engine/tripAlerts';
 import { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './TechLogContext';
 import { HOME_STATION } from '../../config/station';
 
@@ -213,6 +214,13 @@ export function summarizeFleetAirworthiness(state: TechLogState, asOfUtc: string
 /** THIN localStorage wrapper — the only untested seam. */
 export function readFleetAirworthiness(asOfUtc: string): FleetAirworthinessEntry[] {
   return summarizeFleetAirworthiness(loadState(), asOfUtc);
+}
+
+export type { TripForAlerts, TripServiceabilityAlert, TripAlertKind };
+
+/** THIN localStorage wrapper over engine/tripAlerts (pure logic + tests live there). */
+export function readTripServiceabilityAlerts(trips: TripForAlerts[], nowUtc: string): TripServiceabilityAlert[] {
+  return deriveTripServiceabilityAlerts(loadState(), trips, nowUtc);
 }
 
 const newLocalId = (p: string) => `${p}-${Math.random().toString(36).slice(2, 10)}`;

@@ -9,10 +9,11 @@ import { PassengerFormProvider } from './components/contexts/PassengerFormContex
 import { FuelRequestProvider } from './components/contexts/FuelRequestContext';
 import LoginScreen from './components/LoginScreen';
 import PasswordGate from './components/PasswordGate';
-import Dashboard from './components/Dashboard';
+import FleetOpsWall from './components/FleetOpsWall';
 import NotFound from './components/NotFound';
 import { FRONT_DOORS } from './navigation/navConfig';
 import Navigation from './components/Navigation';
+import RouteChrome from './components/RouteChrome';
 import MobileBottomNav from './components/MobileBottomNav';
 import AircraftStatus from './components/AircraftStatus';
 import FRATForm from './components/FRATForm';
@@ -34,15 +35,14 @@ import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
 import VacationRequest from './components/VacationRequest';
 import FuelFarmTracker from './components/FuelFarmTracker';
-import SafetyDashboard from './components/SafetyDashboard';
 import { SafetyCenter } from './components/safety-center';
+import ApprovalsInbox from './components/approvals/ApprovalsInbox';
 import WaiverManagement from './components/WaiverManagement';
 import HazardReporting from './components/HazardReporting';
 import HazardWorkspace from './components/hazard/HazardWorkspace';
 import HazardDetailView from './components/hazard/HazardDetailView';
 import InternalAuditManagement from './components/InternalAuditManagement';
 import { ComplianceDashboard } from './components/documents/pages/ComplianceDashboard';
-import UserSafety from './components/UserSafety';
 import CateringTracker from './components/CateringTracker';
 import CateringOrders from './components/CateringOrders';
 import RestaurantDatabase from './components/RestaurantDatabase';
@@ -66,7 +66,7 @@ import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
 import FirRoutes from './components/fir/FirRoutes';
 import BookingProfile from './components/BookingProfile';
-import TripBuilder from './components/TripBuilder';
+import TripBuilderRoute from './components/trips/TripBuilderRoute';
 import FlightFamily from './components/FlightFamily';
 import ASAPReport from './components/ASAPReport';
 import PartsInventory from './components/PartsInventory';
@@ -88,6 +88,7 @@ import FlightAttendantFlights from './components/inflight/FlightAttendantFlights
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 import UnifiedTripWorkspace from './components/experimental/UnifiedTripWorkspace';
 import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
+import PassengerCurrencyDashboard from './components/passenger-currency/PassengerCurrencyDashboard';
 
 import ForeFlightSyncProvider from './components/ForeFlightSyncProvider';
 import ForeFlightTestUpload from './components/ForeFlightTestUpload';
@@ -219,14 +220,16 @@ export default function App() {
                         <Navigate to="/login" replace />
                       ) : (
                         <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+                          {/* Scroll reset + per-view tab title for every route (LG-19 Wave 1) */}
+                          <RouteChrome userRole={userRole} additionalRoles={additionalRoles} />
                           <Navigation userRole={userRole} additionalRoles={additionalRoles} onLogout={handleLogout}>
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out h-full">
                               <Routes>
-                                {/* Front doors moved to the login redirect — Dashboard stays reachable for every role
-                                    (maintenance-workflow keeps its redirect: its persona can't use the Dashboard). */}
+                                {/* Front doors moved to the login redirect — the ops wall stays reachable for every role
+                                    (maintenance-workflow keeps its redirect: its persona can't use the home screen). */}
                                 <Route path="/" element={
                                   userRole === 'maintenance-workflow' ? <Navigate to="/maintenance-workflow" replace />
-                                    : <Dashboard userRole={userRole} />
+                                    : <FleetOpsWall userRole={userRole} />
                                 } />
                                 <Route path="/aircraft" element={<AircraftStatus />} />
                                 <Route path="/fleet-map" element={<LiveFleetMap />} />
@@ -338,10 +341,9 @@ export default function App() {
                                 <Route path="/maintenance-dashboard" element={<MaintenanceDashboard />} />
                                 <Route path="/vacation-request" element={<VacationRequest userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/fuel-farm" element={<FuelFarmTracker />} />
-                                <Route path="/user-safety" element={<UserSafety userRole={userRole} />} />
                                 <Route path="/safety" element={<SafetyCenter userRole={userRole} additionalRoles={additionalRoles} />} />
-                                <Route path="/safety/classic" element={<SafetyDashboard userRole={userRole} />} />
-                                <Route path="/safety/waivers" element={<WaiverManagement />} />
+                                <Route path="/approvals" element={<ApprovalsInbox userRole={userRole} additionalRoles={additionalRoles} />} />
+                                <Route path="/safety/waivers" element={<WaiverManagement userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/safety/hazards" element={<HazardWorkspace userRole={userRole} />} />
                                 <Route path="/safety/hazards/:id" element={<HazardDetailView userRole={userRole} />} />
                                 <Route path="/safety/audits" element={<InternalAuditManagement />} />
@@ -454,6 +456,14 @@ export default function App() {
                                 {/* Retired: the tabbed workspace folded into the command-center hub. */}
                                 <Route path="/scheduling-workspace" element={<Navigate to="/scheduling-command" replace />} />
                                 <Route
+                                  path="/passenger-currency"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin']}>
+                                      <PassengerCurrencyDashboard />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
                                   path="/pilot-workspace/*"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['pilot', 'chief-pilot', 'admin']}>
@@ -512,10 +522,10 @@ export default function App() {
                                   path="/trip-builder/:tripId?"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'admin', 'lead']}>
-                                      <TripBuilder
-                                        onSave={() => { }}
-                                        onCancel={() => window.history.back()}
-                                      />
+                                      {/* onSave was an empty function and onCancel used
+                                          window.history.back(), which exits the app when the
+                                          builder was reached by deep link (LG-19). */}
+                                      <TripBuilderRoute />
                                     </ProtectedRoute>
                                   }
                                 />

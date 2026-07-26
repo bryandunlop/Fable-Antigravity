@@ -38,7 +38,7 @@ export function buildAuditFeed(
         title: `Audit expired: ${a.title}`,
         detail: [`Expired ${Math.abs(daysUntil)} day(s) ago.`, assigned].filter(Boolean).join(' '),
         module: 'Audit Management',
-        link: '/internal-audits',
+        link: '/safety/audits',
       });
     } else if (daysUntil <= 30) {
       out.push({
@@ -47,7 +47,7 @@ export function buildAuditFeed(
         title: `Audit expiring in ${daysUntil}d: ${a.title}`,
         detail: assigned,
         module: 'Audit Management',
-        link: '/internal-audits',
+        link: '/safety/audits',
       });
     }
   }

@@ -1,33 +1,13 @@
 import React, { useState } from 'react';
-import { Search, UserCheck, Shuffle, Shield } from 'lucide-react';
+import { Search, UserCheck, Sparkles, Shield } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Audit, useAudits } from '../../contexts/AuditContext';
-import { toast } from 'sonner';
-
-const AUDITORS = [
-  { name: 'Sarah Wilson',    role: 'Safety' },
-  { name: 'Mike Johnson',    role: 'Pilot' },
-  { name: 'Emily Davis',     role: 'Document Manager' },
-  { name: 'David Brown',     role: 'Maintenance' },
-  { name: 'Lisa Chen',       role: 'Safety' },
-  { name: 'Tom Anderson',    role: 'Pilot' },
-  { name: 'Jennifer Lee',    role: 'Inflight' },
-  { name: 'Robert Martinez', role: 'Maintenance' },
-  { name: 'Amanda Foster',   role: 'Safety' },
-  { name: 'Chris Taylor',    role: 'Admin' },
-];
-
-const ROLE_COLORS: Record<string, string> = {
-  Safety: 'bg-blue-100 text-blue-700',
-  Pilot: 'bg-indigo-100 text-indigo-700',
-  Maintenance: 'bg-orange-100 text-orange-700',
-  Inflight: 'bg-purple-100 text-purple-700',
-  'Document Manager': 'bg-teal-100 text-teal-700',
-  Admin: 'bg-gray-100 text-gray-700',
-};
+import { AUDITORS, ROLE_COLORS, initialsOf } from './auditors';
+import { auditLoadByPerson, suggestAuditor } from './assignSuggestion';
+import { useAssignAudit } from './useAssignAudit';
 
 interface AssignAuditorPopoverProps {
   audit: Audit;
@@ -35,33 +15,27 @@ interface AssignAuditorPopoverProps {
 }
 
 export default function AssignAuditorPopover({ audit, children }: AssignAuditorPopoverProps) {
-  const { updateAudit, audits } = useAudits();
+  const { audits } = useAudits();
+  const assignAudit = useAssignAudit();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
 
   const assign = (name: string, role: string, method: string) => {
-    updateAudit(audit.id, { assignedTo: name, assignedRole: role, assignmentType: method });
-    toast.success(`${audit.id} assigned to ${name}`);
+    assignAudit(audit, name, role, method);
     setOpen(false);
     setSearch('');
   };
 
-  const randomAssign = () => {
-    const pick = AUDITORS[Math.floor(Math.random() * AUDITORS.length)];
-    assign(pick.name, pick.role, 'Random');
-  };
-
   // Count how many audits each auditor currently has (in the same year)
   const currentYear = new Date().getFullYear();
-  const auditCountByPerson: Record<string, number> = {};
-  audits.forEach(a => {
-    if (a.assignedTo && a.assignedTo !== 'Unassigned') {
-      const yr = a.scheduledDate ? new Date(a.scheduledDate + 'T00:00:00').getFullYear() : null;
-      if (yr === currentYear) {
-        auditCountByPerson[a.assignedTo] = (auditCountByPerson[a.assignedTo] || 0) + 1;
-      }
-    }
-  });
+  const auditCountByPerson = auditLoadByPerson(audits, currentYear);
+
+  // Balanced suggestion (role matched to the audit category, then lightest load)
+  // — replaces the blind Random pick with a see-before-you-accept default.
+  const suggested = suggestAuditor(audit, AUDITORS, audits, currentYear);
+  const suggestAssign = () => {
+    if (suggested) assign(suggested.name, suggested.role, 'Suggested');
+  };
 
   const filtered = AUDITORS.filter(
     a =>
@@ -72,23 +46,39 @@ export default function AssignAuditorPopover({ audit, children }: AssignAuditorP
   return (
     <Popover open={open} onOpenChange={(v: boolean) => { setOpen(v); if (!v) setSearch(''); }}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent className="w-72 p-0 shadow-xl" align="start" sideOffset={8}>
+      {/* stopPropagation on the content itself: the popover renders through a
+          Radix Portal, and React synthetic events bubble through the COMPONENT
+          tree, not the DOM tree — so a click on a roster row would otherwise
+          reach an ancestor card's onClick (opening the drawer). Trigger-only
+          stopPropagation does not cover the picks made inside the popover. */}
+      <PopoverContent
+        className="w-72 p-0 shadow-xl"
+        align="start"
+        sideOffset={8}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="px-3 py-2.5 border-b bg-muted/30">
           <p className="text-xs font-bold text-foreground">Assign Auditor</p>
           <p className="text-[10px] text-muted-foreground truncate">{audit.title}</p>
         </div>
 
-        {/* Quick Actions */}
-        <div className="px-3 pt-3 pb-2 flex gap-2">
+        {/* Quick Action — balanced suggestion, shows who before you accept */}
+        <div className="px-3 pt-3 pb-2">
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 h-8 text-xs"
-            onClick={randomAssign}
+            className="w-full h-8 text-xs justify-start"
+            onClick={suggestAssign}
+            disabled={!suggested}
+            title={suggested ? `Fewest audits this year, role matched to ${audit.category}` : undefined}
           >
-            <Shuffle className="w-3.5 h-3.5 mr-1.5" />
-            Random
+            <Sparkles className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+            {suggested ? (
+              <>Suggest <span className="font-semibold ml-1">{suggested.name}</span></>
+            ) : (
+              'No auditor available'
+            )}
           </Button>
         </div>
 
@@ -124,7 +114,7 @@ export default function AssignAuditorPopover({ audit, children }: AssignAuditorP
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary shrink-0">
-                      {auditor.name.split(' ').map(n => n[0]).join('')}
+                      {initialsOf(auditor.name)}
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-foreground">{auditor.name}</p>

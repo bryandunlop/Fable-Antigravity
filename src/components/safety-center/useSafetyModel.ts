@@ -1,13 +1,14 @@
-// Builds the Do/Track/Know model. Real hazards (HazardContext) are mapped onto the
-// five-stage lifecycle and merged with mock supplements for the other item types.
+// Builds the safety model from real stores only. Hazards (HazardContext) are
+// mapped onto the five-stage lifecycle; the move/waiting/track/done buckets are
+// derived per item and drive sorting and door counts — they are not visible
+// navigation language (D38). Work lists carry no mock rows, so every count on
+// screen corresponds to a record a user can act on; MOCK_SUBMISSIONS /
+// MOCK_PUBLISHED remain only as archive/library history seeds.
 
 import { useMemo } from 'react';
 import { differenceInCalendarDays } from 'date-fns';
 import { useHazards, WORKFLOW_STAGES, type Hazard } from '../../contexts/HazardContext';
 import type { PublishedReport, SafetyItem, SafetyModel, StatusChip, ThreadMsg } from './types';
-import {
-  MY_MOVE, MY_WAITING, MY_DONE, OPS_MOVE, OPS_TRACK, OPS_DONE, KNOW,
-} from './mockSafetyItems';
 import { MOCK_SUBMISSIONS, MOCK_PUBLISHED } from './forms';
 
 const STALL_DAYS = 30;
@@ -110,22 +111,6 @@ export function hazardToItem(h: Hazard): SafetyItem {
   };
 }
 
-const MY_REPLY: SafetyItem = {
-  id: 'm-reply-1', type: 'HAZARD', bucket: 'move',
-  title: "Reply to safety's question on #H-241", sub: 'They asked which tow lane',
-  due: { label: 'Waiting on you', tone: 'amber' },
-  fields: [
-    { label: 'Your report', value: 'FOD near stand 3' },
-    { label: 'Ref', value: '#H-241' },
-    { label: 'Asked by', value: 'J. Kerr (Safety)' },
-  ],
-  thread: [
-    { who: 'You', role: 'you', at: '2d ago', text: 'Loose panel fastener + FOD near the tow path at stand 3.' },
-    { who: 'J. Kerr (Safety)', role: 'team', at: '1d ago', text: 'West or east tow lane? Placing the barrier correctly.' },
-  ],
-  actions: [{ label: 'Reply', primary: true }, { label: 'View report' }],
-};
-
 // Demo identity — matches the reporter stamped by SafetyCenter.handleFiled.
 const REPORTER = 'Capt. Dunlop';
 
@@ -154,52 +139,61 @@ function hazardToWaitingItem(h: Hazard): SafetyItem {
   };
 }
 
+export function buildSafetyModel(hazards: Hazard[], extraMove: SafetyItem[] = []): SafetyModel {
+  // Dedup by id defensively — the persisted hazard store can carry duplicate
+  // rows after a multi-instance localStorage race (see HazardContext load/merge).
+  const seen = new Set<string>();
+  const live = (hazards || []).filter((h) => {
+    if (h.isDeleted || seen.has(h.id)) return false;
+    seen.add(h.id);
+    return true;
+  });
+  const hz = live.map(hazardToItem);
+  const hzMove = hz.filter((i) => i.bucket === 'move');
+  const hzTrack = hz.filter((i) => i.bucket === 'track');
+  const hzDone = hz.filter((i) => i.bucket === 'done');
+  // Crew: my own open reports (visible as "with the safety team").
+  const myWaiting = live
+    .filter((h) => !h.isAnonymous && h.reportedBy === REPORTER && phaseIndexOf(h.workflowStage) < 4)
+    .map(hazardToWaitingItem);
+  const myDone = hzDone.filter((i) => i.submittedBy === REPORTER);
+
+  // Submissions archive = every hazard (any state) + seeded non-hazard history.
+  const submissions: SafetyItem[] = [...hz, ...MOCK_SUBMISSIONS]
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  // Published library = de-identified final reports.
+  const derivedPublished: PublishedReport[] = live
+    .filter((h) => h.workflowStage === WORKFLOW_STAGES.PUBLISHED || h.isPublished)
+    .map((h) => ({
+      id: `pub-${h.id}`,
+      ref: `#${h.id}`,
+      title: h.title || 'Published safety report',
+      category: h.category || 'Safety',
+      publishedDate: h.finalReportPublished ? '' : (h.reportedDate ? String(h.reportedDate).slice(0, 10) : ''),
+      summary: h.deidentifiedMitigationSummary || h.description?.slice(0, 200) || '',
+      whatHappened: h.finalReportPublished || h.description || '',
+      lessons: h.suggestedCorrectiveAction ? [h.suggestedCorrectiveAction] : [],
+    }));
+
+  return {
+    my: {
+      move: extraMove,
+      waiting: myWaiting,
+      done: myDone,
+    },
+    ops: {
+      move: hzMove,
+      track: hzTrack,
+      done: hzDone,
+    },
+    submissions,
+    published: [...MOCK_PUBLISHED, ...derivedPublished],
+    know: [],
+  };
+}
+
 export function useSafetyModel(extraMove: SafetyItem[] = []): SafetyModel {
   const { hazards } = useHazards();
-
-  return useMemo(() => {
-    const live = (hazards || []).filter((h) => !h.isDeleted);
-    const hz = live.map(hazardToItem);
-    const hzMove = hz.filter((i) => i.bucket === 'move');
-    const hzTrack = hz.filter((i) => i.bucket === 'track');
-    const hzDone = hz.filter((i) => i.bucket === 'done');
-    // Crew view: my own open reports, visible under Waiting.
-    const myWaiting = live
-      .filter((h) => !h.isAnonymous && h.reportedBy === REPORTER && phaseIndexOf(h.workflowStage) < 4)
-      .map(hazardToWaitingItem);
-
-    // Submissions archive = every hazard (any state) + non-hazard records.
-    const submissions: SafetyItem[] = [...hz, ...MOCK_SUBMISSIONS]
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-
-    // Published library = de-identified final reports.
-    const derivedPublished: PublishedReport[] = live
-      .filter((h) => h.workflowStage === WORKFLOW_STAGES.PUBLISHED || h.isPublished)
-      .map((h) => ({
-        id: `pub-${h.id}`,
-        ref: `#${h.id}`,
-        title: h.title || 'Published safety report',
-        category: h.category || 'Safety',
-        publishedDate: h.finalReportPublished ? '' : (h.reportedDate ? String(h.reportedDate).slice(0, 10) : ''),
-        summary: h.deidentifiedMitigationSummary || h.description?.slice(0, 200) || '',
-        whatHappened: h.finalReportPublished || h.description || '',
-        lessons: h.suggestedCorrectiveAction ? [h.suggestedCorrectiveAction] : [],
-      }));
-
-    return {
-      my: {
-        move: [...extraMove, ...MY_MOVE, MY_REPLY],
-        waiting: [...myWaiting, ...MY_WAITING],
-        done: MY_DONE,
-      },
-      ops: {
-        move: [...hzMove, ...OPS_MOVE],
-        track: [...hzTrack, ...OPS_TRACK],
-        done: [...hzDone.slice(0, 4), ...OPS_DONE],
-      },
-      submissions,
-      published: [...MOCK_PUBLISHED, ...derivedPublished],
-      know: KNOW,
-    };
-  }, [hazards, extraMove]);
+  return useMemo(() => buildSafetyModel(hazards || [], extraMove), [hazards, extraMove]);
 }

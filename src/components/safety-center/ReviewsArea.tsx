@@ -1,6 +1,7 @@
-// Operations → Reviews: mounts the existing, persisted review consoles
-// (FRAT review, GRAT review, waiver approvals) under one sub-nav. Wire-in per the
-// parity plan — these already read/write their own stores.
+// Operations → Reviews: mounts the persisted review consoles (FRAT review, GRAT
+// review, ASAP, waiver register) under one sub-nav. FRAT/GRAT/ASAP read their own
+// stores; the waiver register reads the shared approvalRequests store the
+// /approvals inbox uses (D40), which is why it needs the acting role.
 
 import { useState } from 'react';
 import FRATReview from '../FRATReview';
@@ -16,7 +17,9 @@ const TABS: { key: Sub; label: string }[] = [
   { key: 'waivers', label: 'Waivers' },
 ];
 
-export function ReviewsArea() {
+interface Props { userRole: string; additionalRoles?: string[] }
+
+export function ReviewsArea({ userRole, additionalRoles = [] }: Props) {
   const [sub, setSub] = useState<Sub>('frat');
   return (
     <div className="mt-4">
@@ -36,7 +39,7 @@ export function ReviewsArea() {
         <div className="-mx-6">
           {sub === 'frat' && <FRATReview />}
           {sub === 'grat' && <GRATReview />}
-          {sub === 'waivers' && <WaiverManagement />}
+          {sub === 'waivers' && <WaiverManagement userRole={userRole} additionalRoles={additionalRoles} />}
         </div>
       )}
     </div>

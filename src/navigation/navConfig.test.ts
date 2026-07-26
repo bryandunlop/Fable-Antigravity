@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { NAV_ENTRIES, entriesForRoles, matchEntry, domainsForRole, FRONT_DOORS } from './navConfig';
+import { readRouteTable, resolvesToRoute } from './routeAudit';
 
-const appSrc = readFileSync('src/App.tsx', 'utf8');
-const exactPaths = new Set([...appSrc.matchAll(/path="([^"*]+)"/g)].map((m) => m[1]));
-const wildcards = [...appSrc.matchAll(/path="([^"]+)\/\*"/g)].map((m) => m[1]);
+// One hardened route-table reader for every link audit. This file used to carry
+// its own copy of the regex, which did not strip JSX comments — so a route
+// disabled behind {/* … */} with its sidebar entry left in place would have
+// false-PASSED here, the very bug class LG-19 is about.
+const table = readRouteTable();
 
 describe('route audit — every manifest path is registered in App.tsx', () => {
   it.each(NAV_ENTRIES.map((e) => [e.path, e.label]))('%s (%s)', (path) => {
-    const ok = path === '/' || exactPaths.has(path) || wildcards.some((w) => path === w || path.startsWith(`${w}/`));
-    expect(ok, `${path} has no registered route`).toBe(true);
+    expect(resolvesToRoute(path as string, table), `${path} has no registered route`).toBe(true);
   });
 });
 
@@ -149,7 +150,7 @@ describe('matchEntry', () => {
 describe('front doors', () => {
   it('map to registered routes', () => {
     for (const target of Object.values(FRONT_DOORS)) {
-      expect(exactPaths.has(target) || wildcards.some((w) => target === w), `${target} unregistered`).toBe(true);
+      expect(resolvesToRoute(target, table), `${target} unregistered`).toBe(true);
     }
   });
 });

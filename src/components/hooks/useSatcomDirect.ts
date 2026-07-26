@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { satcomPositions, satcomStatuses } from '../../services/todaysOpsMock';
 
 export interface AircraftPosition {
   tailNumber: string;
@@ -67,166 +68,21 @@ export const useSatcomDirect = ({ refreshInterval = 30000, autoRefresh = true }:
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  // Mock data generation for demonstration - in real app this would be API calls
+  // Mock data — in a real app these are API calls. Sourced from todaysOpsMock so
+  // positions stay coherent with the flights list and NAS analysis.
   const generateMockData = useCallback(() => {
-    const mockPositions: AircraftPosition[] = [
-      {
-        tailNumber: 'N1PG',
-        callSign: 'FLT001',
-        latitude: 40.7589,
-        longitude: -73.7004, // Near JFK
-        altitude: 35000,
-        groundSpeed: 485,
-        heading: 270,
-        verticalSpeed: 0,
-        timestamp: new Date().toISOString(),
-        flightPhase: 'Cruise',
-        departureAirport: 'LAX',
-        arrivalAirport: 'JFK',
-        estimatedArrival: '2025-02-05T11:30:00Z',
-        fuelRemaining: 2400,
-        flightTime: 240
-      },
-      {
-        tailNumber: 'N5PG',
-        callSign: 'FLT002',
-        latitude: 25.7959,
-        longitude: -80.2870, // Near MIA
-        altitude: 0,
-        groundSpeed: 0,
-        heading: 90,
-        verticalSpeed: 0,
-        timestamp: new Date().toISOString(),
-        flightPhase: 'Parked',
-        departureAirport: 'JFK',
-        arrivalAirport: 'MIA',
-        fuelRemaining: 3200,
-        flightTime: 0
-      },
-      {
-        tailNumber: 'N2PG',
-        callSign: '',
-        latitude: 25.7959,
-        longitude: -80.2870, // At MIA
-        altitude: 0,
-        groundSpeed: 0,
-        heading: 180,
-        verticalSpeed: 0,
-        timestamp: new Date().toISOString(),
-        flightPhase: 'Parked',
-        fuelRemaining: 1800,
-        flightTime: 0
-      },
-      {
-        tailNumber: 'N6PG',
-        callSign: 'FLT004',
-        latitude: 41.9742,
-        longitude: -87.9073, // Near ORD
-        altitude: 15000,
-        groundSpeed: 320,
-        heading: 95,
-        verticalSpeed: -1200,
-        timestamp: new Date().toISOString(),
-        flightPhase: 'Descent',
-        departureAirport: 'ORD',
-        arrivalAirport: 'LGA',
-        estimatedArrival: '2025-02-05T15:30:00Z',
-        fuelRemaining: 1600,
-        flightTime: 180
-      }
-    ];
-
-    const mockStatuses: AircraftStatus[] = [
-      {
-        tailNumber: 'N1PG',
-        isOnline: true,
-        lastContact: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-        satcomStatus: 'Connected',
-        systemHealth: {
-          engine: 'Normal',
-          hydraulics: 'Normal',
-          electrical: 'Normal',
-          avionics: 'Normal'
-        },
-        alerts: [],
-        currentFlightPlan: 'LAX-JFK'
-      },
-      {
-        tailNumber: 'N5PG',
-        isOnline: true,
-        lastContact: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-        satcomStatus: 'Connected',
-        systemHealth: {
-          engine: 'Normal',
-          hydraulics: 'Caution',
-          electrical: 'Normal',
-          avionics: 'Normal'
-        },
-        alerts: [
-          {
-            id: 'ALERT001',
-            type: 'System',
-            severity: 'Caution',
-            message: 'Hydraulic pressure low - System B',
-            timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-            acknowledged: false
-          }
-        ],
-        nextScheduledFlight: 'FLT002 - JFK to MIA at 14:15'
-      },
-      {
-        tailNumber: 'N2PG',
-        isOnline: false,
-        lastContact: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-        satcomStatus: 'Maintenance',
-        systemHealth: {
-          engine: 'Warning',
-          hydraulics: 'Normal',
-          electrical: 'Normal',
-          avionics: 'Normal'
-        },
-        alerts: [
-          {
-            id: 'ALERT002',
-            type: 'Maintenance',
-            severity: 'Warning',
-            message: 'Engine oil temperature high - scheduled maintenance required',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            acknowledged: true
-          }
-        ]
-      },
-      {
-        tailNumber: 'N6PG',
-        isOnline: true,
-        lastContact: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-        satcomStatus: 'Connected',
-        systemHealth: {
-          engine: 'Normal',
-          hydraulics: 'Normal',
-          electrical: 'Normal',
-          avionics: 'Normal'
-        },
-        alerts: [],
-        currentFlightPlan: 'ORD-LGA'
-      }
-    ];
-
-    const mockFleetSummary: FleetSummary = {
-      totalAircraft: 4,
-      activeFlights: 3,
-      parkedAircraft: 2,
-      maintenanceAircraft: 1,
-      systemAlerts: 2,
+    const positions = satcomPositions();
+    const statuses = satcomStatuses();
+    const summary: FleetSummary = {
+      totalAircraft: positions.length,
+      activeFlights: positions.filter(p => p.flightPhase !== 'Parked').length,
+      parkedAircraft: positions.filter(p => p.flightPhase === 'Parked').length,
+      maintenanceAircraft: statuses.filter(s => s.satcomStatus === 'Maintenance').length,
+      systemAlerts: statuses.reduce((n, s) => n + s.alerts.filter(a => !a.acknowledged).length, 0),
       avgFuelLevel: 75,
-      onlineAircraft: 4
+      onlineAircraft: statuses.filter(s => s.isOnline).length,
     };
-
-    return {
-      positions: mockPositions,
-      statuses: mockStatuses,
-      summary: mockFleetSummary
-    };
+    return { positions, statuses, summary };
   }, []);
 
   const fetchSatcomData = useCallback(async (isInitial = false) => {

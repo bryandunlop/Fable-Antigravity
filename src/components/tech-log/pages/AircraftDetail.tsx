@@ -6,12 +6,13 @@ import {
   Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, CloudDownload,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
-import { formatRegulatoryCompact } from '../util/displayZone';
+import { formatRegulatoryCompact, type DisplayZoneMode } from '../util/displayZone';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
 import { deriveServiceability } from '../engine/serviceability';
+import { buildBlockers, governingSentence, type BlockerRow, type BlockerAction } from '../engine/blockers';
 import { currentRows } from '../engine/supersede';
-import { isDeferralExpired } from '../engine/pl25';
+import { isDeferralExpired, DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
 import { canSignPlacardDischarge } from '../engine/disposition';
 import { INTENT } from '../constants';
@@ -55,6 +56,76 @@ const RULE_TEXT: Record<number, string> = {
 };
 
 const CHECK_BADGE: Record<string, 'secondary' | 'destructive' | 'outline'> = { CURRENT: 'secondary', DUE_SOON: 'outline', EXPIRED: 'destructive', NEVER_DONE: 'destructive' };
+
+// D42: the label says which of the two "fix it" paths you are taking. "Rectify" and "Quick CRS"
+// sat side by side with nothing on screen distinguishing raise-a-job from sign-it-off.
+const ACTION_LABEL: Record<BlockerAction, string> = {
+  DEFER: 'Defer (MEL)',
+  RAISE_CARD: 'Raise work card',
+  SIGN_RELEASE: 'Sign release now',
+  SIGN_GATING: 'Sign (M)/placard release',
+  ACCOMPLISH: 'Accomplish & sign',
+  EXTEND: 'Extend',
+  OPEN_CARD: 'Open card',
+};
+// The first action on a row is the one that most directly clears it.
+const PRIMARY_ACTION: Partial<Record<string, BlockerAction>> = {
+  DEFECT_OPEN: 'DEFER',
+  DEFERRAL_PENDING_PLACARD: 'SIGN_GATING',
+  DEFERRAL_EXPIRED: 'RAISE_CARD',
+  CHECK_EXPIRED: 'ACCOMPLISH',
+  WORK_CARD_OPEN: 'OPEN_CARD',
+};
+
+function BlockerCard({
+  row, isMaint, onAction, tone = 'block', displayZone,
+}: {
+  row: BlockerRow;
+  isMaint: boolean;
+  onAction: (row: BlockerRow, action: BlockerAction) => void;
+  tone?: 'block' | 'warn' | 'quiet';
+  displayZone: DisplayZoneMode;
+}) {
+  const accent =
+    tone === 'block' ? 'border-[var(--gfo-error,#EF3340)]/40'
+    : tone === 'warn' ? 'border-[var(--gfo-warning,#F1B434)]/40'
+    : '';
+  return (
+    <div className={cn('rounded-md border p-3', accent, row.governing && 'ring-1 ring-inset ring-primary/30')}>
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">{row.title}</span>
+            {row.governing && <Badge variant="outline" className="text-xs">why it's {tone === 'warn' ? 'restricted' : 'grounded'}</Badge>}
+          </div>
+          {row.dueUtc && (
+            <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
+              {/* Only deferral rows carry a due instant, and a deferral always stores its governing
+                  zone at signing — the D24 operator anchor is the fallback, never a guess. */}
+              <Clock className="h-3.5 w-3.5" /> repair due {formatRegulatoryCompact(row.dueUtc, displayZone, row.governingTimezone ?? DEFAULT_GOVERNING_TIMEZONE)}
+            </p>
+          )}
+          {row.detail && <p className="mt-0.5 text-xs text-muted-foreground">{row.detail}</p>}
+          <p className="mt-1 text-xs text-muted-foreground">Clears when: {row.clearsWhen}</p>
+        </div>
+        {isMaint && row.actions.length > 0 && (
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {row.actions.map(a => (
+              <Button
+                key={a}
+                size="sm"
+                variant={a === PRIMARY_ACTION[row.kind] ? 'default' : 'outline'}
+                onClick={() => onAction(row, a)}
+              >
+                {ACTION_LABEL[a]}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type WorkspaceTab = 'workspace' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
 const TABS: { key: WorkspaceTab; label: string }[] = [
@@ -138,11 +209,10 @@ export default function AircraftDetail() {
   const custody = deriveCustody(ac.id, state, now);
   const shownStep: StepKey = activeStep;
 
-  // P3-1: out-of-service → run cards → return-to-service spine (derived; reuses serviceability + work cards, no new state machine).
-  const spineOpenDefects = currentRows(state.defects).filter(d => d.aircraftId === ac.id && d.status === 'OPEN');
-  const spineOpenCards = state.workCards.filter(w => w.aircraftId === ac.id && w.status !== 'COMPLETED');
-  const spineStage: 'OUT_OF_SERVICE' | 'RESTRICTED' | 'IN_SERVICE' = sv.status === 'RED' ? 'OUT_OF_SERVICE' : sv.status === 'AMBER' ? 'RESTRICTED' : 'IN_SERVICE';
-  const spineDriverDefect = sv.drivingDefectId ? currentRows(state.defects).find(d => d.id === sv.drivingDefectId) : undefined;
+  // D42: one derived board of "what stands between this tail and dispatch". Replaces the old
+  // three-box spine, which listed only open defects + work cards and so showed nothing for a tail
+  // grounded by an expired deferral, a pending (M)/placard release, or an expired recurring check.
+  const board = buildBlockers(ac.id, state, now);
 
   const acceptedBriefing = currentRows(state.briefings).filter(b => b.aircraftId === ac.id && b.status === 'ACKNOWLEDGED').sort((a, b) => (b.acknowledgedAtUtc ?? '').localeCompare(a.acknowledgedAtUtc ?? ''))[0];
 
@@ -207,6 +277,27 @@ export default function AircraftDetail() {
     setInline({ kind, id: defectId });
   };
 
+  // D42: a blocker row's disposition runs the same handler the tab-buried button ran — the change is
+  // where the affordance lives, never what it is allowed to do. Each panel keeps its own gate.
+  const defectFor = (row: BlockerRow) =>
+    row.defect ?? (row.deferral?.defectId ? currentRows(state.defects).find(d => d.id === row.deferral!.defectId) : undefined);
+
+  const runAction = (row: BlockerRow, action: BlockerAction) => {
+    const d = defectFor(row);
+    switch (action) {
+      case 'DEFER': return d ? startTriage(d.id, 'defer') : toast.error('No underlying defect to defer.');
+      case 'RAISE_CARD': return d ? rectifyToWorkCard(d) : toast.error('No underlying defect to raise a card against.');
+      case 'SIGN_RELEASE': return d ? startTriage(d.id, 'rectify') : toast.error('No underlying defect to release.');
+      case 'SIGN_GATING':
+        if (!row.deferral) return;
+        setTab('deferrals');
+        return setInline({ kind: 'gating', id: row.deferral.id });
+      case 'ACCOMPLISH': return row.check ? beginAccomplish(row.check.id) : undefined;
+      case 'EXTEND': return row.deferral ? setExtendFor(row.deferral) : undefined;
+      case 'OPEN_CARD': return row.workCard ? navigate(`/tech-log/work-cards/${row.workCard.id}`) : undefined;
+    }
+  };
+
   const pull = () => {
     if (!pullWo) return toast.error('Select a work order.');
     const wo = integration.pullWorkOrder(ac.id, pullWo);
@@ -260,19 +351,24 @@ export default function AircraftDetail() {
       actions={
         <>
           <Button variant="outline" size="sm" onClick={() => navigate('/tech-log')}><ArrowLeft className="mr-1.5 h-4 w-4" /> Fleet</Button>
-          <Button size="sm" onClick={() => setReportOpen(true)}><FilePlus className="mr-1.5 h-4 w-4" /> Report defect</Button>
+          {/* D42: for maintenance this action lives on the blocker board, where the work is.
+              Pilots have no blocker board, so they keep it here. */}
+          {!isMaint && <Button size="sm" onClick={() => setReportOpen(true)}><FilePlus className="mr-1.5 h-4 w-4" /> Report defect</Button>}
         </>
       }
     >
-      {/* Status / why — always visible above the workspace tabs so the chip is in view as it changes */}
+      {/* Status / why — always visible above the workspace tabs so the chip is in view as it changes.
+          The headline names the governing *item*, not just the rule, so "why is this tail red" is
+          answered without navigating (D42). */}
       <Card className="mb-4">
         <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {ac.isProvisional ? <Badge variant="outline">Provisional</Badge> : <ServiceabilityChip status={sv.status} />}
               <CustodyChip state={custody.state} />
-              <span className="text-sm text-muted-foreground">{RULE_TEXT[sv.governingRule]}</span>
+              <span className="text-sm">{governingSentence(board, ac.tailNumber)}</span>
             </div>
+            <span className="text-xs text-muted-foreground">{RULE_TEXT[sv.governingRule]}</span>
             {acceptedBriefing?.acknowledgedByOid && (
               <span className="text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {nameOf(acceptedBriefing.acknowledgedByOid)} · {acceptedBriefing.acknowledgedAtUtc ? new Date(acceptedBriefing.acknowledgedAtUtc).toLocaleString() : ''}</span>
             )}
@@ -290,66 +386,83 @@ export default function AircraftDetail() {
         </Card>
       )}
 
-      {/* Lifecycle stepper drives the workspace; reference data lives behind Records */}
-      <div className="mb-4 flex items-start justify-between gap-2">
-        <div className="flex-1">
-          {tab === 'workspace' && <LifecycleStepper aircraft={ac} onSelect={(k) => { setActiveStep(k); setTab('workspace'); }} />}
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
-          <button onClick={() => setTab('workspace')} className={cn('rounded-md px-3 py-1.5 text-sm', tab === 'workspace' ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>Workspace</button>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)} className={cn('rounded-md px-3 py-1.5 text-sm', tab === t.key ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
-              {t.label}{tabCount[t.key] ? <span className="ml-1.5 rounded-full bg-muted px-1.5 text-xs">{tabCount[t.key]}</span> : null}
-            </button>
-          ))}
-        </div>
+      {/* D42: the flight-custody stepper is the PILOT's axis (preflight → accepted → postflight).
+          Showing it to maintenance put two steppers on two different axes side by side; maintenance
+          reads its own progress off the blocker board below. */}
+      {!isMaint && tab === 'workspace' && (
+        <LifecycleStepper aircraft={ac} onSelect={(k) => { setActiveStep(k); setTab('workspace'); }} />
+      )}
+
+      {/* D42: records are for looking things up, never the way to act — so they read as a quiet
+          lookup row rather than a second primary tab bar competing with the workspace. */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-1 gap-y-1 border-b pb-2 text-sm">
+        <button
+          onClick={() => setTab('workspace')}
+          className={cn('rounded-md px-3 py-1.5', tab === 'workspace' ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground')}
+        >
+          Workspace
+        </button>
+        <span className="ml-2 mr-1 text-xs uppercase tracking-wide text-muted-foreground/70">Records</span>
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={cn('rounded-md px-2 py-1 text-xs', tab === t.key ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground')}
+          >
+            {t.label}{tabCount[t.key] ? <span className="ml-1 rounded-full bg-muted px-1.5">{tabCount[t.key]}</span> : null}
+          </button>
+        ))}
       </div>
 
       {/* ===== WORKSPACE (stepper-driven active panel + unified feed) ===== */}
       {tab === 'workspace' && (
         <div className="space-y-4">
-          {/* ===== Maintenance spine: out-of-service → run cards → return-to-service (P3-1) ===== */}
+          {/* ===== D42: one blocker board — every grounding cause listed, each disposed of in place ===== */}
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4" /> Return-to-service spine</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Wrench className="h-4 w-4" />
+                {board.blockers.length > 0
+                  ? `Stands between ${ac.tailNumber} and dispatch (${board.blockers.length})`
+                  : `Nothing is holding ${ac.tailNumber} on the ground`}
+              </CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setReportOpen(true)}>
+                <FilePlus className="mr-1.5 h-4 w-4" /> Log a new issue
+              </Button>
+            </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                <div className={cn('flex-1 rounded-md border p-2 text-sm', spineStage === 'OUT_OF_SERVICE' ? 'border-[var(--gfo-error,#EF3340)] bg-[var(--gfo-error,#EF3340)]/5' : 'opacity-60')}>
-                  <div className="font-medium">1 · Out of service</div>
-                  <div className="text-xs text-muted-foreground">{sv.status === 'RED' ? (spineDriverDefect ? `ATA ${spineDriverDefect.ataChapter} — ${spineDriverDefect.description}` : 'grounded — see open items') : 'cleared'}</div>
-                </div>
-                <div className="hidden items-center text-muted-foreground sm:flex">→</div>
-                <div className={cn('flex-1 rounded-md border p-2 text-sm', (spineOpenDefects.length || spineOpenCards.length) ? 'border-[var(--gfo-warning,#F1B434)] bg-[var(--gfo-warning,#F1B434)]/5' : 'opacity-60')}>
-                  <div className="font-medium">2 · Work it</div>
-                  <div className="text-xs text-muted-foreground">{spineOpenCards.length} work card(s) · {spineOpenDefects.length} open defect(s)</div>
-                </div>
-                <div className="hidden items-center text-muted-foreground sm:flex">→</div>
-                <div className={cn('flex-1 rounded-md border p-2 text-sm', sv.status === 'GREEN' ? 'border-[var(--gfo-success,#00B140)] bg-[var(--gfo-success,#00B140)]/5' : 'opacity-60')}>
-                  <div className="font-medium">3 · Returned to service</div>
-                  <div className="text-xs text-muted-foreground">{sv.status === 'GREEN' ? 'dispatchable (GREEN)' : 'sign the release(s) to clear'}</div>
-                </div>
-              </div>
-              {(spineOpenDefects.length > 0 || spineOpenCards.length > 0) ? (
-                <div className="space-y-1">
-                  <div className="text-xs font-medium text-muted-foreground">Stands between {ac.tailNumber} and return-to-service:</div>
-                  {spineOpenDefects.map(d => (
-                    <div key={d.id} className="flex items-center justify-between gap-2 rounded border p-2 text-sm">
-                      <span className="text-muted-foreground">Open defect · ATA {d.ataChapter} — {d.description}</span>
-                      {isMaint && <Button size="sm" variant="outline" onClick={() => rectifyToWorkCard(d)}>Rectify</Button>}
-                    </div>
-                  ))}
-                  {spineOpenCards.map(w => (
-                    <div key={w.id} className="flex items-center justify-between gap-2 rounded border p-2 text-sm">
-                      <span className="text-muted-foreground">Work card {w.cardNumber ?? w.woNumber ?? w.id} — {w.title}</span>
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/tech-log/work-cards/${w.id}`)}>Open card</Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className={cn('flex items-center gap-1.5 text-sm', sv.status === 'GREEN' ? 'text-[var(--gfo-success,#00B140)]' : sv.status === 'AMBER' ? 'text-[var(--gfo-warning,#F1B434)]' : 'text-[var(--gfo-error,#EF3340)]')}>
+              {board.blockers.length === 0 && (
+                <div className={cn('flex items-center gap-1.5 text-sm', sv.status === 'GREEN' ? 'text-[var(--gfo-success,#00B140)]' : 'text-[var(--gfo-warning,#F1B434)]')}>
                   <CheckCircle2 className="h-4 w-4" />
-                  {sv.status === 'GREEN' ? `No open maintenance — ${ac.tailNumber} is dispatchable.`
-                    : sv.status === 'AMBER' ? 'Dispatchable under restriction — active deferral(s) in force.'
-                    : 'Grounded — see Deferrals / Recurring checks for the driving condition.'}
+                  {sv.status === 'GREEN'
+                    ? `No open maintenance — ${ac.tailNumber} is dispatchable.`
+                    : 'Dispatchable under restriction — see the deferrals in force below.'}
+                </div>
+              )}
+
+              {board.blockers.map(row => (
+                <BlockerCard key={`${row.kind}-${row.id}`} row={row} isMaint={isMaint} onAction={runAction} displayZone={displayZone} />
+              ))}
+
+              {board.restrictions.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    In force — dispatchable under restriction ({board.restrictions.length})
+                  </div>
+                  {board.restrictions.map(row => (
+                    <BlockerCard key={`${row.kind}-${row.id}`} row={row} isMaint={isMaint} onAction={runAction} displayZone={displayZone} tone="warn" />
+                  ))}
+                </div>
+              )}
+
+              {board.inProgress.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Work under way ({board.inProgress.length})
+                  </div>
+                  {board.inProgress.map(row => (
+                    <BlockerCard key={`${row.kind}-${row.id}`} row={row} isMaint={isMaint} onAction={runAction} displayZone={displayZone} tone="quiet" />
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -444,11 +557,12 @@ export default function AircraftDetail() {
                       </div>
                     ) : null}
                   </div>
+                  {/* D42: same three dispositions, same order, same words as the blocker board. */}
                   {(isMaint || user.crewDeferralAuthorized) && isOpen && d.status === 'OPEN' && (
                     <div className="flex shrink-0 flex-wrap gap-2">
                       <Button size="sm" variant="secondary" onClick={() => startTriage(d.id, 'defer')}><Wrench className="mr-1.5 h-4 w-4" /> Defer (MEL)</Button>
-                      {isMaint && <Button size="sm" onClick={() => rectifyToWorkCard(d)}><CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify</Button>}
-                      {isMaint && <Button size="sm" variant="outline" onClick={() => startTriage(d.id, 'rectify')}>Quick CRS</Button>}
+                      {isMaint && <Button size="sm" onClick={() => rectifyToWorkCard(d)} title="Open a work card and go do the work"><ClipboardList className="mr-1.5 h-4 w-4" /> Raise work card</Button>}
+                      {isMaint && <Button size="sm" variant="outline" onClick={() => startTriage(d.id, 'rectify')} title="Work is already done — sign the release now"><CheckCircle2 className="mr-1.5 h-4 w-4" /> Sign release now</Button>}
                     </div>
                   )}
                 </CardContent>
