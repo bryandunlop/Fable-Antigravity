@@ -121,12 +121,18 @@ export function TripDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-6">
+        {/* Above the loading branch on purpose (LG-30). Radix asserts a Title on the
+            dialog at MOUNT, and the drawer mounts before the trip resolves — a Title
+            that lives only in the loaded branch is a console error on every open.
+            The visible name is the identity header; this is its accessible twin. */}
+        <SheetTitle className="sr-only">
+          {identity ? `Trip ${identity.route}` : 'Loading trip'}
+        </SheetTitle>
         {!trip || !identity ? (
           <p className="text-sm text-muted-foreground py-10 text-center">Loading trip…</p>
         ) : (
           <div className="space-y-5">
             <SheetHeader className="space-y-3 text-left">
-              <SheetTitle className="sr-only">{identity.route}</SheetTitle>
               <TripIdentityHeader trip={identity} />
               {readiness && (
                 <div className="flex items-center gap-3">
