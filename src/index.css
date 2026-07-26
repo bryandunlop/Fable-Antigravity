@@ -51,6 +51,14 @@
     --destructive-foreground: #ffffff;
 
     --border: var(--pg-rule);      /* hairline divider on white, per VIS ID */
+    /* --input is a FILL, not a border (TL-20). Upstream shadcn uses this token as
+       the input *border* colour; this app repurposed it as a wash (bg-input/30,
+       bg-input/50, and the switch's off-track at bg-input/80) and left the border
+       role pointing at it too — transparent in light, the page colour in dark, so
+       every form primitive drew a boundary you could not see. Since 2026-07-26
+       every form boundary reads --border and this token is fill-only.
+       If you paste a fresh shadcn primitive in, rewrite its border utility to
+       border-border before you trust it. */
     --input: transparent;
     --input-background: #F4F6FA;
     --switch-background: #cbced4;
@@ -125,7 +133,7 @@
     --destructive-foreground: #ffffff;
 
     --border: var(--pg-rule-on-brand);   /* was 0.14 — the VIS ID says 0.18 on PMS293 */
-    --input: #0D1F5C;
+    --input: #0D1F5C;                    /* fill only — see the light-theme note (TL-20) */
     --input-background: #0D1F5C;
     --ring: #0096FC;
 

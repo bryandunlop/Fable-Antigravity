@@ -89,7 +89,7 @@ export function SuggestionDialog({
               id="sugAnchor"
               value={blockId}
               onChange={(e) => setBlockId(e.target.value)}
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             >
               <option value="">General — the whole document</option>
               {groups.map((g) => (

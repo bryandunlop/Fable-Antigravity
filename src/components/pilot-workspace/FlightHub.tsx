@@ -144,6 +144,10 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
       {/* Airport review — slide-over drawer; stays in the pilot workspace, no environment switch. */}
       <Sheet open={!!airportLeg} onOpenChange={(o: boolean) => { if (!o) setParam('airport', null); }}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          {/* `open` tracks airportLeg alone, but the body also needs tlTrip — a deep link
+              to ?airport=… for a trip absent from tech-log state mounts this sheet with
+              no Title, which Radix reports as an accessibility error (LG-30). */}
+          {airportLeg && !tlTrip && <SheetTitle className="sr-only">Airport review</SheetTitle>}
           {airportLeg && tlTrip && (
             <>
               <SheetHeader>

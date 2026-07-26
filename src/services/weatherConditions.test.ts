@@ -4,6 +4,8 @@ import {
   conditionFromShortForecast,
   conditionFromForecastPeriod,
   conditionFromMetar,
+  conditionFromGridpoint,
+  conditionFromSkyCoverPercent,
   WEATHER_CONDITIONS,
   type WeatherCondition,
 } from './weatherConditions';
@@ -210,5 +212,105 @@ describe('conditionFromMetar', () => {
     // Unlike the forecast, an empty METAR sky group means the observer saw no
     // cloud — CLR/SKC is a positive observation, not an absence of data.
     expect(conditionFromMetar({})).toBe('clear');
+  });
+});
+
+describe('conditionFromGridpoint — the contracted path (TL-23)', () => {
+  it('maps every value of the closed 23-member weather enum, except frost', () => {
+    // Verbatim from Gridpoint.properties.weather…value[].weather in
+    // api.weather.gov/openapi.json (re-read 2026-07-26). If NWS adds a value this
+    // test still passes; the point is that none of the 23 known ones falls through.
+    const values = [
+      'blowing_dust', 'blowing_sand', 'blowing_snow', 'drizzle', 'fog', 'freezing_fog',
+      'freezing_drizzle', 'freezing_rain', 'freezing_spray', 'hail', 'haze',
+      'ice_crystals', 'ice_fog', 'rain', 'rain_showers', 'sleet', 'smoke', 'snow',
+      'snow_showers', 'thunderstorms', 'volcanic_ash', 'water_spouts',
+    ];
+    for (const weather of values) {
+      const got = conditionFromGridpoint({ weather: [{ weather, attributes: [] }] });
+      expect(got, `weather "${weather}" fell through to null`).not.toBeNull();
+      expect(WEATHER_CONDITIONS).toContain(got as WeatherCondition);
+    }
+  });
+
+  it('leaves `frost` unmapped so it cannot overwrite a real sky reading', () => {
+    // Frost is a surface phenomenon with no sky story. Mapping it to anything would
+    // render a frosty overcast morning as something other than overcast.
+    expect(conditionFromGridpoint({ weather: [{ weather: 'frost', attributes: [] }] })).toBeNull();
+    expect(conditionFromGridpoint({
+      weather: [{ weather: 'frost', attributes: [] }],
+      skyCoverPercent: 95,
+    })).toBe('cloudy');
+  });
+
+  it('agrees with conditionFromMetar on the phenomena both can see', () => {
+    // The strip and the observation beside it must not disagree about the same sky.
+    expect(conditionFromGridpoint({ weather: [{ weather: 'freezing_fog' }] }))
+      .toBe(conditionFromMetar({ wxString: 'FZFG' }));          // fog — nothing falling
+    expect(conditionFromGridpoint({ weather: [{ weather: 'freezing_rain' }] }))
+      .toBe(conditionFromMetar({ wxString: 'FZRA' }));          // sleet
+    expect(conditionFromGridpoint({ weather: [{ weather: 'hail' }] }))
+      .toBe(conditionFromMetar({ wxString: 'GR' }));            // sleet
+    expect(conditionFromGridpoint({ weather: [{ weather: 'ice_crystals' }] }))
+      .toBe(conditionFromMetar({ wxString: 'IC' }));            // sleet
+    expect(conditionFromGridpoint({ weather: [{ weather: 'volcanic_ash' }] }))
+      .toBe(conditionFromMetar({ wxString: 'VA' }));            // fog — obscuration
+    expect(conditionFromGridpoint({ weather: [{ weather: 'thunderstorms' }] }))
+      .toBe(conditionFromMetar({ wxString: 'TSRA' }));          // storm
+  });
+
+  it('escalates on the three storm attributes and ignores the intensifying five', () => {
+    const at = (a: string) => conditionFromGridpoint({ weather: [{ weather: 'rain', attributes: [a] }] });
+    expect(at('tornadoes')).toBe('storm');
+    expect(at('large_hail')).toBe('storm');
+    expect(at('dry_thunderstorms')).toBe('storm');
+    for (const a of ['damaging_wind', 'flooding', 'gusty_wind', 'heavy_rain', 'small_hail']) {
+      expect(at(a), `attribute "${a}" should not change the glyph`).toBe('rain');
+    }
+  });
+
+  it('returns null rather than guessing when there is neither weather nor sky cover', () => {
+    expect(conditionFromGridpoint({})).toBeNull();
+    expect(conditionFromGridpoint({ weather: [] })).toBeNull();
+    expect(conditionFromGridpoint({ weather: [{ weather: null }] })).toBeNull();
+    expect(conditionFromGridpoint({ skyCoverPercent: null })).toBeNull();
+    expect(conditionFromGridpoint({ skyCoverPercent: NaN })).toBeNull();
+  });
+
+  it('ignores an unrecognised future enum value instead of inventing a glyph', () => {
+    expect(conditionFromGridpoint({ weather: [{ weather: 'sharknado' }] })).toBeNull();
+    expect(conditionFromGridpoint({ weather: [{ weather: 'sharknado' }], skyCoverPercent: 10 })).toBe('clear');
+  });
+});
+
+describe('conditionFromSkyCoverPercent', () => {
+  it('breaks at the same octa boundaries the METAR cloud groups use', () => {
+    // FEW is <=2/8 and reads clear; SCT is 3-4/8 and reads partly; BKN/OVC is more
+    // than half the sky. Same thresholds, so skyCover and a cloud group describing
+    // the same sky cannot disagree.
+    expect(conditionFromSkyCoverPercent(0)).toBe('clear');
+    expect(conditionFromSkyCoverPercent(25)).toBe('clear');
+    expect(conditionFromSkyCoverPercent(26)).toBe('partly');
+    expect(conditionFromSkyCoverPercent(50)).toBe('partly');
+    expect(conditionFromSkyCoverPercent(51)).toBe('cloudy');
+    expect(conditionFromSkyCoverPercent(100)).toBe('cloudy');
+
+    expect(conditionFromSkyCoverPercent(20)).toBe(conditionFromMetar({ clouds: [{ cover: 'FEW' }] }));
+    expect(conditionFromSkyCoverPercent(45)).toBe(conditionFromMetar({ clouds: [{ cover: 'SCT' }] }));
+    expect(conditionFromSkyCoverPercent(70)).toBe(conditionFromMetar({ clouds: [{ cover: 'BKN' }] }));
+  });
+});
+
+describe('conditionFromForecastPeriod — precedence', () => {
+  it('prefers a composed gridpoint condition over the text and the deprecated icon', () => {
+    expect(conditionFromForecastPeriod({
+      condition: 'storm',
+      shortForecast: 'Sunny',
+      icon: 'https://api.weather.gov/icons/land/day/skc',
+    })).toBe('storm');
+  });
+
+  it('falls back to the legacy path when the gridpoint half is absent', () => {
+    expect(conditionFromForecastPeriod({ condition: undefined, shortForecast: 'Patchy Fog' })).toBe('fog');
   });
 });

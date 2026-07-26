@@ -967,7 +967,11 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                        {/* Same dialog content as list view */}
+                        {/* NOTE: this dialog has no body — the "Same dialog content as list
+                            view" was never written, so View in the grid opens an empty modal.
+                            That is a separate bug; the Title below only silences the Radix
+                            accessibility assertion it was also throwing (LG-30). */}
+                        <DialogTitle className="sr-only">Submission details</DialogTitle>
                       </DialogContent>
                     </Dialog>
 

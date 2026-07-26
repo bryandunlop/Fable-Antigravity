@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -106,13 +106,24 @@ export default function Planners() {
   };
 
   // Mirror open CAMP work orders (with their scheduled in/out window + service center) for the
-  // calendar overlay. Fetched once per tail set; only recomputed when the fleet/filter changes.
-  const campWos = useMemo<PlannerCampWo[]>(() => {
+  // calendar overlay. Fetched once per tail set; only refetched when the fleet/filter changes.
+  //
+  // This is an EFFECT, not a useMemo, and that is the whole of TL-7. listWorkOrders opens a CAMP
+  // session and writes an ADD_INTEGRATION_EVENT to the tech-log reducer for every tail it reads —
+  // it is a side effect, not a computation. Running it inside a memo dispatched into
+  // TechLogProvider *during* this component's render, which is exactly what React's
+  // "Cannot update a component while rendering a different component" warning describes.
+  // Deriving it in an effect is the fix, not a suppression: the fetch now happens after commit.
+  const [campWos, setCampWos] = useState<PlannerCampWo[]>([]);
+  useEffect(() => {
     const tails = state.aircraft.filter(a => !a.isProvisional && (tailFilter === 'ALL' || a.id === tailFilter));
-    return tails.flatMap(ac => listWorkOrders(ac.id).map(w => ({
+    setCampWos(tails.flatMap(ac => listWorkOrders(ac.id).map(w => ({
       woNumber: w.woNumber, aircraftId: ac.id, title: w.title,
       startUtc: w.scheduledInUtc, endUtc: w.scheduledOutUtc, icao: w.icao, serviceCenter: w.serviceCenter,
-    })));
+    }))));
+    // listWorkOrders is re-created every render (it closes over the reducer), so it cannot be a
+    // dep without refetching forever. The fleet + filter are what actually change the result.
+    // ADD_INTEGRATION_EVENT does not replace state.aircraft, so the dispatch cannot re-trigger us.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.aircraft, tailFilter]);
 

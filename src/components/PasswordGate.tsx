@@ -54,7 +54,7 @@ export default function PasswordGate({ children }: PasswordGateProps) {
                   setError(false);
                 }}
                 placeholder="Password"
-                className="h-14 text-base bg-muted/50 border-input rounded-xl"
+                className="h-14 text-base bg-muted/50 border-border rounded-xl"
                 autoFocus
               />
               {error && (
