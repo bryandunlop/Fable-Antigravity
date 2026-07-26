@@ -8,24 +8,16 @@ import { canRecordPostflight } from './engine/custody';
 import { isSelfApproval, applyApproval } from './engine/approvals';
 import { newId } from './util/id';
 import type { DisplayZoneMode } from './util/displayZone';
+import { STORAGE_KEY, isDurableAction, loadPersistedState, persistState, type StorageLike } from './persistence';
 
-export const STORAGE_KEY = 'tech-log-state';
-export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-26-v15'; // TL-16 signed-record snapshots — reseed so briefings carry disclosureAtRelease and flight logs / labor entries carry frozen crew + technician names
+// Persistence lives in ./persistence so the durability rules are testable in node (TL-26).
+export { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './persistence';
 const DISPLAY_ZONE_KEY = 'tech-log-display-zone'; // D24 UI preference, separate from domain state (survives demo reset)
 
+const browserStorage = (): StorageLike | null => (typeof localStorage === 'undefined' ? null : localStorage);
+
 function loadInitialState(): TechLogState {
-  try {
-    if (localStorage.getItem(VERSION_KEY) !== DATA_VERSION) {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.setItem(VERSION_KEY, DATA_VERSION);
-      return getDefaultState();
-    }
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...getDefaultState(), ...JSON.parse(raw) } : getDefaultState();
-  } catch {
-    return getDefaultState();
-  }
+  return loadPersistedState(browserStorage(), getDefaultState);
 }
 
 /** Defense-in-depth: every SUPERSEDE_* action funnels through here before being applied. If the
@@ -242,8 +234,19 @@ function resolveFromLogin(userRole: string | undefined, personnel: Personnel[]):
 }
 
 export function TechLogProvider({ children, userRole }: { children: ReactNode; userRole?: string }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadInitialState);
+  const [state, rawDispatch] = useReducer(reducer, undefined, loadInitialState);
   const [loading] = useState(false);
+
+  /**
+   * TL-26 — set by a dispatch that produces a signed/regulated record, so the persistence effect
+   * below writes in the SAME commit instead of on a 300 ms debounce. `CLAUDE.md`: "ALWAYS persist a
+   * signed record to durable storage the instant it is signed, before attempting sync."
+   */
+  const durablePendingRef = useRef(false);
+  const dispatch = useCallback((action: TechLogAction) => {
+    if (isDurableAction(action.type)) durablePendingRef.current = true;
+    rawDispatch(action);
+  }, []);
 
   // D24 display-zone preference — a UI lens for regulatory times, kept out of the domain state so it
   // survives a demo reset. Never affects the grounding decision (that compares UTC instants).
@@ -277,16 +280,26 @@ export function TechLogProvider({ children, userRole }: { children: ReactNode; u
     conflictCountRef.current = state.supersedeConflicts.length;
   }, [state.supersedeConflicts]);
 
+  // TL-26 — durability. A regulated dispatch is written synchronously in the commit phase that
+  // follows it, so there is no window in which navigating away can drop it. Everything else stays
+  // debounced so a keystroke in a notes field does not stringify the whole state.
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
   useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch {
-        /* storage full/unavailable — ignore for the demo */
-      }
-    }, 300);
+    if (durablePendingRef.current) {
+      durablePendingRef.current = false;
+      persistState(browserStorage(), state);
+      return;
+    }
+    const t = setTimeout(() => persistState(browserStorage(), state), 300);
     return () => clearTimeout(t);
   }, [state]);
+
+  // Belt and braces for the non-regulated half: flush the latest state once, on real unmount, so a
+  // pending debounce is not simply cancelled. This alone would NOT have fixed the bug — an incoming
+  // provider's initialiser runs during render, before this cleanup runs in the commit phase — which
+  // is why the synchronous write above, not this, is the actual fix.
+  useEffect(() => () => persistState(browserStorage(), latestStateRef.current), []);
 
   return <TechLogContext.Provider value={{ state, dispatch, loading, displayZone, setDisplayZone }}>{children}</TechLogContext.Provider>;
 }

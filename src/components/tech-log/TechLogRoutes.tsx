@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { TechLogProvider } from './TechLogContext';
 import PilotHome from './pages/PilotHome';
 import FleetStatus from './pages/FleetStatus';
 import AircraftDetail from './pages/AircraftDetail';
@@ -29,11 +28,12 @@ import Integration from './pages/Integration';
 
 /**
  * Self-contained eTechLog domain. Mounted at "/tech-log/*" in App.tsx.
- * One TechLogProvider wraps all sub-pages so persona + mock state are shared.
+ * State comes from the single TechLogProvider hoisted above <Router> in App.tsx. This file used to
+ * mount its own, which meant navigating to /fir or /pilot-workspace (which did the same) unmounted
+ * the whole store and re-hydrated it from localStorage — see TL-26.
  */
-export default function TechLogRoutes({ userRole }: { userRole?: string }) {
+export default function TechLogRoutes({ userRole: _userRole }: { userRole?: string }) {
   return (
-    <TechLogProvider userRole={userRole}>
       <Routes>
         <Route path="/" element={<PilotHome />} />
         <Route path="fleet" element={<FleetStatus />} />
@@ -65,6 +65,5 @@ export default function TechLogRoutes({ userRole }: { userRole?: string }) {
         <Route path="admin/checklists" element={<AdminChecklists />} />
         <Route path="*" element={<Navigate to="/tech-log" replace />} />
       </Routes>
-    </TechLogProvider>
   );
 }
