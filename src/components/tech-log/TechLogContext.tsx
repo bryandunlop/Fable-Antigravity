@@ -11,7 +11,7 @@ import type { DisplayZoneMode } from './util/displayZone';
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-14-v13'; // D24 governingTimezone + servicing checklist seeds — reseed so persisted rows carry both
+export const DATA_VERSION = '2026-07-15-v14'; // D36 melSubItemNumber/melTitle snapshot — reseed so persisted deferrals carry the frozen MEL identity ramp mode reads
 const DISPLAY_ZONE_KEY = 'tech-log-display-zone'; // D24 UI preference, separate from domain state (survives demo reset)
 
 function loadInitialState(): TechLogState {

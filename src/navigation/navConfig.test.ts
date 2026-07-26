@@ -30,6 +30,10 @@ const KNOWN_UNREGISTERED = [
   '/aircraft-cleaning/manager-dashboard',
   '/aircraft-cleaning/new-workflow',
   '/pilot/elb',
+  // D36 ramp mode: reached by the "Ramp check" button on a specific tail, never from
+  // nav — the path has no meaning without a :tail, so a manifest entry would be a link
+  // to nowhere. Same shape as the other parameterised workflow routes in this list.
+  '/tech-log/aircraft/:tail/ramp',
   '/grat/form-builder',
   '/grat/form-fields',
   // Removed 2026-07-26 when this audit moved onto the comment-stripping reader:

@@ -59,6 +59,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   deferrals.push({
     id: 'df-n6pg', defectId: 'd-n6pg', aircraftId: 'ac-n6pg', melItemId: melAmber.id,
     governingMmelRevision: melAmber.mmelRevision, governingEffectiveDate: melAmber.effectiveDate,
+    melSubItemNumber: melAmber.subItemNumber, melTitle: melAmber.title, // D36 — frozen at signing
     category: melAmber.category, dayOfDiscoveryUtc: discN6, clockStartDateUtc: clockStart,
     governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
     repairDueDateUtc: due.repairDueDateUtc, usageDueThreshold: due.usageDueThreshold,
