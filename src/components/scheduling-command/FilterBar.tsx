@@ -53,7 +53,7 @@ export function FilterBar({
       <div className="flex gap-1">
         {fleet.map(ac => (
           <button key={ac.tail} onClick={() => onToggleTail(ac.tail)}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${tailFilter.has(ac.tail) ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-input hover:text-foreground hover:bg-accent'}`}>
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${tailFilter.has(ac.tail) ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-accent'}`}>
             {ac.tail}
           </button>
         ))}
@@ -62,7 +62,7 @@ export function FilterBar({
       <div className="flex gap-1">
         {TRIP_TYPE_OPTIONS.map(([value, label]) => (
           <button key={value} onClick={() => onToggleTripType(value)}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${tripTypeFilter.has(value) ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-input hover:text-foreground hover:bg-accent'}`}>
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${tripTypeFilter.has(value) ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-accent'}`}>
             {label}
           </button>
         ))}

@@ -36,8 +36,8 @@ export function LegStepper({
                 onClick={() => onSelect(index)}
                 className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors ${
                   selected ? 'border-primary bg-accent text-foreground'
-                  : past ? 'border-input bg-muted text-muted-foreground'
-                  : 'border-input bg-background text-foreground hover:bg-accent'
+                  : past ? 'border-border bg-muted text-muted-foreground'
+                  : 'border-border bg-background text-foreground hover:bg-accent'
                 }`}
               >
                 <span className="inline-flex items-center gap-1">

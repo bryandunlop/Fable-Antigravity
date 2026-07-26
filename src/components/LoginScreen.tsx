@@ -40,7 +40,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             <div className="space-y-3">
               <Label htmlFor="role" className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Select Your Role</Label>
               <Select value={role} onValueChange={setRole} required>
-                <SelectTrigger className="h-14 text-base bg-muted/50 border-input hover:bg-muted transition-colors rounded-xl">
+                <SelectTrigger className="h-14 text-base bg-muted/50 border-border hover:bg-muted transition-colors rounded-xl">
                   <SelectValue placeholder="Choose your role to access the system" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-border/50 max-h-[500px]">
