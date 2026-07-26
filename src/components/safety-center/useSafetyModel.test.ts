@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hazardToItem, phaseIndexOf, ageInStage } from './useSafetyModel';
+import { buildSafetyModel, hazardToItem, phaseIndexOf, ageInStage } from './useSafetyModel';
 import { WORKFLOW_STAGES, type Hazard } from '../../contexts/HazardContext';
 
 function makeHazard(over: Partial<Hazard>): Hazard {
@@ -86,5 +86,70 @@ describe('hazardToItem — bucket routing', () => {
     const order = Object.values(WORKFLOW_STAGES);
     const i = order.indexOf(WORKFLOW_STAGES.SUBMITTED);
     expect(order[i + 1]).toBe(WORKFLOW_STAGES.SM_INVESTIGATION);
+  });
+});
+
+describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
+  const REPORTER = 'Capt. Dunlop';
+
+  it('derives every work-list row from the hazards passed in — empty in, empty out', () => {
+    const m = buildSafetyModel([]);
+    expect(m.my.move).toEqual([]);
+    expect(m.my.waiting).toEqual([]);
+    expect(m.my.done).toEqual([]);
+    expect(m.ops.move).toEqual([]);
+    expect(m.ops.track).toEqual([]);
+    expect(m.ops.done).toEqual([]);
+    expect(m.know).toEqual([]);
+  });
+
+  it("puts the reporter's own open hazard in my.waiting and the ops inbox", () => {
+    const m = buildSafetyModel([
+      makeHazard({ id: 'H-9', reportedBy: REPORTER, workflowStage: WORKFLOW_STAGES.SUBMITTED }),
+    ]);
+    expect(m.my.waiting).toHaveLength(1);
+    expect(m.my.waiting[0].sourceId).toBe('H-9');
+    expect(m.ops.move).toHaveLength(1);
+  });
+
+  it("excludes anonymous and other people's hazards from my.waiting", () => {
+    const m = buildSafetyModel([
+      makeHazard({ id: 'H-1', reportedBy: REPORTER, isAnonymous: true }),
+      makeHazard({ id: 'H-2', reportedBy: 'Someone Else' }),
+    ]);
+    expect(m.my.waiting).toEqual([]);
+  });
+
+  it("routes the reporter's closed hazard to my.done, not my.waiting", () => {
+    const m = buildSafetyModel([
+      makeHazard({ id: 'H-3', reportedBy: REPORTER, workflowStage: WORKFLOW_STAGES.CLOSED }),
+    ]);
+    expect(m.my.waiting).toEqual([]);
+    expect(m.my.done).toHaveLength(1);
+  });
+
+  it('dedups duplicate hazard ids from a corrupted persisted store', () => {
+    const m = buildSafetyModel([
+      makeHazard({ id: 'HZ-010', reportedBy: REPORTER }),
+      makeHazard({ id: 'HZ-010', reportedBy: REPORTER }),
+    ]);
+    expect(m.ops.move).toHaveLength(1);
+    expect(m.submissions.filter((s) => s.sourceId === 'HZ-010')).toHaveLength(1);
+  });
+
+  it('skips deleted hazards everywhere', () => {
+    const m = buildSafetyModel([
+      makeHazard({ id: 'H-4', reportedBy: REPORTER, isDeleted: true } as Partial<Hazard>),
+    ]);
+    expect(m.ops.move).toEqual([]);
+    expect(m.submissions.filter((s) => s.sourceId === 'H-4')).toEqual([]);
+  });
+
+  it('keeps archive/library seeds out of the work lists but present in submissions/published', () => {
+    const m = buildSafetyModel([]);
+    // History seeds are allowed in the archive and library only.
+    expect(m.submissions.length).toBeGreaterThan(0);
+    expect(m.published.length).toBeGreaterThan(0);
+    expect(m.submissions.every((s) => s.bucket === 'done')).toBe(true);
   });
 });

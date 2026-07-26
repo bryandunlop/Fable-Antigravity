@@ -183,7 +183,12 @@ export function VacationManagerReview({ requests, onUpdateRequests }: VacationMa
       confirmed: { label: 'Confirmed', variant: 'outline' }
     };
 
-    return <Badge variant={statusConfig[status].variant}>{statusConfig[status].label}</Badge>;
+    // Defensive: a status this map has not caught up with (e.g. 'withdrawn', which
+    // the crew-side lifecycle can now produce) must render oddly, not crash the
+    // whole review queue on `.variant` of undefined.
+    const config = statusConfig[status as keyof typeof statusConfig];
+    if (!config) return <Badge variant="outline">{String(status)}</Badge>;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const pendingRequests = requests.filter(r => r.status === 'pending_manager');

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -104,7 +105,11 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           </p>
           <div className="pt-4 border-t border-border/50">
             <p className="text-xs text-muted-foreground/70">
-              Created by <span className="font-medium text-foreground">Bryan Dunlop</span>
+              {/* The quiet door to /ops — the Work Ledger window (design §7). */}
+              Created by{' '}
+              <Link to="/ops" className="font-medium text-foreground transition-colors hover:text-gfo-sunrise-deep dark:hover:text-gfo-sunrise">
+                Bryan Dunlop
+              </Link>
             </p>
           </div>
         </div>

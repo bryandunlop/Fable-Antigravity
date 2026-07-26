@@ -89,7 +89,9 @@ export interface FormDef {
 }
 
 // ---- Form templates (SM management) ----
-export type FieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'number' | 'date';
+// 'checkbox' is a single yes/no toggle; 'multiselect' is a check-all-that-apply
+// group (risk factors, event types, contributing factors on the intake forms).
+export type FieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'multiselect' | 'number' | 'date';
 
 export interface FormField {
   id: string;
@@ -108,6 +110,10 @@ export interface FormTemplate {
   description: string;
   scored: boolean;      // risk-scored forms (FRAT/GRAT) vs plain
   fields: FormField[];
+  // Ordered approver role ids (D39). A filed form with a non-empty chain
+  // creates an ApprovalRequest routed through these roles in turn. Undefined /
+  // empty = no approval step. Not honored for Hazard (its own workflow governs).
+  approvalChain?: string[];
 }
 
 // ---- Published reports (everyone) ----

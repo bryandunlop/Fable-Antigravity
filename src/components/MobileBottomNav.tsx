@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { domainsForRole } from '../navigation/navConfig';
-import { mobileNavItemsForRole } from '../navigation/mobileNavItems';
+import { mobileNavItemsForRole, MAX_VISIBLE_TABS } from '../navigation/mobileNavItems';
 import { Menu, FileText } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -25,8 +25,17 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
   // Don't show on desktop
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gfo-midnight border-t border-white/10 z-40">
-      <div className="grid grid-cols-5 gap-1 px-2 py-2">
-        {navItems.slice(0, 4).map((item) => {
+      {/* MAX_VISIBLE_TABS tabs + the More cell. The cap comes from the manifest
+          module so the render-side slice and the data-side budget cannot drift —
+          when they did, roles silently lost their last tabs. */}
+      {/* Columns follow the tabs a role actually has, +1 for More. A fixed
+          MAX_VISIBLE_TABS + 1 leaves an empty cell for roles with fewer tabs
+          (document-manager has three) and pushes More off-centre. */}
+      <div
+        className="grid gap-1 px-2 py-2"
+        style={{ gridTemplateColumns: `repeat(${Math.min(navItems.length, MAX_VISIBLE_TABS) + 1}, minmax(0, 1fr))` }}
+      >
+        {navItems.slice(0, MAX_VISIBLE_TABS).map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;
 
