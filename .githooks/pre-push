@@ -1,0 +1,21 @@
+#!/bin/sh
+# Typecheck baseline gate — TL-27.
+#
+# Blocks a push that would land NEW TypeScript errors on main, the branch that
+# auto-deploys prod. `vite build` transpiles but never typechecks, so without
+# this a type regression ships silently. The ~163 pre-existing errors are
+# grandfathered in typecheck-baseline.json and burned down over time; only
+# genuinely new errors fail the gate (see scripts/typecheck-baseline.mjs).
+#
+# Scoped to main so feature-branch pushes stay fast. Enabled repo-wide via
+# `core.hooksPath=.githooks`, which the `prepare` npm script sets on install.
+# In a genuine emergency the gate can be bypassed with `git push --no-verify`.
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main)
+      echo "pre-push: typecheck baseline gate (push to main)…"
+      npm run --silent type-check:baseline || exit 1
+      ;;
+  esac
+done
+exit 0

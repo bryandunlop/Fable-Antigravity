@@ -26,7 +26,10 @@ describe('buildAuditFeed', () => {
       ['audit-due:A3', 'info'],
     ]);
     expect(items[0].module).toBe('Audit Management');
-    expect(items[0].link).toBe('/internal-audits');
+    // Was '/internal-audits' — a route that never existed, so a critical "audit
+    // expired" notification dropped the user on the 404 page. This assertion had
+    // locked the bug in; linkAudit.test.ts now guards the whole class.
+    expect(items[0].link).toBe('/safety/audits');
     expect(items[0].detail).toContain('Sarah Wilson');
   });
 

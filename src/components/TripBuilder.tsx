@@ -33,6 +33,8 @@ import { format, addMinutes } from 'date-fns';
 interface TripBuilderProps {
   tripId?: string;
   onSave: (trip: any) => void;
+  /** Save, then hand the trip on for review. Was a button with no handler. */
+  onSubmitForReview?: (trip: any) => void;
   onCancel: () => void;
   isReadOnly?: boolean;
 }
@@ -62,7 +64,7 @@ interface Passenger {
   emergencyContact?: string;
 }
 
-export default function TripBuilder({ tripId, onSave, onCancel, isReadOnly = false }: TripBuilderProps) {
+export default function TripBuilder({ tripId, onSave, onSubmitForReview, onCancel, isReadOnly = false }: TripBuilderProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isAddPassengerOpen, setIsAddPassengerOpen] = useState(false);
@@ -312,10 +314,12 @@ export default function TripBuilder({ tripId, onSave, onCancel, isReadOnly = fal
                 <Save className="w-4 h-4 mr-1" />
                 Save Trip
               </Button>
-              <Button>
-                <Send className="w-4 h-4 mr-1" />
-                Submit for Review
-              </Button>
+              {onSubmitForReview && (
+                <Button onClick={() => onSubmitForReview({ tripData, passengers, itinerary })}>
+                  <Send className="w-4 h-4 mr-1" />
+                  Submit for Review
+                </Button>
+              )}
             </>
           )}
         </div>
