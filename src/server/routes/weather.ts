@@ -19,16 +19,20 @@ const NWS_USER_AGENT =
   process.env.NWS_USER_AGENT ?? '(myGFO eTechLog, contact-unset)';
 
 /**
- * station → NWS forecast URL. The /points → grid mapping is static enough that
- * the NWS docs explicitly bless caching it; they ask that you re-check
+ * station → NWS forecast + gridpoint URLs. The /points → grid mapping is static
+ * enough that the NWS docs explicitly bless caching it; they ask that you re-check
  * periodically in case an office/grid remapping happens. This removes two
  * upstream hops (METAR-for-coords, then /points) from the hot path.
+ *
+ * Both URLs come from the same /points response (`properties.forecast` and
+ * `properties.forecastGridData`), so caching the gridpoint one alongside costs
+ * nothing (TL-23).
  *
  * NOTE: deliberately NOT used for METAR/TAF. Caching official aviation weather
  * would risk rendering a stale observation as current — that is a safety
  * decision, not a performance one. Only the grid mapping is cached here.
  */
-const gridCache = new Map<string, { forecastUrl: string; at: number }>();
+const gridCache = new Map<string, { forecastUrl: string; gridpointUrl: string | null; at: number }>();
 const GRID_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -76,9 +80,11 @@ weatherRoute.get('/', async (c) => {
  * (see D30, "Coordinate provenance"). The cost — a coords lookup — lands on
  * cache misses only.
  */
-async function resolveForecastUrl(station: string): Promise<string> {
+async function resolveForecastUrl(station: string): Promise<{ forecastUrl: string; gridpointUrl: string | null }> {
   const hit = gridCache.get(station);
-  if (hit && Date.now() - hit.at < GRID_TTL_MS) return hit.forecastUrl;
+  if (hit && Date.now() - hit.at < GRID_TTL_MS) {
+    return { forecastUrl: hit.forecastUrl, gridpointUrl: hit.gridpointUrl };
+  }
 
   const metarRes = await fetch(
     `${AWC_BASE}/metar?ids=${encodeURIComponent(station)}&format=json&hours=2`,
@@ -99,6 +105,12 @@ async function resolveForecastUrl(station: string): Promise<string> {
   if (typeof forecastUrl !== 'string') {
     throw new Error(`NWS returned no forecast URL for ${station}`);
   }
+  // Not required — a missing gridpoint URL costs the contracted condition enums
+  // and nothing else, so it degrades rather than failing the whole outlook.
+  const gridpointUrl =
+    typeof points?.properties?.forecastGridData === 'string'
+      ? points.properties.forecastGridData
+      : null;
 
   // Evict the oldest insertion once at the cap. Map preserves insertion order,
   // so the first key is the oldest.
@@ -106,12 +118,23 @@ async function resolveForecastUrl(station: string): Promise<string> {
     const oldest = gridCache.keys().next().value;
     if (oldest !== undefined) gridCache.delete(oldest);
   }
-  gridCache.set(station, { forecastUrl, at: Date.now() });
-  return forecastUrl;
+  gridCache.set(station, { forecastUrl, gridpointUrl, at: Date.now() });
+  return { forecastUrl, gridpointUrl };
 }
 
-// GET /api/weather/forecast?ids=KLUK  → raw NWS forecast JSON
+// GET /api/weather/forecast?ids=KLUK
+//   → { forecast: <raw NWS /forecast JSON>, gridpoint: { weather, skyCover } | null }
 // Parsing/normalisation happens client-side, matching the METAR/TAF route.
+//
+// Two upstream reads, not one (TL-23). /forecast supplies the named 12-hour day
+// columns, temperatures and winds; the gridpoint supplies the only CONTRACTED
+// condition fields NWS publishes (`weather` is a closed enum with no deprecation
+// flag, unlike `icon`). Only those two layers are forwarded — the full gridpoint
+// payload is ~40 layers and hundreds of KB, almost all of it unused.
+//
+// The gridpoint is fetched in parallel and is strictly optional: if it fails,
+// `gridpoint` is null and the client falls back to the legacy text/icon path. A
+// deprecated-but-working field beats no outlook.
 weatherRoute.get('/forecast', async (c) => {
   const station = (c.req.query('ids') || HOME_STATION).toUpperCase();
   if (!ICAO_RE.test(station)) {
@@ -119,18 +142,29 @@ weatherRoute.get('/forecast', async (c) => {
   }
 
   try {
-    const forecastUrl = await resolveForecastUrl(station);
-    const res = await fetch(forecastUrl, {
-      headers: { 'User-Agent': NWS_USER_AGENT, Accept: 'application/geo+json' },
-    });
+    const { forecastUrl, gridpointUrl } = await resolveForecastUrl(station);
+    const nwsHeaders = { 'User-Agent': NWS_USER_AGENT, Accept: 'application/geo+json' };
+
+    const [res, gridRes] = await Promise.all([
+      fetch(forecastUrl, { headers: nwsHeaders }),
+      gridpointUrl
+        ? fetch(gridpointUrl, { headers: nwsHeaders }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
     if (!res.ok) {
       return c.json({ error: `NWS forecast failed (${res.status})` }, 502);
+    }
+
+    let gridpoint: { weather: unknown; skyCover: unknown } | null = null;
+    if (gridRes?.ok) {
+      const props = (await gridRes.json())?.properties;
+      if (props) gridpoint = { weather: props.weather ?? null, skyCover: props.skyCover ?? null };
     }
 
     // Advisory outlook, not an observation — safe to let the edge hold it
     // briefly. Contrast with METAR/TAF above, which are never cached.
     c.header('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=300');
-    return c.json(await res.json());
+    return c.json({ forecast: await res.json(), gridpoint });
   } catch (err) {
     return c.json(
       { error: err instanceof Error ? err.message : 'Forecast fetch failed' },
