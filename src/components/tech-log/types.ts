@@ -259,6 +259,12 @@ export interface LaborEntry {
   id: string;
   workCardId: string;
   techOid: string;
+  /**
+   * TL-16: the technician's display name frozen when the entry is logged. Labor lines are printed
+   * on the work-card CRS, which live-joined `Personnel` — so a rename repainted a signed release.
+   * Nullable per the ledger rule; absent reads as absent, never backfilled by a join.
+   */
+  techName?: string;
   hours: number;
   dateUtc: string;
   description: string;
@@ -447,12 +453,71 @@ export interface Trip {
 // ── Preflight checklist → Flight Briefing (maintenance → pilot handoff) ──
 export type BriefingStatus = 'DRAFT' | 'RELEASED' | 'ACKNOWLEDGED';
 
+/** Projected state of a recurring check (see `engine/recurringChecks.ts`). */
+export type RecurringCheckState = 'CURRENT' | 'DUE_SOON' | 'EXPIRED' | 'NEVER_DONE';
+
+/**
+ * TL-16 — the disclosure snapshot persisted on a released `FlightBriefing`: the airworthiness content
+ * exactly as it was shown to the crew. Built by `engine/briefingDisclosure.ts`, whose state parameter
+ * deliberately cannot see `melItems` or `personnel` so a live join is a compile error. These shapes
+ * live here, in the leaf types module, because they are PERSISTED on a signed record — unlike
+ * `RampView`, which is a transient view model and rightly lives with its engine.
+ */
+export interface BriefingDeferralRow {
+  deferralId: string;
+  /** Frozen at signing. null on a row predating the D36 snapshot — never backfilled by a join. */
+  melSubItemNumber: string | null;
+  melTitle: string | null;
+  category: MelCategory;
+  /** Effective status: the stored status, re-read against the due boundary (expiry is derived). */
+  status: DeferralStatus;
+  isExpired: boolean;
+  restrictionText: string | null;
+  placardRequired: boolean;
+}
+
+export interface BriefingDefectRow {
+  defectId: string;
+  ataChapter: string;
+  description: string;
+}
+
+export interface BriefingCheckRow {
+  checkId: string;
+  name: string;
+  state: RecurringCheckState;
+}
+
+/**
+ * A coming-due row as disclosed. Supplied to the projection by its caller and frozen at release:
+ * `campForecast()` computes every due date as an offset from `Date.now()`, so re-deriving this at
+ * print time renders different dates on every print with no state change at all.
+ */
+export interface BriefingComingDueRow {
+  ref: string;
+  description: string;
+  dueDateUtc: string | null;
+}
+
+export interface BriefingDisclosure {
+  aircraftId: string;
+  /** From `deriveServiceability` — the same projection the fleet board reads. NOT recomputed. */
+  serviceability: Serviceability;
+  deferrals: BriefingDeferralRow[];
+  openDefects: BriefingDefectRow[];
+  /** Non-airworthiness items, kept separate so a cabin/NEF item is never printed as a defect. */
+  watchItems: BriefingDefectRow[];
+  checksDue: BriefingCheckRow[];
+  comingDue: BriefingComingDueRow[];
+  computedAtUtc: string;
+}
+
 /**
  * A maintenance "release for flight" briefing sent to the crew. Fuel + notes are captured here;
  * the preflight checklist is a separate ChecklistInstance referenced by checklistInstanceId; the
- * airworthiness content (serviceability, MELs, defects, coming-due) is derived live for display,
- * with the headline serviceability snapshotted at release. Release + acknowledge are e-signed
- * events (not a CRS — this is a dispatch briefing).
+ * airworthiness content is captured in `disclosureAtRelease` — a snapshot of what was actually
+ * disclosed, frozen at release. Release + acknowledge are e-signed events (not a CRS — this is a
+ * dispatch briefing).
  */
 export interface FlightBriefing {
   id: string;
@@ -465,8 +530,22 @@ export interface FlightBriefing {
   notes?: string;
   // snapshot at release
   serviceabilityAtRelease?: Serviceability;
+  /**
+   * TL-16: the airworthiness content as disclosed to the crew, frozen at release. Everything the
+   * readout and the printed briefing show for a non-DRAFT briefing reads from here — previously all
+   * of it was re-derived live on every render, so a printed briefing could show an item the PIC
+   * never saw while its content hash still verified. Nullable per the ledger rule that added columns
+   * must be nullable; a briefing predating this snapshot renders a stated caveat rather than
+   * silently falling back to live values. See `engine/briefingDisclosure.ts`.
+   */
+  disclosureAtRelease?: BriefingDisclosure;
   releasedAtUtc?: string;
   releaseSignatureId?: string;
+  /**
+   * TL-16: the preparer's display name, frozen when the draft is created. `preparedByOid` alone
+   * forces a live `Personnel` join at render time, and `EDIT_PERSONNEL` replaces a row in place.
+   */
+  preparedByName?: string;
   // acknowledgement
   acknowledgedByOid?: string;
   acknowledgedAtUtc?: string;
@@ -622,6 +701,14 @@ export interface FlightLog {
   blockTime: number; flightTime: number;
   landings: number; cycles: number;
   picOid: string; sicOid: string;
+  /**
+   * TL-16: crew display names frozen at signing. The oids above are the only crew identity a
+   * FlightLog carried, so the printed journey log live-joined `Personnel` — and `EDIT_PERSONNEL`
+   * replaces a row in place, so a rename repainted an already-signed journey log. The SIC is never
+   * a signer, so no frozen Signature row carries that name either. Nullable per the ledger rule;
+   * an absent snapshot reads as absent and is never backfilled by a join.
+   */
+  picName?: string; sicName?: string;
   fuelUplift?: number;
   oilUplift?: OilUplift;
   deIce?: DeIceRecord;
