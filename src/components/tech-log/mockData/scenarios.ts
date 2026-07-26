@@ -62,6 +62,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     id: 'df-n6pg', defectId: 'd-n6pg', aircraftId: 'ac-n6pg', melItemId: melAmber.id,
     governingMmelRevision: melAmber.mmelRevision, governingEffectiveDate: melAmber.effectiveDate,
     melSubItemNumber: melAmber.subItemNumber, melTitle: melAmber.title, // D36 — frozen at signing
+    melOProcedure: melAmber.oProcedure, // TL-16 — decides whether the PIC must acknowledge this item
     category: melAmber.category, dayOfDiscoveryUtc: discN6, clockStartDateUtc: clockStart,
     governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
     repairDueDateUtc: due.repairDueDateUtc, usageDueThreshold: due.usageDueThreshold,
@@ -442,6 +443,16 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
         .sort((a, b) => (a.dueDateUtc ?? '').localeCompare(b.dueDateUtc ?? ''))
         .slice(0, 3)
         .map(i => ({ ref: i.ref, description: i.description, dueDateUtc: i.dueDateUtc ?? null })),
+      // TL-16: the checklist is the body of a signed printed document, so it is frozen too.
+      (() => {
+        const inst = checklistInstances.find(i => i.id === briefings[0].checklistInstanceId);
+        const t = inst && SEED_CHECKLIST_TEMPLATES.find(x => x.id === inst.templateId && x.version === inst.templateVersion);
+        if (!inst || !t) return [];
+        return t.sections.flatMap(sec => sec.items).map(def => {
+          const e = inst.entries.find(en => en.itemDefId === def.id);
+          return { label: def.label, done: e?.state === 'DONE' || e?.state === 'NA' };
+        });
+      })(),
     ) ?? undefined;
     briefings[0].preparedByName = tech.displayName;
   }

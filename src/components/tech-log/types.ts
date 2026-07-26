@@ -107,6 +107,16 @@ export interface Deferral {
   // rows predating this snapshot read null rather than silently falling back to a join.
   melSubItemNumber?: string;
   melTitle?: string;
+  /**
+   * TL-16: the (O) operational procedure, frozen with the rest of the MEL identity. This one is not
+   * cosmetic — `deferralsRequiringAck` decides which items the PIC must tick before accepting, and
+   * it used to test the LIVE `MelItem.oProcedure`. Editing the MelItem could therefore make a
+   * mandatory crew acknowledgement appear *or vanish* on an already-signed briefing, invisibly:
+   * removing an (O) procedure silently dropped a checkbox the PIC had been required to tick, and the
+   * disclosure digest could not see it because the change was outside the disclosure. Proven by an
+   * adversarial verifier, 2026-07-26. Nullable per the ledger rule.
+   */
+  melOProcedure?: string;
   category: MelCategory;
   dayOfDiscoveryUtc: string;
   clockStartDateUtc: string;
@@ -473,7 +483,17 @@ export interface BriefingDeferralRow {
   status: DeferralStatus;
   isExpired: boolean;
   restrictionText: string | null;
+  /**
+   * The frozen (O) procedure. Carried because it is what makes this item a MANDATORY crew
+   * acknowledgement — an adversarial verifier showed the digest could not see it change.
+   */
+  melOProcedure: string | null;
   placardRequired: boolean;
+  placardInstalled: boolean;
+  mProcedureRequired: boolean;
+  extensionUsed: boolean;
+  /** In the disclosure so a due date moving between release and acceptance is detectable. */
+  repairDueDateUtc: string | null;
 }
 
 export interface BriefingDefectRow {
@@ -499,6 +519,17 @@ export interface BriefingComingDueRow {
   dueDateUtc: string | null;
 }
 
+/**
+ * A preflight-checklist line as disclosed. Frozen because it is the BODY of a signed, printed
+ * regulatory document: it was previously re-resolved from the (mutable) `ChecklistInstance` on every
+ * render, so flipping an entry back to PENDING made an already-acknowledged briefing print unticked.
+ * The template was always correctly version-pinned — the instance was the hole.
+ */
+export interface BriefingChecklistRow {
+  label: string;
+  done: boolean;
+}
+
 export interface BriefingDisclosure {
   aircraftId: string;
   /** From `deriveServiceability` — the same projection the fleet board reads. NOT recomputed. */
@@ -509,6 +540,7 @@ export interface BriefingDisclosure {
   watchItems: BriefingDefectRow[];
   checksDue: BriefingCheckRow[];
   comingDue: BriefingComingDueRow[];
+  checklist: BriefingChecklistRow[];
   computedAtUtc: string;
 }
 

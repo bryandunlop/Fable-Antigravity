@@ -11,7 +11,7 @@ import { INTENT } from '../constants';
 import { latestPublishedTemplate, isReleaseGated, buildInitialEntries } from '../engine/checklist';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { newId } from '../util/id';
-import type { Aircraft, BriefingComingDueRow, BriefingDisclosure, FlightBriefing, Signature } from '../types';
+import type { Aircraft, BriefingChecklistRow, BriefingComingDueRow, BriefingDisclosure, FlightBriefing, Signature } from '../types';
 import { SignCeremonyDialog } from './SignCeremonyDialog';
 import { ChecklistRunner } from './checklist/ChecklistRunner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -24,11 +24,6 @@ import { Textarea } from '../../ui/textarea';
 /** Latest briefing for an aircraft (most recent by createdAtUtc). */
 export function latestBriefing(briefings: FlightBriefing[], aircraftId: string): FlightBriefing | undefined {
   return briefings.filter(b => b.aircraftId === aircraftId).sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0];
-}
-
-interface ChecklistLine {
-  label: string;
-  done: boolean;
 }
 
 const melLabel = (r: { melSubItemNumber: string | null }) => r.melSubItemNumber ?? 'not recorded';
@@ -45,11 +40,10 @@ function printBriefing(input: {
   b: FlightBriefing;
   aircraft: Aircraft;
   disclosure: BriefingDisclosure | null;
-  checklistLines: ChecklistLine[];
   signatures: Signature[];
   unsnapshotted: boolean;
 }): void {
-  const { b, aircraft, disclosure, checklistLines, signatures, unsnapshotted } = input;
+  const { b, aircraft, disclosure, signatures, unsnapshotted } = input;
   const list = <T,>(rows: T[], fmt: (r: T) => string) => (rows.length ? rows.map(fmt).join('\n') : 'None');
   printSignedRecord({
     docTitle: 'Flight Briefing', recordType: 'Briefing', reference: b.id,
@@ -67,7 +61,7 @@ function printBriefing(input: {
       { heading: 'Watch items — tracked, non-airworthiness', body: list(disclosure?.watchItems ?? [], d => `ATA ${d.ataChapter} — ${d.description}`) },
       { heading: 'Recurring checks due', body: list(disclosure?.checksDue ?? [], c => `${c.name} — ${c.state}`) },
       { heading: 'Coming due (CAMP)', body: list(disclosure?.comingDue ?? [], i => `${i.description} — ${i.dueDateUtc ? new Date(i.dueDateUtc).toLocaleDateString() : ''}`) },
-      { heading: 'Preflight checklist', body: checklistLines.length ? checklistLines.map(l => `${l.done ? '☑' : '☐'} ${l.label}`).join('\n') : '—' },
+      { heading: 'Preflight checklist', body: disclosure?.checklist.length ? disclosure.checklist.map(l => `${l.done ? '☑' : '☐'} ${l.label}`).join('\n') : '—' },
     ],
     signatures: signatures.map(s => ({ role: s.signerRole, name: s.signerName, cert: s.certNumber, hash: s.mockContentHash, signedAtUtc: s.signedAtUtc, amr: s.amr.join('+') })),
     footnote: unsnapshotted
@@ -101,9 +95,26 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
     .slice(0, 3)
     .map(i => ({ ref: i.ref, description: i.description, dueDateUtc: i.dueDateUtc ?? null }));
 
+  /**
+   * The checklist as it stands NOW. Resolved here and folded INTO the disclosure so it is frozen at
+   * release with everything else: an adversarial verifier proved (2026-07-26) that reading it live
+   * let an already-acknowledged briefing print an item unticked, because `EDIT_CHECKLIST_INSTANCE`
+   * replaces the whole instance row. The template was always correctly version-pinned; the mutable
+   * instance was the hole.
+   */
+  const liveChecklistLines = (b: FlightBriefing | undefined): BriefingChecklistRow[] => {
+    const inst = b && state.checklistInstances.find(i => i.id === b.checklistInstanceId);
+    const t = inst && state.checklistTemplates.find(x => x.id === inst.templateId && x.version === inst.templateVersion);
+    if (!inst || !t) return [];
+    return t.sections.flatMap(sec => sec.items).map(def => {
+      const e = inst.entries.find(en => en.itemDefId === def.id);
+      return { label: def.label, done: e?.state === 'DONE' || e?.state === 'NA' };
+    });
+  };
+
   // What the aircraft looks like RIGHT NOW. Used to build the snapshot at release, to fill the DRAFT
   // view, and — after release — only to detect that the released briefing no longer matches reality.
-  const liveDisclosure = buildBriefingDisclosure(aircraft.id, state, now, comingDueRows);
+  const liveDisclosure = buildBriefingDisclosure(aircraft.id, state, now, comingDueRows, liveChecklistLines(briefing));
 
   const frozen = briefing?.disclosureAtRelease ?? null;
   const isDraft = !briefing || briefing.status === 'DRAFT';
@@ -126,9 +137,17 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   const baseGate = canAcceptDispatch(aircraft.id, state, now);
   const acceptGate = !baseGate.ok
     ? baseGate
-    : isStale
-      ? { ok: false, reason: "The aircraft's records have changed since this briefing was released. Maintenance must release an updated briefing before you accept it." }
-      : { ok: true as const, reason: undefined };
+    : unsnapshotted
+      // An adversarial verifier proved (2026-07-26) that the legacy fallback was the worst hole in
+      // this panel: a RELEASED briefing with no snapshot rendered LIVE content on the PIC's signing
+      // surface, `isStale` was structurally incapable of firing (it requires `frozen`), and the only
+      // caveat sat inside a readout collapsed behind "Full briefing". So the PIC could sign a
+      // document whose disclosed content nobody can attest to, with no warning anywhere they look.
+      // If we cannot say what was disclosed, it cannot be accepted.
+      ? { ok: false, reason: 'This briefing was released before its content was recorded, so what it disclosed cannot be attested. Maintenance must release a new briefing before you accept it.' }
+      : isStale
+        ? { ok: false, reason: "The aircraft's records have changed since this briefing was released. Maintenance must release an updated briefing before you accept it." }
+        : { ok: true as const, reason: undefined };
 
   const template = latestPublishedTemplate(state.checklistTemplates, aircraft.type, 'PREFLIGHT');
   const instance = state.checklistInstances.find(i => i.id === briefing?.checklistInstanceId);
@@ -136,23 +155,11 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   // which may have drifted (a new version can be published while this briefing sits in DRAFT).
   const instanceTemplate = instance && state.checklistTemplates.find(t => t.id === instance.templateId && t.version === instance.templateVersion);
 
-  /** Resolved once here so the readout and the print path never touch `state` themselves. */
-  const checklistLinesFor = (b: FlightBriefing): ChecklistLine[] => {
-    const inst = state.checklistInstances.find(i => i.id === b.checklistInstanceId);
-    const t = inst && state.checklistTemplates.find(x => x.id === inst.templateId && x.version === inst.templateVersion);
-    if (!inst || !t) return [];
-    return t.sections.flatMap(s => s.items).map(def => {
-      const e = inst.entries.find(en => en.itemDefId === def.id);
-      return { label: def.label, done: e?.state === 'DONE' || e?.state === 'NA' };
-    });
-  };
-
   /** Signer identity always from the frozen Signature row — never a live Personnel join (DM-3/IN-4). */
   const sigById = (id?: string) => (id ? state.signatures.find(s => s.id === id) : undefined);
   const doPrint = (b: FlightBriefing) => printBriefing({
     b, aircraft,
     disclosure: b.status === 'DRAFT' ? liveDisclosure : (b.disclosureAtRelease ?? liveDisclosure),
-    checklistLines: checklistLinesFor(b),
     signatures: [sigById(b.releaseSignatureId), sigById(b.ackSignatureId)].filter((s): s is Signature => Boolean(s)),
     unsnapshotted: b.status !== 'DRAFT' && !b.disclosureAtRelease,
   });
@@ -218,7 +225,6 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   const readoutProps = (b: FlightBriefing) => ({
     b,
     disclosure: b.status === 'DRAFT' ? liveDisclosure : (b.disclosureAtRelease ?? liveDisclosure),
-    checklistLines: checklistLinesFor(b),
     acknowledgedByName: sigById(b.ackSignatureId)?.signerName ?? null,
     unsnapshotted: b.status !== 'DRAFT' && !b.disclosureAtRelease,
   });
@@ -312,6 +318,16 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
         {briefing.releasedAtUtc && <span className="ml-auto text-xs text-muted-foreground">released {new Date(briefing.releasedAtUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
       </div>
 
+      {/* Both caveats sit HERE, on the accept sheet itself — above the verdict, the MEL checkboxes
+          and the sign button. The readout's own banner is not enough: on this surface the readout is
+          collapsed behind "Full briefing" by default, so a warning that lives only inside it is a
+          warning the PIC never sees before signing. */}
+      {unsnapshotted && (
+        <div className="flex items-start gap-2 rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--gfo-warning,#F1B434)' }}>
+          <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--gfo-warning,#F1B434)' }} />
+          <span>This briefing was released before myGFO recorded what it disclosed, so the items below are <strong>current values, not a record of what you were shown</strong>. It cannot be accepted — ask maintenance for a new briefing.</span>
+        </div>
+      )}
       {isStale && (
         <div className="flex items-start gap-2 rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--gfo-warning,#F1B434)' }}>
           <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--gfo-warning,#F1B434)' }} />
@@ -385,10 +401,9 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
  * previously nested inside `BriefingPanel` and read `deferrals`/`openDefects`/`watchItems`/`comingDue`
  * straight out of live state on every render.
  */
-function BriefingReadout({ b, disclosure, checklistLines, acknowledgedByName, unsnapshotted, onPrint }: {
+function BriefingReadout({ b, disclosure, acknowledgedByName, unsnapshotted, onPrint }: {
   b: FlightBriefing;
   disclosure: BriefingDisclosure | null;
-  checklistLines: ChecklistLine[];
   acknowledgedByName: string | null;
   unsnapshotted: boolean;
   onPrint?: () => void;
@@ -453,9 +468,9 @@ function BriefingReadout({ b, disclosure, checklistLines, acknowledgedByName, un
         <div>
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preflight checklist</div>
           <div className="grid grid-cols-1 gap-0.5 md:grid-cols-2">
-            {checklistLines.length === 0
+            {!disclosure?.checklist.length
               ? <div className="text-muted-foreground">—</div>
-              : checklistLines.map(l => <div key={l.label} className="text-xs">{l.done ? '☑' : '☐'} {l.label}</div>)}
+              : disclosure.checklist.map(l => <div key={l.label} className="text-xs">{l.done ? '☑' : '☐'} {l.label}</div>)}
           </div>
         </div>
 

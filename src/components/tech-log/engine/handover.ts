@@ -5,18 +5,29 @@ import { deriveServiceability } from './serviceability';
 /**
  * The ACTIVE deferrals the PIC must acknowledge item-by-item before accepting (design §A):
  * those carrying an (O) operational procedure, a restriction, or a placard the crew must observe.
+ *
+ * TL-16 — NOTE THE STATE PARAMETER. `melItems` is deliberately absent, so a live foreign-key join is
+ * a compile error. This function does not merely *render* a signed record: it decides which
+ * acknowledgements the PIC is REQUIRED to make, and its result is written into the signed briefing
+ * (`acknowledgedDeferralIds`) and into the acknowledgement signature's hashed payload. It used to
+ * test the live `MelItem.oProcedure`, so an edit to a MelItem could make a mandatory crew
+ * acknowledgement appear — or, far worse, silently VANISH — on an already-signed briefing, while the
+ * disclosure digest stayed identical because the change lay outside the disclosure. An adversarial
+ * verifier proved both directions on 2026-07-26. The (O) procedure is now frozen onto the Deferral
+ * at signing, alongside the rest of the MEL identity.
+ *
+ * A row predating that snapshot reads `melOProcedure === undefined`, treated as "no (O) procedure" —
+ * the restriction and placard limbs still apply, and a briefing whose disclosure was never
+ * snapshotted is separately barred from acceptance by the gate in `BriefingPanel`.
  */
 export function deferralsRequiringAck(
   aircraftId: string,
-  state: Pick<TechLogState, 'deferrals' | 'melItems'>,
+  state: Pick<TechLogState, 'deferrals'>,
   _asOfUtc: string,
 ): Deferral[] {
   return currentRows(state.deferrals)
     .filter(d => d.aircraftId === aircraftId && d.status === 'ACTIVE')
-    .filter(d => {
-      const mel = state.melItems.find(m => m.id === d.melItemId);
-      return Boolean(d.restrictionText || d.placardRequired || mel?.oProcedure);
-    });
+    .filter(d => Boolean(d.restrictionText || d.placardRequired || d.melOProcedure));
 }
 
 /** Dispatch acceptance gate (design §A): a RED aircraft cannot be accepted. */

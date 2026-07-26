@@ -38,8 +38,8 @@
  */
 
 import type {
-  BriefingComingDueRow, BriefingDefectRow, BriefingDeferralRow, BriefingDisclosure,
-  Defect, Deferral, DeferralStatus, TechLogState,
+  BriefingChecklistRow, BriefingComingDueRow, BriefingDefectRow, BriefingDeferralRow,
+  BriefingDisclosure, Defect, Deferral, DeferralStatus, TechLogState,
 } from '../types';
 import { currentRows } from './supersede';
 import { isDeferralExpired } from './pl25';
@@ -50,7 +50,8 @@ import { projectCheck } from './recurringChecks';
 // The persisted disclosure shapes live in `../types` because they are stored on a signed
 // FlightBriefing row; re-exported here so callers can import the projection and its result together.
 export type {
-  BriefingCheckRow, BriefingComingDueRow, BriefingDefectRow, BriefingDeferralRow, BriefingDisclosure,
+  BriefingCheckRow, BriefingChecklistRow, BriefingComingDueRow, BriefingDefectRow, BriefingDeferralRow,
+  BriefingDisclosure,
 } from '../types';
 
 /** Everything the disclosure may see — note the absence of `melItems` and `personnel`. */
@@ -70,6 +71,7 @@ export function buildBriefingDisclosure(
   state: BriefingDisclosureState,
   asOfUtc: string,
   comingDue: BriefingComingDueRow[] = [],
+  checklist: BriefingChecklistRow[] = [],
 ): BriefingDisclosure | null {
   const ac = state.aircraft.find(a => a.id === aircraftId);
   // No aircraft means no disclosure. Returning an empty all-clear object here would print
@@ -102,7 +104,12 @@ export function buildBriefingDisclosure(
       status,
       isExpired: status === 'EXPIRED',
       restrictionText: d.restrictionText ?? null,
+      melOProcedure: d.melOProcedure ?? null,
       placardRequired: d.placardRequired,
+      placardInstalled: d.placardInstalled ?? false,
+      mProcedureRequired: d.mProcedureRequired,
+      extensionUsed: d.extensionUsed,
+      repairDueDateUtc: d.repairDueDateUtc ?? null,
     }))
     .sort((a, b) => Number(b.isExpired) - Number(a.isExpired) || a.deferralId.localeCompare(b.deferralId));
 
@@ -125,6 +132,7 @@ export function buildBriefingDisclosure(
     watchItems: watchItemsFor(state.defects, aircraftId).map(defectRow),
     checksDue,
     comingDue,
+    checklist,
     computedAtUtc: asOfUtc,
   };
 }
@@ -154,9 +162,11 @@ export function disclosureDigest(d: BriefingDisclosure): string {
   return JSON.stringify([
     d.aircraftId,
     d.serviceability,
-    byId(d.deferrals, r => r.deferralId).map(r => [r.deferralId, r.melSubItemNumber, r.melTitle, r.category, r.status, r.isExpired, r.restrictionText, r.placardRequired]),
+    byId(d.deferrals, r => r.deferralId).map(r => [r.deferralId, r.melSubItemNumber, r.melTitle, r.melOProcedure, r.category, r.status, r.isExpired, r.restrictionText, r.placardRequired, r.placardInstalled, r.mProcedureRequired, r.extensionUsed, r.repairDueDateUtc]),
     byId(d.openDefects, r => r.defectId).map(r => [r.defectId, r.ataChapter, r.description]),
     byId(d.watchItems, r => r.defectId).map(r => [r.defectId, r.ataChapter, r.description]),
-    byId(d.checksDue, r => r.checkId).map(r => [r.checkId, r.state]),
+    byId(d.checksDue, r => r.checkId).map(r => [r.checkId, r.name, r.state]),
+    // Checklist order IS content — it is the printed sequence, so it is hashed as given.
+    d.checklist.map(r => [r.label, r.done]),
   ]);
 }

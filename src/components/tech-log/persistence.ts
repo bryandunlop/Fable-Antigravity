@@ -42,7 +42,7 @@ export type { StorageLike };
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-26-v15'; // TL-16 signed-record snapshots — reseed so briefings carry disclosureAtRelease and flight logs / labor entries carry frozen crew + technician names
+export const DATA_VERSION = '2026-07-26-v16'; // TL-16 adversarial-pass fixes — reseed so deferrals carry melOProcedure and briefings carry the frozen checklist
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a

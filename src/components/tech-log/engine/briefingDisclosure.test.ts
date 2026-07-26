@@ -3,6 +3,7 @@ import {
   buildBriefingDisclosure as build,
   disclosureDigest,
   type BriefingDisclosureState,
+  type BriefingChecklistRow,
   type BriefingComingDueRow,
 } from './briefingDisclosure';
 import type { Aircraft, Defect, Deferral, MelItem, RecurringCheck } from '../types';
@@ -13,12 +14,14 @@ const buildBriefingDisclosure = (
   s: Partial<BriefingDisclosureState> & Pick<BriefingDisclosureState, 'aircraft'>,
   now: string,
   comingDue?: BriefingComingDueRow[],
+  checklist?: BriefingChecklistRow[],
 ) =>
   build(
     aircraftId,
     { deferrals: [], defects: [], recurringChecks: [], recurringAccomplishments: [], ...s },
     now,
     comingDue,
+    checklist,
   );
 
 const NOW = '2026-07-10T12:00:00Z';
@@ -187,6 +190,24 @@ describe('buildBriefingDisclosure — what the PIC was actually shown (TL-16)', 
     expect(d.comingDue).toEqual(rows);
   });
 
+  it('carries the preflight checklist it was given — it is the body of a signed printed document', () => {
+    // An adversarial verifier proved (2026-07-26) that reading the checklist live let an
+    // ACKNOWLEDGED briefing print an item unticked: EDIT_CHECKLIST_INSTANCE replaces the whole
+    // instance row. The template was always version-pinned; the mutable instance was the hole.
+    const lines = [{ label: 'Remove protective covers', done: true }, { label: 'Tire pressure', done: false }];
+    const d = buildBriefingDisclosure('ac-1', { aircraft: [AC] }, NOW, [], lines)!;
+    expect(d.checklist).toEqual(lines);
+  });
+
+  it('freezes the (O) procedure, which is what makes an item a mandatory crew acknowledgement', () => {
+    const d = buildBriefingDisclosure(
+      'ac-1',
+      { aircraft: [AC], deferrals: [deferral({ melOProcedure: 'Pull CB 3-J14 before each flight' })], defects: [defect()] },
+      NOW,
+    )!;
+    expect(d.deferrals[0].melOProcedure).toBe('Pull CB 3-J14 before each flight');
+  });
+
   it('omits a cleared deferral — history is the audit ledger\'s job', () => {
     const d = buildBriefingDisclosure(
       'ac-1',
@@ -285,6 +306,36 @@ describe('disclosureDigest — detecting that a released briefing no longer matc
     }, NOW)!;
     expect(a.openDefects.map(r => r.defectId)).not.toEqual(b.openDefects.map(r => r.defectId));
     expect(disclosureDigest(a)).toBe(disclosureDigest(b));
+  });
+
+  // Blind spots an adversarial verifier proved on 2026-07-26: each of these changed the aircraft's
+  // real state while the digest stayed identical, so the briefing never went stale.
+  it.each([
+    ['the (O) procedure that makes an item a mandatory acknowledgement', { melOProcedure: 'Pull CB' }],
+    ['the repair due date moving', { repairDueDateUtc: '2026-07-11T03:59:59Z' }],
+    ['the placard being removed', { placardInstalled: false }],
+    ['an (M) procedure becoming required', { mProcedureRequired: true }],
+    ['an extension being taken', { extensionUsed: true }],
+  ])('changes when %s', (_label, over) => {
+    const before = base();
+    const after = buildBriefingDisclosure(
+      'ac-1',
+      { aircraft: [AC], deferrals: [deferral(over)], defects: [defect()] },
+      NOW,
+    )!;
+    expect(disclosureDigest(after)).not.toBe(disclosureDigest(before));
+  });
+
+  it('changes when a checklist item is un-ticked after release', () => {
+    const withList = (done: boolean) =>
+      buildBriefingDisclosure('ac-1', { aircraft: [AC] }, NOW, [], [{ label: 'Tire pressure', done }])!;
+    expect(disclosureDigest(withList(false))).not.toBe(disclosureDigest(withList(true)));
+  });
+
+  it('changes when a recurring check is renamed — the printed briefing shows the name', () => {
+    const named = (name: string) =>
+      buildBriefingDisclosure('ac-1', { aircraft: [AC], recurringChecks: [{ ...CHECK, name }], recurringAccomplishments: [] }, NOW)!;
+    expect(disclosureDigest(named('Emergency equipment check'))).not.toBe(disclosureDigest(named('RENAMED')));
   });
 
   it('changes when a deferral expires between release and acknowledgement', () => {
