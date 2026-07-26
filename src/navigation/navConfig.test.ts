@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NAV_ENTRIES, entriesForRoles, matchEntry, domainsForRole, FRONT_DOORS } from './navConfig';
-import { readRouteTable, resolvesToRoute } from './routeAudit';
+import { readAppRoutePaths, readRouteTable, resolvesToRoute } from './routeAudit';
 
 // One hardened route-table reader for every link audit. This file used to carry
 // its own copy of the regex, which did not strip JSX comments — so a route
@@ -32,7 +32,10 @@ const KNOWN_UNREGISTERED = [
   '/pilot/elb',
   '/grat/form-builder',
   '/grat/form-fields',
-  '/safety/classic', // finding #14's original instance — enumerated at last
+  // Removed 2026-07-26 when this audit moved onto the comment-stripping reader:
+  // '/safety/classic' no longer exists in App.tsx at all, and '/restaurant-database'
+  // and '/flight-family' are both inside {/* … */}. The old raw regex counted all
+  // three as live routes, which is what kept them looking like justified debt.
   '/safety/waivers',
   '/safety/hazards',
   '/safety/hazards/:id',
@@ -44,14 +47,12 @@ const KNOWN_UNREGISTERED = [
   '/safety/manager-dashboard',
   '/safety/hazard-workflow/:id',
   '/safety/preflight-workflow/:id',
-  '/restaurant-database',
   '/inventory-v2',
   '/inventory-v2/inspection/review',
   '/inventory-v2/commissary/location/:locationId',
   '/inventory-v2/commissary/item/:itemId',
   '/scheduling-workspace', // redirect stub
   '/tax-compliance',
-  '/flight-family',
   '/booking-profile',
   '/trip-builder/:tripId?',
   '/itinerary-builder',
@@ -66,11 +67,12 @@ const KNOWN_UNREGISTERED = [
 ];
 
 describe('route audit — every App.tsx route is manifest-covered or enumerated debt', () => {
-  const appRoutes = [...new Set(
-    [...appSrc.matchAll(/path="([^"]+)"/g)]
-      .map((m) => m[1])
-      .filter((p) => p !== '*' && p !== '/*' && p !== '/login'),
-  )];
+  // Sourced from the shared reader, not a second raw regex over App.tsx. This block
+  // originally carried its own `appSrc.matchAll(/path="…"/)`; that copy did not strip
+  // JSX comments, so a route commented out behind {/* … */} still counted as live here
+  // — and three such routes were sitting in KNOWN_UNREGISTERED as a result.
+  const appRoutes = readAppRoutePaths()
+    .filter((p) => p !== '*' && p !== '/*' && p !== '/login');
   const manifestPaths = NAV_ENTRIES.map((e) => e.path);
   const norm = (p: string) => p.replace(/\/\*$/, '').replace(/\/:.*$/, '');
   const covered = (p: string) => {
