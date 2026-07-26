@@ -349,6 +349,11 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
       {/* View Bulletin Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-900">
+          {/* Outside the conditional: `isViewDialogOpen` and `selectedBulletin` are
+              independent, so the dialog can mount with no bulletin and Radix asserts a
+              Title at mount. The letterhead h2 inside is the masthead, not the document
+              name, so this is sr-only rather than reusing it (LG-30). */}
+          <DialogTitle className="sr-only">{selectedBulletin?.title ?? 'Bulletin'}</DialogTitle>
           {selectedBulletin && (() => {
             const mustAck = selectedBulletin.requireAcknowledgment && isTargetRole(selectedBulletin, userRole);
             const acked = isAcknowledged(selectedBulletin, acks, currentUserId);

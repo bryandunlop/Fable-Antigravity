@@ -2,8 +2,18 @@
  * Weather condition tokens — the internal contract between a weather *source*
  * and a weather *icon*.
  *
- * Why this module exists at all: neither NWS field we can reach is a condition
- * key we're allowed to lean on.
+ * PRIMARY SOURCE (since TL-23, 2026-07-26): the **gridpoint** forecast,
+ * `GET /gridpoints/{wfo}/{x},{y}` → `properties.weather.values[]` for
+ * precipitation/obscuration and `properties.skyCover.values[]` for the sky. That
+ * is the only condition surface NWS publishes with an actual contract: no
+ * `deprecated` flag, and every sub-field a closed enum (23 `weather`, 16
+ * `coverage`, 4 `intensity`, 8 `attributes` — re-verified against
+ * api.weather.gov/openapi.json on 2026-07-26). See conditionFromGridpoint below.
+ *
+ * The two functions further down are the LEGACY FALLBACK, kept because the
+ * gridpoint fetch can fail independently of /forecast and an outlook with no
+ * glyph is worse than an outlook with a best-effort one. Neither field they read
+ * is a condition key we're allowed to lean on:
  *
  *   - `icon` (the URL the 7-day strip used to hotlink) is formally
  *     `deprecated: true` in NWS's own OpenAPI spec, along with the whole
@@ -19,11 +29,9 @@
  *
  * The response is to keep the guesswork behind ONE small pure boundary. Every
  * consumer downstream — icons, tests, mock data — speaks WeatherCondition, and
- * nothing else in the app knows an NWS slug exists. When the gridpoint
- * `weather` enum migration lands (the only properly enumerated, non-deprecated
- * condition field NWS publishes: /gridpoints/{wfo}/{x},{y} →
- * properties.weather.values[].weather, 23 documented values), it replaces the
- * bodies here and nothing else moves. See vault ref-nws-icon-deprecation.
+ * nothing else in the app knows an NWS slug exists. That boundary is what let
+ * TL-23 land as an added function plus a changed precedence, touching no icon and
+ * no component. See vault ref-nws-icon-deprecation.
  *
  * NOTE ON SCOPE: this drives a *planning outlook* explicitly labelled "not for
  * flight planning" (Q14 / D30), plus a decorative icon beside the METAR. It is
@@ -52,6 +60,146 @@ const SEVERITY: Record<WeatherCondition, number> = {
 
 const worst = (a: WeatherCondition, b: WeatherCondition): WeatherCondition =>
   (SEVERITY[b] > SEVERITY[a] ? b : a);
+
+/**
+ * Wind thresholds at which a *featureless* sky becomes a wind story.
+ *
+ * Display heuristic only — these numbers carry NO regulatory or dispatch
+ * meaning and are not derived from any limitation. They exist to decide which
+ * of two pictures to draw.
+ */
+const WIND_ICON_SUSTAINED_KT = 20;
+const WIND_ICON_GUST_KT = 30;
+
+/* ────────────────────────────────────────────────────────────────────────────
+   THE CONTRACTED PATH — gridpoint `weather` + `skyCover` (TL-23)
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The 23 `weather` values from `Gridpoint.properties.weather.values[].value[]`,
+ * verbatim from api.weather.gov/openapi.json (re-read 2026-07-26), mapped onto
+ * our nine. Unlike the icon slugs below this list IS a contract — a closed enum
+ * in the spec, on a field with no `deprecated` flag.
+ *
+ * Four calls worth reading twice, all of them made to match what
+ * conditionFromMetar already does for the equivalent METAR code, so the strip and
+ * the observation beside it never disagree about the same phenomenon:
+ *
+ *  - `hail` → sleet, not storm. Matches METAR GR/GS → sleet. Hail without
+ *    thunder is the icon's problem, not a severity judgement; the `tornadoes` /
+ *    `large_hail` / `dry_thunderstorms` *attributes* do escalate to storm.
+ *  - `ice_crystals` → sleet. Matches METAR IC → sleet.
+ *  - `freezing_fog` / `ice_fog` → fog, not sleet. Nothing is falling. This is the
+ *    exact bug D35 fixed on the METAR side (a bare /FZ/ read FZFG as sleet).
+ *  - `volcanic_ash` → fog. Matches METAR VA → fog: an obscuration.
+ *
+ * `frost` is deliberately ABSENT. It is a surface phenomenon with no sky story,
+ * and mapping it to anything would override a real skyCover reading — a frosty
+ * overcast morning would render clear. Unmapped means "no opinion", which is
+ * correct, and is also how an unrecognised future enum value behaves.
+ */
+const GRIDPOINT_WEATHER_TO_CONDITION: Record<string, WeatherCondition> = {
+  // Convective
+  thunderstorms: 'storm', water_spouts: 'storm',
+  // Liquid
+  drizzle: 'rain', rain: 'rain', rain_showers: 'rain',
+  // Frozen / mixed / icing
+  snow: 'snow', snow_showers: 'snow', blowing_snow: 'snow',
+  sleet: 'sleet', freezing_drizzle: 'sleet', freezing_rain: 'sleet',
+  hail: 'sleet', ice_crystals: 'sleet', freezing_spray: 'sleet',
+  // Obscuration
+  fog: 'fog', freezing_fog: 'fog', ice_fog: 'fog', haze: 'fog', smoke: 'fog',
+  blowing_dust: 'fog', blowing_sand: 'fog', volcanic_ash: 'fog',
+  // (frost: intentionally unmapped — see the doc comment)
+};
+
+/**
+ * The `attributes` values that escalate a period to `storm` regardless of the
+ * `weather` value they sit beside. Closed enum of 8; the other five
+ * (`damaging_wind`, `flooding`, `gusty_wind`, `heavy_rain`, `small_hail`)
+ * intensify something already reported and change no glyph.
+ */
+const STORM_ATTRIBUTES = new Set(['tornadoes', 'large_hail', 'dry_thunderstorms']);
+
+/**
+ * One entry of `properties.weather.values[].value[]`. Field names are the spec's.
+ *
+ * `coverage` and `intensity` are declared but deliberately NOT read, which is a
+ * decision rather than an oversight. Reading `coverage` would mean deciding that
+ * a `slight_chance` of thunderstorms is not worth a storm glyph — and both the
+ * legacy path this replaces (`/thunder/` matches "Slight Chance Showers And
+ * Thunderstorms" → storm) and this module's own stated principle (understating
+ * the weather is the dangerous direction to be wrong in) say it is. Filtering on
+ * probability is a product call about what an outlook glyph MEANS, not a
+ * mechanical part of the enum migration, so it stays out of TL-23. If it is ever
+ * taken, note that the strip already prints precipitation probability as its own
+ * numeric row — the glyph is not the only place a reader learns the odds.
+ */
+export interface GridpointWeatherEntry {
+  coverage?: string | null;
+  weather?: string | null;
+  intensity?: string | null;
+  attributes?: string[] | null;
+}
+
+/**
+ * Sky-cover percent → condition, at the octa boundaries the METAR table already
+ * uses: FEW is ≤2/8 (25%) and reads clear, SCT is 3-4/8 (≤50%) and reads partly,
+ * BKN/OVC is more than half the sky and reads cloudy. Same thresholds, so
+ * skyCover and a cloud group describing the same sky agree.
+ *
+ * `skyCover` is a generic `GridpointQuantitativeValueLayer` (uom
+ * `wmoUnit:percent`, confirmed live 2026-07-26) rather than a named schema
+ * property, so it carries no `deprecated` flag but also no individual contract.
+ * That is still strictly better than parsing an icon URL NWS has deprecated.
+ */
+export function conditionFromSkyCoverPercent(percent: number): WeatherCondition {
+  if (percent <= 25) return 'clear';
+  if (percent <= 50) return 'partly';
+  return 'cloudy';
+}
+
+/**
+ * Resolves one composed gridpoint period to a condition.
+ *
+ * Precedence mirrors conditionFromMetar exactly: present weather beats sky (rain
+ * under an overcast is a rain report), and among concurrent weather entries the
+ * worse wins — gridpoint really does return `thunderstorms` and `rain_showers` in
+ * the same interval, which is the whole reason /forecast's single glyph had to be
+ * composed for us before.
+ *
+ * Wind is the last resort, and only over an otherwise featureless sky, for the
+ * same reason the wind_* icon slugs are read that way: the strip already prints
+ * wind in knots as its own row, so spending the glyph on it too would say one
+ * thing twice and the sky not at all.
+ *
+ * Returns null — never a guess — when there is no weather entry we recognise AND
+ * no sky-cover reading. The caller decides what an absent condition means.
+ */
+export function conditionFromGridpoint(input: {
+  weather?: GridpointWeatherEntry[] | null;
+  skyCoverPercent?: number | null;
+  windKt?: number | null;
+}): WeatherCondition | null {
+  const fromWeather = (input.weather ?? [])
+    .map((e): WeatherCondition | undefined => {
+      if ((e.attributes ?? []).some(a => STORM_ATTRIBUTES.has(a))) return 'storm';
+      return e.weather ? GRIDPOINT_WEATHER_TO_CONDITION[e.weather] : undefined;
+    })
+    .filter((c): c is WeatherCondition => c !== undefined);
+
+  if (fromWeather.length) return fromWeather.reduce(worst);
+
+  const cover = input.skyCoverPercent;
+  if (cover === null || cover === undefined || !Number.isFinite(cover)) return null;
+
+  const sky = conditionFromSkyCoverPercent(cover);
+  return sky === 'clear' && (input.windKt ?? 0) >= WIND_ICON_SUSTAINED_KT ? 'wind' : sky;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   THE LEGACY FALLBACK — deprecated `icon` + free-text `shortForecast`
+   ──────────────────────────────────────────────────────────────────────────── */
 
 /**
  * The complete 35-slug vocabulary published by GET https://api.weather.gov/icons
@@ -164,20 +312,32 @@ export function conditionFromShortForecast(text: string): WeatherCondition | nul
 /**
  * Resolves one forecast period to a condition.
  *
- * Text first, icon second — inverted from what you'd expect, for two reasons.
- * The strip's tooltip shows the TEXT, so keying off the text guarantees the
- * glyph and the words agree; keying off the icon lets them contradict each other
- * on screen, which live NWS data does. And `icon` is the deprecated field of the
- * two, so leading with it would put the removable one on the critical path.
+ * `condition` first (TL-23): parseForecast composes it from the gridpoint enums
+ * whenever the gridpoint layers came back, and that is the only contracted input
+ * of the three. It stays optional because the gridpoint fetch fails independently
+ * of /forecast, and because the demo seed has no gridpoint behind it.
+ *
+ * Then text, then icon — text first because `icon` is the deprecated one of the
+ * two, so leading with it would put the removable field on the critical path.
+ *
+ * ⚠ The glyph and the tooltip can now disagree, and that is the cost of the
+ * migration. Text-first used to be justified partly by the tooltip showing
+ * `shortForecast`, so keying off the text kept picture and words in step. Putting
+ * the contracted field on top gives that up: NWS's own prose and its own gridpoint
+ * contradict each other in live data (the "Partly Sunny" period whose icon slug
+ * read `bkn`, sampled 2026-07-26), and this now believes the contract. The right
+ * follow-up is to show the DERIVED condition's label next to the NWS text so a
+ * reader sees both, rather than to reintroduce the free-text regex as arbiter.
  *
  * Falls back to `cloudy`, never `clear`: when we don't know, we don't get to
  * imply good weather. Same instinct as parseTempC returning null rather than a
  * 0 that renders as a hard freeze.
  */
 export function conditionFromForecastPeriod(
-  period: { icon?: string; shortForecast?: string },
+  period: { condition?: WeatherCondition | null; icon?: string; shortForecast?: string },
 ): WeatherCondition {
   return (
+    period.condition ??
     conditionFromShortForecast(period.shortForecast ?? '') ??
     conditionFromNwsIconUrl(period.icon ?? '') ??
     'cloudy'
@@ -209,16 +369,6 @@ const COVER_TO_CONDITION: Record<string, WeatherCondition> = {
   SCT: 'partly',
   BKN: 'cloudy', OVC: 'cloudy', VV: 'cloudy',
 };
-
-/**
- * Wind thresholds at which a *featureless* sky becomes a wind story.
- *
- * Display heuristic only — these numbers carry NO regulatory or dispatch
- * meaning and are not derived from any limitation. They exist to decide which
- * of two pictures to draw.
- */
-const WIND_ICON_SUSTAINED_KT = 20;
-const WIND_ICON_GUST_KT = 30;
 
 /**
  * Resolves an observation to a condition.

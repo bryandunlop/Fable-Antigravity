@@ -36,7 +36,7 @@ const chipClass = (active: boolean) =>
   `px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${
     active
       ? 'bg-foreground text-background border-foreground'
-      : 'bg-background text-muted-foreground border-input hover:text-foreground hover:bg-accent'
+      : 'bg-background text-muted-foreground border-border hover:text-foreground hover:bg-accent'
   }`;
 
 export default function MyFlightsPanel({ onOpen }: { onOpen: (trip: TripRecord) => void }) {
@@ -109,7 +109,7 @@ export default function MyFlightsPanel({ onOpen }: { onOpen: (trip: TripRecord) 
               <span className="text-[10px] font-medium uppercase tracking-wide rounded border px-1.5 py-0.5 text-muted-foreground">{badge}</span>
             )}
             {needsPrepById[t.id] && (
-              <span className="text-[10px] font-medium uppercase tracking-wide rounded-full border border-input bg-background px-2 py-0.5 text-foreground">
+              <span className="text-[10px] font-medium uppercase tracking-wide rounded-full border border-border bg-background px-2 py-0.5 text-foreground">
                 Needs prep
               </span>
             )}
