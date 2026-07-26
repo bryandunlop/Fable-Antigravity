@@ -38,6 +38,22 @@ function readNested(mount: string, file: string): string[] {
     .map((p) => (p === '/' ? mount : `${mount}/${p.replace(/^\//, '')}`));
 }
 
+/**
+ * The route paths declared in App.tsx itself, exactly as spelled there (wildcards
+ * keep their `/*`, params keep their `:name`), with JSX-commented routes removed.
+ *
+ * This is the input the REVERSE audit needs — "which App.tsx routes exist that the
+ * manifest doesn't know about" — and it is deliberately NOT `readRouteTable()`:
+ * that one drops the `/*` suffix and expands nested routers, so a nested child
+ * would arrive looking like a new top-level route the manifest must cover. Same
+ * single reader either way; the comment-strip is the part that must not be
+ * re-implemented per caller.
+ */
+export function readAppRoutePaths(appPath = 'src/App.tsx'): string[] {
+  const live = readFileSync(appPath, 'utf8').replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '');
+  return [...new Set([...live.matchAll(/path="([^"]+)"/g)].map((m) => m[1]))];
+}
+
 export function readRouteTable(appPath = 'src/App.tsx'): RouteTable {
   const src = readFileSync(appPath, 'utf8');
   // Route elements inside a JSX comment are not registered — strip them first, or a

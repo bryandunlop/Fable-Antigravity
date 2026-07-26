@@ -1,0 +1,418 @@
+{
+  "generated_at": "2026-07-15T20:55:35.840Z",
+  "rows": [
+    {
+      "id": "LG-1",
+      "title": "RII ATA-chapter list (operator-defined required inspection items)",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-06-30",
+      "captured_from": "",
+      "blocked_on": "dom",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q3"
+      ],
+      "body": "Migrated 2026-07-15 (Work Ledger Slice 2) from the Questions register. Content and rationale\nlive in [[Q3]]; this row is queue state only. `captured_on` approximates the question's origin\n(the 2026-06 critical-review era) so the waiting-age is honest."
+    },
+    {
+      "id": "LG-10",
+      "title": "Signed flight briefing must render what the PIC signed, not live content",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-14",
+      "captured_from": "",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "TL-16"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2). The TL-16 thread named in the design §12 migration set.\nContent and severity live in [[TL-16]] (high). Note: other open gaps deliberately do NOT get\nledger rows — the Gaps register already carries them; this one is mirrored only because the\napproved design names it. Slice 3's board snapshot should union open gaps rather than\nmirroring more rows."
+    },
+    {
+      "id": "LG-11",
+      "title": "Standing regulatory & vendor intelligence agent",
+      "status": "parked",
+      "source": "session",
+      "captured_on": "2026-07-13",
+      "captured_from": "Standing regulatory & vendor intelligence agent (the 'crazy' research option — monitors AC/CFR/CAMP/library changes and flags decisions resting on changed sources). Revisit as a possible product feature.",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "myGFO Loop — System Design"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2) from `Parking-Lot.md` — its single item, and the ledger's first\nparked row. The crazy option from the loop-design three-option ritual; revisit as a possible\nproduct feature."
+    },
+    {
+      "id": "LG-12",
+      "title": "Decide whether the ledger subsumes handoffs' unfinished/next_actions",
+      "status": "captured",
+      "source": "session",
+      "captured_on": "2026-07-14",
+      "captured_from": "What happens to Handoffs/? Nine sibling notes for one day is itself a symptom.",
+      "blocked_on": "bryan",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "myGFO Work Ledger — System Design"
+      ],
+      "body": "Work Ledger design §14 Q3, deliberately left open at approval: the ledger may subsume most of a\nhandoff's `unfinished`/`next_actions`, leaving handoffs as narrative only. Bryan decides; do not\ndelete anything in Slices 1–3 meanwhile."
+    },
+    {
+      "id": "LG-13",
+      "title": "Decide whether /ops belongs in the demo or a separate tiny app",
+      "status": "parked",
+      "source": "session",
+      "captured_on": "2026-07-14",
+      "captured_from": "",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "myGFO Work Ledger — System Design"
+      ],
+      "body": "Work Ledger design §14 Q2. Parked: revisit only if the DOM ever self-serves the demo —\n/ops is registered hidden + admin-only and off the DOM's narrative path (design §7)."
+    },
+    {
+      "id": "LG-14",
+      "title": "Work Ledger Slice 3 — the /ops window",
+      "status": "in-flight",
+      "source": "session",
+      "captured_on": "2026-07-15",
+      "captured_from": "",
+      "blocked_on": "nobody",
+      "branch": "feat/ops-board",
+      "session": "Outstanding-tasks-review-slice-3",
+      "landed_by": "",
+      "refs": [],
+      "body": ""
+    },
+    {
+      "id": "LG-15",
+      "title": "Way for the pilot to display a deferral to a regulator or inspector, with export/print as the secondary path",
+      "status": "captured",
+      "source": "session",
+      "captured_on": "2026-07-15",
+      "captured_from": "",
+      "blocked_on": "",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [],
+      "body": ""
+    },
+    {
+      "id": "LG-2",
+      "title": "Supersede authorization model (who may correct whose record)",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-06-30",
+      "captured_from": "",
+      "blocked_on": "chief-pilot",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q5"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2). Content in [[Q5]]. DOM's 2026-07-09 \"anyone can edit but note it\"\nis NOT ratified and conflicts with the SE-1 NEVER rule; the Chief Pilot must rule for\npilot-signed records. `captured_on` approximate (2026-06 review era)."
+    },
+    {
+      "id": "LG-3",
+      "title": "Cutover source & migration method",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-06-30",
+      "captured_from": "",
+      "blocked_on": "dom",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q6"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2). Content in [[Q6]] — blocks schema freeze\n(record_origin / migration_batch_id / back-entry). `captured_on` approximate (2026-06 review era)."
+    },
+    {
+      "id": "LG-4",
+      "title": "Retention durations & AC currency",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-06-30",
+      "captured_from": "",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q8"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2). Content in [[Q8]]. Owner is dev (us): confirm 14 CFR 91.417(b)\nperiods against final AC 43-9D / AC 91-417 before WORM lock — gated research, not a human ruling,\nhence `blocked_on: nobody`. `captured_on` approximate (2026-06 review era)."
+    },
+    {
+      "id": "LG-5",
+      "title": "Maintenance check flight (14 CFR 91.407(b))",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-03",
+      "captured_from": "",
+      "blocked_on": "dom",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q10"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2). Content in [[Q10]] — from the 2026-07-03 gap audit (G1);\nblocks schema freeze (check_flight_required + CHECK_FLIGHT marker)."
+    },
+    {
+      "id": "LG-6",
+      "title": "CAMP work-order & publications API depth",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-04",
+      "captured_from": "",
+      "blocked_on": "camp",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q11"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2). Content in [[Q11]]. Sequencing UNBLOCKED 2026-07-09 (D27):\nthe §2 open subset is ready to send to the CAMP rep — sandbox only. Bryan routed this to CAMP\nvia the D22/D27 decisions. `captured_on` approximate."
+    },
+    {
+      "id": "LG-7",
+      "title": "Non-aviation 7-day NWS forecast adjacent to METAR/TAF?",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-14",
+      "captured_from": "",
+      "blocked_on": "dom",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Q14",
+        "D30"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2). Content in [[Q14]] — raised during the D30 weather-outlook work,\n2026-07-14. DOM to rule on adjacency to official products."
+    },
+    {
+      "id": "LG-8",
+      "title": "Fable demo polish — elevation & variants pass",
+      "status": "landed",
+      "source": "session",
+      "captured_on": "2026-07-14",
+      "captured_from": "",
+      "blocked_on": "nobody",
+      "branch": "fix/elevation-and-variants",
+      "session": "Fable-polish",
+      "landed_by": "98f58614714dc880e52b16abd5aa80b35b359d5b",
+      "refs": [],
+      "body": "Migrated 2026-07-15 (Slice 2) as the one in-flight branch; landed the same hour. `landed_by`\nset by hand-with-proof rather than by reconcile.mjs: the Fable-polish session merged AND swept\nthe ref before the first reconcile ran, so the reconciler (correctly) warned instead of\nguessing. Evidence: merge commit 98f58614 \"Merge fix/elevation-and-variants — overlays sit\nhighest, the outline button becomes visible, dev scaffolding leaves the pilot screen (D33)\"\nis on origin/main. This is the reconcile-before-sweep ordering lesson, observed live on day one."
+    },
+    {
+      "id": "LG-9",
+      "title": "Watchlist–Scheduling board review debt (findings 6–31 on merged prod, #22 next)",
+      "status": "triaged",
+      "source": "review",
+      "captured_on": "2026-07-08",
+      "captured_from": "",
+      "blocked_on": "nobody",
+      "branch": "",
+      "session": "",
+      "landed_by": "",
+      "refs": [
+        "Watchlist-Scheduling Board Code Review"
+      ],
+      "body": "Migrated 2026-07-15 (Slice 2). The named backlog thread from the Work Ledger design §12:\n26 findings on MERGED prod code, re-verified still open 2026-07-14 (8 worse); #7 fixed (D32),\n#22 next; labels are SC-2/SC-3. Content in [[Watchlist-Scheduling Board Code Review]]."
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q10",
+      "title": "Maintenance check flight (14 CFR 91.407(b))",
+      "owner": "DOM",
+      "status": "open"
+    },
+    {
+      "id": "Q11",
+      "title": "CAMP work-order & publications API depth",
+      "owner": "CAMP",
+      "status": "open"
+    },
+    {
+      "id": "Q14",
+      "title": "May a non-aviation 7-day NWS forecast sit adjacent to METAR/TAF on the dashboard?",
+      "owner": "DOM",
+      "status": "open"
+    },
+    {
+      "id": "Q15",
+      "title": "Does a plain Part 91 operator need (or can obtain) an OpSpec A025 equivalent to authorize electronic recordkeeping? AC 120-78B routes authorization solely through A025",
+      "owner": "dev",
+      "status": "open"
+    },
+    {
+      "id": "Q3",
+      "title": "RII ATA-chapter list (operator-defined required inspection items)",
+      "owner": "DOM",
+      "status": "open"
+    },
+    {
+      "id": "Q5",
+      "title": "Supersede authorization model (who may correct whose record)",
+      "owner": "Chief Pilot",
+      "status": "blocked"
+    },
+    {
+      "id": "Q6",
+      "title": "Cutover source & migration method",
+      "owner": "DOM",
+      "status": "open"
+    },
+    {
+      "id": "Q8",
+      "title": "Retention durations & AC currency",
+      "owner": "dev",
+      "status": "open"
+    }
+  ],
+  "gaps": [
+    {
+      "id": "TL-12",
+      "title": "NWS_USER_AGENT is a placeholder — must be a real contact before the outlook ships to prod",
+      "severity": "high",
+      "status": "open",
+      "area": "weather/config"
+    },
+    {
+      "id": "TL-15",
+      "title": "The API cannot run locally — no /api proxy, and DB middleware blocks DB-free routes",
+      "severity": "high",
+      "status": "open",
+      "area": "tooling/dev-env"
+    },
+    {
+      "id": "TL-16",
+      "title": "A signed flight briefing renders live defect/deferral/watch content, not what the PIC actually signed",
+      "severity": "high",
+      "status": "open",
+      "area": "signing / briefing"
+    },
+    {
+      "id": "TL-18",
+      "title": "Production API is broken — every route 500s (DATABASE_URL unset) and nested /api paths never route (404)",
+      "severity": "high",
+      "status": "open",
+      "area": "infra/prod"
+    },
+    {
+      "id": "TL-21",
+      "title": "MEL clock (D24/TL-2) rests on unconfirmed evidence — primary FAA PL-25 text never read",
+      "severity": "high",
+      "status": "open",
+      "area": "mel-clock / evidence"
+    },
+    {
+      "id": "TL-24",
+      "title": "CFR_MATRIX cites 91.213(d)(3) for placard gating — (d) is the no-MEL path and cannot apply to a turbine G650ER/G500",
+      "severity": "high",
+      "status": "open",
+      "area": "tech-log / compliance traceability"
+    },
+    {
+      "id": "TL-5",
+      "title": "D24 production ledger columns + canonical_payload snapshot (before schema freeze)",
+      "severity": "high",
+      "status": "open",
+      "area": "schema / ledger"
+    },
+    {
+      "id": "TL-11",
+      "title": "vitest excludes .tsx — component behaviour, incl. the Q14 advisory label, cannot be tested",
+      "severity": "med",
+      "status": "open",
+      "area": "testing"
+    },
+    {
+      "id": "TL-14",
+      "title": "Live code stamps a hardcoded IP into AuditEntry, and the deleted signature component's data contract survives in MaintenanceContext",
+      "severity": "med",
+      "status": "open",
+      "area": "signing / audit trail"
+    },
+    {
+      "id": "TL-20",
+      "title": "The --input token is invisible as a border in BOTH themes, because it is overloaded as a fill",
+      "severity": "med",
+      "status": "open",
+      "area": "UI / design system"
+    },
+    {
+      "id": "TL-22",
+      "title": "validate_vault.py does not know reference `class` exists — a missing or misspelled class still PASSes",
+      "severity": "med",
+      "status": "open",
+      "area": "loop-substrate / validator"
+    },
+    {
+      "id": "TL-25",
+      "title": "myGFO holds neither the D195 MEL documents nor the LOA — AC 91-67A §5.4 requires the MEL onboard; 8900.1 ¶6-95D says MEL+LOA must be on board",
+      "severity": "med",
+      "status": "open",
+      "area": "tech-log / documents (cross-module)"
+    },
+    {
+      "id": "TL-3",
+      "title": "Cat-A MEL \"next due\" computation",
+      "severity": "med",
+      "status": "open",
+      "area": "MEL clock"
+    },
+    {
+      "id": "TL-9",
+      "title": "CLAUDE.md documents a Next.js stack; the repo is actually Vite + Hono",
+      "severity": "med",
+      "status": "open",
+      "area": "tooling/docs"
+    },
+    {
+      "id": "TL-10",
+      "title": "type-check script exists but main carries 163 TS errors — nothing gates it",
+      "severity": "low",
+      "status": "open",
+      "area": "tooling/ci"
+    },
+    {
+      "id": "TL-19",
+      "title": "Work-ledger allocator/sweep — two edges found while dogfooding slice 1",
+      "severity": "low",
+      "status": "open",
+      "area": "work-ledger tooling"
+    },
+    {
+      "id": "TL-23",
+      "title": "Weather condition mapping keys off NWS's deprecated icon field + free-text regex; gridpoint weather enum is the contracted replacement",
+      "severity": "low",
+      "status": "open",
+      "area": "weather/integration"
+    },
+    {
+      "id": "TL-7",
+      "title": "Pre-existing setState-in-render warning in the Planners page",
+      "severity": "low",
+      "status": "open",
+      "area": "maintenance planning"
+    }
+  ]
+}

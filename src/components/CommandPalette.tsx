@@ -105,7 +105,7 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
     }
   }, [isOpen, hasInventoryAccess, inventory]);
 
-  const visibleEntries = entriesForRoles(userRole, additionalRoles).filter(e => e.searchable !== false);
+  const visibleEntries = entriesForRoles(userRole, additionalRoles).filter(e => e.searchable !== false && !e.hidden);
   const searchTerm = query.toLowerCase().trim();
 
   // Recent sections — only when not searching. Stored paths are exact manifest
