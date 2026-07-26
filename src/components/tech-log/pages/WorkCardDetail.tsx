@@ -345,7 +345,7 @@ export default function WorkCardDetail() {
                 </span>
                 {s.riiRequired && (
                   s.riiSignatureId
-                    ? <Badge variant="secondary" className="shrink-0 self-center text-[10px]"><CheckCircle2 className="mr-1 h-3 w-3" />RII {nameOf(s.riiInspectorOid ?? '')}</Badge>
+                    ? <Badge variant="secondary" className="shrink-0 self-center text-[10px]"><CheckCircle2 className="mr-1 h-3 w-3" />RII {state.signatures.find(sig => sig.id === s.riiSignatureId)?.signerName ?? 'not recorded'}</Badge>
                     : !completed && (s.done
                         ? <Button size="sm" variant="outline" className="h-7 shrink-0" disabled={!isMaint || !inspector} onClick={() => beginStepRii(s.id)}>RII sign</Button>
                         : <span className="shrink-0 self-center text-[10px] text-muted-foreground">complete step</span>)

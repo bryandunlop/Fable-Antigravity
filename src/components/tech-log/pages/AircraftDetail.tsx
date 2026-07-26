@@ -203,7 +203,6 @@ export default function AircraftDetail() {
   const sv = deriveServiceability(ac.id, state, now);
   const airframe = { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles };
   const nameOf = (oid: string) => state.personnel.find(p => p.oid === oid)?.displayName ?? oid;
-  const melOf = (id: string) => state.melItems.find(m => m.id === id);
   const sigById = (id?: string) => (id ? state.signatures.find(s => s.id === id) : undefined);
 
   const custody = deriveCustody(ac.id, state, now);
@@ -376,7 +375,7 @@ export default function AircraftDetail() {
             </div>
             <span className="text-xs text-muted-foreground">{RULE_TEXT[sv.governingRule]}</span>
             {acceptedBriefing?.acknowledgedByOid && (
-              <span className="text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {nameOf(acceptedBriefing.acknowledgedByOid)} · {acceptedBriefing.acknowledgedAtUtc ? new Date(acceptedBriefing.acknowledgedAtUtc).toLocaleString() : ''}</span>
+              <span className="text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {sigById(acceptedBriefing.ackSignatureId)?.signerName ?? 'not recorded'} · {acceptedBriefing.acknowledgedAtUtc ? new Date(acceptedBriefing.acknowledgedAtUtc).toLocaleString() : ''}</span>
             )}
           </div>
           <div className="text-xs text-muted-foreground">as of {new Date(now).toLocaleString()}</div>
@@ -590,18 +589,17 @@ export default function AircraftDetail() {
           {deferrals.map(d => {
             const expired = isDeferralExpired(d, now, airframe);
             const effective = expired ? 'EXPIRED' : d.status;
-            const mel = melOf(d.melItemId);
             const ms = d.repairDueDateUtc ? new Date(d.repairDueDateUtc).getTime() - Date.now() : null;
             return (
               <Card key={d.id}>
                 <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline">MEL {mel?.subItemNumber ?? '—'}</Badge>
+                      <Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge>
                       <Badge variant="outline">Cat {d.category}</Badge>
                       <Badge variant={effective === 'ACTIVE' ? 'secondary' : 'destructive'}>{effective}</Badge>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{mel?.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'}</p>
                     {d.repairDueDateUtc && (
                       <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="h-3.5 w-3.5" /> due {formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)} · {ms != null && ms > 0 ? `${Math.floor(ms / 86400000)}d left` : 'overdue'}{d.extensionUsed && ' · extended'}
@@ -686,7 +684,7 @@ export default function AircraftDetail() {
                   <div><div className="text-xs text-muted-foreground">Sector</div><div className="font-medium">#{f.sectorSequence}</div></div>
                   <div><div className="text-xs text-muted-foreground">Date</div><div>{f.flightDateUtc.slice(0, 10)}</div></div>
                   <div><div className="text-xs text-muted-foreground">Block / Flight</div><div>{f.blockTime}h / {f.flightTime}h</div></div>
-                  <div><div className="text-xs text-muted-foreground">Crew</div><div className="truncate">{nameOf(f.picOid)} / {nameOf(f.sicOid)}</div></div>
+                  <div><div className="text-xs text-muted-foreground">Crew</div><div className="truncate">{f.picName ?? 'not recorded'} / {f.sicName ?? 'not recorded'}</div></div>
                   <div><div className="text-xs text-muted-foreground">Trip</div><div>{trip ? trip.tripNumber : '—'}</div></div>
                 </CardContent>
               </Card>

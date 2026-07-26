@@ -32,7 +32,7 @@ import Integration from './pages/Integration';
  * mount its own, which meant navigating to /fir or /pilot-workspace (which did the same) unmounted
  * the whole store and re-hydrated it from localStorage — see TL-26.
  */
-export default function TechLogRoutes({ userRole: _userRole }: { userRole?: string }) {
+export default function TechLogRoutes() {
   return (
       <Routes>
         <Route path="/" element={<PilotHome />} />

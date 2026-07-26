@@ -144,12 +144,19 @@ export function buildBriefingDisclosure(
  *   - a check's remaining days/usage, for the same drift reason — its `state` is carried instead.
  */
 export function disclosureDigest(d: BriefingDisclosure): string {
+  // Every list is sorted by id before hashing. Row ORDER is a presentation concern, not content:
+  // `currentRows` appends superseding rows at the end, so correcting an unrelated defect reorders
+  // `openDefects` without changing a word of it. Digesting that order would mark the briefing stale
+  // for a non-change — and a divergence warning that cries wolf is worse than none, because the crew
+  // learns to click past it. Ordering must never be the reason a briefing is re-released.
+  const byId = <T,>(rows: T[], key: (r: T) => string): T[] =>
+    rows.slice().sort((a, b) => key(a).localeCompare(key(b)));
   return JSON.stringify([
     d.aircraftId,
     d.serviceability,
-    d.deferrals.map(r => [r.deferralId, r.melSubItemNumber, r.melTitle, r.category, r.status, r.isExpired, r.restrictionText, r.placardRequired]),
-    d.openDefects.map(r => [r.defectId, r.ataChapter, r.description]),
-    d.watchItems.map(r => [r.defectId, r.ataChapter, r.description]),
-    d.checksDue.map(r => [r.checkId, r.state]),
+    byId(d.deferrals, r => r.deferralId).map(r => [r.deferralId, r.melSubItemNumber, r.melTitle, r.category, r.status, r.isExpired, r.restrictionText, r.placardRequired]),
+    byId(d.openDefects, r => r.defectId).map(r => [r.defectId, r.ataChapter, r.description]),
+    byId(d.watchItems, r => r.defectId).map(r => [r.defectId, r.ataChapter, r.description]),
+    byId(d.checksDue, r => r.checkId).map(r => [r.checkId, r.state]),
   ]);
 }

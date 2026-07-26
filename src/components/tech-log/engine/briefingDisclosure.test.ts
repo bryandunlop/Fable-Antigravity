@@ -272,6 +272,21 @@ describe('disclosureDigest — detecting that a released briefing no longer matc
     expect(disclosureDigest(after)).not.toBe(disclosureDigest(before));
   });
 
+  it('ignores row ORDER — a supersede elsewhere must not cry wolf', () => {
+    // `currentRows` appends superseding rows at the end, so correcting an unrelated defect reorders
+    // the list without changing its content. A warning that fires on a non-change gets clicked past.
+    const a = buildBriefingDisclosure('ac-1', {
+      aircraft: [AC],
+      defects: [defect({ id: 'dfx-a', status: 'OPEN' }), defect({ id: 'dfx-b', status: 'OPEN' })],
+    }, NOW)!;
+    const b = buildBriefingDisclosure('ac-1', {
+      aircraft: [AC],
+      defects: [defect({ id: 'dfx-b', status: 'OPEN' }), defect({ id: 'dfx-a', status: 'OPEN' })],
+    }, NOW)!;
+    expect(a.openDefects.map(r => r.defectId)).not.toEqual(b.openDefects.map(r => r.defectId));
+    expect(disclosureDigest(a)).toBe(disclosureDigest(b));
+  });
+
   it('changes when a deferral expires between release and acknowledgement', () => {
     const before = base();
     const after = buildBriefingDisclosure(
