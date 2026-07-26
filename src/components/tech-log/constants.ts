@@ -49,9 +49,17 @@ export const INTENT = {
 export const CFR_MATRIX: { capability: string; reg: string }[] = [
   { capability: 'Journey/flight log (OOOI, hours, cycles)', reg: '14 CFR 91.417(b); PIC airworthiness 91.7(b)/91.403(a)' },
   { capability: 'Defect / snag capture', reg: '14 CFR 91.7 (airworthy condition); 91.403' },
-  { capability: 'MEL deferral + PL-25 clock', reg: '14 CFR 91.213(a)/(d); FAA PL-25' },
+  { capability: 'MEL deferral + PL-25 clock', reg: '14 CFR 91.213(a); FAA MMEL PL-25 Rev 23' },
   { capability: 'Provisional-MEL block (G800)', reg: '14 CFR 91.213(a) — no operation under an unapproved MEL' },
-  { capability: '(M)/placard gating; two sign-offs', reg: '14 CFR 91.213(d)(3) — O/M procedures & placarding' },
+  // NOT 91.213(d)(3). Para (d) is the no-MEL path: its own opening clause switches it off
+  // for operators flying under an approved MEL, and (d)(1) lists only rotorcraft,
+  // non-turbine airplanes, gliders, LTA and powered parachutes — never a turbine G650ER
+  // or G500. §§ 91.405(c), 91.405(d) and 43.11(b) are dead ends for the same reason: each
+  // is expressly scoped to items "permitted to be inoperative by/under § 91.213(d)(2)".
+  // There is no placard requirement in the regulation text reaching an approved-MEL
+  // deferral; the obligation arrives through the MEL/LOA itself. (TL-24;
+  // evidence: ref-91213-inoperative-equipment-structure)
+  { capability: '(M)/placard gating; two sign-offs', reg: 'AC 91-67A §5.3/§5.4 + MEL/LOA, binding via 14 CFR 91.213(a)(5)' },
   { capability: 'Maintenance release / CRS (A&P cert)', reg: '14 CFR 91.407(a); record content 91.417(a)(1)(i–iii)' },
   { capability: 'RII dual sign-off', reg: 'Operator RII program (91K/§121.369(b) discipline)' },
   { capability: 'Append-only immutability + supersede', reg: 'AC 43-9 / AC 120-78B (unalterable; original retained)' },
