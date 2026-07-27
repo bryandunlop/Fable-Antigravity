@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { AirportIndexEntry, AirportRecord } from '../../scripts/build-airport-bundle';
+import type { AirportIndexEntry, AirportRecord } from './types';
 
 /**
  * Integration test over the generated reference bundle (D45, D48).

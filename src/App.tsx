@@ -58,6 +58,7 @@ import PublicPassengerForm from './components/PublicPassengerForm';
 import OpsBoardPage from './components/ops/OpsBoardPage';
 import AirportEvaluation from './components/AirportEvaluation';
 import AirportEvaluations from './components/AirportEvaluations';
+import AirportInformation from './components/airport-info/AirportInformation';
 import FuelLoadRequest from './components/FuelLoadRequest';
 import UnifiedTasksActionItems from './components/UnifiedTasksActionItems';
 import AOGManagement from './components/AOGManagement';
@@ -269,7 +270,10 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/airport-evaluations" element={<AirportEvaluations />} />
+                                <Route path="/airport-evaluations" element={<AirportInformation />} />
+                                {/* The previous mock-backed directory, kept reachable while the
+                                    editorial screens it owns are rewired onto real state (D46). */}
+                                <Route path="/airport-evaluations/legacy" element={<AirportEvaluations />} />
                                 <Route path="/currency-dashboard" element={<PilotCurrency userRole={userRole} pilotId={userRole === 'pilot' ? 'P001' : undefined} />} />
                                 <Route path="/fuel-load-request" element={<FuelLoadRequest />} />
 

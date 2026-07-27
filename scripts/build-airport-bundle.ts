@@ -29,12 +29,13 @@ import path from 'node:path';
 
 import { parse } from 'csv-parse';
 
-import { resolveRunwayPavement, type RunwayPavement } from '../src/airport/nasr/pavement';
-import {
-  isPublishableRunway,
-  parseDeclaredDistances,
-  type DeclaredDistances,
-} from '../src/airport/nasr/runway';
+import { resolveRunwayPavement } from '../src/airport/nasr/pavement';
+import { isPublishableRunway, parseDeclaredDistances } from '../src/airport/nasr/runway';
+import type {
+  AirportIndexEntry,
+  AirportRecord,
+  RunwayRecord,
+} from '../src/airport/types';
 
 type Row = Record<string, string>;
 
@@ -81,87 +82,6 @@ function str(value: string | undefined): string | null {
 function list(value: string | undefined): string[] {
   const trimmed = (value ?? '').trim();
   return trimmed ? trimmed.split(',').map((part) => part.trim()).filter(Boolean) : [];
-}
-
-export interface RunwayEndRecord {
-  endId: string;
-  trueAlignmentDeg: number | null;
-  elevationFt: number | null;
-  displacedThresholdFt: number | null;
-  gradientPct: number | null;
-  approachLightingCode: string | null;
-  ilsType: string | null;
-  markingTypeCode: string | null;
-  /** Null when the FAA did not publish them — never derived from runway length. */
-  declaredDistances: DeclaredDistances | null;
-}
-
-export interface RunwayRecord {
-  runwayId: string;
-  lengthFt: number | null;
-  widthFt: number | null;
-  surfaceTypeCode: string | null;
-  condition: string | null;
-  treatmentCode: string | null;
-  lightingCode: string | null;
-  pavement: RunwayPavement;
-  ends: RunwayEndRecord[];
-}
-
-export interface AirportRecord {
-  id: string;
-  icaoId: string | null;
-  siteNo: string;
-  siteTypeCode: string;
-  name: string;
-  city: string | null;
-  stateCode: string | null;
-  countyName: string | null;
-  countryCode: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  elevationFt: number | null;
-  magneticVariation: string | null;
-  trafficPatternAltitudeFt: number | null;
-  status: string | null;
-  ownershipTypeCode: string | null;
-  facilityUseCode: string | null;
-  towerTypeCode: string | null;
-  artccId: string | null;
-  notamId: string | null;
-  notamDFlag: boolean;
-  customsAvailable: boolean;
-  landingRightsAvailable: boolean;
-  landingFee: boolean;
-  far139TypeCode: string | null;
-  fuelTypes: string[];
-  otherServices: string[];
-  contractFuelAvailable: string | null;
-  airportLightingSchedule: string | null;
-  beaconLightingSchedule: string | null;
-  lastInspection: string | null;
-  runways: RunwayRecord[];
-  attendance: { month: string; day: string; hour: string }[];
-  contacts: {
-    title: string | null;
-    name: string | null;
-    phone: string | null;
-    city: string | null;
-    state: string | null;
-  }[];
-  /** The NASR cycle this record came from — the honest answer to "how current is this". */
-  effectiveDate: string;
-}
-
-export interface AirportIndexEntry {
-  id: string;
-  icaoId: string | null;
-  name: string;
-  city: string | null;
-  stateCode: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  longestRunwayFt: number;
 }
 
 function buildRunways(runwayRows: Row[], endRows: Row[], remarkRows: Row[]): RunwayRecord[] {
