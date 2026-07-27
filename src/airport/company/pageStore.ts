@@ -133,11 +133,33 @@ function copyVersion(version: CompanyAirportPageVersion): CompanyAirportPageVers
   return { ...version, content: freezeContent(version.content) };
 }
 
-export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore {
-  private readonly versions: CompanyAirportPageVersion[] = [];
-  private readonly acknowledgements: AirportReviewAcknowledgement[] = [];
+/** Everything the store holds — what a persistence layer round-trips. */
+export interface CompanyAirportPageSnapshot {
+  versions: CompanyAirportPageVersion[];
+  acknowledgements: AirportReviewAcknowledgement[];
+}
 
-  constructor(private readonly clock: StoreClock) {}
+export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore {
+  protected readonly versions: CompanyAirportPageVersion[] = [];
+  protected readonly acknowledgements: AirportReviewAcknowledgement[] = [];
+
+  constructor(
+    protected readonly clock: StoreClock,
+    seed?: CompanyAirportPageSnapshot,
+  ) {
+    if (seed) {
+      this.versions.push(...seed.versions.map(copyVersion));
+      this.acknowledgements.push(...seed.acknowledgements.map((a) => ({ ...a })));
+    }
+  }
+
+  /** A deep copy, so a caller cannot mutate stored state through the snapshot. */
+  snapshot(): CompanyAirportPageSnapshot {
+    return {
+      versions: this.versions.map(copyVersion),
+      acknowledgements: this.acknowledgements.map((a) => ({ ...a })),
+    };
+  }
 
   publish(request: PublishRequest): CompanyAirportPageVersion {
     const current = this.getLatest(request.icao);
