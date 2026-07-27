@@ -70,6 +70,33 @@ describe('findDialogBlocks', () => {
     expect(warningReason(block)).toMatch(/hand-writes an id/);
   });
 
+  // A block can hold one description per branch of a conditional. Checking only
+  // the first would let an id on any later one slip through.
+  it('flags a multi-description block only when EVERY description hand-writes an id', () => {
+    const oneClean = findDialogBlocks(
+      '<DialogContent><DialogDescription id="a">A</DialogDescription>' +
+      '<DialogDescription>B</DialogDescription></DialogContent>',
+      'x.tsx',
+    );
+    expect(warningReason(oneClean[0])).toBeNull();
+
+    const allOwnIds = findDialogBlocks(
+      '<DialogContent><DialogDescription id="a">A</DialogDescription>' +
+      '<DialogDescription id="b">B</DialogDescription></DialogContent>',
+      'x.tsx',
+    );
+    expect(warningReason(allOwnIds[0])).toMatch(/hand-writes an id/);
+  });
+
+  it('does not let a self-closing content tag consume a later block\'s close tag', () => {
+    const blocks = findDialogBlocks(
+      '<DialogContent />\n<DialogContent><DialogDescription>Why</DialogDescription></DialogContent>',
+      'x.tsx',
+    );
+    expect(blocks).toHaveLength(2);
+    expect(blocks.map((b) => b.hasDescription)).toEqual([false, true]);
+  });
+
   it('accepts the aria-describedby={undefined} opt-out', () => {
     const [block] = findDialogBlocks('<DialogContent aria-describedby={undefined}><p /></DialogContent>', 'x.tsx');
     expect(block.optsOut).toBe(true);

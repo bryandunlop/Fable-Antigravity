@@ -100,25 +100,37 @@ export function findDialogBlocks(source: string, file: string): DialogBlock[] {
     while ((match = opening.exec(source))) {
       const openEnd = endOfOpeningTag(source, match.index);
       const openTag = source.slice(match.index, openEnd);
+      // A self-closing <Content /> has no body and never a matching close tag —
+      // walking forward would consume an unrelated later block's close tag and
+      // corrupt both. Treat the body as empty.
+      const selfClosing = openTag.endsWith('/>');
 
       // Walk to the matching close tag, counting same-name nesting.
-      const boundary = new RegExp(`<${tag}(?=[\\s/>])|</${tag}>`, 'g');
-      boundary.lastIndex = match.index;
-      let depth = 0;
-      let end = source.length;
-      let hit: RegExpExecArray | null;
-      while ((hit = boundary.exec(source))) {
-        if (hit[0].startsWith('</')) {
-          if (--depth === 0) {
-            end = hit.index;
-            break;
-          }
-        } else depth++;
+      let end = openEnd;
+      if (!selfClosing) {
+        const boundary = new RegExp(`<${tag}(?=[\\s/>])|</${tag}>`, 'g');
+        boundary.lastIndex = match.index;
+        let depth = 0;
+        end = source.length;
+        let hit: RegExpExecArray | null;
+        while ((hit = boundary.exec(source))) {
+          if (hit[0].startsWith('</')) {
+            if (--depth === 0) {
+              end = hit.index;
+              break;
+            }
+          } else depth++;
+        }
       }
 
       const body = source.slice(openEnd, end);
-      const descOpen = new RegExp(`<${description}(?=[\\s/>])`).exec(body);
-      const descTag = descOpen ? body.slice(descOpen.index, endOfOpeningTag(body, descOpen.index)) : '';
+
+      // EVERY description in the block, not just the first. Radix looks up its own
+      // generated descriptionId, so what matters is whether *some* description in
+      // the block leaves that id in place — one branch of a conditional carrying a
+      // hand-written id does not doom a sibling branch that does not.
+      const descTags = [...body.matchAll(new RegExp(`<${description}(?=[\\s/>])`, 'g'))]
+        .map((m) => body.slice(m.index, endOfOpeningTag(body, m.index)));
 
       // A helper-built header is invisible to a literal scan of the block, so an
       // INDIRECT_HEADERS file counts its description wherever in the file it sits.
@@ -128,8 +140,10 @@ export function findDialogBlocks(source: string, file: string): DialogBlock[] {
         file,
         line: source.slice(0, match.index).split('\n').length,
         tag,
-        hasDescription: descOpen !== null || indirect,
-        descriptionHasOwnId: /\sid\s*=/.test(descTag),
+        hasDescription: descTags.length > 0 || indirect,
+        // Only a problem when NO description leaves Radix's id in place. An
+        // indirect header is wired by the helper, so it is never displaced here.
+        descriptionHasOwnId: !indirect && descTags.length > 0 && descTags.every((t) => /\sid\s*=/.test(t)),
         optsOut: /\saria-describedby\s*=\s*\{\s*undefined\s*\}/.test(openTag),
       });
     }
