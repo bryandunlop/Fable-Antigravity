@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Progress } from './ui/progress';
 import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
@@ -500,6 +500,7 @@ export default function AssignedTasks({ userRole }: AssignedTasksProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Pause Work Order</DialogTitle>
+            <DialogDescription>Record why work stopped — it stays on the card until the job resumes.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

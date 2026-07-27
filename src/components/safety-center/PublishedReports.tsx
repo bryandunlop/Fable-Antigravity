@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Search, BookOpen, Lightbulb } from 'lucide-react';
-import { Sheet, SheetContent } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet';
 import type { PublishedReport } from './types';
 
 export function PublishedReports({ reports }: { reports: PublishedReport[] }) {
@@ -55,8 +55,8 @@ export function PublishedReports({ reports }: { reports: PublishedReport[] }) {
                   <span>· {open.category}</span>
                   <span className="ml-auto">{open.publishedDate}</span>
                 </div>
-                <h2 className="text-lg font-semibold mt-2.5 leading-snug text-balance">{open.title}</h2>
-                <div className="text-xs text-muted-foreground mt-1">{open.ref} · de-identified</div>
+                <SheetTitle className="text-lg font-semibold mt-2.5 leading-snug text-balance">{open.title}</SheetTitle>
+                <SheetDescription className="text-xs text-muted-foreground mt-1">{open.ref} · de-identified</SheetDescription>
               </div>
               <div className="px-6 py-5 overflow-y-auto flex-1">
                 <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Summary</div>

@@ -6,7 +6,7 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../ui/alert-dialog';
 import { ScrollArea } from '../../ui/scroll-area';
 import { useInventoryV2 } from '../InventoryV2Context';
@@ -124,6 +124,7 @@ function FleetTab() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{editTarget ? 'Edit Aircraft' : 'Add Aircraft'}</DialogTitle>
+            <DialogDescription>Tail number and type for an aircraft this commissary stocks.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1">
@@ -317,6 +318,7 @@ function CompartmentsTab() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{editTarget ? 'Edit Compartment' : 'Add Compartment'}</DialogTitle>
+            <DialogDescription>Name a storage compartment and where it sits on the aircraft.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1">
@@ -501,6 +503,7 @@ function ItemCatalogTab() {
         <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editItem ? 'Edit Item' : 'Add Item'}</DialogTitle>
+            <DialogDescription>Catalog details, unit of measure and par level for this item.</DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-1 min-h-0">
             <div className="space-y-4 pr-4">

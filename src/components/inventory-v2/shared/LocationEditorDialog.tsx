@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../../ui/dialog';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
@@ -70,6 +70,7 @@ export default function LocationEditorDialog({ open, onOpenChange, location }: L
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{location ? 'Edit location' : 'New location'}</DialogTitle>
+          <DialogDescription>Name a storage location and the compartment it belongs to.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">

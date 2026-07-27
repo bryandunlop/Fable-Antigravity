@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Progress } from './ui/progress';
 import { Separator } from './ui/separator';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { 
   Plane, 
@@ -617,6 +617,7 @@ export default function FlightOperationsCenter() {
                       <DialogContent className="max-w-2xl">
                         <DialogHeader>
                           <DialogTitle>{passenger.name} - Passenger Profile</DialogTitle>
+                          <DialogDescription>Allergies, medical notes and travel preferences held on file for this passenger.</DialogDescription>
                         </DialogHeader>
                         <ScrollArea className="max-h-96">
                           <div className="space-y-4">

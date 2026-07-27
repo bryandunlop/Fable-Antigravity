@@ -1,4 +1,4 @@
-import { Sheet, SheetContent } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet';
 import { TriangleAlert, FileText, Check, Clock, type LucideIcon } from 'lucide-react';
 import type { KnowItem } from './types';
 
@@ -29,8 +29,8 @@ export function NotificationsPanel({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[420px] max-w-[92vw] p-0 flex flex-col gap-0">
         <div className="px-6 pt-6 pb-4 border-b border-border">
-          <h2 className="text-[17px] font-semibold">Notifications</h2>
-          <div className="text-xs text-muted-foreground mt-0.5">Things that happened — promoted to a task only when they need you.</div>
+          <SheetTitle className="text-[17px] font-semibold">Notifications</SheetTitle>
+          <SheetDescription className="text-xs text-muted-foreground mt-0.5">Things that happened — promoted to a task only when they need you.</SheetDescription>
         </div>
         <div className="overflow-y-auto flex-1 py-1">
           {items.map((n) => {

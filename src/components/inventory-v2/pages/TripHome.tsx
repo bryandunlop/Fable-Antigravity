@@ -10,7 +10,7 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Input } from '../../ui/input';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '../../ui/dialog';
 import { toast } from 'sonner';
 import { useInventoryV2 } from '../InventoryV2Context';
@@ -142,6 +142,7 @@ function NextLegDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Confirm Next Leg' : 'Next Leg'}</DialogTitle>
+          <DialogDescription>Where the aircraft goes next, so stock can be planned against it.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div className="grid grid-cols-2 gap-3">
@@ -219,6 +220,7 @@ function TripCompleteDialog({
             <CheckCircle2 className="h-5 w-5 text-emerald-400" />
             Trip Complete — What's Next?
           </DialogTitle>
+          <DialogDescription>Choose what happens to the remaining stock now the trip has closed.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -283,11 +285,11 @@ function ConfirmCompleteDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Complete Trip?</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            This will mark {trip.tailNumber} as returned and begin the return-to-baseline process.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2 text-sm">
-          <p className="text-muted-foreground">
-            This will mark {trip.tailNumber} as returned and begin the return-to-baseline process.
-          </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-muted-foreground text-xs">Legs completed</p>

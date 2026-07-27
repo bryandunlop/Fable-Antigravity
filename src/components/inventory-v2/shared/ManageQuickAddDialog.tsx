@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -70,12 +70,11 @@ export default function ManageQuickAddDialog({ open, onOpenChange }: ManageQuick
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Quick Add</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
+            These items appear in the Quick Tap grid on every trip. Reorder, remove,
+            or add more from the catalog below.
+          </DialogDescription>
         </DialogHeader>
-
-        <p className="text-xs text-muted-foreground">
-          These items appear in the Quick Tap grid on every trip. Reorder, remove,
-          or add more from the catalog below.
-        </p>
 
         {/* Selected items, in display order */}
         <div className="space-y-1 py-1">

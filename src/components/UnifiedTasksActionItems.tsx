@@ -1683,9 +1683,9 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
                 <Gavel className="w-5 h-5 text-amber-600" />
                 Waiver Decision
               </DialogTitle>
-              <p className="text-sm text-muted-foreground">
+              <DialogDescription className="text-sm text-muted-foreground">
                 Review and make a decision on this waiver request.
-              </p>
+              </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">

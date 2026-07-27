@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import { domainsForRole } from '../navigation/navConfig';
 import { mobileNavItemsForRole, MAX_VISIBLE_TABS } from '../navigation/mobileNavItems';
 import { Menu, FileText } from 'lucide-react';
@@ -73,6 +73,7 @@ export default function MobileBottomNav({ userRole, additionalRoles = [] }: Mobi
         <SheetContent side="bottom" className="max-h-[75dvh] overflow-y-auto pb-8">
           <SheetHeader>
             <SheetTitle>All pages</SheetTitle>
+            <SheetDescription>Every page your role can reach, grouped by area.</SheetDescription>
           </SheetHeader>
           <div className="mt-2 space-y-4">
             {showDomainLabels ? (

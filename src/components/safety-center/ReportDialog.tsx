@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -62,6 +62,13 @@ export function ReportDialog({
             <DialogTitle className="text-base">{step === 2 ? 'Report filed' : t ? t.name : 'Report a safety issue'}</DialogTitle>
             <span className="text-xs text-muted-foreground font-semibold">{step === 2 ? 'Done' : `Step ${step + 1} of 3`}</span>
           </div>
+          <DialogDescription className="text-[12.5px] leading-snug text-left">
+            {step === 2
+              ? 'Routed to the safety team — track it under My reports.'
+              : t
+                ? t.desc
+                : 'Pick the kind of report you want to file.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="px-6 py-5 max-h-[62vh] overflow-y-auto">

@@ -15,7 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../../ui/alert-dialog';
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../../ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -454,6 +454,7 @@ function BatchEditDialog({ batch, uom, onSave, onClose }: BatchEditDialogProps) 
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Edit batch</DialogTitle>
+          <DialogDescription>Quantity and expiry for this batch of stock.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">

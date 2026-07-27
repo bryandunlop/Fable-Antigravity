@@ -967,7 +967,12 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                        {/* Same dialog content as list view */}
+                        {/* The body was never written — tracked separately. Until it is,
+                            the dialog still has to announce itself. */}
+                        <DialogHeader className="sr-only">
+                          <DialogTitle>FRAT submission {submission.id}</DialogTitle>
+                          <DialogDescription>Risk assessment detail for this submission.</DialogDescription>
+                        </DialogHeader>
                       </DialogContent>
                     </Dialog>
 

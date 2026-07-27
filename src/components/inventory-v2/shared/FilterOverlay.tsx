@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../ui/sheet';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
@@ -45,6 +45,7 @@ export default function FilterOverlay({ open, onOpenChange, filters, onFiltersCh
             <Filter className="w-5 h-5 text-primary" />
             Filters
           </SheetTitle>
+          <SheetDescription>Narrow the list by category, location and stock level.</SheetDescription>
         </SheetHeader>
         <div className="space-y-5 mt-6">
           <div className="space-y-2">

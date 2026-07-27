@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -233,6 +234,7 @@ export default function PassengerForms() {
               <div className="p-6">
                 <DialogHeader className="mb-4">
                   <DialogTitle className="text-2xl font-bold">Form Templates</DialogTitle>
+                  <DialogDescription>Create and edit the forms passengers are asked to complete before a trip.</DialogDescription>
                 </DialogHeader>
                 <FormTemplateEditor />
               </div>

@@ -4,7 +4,7 @@
 // moved to the unified Documents module — authoring is at /documents; TL-6 / D29.)
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -76,7 +76,7 @@ function NewsletterPanel({ isMgr }: { isMgr: boolean }) {
           {read && (
             <>
               <DialogHeader className="px-6 py-4 border-b border-border">
-                <div className="text-[11px] text-muted-foreground font-medium">{read.period}</div>
+                <DialogDescription className="text-[11px] text-muted-foreground font-medium">{read.period}</DialogDescription>
                 <DialogTitle className="text-[17px] mt-1">{read.title}</DialogTitle>
               </DialogHeader>
               <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
@@ -113,7 +113,10 @@ function PublishNewsletterDialog({ open, onOpenChange, onPublish }: { open: bool
   return (
     <Dialog open={open} onOpenChange={(v: boolean) => { if (!v) close(); }}>
       <DialogContent className="sm:max-w-[560px] p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b border-border"><DialogTitle className="text-base">Publish safety newsletter</DialogTitle></DialogHeader>
+        <DialogHeader className="px-6 py-4 border-b border-border">
+          <DialogTitle className="text-base">Publish safety newsletter</DialogTitle>
+          <DialogDescription className="text-[12.5px] leading-snug">Goes out to every crew member and shows up in Safety Center.</DialogDescription>
+        </DialogHeader>
         <div className="px-6 py-4 flex flex-col gap-3.5 max-h-[62vh] overflow-y-auto">
           <div className="flex gap-3">
             <div className="flex-1"><Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5 block">Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="July 2026 Safety Newsletter" /></div>

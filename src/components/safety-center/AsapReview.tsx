@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { ShieldCheck, Lock } from 'lucide-react';
@@ -52,12 +52,12 @@ export function AsapReview() {
           {current && (
             <>
               <div className="px-6 pt-6 pb-4 border-b border-border">
-                <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+                <SheetDescription className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
                   <span className="uppercase tracking-wide text-accent font-bold">ASAP</span>
                   <span>· confidential</span>
                   <span className="ml-auto tabular-nums">{current.id}</span>
-                </div>
-                <h2 className="text-lg font-semibold mt-2">{current.phase} · {current.airport}</h2>
+                </SheetDescription>
+                <SheetTitle className="text-lg font-semibold mt-2">{current.phase} · {current.airport}</SheetTitle>
                 <div className="mt-2"><span className={`text-xs font-medium rounded-full px-2.5 py-1 ${TONE[current.status]}`}>{current.status}</span></div>
               </div>
 

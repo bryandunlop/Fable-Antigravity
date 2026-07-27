@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ExternalLink, Send } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { Separator } from '../ui/separator';
@@ -122,11 +122,23 @@ export function TripDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-6">
         {!trip || !identity ? (
-          <p className="text-sm text-muted-foreground py-10 text-center">Loading trip…</p>
+          // The drawer mounts before the trip resolves, and Radix checks for a
+          // title and description the moment it does — so the loading branch
+          // needs its own pair, not just the loaded one below.
+          <>
+            <SheetHeader className="sr-only">
+              <SheetTitle>Trip</SheetTitle>
+              <SheetDescription>Loading the trip detail.</SheetDescription>
+            </SheetHeader>
+            <p className="text-sm text-muted-foreground py-10 text-center">Loading trip…</p>
+          </>
         ) : (
           <div className="space-y-5">
             <SheetHeader className="space-y-3 text-left">
               <SheetTitle className="sr-only">{identity.route}</SheetTitle>
+              <SheetDescription className="sr-only">
+                Trip detail for {identity.route} — readiness, crew, and anything blocking departure.
+              </SheetDescription>
               <TripIdentityHeader trip={identity} />
               {readiness && (
                 <div className="flex items-center gap-3">

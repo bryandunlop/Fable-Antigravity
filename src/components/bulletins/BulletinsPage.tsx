@@ -349,6 +349,17 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
       {/* View Bulletin Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-900">
+          {/* The document below is styled as a printed bulletin with no heading
+              element of its own, so the accessible name and description live
+              here — outside the conditional, which is where Radix looks. */}
+          <DialogHeader className="sr-only">
+            <DialogTitle>{selectedBulletin ? `${config.docLabel} ${selectedBulletin.id}` : config.docLabel}</DialogTitle>
+            <DialogDescription>
+              {selectedBulletin
+                ? `${selectedBulletin.category} · version ${selectedBulletin.version} · effective ${new Date(selectedBulletin.effectiveDate).toLocaleDateString()}`
+                : 'No bulletin selected.'}
+            </DialogDescription>
+          </DialogHeader>
           {selectedBulletin && (() => {
             const mustAck = selectedBulletin.requireAcknowledgment && isTargetRole(selectedBulletin, userRole);
             const acked = isAcknowledged(selectedBulletin, acks, currentUserId);

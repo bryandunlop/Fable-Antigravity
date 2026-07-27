@@ -936,6 +936,7 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Passenger Details - {selectedPassenger?.name}</DialogTitle>
+            <DialogDescription>Contact details, travel documents and catering preferences on file.</DialogDescription>
           </DialogHeader>
           {selectedPassenger && (
             <div className="space-y-4">
