@@ -12,22 +12,7 @@ import {
   normalizeUrl,
   type QuickLink,
 } from './quickLinks';
-
-class MemoryStorage {
-  private m = new Map<string, string>();
-  getItem(k: string): string | null {
-    return this.m.has(k) ? (this.m.get(k) as string) : null;
-  }
-  setItem(k: string, v: string): void {
-    this.m.set(k, String(v));
-  }
-  removeItem(k: string): void {
-    this.m.delete(k);
-  }
-  clear(): void {
-    this.m.clear();
-  }
-}
+import { installMemoryStorage } from '../test/memoryStorage';
 
 function link(overrides: Partial<QuickLink> = {}): QuickLink {
   return {
@@ -39,12 +24,14 @@ function link(overrides: Partial<QuickLink> = {}): QuickLink {
   };
 }
 
+let restoreStorage: () => void;
+
 beforeEach(() => {
-  (globalThis as { localStorage?: unknown }).localStorage = new MemoryStorage();
+  restoreStorage = installMemoryStorage();
 });
 
 afterEach(() => {
-  delete (globalThis as { localStorage?: unknown }).localStorage;
+  restoreStorage();
 });
 
 describe('loadOrgLinks', () => {
