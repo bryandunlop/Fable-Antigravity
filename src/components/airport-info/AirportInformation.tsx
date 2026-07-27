@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Loader2, MapPin, Plane, Search } from 'lucide-react';
+import { AlertCircle, Loader2, MapPin, Plane, RefreshCw, Search } from 'lucide-react';
 
 import { airportReference } from '../../airport/referenceClient';
 import type { AirportIndexEntry, AirportRecord } from '../../airport/types';
@@ -35,8 +35,11 @@ export default function AirportInformation({ onSubmitCorrection }: AirportInform
   const [selected, setSelected] = useState<AirportRecord | null>(null);
   const [loadingAirport, setLoadingAirport] = useState<string | null>(null);
 
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     airportReference
       .loadIndex()
       .then((index) => {
@@ -51,7 +54,7 @@ export default function AirportInformation({ onSubmitCorrection }: AirportInform
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const results = useMemo(
     () => (indexLoaded ? airportReference.search(query) : []),
@@ -92,6 +95,14 @@ export default function AirportInformation({ onSubmitCorrection }: AirportInform
         <div>
           <h2 className="font-medium">Airport reference data unavailable</h2>
           <p className="mt-1 text-sm text-muted-foreground">{loadError}</p>
+          <Button
+            variant="outline"
+            className="mt-3"
+            onClick={() => setAttempt((n) => n + 1)}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try again
+          </Button>
         </div>
       </Card>
     );

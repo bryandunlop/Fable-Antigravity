@@ -10,6 +10,26 @@ import type { AirportIndex, AirportIndexEntry, AirportRecord } from './types';
 
 const BUNDLE_BASE = '/airport-data';
 
+/**
+ * `fetch` rejects with a bare `TypeError: Failed to fetch` for every network-level
+ * failure — server down, offline, DNS, blocked. That string tells a pilot nothing,
+ * and it is what actually reached the screen the first time this broke.
+ *
+ * A non-OK HTTP status is left alone: the server answered, and its status is
+ * genuinely useful.
+ */
+async function fetchOrExplain(url: string, what: string): Promise<Response> {
+  try {
+    return await fetch(url);
+  } catch (cause) {
+    throw new Error(
+      `Airport reference data (${what}) could not be reached. The app is running but the ` +
+        `server did not respond — check the connection, then try again.`,
+      { cause },
+    );
+  }
+}
+
 export class AirportReferenceClient {
   private index: AirportIndex | null = null;
   private indexRequest: Promise<AirportIndex> | null = null;
@@ -21,7 +41,7 @@ export class AirportReferenceClient {
     // Share one in-flight request so a burst of callers on first render does not
     // fetch the index several times over.
     this.indexRequest ??= (async () => {
-      const response = await fetch(`${BUNDLE_BASE}/index.json`);
+      const response = await fetchOrExplain(`${BUNDLE_BASE}/index.json`, 'index');
       if (!response.ok) {
         throw new Error(
           `Airport reference index unavailable (${response.status} ${response.statusText}).`,
@@ -32,7 +52,15 @@ export class AirportReferenceClient {
       return loaded;
     })();
 
-    return this.indexRequest;
+    // Do NOT leave a rejected promise memoised — that poisons the client for the
+    // rest of the session and makes the failure unrecoverable without a page
+    // reload. The app shell comes from a service worker, so it renders fine while
+    // the network is down (an iPad on a ramp is the point), and the user's
+    // instinct is to retry rather than reload.
+    return this.indexRequest.catch((error) => {
+      this.indexRequest = null;
+      throw error;
+    });
   }
 
   async loadAirport(id: string): Promise<AirportRecord | null> {
@@ -40,13 +68,19 @@ export class AirportReferenceClient {
     if (cached) return cached;
 
     const request = (async () => {
-      const response = await fetch(`${BUNDLE_BASE}/airports/${encodeURIComponent(id)}.json`);
+      const response = await fetchOrExplain(
+        `${BUNDLE_BASE}/airports/${encodeURIComponent(id)}.json`,
+        id,
+      );
       if (!response.ok) return null;
       return (await response.json()) as AirportRecord;
     })();
 
     this.airports.set(id, request);
-    return request;
+    return request.catch((error) => {
+      this.airports.delete(id);
+      throw error;
+    });
   }
 
   /** The NASR cycle the loaded bundle came from, or null before it loads. */

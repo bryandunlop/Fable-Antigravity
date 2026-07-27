@@ -78,6 +78,47 @@ describe('AirportReferenceClient', () => {
     expect(await client.loadAirport('KKKK')).toBeNull();
   });
 
+  describe('recovering from a failed load', () => {
+    // The app shell is served from a service worker, so it renders while the
+    // network is unavailable — an iPad on a ramp is the target environment. A
+    // failure therefore has to be recoverable without a page reload.
+
+    it('retries the index after a network failure instead of caching the rejection', async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await expect(client.loadIndex()).rejects.toThrow();
+      const recovered = await client.loadIndex();
+
+      expect(recovered.effectiveDate).toBe('2026/07/09');
+    });
+
+    it('retries an airport after a network failure', async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await expect(client.loadAirport('TEB')).rejects.toThrow();
+
+      expect(await client.loadAirport('TEB')).toEqual(teb);
+    });
+
+    it('explains a network failure instead of surfacing the raw browser error', async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      // "Failed to fetch" tells a pilot nothing. The message has to say what is
+      // unreachable and that it is a connection problem, not missing data.
+      await expect(client.loadIndex()).rejects.toThrow(/could not be reached/i);
+    });
+
+    it('still reports an HTTP status when the server answered', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+      } as Response);
+
+      await expect(client.loadIndex()).rejects.toThrow(/503/);
+    });
+  });
+
   describe('search', () => {
     beforeEach(async () => {
       await client.loadIndex();
