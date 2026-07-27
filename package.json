@@ -85,6 +85,7 @@
             "@vercel/node": "^5.8.17",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "autoprefixer": "^10.4.22",
+            "csv-parse": "^7.0.1",
             "dotenv": "^17.4.2",
             "drizzle-kit": "^0.31.10",
             "jsdom": "^29.1.1",
@@ -111,6 +112,7 @@
             "db:studio": "drizzle-kit studio",
             "test": "vitest run",
             "test:watch": "vitest",
-            "gen:myairops": "openapi-typescript src/integration/myairops/schemas/crm.json -o src/integration/myairops/gen/crm.ts && openapi-typescript src/integration/myairops/schemas/booking.json -o src/integration/myairops/gen/booking.ts && openapi-typescript src/integration/myairops/schemas/maintenance.json -o src/integration/myairops/gen/maintenance.ts"
+            "gen:myairops": "openapi-typescript src/integration/myairops/schemas/crm.json -o src/integration/myairops/gen/crm.ts && openapi-typescript src/integration/myairops/schemas/booking.json -o src/integration/myairops/gen/booking.ts && openapi-typescript src/integration/myairops/schemas/maintenance.json -o src/integration/myairops/gen/maintenance.ts",
+            "airport:build-bundle": "tsx scripts/build-airport-bundle.ts"
       }
 }
