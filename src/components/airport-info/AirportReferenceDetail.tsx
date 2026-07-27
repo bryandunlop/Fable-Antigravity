@@ -20,7 +20,12 @@ import { NotPublished, ProvenanceChip } from './ProvenanceChip';
 interface AirportReferenceDetailProps {
   airport: AirportRecord;
   onBack: () => void;
-  onSubmitCorrection: () => void;
+  /**
+   * Omitted while the propose/review/publish flow is unwired (D46). When absent
+   * the control renders disabled and says so, rather than presenting a live
+   * primary action that silently swallows the click.
+   */
+  onSubmitCorrection?: () => void;
 }
 
 /**
@@ -225,10 +230,13 @@ export default function AirportReferenceDetail({
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            <Button onClick={onSubmitCorrection}>
+            <Button onClick={onSubmitCorrection} disabled={!onSubmitCorrection}>
               <Edit className="mr-2 h-4 w-4" />
               Propose a change
             </Button>
+            {onSubmitCorrection ? null : (
+              <span className="text-xs text-muted-foreground">Not wired up yet</span>
+            )}
             <span className="text-xs text-muted-foreground">
               FAA NASR cycle {formatCycle(airport.effectiveDate)}
             </span>
@@ -362,8 +370,13 @@ export default function AirportReferenceDetail({
         </div>
         <p className="text-sm text-muted-foreground">
           PPR, curfews, operations notes, FBO preference and handling limits are authored by the
-          flight department rather than published by any vendor. Nothing has been published for
-          this airport yet — use “Propose a change” to start one.
+          flight department rather than published by any vendor. No vendor supplies them, so this
+          layer is the one that has to be written by hand.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {onSubmitCorrection
+            ? 'Nothing has been published for this airport yet.'
+            : 'Nothing has been published for this airport yet, and the propose → review → publish workflow is not wired up in this build — the editing screens still run on demo data.'}
         </p>
       </Card>
     </div>

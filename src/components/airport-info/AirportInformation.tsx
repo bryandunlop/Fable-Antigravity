@@ -75,7 +75,12 @@ export default function AirportInformation({ onSubmitCorrection }: AirportInform
       <AirportReferenceDetail
         airport={selected}
         onBack={() => setSelected(null)}
-        onSubmitCorrection={() => onSubmitCorrection?.(selected.id)}
+        // Deliberately forwarded as undefined when no handler was supplied, so the
+        // detail view renders the control disabled instead of wrapping nothing in
+        // an arrow function and presenting a live button that swallows the click.
+        onSubmitCorrection={
+          onSubmitCorrection ? () => onSubmitCorrection(selected.id) : undefined
+        }
       />
     );
   }
