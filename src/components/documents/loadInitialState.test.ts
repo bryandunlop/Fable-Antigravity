@@ -8,22 +8,7 @@ import {
   DATA_VERSION,
   BULLETINS_IMPORTED_KEY,
 } from './DocumentsContext';
-
-class MemoryStorage {
-  private m = new Map<string, string>();
-  getItem(k: string): string | null {
-    return this.m.has(k) ? (this.m.get(k) as string) : null;
-  }
-  setItem(k: string, v: string): void {
-    this.m.set(k, String(v));
-  }
-  removeItem(k: string): void {
-    this.m.delete(k);
-  }
-  clear(): void {
-    this.m.clear();
-  }
-}
+import { installMemoryStorage } from '../../test/memoryStorage';
 
 function userDoc(): Doc {
   return {
@@ -105,12 +90,14 @@ function legacyBulletin(title: string): Bulletin {
   };
 }
 
+let restoreStorage: () => void;
+
 beforeEach(() => {
-  (globalThis as { localStorage?: unknown }).localStorage = new MemoryStorage();
+  restoreStorage = installMemoryStorage();
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => {
-  delete (globalThis as { localStorage?: unknown }).localStorage;
+  restoreStorage();
   vi.restoreAllMocks();
 });
 
