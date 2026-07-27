@@ -1,9 +1,11 @@
-import type { RecurringCheck, RecurringCheckAccomplishment, TechLogState } from '../types';
+import type { RecurringCheck, RecurringCheckAccomplishment, RecurringCheckState, TechLogState } from '../types';
 import { currentRows } from './supersede';
 
 const DAY_MS = 86400000;
 
-export type CheckState = 'CURRENT' | 'DUE_SOON' | 'EXPIRED' | 'NEVER_DONE';
+/** Single source of truth is `RecurringCheckState` in ../types: a briefing's frozen disclosure
+ *  persists this value (TL-16), so the union must not be able to drift between the two modules. */
+export type CheckState = RecurringCheckState;
 
 export interface CheckProjection {
   check: RecurringCheck;

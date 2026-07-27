@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { TechLogProvider } from '../tech-log/TechLogContext';
 import { FirProvider } from './FirContext';
 import { FirList } from './pages/FirList';
 import { FirNew } from './pages/FirNew';
@@ -8,8 +7,10 @@ import { PublishedFirList } from './pages/PublishedFirList';
 import { PublishedFirReader } from './pages/PublishedFirReader';
 
 /** FIR is retrospective explainability over tech-log evidence: pages read the
- * tech-log state (defects, cards, labor, personnel) to derive SYSTEM timelines,
- * so the routes mount inside a TechLogProvider alongside the FIR store. */
+ * tech-log state (defects, cards, labor, personnel) to derive SYSTEM timelines.
+ * That state comes from the single TechLogProvider hoisted above <Router> in App.tsx — this file
+ * used to mount its own, so navigating /fir <-> /tech-log unmounted and re-hydrated the whole
+ * store, which is how a just-signed record could be lost (TL-26). */
 export default function FirRoutes({
   userRole,
   additionalRoles = [],
@@ -18,7 +19,6 @@ export default function FirRoutes({
   additionalRoles?: string[];
 }) {
   return (
-    <TechLogProvider userRole={userRole}>
       <FirProvider>
         <Routes>
           <Route path="/" element={<FirList userRole={userRole} additionalRoles={additionalRoles} />} />
@@ -31,6 +31,5 @@ export default function FirRoutes({
           <Route path="*" element={<Navigate to="/fir" replace />} />
         </Routes>
       </FirProvider>
-    </TechLogProvider>
   );
 }

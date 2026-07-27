@@ -10,21 +10,44 @@ const open = (p: Partial<Defect> = {}): Defect => ({ id: 'd1', aircraftId: 'ac1'
 
 describe('deferralsRequiringAck', () => {
   it('includes an ACTIVE deferral with a restriction', () => {
-    const r = deferralsRequiringAck('ac1', { deferrals: [deferral({ restrictionText: 'Day VMC only' })], melItems: [mel()] }, NOW);
+    const r = deferralsRequiringAck('ac1', { deferrals: [deferral({ restrictionText: 'Day VMC only' })] }, NOW);
     expect(r.map(d => d.id)).toEqual(['df1']);
   });
-  it('includes an ACTIVE deferral whose MEL has an (O) procedure', () => {
-    expect(deferralsRequiringAck('ac1', { deferrals: [deferral()], melItems: [mel({ oProcedure: 'Pull CB' })] }, NOW)).toHaveLength(1);
+  it('includes an ACTIVE deferral whose FROZEN (O) procedure is set', () => {
+    expect(deferralsRequiringAck('ac1', { deferrals: [deferral({ melOProcedure: 'Pull CB' })] }, NOW)).toHaveLength(1);
   });
   it('excludes a deferral with no (O)/restriction/placard', () => {
-    expect(deferralsRequiringAck('ac1', { deferrals: [deferral()], melItems: [mel()] }, NOW)).toHaveLength(0);
+    expect(deferralsRequiringAck('ac1', { deferrals: [deferral()] }, NOW)).toHaveLength(0);
   });
   it('excludes non-ACTIVE deferrals', () => {
-    expect(deferralsRequiringAck('ac1', { deferrals: [deferral({ status: 'PENDING_PLACARD', restrictionText: 'x' })], melItems: [mel()] }, NOW)).toHaveLength(0);
+    expect(deferralsRequiringAck('ac1', { deferrals: [deferral({ status: 'PENDING_PLACARD', restrictionText: 'x' })] }, NOW)).toHaveLength(0);
   });
   it('excludes ACTIVE deferrals on a different aircraft', () => {
     const otherDeferral = deferral({ id: 'df2', aircraftId: 'ac2', restrictionText: 'Day VMC only' });
-    expect(deferralsRequiringAck('ac1', { deferrals: [otherDeferral], melItems: [mel()] }, NOW)).toHaveLength(0);
+    expect(deferralsRequiringAck('ac1', { deferrals: [otherDeferral] }, NOW)).toHaveLength(0);
+  });
+
+  // TL-16 regression: an adversarial verifier proved (2026-07-26) that editing the MelItem could
+  // make a mandatory PIC acknowledgement appear or VANISH on an already-signed briefing, invisibly
+  // to the disclosure digest. The decision must rest on the frozen row, and the live table must be
+  // unreachable from here.
+  it('ignores a contradicting live MelItem — the (O) procedure is read from the frozen deferral', () => {
+    const frozen = deferral({ melOProcedure: 'Pull CB 3-J14 before each flight' });
+    // The MelItem that once carried it has since had the (O) procedure removed entirely.
+    expect(deferralsRequiringAck('ac1', { deferrals: [frozen] }, NOW)).toHaveLength(1);
+  });
+
+  it('cannot be handed melItems — deciding a required acknowledgement from live data is a compile error', () => {
+    deferralsRequiringAck(
+      'ac1',
+      {
+        deferrals: [deferral()],
+        // @ts-expect-error — melItems is deliberately absent from this signature (TL-16). If this
+        // stops erroring, the live join that could delete a required crew acknowledgement is back.
+        melItems: [mel({ oProcedure: 'Pull CB' })],
+      },
+      NOW,
+    );
   });
 });
 

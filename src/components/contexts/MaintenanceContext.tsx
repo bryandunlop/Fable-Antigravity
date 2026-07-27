@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
+import { createAuditEntry, type AuditEntry } from './auditEntry';
 
 // ==================== TYPES ====================
 
@@ -46,7 +47,6 @@ export interface MaintenanceAction {
   inspectedBy?: string;
   signedOff: boolean;
   signOffTime?: Date;
-  signOffData?: SignatureData;
 }
 
 export interface Deferral {
@@ -87,29 +87,16 @@ export interface LifecycleEvent {
   automated?: boolean;
 }
 
-export interface AuditEntry {
-  id: string;
-  timestamp: Date;
-  userId: string;
-  userName: string;
-  action: string;
-  field?: string;
-  oldValue?: any;
-  newValue?: any;
-  ipAddress?: string;
-  metadata?: any;
-}
+// TL-14: AuditEntry now lives in ./auditEntry — it no longer fabricates an ipAddress.
+export type { AuditEntry } from './auditEntry';
 
-export interface SignatureData {
-  signature: string;
-  timestamp: Date;
-  ipAddress: string;
-  userAgent: string;
-  documentHash: string;
-  signedBy: string;
-  email: string;
-  role: string;
-}
+// TL-14: `SignatureData` was deleted here. It was the data contract of the DigitalSignature.tsx
+// component that TL-13 removed, and it outlived its producer: five references, all inside this
+// file, nothing imported it, and its two producers (completeInspection /
+// generateAirworthinessRelease) had no caller anywhere and took `any`. It declared
+// `ipAddress: string` and `documentHash: string` as REQUIRED — the exact pair TL-13 deleted — so
+// anyone implementing against it would have rebuilt the thing that was removed. The live signing
+// contract is tech-log's `Signature` (tech-log/types.ts), which has no IP field.
 
 export interface PatternInfo {
   detectedAt: Date;
@@ -189,7 +176,6 @@ export interface SubTask {
   completedAt?: string;
   notes?: string;
   signOffRequired?: boolean;
-  signOffData?: SignatureData;
 }
 
 export interface InspectionCheckpoint {
@@ -207,7 +193,6 @@ export interface CompletedInspection {
   inspector: string;
   inspectorRole: string;
   completedAt: Date;
-  signOffData: SignatureData;
   findings?: string;
   passed: boolean;
 }
@@ -228,7 +213,6 @@ export interface AirworthinessRelease {
   aircraftTail: string;
   releasedBy: string;
   releasedAt: Date;
-  signOffData: SignatureData;
   maintenancePerformed: string;
   certificateNumber: string;
   returnToService: boolean;
@@ -1349,24 +1333,15 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
 
   // ==================== AUDIT TRAIL ====================
 
-  const createAuditEntry = (
+  // TL-14: delegates to the extracted factory, which records no IP and takes the actor from here
+  // rather than a hardcoded 'USER-001'.
+  const auditEntry = (
     action: string,
     field?: string,
-    oldValue?: any,
-    newValue?: any,
-    metadata?: any
-  ): AuditEntry => ({
-    id: `AUDIT - ${Date.now()} - ${Math.random().toString(36).substr(2, 9)} `,
-    timestamp: new Date(),
-    userId: 'USER-001',
-    userName: currentUser,
-    action,
-    field,
-    oldValue,
-    newValue,
-    ipAddress: '192.168.1.100', // In production, get actual IP
-    metadata
-  });
+    oldValue?: unknown,
+    newValue?: unknown,
+    metadata?: Record<string, unknown>
+  ): AuditEntry => createAuditEntry({ actor: currentUser, action, field, oldValue, newValue, metadata });
 
   // ==================== LIFECYCLE ====================
 
@@ -1406,7 +1381,7 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
       ...squawkData,
       id: `SQ - ${Date.now()} `,
       lifecycleStage: createLifecycleStage('reported'),
-      auditTrail: [createAuditEntry('Squawk created')]
+      auditTrail: [auditEntry('Squawk created')]
     };
 
     setSquawks(prev => [...prev, newSquawk]);
@@ -1446,7 +1421,7 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
     setSquawks(prev => prev.map(squawk => {
       if (squawk.id === id) {
         const auditEntries = Object.keys(updates).map(key =>
-          createAuditEntry(`Updated ${key} `, key, squawk[key as keyof Squawk], updates[key as keyof Partial<Squawk>])
+          auditEntry(`Updated ${key}`, key, squawk[key as keyof Squawk], updates[key as keyof Partial<Squawk>])
         );
 
         return {
@@ -1514,7 +1489,7 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
       ...woData,
       id: `WO - ${Date.now()} `,
       lifecycleStage: createLifecycleStage('wo-created'),
-      auditTrail: [createAuditEntry('Work Order created')],
+      auditTrail: [auditEntry('Work Order created')],
       notificationsSent: [],
       laborLog: []
     };
@@ -1540,7 +1515,7 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
     setWorkOrders(prev => prev.map(wo => {
       if (wo.id === id) {
         const auditEntries = Object.keys(updates).map(key =>
-          createAuditEntry(`Updated ${key} `, key, wo[key as keyof WorkOrderExtended], updates[key as keyof Partial<WorkOrderExtended>])
+          auditEntry(`Updated ${key}`, key, wo[key as keyof WorkOrderExtended], updates[key as keyof Partial<WorkOrderExtended>])
         );
 
         // Check for completion and notify
@@ -1686,7 +1661,6 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
       inspector: inspectionData.inspector,
       inspectorRole: inspectionData.inspectorRole,
       completedAt: new Date(),
-      signOffData: inspectionData.signOffData,
       findings: inspectionData.findings,
       passed: inspectionData.passed
     };
@@ -1757,7 +1731,6 @@ export const MaintenanceProvider: React.FC<MaintenanceProviderProps> = ({ childr
       aircraftTail: wo.tailNumber,
       releasedBy: currentUser,
       releasedAt: new Date(),
-      signOffData: releaseData.signOffData,
       maintenancePerformed: wo.description,
       certificateNumber: `AWR - ${Date.now()} `,
       returnToService: true,
