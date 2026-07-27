@@ -20,15 +20,14 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-        // This carried a dark-variant border-input override, which painted the border
-        // --input (#0D1F5C) — the dark page background. The app's most-used variant
+        // This once carried a dark-variant border override painted from --input
+        // (#0D1F5C) — the dark page background. The app's most-used variant
         // (1,159 call sites) had a border at 1.00:1: literally the page colour.
         // Dropping it falls back to --border, which in dark resolves to
         // --pg-rule-on-brand (white @18%) — measured 1.68:1 live. The bg-input/30 wash
         // stays; it's the fill, the border was always meant to be the affordance.
-        // Root cause survives as TL-20: --input is invisible as a border in BOTH themes
-        // (transparent in light, page-colour in dark) across 17 uses, because it also
-        // doubles as a fill.
+        // TL-20 finished the job in 2026-07-26: --input is now fill-only and every
+        // form primitive draws its boundary from --border. See src/index.css.
         //
         // The removed class is deliberately NOT spelled out above. Tailwind scans source
         // TEXT, so naming it in a comment makes Tailwind emit that class's rule into the

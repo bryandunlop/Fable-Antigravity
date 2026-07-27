@@ -349,17 +349,16 @@ export default function BulletinsPage({ userRole, config }: BulletinsPageProps) 
       {/* View Bulletin Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-900">
-          {/* The document below is styled as a printed bulletin with no heading
-              element of its own, so the accessible name and description live
-              here — outside the conditional, which is where Radix looks. */}
-          <DialogHeader className="sr-only">
-            <DialogTitle>{selectedBulletin ? `${config.docLabel} ${selectedBulletin.id}` : config.docLabel}</DialogTitle>
-            <DialogDescription>
-              {selectedBulletin
-                ? `${selectedBulletin.category} · version ${selectedBulletin.version} · effective ${new Date(selectedBulletin.effectiveDate).toLocaleDateString()}`
-                : 'No bulletin selected.'}
-            </DialogDescription>
-          </DialogHeader>
+          {/* Outside the conditional: `isViewDialogOpen` and `selectedBulletin` are
+              independent, so the dialog can mount with no bulletin and Radix asserts a
+              Title at mount. The letterhead h2 inside is the masthead, not the document
+              name, so this is sr-only rather than reusing it (LG-30). */}
+          <DialogTitle className="sr-only">{selectedBulletin?.title ?? 'Bulletin'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {selectedBulletin
+              ? `${config.docLabel} ${selectedBulletin.id} · ${selectedBulletin.category} · version ${selectedBulletin.version}`
+              : 'No bulletin selected.'}
+          </DialogDescription>
           {selectedBulletin && (() => {
             const mustAck = selectedBulletin.requireAcknowledgment && isTargetRole(selectedBulletin, userRole);
             const acked = isAcknowledged(selectedBulletin, acks, currentUserId);

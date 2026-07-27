@@ -125,6 +125,8 @@ export function DeferralCreatePanel({
       // place, so anything read back through melItemId later shows the CURRENT text — which on a
       // ramp screen means showing a regulator the wrong provision under a right-looking revision.
       melSubItemNumber: selectedMel.subItemNumber, melTitle: selectedMel.title,
+      // TL-16: the (O) procedure too — it decides whether the PIC must acknowledge this item.
+      melOProcedure: selectedMel.oProcedure,
       category: selectedMel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: clockStart,
       governingTimezone: zone,
       governingTimezoneOverrideReason: isOverride(zone) ? overrideReason.trim() : undefined,

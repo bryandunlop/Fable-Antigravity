@@ -136,7 +136,10 @@ export default function JourneyLog() {
       id: pendingId, aircraftId: ac.id, tripId: original?.tripId, sectorSequence: seq, flightDateUtc: iso(out),
       outUtc: oooi[0], offUtc: oooi[1], onUtc: oooi[2], inUtc: oooi[3],
       blockTime, flightTime, landings: Number(landings) || 0, cycles: cyc,
-      picOid: pic, sicOid: sic, fuelUplift: fuel ? Number(fuel) : undefined,
+      // TL-16: freeze the crew names into the signed row. The SIC never signs, so without this
+      // there is no frozen record of that name anywhere and the printed log live-joined Personnel.
+      picOid: pic, sicOid: sic, picName: nameOf(pic), sicName: nameOf(sic),
+      fuelUplift: fuel ? Number(fuel) : undefined,
       oilUplift, deIce,
       delayCode: delayCode.trim() || undefined,
       delayMinutes: delayMins ? Number(delayMins) : undefined,
@@ -186,8 +189,9 @@ export default function JourneyLog() {
           { label: 'ON / IN', value: `${f.onUtc.slice(11, 16)} / ${f.inUtc.slice(11, 16)}` },
           { label: 'Block / Flight', value: `${f.blockTime}h / ${f.flightTime}h` },
           { label: 'Landings / Cycles', value: `${f.landings} / ${f.cycles}` },
-          { label: 'PIC', value: nameOf(f.picOid) },
-          { label: 'SIC', value: nameOf(f.sicOid) },
+          // Frozen at signing (TL-16) — never a live Personnel join on a signed journey log.
+          { label: 'PIC', value: f.picName ?? 'not recorded' },
+          { label: 'SIC', value: f.sicName ?? 'not recorded' },
           { label: 'Airframe total', value: `${f.airframeTotalHours}h / ${f.airframeTotalCycles} cyc` },
           ...extras,
         ] },
@@ -225,7 +229,7 @@ export default function JourneyLog() {
               <div><div className="text-xs text-muted-foreground">OOOI</div><div>{f.outUtc.slice(11, 16)}/{f.offUtc.slice(11, 16)}/{f.onUtc.slice(11, 16)}/{f.inUtc.slice(11, 16)}</div></div>
               <div><div className="text-xs text-muted-foreground">Block / Flight</div><div>{f.blockTime}h / {f.flightTime}h</div></div>
               <div><div className="text-xs text-muted-foreground">Ldg / Cyc</div><div>{f.landings} / {f.cycles}</div></div>
-              <div><div className="text-xs text-muted-foreground">Crew</div><div className="truncate">{nameOf(f.picOid)} / {nameOf(f.sicOid)}</div></div>
+              <div><div className="text-xs text-muted-foreground">Crew</div><div className="truncate">{f.picName ?? 'not recorded'} / {f.sicName ?? 'not recorded'}</div></div>
               <div><div className="text-xs text-muted-foreground">Airframe</div><div>{f.airframeTotalHours}h</div></div>
               {extras.length > 0 && (
                 <div className="col-span-2 mt-1 flex flex-wrap gap-1.5 border-t pt-2 md:col-span-6">

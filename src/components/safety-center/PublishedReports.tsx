@@ -55,6 +55,8 @@ export function PublishedReports({ reports }: { reports: PublishedReport[] }) {
                   <span>· {open.category}</span>
                   <span className="ml-auto">{open.publishedDate}</span>
                 </div>
+                {/* SheetTitle renders an h2, so the visible heading doubles as the Radix
+                    accessible name — no sr-only duplicate needed (LG-30). */}
                 <SheetTitle className="text-lg font-semibold mt-2.5 leading-snug text-balance">{open.title}</SheetTitle>
                 <SheetDescription className="text-xs text-muted-foreground mt-1">{open.ref} · de-identified</SheetDescription>
               </div>

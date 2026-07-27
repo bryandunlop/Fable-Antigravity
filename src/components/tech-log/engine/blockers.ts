@@ -78,12 +78,13 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
   const airframe = { hours: ac?.airframeTotalHours ?? 0, cycles: ac?.airframeTotalCycles ?? 0 };
   const sv = deriveServiceability(aircraftId, state, asOfUtc);
 
-  /** "MEL 32-04-01 Cat D — Tire Pressure Monitoring System" — a tech recognises the item, not "Cat C". */
+  /** "MEL 32-04-01 Cat D — Tire Pressure Monitoring System" — a tech recognises the item, not "Cat C".
+   *  TL-16: read from the frozen Deferral. This built the governing sentence for a signed deferral
+   *  out of the LIVE MelItem, so a later revision repainted it. */
   const melLabel = (df: Deferral) => {
-    const m = (state.melItems ?? []).find(x => x.id === df.melItemId);
-    const ref = m?.subItemNumber ? `MEL ${m.subItemNumber}` : 'MEL item';
+    const ref = df.melSubItemNumber ? `MEL ${df.melSubItemNumber}` : 'MEL item';
     const cat = df.category ? ` Cat ${df.category}` : '';
-    return m?.title ? `${ref}${cat} — ${m.title}` : `${ref}${cat}`;
+    return df.melTitle ? `${ref}${cat} — ${df.melTitle}` : `${ref}${cat}`;
   };
 
   const defects = currentRows(state.defects).filter(d => d.aircraftId === aircraftId);

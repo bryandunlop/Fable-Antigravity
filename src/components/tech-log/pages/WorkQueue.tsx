@@ -38,7 +38,6 @@ export default function WorkQueue() {
     return c;
   }, [state, now]);
   const tailOf = (id: string) => state.aircraft.find(a => a.id === id)?.tailNumber ?? '—';
-  const melOf = (id: string) => state.melItems.find(m => m.id === id);
   const open = (tail: string, q = '') => navigate(`/tech-log/aircraft/${tail}${q}`);
 
   // ── PILOT lens: "my reported squawks + status back" ──
@@ -159,8 +158,8 @@ export default function WorkQueue() {
           <Section icon={<AlertTriangle className="h-4 w-4" />} title="Pending (M)/placard release — still grounded" count={wq.counts.pendingPlacard}>
             {wq.pendingPlacard.length === 0 ? empty : wq.pendingPlacard.map(d => (
               <Row key={d.id} next="Sign the release" onClick={() => open(tailOf(d.aircraftId), `?tab=deferrals&deferral=${d.id}&gating=1`)}>
-                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {melOf(d.melItemId)?.subItemNumber ?? '—'}</Badge><Badge variant="destructive">PENDING_PLACARD</Badge></div>
-                <p className="mt-0.5 truncate text-muted-foreground">{melOf(d.melItemId)?.title} — sign the (M)/placard release to dispatch.</p>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge><Badge variant="destructive">PENDING_PLACARD</Badge></div>
+                <p className="mt-0.5 truncate text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'} — sign the (M)/placard release to dispatch.</p>
               </Row>
             ))}
           </Section>
@@ -168,8 +167,8 @@ export default function WorkQueue() {
           <Section icon={<Clock className="h-4 w-4" />} title="Deferrals overdue — re-grounded" count={overdueDeferrals.length}>
             {overdueDeferrals.length === 0 ? empty : overdueDeferrals.map(({ deferral: d }) => (
               <Row key={d.id} next="Rectify to clear" onClick={() => open(tailOf(d.aircraftId), '?tab=deferrals')}>
-                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {melOf(d.melItemId)?.subItemNumber ?? '—'}</Badge><Badge variant="destructive">OVERDUE</Badge></div>
-                <p className="mt-0.5 truncate text-muted-foreground">{d.repairDueDateUtc ? `due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}` : ''} · {melOf(d.melItemId)?.title}</p>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge><Badge variant="destructive">OVERDUE</Badge></div>
+                <p className="mt-0.5 truncate text-muted-foreground">{d.repairDueDateUtc ? `due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}` : ''} · {d.melTitle ?? 'MEL item not recorded'}</p>
               </Row>
             ))}
           </Section>
@@ -191,8 +190,8 @@ export default function WorkQueue() {
           <Section icon={<Clock className="h-4 w-4" />} title="Deferrals due soon" count={soonDeferrals.length}>
             {soonDeferrals.length === 0 ? empty : soonDeferrals.map(({ deferral: d }) => (
               <Row key={d.id} next="Rectify or extend" onClick={() => open(tailOf(d.aircraftId), '?tab=deferrals')}>
-                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {melOf(d.melItemId)?.subItemNumber ?? '—'}</Badge><Badge variant="secondary">DUE SOON</Badge></div>
-                <p className="mt-0.5 truncate text-muted-foreground">{d.repairDueDateUtc ? `due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}` : ''} · {melOf(d.melItemId)?.title}</p>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge><Badge variant="secondary">DUE SOON</Badge></div>
+                <p className="mt-0.5 truncate text-muted-foreground">{d.repairDueDateUtc ? `due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}` : ''} · {d.melTitle ?? 'MEL item not recorded'}</p>
               </Row>
             ))}
           </Section>

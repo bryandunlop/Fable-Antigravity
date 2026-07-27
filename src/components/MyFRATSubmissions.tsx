@@ -70,8 +70,6 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('month');
-  const [selectedSubmission, setSelectedSubmission] = useState<FRATSubmission | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
   // Get current user (in real app this would come from auth context)
   const currentUser = 'Current User'; // Would be actual authenticated user
@@ -487,6 +485,76 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
     }
   };
 
+  // The body of the "View submission" dialog. Rendered from both the list view and the
+  // card/grid view — the grid's copy used to be an empty DialogContent, so View there
+  // opened a blank modal. Takes the row's own submission so it never depends on which
+  // row was clicked last.
+  const renderSubmissionDialogContent = (submission: FRATSubmission) => (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <FileText className="w-5 h-5 text-blue-500" />
+          FRAT Submission - {submission.flightNumber}
+        </DialogTitle>
+        <DialogDescription>
+          View detailed Flight Risk Assessment submission for {submission.flightNumber}. Submitted on {new Date(submission.submittedAt).toLocaleString()}.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <strong>Flight:</strong> {submission.flightNumber}
+          </div>
+          <div>
+            <strong>Aircraft:</strong> {submission.aircraft}
+          </div>
+          <div>
+            <strong>Route:</strong> {submission.route}
+          </div>
+          <div>
+            <strong>Status:</strong> <Badge className={getStatusColor(submission.status)}>{submission.status}</Badge>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-5 gap-2">
+          <div className="text-center p-2 bg-blue-50 rounded">
+            <div className="text-sm font-bold text-blue-600">{submission.factors.weather}</div>
+            <p className="text-xs text-blue-700">Weather</p>
+          </div>
+          <div className="text-center p-2 bg-green-50 rounded">
+            <div className="text-sm font-bold text-green-600">{submission.factors.airport}</div>
+            <p className="text-xs text-green-700">Airport</p>
+          </div>
+          <div className="text-center p-2 bg-yellow-50 rounded">
+            <div className="text-sm font-bold text-yellow-600">{submission.factors.crew}</div>
+            <p className="text-xs text-yellow-700">Crew</p>
+          </div>
+          <div className="text-center p-2 bg-purple-50 rounded">
+            <div className="text-sm font-bold text-purple-600">{submission.factors.aircraft}</div>
+            <p className="text-xs text-purple-700">Aircraft</p>
+          </div>
+          <div className="text-center p-2 bg-orange-50 rounded">
+            <div className="text-sm font-bold text-orange-600">{submission.factors.operation}</div>
+            <p className="text-xs text-orange-700">Operation</p>
+          </div>
+        </div>
+
+        {submission.flaggedItems.length > 0 && (
+          <div>
+            <h4 className="font-medium mb-2">Flagged Items:</h4>
+            {submission.flaggedItems.map((item, index) => (
+              <Alert key={index} className="mb-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{item}</AlertDescription>
+              </Alert>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   const filteredSubmissions = useMemo(() => {
     return submissions.filter(submission => {
       const matchesSearch = 
@@ -787,78 +855,12 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                             <div className="flex items-center gap-1">
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setSelectedSubmission(submission)}
-                                  >
+                                  <Button variant="outline" size="sm">
                                     <Eye className="w-4 h-4" />
                                   </Button>
                                 </DialogTrigger>
                                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                                  <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2">
-                                      <FileText className="w-5 h-5 text-blue-500" />
-                                      FRAT Submission - {submission.flightNumber}
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                      View detailed Flight Risk Assessment submission for {submission.flightNumber}. Submitted on {new Date(submission.submittedAt).toLocaleString()}.
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  
-                                  {selectedSubmission && (
-                                    <div className="space-y-4">
-                                      <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                          <strong>Flight:</strong> {selectedSubmission.flightNumber}
-                                        </div>
-                                        <div>
-                                          <strong>Aircraft:</strong> {selectedSubmission.aircraft}
-                                        </div>
-                                        <div>
-                                          <strong>Route:</strong> {selectedSubmission.route}
-                                        </div>
-                                        <div>
-                                          <strong>Status:</strong> <Badge className={getStatusColor(selectedSubmission.status)}>{selectedSubmission.status}</Badge>
-                                        </div>
-                                      </div>
-                                      
-                                      <div className="grid grid-cols-5 gap-2">
-                                        <div className="text-center p-2 bg-blue-50 rounded">
-                                          <div className="text-sm font-bold text-blue-600">{selectedSubmission.factors.weather}</div>
-                                          <p className="text-xs text-blue-700">Weather</p>
-                                        </div>
-                                        <div className="text-center p-2 bg-green-50 rounded">
-                                          <div className="text-sm font-bold text-green-600">{selectedSubmission.factors.airport}</div>
-                                          <p className="text-xs text-green-700">Airport</p>
-                                        </div>
-                                        <div className="text-center p-2 bg-yellow-50 rounded">
-                                          <div className="text-sm font-bold text-yellow-600">{selectedSubmission.factors.crew}</div>
-                                          <p className="text-xs text-yellow-700">Crew</p>
-                                        </div>
-                                        <div className="text-center p-2 bg-purple-50 rounded">
-                                          <div className="text-sm font-bold text-purple-600">{selectedSubmission.factors.aircraft}</div>
-                                          <p className="text-xs text-purple-700">Aircraft</p>
-                                        </div>
-                                        <div className="text-center p-2 bg-orange-50 rounded">
-                                          <div className="text-sm font-bold text-orange-600">{selectedSubmission.factors.operation}</div>
-                                          <p className="text-xs text-orange-700">Operation</p>
-                                        </div>
-                                      </div>
-
-                                      {selectedSubmission.flaggedItems.length > 0 && (
-                                        <div>
-                                          <h4 className="font-medium mb-2">Flagged Items:</h4>
-                                          {selectedSubmission.flaggedItems.map((item, index) => (
-                                            <Alert key={index} className="mb-2">
-                                              <AlertTriangle className="h-4 w-4" />
-                                              <AlertDescription>{item}</AlertDescription>
-                                            </Alert>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                                  {renderSubmissionDialogContent(submission)}
                                 </DialogContent>
                               </Dialog>
 
@@ -960,19 +962,13 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                           variant="outline"
                           size="sm"
                           className="flex-1"
-                          onClick={() => setSelectedSubmission(submission)}
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           View
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                        {/* The body was never written — tracked separately. Until it is,
-                            the dialog still has to announce itself. */}
-                        <DialogHeader className="sr-only">
-                          <DialogTitle>FRAT submission {submission.id}</DialogTitle>
-                          <DialogDescription>Risk assessment detail for this submission.</DialogDescription>
-                        </DialogHeader>
+                        {renderSubmissionDialogContent(submission)}
                       </DialogContent>
                     </Dialog>
 

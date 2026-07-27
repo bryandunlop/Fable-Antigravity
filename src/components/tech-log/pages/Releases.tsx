@@ -27,9 +27,9 @@ export default function Releases() {
   // ===== GATING-DISCHARGE MODE (deep-link) =====
   if (isGating && deferral) {
     const aircraft = state.aircraft.find(a => a.id === deferral.aircraftId);
-    const mel = state.melItems.find(m => m.id === deferral.melItemId);
+    // TL-16: MEL identity frozen on the signed deferral (D36), not a live MelItem join.
     return (
-      <TechLogShell title={`(M)/Placard Release — ${aircraft?.tailNumber ?? ''}`} subtitle={`MEL ${mel?.subItemNumber ?? ''} · ${mel?.title ?? ''}`}>
+      <TechLogShell title={`(M)/Placard Release — ${aircraft?.tailNumber ?? ''}`} subtitle={`MEL ${deferral.melSubItemNumber ?? 'not recorded'} · ${deferral.melTitle ?? ''}`}>
         <div className="max-w-2xl">
           <GatingReleasePanel
             deferral={deferral}
@@ -61,7 +61,6 @@ export default function Releases() {
   const releases = currentRows(state.releases).slice().reverse();
   const acOf = (id: string) => state.aircraft.find(a => a.id === id);
   const sigById = (id?: string) => (id ? state.signatures.find(s => s.id === id) : undefined);
-  const nameOf = (oid?: string) => state.personnel.find(p => p.oid === oid)?.displayName ?? oid ?? '—';
 
   const printRelease = (r: MaintenanceRelease) => {
     const ac = acOf(r.aircraftId);
@@ -78,10 +77,14 @@ export default function Releases() {
         { heading: 'Work performed (14 CFR 91.417(a)(1)(i))', body: r.workDescription },
         { heading: 'Return to service', fields: [
           { label: 'Completed', value: new Date(r.completionDateUtc).toLocaleString() },
-          { label: 'Certifying tech', value: nameOf(r.certifyingTechOid) },
+          // TL-16 / DM-3: read the name frozen into the Signature this release was signed with.
+          // These were live Personnel joins while `perf.signerName` — already fetched two lines
+          // above for the signature block — sat unused, so one printed CRS could show two
+          // different names for the same person, beside a cert number that WAS frozen.
+          { label: 'Certifying tech', value: perf?.signerName ?? 'not recorded' },
           { label: 'A&P / IA cert', value: r.apCertificateNumber || '—' },
           { label: 'RII required', value: r.riiRequired ? 'Yes' : 'No' },
-          ...(r.riiInspectorOid ? [{ label: 'RII inspector', value: nameOf(r.riiInspectorOid) }] : []),
+          ...(r.riiInspectorOid ? [{ label: 'RII inspector', value: rii?.signerName ?? 'not recorded' }] : []),
         ], body: r.returnToServiceStatement },
       ],
       signatures: sigs,

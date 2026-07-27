@@ -57,6 +57,8 @@ export function AsapReview() {
                   <span>· confidential</span>
                   <span className="ml-auto tabular-nums">{current.id}</span>
                 </SheetDescription>
+                {/* SheetTitle renders an h2 — visible heading doubles as the Radix
+                    accessible name, which was missing entirely (LG-30). */}
                 <SheetTitle className="text-lg font-semibold mt-2">{current.phase} · {current.airport}</SheetTitle>
                 <div className="mt-2"><span className={`text-xs font-medium rounded-full px-2.5 py-1 ${TONE[current.status]}`}>{current.status}</span></div>
               </div>

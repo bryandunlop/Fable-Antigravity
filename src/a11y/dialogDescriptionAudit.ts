@@ -51,6 +51,8 @@ export const DESCRIBED_PAIRS: ReadonlyArray<readonly [content: string, descripti
 export const INDIRECT_HEADERS: Record<string, string> = {
   'src/components/ProposalSubmissionFlow.tsx':
     'One dialog, four wizard steps: getStepContent() returns a DialogHeader with a title and description per step.',
+  'src/components/MyFRATSubmissions.tsx':
+    'List and grid views share renderSubmissionDialogContent(submission), which carries the DialogHeader for both.',
 };
 
 export type DialogBlock = {
