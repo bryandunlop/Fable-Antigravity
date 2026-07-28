@@ -29,6 +29,7 @@ import path from 'node:path';
 
 import { parse } from 'csv-parse';
 
+import { airportFacts } from '../src/airport/flags/rules';
 import { resolveRunwayPavement } from '../src/airport/nasr/pavement';
 import { isPublishableRunway, parseDeclaredDistances } from '../src/airport/nasr/runway';
 import type {
@@ -264,6 +265,17 @@ async function main(): Promise<void> {
   await writeFile(
     path.join(OUTPUT_DIR, 'index.json'),
     JSON.stringify({ effectiveDate, count: index.length, airports: index }),
+  );
+
+  // Derived facts for every airport in one file, so the flag rule builder can
+  // show a live match count across the whole set (D50) without fetching 2,128
+  // detail files, and so flag evaluation on the pilot workspace stays cheap.
+  await writeFile(
+    path.join(OUTPUT_DIR, 'facts.json'),
+    JSON.stringify({
+      effectiveDate,
+      facts: Object.fromEntries(records.map((record) => [record.id, airportFacts(record)])),
+    }),
   );
   await Promise.all(
     records.map((record) =>
