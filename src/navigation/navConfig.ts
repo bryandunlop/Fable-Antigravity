@@ -104,6 +104,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // rewired onto real state (D46).
   { path: '/airport-evaluations/legacy', label: 'Airport Information (legacy mock)', domain: 'flight-ops', icon: MapPin, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
   { path: '/airport-evaluations/review', label: 'Airport Page Review', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['airport', 'proposal', 'approve', 'company page'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
+  { path: '/airport-evaluations/flags', label: 'Airport Flags', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['flag', 'rule', 'short runway', 'noise abatement'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
   { path: '/fuel-load-request', label: 'Fuel Load Request', domain: 'flight-ops', icon: Fuel, primary: false, roles: ['pilot', 'admin'] },
   { path: '/frat/review', label: 'FRAT Review', domain: 'flight-ops', icon: FileText, sidebar: false, roles: ['safety', 'admin'] },
   { path: '/flight-operations-center', label: 'Flight Operations Center', domain: 'flight-ops', icon: Monitor, sidebar: false, keywords: ['foc', 'ops center'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },

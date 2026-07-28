@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 import { requiredApprovals, type ApproverRole } from '../../airport/company/approvalRouting';
+import type { FlagRule } from '../../airport/flags/rules';
 import type { CompanyAirportPageContent, CompanyAirportPageVersion } from '../../airport/company/pageStore';
 import { PersistentCompanyAirportPageStore } from '../../airport/company/persistence';
 import {
@@ -12,6 +13,64 @@ import {
 import { defaultStorage, memoryStorage, type StorageLike } from '../../notifications/storage';
 
 export const PROPOSALS_KEY = 'airport-company-proposals';
+export const RULES_KEY = 'airport-flag-rules';
+
+function loadRules(storage: StorageLike): FlagRule[] {
+  const raw = storage.getItem(RULES_KEY);
+  if (!raw) return DEFAULT_RULES;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as FlagRule[]) : DEFAULT_RULES;
+  } catch {
+    return DEFAULT_RULES;
+  }
+}
+
+/**
+ * Seed rules, so the builder opens with worked examples rather than a blank page.
+ * They are ordinary rules — editable and deletable like any other, not special.
+ */
+const DEFAULT_RULES: FlagRule[] = [
+  {
+    id: 'seed-short-runway',
+    label: 'Short runway',
+    severity: 'caution',
+    appliesTo: [],
+    showOnPilotWorkspace: true,
+    guidance: 'Check performance for the day. Runway is short for this fleet.',
+    group: { combine: 'AND', conditions: [{ field: 'longestRunwayFt', operator: 'lt', value: 6000 }] },
+  },
+  {
+    id: 'seed-no-declared-distances',
+    label: 'No declared distances published',
+    severity: 'info',
+    appliesTo: [],
+    showOnPilotWorkspace: true,
+    guidance:
+      'The FAA publishes no TORA/TODA/ASDA/LDA here. Do not substitute runway length.',
+    group: {
+      combine: 'AND',
+      conditions: [{ field: 'hasDeclaredDistances', operator: 'isFalse' }],
+    },
+  },
+  {
+    id: 'seed-high-elevation',
+    label: 'High elevation',
+    severity: 'caution',
+    appliesTo: [],
+    showOnPilotWorkspace: true,
+    guidance: 'Density altitude will bite. Recheck takeoff and climb performance.',
+    group: { combine: 'AND', conditions: [{ field: 'elevationFt', operator: 'gt', value: 5000 }] },
+  },
+  {
+    id: 'seed-untowered',
+    label: 'Untowered',
+    severity: 'info',
+    appliesTo: [],
+    showOnPilotWorkspace: true,
+    group: { combine: 'AND', conditions: [{ field: 'towerTypeCode', operator: 'isEmpty' }] },
+  },
+];
 
 function loadProposals(storage: StorageLike): CompanyAirportProposal[] {
   const raw = storage.getItem(PROPOSALS_KEY);
@@ -41,6 +100,9 @@ interface CompanyAirportApi {
   readyToPublish(): CompanyAirportProposal[];
   forAirport(icao: string): CompanyAirportProposal[];
   approvalsFor(changedFields: string[]): ApproverRole[];
+  rules(): FlagRule[];
+  saveRule(rule: FlagRule): void;
+  deleteRule(ruleId: string): void;
 }
 
 const CompanyAirportContext = createContext<CompanyAirportApi | null>(null);
@@ -55,6 +117,7 @@ export function CompanyAirportProvider({ children }: { children: React.ReactNode
     pages: PersistentCompanyAirportPageStore;
     workflow: ProposalWorkflow;
     storage: StorageLike;
+    rules: FlagRule[];
   } | null>(null);
   if (!engine.current) {
     const clock = {
@@ -68,14 +131,16 @@ export function CompanyAirportProvider({ children }: { children: React.ReactNode
       pages,
       workflow: new ProposalWorkflow(pages, clock, loadProposals(storage)),
       storage,
+      rules: loadRules(storage),
     };
   }
 
-  /** Persist the in-flight queue and re-render. Pages persist themselves. */
+  /** Persist the in-flight queue and the rule set, then re-render. Pages persist themselves. */
   const commit = useCallback(() => {
-    const { workflow, storage } = engine.current!;
+    const { workflow, storage, rules } = engine.current!;
     try {
       storage.setItem(PROPOSALS_KEY, JSON.stringify(workflow.snapshot()));
+      storage.setItem(RULES_KEY, JSON.stringify(rules));
     } catch {
       /* quota or private browsing — the session is still correct in memory */
     }
@@ -105,6 +170,20 @@ export function CompanyAirportProvider({ children }: { children: React.ReactNode
       readyToPublish: () => workflow.readyToPublish(),
       forAirport: (icao) => workflow.forAirport(icao),
       approvalsFor: (changedFields) => requiredApprovals(changedFields),
+      rules: () => engine.current!.rules,
+      saveRule: (rule) => {
+        const current = engine.current!.rules;
+        const index = current.findIndex((r) => r.id === rule.id);
+        engine.current!.rules =
+          index >= 0
+            ? current.map((r) => (r.id === rule.id ? rule : r))
+            : [...current, rule];
+        commit();
+      },
+      deleteRule: (ruleId) => {
+        engine.current!.rules = engine.current!.rules.filter((r) => r.id !== ruleId);
+        commit();
+      },
     };
     // `revision` IS a real dependency, despite not being read here.
     //

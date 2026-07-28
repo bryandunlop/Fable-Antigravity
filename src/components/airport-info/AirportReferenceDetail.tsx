@@ -16,6 +16,7 @@ import type { CompanyAirportPageContent } from '../../airport/company/pageStore'
 import type { AirportRecord, RunwayRecord } from '../../airport/types';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
+import { AirportFlags } from './AirportFlags';
 import { useCompanyAirport } from './CompanyAirportContext';
 import { NotPublished, ProvenanceChip } from './ProvenanceChip';
 
@@ -324,6 +325,8 @@ export default function AirportReferenceDetail({
           </div>
         </div>
       </div>
+
+      <AirportFlags airport={airport} />
 
       <Card className="p-6">
         <div className="mb-4 flex items-center justify-between">
