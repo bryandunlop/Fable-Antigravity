@@ -16,8 +16,8 @@ phase.
 For the Tech Log specifically, we're proposing a change in approach: rather than rebuilding from
 the prototype as a wireframe, **we'll hand over the working module — front end, rule engines, and
 test suite — for CEG to port and build production infrastructure underneath.** Section 2 sets out
-exactly what we're providing and what remains to be built. Section 3 lists the acceptance
-artifacts we'll supply alongside the code.
+exactly what we're providing and what remains to be built. Section 3 covers the acceptance
+artifacts — three of which are complete and attached to this document.
 
 There are also a number of items in the quote we'd like clarified or corrected before this goes
 to a PO. Those are in sections 4 and 5.
@@ -100,21 +100,35 @@ test cases, roughly 81 cover the compliance rules directly.
 These modules are plain TypeScript with explicit inputs and outputs — no React, no context, no
 mocking in the tests. They should port with minimal change and are straightforward to re-verify.
 
-### 2.2 What is deliberately mock — and must be replaced
+### 2.2 What is still mock — and must be replaced
 
-The handover is a design and behavior reference. It runs on mock data and placeholder
-infrastructure. The following are **not** production-ready and are the substance of what Phase 2
+The handover is a design and behavior reference. Below the rule engines it runs on mock data and
+placeholder infrastructure. These are **not** production-ready and are the substance of what Phase 2
 needs to build:
 
 | # | Component | Current state in the code we're providing |
 |---|---|---|
-| 1 | **Signature hashing** | `engine/signing.ts` — a non-cryptographic FNV-style digest, commented in the source as "display-only — NOT real hashing" |
-| 2 | **Attachment SHA-256** | `engine/signing.ts` — `mockSha256()`, commented as "NOT real crypto"; derives stable hex from a description string |
-| 3 | **RFC 8785 canonicalization** | Not implemented. The `canonicalize` library is not a dependency |
-| 4 | **Record storage** | `persistence.ts` — a debounced whole-blob write to browser storage. Not a ledger |
-| 5 | **All data** | 9 mock-data files, ~17,900 lines of fixtures. No backend |
-| 6 | **CAMP transport** | `integration/campClient.ts` — mock. The mapping and session contract are specified and tested; no SOAP client is installed |
-| 7 | **Offline storage** | Not present. No Capacitor, no native SQLite |
+| 1 | **Record storage** | `persistence.ts` — a debounced whole-blob write to browser storage. Not a ledger |
+| 2 | **All data** | 9 mock-data files, ~17,900 lines of fixtures. No backend, no API |
+| 3 | **CAMP transport** | `integration/campClient.ts` — mock. The mapping, session and reconciliation contract are specified and tested; no SOAP client is installed |
+| 4 | **Offline storage** | Not present. No Capacitor, no native SQLite, no sync |
+| 5 | **Server-side enforcement** | Every airworthiness rule is enforced client-side only, because there is no server to enforce it at |
+
+### 2.2a One item moved out of that table while preparing this
+
+Signature hashing **was** mock — a non-cryptographic digest and a `mockSha256()` that derived hex
+from a description string, both labelled as such in the source but rendered in the UI as though
+they were real.
+
+That is now built and ships with the handover: RFC 8785 (JCS) canonicalization plus true SHA-256,
+in `engine/contentHash.ts`, with 11 golden vectors and 25 tests. So the signature chain is no
+longer something to build — it is something to **integrate**, and the remaining work on it is
+server-side recompute-and-reject at commit, not the algorithm.
+
+One honest caveat: `attachmentSha256()` now uses a real SHA-256, but over a
+`name|size|lastModified` descriptor rather than the file's bytes, because the prototype has no file
+storage. Production must hash the actual bytes — same function, real input. It's flagged in the
+source.
 
 ### 2.3 What the Tech Log estimate should therefore cover
 
@@ -124,26 +138,29 @@ if the number needs to change:
 
 1. **Append-only ledger storage.** Signed records — journey log, defects, deferrals, maintenance
    releases, signatures, audit trail — stored immutably, with corrections handled as superseding
-   inserts rather than updates. Note that ledger schema changes are forward-only, so the schema
-   needs to be settled before the tables are created.
+   inserts rather than updates. The schema contract in section 3 specifies this. Ledger migrations
+   are forward-only, so it must be agreed before the tables are created.
 
-2. **Real signature chain.** RFC 8785 (JCS) canonicalization plus SHA-256, replacing items 1–3
-   above. The content hash must be recomputed server-side at commit, and the server timestamp
-   must be authoritative over the client's.
+2. **Backend and API.** Replacing 2.2 items 1–2 — real persistence behind the provided front end.
 
-3. **Durable and offline persistence.** Replacing item 4. Signed records must persist to durable
-   storage the moment they are signed, before any sync is attempted. This includes the
-   idempotency and conflict model for reconnect.
+3. **Durable and offline persistence.** Replacing 2.2 item 4. Signed records must persist to
+   durable storage the moment they are signed, before any sync is attempted. This includes the
+   idempotency and conflict model for reconnect, and it is the requirement most likely to be
+   underestimated — retrofitting offline onto an online-only build is a rewrite, not a change.
 
-4. **Backend and API.** Replacing item 5 — real persistence behind the provided front end.
+4. **Signature commit path.** The hashing itself is provided and tested. What remains is
+   server-side: recompute the content hash at commit and **reject** a mismatch — never re-hash and
+   accept — and stamp the authoritative server timestamp. The golden vectors in section 3 are the
+   acceptance test.
 
-5. **CAMP transport.** Replacing item 6 — the live SOAP client behind the provided mapping,
+5. **CAMP transport.** Replacing 2.2 item 3 — the live SOAP client behind the provided mapping,
    session, and reconciliation layer, with the documented error taxonomy handled explicitly.
 
-6. **Sign-off enforcement, server-side.** The rules are specified and tested in the code we're
-   providing, but they must be enforced at the API, not only in the UI: a Certificate of Release
-   to Service blocked when the signer has no A&P certificate number on file, and performer /
-   inspector separation on RII-required sign-offs.
+6. **Server-side enforcement of every airworthiness rule.** The rules are specified and tested in
+   the code we're providing, but they currently run client-side only. At minimum: CRS blocked
+   without an A&P certificate on file; performer/inspector separation on RII sign-offs; no deferral
+   against a `DRAFT` or `PENDING_FSDO` MEL item (409/422); extension limits by MEL category. The
+   negative-path checklist in section 3 enumerates all 33 cases.
 
 7. **Test coverage.** Confirmation that the provided suite runs green against the production
    build, plus coverage for the new infrastructure.
@@ -160,39 +177,84 @@ integrity cannot be retrofitted after records have been signed. We'd rather incr
 and cut elsewhere than discover a gap mid-build, so please tell us plainly if 160 hrs does not
 cover the seven items above.
 
+### 2.5 Are you porting the rule engines, or rewriting them?
+
+One question we'd like answered explicitly, because it changes what both sides need to produce.
+
+The 36 rule engines are plain TypeScript — pure functions, no React, no framework coupling — and
+they carry 503 tests that travel with them. If you port them as TypeScript, that coverage comes for
+free and you inherit the regulatory logic already verified.
+
+If you rewrite them in another stack, the tests don't come along. In that case we'll produce the
+compliance conformance pack described in section 3 so the rules stay verifiable against your
+implementation. We'd rather build it than have the logic reimplemented against prose.
+
 ---
 
-## 3. Acceptance artifacts we will provide
+## 3. Acceptance artifacts
 
-To make the port cleaner and to give both sides an objective definition of "correct," we'll
-prepare the following alongside the code handover. These are our deliverables, at our cost, and
-we'd like them referenced as acceptance criteria in the SOW.
+To make the port cleaner and give both sides an objective definition of "correct," we've prepared
+the following. **Three are complete and attached.** They're our deliverables, at our cost, and we'd
+like them referenced as acceptance criteria in the SOW.
 
-**1. Golden signing vectors.** A fixture set of representative signed payloads with their RFC 8785
-canonical form and true SHA-256 digest. Any correct implementation reproduces the digests exactly.
-This makes client/server hash agreement verifiable rather than a matter of inspection, and it is
-the single hardest property to confirm by code review.
+| # | Artifact | Status |
+|---|---|---|
+| 1 | **Golden signing vectors** — 11 cases | **Complete — attached** |
+| 2 | **Ledger schema contract** | **Complete — attached.** Must be agreed before any table is created |
+| 3 | **Negative-path checklist** — 33 assertions | **Complete — attached** |
+| 4 | Compliance conformance pack | Conditional — see 2.5 |
+| 5 | CAMP fixture pack | To follow |
 
-**2. Compliance conformance pack.** The ~81 compliance test cases extracted into
-language-neutral fixtures — input, expected output, and the governing rule for each. Covers the
-PL-25 clock, deferral expiry and extension, RII separation, superseding records, custody, and
-dispatch gating. The production build should pass these as a condition of acceptance.
+**1. Golden signing vectors.** Representative signed payloads with their RFC 8785 canonical form
+and true SHA-256. Any correct implementation, in any language, reproduces the digests exactly. This
+makes client/server hash agreement testable rather than reviewable — the single hardest property to
+confirm by code review, and one that fails invisibly until someone tries to verify an old
+signature. The fixture is generated by one implementation and verified by a second, so a green run
+demonstrates exactly the agreement your build needs between iPad and server.
 
-**3. Ledger schema contract.** Table-by-table definition of which records are append-only versus
-updatable, the superseding-insert pattern, and column nullability rules. Provided before the
-tables are created, since ledger migrations are forward-only.
+**2. Ledger schema contract.** Table-by-table: append-only versus updatable, the superseding-insert
+pattern, column nullability, and the platform constraints that are expensive to discover late —
+ledger is unsupported on elastic pools, and digests need immutable-tier GRS or ZRS storage. It
+closes with four open decisions that need an owner. **This one has a real deadline:** ledger
+migrations are forward-only, so it must be agreed before the first table exists.
 
-**4. CAMP fixture pack.** The error taxonomy as explicit constants with required handling per
-code, unit-conversion cases (CAMP stores hours as minutes; utilization is increase-only), and
-tail/serial exact-match validation cases. Exact tail and serial matching is the documented
-leading cause of CAMP integration failure, so we want it pinned by fixture.
+**3. Negative-path checklist.** 33 assertions that must *fail* when exercised — the paths where a
+wrong result is silent rather than visible. Each records the layer the control must live at, and
+whether the logic ports from the handover. Supplied as markdown and as JSON suitable for driving an
+automated suite.
 
-**5. Negative-path acceptance checklist.** A short set of assertions that must fail correctly —
-an UPDATE against a ledger table, a CRS sign-off without an A&P certificate on file, a deferral
-against an MEL item not yet approved, the same person as both performer and RII inspector. These
-are the cases where a wrong result is silent.
+**4. Compliance conformance pack.** The ~81 compliance cases as language-neutral fixtures. Only
+necessary if the engines are rewritten rather than ported — see 2.5.
 
-We'd propose that items 1, 2, and 5 form the objective portion of UAT for the Tech Log module.
+**5. CAMP fixture pack.** Error taxonomy with required handling per code, unit-conversion cases
+(CAMP stores hours as minutes; utilization is increase-only), and tail/serial exact-match
+validation. Much of this already exists in the module's `campTaxonomy`; we'll complete it once the
+CAMP scope in 5.6 is settled.
+
+We'd propose that artifacts 1, 2 and 3 form the objective portion of UAT for the Tech Log module.
+
+### What the checklist tells us about the estimate
+
+Scoring each of the 33 assertions for whether its logic ports from the handover produces a split
+worth putting in front of you directly:
+
+| Group | Ports from the handover |
+|---|---|
+| Sign-off authority, signature integrity, point-in-time MEL | **15 of 18** |
+| Immutability, concurrent supersede, idempotent offline sync | **3 of 15** |
+
+The regulatory **rules** are largely solved and travel with the code. The **enforcement layer** —
+immutable storage, safe concurrent corrections, idempotent offline sync — is new construction.
+
+This is the whole reason we're asking for the 160 to be broken down. An estimate built by walking
+the module sees the first group, because that group has screens and tests to look at. The second
+group has nothing to look at, and it's where the work is.
+
+One item moved between those columns while we were preparing this. The rule blocking a deferral
+against a `DRAFT` or `PENDING_FSDO` MEL item existed only as a filter on the MEL picker, with no
+guard behind it — a payload arriving by any other path was unchecked. We've since added
+`validateMelDeferrable()` to the rule engines with tests, so it now ports. It still has to be
+enforced at your API with a 409/422; a client-side guard is a better error message, not a control.
 
 ---
 
@@ -340,7 +402,8 @@ surprise:
 
 - Pricing assumes $85/hr holds at reduced volume (see 5.1). All figures above use $85.
 - The Tech Log module, its rule engines, and its test suite are provided by us as the starting
-  point for the production build, along with the acceptance artifacts in section 3.
+  point for the production build. Acceptance artifacts 1–3 in section 3 are complete and attached;
+  4 and 5 follow once 2.5 and 5.6 are settled.
 - Timeline: we'd expect a shorter schedule than the 10–12 weeks quoted for full scope, but we
   recognize project coordination, governance support, and UAT don't scale down proportionally.
   Please propose a revised timeline alongside the revised quote, and show fixed project overhead
@@ -353,5 +416,10 @@ surprise:
 ## 8. Requested next step
 
 A revised quote reflecting the 513-hour scope, with the Tech Log broken into sub-items per
-section 2.3 and the rate confirmed per section 5.1. Happy to get on a call to walk through the
-handover and the acceptance artifacts if that's faster.
+section 2.3 and the rate confirmed per section 5.1.
+
+The two answers that block everything else are **5.1** (does $85/hr hold at ~513 hours) and **2.3**
+(what the Tech Log 160 covers). The rest can follow.
+
+Happy to get on a call to walk through the handover and the acceptance artifacts if that's faster —
+the three attached documents are easier to talk through than to read cold.
