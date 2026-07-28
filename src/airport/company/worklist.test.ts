@@ -208,6 +208,22 @@ describe('officer worklist (LG-83)', () => {
     expect(narrowed.counts.neverReviewed).toBe(1);
   });
 
+  it('does not list a page whose fields have all been cleared', () => {
+    const t = ctx();
+    t.publish('KTEB', { opsNotes: 'Note' });
+    t.set('2026-03-01T12:00:00.000Z');
+    // Clearing the last populated field is an ordinary publishable change.
+    t.publish('KTEB', { opsNotes: null });
+
+    // There is nothing to confirm, so there is nothing for the officer to do.
+    // Listing it would render a card with no fields and therefore no button to
+    // clear it — a permanent row that only inflates the counts.
+    const list = buildOfficerWorklist(t.pages, t.workflow, 'airport-evaluator', {
+      todayIso: '2027-01-01',
+    });
+    expect(list.counts.total).toBe(0);
+  });
+
   it('does not list an airport with no page at all', () => {
     const t = ctx();
     const list = buildOfficerWorklist(t.pages, t.workflow, 'airport-evaluator', {

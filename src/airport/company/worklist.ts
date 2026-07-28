@@ -90,15 +90,20 @@ export function buildOfficerWorklist(
     openProposals: openByIcao.get(icao) ?? 0,
   }));
 
+  // A page with no fields carrying a value has nothing to review. It is not a
+  // stale fact, it is an absent one — and putting it on the board produces a
+  // card with no field rows and therefore no button to clear it, which sits
+  // there permanently inflating the counts. Reachable: clearing the last
+  // populated field is an ordinary publishable change.
+  const reviewable = rows.filter(
+    (row) => row.summary.status !== 'no-page' && row.summary.status !== 'not-applicable',
+  );
+
   // A page nobody has ever confirmed belongs in exactly one bucket. Listing it
   // under both "never reviewed" and "stale" would double-count the board and
   // make the total meaningless.
-  const neverReviewed = rows.filter(
-    (row) => row.summary.status !== 'no-page' && row.summary.neverConfirmed,
-  );
-  const reviewed = rows.filter(
-    (row) => row.summary.status !== 'no-page' && !row.summary.neverConfirmed,
-  );
+  const neverReviewed = reviewable.filter((row) => row.summary.neverConfirmed);
+  const reviewed = reviewable.filter((row) => !row.summary.neverConfirmed);
 
   const stale = reviewed.filter((row) => row.summary.status === 'overdue');
   const dueSoon = reviewed.filter((row) => row.summary.status === 'due-soon');
