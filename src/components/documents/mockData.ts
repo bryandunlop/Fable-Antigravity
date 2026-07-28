@@ -6,7 +6,7 @@ import type { Doc, DocRevision, DocAcknowledgment, DocComment, DocSuggestion, Do
 import type { Signature } from '../tech-log/types';
 import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
-import { mockSha256 } from '../tech-log/engine/signing';
+import { attachmentSha256 } from '../tech-log/engine/signing';
 import { sectionsFromMarkdown, checksumForSections } from './engine/blocks';
 import { applyComplianceRefs } from './engine/regCatalog';
 import { operatorTodayIso } from '../../lib/operatorDate';
@@ -388,7 +388,8 @@ const seedSignature: Signature = {
   amr: ['pwd', 'mfa'],
   authTimeUtc: daysFromNow(-2) + 'T15:05:00.000Z',
   signedAtUtc: daysFromNow(-2) + 'T15:05:00.000Z',
-  mockContentHash: mockSha256('seed|SOP-001-r2|USR004').slice(0, 8),
+  contentHash: attachmentSha256('seed|SOP-001-r2|USR004'),
+  contentHashShort: attachmentSha256('seed|SOP-001-r2|USR004').slice(0, 8),
 };
 
 const SEED_ACKS: DocAcknowledgment[] = [

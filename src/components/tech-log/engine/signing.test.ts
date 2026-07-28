@@ -23,7 +23,7 @@ describe('signing gates', () => {
   it('makeSignature stamps amr/authTime/hash', () => {
     const s = makeSignature({ id: 's1', signedEntity: 'CRS', signedEntityId: 'r1', signer: tech, intentStatement: 'x', signedAtUtc: '2026-06-21T00:00:00Z', certNumber: 'AP123' });
     expect(s.amr.length).toBeGreaterThan(0);
-    expect(s.mockContentHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(s.contentHashShort).toMatch(/^[0-9a-f]{8}$/);
     expect(s.signerName).toBe('Tom Parker');
   });
 });

@@ -196,7 +196,7 @@ export default function JourneyLog() {
           ...extras,
         ] },
       ],
-      signatures: sig ? [{ role: sig.signerRole, name: sig.signerName, cert: sig.certNumber, hash: sig.mockContentHash, signedAtUtc: sig.signedAtUtc, amr: sig.amr.join('+') }] : [],
+      signatures: sig ? [{ role: sig.signerRole, name: sig.signerName, cert: sig.certNumber, hash: sig.contentHashShort, signedAtUtc: sig.signedAtUtc, amr: sig.amr.join('+') }] : [],
       footnote: f.supersedesId ? `This entry is a correction superseding ${f.supersedesId}.` : undefined,
     });
   };

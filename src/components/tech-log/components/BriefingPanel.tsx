@@ -63,7 +63,7 @@ function printBriefing(input: {
       { heading: 'Coming due (CAMP)', body: list(disclosure?.comingDue ?? [], i => `${i.description} — ${i.dueDateUtc ? new Date(i.dueDateUtc).toLocaleDateString() : ''}`) },
       { heading: 'Preflight checklist', body: disclosure?.checklist.length ? disclosure.checklist.map(l => `${l.done ? '☑' : '☐'} ${l.label}`).join('\n') : '—' },
     ],
-    signatures: signatures.map(s => ({ role: s.signerRole, name: s.signerName, cert: s.certNumber, hash: s.mockContentHash, signedAtUtc: s.signedAtUtc, amr: s.amr.join('+') })),
+    signatures: signatures.map(s => ({ role: s.signerRole, name: s.signerName, cert: s.certNumber, hash: s.contentHashShort, signedAtUtc: s.signedAtUtc, amr: s.amr.join('+') })),
     footnote: unsnapshotted
       ? 'This briefing predates content snapshotting (TL-16): the items above are current values, not a record of what was disclosed at release.'
       : undefined,

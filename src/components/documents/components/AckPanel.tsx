@@ -39,7 +39,7 @@ export function AckPanel({ doc, rev, userRole }: { doc: Doc; rev: DocRevision; u
           <CheckCircle2 className="h-5 w-5 shrink-0" />
           <span className="text-sm">
             {myAck.level === 'signature' ? (
-              <>Read &amp; signed on {new Date(myAck.acknowledgedAtUtc).toLocaleString()}{sig ? <> · hash <span className="font-mono">{sig.mockContentHash}</span></> : null}.</>
+              <>Read &amp; signed on {new Date(myAck.acknowledgedAtUtc).toLocaleString()}{sig ? <> · hash <span className="font-mono">{sig.contentHashShort}</span></> : null}.</>
             ) : (
               <>Read &amp; initialed ({myAck.initials}) on {new Date(myAck.acknowledgedAtUtc).toLocaleString()}.</>
             )}{' '}

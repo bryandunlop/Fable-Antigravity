@@ -706,7 +706,10 @@ export interface Signature {
   amr: string[];
   authTimeUtc: string;
   signedAtUtc: string;
-  mockContentHash: string;  // display-only
+  /** SHA-256 over the RFC 8785 canonical signed payload — see engine/contentHash.ts. */
+  contentHash: string;
+  /** First 8 hex chars of `contentHash`, for compact display. Never use for verification. */
+  contentHashShort: string;
 }
 
 /** Oil uplift in quarts, per engine + APU (§3.1). */

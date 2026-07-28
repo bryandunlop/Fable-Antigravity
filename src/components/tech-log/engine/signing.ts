@@ -1,4 +1,5 @@
 import type { Personnel, Signature } from '../types';
+import { hashSignedRecord, sha256Hex } from './contentHash';
 
 export function validateCrs(signer: Personnel): { ok: boolean; error?: string } {
   if (!signer.apCertificateNumber) {
@@ -21,29 +22,15 @@ export function validateRii(
   return { ok: true };
 }
 
-// Tiny deterministic non-cryptographic digest (display-only — NOT real hashing).
-function mockHash(input: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(16).padStart(8, '0');
-}
-
 /**
- * Deterministic 64-hex "SHA-256" for the demo (NOT real crypto). In production this is a true
- * SHA-256 over the attachment bytes; here we derive a stable 64-char hex from a description string
- * so attachments can be folded into the signed payload and shown as digests.
+ * True SHA-256 of a descriptor string, for attachment digests.
+ *
+ * NOTE FOR THE PRODUCTION BUILD: the algorithm here is real, but the INPUT is not. This prototype
+ * has no file storage, so it hashes a `name|size|lastModified` descriptor rather than the file's
+ * bytes. Production must hash the actual bytes — same function, real input.
  */
-export function mockSha256(input: string): string {
-  let out = '';
-  let seed = input;
-  while (out.length < 64) {
-    out += mockHash(seed + out.length);
-    seed = out;
-  }
-  return out.slice(0, 64);
+export function attachmentSha256(descriptor: string): string {
+  return sha256Hex(descriptor);
 }
 
 export function makeSignature(input: {
@@ -54,8 +41,27 @@ export function makeSignature(input: {
   intentStatement: string;
   signedAtUtc: string;
   certNumber?: string;
-  payloadExtra?: string; // e.g. attachment SHA-256 digests — folded into the content hash
+  /** Attachment SHA-256 digests folded into the signed payload. */
+  attachmentSha256?: string[];
+  /** Record-specific fields covered by the signature (e.g. MEL category, due date). */
+  fields?: Record<string, unknown>;
+  /** Opaque extra bytes folded into the hash (e.g. a briefing-disclosure digest). */
+  payloadExtra?: string;
 }): Signature {
+  const certNumber = input.certNumber ?? input.signer.apCertificateNumber;
+  // RFC 8785 canonicalization + SHA-256 — see engine/contentHash.ts and the golden vectors in
+  // docs/tech-log/handover/. The server recomputes this at commit and rejects a mismatch.
+  const contentHash = hashSignedRecord({
+    entity: input.signedEntity,
+    entityId: input.signedEntityId,
+    signerOid: input.signer.oid,
+    certNumber,
+    intent: input.intentStatement,
+    signedAtUtc: input.signedAtUtc,
+    attachmentSha256: input.attachmentSha256,
+    fields: input.fields,
+    payloadExtra: input.payloadExtra,
+  });
   return {
     id: input.id,
     signedEntity: input.signedEntity,
@@ -63,14 +69,12 @@ export function makeSignature(input: {
     signerOid: input.signer.oid,
     signerName: input.signer.displayName,
     signerRole: input.signer.role,
-    certNumber: input.certNumber ?? input.signer.apCertificateNumber,
+    certNumber,
     intentStatement: input.intentStatement,
     amr: ['pwd', 'mfa'],
     authTimeUtc: input.signedAtUtc,
     signedAtUtc: input.signedAtUtc,
-    mockContentHash: mockHash(
-      `${input.signedEntity}|${input.signedEntityId}|${input.signer.oid}|${input.signedAtUtc}` +
-        (input.payloadExtra ? `|${input.payloadExtra}` : ''),
-    ),
+    contentHash,
+    contentHashShort: contentHash.slice(0, 8),
   };
 }

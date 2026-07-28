@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, Paperclip, Camera, MapPin, X } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
-import { mockSha256 } from '../../engine/signing';
+import { attachmentSha256 } from '../../engine/signing';
 import { ATA_CHAPTERS, INTENT } from '../../constants';
 import { newId } from '../../util/id';
 import type { Defect, Severity, DefectSource, Attachment, DefectLocationKind } from '../../types';
@@ -102,7 +102,7 @@ export function ReportDefectDialog({
       const thumb = await fileToThumb(file);
       added.push({
         id: newId('att'), filename: file.name, contentType: file.type || 'application/octet-stream', bytes: file.size,
-        sha256: mockSha256(`${file.name}|${file.size}|${file.lastModified}`),
+        sha256: attachmentSha256(`${file.name}|${file.size}|${file.lastModified}`),
         uri: thumb ?? `blob://mygfo/attach/${file.name}`, capturedAtUtc: new Date().toISOString(),
       });
     }

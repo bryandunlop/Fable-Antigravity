@@ -12,10 +12,10 @@ export default function AuditTrail() {
   const nameOf = (oid: string) => state.personnel.find(p => p.oid === oid)?.displayName ?? oid;
 
   const ledgerRows = [
-    ...state.defects.map(d => ({ kind: 'Defect', id: d.id, label: `ATA ${d.ataChapter} · ${d.status}`, supersedesId: d.supersedesId, hash: state.signatures.find(s => s.id === d.signatureId)?.mockContentHash })),
-    ...state.deferrals.map(d => ({ kind: 'Deferral', id: d.id, label: `Cat ${d.category} · ${d.status}`, supersedesId: d.supersedesId, hash: state.signatures.find(s => s.id === d.signatureId)?.mockContentHash })),
-    ...state.releases.map(r => ({ kind: 'Release', id: r.id, label: r.signoffType, supersedesId: r.supersedesId, hash: state.signatures.find(s => s.id === r.signatureId)?.mockContentHash })),
-    ...state.flightLogs.map(f => ({ kind: 'FlightLog', id: f.id, label: `sector ${f.sectorSequence}`, supersedesId: f.supersedesId, hash: state.signatures.find(s => s.id === f.signatureId)?.mockContentHash })),
+    ...state.defects.map(d => ({ kind: 'Defect', id: d.id, label: `ATA ${d.ataChapter} · ${d.status}`, supersedesId: d.supersedesId, hash: state.signatures.find(s => s.id === d.signatureId)?.contentHashShort })),
+    ...state.deferrals.map(d => ({ kind: 'Deferral', id: d.id, label: `Cat ${d.category} · ${d.status}`, supersedesId: d.supersedesId, hash: state.signatures.find(s => s.id === d.signatureId)?.contentHashShort })),
+    ...state.releases.map(r => ({ kind: 'Release', id: r.id, label: r.signoffType, supersedesId: r.supersedesId, hash: state.signatures.find(s => s.id === r.signatureId)?.contentHashShort })),
+    ...state.flightLogs.map(f => ({ kind: 'FlightLog', id: f.id, label: `sector ${f.sectorSequence}`, supersedesId: f.supersedesId, hash: state.signatures.find(s => s.id === f.signatureId)?.contentHashShort })),
   ];
   const supersededIds = new Set(ledgerRows.map(r => r.supersedesId).filter(Boolean) as string[]);
   const supersededCount = supersededIds.size;
@@ -58,7 +58,7 @@ export default function AuditTrail() {
             {state.signatures.map(s => (
               <div key={s.id} className="flex items-center justify-between gap-3 border-b py-1.5 last:border-0">
                 <div><Badge variant="outline" className="mr-2">{s.signedEntity}</Badge>{s.signerName} <span className="text-xs text-muted-foreground">· {s.amr.join('+')}</span></div>
-                <span className="shrink-0 font-mono text-xs text-muted-foreground">{s.mockContentHash} · {new Date(s.signedAtUtc).toLocaleString()}</span>
+                <span className="shrink-0 font-mono text-xs text-muted-foreground">{s.contentHashShort} · {new Date(s.signedAtUtc).toLocaleString()}</span>
               </div>
             ))}
           </CardContent></Card>

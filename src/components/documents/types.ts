@@ -75,7 +75,7 @@ export interface DocRevision {
   ackLevel: AckLevel;
   /** Drives the overdue chase list. */
   ackDueDate?: string;
-  /** mockSha256 of the canonical section serialization — shown as an integrity chip; folded into signature payloads. */
+  /** attachmentSha256 of the canonical section serialization — shown as an integrity chip; folded into signature payloads. */
   mockChecksum: string;
   submittedAtUtc?: string;
   decidedAtUtc?: string;

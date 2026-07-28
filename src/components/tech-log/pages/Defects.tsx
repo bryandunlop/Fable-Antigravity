@@ -7,7 +7,7 @@ import { useIntegration } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
 import { currentRows } from '../engine/supersede';
 import { canSupersede } from '../engine/authz';
-import { mockSha256 } from '../engine/signing';
+import { attachmentSha256 } from '../engine/signing';
 import { detectRepetitiveGroups } from '../engine/repetitive';
 import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
@@ -125,7 +125,7 @@ export default function Defects() {
         contentType: file.type || 'application/octet-stream',
         bytes: file.size,
         // mock SHA-256 over identifying metadata (real impl hashes the bytes)
-        sha256: mockSha256(`${file.name}|${file.size}|${file.lastModified}`),
+        sha256: attachmentSha256(`${file.name}|${file.size}|${file.lastModified}`),
         uri: thumb ?? `blob://mygfo/attach/${file.name}`,
         capturedAtUtc: new Date().toISOString(),
       });

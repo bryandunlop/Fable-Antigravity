@@ -267,7 +267,7 @@ export default function WorkCardDetail() {
         { heading: 'Labor', body: labor.length ? labor.map(l => `${l.techName ?? 'not recorded'} — ${l.hours} h — ${l.description}`).join('\n') + `\nTotal: ${totalLabor} h` : 'None' },
         { heading: 'Return to service', body: release.returnToServiceStatement },
       ],
-      signatures: [perf, rii].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.mockContentHash, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') })),
+      signatures: [perf, rii].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.contentHashShort, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') })),
     });
   };
 

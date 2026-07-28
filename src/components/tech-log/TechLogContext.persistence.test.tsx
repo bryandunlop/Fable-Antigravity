@@ -25,7 +25,8 @@ const SIG: Signature = {
   id: 'sig-tl26', signedEntity: 'CRS', signedEntityId: 'rel-tl26',
   signerOid: 'USR008', signerName: 'Tom Parker', signerRole: 'MAINTENANCE',
   certNumber: 'A&P 3312445', intentStatement: 'test', amr: ['pwd', 'mfa'],
-  authTimeUtc: '2026-07-26T12:00:00Z', signedAtUtc: '2026-07-26T12:00:00Z', mockContentHash: 'deadbeef',
+  authTimeUtc: '2026-07-26T12:00:00Z', signedAtUtc: '2026-07-26T12:00:00Z',
+  contentHash: 'deadbeef'.repeat(8), contentHashShort: 'deadbeef',
 };
 
 const storedSignatureIds = (): string[] => {

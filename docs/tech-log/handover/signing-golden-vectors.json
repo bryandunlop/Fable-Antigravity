@@ -1,0 +1,229 @@
+{
+  "$comment": "Golden signing vectors for the myGFO eTechLog. Any correct implementation must reproduce `canonical` and `sha256` byte-for-byte from `payload`. Regenerate with: node scripts/gen-signing-vectors.mjs",
+  "spec": {
+    "canonicalization": "RFC 8785 (JCS)",
+    "digest": "SHA-256",
+    "encoding": "UTF-8",
+    "output": "lowercase hex"
+  },
+  "payloadVersion": 1,
+  "invariants": [
+    "Object keys are sorted by UTF-16 code unit at every nesting level.",
+    "An omitted optional field and an explicit null are DIFFERENT payloads with different hashes.",
+    "Attachment digests are sorted ascending before hashing, so upload order is not covered.",
+    "Non-ASCII is emitted as UTF-8, never as \\u escapes.",
+    "The client hash and the server recomputation must match exactly; on mismatch the commit is rejected, never re-hashed.",
+    "payloadExtra is opaque to a verifier but is covered by the hash; production should prefer structured fields."
+  ],
+  "vectors": [
+    {
+      "id": "crs-release-basic",
+      "note": "Baseline CRS sign-off with an A&P certificate number present.",
+      "payload": {
+        "v": 1,
+        "entity": "MaintenanceRelease",
+        "entityId": "REL-2026-0417",
+        "signerOid": "3f2a1b7c-9d4e-4a11-8c22-0b7d5e6f8a90",
+        "intent": "I certify this aircraft is approved for return to service with respect to the work performed.",
+        "signedAtUtc": "2026-07-14T16:32:05.000Z",
+        "certNumber": "A&P 3412887"
+      },
+      "canonical": "{\"certNumber\":\"A&P 3412887\",\"entity\":\"MaintenanceRelease\",\"entityId\":\"REL-2026-0417\",\"intent\":\"I certify this aircraft is approved for return to service with respect to the work performed.\",\"signedAtUtc\":\"2026-07-14T16:32:05.000Z\",\"signerOid\":\"3f2a1b7c-9d4e-4a11-8c22-0b7d5e6f8a90\",\"v\":1}",
+      "sha256": "3fcd2534a7d17f7c5801e2cc927a77fb3d38b72f3c89f4e17b716954db6e0ef2"
+    },
+    {
+      "id": "pilot-acceptance-no-cert",
+      "note": "certNumber is OMITTED, not null. The absent-vs-null distinction changes the bytes — see the null-cert case.",
+      "payload": {
+        "v": 1,
+        "entity": "FlightLog",
+        "entityId": "FL-2026-1188",
+        "signerOid": "8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e",
+        "intent": "I accept the aircraft for dispatch and acknowledge the open deferrals listed.",
+        "signedAtUtc": "2026-07-14T17:04:00.000Z"
+      },
+      "canonical": "{\"entity\":\"FlightLog\",\"entityId\":\"FL-2026-1188\",\"intent\":\"I accept the aircraft for dispatch and acknowledge the open deferrals listed.\",\"signedAtUtc\":\"2026-07-14T17:04:00.000Z\",\"signerOid\":\"8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e\",\"v\":1}",
+      "sha256": "e4a981ad5d378201f01cb80a7459f1f926aaf7e5dc9c2862ef250f248b0c5578"
+    },
+    {
+      "id": "deferral-with-fields",
+      "note": "Record-specific fields folded in — MEL category, governing revision, computed due date.",
+      "payload": {
+        "v": 1,
+        "entity": "Deferral",
+        "entityId": "DEF-2026-0093",
+        "signerOid": "3f2a1b7c-9d4e-4a11-8c22-0b7d5e6f8a90",
+        "intent": "I defer this item under the approved MEL.",
+        "signedAtUtc": "2026-01-26T10:00:00.000Z",
+        "certNumber": "A&P 3412887",
+        "fields": {
+          "melCategory": "C",
+          "melItemRef": "25-10-01a",
+          "governingMmelRevision": "2025-11-14",
+          "clockStartUtc": "2026-01-27T05:00:00.000Z",
+          "repairDueUtc": "2026-02-06T05:00:00.000Z",
+          "governingTimezone": "America/New_York"
+        }
+      },
+      "canonical": "{\"certNumber\":\"A&P 3412887\",\"entity\":\"Deferral\",\"entityId\":\"DEF-2026-0093\",\"fields\":{\"clockStartUtc\":\"2026-01-27T05:00:00.000Z\",\"governingMmelRevision\":\"2025-11-14\",\"governingTimezone\":\"America/New_York\",\"melCategory\":\"C\",\"melItemRef\":\"25-10-01a\",\"repairDueUtc\":\"2026-02-06T05:00:00.000Z\"},\"intent\":\"I defer this item under the approved MEL.\",\"signedAtUtc\":\"2026-01-26T10:00:00.000Z\",\"signerOid\":\"3f2a1b7c-9d4e-4a11-8c22-0b7d5e6f8a90\",\"v\":1}",
+      "sha256": "55301d964fb56cad4af33775305ca06ca91814f54c480f3d26cb2d51d6ca1387"
+    },
+    {
+      "id": "defect-with-attachments",
+      "note": "Attachment digests are sorted before hashing, so upload order cannot change the result.",
+      "payload": {
+        "v": 1,
+        "entity": "Defect",
+        "entityId": "DFT-2026-0451",
+        "signerOid": "8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e",
+        "intent": "I report the defect described above.",
+        "signedAtUtc": "2026-07-14T09:15:30.000Z",
+        "attachmentSha256": [
+          "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+          "7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d",
+          "ffb1c0d2e3f4a5b60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e"
+        ]
+      },
+      "canonical": "{\"attachmentSha256\":[\"0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9\",\"7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d\",\"ffb1c0d2e3f4a5b60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e\"],\"entity\":\"Defect\",\"entityId\":\"DFT-2026-0451\",\"intent\":\"I report the defect described above.\",\"signedAtUtc\":\"2026-07-14T09:15:30.000Z\",\"signerOid\":\"8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e\",\"v\":1}",
+      "sha256": "cc2bae0c72c2a56ea593d7c82ed88ba251375de51f396afc633f6123c4f89794"
+    },
+    {
+      "id": "unicode-signer-and-intent",
+      "note": "Non-ASCII must survive as UTF-8, not \\u-escapes. A signer name with a diacritic and a non-Latin script.",
+      "payload": {
+        "v": 1,
+        "entity": "MaintenanceRelease",
+        "entityId": "REL-2026-0418",
+        "signerOid": "a1b2c3d4-e5f6-4718-a293-a4b5c6d7e8f9",
+        "intent": "Signed by José Álvarez — 検査完了 — work verified.",
+        "signedAtUtc": "2026-07-15T08:00:00.000Z",
+        "certNumber": "A&P 2298104"
+      },
+      "canonical": "{\"certNumber\":\"A&P 2298104\",\"entity\":\"MaintenanceRelease\",\"entityId\":\"REL-2026-0418\",\"intent\":\"Signed by José Álvarez — 検査完了 — work verified.\",\"signedAtUtc\":\"2026-07-15T08:00:00.000Z\",\"signerOid\":\"a1b2c3d4-e5f6-4718-a293-a4b5c6d7e8f9\",\"v\":1}",
+      "sha256": "321706e6295042dbcbf93578c3974a9acc64569641f68dd0abe7bc9527834c31"
+    },
+    {
+      "id": "escaping-in-intent",
+      "note": "Quote, backslash, newline, tab and a control character must use the RFC 8785 escape set exactly.",
+      "payload": {
+        "v": 1,
+        "entity": "Defect",
+        "entityId": "DFT-2026-0452",
+        "signerOid": "a1b2c3d4-e5f6-4718-a293-a4b5c6d7e8f9",
+        "intent": "Crew reported \"bang\\thud\" on rotation.\nRef: C:\\logs\\ata32\u0007 end.",
+        "signedAtUtc": "2026-07-15T08:30:00.000Z"
+      },
+      "canonical": "{\"entity\":\"Defect\",\"entityId\":\"DFT-2026-0452\",\"intent\":\"Crew reported \\\"bang\\\\thud\\\" on rotation.\\nRef: C:\\\\logs\\\\ata32\\u0007 end.\",\"signedAtUtc\":\"2026-07-15T08:30:00.000Z\",\"signerOid\":\"a1b2c3d4-e5f6-4718-a293-a4b5c6d7e8f9\",\"v\":1}",
+      "sha256": "232b052a995d7e142981fb37c83e0674dd5c78e5f5ae28e7fba9b4492c93a703"
+    },
+    {
+      "id": "numeric-field-formatting",
+      "note": "Numbers follow ES6 Number::toString — integers unsuffixed, no trailing zeros, exponent form above 1e21.",
+      "payload": {
+        "v": 1,
+        "entity": "FlightLog",
+        "entityId": "FL-2026-1189",
+        "signerOid": "8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e",
+        "intent": "I certify the recorded times and cycles are correct.",
+        "signedAtUtc": "2026-07-15T12:00:00.000Z",
+        "fields": {
+          "airframeHours": 12034.5,
+          "cycles": 4821,
+          "blockMinutes": 137,
+          "fuelBurnLb": 8420.25,
+          "oilUpliftQt": 0.5,
+          "zeroValue": 0,
+          "negative": -1.75
+        }
+      },
+      "canonical": "{\"entity\":\"FlightLog\",\"entityId\":\"FL-2026-1189\",\"fields\":{\"airframeHours\":12034.5,\"blockMinutes\":137,\"cycles\":4821,\"fuelBurnLb\":8420.25,\"negative\":-1.75,\"oilUpliftQt\":0.5,\"zeroValue\":0},\"intent\":\"I certify the recorded times and cycles are correct.\",\"signedAtUtc\":\"2026-07-15T12:00:00.000Z\",\"signerOid\":\"8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e\",\"v\":1}",
+      "sha256": "610c34371a14e69343cfd7c27d2abd78f19ec9437907df965c84f3a0fa780f97"
+    },
+    {
+      "id": "payload-extra-covered",
+      "note": "payloadExtra is opaque but IS covered by the hash — changing it changes the signature. Production should prefer structured `fields`.",
+      "payload": {
+        "v": 1,
+        "entity": "FlightLog",
+        "entityId": "FL-2026-1190",
+        "signerOid": "8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e",
+        "intent": "I acknowledge the briefing disclosure shown.",
+        "signedAtUtc": "2026-07-15T15:00:00.000Z",
+        "payloadExtra": "DEF-0093,DEF-0094|d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "canonical": "{\"entity\":\"FlightLog\",\"entityId\":\"FL-2026-1190\",\"intent\":\"I acknowledge the briefing disclosure shown.\",\"payloadExtra\":\"DEF-0093,DEF-0094|d41d8cd98f00b204e9800998ecf8427e\",\"signedAtUtc\":\"2026-07-15T15:00:00.000Z\",\"signerOid\":\"8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e\",\"v\":1}",
+      "sha256": "cdbef5afff4b809ebb366d0ae120db5955692e05b844cb8d3c050376b42e114e"
+    },
+    {
+      "id": "null-cert-differs-from-absent",
+      "note": "PAIRED WITH pilot-acceptance-no-cert. Same payload but certNumber explicitly null — canonicalize KEEPS null and DROPS undefined, so this hash MUST differ. An implementation that emits null for a missing cert will silently produce unverifiable signatures.",
+      "payload": {
+        "v": 1,
+        "entity": "FlightLog",
+        "entityId": "FL-2026-1188",
+        "signerOid": "8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e",
+        "certNumber": null,
+        "intent": "I accept the aircraft for dispatch and acknowledge the open deferrals listed.",
+        "signedAtUtc": "2026-07-14T17:04:00.000Z"
+      },
+      "canonical": "{\"certNumber\":null,\"entity\":\"FlightLog\",\"entityId\":\"FL-2026-1188\",\"intent\":\"I accept the aircraft for dispatch and acknowledge the open deferrals listed.\",\"signedAtUtc\":\"2026-07-14T17:04:00.000Z\",\"signerOid\":\"8c1d0e2f-4a5b-4c6d-9e70-1f2a3b4c5d6e\",\"v\":1}",
+      "sha256": "75c6f07791ed2e2d781c949bb565198ab504bda6e3bc358f0c655bbd149552cd"
+    },
+    {
+      "id": "nested-and-empty-structures",
+      "note": "Nested objects sort at every level; empty object and empty array are preserved distinctly.",
+      "payload": {
+        "v": 1,
+        "entity": "Deferral",
+        "entityId": "DEF-2026-0094",
+        "signerOid": "3f2a1b7c-9d4e-4a11-8c22-0b7d5e6f8a90",
+        "intent": "Nested structure case.",
+        "signedAtUtc": "2026-07-15T13:00:00.000Z",
+        "fields": {
+          "zulu": {
+            "yankee": 1,
+            "alpha": {
+              "delta": [
+                3,
+                1,
+                2
+              ],
+              "bravo": "x"
+            }
+          },
+          "emptyObject": {},
+          "emptyArray": [],
+          "booleanFalse": false
+        }
+      },
+      "canonical": "{\"entity\":\"Deferral\",\"entityId\":\"DEF-2026-0094\",\"fields\":{\"booleanFalse\":false,\"emptyArray\":[],\"emptyObject\":{},\"zulu\":{\"alpha\":{\"bravo\":\"x\",\"delta\":[3,1,2]},\"yankee\":1}},\"intent\":\"Nested structure case.\",\"signedAtUtc\":\"2026-07-15T13:00:00.000Z\",\"signerOid\":\"3f2a1b7c-9d4e-4a11-8c22-0b7d5e6f8a90\",\"v\":1}",
+      "sha256": "6d1d0f7d250e28ffdba093a84f0682945d4128c65a2497c587a7939d7607c23b"
+    },
+    {
+      "id": "key-sorting-utf16",
+      "note": "RFC 8785 sorts by UTF-16 code unit, NOT by locale or code point. Uppercase sorts before lowercase; the astral character sorts by its surrogate pair.",
+      "payload": {
+        "v": 1,
+        "entity": "Defect",
+        "entityId": "DFT-2026-0453",
+        "signerOid": "a1b2c3d4-e5f6-4718-a293-a4b5c6d7e8f9",
+        "intent": "Key ordering case.",
+        "signedAtUtc": "2026-07-15T14:00:00.000Z",
+        "fields": {
+          "1": 9,
+          "b": 1,
+          "A": 2,
+          "a": 3,
+          "B": 4,
+          "é": 5,
+          "z": 6,
+          "ü": 7,
+          "𝄞": 8,
+          "": 10
+        }
+      },
+      "canonical": "{\"entity\":\"Defect\",\"entityId\":\"DFT-2026-0453\",\"fields\":{\"\":10,\"1\":9,\"A\":2,\"B\":4,\"a\":3,\"b\":1,\"z\":6,\"é\":5,\"ü\":7,\"𝄞\":8},\"intent\":\"Key ordering case.\",\"signedAtUtc\":\"2026-07-15T14:00:00.000Z\",\"signerOid\":\"a1b2c3d4-e5f6-4718-a293-a4b5c6d7e8f9\",\"v\":1}",
+      "sha256": "9be07d8228a939c8feb5dd23ec321128ed0dc61b40a0a322fb13c55dfefef8cc"
+    }
+  ]
+}

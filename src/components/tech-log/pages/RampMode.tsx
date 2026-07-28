@@ -111,7 +111,7 @@ export default function RampMode() {
         ...(r.restrictionText ? [{ heading: 'Restriction', body: r.restrictionText }] : []),
       ],
       signatures: sig
-        ? [{ role: sig.signerRole, name: sig.signerName, cert: sig.certNumber, hash: sig.mockContentHash, signedAtUtc: sig.signedAtUtc, amr: sig.amr.join('+') }]
+        ? [{ role: sig.signerRole, name: sig.signerName, cert: sig.certNumber, hash: sig.contentHashShort, signedAtUtc: sig.signedAtUtc, amr: sig.amr.join('+') }]
         : [],
       pdfBlobUri: mockPdfBlobUri('deferral', r.deferralId),
       // Says what this document IS (91.213(a)(4)'s required entry describing inoperative equipment),
@@ -239,7 +239,7 @@ function RampRow({
   row: RampDeferralRow;
   open: boolean;
   onToggle: () => void;
-  signature?: { signerName: string; signerRole: string; certNumber?: string; signedAtUtc: string; mockContentHash: string; amr: string[] };
+  signature?: { signerName: string; signerRole: string; certNumber?: string; signedAtUtc: string; contentHashShort: string; amr: string[] };
   onPrint: () => void;
 }) {
   const bad = row.status !== 'ACTIVE';
@@ -302,7 +302,7 @@ function RampRow({
                 <p className="text-muted-foreground">
                   {formatRegulatoryCompact(signature.signedAtUtc, 'UTC', 'UTC')} · {signature.amr.join('+')}
                 </p>
-                <p className="font-mono text-muted-foreground">{signature.mockContentHash}</p>
+                <p className="font-mono text-muted-foreground">{signature.contentHashShort}</p>
               </>
             ) : (
               <p className="text-[var(--gfo-error,#EF3340)]">Signature record not found.</p>

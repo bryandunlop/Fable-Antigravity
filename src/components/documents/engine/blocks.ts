@@ -1,7 +1,7 @@
 // Pure block content model: markdown ↔ section tree, deterministic IDs, and a
 // canonical serialization for the content checksum. No React / no storage.
 import type { DocSection, DocBlock, BlockType } from '../types';
-import { mockSha256 } from '../../tech-log/engine/signing';
+import { attachmentSha256 } from '../../tech-log/engine/signing';
 
 function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled';
@@ -140,7 +140,7 @@ export function canonicalizeSections(sections: DocSection[]): string {
 }
 
 export function checksumForSections(sections: DocSection[]): string {
-  return mockSha256(canonicalizeSections(sections));
+  return attachmentSha256(canonicalizeSections(sections));
 }
 
 /** The two content-derived DocRevision fields from a single parse — so the

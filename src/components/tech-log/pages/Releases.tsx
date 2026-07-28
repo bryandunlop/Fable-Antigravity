@@ -66,7 +66,7 @@ export default function Releases() {
     const ac = acOf(r.aircraftId);
     const perf = sigById(r.signatureId);
     const rii = sigById(r.riiSignatureId);
-    const sigs = [perf, rii].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.mockContentHash, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') }));
+    const sigs = [perf, rii].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.contentHashShort, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') }));
     printSignedRecord({
       docTitle: r.signoffType === 'DEFERRAL' ? '(M) / Placard Discharge Release' : 'Certificate of Release to Service',
       recordType: r.isGatingDischarge ? 'Gating discharge' : r.signoffType,

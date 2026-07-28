@@ -60,7 +60,7 @@ export function SignCeremonyDialog({
     onSigned(sig);
     setPin('');
     onOpenChange(false);
-    toast.success(`Signed by ${signer.displayName}`, { description: `Hash ${sig.mockContentHash} · ${sig.amr.join('+')}` });
+    toast.success(`Signed by ${signer.displayName}`, { description: `Hash ${sig.contentHashShort} · ${sig.amr.join('+')}` });
   };
 
   return (

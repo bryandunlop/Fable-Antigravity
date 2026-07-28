@@ -335,7 +335,7 @@ export default function AircraftDetail() {
           { label: 'RII required', value: r.riiRequired ? 'Yes' : 'No' },
         ], body: r.returnToServiceStatement },
       ],
-      signatures: [perf, rii].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.mockContentHash, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') })),
+      signatures: [perf, rii].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.contentHashShort, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') })),
     });
   };
 
