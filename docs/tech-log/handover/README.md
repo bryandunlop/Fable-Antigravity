@@ -108,13 +108,50 @@ Covers:
 
 ---
 
-## 3. Still to be produced
+## 3. `negative-path-checklist.md` / `.json` — the cases that must fail
+
+**Status: complete. Proposed as the objective portion of Tech Log UAT.**
+
+33 assertions, every one a case that must **fail** when exercised. These are the paths where a
+wrong result is silent — an `UPDATE` that quietly succeeds against a signed record, a signature
+that verifies against the wrong bytes, a deferral written against an MEL item the FAA never
+approved. Positive-path testing cannot find any of them.
+
+Each assertion records the **layer** the control must live at (`DB` / `API` / `ENGINE` / `CLIENT`)
+and whether the logic is portable from the handover. `portable` is deliberately conservative:
+UI-only enforcement counts as **not** portable, because a filter on a picker is not a control.
+
+```bash
+npm run negative-paths:check   # confirms the JSON matches the generator
+```
+
+### What the coverage split says
+
+| Group | Portable | Meaning |
+|---|---|---|
+| Sign-off authority, signature integrity, point-in-time MEL | 15 of 18 | The regulatory **rules** are largely solved and travel with the code |
+| Immutability, concurrent supersede, idempotent offline sync | 3 of 15 | The **enforcement layer** is new construction |
+
+An estimate built by walking the module will see the first group and undercount the second, because
+the second group has nothing to look at.
+
+### Two assertions worth reading before the rest
+
+- **2.2 — concurrent double-supersede.** An application-layer test passes this falsely. Two requests
+  can both call `wouldFork()`, both see no conflict, and both insert. It must be tested with real
+  concurrency against the real database; only the unique index prevents it.
+- **4.1 — hash mismatch on commit.** There is a specific wrong implementation to guard against:
+  recomputing the hash server-side and *storing the recomputed value*. That always "succeeds" and
+  silently destroys the client's attestation. The server recomputes to **compare**, then rejects.
+
+---
+
+## 4. Still to be produced
 
 Described in the Phase 2 scope request (section 3).
 
 | Artifact | Purpose | Priority |
 |---|---|---|
-| **Negative-path acceptance checklist** | The section 8 assertions as runnable tests: UPDATE against a ledger table, CRS without an A&P cert, deferral against an unapproved MEL item, same person as performer and RII inspector | High — these fail silently when wrong |
 | **Compliance conformance pack** | The ~81 compliance cases as language-neutral fixtures | Only needed if the rule engines are **rewritten** rather than ported — the 503 tests travel with the TypeScript |
 | **CAMP fixture pack** | Error taxonomy with required handling per code, minutes↔hours conversion, increase-only guard, tail/serial exact-match | Medium — `integration/campTaxonomy.ts` already covers much of it |
 

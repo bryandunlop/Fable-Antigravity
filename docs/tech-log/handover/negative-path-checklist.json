@@ -1,0 +1,309 @@
+{
+  "$comment": "Negative-path acceptance checklist for the myGFO eTechLog. EVERY assertion here must FAIL when exercised — these are the paths where a wrong result is silent. Regenerate with: node scripts/gen-negative-path-checklist.mjs",
+  "purpose": "Objective portion of Tech Log UAT. Positive-path testing cannot find any of these.",
+  "layers": {
+    "DB": "Enforced by the database engine — ledger table type, constraint, or index",
+    "API": "Enforced server-side on the request path, before commit",
+    "ENGINE": "Pure logic, portable from the handed-over module",
+    "CLIENT": "Enforced on the device",
+    "UI": "Enforced only by what the interface offers — never sufficient on its own"
+  },
+  "summary": {
+    "total": 33,
+    "portable": 17,
+    "partiallyPortable": 1,
+    "newConstruction": 15
+  },
+  "sections": [
+    {
+      "id": "immutability",
+      "title": "Immutability",
+      "assertions": [
+        {
+          "id": "1.1",
+          "assertion": "UPDATE a signed defect row",
+          "layer": "DB",
+          "expected": "rejected",
+          "portable": false,
+          "note": "Append-only ledger rejects UPDATE at the engine."
+        },
+        {
+          "id": "1.2",
+          "assertion": "DELETE a signature row",
+          "layer": "DB",
+          "expected": "rejected",
+          "portable": false
+        },
+        {
+          "id": "1.3",
+          "assertion": "UPDATE repair_due_date_utc on a signed deferral",
+          "layer": "DB",
+          "expected": "rejected",
+          "portable": false
+        },
+        {
+          "id": "1.4",
+          "assertion": "UPDATE an audit_trail row",
+          "layer": "DB",
+          "expected": "rejected",
+          "portable": false
+        },
+        {
+          "id": "1.5",
+          "assertion": "Verify the ledger digest against Blob storage",
+          "layer": "DB",
+          "expected": "verifies",
+          "portable": false,
+          "note": "An append-only table you never verify is a promise, not a proof. Run on a schedule, not just at UAT."
+        }
+      ]
+    },
+    {
+      "id": "supersede",
+      "title": "Supersede integrity",
+      "assertions": [
+        {
+          "id": "2.1",
+          "assertion": "Insert a second row with an existing supersedes_id",
+          "layer": "DB",
+          "expected": "rejected",
+          "portable": "partial",
+          "note": "Unique partial index on supersedes_id. wouldFork() is the friendly error path only."
+        },
+        {
+          "id": "2.2",
+          "assertion": "Two concurrent requests supersede the same parent",
+          "layer": "DB",
+          "expected": "exactly one commits",
+          "portable": false,
+          "note": "An application check cannot do this — both requests can pass it and both insert. Test with real concurrency against the real database."
+        },
+        {
+          "id": "2.3",
+          "assertion": "A rejected fork writes supersede_conflict + audit_trail",
+          "layer": "API",
+          "expected": "both rows present",
+          "portable": true,
+          "note": "buildSupersedeConflict() constructs both."
+        },
+        {
+          "id": "2.4",
+          "assertion": "Read an entity with a 3-deep supersede chain",
+          "layer": "ENGINE",
+          "expected": "returns only the head",
+          "portable": true,
+          "note": "currentRows(), latestFor()."
+        }
+      ]
+    },
+    {
+      "id": "signoff",
+      "title": "Sign-off authority",
+      "assertions": [
+        {
+          "id": "3.1",
+          "assertion": "CRS sign-off with no A&P certificate on file",
+          "layer": "API+DB",
+          "expected": "rejected",
+          "portable": true,
+          "note": "14 CFR 91.417. validateCrs()."
+        },
+        {
+          "id": "3.2",
+          "assertion": "CRS insert with ap_certificate_number NULL, posted directly",
+          "layer": "DB",
+          "expected": "rejected",
+          "portable": false,
+          "note": "CHECK constraint — the API guard alone is defeated by a direct write."
+        },
+        {
+          "id": "3.3",
+          "assertion": "RII sign-off where inspector OID equals performer OID",
+          "layer": "API+DB",
+          "expected": "rejected",
+          "portable": true,
+          "note": "validateRii()."
+        },
+        {
+          "id": "3.4",
+          "assertion": "RII sign-off by an inspector unauthorized for that ATA chapter",
+          "layer": "API",
+          "expected": "rejected",
+          "portable": true,
+          "note": "validateRii()."
+        },
+        {
+          "id": "3.5",
+          "assertion": "Deferral against an MEL item in DRAFT",
+          "layer": "API",
+          "expected": "rejected 409/422",
+          "portable": true,
+          "note": "validateMelDeferrable(). Was UI-filter-only before this handover."
+        },
+        {
+          "id": "3.6",
+          "assertion": "Deferral against an MEL item in PENDING_FSDO",
+          "layer": "API",
+          "expected": "rejected 409/422",
+          "portable": true,
+          "note": "The G800 provisional case. validateMelDeferrable()."
+        },
+        {
+          "id": "3.7",
+          "assertion": "Deferral against a SUPERSEDED MEL item",
+          "layer": "API",
+          "expected": "rejected, points at current item",
+          "portable": true,
+          "note": "validateMelDeferrable()."
+        },
+        {
+          "id": "3.8",
+          "assertion": "Second extension on a Cat B or C deferral",
+          "layer": "ENGINE+API",
+          "expected": "rejected",
+          "portable": true,
+          "note": "Extendable once. extensionUsed gate."
+        },
+        {
+          "id": "3.9",
+          "assertion": "Any extension on a Cat A or D deferral",
+          "layer": "ENGINE+API",
+          "expected": "rejected",
+          "portable": true,
+          "note": "Never extendable."
+        }
+      ]
+    },
+    {
+      "id": "signature",
+      "title": "Signature integrity",
+      "assertions": [
+        {
+          "id": "4.1",
+          "assertion": "Commit a payload whose content_hash disagrees with the server recomputation",
+          "layer": "API",
+          "expected": "rejected",
+          "portable": true,
+          "note": "WRONG IMPLEMENTATION TO GUARD AGAINST: recomputing and storing the recomputed value. That always succeeds and silently destroys the attestation. Recompute to COMPARE, then reject."
+        },
+        {
+          "id": "4.2",
+          "assertion": "Alter any covered field after signing, then verify",
+          "layer": "ENGINE",
+          "expected": "verification fails",
+          "portable": true
+        },
+        {
+          "id": "4.3",
+          "assertion": "Emit null for a missing certNumber instead of omitting the key",
+          "layer": "ENGINE",
+          "expected": "different hash",
+          "portable": true,
+          "note": "Golden vector null-cert-differs-from-absent."
+        },
+        {
+          "id": "4.4",
+          "assertion": "Client and server hash the same payload",
+          "layer": "API",
+          "expected": "identical",
+          "portable": true,
+          "note": "Golden vectors are the contract."
+        },
+        {
+          "id": "4.5",
+          "assertion": "Accept a client-supplied signedAtUtc as authoritative",
+          "layer": "API",
+          "expected": "must not — server timestamp wins",
+          "portable": false
+        },
+        {
+          "id": "4.6",
+          "assertion": "Verify a signature written under an earlier payload_version",
+          "layer": "API",
+          "expected": "verifies using that version field set",
+          "portable": false
+        }
+      ]
+    },
+    {
+      "id": "point-in-time-mel",
+      "title": "Point-in-time MEL",
+      "assertions": [
+        {
+          "id": "5.1",
+          "assertion": "Edit a mel_item, re-read a deferral signed under the prior revision",
+          "layer": "DB+API",
+          "expected": "unchanged",
+          "portable": true,
+          "note": "Frozen columns, no join."
+        },
+        {
+          "id": "5.2",
+          "assertion": "Remove the (O) procedure from a mel_item, re-open a signed briefing",
+          "layer": "ENGINE",
+          "expected": "PIC acknowledgment requirement unchanged",
+          "portable": true,
+          "note": "A real defect found by adversarial review 2026-07-26: deferralsRequiringAck() read the live oProcedure, so editing the MEL could make a mandatory acknowledgment appear or vanish on a signed briefing, invisibly."
+        },
+        {
+          "id": "5.3",
+          "assertion": "Ship MMEL revision N+1, render a deferral signed under revision N",
+          "layer": "API",
+          "expected": "shows revision N",
+          "portable": true
+        }
+      ]
+    },
+    {
+      "id": "idempotency",
+      "title": "Idempotency and offline sync",
+      "assertions": [
+        {
+          "id": "6.1",
+          "assertion": "Replay a mutation with the same idempotency key",
+          "layer": "API",
+          "expected": "identical response, no second row",
+          "portable": false
+        },
+        {
+          "id": "6.2",
+          "assertion": "Replay after a lost ACK",
+          "layer": "API",
+          "expected": "identical response, no duplicate",
+          "portable": false
+        },
+        {
+          "id": "6.3",
+          "assertion": "Same payload, different idempotency key",
+          "layer": "API",
+          "expected": "creates a second row",
+          "portable": false,
+          "note": "The key is the identity, not the payload."
+        },
+        {
+          "id": "6.4",
+          "assertion": "Sync a superseding row before its parent",
+          "layer": "API",
+          "expected": "rejected by FK",
+          "portable": false,
+          "note": "Client outbox must order by supersede chain."
+        },
+        {
+          "id": "6.5",
+          "assertion": "Sign offline, kill the app before sync",
+          "layer": "CLIENT",
+          "expected": "record survives and syncs on relaunch",
+          "portable": false,
+          "note": "Decides whether the system is trustworthy at an airfield with no signal."
+        },
+        {
+          "id": "6.6",
+          "assertion": "Two devices sign the same entity offline, then both sync",
+          "layer": "API",
+          "expected": "one commits, other becomes supersede_conflict",
+          "portable": false
+        }
+      ]
+    }
+  ]
+}

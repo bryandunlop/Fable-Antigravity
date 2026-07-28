@@ -6,6 +6,7 @@ import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from 
 import { GOVERNING_ZONE_OPTIONS, isOverride, validateGoverningOverride } from '../../util/governingZone';
 import { formatRegulatoryCompact } from '../../util/displayZone';
 import { canDeferDefect } from '../../engine/disposition';
+import { validateMelDeferrable } from '../../engine/approvals';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
 import { newId } from '../../util/id';
@@ -98,6 +99,10 @@ export function DeferralCreatePanel({
     if (!selectedMel) return toast.error('Select a governing MEL item.');
     if (!ack) return toast.error('You must acknowledge the MEL review before signing.');
     if (!canDeferDefect(user, selectedMel)) return toast.error('You are not authorized to defer this MEL item.');
+    // Defense-in-depth: the picker only lists APPROVED items, but a stale selection or any other
+    // entry path must not slip an unapproved MEL through. See engine/approvals.validateMelDeferrable.
+    const deferrable = validateMelDeferrable(selectedMel);
+    if (!deferrable.ok) return toast.error(deferrable.error!);
     const ovr = validateGoverningOverride(governingZone, overrideReason);
     if (!ovr.ok) return toast.error(ovr.error!);
     setPendingDeferralId(newId('df'));
@@ -106,6 +111,9 @@ export function DeferralCreatePanel({
 
   const onSigned = (sig: { id: string }) => {
     if (!selectedMel) return;
+    // Re-check at commit: an approval can be revoked while the signature ceremony is open.
+    const deferrable = validateMelDeferrable(selectedMel);
+    if (!deferrable.ok) { toast.error(deferrable.error!); return; }
     const now = new Date().toISOString();
     // D24: anchor the PL-25 clock to the governing zone (Eastern default, or a per-deferral override
     // to the aircraft operating-local zone). The stored governingTimezone must be the same zone the

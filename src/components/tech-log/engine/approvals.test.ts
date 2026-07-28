@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isSelfApproval, applyApproval, type ReferenceTables } from './approvals';
+import { isSelfApproval, applyApproval, validateMelDeferrable, type ReferenceTables } from './approvals';
 import type { Aircraft, Personnel, MelItem, PendingApproval } from '../types';
 
 const aircraft: Aircraft = { id: 'ac1', tailNumber: 'N1PG', type: 'G800', serialNumber: '88041', status: 'PROVISIONAL', isProvisional: true, homeBase: 'KTEB', airframeTotalHours: 10, airframeTotalCycles: 5 };
@@ -52,5 +52,40 @@ describe('applyApproval', () => {
     expect(result.melItems.find(m => m.id === 'mel1')?.approvalState).toBe('PENDING_FSDO'); // untouched sibling
     expect(result.aircraft).toBe(tables.aircraft); // untouched table keeps reference identity
     expect(result.personnel).toBe(tables.personnel);
+  });
+});
+
+describe('validateMelDeferrable (CLAUDE.md hard stop: no deferral against an unapproved MEL)', () => {
+  const item = (approvalState: MelItem['approvalState']) => ({ approvalState, subItemNumber: '24-02-02' });
+
+  it('allows a deferral against an APPROVED item', () => {
+    expect(validateMelDeferrable(item('APPROVED')).ok).toBe(true);
+  });
+
+  it('blocks DRAFT — the item carries no dispatch relief yet', () => {
+    const r = validateMelDeferrable(item('DRAFT'));
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('still in draft');
+  });
+
+  it('blocks PENDING_FSDO — the G800 provisional case', () => {
+    const r = validateMelDeferrable(item('PENDING_FSDO'));
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('awaiting FSDO approval');
+  });
+
+  it('blocks SUPERSEDED with a distinct message pointing at the current item', () => {
+    const r = validateMelDeferrable(item('SUPERSEDED'));
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('superseded');
+  });
+
+  it('names the offending MEL item so the error is actionable', () => {
+    expect(validateMelDeferrable({ approvalState: 'DRAFT', subItemNumber: '25-10-01a' }).error).toContain('25-10-01a');
+  });
+
+  it('is not satisfied by any state other than APPROVED', () => {
+    const states: MelItem['approvalState'][] = ['DRAFT', 'PENDING_FSDO', 'SUPERSEDED'];
+    for (const s of states) expect(validateMelDeferrable(item(s)).ok).toBe(false);
   });
 });

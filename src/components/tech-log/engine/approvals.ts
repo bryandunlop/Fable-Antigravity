@@ -10,6 +10,29 @@ export function isSelfApproval(pending: PendingApproval, decidedByOid: string): 
   return pending.proposedByOid === decidedByOid;
 }
 
+/**
+ * A deferral may only be written against an MEL item the FAA has actually approved. An item still
+ * in DRAFT or awaiting FSDO sign-off — the G800 provisional case — carries no dispatch relief, so
+ * deferring against it produces a record asserting authority that does not exist.
+ *
+ * This existed only as a filter on the MEL picker in `DeferralCreatePanel`, which is not a control:
+ * it shapes what the UI offers and does nothing about a payload that arrives by any other path.
+ * Same reasoning as `isSelfApproval` above — never trust a single call site.
+ *
+ * In production this check belongs at the API and must return 409/422; the UI filter and this guard
+ * are the friendly error paths in front of it, not a substitute for it.
+ */
+export function validateMelDeferrable(mel: Pick<MelItem, 'approvalState' | 'subItemNumber'>): { ok: boolean; error?: string } {
+  if (mel.approvalState === 'APPROVED') return { ok: true };
+  if (mel.approvalState === 'SUPERSEDED') {
+    return { ok: false, error: `MEL ${mel.subItemNumber} has been superseded by a later revision — defer against the current item.` };
+  }
+  return {
+    ok: false,
+    error: `MEL ${mel.subItemNumber} is ${mel.approvalState === 'DRAFT' ? 'still in draft' : 'awaiting FSDO approval'} and cannot be used for a deferral.`,
+  };
+}
+
 export interface ReferenceTables {
   aircraft: Aircraft[];
   personnel: Personnel[];

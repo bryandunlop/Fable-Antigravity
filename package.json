@@ -108,6 +108,8 @@
             "type-check:baseline": "node scripts/typecheck-baseline.mjs",
             "signing-vectors": "node scripts/gen-signing-vectors.mjs",
             "signing-vectors:check": "node scripts/gen-signing-vectors.mjs --check",
+            "negative-paths": "node scripts/gen-negative-path-checklist.mjs",
+            "negative-paths:check": "node scripts/gen-negative-path-checklist.mjs --check",
             "prepare": "git config core.hooksPath .githooks || true",
             "db:generate": "drizzle-kit generate",
             "db:push": "drizzle-kit push",
