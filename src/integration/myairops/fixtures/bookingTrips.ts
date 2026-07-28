@@ -7,6 +7,8 @@
 //             date (clockStart+10d ≈ now+7d16h..+8d16h) falls INSIDE the trip window
 //             -> deferral-expires-mid-trip alert
 //   MAO-7310  N5PG (GREEN seed)        +4d                     -> clean control
+//   MAO-7315  N2PG                     -4h .. +5h, mid-turn    -> the only trip inside the
+//             leg-resolution window: leg 1 landed 2h ago, leg 2 departs in 3h (D53)
 // Tails/types match the tech-log seed fleet (fleet.ts) — the tail is the join key.
 
 import type { BookingTripWithLegs, BookingTripPassenger } from '../bookingAdapter';
@@ -113,6 +115,36 @@ export function buildMyairopsBookingFixtures(nowUtcIso: string): MyairopsBooking
       passengers: [
         pax(9161, 7310, 'Tom Okafor', 506, { leadPassenger: true }),
         pax(9162, 7310, 'Mei-Lin Chu', 507),
+      ],
+    },
+    {
+      // MAO-7315  N2PG — a trip mid-turn RIGHT NOW: leg 1 landed 2h ago, leg 2 departs in 3h.
+      // The only fixture inside the leg-resolution window (D53), so inventory v2's "click a
+      // tail and it knows the leg" has something to resolve; the other three sit days out on
+      // purpose and must stay that way for the scheduling-hub alert scenarios.
+      trip: {
+        id: 7315, reference: 'MAO-7315', clientId: 12, aircraft: 'N2PG', aircraftType: 'GLF6',
+        status: 'InProgress', requiresQuotation: false,
+        legs: [
+          {
+            id: 90371, tripId: 7315,
+            departureAirport: { id: 101, icao: 'KLUK', iata: 'LUK', name: 'Cincinnati Municipal Lunken' },
+            arrivalAirport: { id: 102, icao: 'KTEB', iata: 'TEB', name: 'Teterboro' },
+            departureDateTime: iso(-4 * HOUR_MS), arrivalDateTime: iso(-2 * HOUR_MS),
+            adults: 4, children: 0, crew: 2, cabinCrew: 1, flyingTime: 120,
+          },
+          {
+            id: 90372, tripId: 7315,
+            departureAirport: { id: 102, icao: 'KTEB', iata: 'TEB', name: 'Teterboro' },
+            arrivalAirport: { id: 101, icao: 'KLUK', iata: 'LUK', name: 'Cincinnati Municipal Lunken' },
+            departureDateTime: iso(3 * HOUR_MS), arrivalDateTime: iso(5 * HOUR_MS),
+            adults: 4, children: 0, crew: 2, cabinCrew: 1, flyingTime: 120,
+          },
+        ],
+      } as BookingTripWithLegs,
+      passengers: [
+        pax(9171, 7315, 'Adaeze Nwosu', 508, { leadPassenger: true }),
+        pax(9172, 7315, 'Franklin Oyelaran', 509),
       ],
     },
   ];
