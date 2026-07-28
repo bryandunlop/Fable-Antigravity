@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plane, Plus, Calendar, Users, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { Card, CardContent } from '../../ui/card';
@@ -8,10 +8,15 @@ import { Input } from '../../ui/input';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from '../../ui/dialog';
+import { loadMyairopsTripMirrors } from '../../../integration/myairops/scheduleSource';
+import { resolveLegForTail } from '../../../integration/myairops/legResolver';
+import type { LegResolution, ResolvedLeg } from '../../../integration/myairops/legResolver';
+import { adoptMyairopsTrip, findAdoptedTrip, formatLegRoute, formatLegTiming } from '../legAdoption';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
 import { V2Badge } from '../shared/V2Badge';
@@ -178,22 +183,34 @@ function NewTripDialog({
 function AircraftCard({
   aircraft,
   activeTrip,
+  resolution,
   onStartTrip,
+  onAdoptLeg,
+  onPickLeg,
   lastInspection,
   stockStatus,
 }: {
   aircraft: FleetAircraft;
   activeTrip: Trip | undefined;
+  resolution: LegResolution | undefined;
   onStartTrip: () => void;
+  onAdoptLeg: (resolved: ResolvedLeg) => void;
+  onPickLeg: () => void;
   lastInspection?: { readinessScore: number; date: string } | null;
   stockStatus: { status: 'stocked' | 'attention'; count: number };
 }) {
   const navigate = useNavigate();
   const activeLeg = activeTrip?.legs.find(l => l.status === 'active');
+  // Only offer the schedule when no trip is already running on this tail — mid-trip, the
+  // trip you are in wins over whatever the schedule thinks.
+  const resolved = activeTrip ? null : resolution?.primary ?? null;
+  const hasOtherLegs = !!resolution && resolution.candidates.length > 1;
 
   function handleClick() {
     if (activeTrip) {
       navigate(`/inventory-v2/trips/${activeTrip.id}`);
+    } else if (resolved) {
+      onAdoptLeg(resolved);
     } else {
       onStartTrip();
     }
@@ -206,7 +223,9 @@ function AircraftCard({
         'cursor-pointer transition-all hover:scale-[1.02]',
         activeTrip
           ? 'border-amber-500/40 bg-amber-500/5 hover:border-amber-500/60'
-          : 'border-border hover:border-primary/40'
+          : resolved
+            ? 'border-sky-500/40 bg-sky-500/5 hover:border-sky-500/60'
+            : 'border-border hover:border-primary/40'
       )}
     >
       <CardContent className="p-5 space-y-3">
@@ -219,11 +238,11 @@ function AircraftCard({
           </div>
           <div className={cn(
             'p-2.5 rounded-xl',
-            activeTrip ? 'bg-amber-500/20' : 'bg-muted'
+            activeTrip ? 'bg-amber-500/20' : resolved ? 'bg-sky-500/20' : 'bg-muted'
           )}>
             <Plane className={cn(
               'h-6 w-6',
-              activeTrip ? 'text-amber-400' : 'text-slate-500'
+              activeTrip ? 'text-amber-400' : resolved ? 'text-sky-400' : 'text-slate-500'
             )} />
           </div>
         </div>
@@ -245,6 +264,26 @@ function AircraftCard({
             {activeTrip.tripName && (
               <p className="text-xs text-muted-foreground truncate">{activeTrip.tripName}</p>
             )}
+          </div>
+        ) : resolved ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-sm font-mono text-sky-400">
+              <span>{resolved.leg.departureIcao}</span>
+              <span className="text-muted-foreground">→</span>
+              <span>{resolved.leg.arrivalIcao}</span>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {resolved.leg.paxCount} pax
+              </span>
+              {/* Scheduled, not actual — the time and its age are always on screen so a
+                  stale answer is visible rather than trusted (D53). */}
+              <span>{formatLegTiming(resolved)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground truncate">
+              From myairops · {resolved.trip.tripNumber}
+            </p>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No active trip</p>
@@ -272,11 +311,26 @@ function AircraftCard({
           )}
         </div>
 
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-3">
           {activeTrip ? (
             <span className="text-xs text-amber-400 flex items-center gap-1">
               Open <ChevronRight className="h-3 w-3" />
             </span>
+          ) : resolved ? (
+            <>
+              {hasOtherLegs && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); onPickLeg(); }}
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                >
+                  Not this leg?
+                </button>
+              )}
+              <span className="text-xs text-sky-400 flex items-center gap-1">
+                Open leg <ChevronRight className="h-3 w-3" />
+              </span>
+            </>
           ) : (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Plus className="h-3 w-3" /> Start Trip
@@ -285,6 +339,65 @@ function AircraftCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Leg Picker ─────────────────────────────────────────────────────────────
+// The correction path. Resolution is inferred from a SCHEDULE, so saying "no, that
+// one" has to be one tap — otherwise a late trip forces the user back to typing.
+
+function LegPickerDialog({
+  aircraft,
+  resolution,
+  onPick,
+  onManual,
+  onClose,
+}: {
+  aircraft: FleetAircraft;
+  resolution: LegResolution | undefined;
+  onPick: (resolved: ResolvedLeg) => void;
+  onManual: () => void;
+  onClose: () => void;
+}) {
+  const candidates = resolution?.candidates ?? [];
+
+  return (
+    <Dialog open onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plane className="h-5 w-5 text-sky-400" />
+            Which leg? — {aircraft.tailNumber}
+          </DialogTitle>
+          <DialogDescription>
+            Scheduled legs from myairops within a day of now. Times are scheduled, not actual.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2 py-1">
+          {candidates.map(candidate => (
+            <button
+              key={candidate.leg.id}
+              type="button"
+              onClick={() => onPick(candidate)}
+              className="w-full rounded-md border border-border px-3 py-2.5 text-left transition-colors hover:border-sky-500/60 hover:bg-sky-500/5"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-mono text-sm text-sky-400">{formatLegRoute(candidate)}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{candidate.leg.paxCount} pax</span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {formatLegTiming(candidate)} · {candidate.trip.tripNumber}
+              </p>
+            </button>
+          ))}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onManual}>Enter a trip manually</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -337,6 +450,19 @@ export default function TripList() {
   const [showDialog, setShowDialog] = useState(false);
   const [selectedAircraft, setSelectedAircraft] = useState<FleetAircraft | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [pickerFor, setPickerFor] = useState<FleetAircraft | null>(null);
+
+  // Pinned at mount so the cards don't re-resolve under the user mid-tap. The page is
+  // remounted on navigation, which is often enough for a turn.
+  const [nowIso] = useState(() => new Date().toISOString());
+
+  const mirrors = useMemo(() => loadMyairopsTripMirrors(nowIso), [nowIso]);
+
+  const resolutions = useMemo(() => {
+    const map = new Map<string, LegResolution>();
+    state.fleet.forEach(a => map.set(a.tailNumber, resolveLegForTail(mirrors, a.tailNumber, nowIso)));
+    return map;
+  }, [mirrors, state.fleet, nowIso]);
 
   const completedTrips = state.trips
     .filter(t => t.status !== 'active')
@@ -367,6 +493,26 @@ export default function TripList() {
   function handleStartTrip(aircraft: FleetAircraft) {
     setSelectedAircraft(aircraft);
     setShowDialog(true);
+  }
+
+  // Adopting the schedule instead of retyping it. Idempotent on the myairops trip
+  // reference: a second tap opens the trip already adopted rather than making a twin.
+  function handleAdoptLeg(aircraft: FleetAircraft, resolved: ResolvedLeg) {
+    setPickerFor(null);
+
+    const existing = findAdoptedTrip(state.trips, resolved.trip);
+    if (existing) {
+      navigate(`/inventory-v2/trips/${existing.id}`);
+      return;
+    }
+
+    const trip = adoptMyairopsTrip(resolved, {
+      aircraftType: aircraft.type,
+      createdBy: state.currentUser.name,
+      nowIso: new Date().toISOString(),
+    });
+    dispatch({ type: 'ADD_TRIP', payload: trip });
+    navigate(`/inventory-v2/trips/${trip.id}`);
   }
 
   function handleCreateTrip(data: {
@@ -435,7 +581,10 @@ export default function TripList() {
             key={aircraft.tailNumber}
             aircraft={aircraft}
             activeTrip={getActiveTrip(aircraft.tailNumber)}
+            resolution={resolutions.get(aircraft.tailNumber)}
             onStartTrip={() => handleStartTrip(aircraft)}
+            onAdoptLeg={resolved => handleAdoptLeg(aircraft, resolved)}
+            onPickLeg={() => setPickerFor(aircraft)}
             lastInspection={getLastInspection(aircraft.tailNumber)}
             stockStatus={getStockStatus(aircraft.tailNumber)}
           />
@@ -464,6 +613,17 @@ export default function TripList() {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Leg Picker — the "not this leg?" correction */}
+      {pickerFor && (
+        <LegPickerDialog
+          aircraft={pickerFor}
+          resolution={resolutions.get(pickerFor.tailNumber)}
+          onPick={resolved => handleAdoptLeg(pickerFor, resolved)}
+          onManual={() => { const a = pickerFor; setPickerFor(null); handleStartTrip(a); }}
+          onClose={() => setPickerFor(null)}
+        />
       )}
 
       {/* New Trip Dialog */}

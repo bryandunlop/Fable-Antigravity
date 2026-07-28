@@ -56,6 +56,9 @@ interface InspectionDraft {
   checkedItems: InspectionCheckedItem[];
   readinessScore: number;
   reportedBy: string;
+  /** The myairops leg this inspection followed, resolved on the tail card (D53). */
+  legRef?: string;
+  legLabel?: string;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -245,6 +248,8 @@ export default function InspectionReview() {
       date: new Date().toISOString(),
       reportedBy: draft.reportedBy ?? MOCK_USERS[0].name,
       reservationId: reservationId || undefined,
+      legRef: draft.legRef,
+      legLabel: draft.legLabel,
       status: hasMissingItems ? 'restocking_needed' : 'submitted',
       checkedItems: draft.checkedItems,
       topLevelNotes,
@@ -344,6 +349,11 @@ export default function InspectionReview() {
           {draft?.reportedBy && (
             <p className="text-sm text-muted-foreground">
               Inspector: <span className="font-medium text-foreground">{draft.reportedBy}</span>
+            </p>
+          )}
+          {draft?.legLabel && (
+            <p className="text-sm text-muted-foreground">
+              After leg: <span className="font-medium text-sky-400">{draft.legLabel}</span>
             </p>
           )}
         </div>

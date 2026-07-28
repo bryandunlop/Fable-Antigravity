@@ -107,6 +107,10 @@ export interface InspectionV2 {
   date: string;
   reportedBy: string;
   reservationId?: string;
+  /** The myairops leg this inspection followed, when one could be resolved (D53). */
+  legRef?: string;
+  /** Human-readable form of that leg, e.g. "KLUK → KTEB · landed 14:05". Snapshot for display. */
+  legLabel?: string;
   status: InspectionStatus;
   checkedItems: InspectionCheckedItem[];
   topLevelNotes: string;
@@ -286,6 +290,10 @@ export interface Trip {
   aircraftType: 'G650' | 'G500';
   tripName?: string;
   tripNumber?: string;
+  /** 'myairops' when this trip was adopted from the mirrored schedule instead of typed by hand (D53). */
+  sourceSystem?: 'manual' | 'myairops';
+  /** The myairops trip reference (e.g. MAO-7315). Adoption is idempotent on this. Never written back. */
+  sourceTripRef?: string;
   status: 'active' | 'completed' | 'cancelled';
   startDate: string;
   endDate?: string;
@@ -308,6 +316,8 @@ export interface TripLeg {
   destination: string;
   date: string;
   paxCount: number;
+  /** The myairops leg id this mirrors. Absent on hand-created legs. The join key for a later merge. */
+  sourceLegRef?: string;
   status: 'upcoming' | 'active' | 'completed';
   phase: LegPhase;
   usageLog: UsageLogEntry[];

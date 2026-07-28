@@ -118,6 +118,9 @@ export default function InspectionForm() {
         aircraftType: aircraft.type,
         checkedItems: Array.from(checkedItems.values()),
         readinessScore: 0, // recalculated on review
+        // The myairops leg this inspection follows, carried from the tail card (D53).
+        legRef: searchParams.get('legRef') ?? undefined,
+        legLabel: searchParams.get('legLabel') ?? undefined,
       };
       try {
         sessionStorage.setItem(SESSION_KEY, JSON.stringify(draft));
@@ -127,7 +130,7 @@ export default function InspectionForm() {
     }, 500);
 
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [selectedTailNumber, checkedItems, state.fleet]);
+  }, [selectedTailNumber, checkedItems, state.fleet, searchParams]);
 
   // ── Pre-select aircraft from ?tail= query param ──
   useEffect(() => {
@@ -403,11 +406,13 @@ export default function InspectionForm() {
       checkedItems: Array.from(checkedItems.values()),
       readinessScore,
       reportedBy: selectedUser.name,
+      legRef: searchParams.get('legRef') ?? undefined,
+      legLabel: searchParams.get('legLabel') ?? undefined,
     };
 
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(draft));
     navigate('/inventory-v2/inspection/review');
-  }, [selectedTailNumber, aircraftType, checkedItems, selectedUser, navigate]);
+  }, [selectedTailNumber, aircraftType, checkedItems, selectedUser, navigate, searchParams]);
 
   // ── Readiness stats per compartment ──
 

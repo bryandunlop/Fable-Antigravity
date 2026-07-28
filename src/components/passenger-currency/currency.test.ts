@@ -33,8 +33,11 @@ describe('assessTripPassengerCurrency × myairops fixtures (end-to-end pure)', (
   const byTrip = (n: string) => groups.find(g => g.tripNumber === n)!;
   const byName = (n: string, name: string) => byTrip(n).passengers.find(p => p.name.includes(name))!;
 
-  it('orders trips by first departure and keeps only future trips', () => {
-    expect(groups.map(g => g.tripNumber)).toEqual(['MAO-7301', 'MAO-7310', 'MAO-7305']);
+  // "Not yet ended", not "not yet started": the filter is tripEndUtc >= now, so a trip
+  // already in the air stays — its remaining legs still carry those passengers.
+  // MAO-7315 departed 4h before NOW and lands 5h after it, so it sorts first.
+  it('orders trips by first departure and keeps every trip that has not ended', () => {
+    expect(groups.map(g => g.tripNumber)).toEqual(['MAO-7315', 'MAO-7301', 'MAO-7310', 'MAO-7305']);
   });
 
   it('marks a fresh CRM record with a valid passport CURRENT (Marcus Webb)', () => {

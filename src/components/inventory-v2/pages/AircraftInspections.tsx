@@ -8,6 +8,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/co
 import { useInventoryV2 } from '../InventoryV2Context';
 import { V2Badge } from '../shared/V2Badge';
 import { getCompartmentsForAircraft } from '../compartmentConfig';
+import { loadMyairopsTripMirrors } from '../../../integration/myairops/scheduleSource';
+import { resolveLegForTail } from '../../../integration/myairops/legResolver';
+import type { ResolvedLeg } from '../../../integration/myairops/legResolver';
+import { describeResolvedLeg, formatLegRoute, formatLegTiming } from '../legAdoption';
 import type { InspectionV2 } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -83,13 +87,30 @@ export default function AircraftInspections() {
     return list;
   }, [state.inspections, filterTail]);
 
+  // Which leg each tail just flew, from the myairops mirror (D53), so a post-flight
+  // inspection records the leg it followed instead of only a date.
+  const [nowIso] = useState(() => new Date().toISOString());
+  const mirrors = useMemo(() => loadMyairopsTripMirrors(nowIso), [nowIso]);
+  const resolvedByTail = useMemo(() => {
+    const map = new Map<string, ResolvedLeg>();
+    state.fleet.forEach(a => {
+      const primary = resolveLegForTail(mirrors, a.tailNumber, nowIso).primary;
+      if (primary) map.set(a.tailNumber, primary);
+    });
+    return map;
+  }, [mirrors, state.fleet, nowIso]);
+
   const handleCardClick = (tail: string) => {
     const inProg = inProgressForTail(tail);
     if (inProg) {
       navigate(`/inventory-v2/inspection?resume=${inProg.id}`);
-    } else {
-      navigate(`/inventory-v2/inspection?tail=${tail}`);
+      return;
     }
+    const resolved = resolvedByTail.get(tail);
+    const legParams = resolved
+      ? `&legRef=${encodeURIComponent(resolved.leg.id)}&legLabel=${encodeURIComponent(describeResolvedLeg(resolved))}`
+      : '';
+    navigate(`/inventory-v2/inspection?tail=${tail}${legParams}`);
   };
 
   return (
@@ -108,6 +129,7 @@ export default function AircraftInspections() {
           const last = lastInspection(aircraft.tailNumber);
           const count = yearCount(aircraft.tailNumber);
           const inProg = inProgressForTail(aircraft.tailNumber);
+          const resolved = resolvedByTail.get(aircraft.tailNumber);
 
           return (
             <Card
@@ -131,6 +153,12 @@ export default function AircraftInspections() {
                     </Badge>
                   )}
                 </div>
+                {resolved && (
+                  <div className="mt-3 rounded-md border border-sky-500/30 bg-sky-500/5 px-2.5 py-1.5">
+                    <div className="font-mono text-xs text-sky-400">{formatLegRoute(resolved)}</div>
+                    <div className="text-xs text-muted-foreground">{formatLegTiming(resolved)}</div>
+                  </div>
+                )}
                 <div className="text-xs text-muted-foreground mt-3">
                   {count} inspection{count !== 1 ? 's' : ''} this year
                 </div>
