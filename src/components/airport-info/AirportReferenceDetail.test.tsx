@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { AirportRecord } from '../../airport/types';
 import AirportReferenceDetail from './AirportReferenceDetail';
+import { CompanyAirportProvider } from './CompanyAirportContext';
 
 /**
  * Guards against the facade-control failure mode: a primary action that looks
@@ -49,33 +50,46 @@ const airport: AirportRecord = {
   effectiveDate: '2026/07/09',
 };
 
+function renderDetail(onSubmitCorrection?: () => void) {
+  return render(
+    <CompanyAirportProvider>
+      <AirportReferenceDetail
+        airport={airport}
+        onBack={() => {}}
+        onSubmitCorrection={onSubmitCorrection}
+      />
+    </CompanyAirportProvider>,
+  );
+}
+
 describe('AirportReferenceDetail — propose a change', () => {
   it('disables the control when no handler is wired', () => {
-    render(<AirportReferenceDetail airport={airport} onBack={() => {}} />);
+    renderDetail();
 
     expect(screen.getByRole('button', { name: /propose a change/i })).toBeDisabled();
     expect(screen.getByText(/not wired up yet/i)).toBeInTheDocument();
   });
 
   it('does not tell the user to press a control that does nothing', () => {
-    render(<AirportReferenceDetail airport={airport} onBack={() => {}} />);
+    renderDetail();
 
-    expect(screen.getByText(/not wired up in this build/i)).toBeInTheDocument();
+    // The company-page copy must not invite a click on a disabled control.
+    expect(screen.queryByText(/use .propose a change./i)).not.toBeInTheDocument();
+    expect(screen.getByText(/proposing changes is not available here/i)).toBeInTheDocument();
   });
 
-  it('enables the control once a handler is supplied', () => {
-    render(
-      <AirportReferenceDetail airport={airport} onBack={() => {}} onSubmitCorrection={vi.fn()} />,
-    );
+  it('enables the control once a handler is supplied, and then invites the click', () => {
+    renderDetail(vi.fn());
 
     expect(screen.getByRole('button', { name: /propose a change/i })).toBeEnabled();
     expect(screen.queryByText(/not wired up/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/use .propose a change./i)).toBeInTheDocument();
   });
 });
 
 describe('AirportReferenceDetail — the NASR cycle is a calendar date', () => {
   it('does not shift the cycle a day earlier west of UTC', () => {
-    render(<AirportReferenceDetail airport={airport} onBack={() => {}} />);
+    renderDetail();
 
     // Formatting 2026/07/09 through a US timezone as an instant renders 8 Jul.
     expect(screen.getAllByText(/Jul 9, 2026/).length).toBeGreaterThan(0);

@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { ProvenanceChip } from './ProvenanceChip';
+import { ProposeChangeDialog } from './ProposeChangeDialog';
 import AirportReferenceDetail from './AirportReferenceDetail';
 
 /**
@@ -20,10 +21,14 @@ import AirportReferenceDetail from './AirportReferenceDetail';
 const PAGE_SIZE = 40;
 
 interface AirportInformationProps {
-  onSubmitCorrection?: (airportId: string) => void;
+  /** Who is proposing. Real identity lands with auth; the demo role switcher supplies it today. */
+  currentUserOid?: string;
 }
 
-export default function AirportInformation({ onSubmitCorrection }: AirportInformationProps) {
+export default function AirportInformation({
+  currentUserOid = 'demo-user',
+}: AirportInformationProps) {
+  const [proposing, setProposing] = useState(false);
   const [indexLoaded, setIndexLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [effectiveDate, setEffectiveDate] = useState<string | null>(null);
@@ -75,16 +80,20 @@ export default function AirportInformation({ onSubmitCorrection }: AirportInform
 
   if (selected) {
     return (
-      <AirportReferenceDetail
-        airport={selected}
-        onBack={() => setSelected(null)}
-        // Deliberately forwarded as undefined when no handler was supplied, so the
-        // detail view renders the control disabled instead of wrapping nothing in
-        // an arrow function and presenting a live button that swallows the click.
-        onSubmitCorrection={
-          onSubmitCorrection ? () => onSubmitCorrection(selected.id) : undefined
-        }
-      />
+      <>
+        <AirportReferenceDetail
+          airport={selected}
+          onBack={() => setSelected(null)}
+          onSubmitCorrection={() => setProposing(true)}
+        />
+        <ProposeChangeDialog
+          icao={selected.icaoId ?? selected.id}
+          airportName={selected.name}
+          currentUserOid={currentUserOid}
+          open={proposing}
+          onOpenChange={setProposing}
+        />
+      </>
     );
   }
 

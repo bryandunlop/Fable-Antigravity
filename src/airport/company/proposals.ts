@@ -129,7 +129,21 @@ export class ProposalWorkflow {
   constructor(
     private readonly pages: CompanyAirportPageStore,
     private readonly clock: StoreClock,
-  ) {}
+    seed?: readonly CompanyAirportProposal[],
+  ) {
+    if (seed) this.proposals.push(...seed.map(copy));
+  }
+
+  /**
+   * Everything in flight, deep-copied.
+   *
+   * Proposals are workflow state rather than a ledger, but losing them is not
+   * acceptable: a submitter who refreshes and finds their proposal gone believes
+   * it is sitting with a reviewer when it is nowhere.
+   */
+  snapshot(): CompanyAirportProposal[] {
+    return this.proposals.map(copy);
+  }
 
   submit(request: SubmitRequest): CompanyAirportProposal {
     const changedFields = Object.keys(request.changes);

@@ -12,9 +12,11 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+import type { CompanyAirportPageContent } from '../../airport/company/pageStore';
 import type { AirportRecord, RunwayRecord } from '../../airport/types';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
+import { useCompanyAirport } from './CompanyAirportContext';
 import { NotPublished, ProvenanceChip } from './ProvenanceChip';
 
 interface AirportReferenceDetailProps {
@@ -178,11 +180,90 @@ function PavementBlock({ runway }: { runway: RunwayRecord }) {
   );
 }
 
+const COMPANY_FIELDS: { key: keyof CompanyAirportPageContent; label: string }[] = [
+  { key: 'ppr', label: 'PPR' },
+  { key: 'curfew', label: 'Curfew' },
+  { key: 'rampHandlingLimits', label: 'Ramp and handling limits' },
+  { key: 'fboPreference', label: 'Preferred FBO / handler' },
+  { key: 'opsNotes', label: 'Operations notes' },
+];
+
+function CompanyPageCard({
+  icao,
+  pendingCount,
+  canPropose,
+}: {
+  icao: string;
+  pendingCount: number;
+  canPropose: boolean;
+}) {
+  const company = useCompanyAirport();
+  const published = company.getLatest(icao);
+
+  const written = COMPANY_FIELDS.filter(
+    ({ key }) => typeof published?.content[key] === 'string' && published.content[key],
+  );
+
+  return (
+    <Card className={published ? 'p-6' : 'border-dashed p-6'}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xl font-semibold">Company page</h2>
+        <div className="flex items-center gap-2">
+          {pendingCount > 0 ? (
+            <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              {pendingCount} awaiting review
+            </span>
+          ) : null}
+          <ProvenanceChip
+            source="company"
+            detail={published ? `v${published.version}` : undefined}
+          />
+        </div>
+      </div>
+
+      {published ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            {written.map(({ key, label }) => (
+              <div key={key}>
+                <p className="text-sm text-muted-foreground mb-1">{label}</p>
+                <p className="whitespace-pre-wrap font-medium">{published.content[key] as string}</p>
+              </div>
+            ))}
+          </div>
+          {written.length === 0 ? (
+            <NotPublished what="Published, but every field is empty" />
+          ) : null}
+          <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
+            Version {published.version}, published by {published.publishedBy} on{' '}
+            {new Date(published.publishedAtUtc).toLocaleString()}.
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          PPR, curfews, operations notes, FBO preference and handling limits are authored by the
+          flight department — no vendor supplies them. Nothing has been published for this airport
+          yet
+          {canPropose
+            ? '; use “Propose a change” to start one.'
+            : ', and proposing changes is not available here.'}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 export default function AirportReferenceDetail({
   airport,
   onBack,
   onSubmitCorrection,
 }: AirportReferenceDetailProps) {
+  const company = useCompanyAirport();
+  const icao = airport.icaoId ?? airport.id;
+  const pendingProposals = company
+    .forAirport(icao)
+    .filter((proposal) => proposal.status === 'pending' || proposal.status === 'approved').length;
+
   const attended = airport.attendance
     .map((slot) => `${slot.month}/${slot.day} ${slot.hour}`)
     .join(', ');
@@ -363,22 +444,11 @@ export default function AirportReferenceDetail({
         )}
       </Card>
 
-      <Card className="border-dashed p-6">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Company page</h2>
-          <ProvenanceChip source="company" />
-        </div>
-        <p className="text-sm text-muted-foreground">
-          PPR, curfews, operations notes, FBO preference and handling limits are authored by the
-          flight department rather than published by any vendor. No vendor supplies them, so this
-          layer is the one that has to be written by hand.
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {onSubmitCorrection
-            ? 'Nothing has been published for this airport yet.'
-            : 'Nothing has been published for this airport yet, and the propose → review → publish workflow is not wired up in this build — the editing screens still run on demo data.'}
-        </p>
-      </Card>
+      <CompanyPageCard
+        icao={icao}
+        pendingCount={pendingProposals}
+        canPropose={Boolean(onSubmitCorrection)}
+      />
     </div>
   );
 }

@@ -300,6 +300,70 @@ describe('ProposalWorkflow — publish', () => {
   });
 });
 
+describe('ProposalWorkflow — surviving a reload', () => {
+  it('round-trips in-flight proposals through a snapshot', () => {
+    // A submitted proposal that disappears on refresh is worse than no workflow:
+    // the submitter believes it is with a reviewer, and it is nowhere.
+    const first = makeWorkflow();
+    const submitted = first.workflow.submit({
+      icao: 'KASE',
+      submittedBy: 'pilot-1',
+      reason: 'curfew',
+      changes: { curfew: 'No departures 2200-0600' },
+    });
+    first.workflow.decide({
+      proposalId: submitted.id,
+      role: 'airport-evaluator',
+      reviewerOid: 'evaluator-1',
+      decision: 'approve',
+    });
+
+    const restored = new ProposalWorkflow(
+      first.pages,
+      { now: () => '2026-07-27T13:00:00.000Z', nextId: () => 'later' },
+      first.workflow.snapshot(),
+    );
+
+    const proposal = restored.get(submitted.id);
+    expect(proposal?.status).toBe('pending');
+    expect(proposal?.decisions).toHaveLength(1);
+    // Still owed by the chief pilot, and the officer's decision is not replayable.
+    expect(restored.awaiting('chief-pilot').map((p) => p.id)).toEqual([submitted.id]);
+    expect(restored.awaiting('airport-evaluator')).toEqual([]);
+  });
+
+  it('does not let a restored proposal be decided twice by the same person', () => {
+    const first = makeWorkflow();
+    const submitted = first.workflow.submit({
+      icao: 'KASE',
+      submittedBy: 'pilot-1',
+      reason: 'curfew',
+      changes: { curfew: 'No departures 2200-0600' },
+    });
+    first.workflow.decide({
+      proposalId: submitted.id,
+      role: 'airport-evaluator',
+      reviewerOid: 'wears-both-hats',
+      decision: 'approve',
+    });
+
+    const restored = new ProposalWorkflow(
+      first.pages,
+      { now: () => '2026-07-27T13:00:00.000Z', nextId: () => 'later' },
+      first.workflow.snapshot(),
+    );
+
+    expect(() =>
+      restored.decide({
+        proposalId: submitted.id,
+        role: 'chief-pilot',
+        reviewerOid: 'wears-both-hats',
+        decision: 'approve',
+      }),
+    ).toThrow(SameReviewerTwiceError);
+  });
+});
+
 describe('ProposalWorkflow — queues', () => {
   it('lists what is waiting on a given role, and nothing else', () => {
     const ctx = makeWorkflow();

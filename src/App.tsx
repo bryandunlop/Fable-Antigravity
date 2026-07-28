@@ -59,6 +59,8 @@ import OpsBoardPage from './components/ops/OpsBoardPage';
 import AirportEvaluation from './components/AirportEvaluation';
 import AirportEvaluations from './components/AirportEvaluations';
 import AirportInformation from './components/airport-info/AirportInformation';
+import AirportProposalQueue from './components/airport-info/AirportProposalQueue';
+import { CompanyAirportProvider } from './components/airport-info/CompanyAirportContext';
 import FuelLoadRequest from './components/FuelLoadRequest';
 import UnifiedTasksActionItems from './components/UnifiedTasksActionItems';
 import AOGManagement from './components/AOGManagement';
@@ -196,6 +198,11 @@ export default function App() {
                     stale blob during render and wrote it back — silently losing a just-signed
                     record. Hoisting removes the remount entirely. Ramp mode's route STAYS in the
                     outer chrome-less tree (its lockdown is the point); only the provider moved. */}
+                {/* Hoisted with the other cross-cutting stores, for the same reason TL-26 hoisted
+                    TechLogProvider: the airport page and its review queue are sibling routes, and a
+                    provider mounted per-subtree would remount between them and lose in-flight
+                    proposals. */}
+                <CompanyAirportProvider>
                 <TechLogProvider userRole={userRole}>
                 <Router>
                   <Routes>
@@ -270,7 +277,18 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/airport-evaluations" element={<AirportInformation />} />
+                                <Route path="/airport-evaluations" element={<AirportInformation currentUserOid={userRole} />} />
+                                <Route
+                                  path="/airport-evaluations/review"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
+                                      <AirportProposalQueue
+                                        role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}
+                                        currentUserOid={userRole}
+                                      />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 {/* The previous mock-backed directory, kept reachable while the
                                     editorial screens it owns are rewired onto real state (D46). */}
                                 <Route path="/airport-evaluations/legacy" element={<AirportEvaluations />} />
@@ -614,6 +632,7 @@ export default function App() {
                   </Routes>
                 </Router>
                 </TechLogProvider>
+                </CompanyAirportProvider>
                 </PassengerProvider>
                 </BulletinProvider>
                 </DocumentsProvider>
