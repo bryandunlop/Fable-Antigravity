@@ -60,6 +60,7 @@ import AirportEvaluation from './components/AirportEvaluation';
 import AirportEvaluations from './components/AirportEvaluations';
 import AirportInformation from './components/airport-info/AirportInformation';
 import AirportProposalQueue from './components/airport-info/AirportProposalQueue';
+import AirportEvaluationWorklist from './components/airport-info/AirportEvaluationWorklist';
 import FlagRuleBuilder from './components/airport-info/FlagRuleBuilder';
 import { CompanyAirportProvider } from './components/airport-info/CompanyAirportContext';
 import FuelLoadRequest from './components/FuelLoadRequest';
@@ -292,6 +293,17 @@ export default function App() {
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
                                       <AirportProposalQueue
+                                        role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}
+                                        currentUserOid={userRole}
+                                      />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/airport-evaluations/worklist"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
+                                      <AirportEvaluationWorklist
                                         role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}
                                         currentUserOid={userRole}
                                       />

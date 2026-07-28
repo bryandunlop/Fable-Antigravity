@@ -2,7 +2,15 @@ import React, { createContext, useCallback, useContext, useMemo, useRef, useStat
 
 import { requiredApprovals, type ApproverRole } from '../../airport/company/approvalRouting';
 import type { FlagRule } from '../../airport/flags/rules';
-import type { CompanyAirportPageContent, CompanyAirportPageVersion } from '../../airport/company/pageStore';
+import type {
+  AirportReviewAcknowledgement,
+  CompanyAirportPageContent,
+  CompanyAirportPageVersion,
+  ConfirmFieldRequest,
+  FieldConfirmation,
+} from '../../airport/company/pageStore';
+import { confirmationStates, type FieldConfirmationState } from '../../airport/company/confirmations';
+import { buildOfficerWorklist, type OfficerWorklist } from '../../airport/company/worklist';
 import { PersistentCompanyAirportPageStore } from '../../airport/company/persistence';
 import {
   ProposalWorkflow,
@@ -103,6 +111,14 @@ interface CompanyAirportApi {
   rules(): FlagRule[];
   saveRule(rule: FlagRule): void;
   deleteRule(ruleId: string): void;
+  /** Record that a field was checked and is still true (D54). */
+  confirm(request: ConfirmFieldRequest): FieldConfirmation;
+  /** Per-field confirmation state for an airport, derived — never stored. */
+  confirmationStates(icao: string, todayIso?: string): FieldConfirmationState[];
+  /** Record that a crew READ the current version. A read receipt, not a confirmation (D47). */
+  acknowledge(icao: string, crewOid: string, nasrCycleEffDate: string | null): AirportReviewAcknowledgement;
+  acknowledgements(icao: string): AirportReviewAcknowledgement[];
+  worklist(role: ApproverRole, todayIso?: string): OfficerWorklist;
 }
 
 const CompanyAirportContext = createContext<CompanyAirportApi | null>(null);
@@ -184,6 +200,22 @@ export function CompanyAirportProvider({ children }: { children: React.ReactNode
         engine.current!.rules = engine.current!.rules.filter((r) => r.id !== ruleId);
         commit();
       },
+      confirm: (request) => {
+        const confirmation = pages.confirm(request);
+        // The store persisted it synchronously; commit() is here only to bump
+        // the revision so the card and the worklist re-render.
+        commit();
+        return confirmation;
+      },
+      confirmationStates: (icao, todayIso) =>
+        confirmationStates(pages.versionsFor(icao), pages.confirmationsFor(icao), todayIso),
+      acknowledge: (icao, crewOid, nasrCycleEffDate) => {
+        const acknowledgement = pages.acknowledge({ icao, crewOid, nasrCycleEffDate });
+        commit();
+        return acknowledgement;
+      },
+      acknowledgements: (icao) => pages.acknowledgementsFor(icao),
+      worklist: (role, todayIso) => buildOfficerWorklist(pages, workflow, role, { todayIso }),
     };
     // `revision` IS a real dependency, despite not being read here.
     //

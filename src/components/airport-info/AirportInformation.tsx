@@ -85,6 +85,7 @@ export default function AirportInformation({
           airport={selected}
           onBack={() => setSelected(null)}
           onSubmitCorrection={() => setProposing(true)}
+          currentUserOid={currentUserOid}
         />
         <ProposeChangeDialog
           icao={selected.icaoId ?? selected.id}

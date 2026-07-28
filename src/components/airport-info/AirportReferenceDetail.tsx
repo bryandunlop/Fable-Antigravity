@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Building2,
   Edit,
+  Eye,
   Fuel,
   MapPin,
   Phone,
@@ -12,7 +13,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-import type { CompanyAirportPageContent } from '../../airport/company/pageStore';
+import type { CompanyAirportPageContent, ConfirmableField } from '../../airport/company/pageStore';
 import type { AirportRecord, RunwayRecord } from '../../airport/types';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
@@ -30,6 +31,8 @@ interface AirportReferenceDetailProps {
    * primary action that silently swallows the click.
    */
   onSubmitCorrection?: () => void;
+  /** Whose read receipt an acknowledgement records (D47). Real identity lands with auth. */
+  currentUserOid?: string;
 }
 
 /**
@@ -287,13 +290,23 @@ function CompanyPageCard({
   icao,
   pendingCount,
   canPropose,
+  currentUserOid,
+  nasrCycleEffDate,
 }: {
   icao: string;
   pendingCount: number;
   canPropose: boolean;
+  currentUserOid: string;
+  nasrCycleEffDate: string | null;
 }) {
   const company = useCompanyAirport();
   const published = company.getLatest(icao);
+  const states = company.confirmationStates(icao);
+  const stateFor = new Map(states.map((state) => [state.field, state]));
+  const acknowledgements = company.acknowledgements(icao);
+  const myAcknowledgement = acknowledgements.find(
+    (a) => a.crewOid === currentUserOid && a.companyPageVersionId === published?.id,
+  );
 
   const written = COMPANY_FIELDS.filter(
     ({ key }) => typeof published?.content[key] === 'string' && published.content[key],
@@ -319,19 +332,66 @@ function CompanyPageCard({
       {published ? (
         <>
           <div className="grid gap-4 md:grid-cols-2">
-            {written.map(({ key, label }) => (
-              <div key={key}>
-                <p className="text-sm text-muted-foreground mb-1">{label}</p>
-                <p className="whitespace-pre-wrap font-medium">{published.content[key] as string}</p>
-              </div>
-            ))}
+            {written.map(({ key, label }) => {
+              // The confirmation caveat sits with the fact it qualifies, not at
+              // the top of the page — a warning read once and scrolled past does
+              // not travel with the value it is about (D54).
+              const state = stateFor.get(key as ConfirmableField);
+              return (
+                <div key={key}>
+                  <p className="text-sm text-muted-foreground mb-1">{label}</p>
+                  <p className="whitespace-pre-wrap font-medium">
+                    {published.content[key] as string}
+                  </p>
+                  {state?.lastConfirmed ? (
+                    <p
+                      className={`mt-1 text-xs ${
+                        state.status === 'overdue'
+                          ? 'text-destructive'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      {state.lastConfirmed.via === 'publish'
+                        ? 'Written by the flight department'
+                        : `Confirmed by ${state.lastConfirmed.by}`}{' '}
+                      {new Date(state.lastConfirmed.atUtc).toLocaleDateString()}
+                      {state.status === 'overdue'
+                        ? ' — due for review, verify before you rely on it'
+                        : ''}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
           {written.length === 0 ? (
             <NotPublished what="Published, but every field is empty" />
           ) : null}
-          <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
-            Version {published.version}, published by {published.publishedBy} on{' '}
-            {new Date(published.publishedAtUtc).toLocaleString()}.
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+            <p className="text-xs text-muted-foreground">
+              Version {published.version}, published by {published.publishedBy} on{' '}
+              {new Date(published.publishedAtUtc).toLocaleString()}.
+            </p>
+            {myAcknowledgement ? (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Eye className="h-3 w-3" />
+                You marked this version seen on{' '}
+                {new Date(myAcknowledgement.acknowledgedAtUtc).toLocaleDateString()}
+              </span>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => company.acknowledge(icao, currentUserOid, nasrCycleEffDate)}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Mark as seen
+              </Button>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            &ldquo;Seen&rdquo; records which version you read, so what you were shown can be
+            reconstructed later. It does not assert the page is correct.
           </p>
         </>
       ) : (
@@ -352,6 +412,7 @@ export default function AirportReferenceDetail({
   airport,
   onBack,
   onSubmitCorrection,
+  currentUserOid = 'demo-user',
 }: AirportReferenceDetailProps) {
   const company = useCompanyAirport();
   const icao = airport.icaoId ?? airport.id;
@@ -553,6 +614,8 @@ export default function AirportReferenceDetail({
         icao={icao}
         pendingCount={pendingProposals}
         canPropose={Boolean(onSubmitCorrection)}
+        currentUserOid={currentUserOid}
+        nasrCycleEffDate={airport.effectiveDate}
       />
     </div>
   );
