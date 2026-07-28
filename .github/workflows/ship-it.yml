@@ -1,0 +1,122 @@
+name: ship-it
+
+# Merge a PR once Bryan has said go AND the machine has proven it safe.
+#
+# This does not remove his decision — it removes the requirement that he be at a
+# terminal to act on one. Today a finished branch waits for him to open a
+# session, ask an agent to serve it on localhost, look, and say "merge it". Two
+# branches sat like that; four ledger rows aged past a week. Now: open the Vercel
+# preview on his phone, add the `ship-it` label in the GitHub app. Nothing merges
+# without that label, so his approval still authorises every single production
+# deploy — it just costs two taps from anywhere instead of a session at his desk.
+#
+# GitHub's own auto-merge is unavailable here: it requires status checks, which
+# require branch protection, which requires GitHub Pro on a private repo (403).
+# So the gate is implemented explicitly — which at least makes it readable.
+
+on:
+  # CI finished — if the label is already on, ship it.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  # Label added — if CI is already green, ship it. Either order works.
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ship:
+    # Cheap exit so an ordinary label (or any unrelated run) costs nothing.
+    if: >-
+      github.event_name == 'workflow_run' ||
+      github.event.label.name == 'ship-it'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          RUN_PRS: ${{ toJson(github.event.workflow_run.pull_requests) }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          LABEL_PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            echo "number=$LABEL_PR" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # workflow_run.pull_requests is not reliably populated, so fall back to
+          # a branch lookup rather than silently doing nothing.
+          n=$(echo "$RUN_PRS" | jq -r 'if type=="array" and length>0 then .[0].number else empty end')
+          if [ -z "$n" ]; then
+            n=$(gh pr list --repo "$REPO" --head "$RUN_BRANCH" --state open \
+                  --json number --jq '.[0].number // empty')
+          fi
+          if [ -z "$n" ]; then
+            echo "no open PR for ${RUN_BRANCH:-this run} — nothing to ship"
+          fi
+          echo "number=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Check the gate, then merge
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+
+          meta=$(gh pr view "$PR" --repo "$REPO" \
+                   --json state,isDraft,headRefOid,baseRefName,mergeStateStatus,labels)
+          STATE=$(jq -r .state <<<"$meta")
+          DRAFT=$(jq -r .isDraft <<<"$meta")
+          SHA=$(jq -r .headRefOid <<<"$meta")
+          BASE=$(jq -r .baseRefName <<<"$meta")
+          MERGE_STATE=$(jq -r .mergeStateStatus <<<"$meta")
+          LABELS=$(jq -r '[.labels[].name] | join(",")' <<<"$meta")
+
+          say() { gh pr comment "$PR" --repo "$REPO" --body "$1" || true; echo "$1"; }
+
+          [ "$STATE" = "OPEN" ]  || { echo "PR #$PR is $STATE — nothing to do"; exit 0; }
+          [ "$DRAFT" = "false" ] || { echo "PR #$PR is a draft"; exit 0; }
+
+          case ",$LABELS," in
+            *,ship-it,*) ;;
+            *) echo "no ship-it label on #$PR — waiting for Bryan"; exit 0 ;;
+          esac
+          case ",$LABELS," in
+            *,hold,*) say "🛑 \`hold\` is on — not merging."; exit 0 ;;
+          esac
+
+          # Was CI green for THIS exact commit? Checking the head sha rather than
+          # "the latest CI run" is the whole point: a green run on an earlier push
+          # proves nothing about what would actually land.
+          concl=$(gh api "repos/$REPO/commits/$SHA/check-runs" \
+                    --jq '[.check_runs[] | select(.name=="verify")]
+                          | sort_by(.completed_at) | last | .conclusion // "none"')
+          if [ "$concl" != "success" ]; then
+            echo "CI for $SHA is '$concl' — not merging"
+            if [ "$concl" != "none" ]; then
+              say "🚦 \`ship-it\` is on, but CI for \`${SHA:0:7}\` concluded **$concl**. Not merging."
+            fi
+            exit 0
+          fi
+
+          # BEHIND means main advanced after CI ran, so the merge result is a tree
+          # nobody tested. That exact situation already broke a merge here once —
+          # origin/main was eight commits ahead with a new dependency.
+          if [ "$MERGE_STATE" = "BEHIND" ] || [ "$MERGE_STATE" = "DIRTY" ]; then
+            say "⏳ \`ship-it\` is on and CI is green, but this branch is **$MERGE_STATE** against \`$BASE\` — merging would produce a tree CI never saw. Update the branch; CI re-runs and this fires again."
+            exit 0
+          fi
+
+          # A merge commit, never a squash: reconcile.mjs proves `landed` from a
+          # merge commit whose SECOND PARENT is the branch tip. Squashing destroys
+          # that proof and the ledger row can then only be closed by assertion.
+          gh pr merge "$PR" --repo "$REPO" --merge --delete-branch=false
+          say "🚀 Merged on Bryan's \`ship-it\`, CI green for \`${SHA:0:7}\`. Vercel is deploying \`$BASE\` to production."

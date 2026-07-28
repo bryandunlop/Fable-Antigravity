@@ -1,0 +1,56 @@
+name: CI
+
+# Why this exists: verification was local-only. 1,532 tests ran when whichever
+# of a dozen parallel agent sessions remembered to run them, in whichever
+# worktree, against whatever that worktree had checked out — and `main` (which
+# auto-deploys prod on push) was only ever proven by an assertion in a commit
+# message. The pre-push hook covers typecheck on main and nothing else.
+#
+# So: the machine owns mechanical correctness. Bryan's "go" then means "this is
+# what I wanted", not "I hope it's safe" — which is the throughput point. A
+# human should be the gate for intent, never for arithmetic.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Many branches move at once here. Cancel superseded runs on the same ref so a
+# fast follow-up push doesn't queue behind the run it obsoletes (and doesn't
+# burn the private-repo Actions quota twice for one answer).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` not `npm install`: the lockfile is the input, and a merge that
+      # silently resolved a different dependency tree than the local run is
+      # exactly the class of surprise this job exists to catch. (One merge
+      # already needed reset + re-merge + npm install + re-test because
+      # origin/main had advanced eight commits with a new dependency.)
+      - run: npm ci
+
+      # Same gate as .githooks/pre-push, run here so it also covers PRs and
+      # cannot be skipped with --no-verify. Only NEW errors fail; the ~163
+      # grandfathered ones live in typecheck-baseline.json.
+      - name: Typecheck (baseline gate)
+        run: npm run type-check:baseline
+
+      - name: Tests
+        run: npm test
+
+      # vite build is not redundant with the above: it is the only step that
+      # proves the thing Vercel will actually run can be produced at all.
+      - name: Production build
+        run: npm run build
