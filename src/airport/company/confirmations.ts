@@ -294,9 +294,16 @@ export function pageConfirmationSummary(
 
   return {
     status: worst,
-    // A publish is the author asserting their own edit. It is not review, so it
-    // does not clear "nobody has ever checked this".
-    neverConfirmed: !confirmations.some((c) => CONFIRMABLE_FIELDS.includes(c.field)),
+    // Derived from the CURRENT fields, not from confirmation history. A publish
+    // is the author asserting their own edit, so it never clears "nobody has
+    // checked this" — and neither does a confirmation of a value that has since
+    // been edited or cleared, because it no longer vouches for anything on the
+    // page. Reading history instead let a page whose only confirmed field was
+    // later cleared drop off the board entirely, with nothing on it ever
+    // human-checked.
+    neverConfirmed: !present.some(
+      (state) => state.lastConfirmed !== null && state.lastConfirmed.via !== 'publish',
+    ),
     oldestConfirmedAtUtc: oldest,
     nextDueDateIso: nextDue,
     overdueFields: present.filter((s) => s.status === 'overdue').map((s) => s.field),

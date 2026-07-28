@@ -379,6 +379,14 @@ export default function AirportEvaluationWorklist({
         todayIso={todayIso}
         currentUserOid={currentUserOid}
       />
+
+      {/* An unattributed red "overdue" acquires implied authority through
+          repetition. Say on screen what the code comment says: these intervals
+          are ours, not a regulator's. */}
+      <p className="border-t pt-4 text-xs text-muted-foreground">
+        Review intervals are a flight-department default (90 days to a year, by field), not a
+        regulatory requirement.
+      </p>
     </div>
   );
 }

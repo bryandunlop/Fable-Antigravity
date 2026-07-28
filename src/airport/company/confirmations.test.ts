@@ -332,6 +332,43 @@ describe('per-field confirmation (D54)', () => {
       );
     });
 
+    it('goes back to never-confirmed when the only confirmed field is cleared', () => {
+      const t = ctx();
+      const v1 = t.publish({ ppr: 'PPR 24h' });
+      const confirmations = [confirmation('ppr', '2026-01-15T09:00:00.000Z', v1.id)];
+      expect(
+        pageConfirmationSummary(t.store.snapshot().versions, confirmations, '2026-02-01')
+          .neverConfirmed,
+      ).toBe(false);
+
+      // The PPR is dropped and a fresh curfew authored. Nothing on the page as
+      // it now stands has ever been checked by a human — reading confirmation
+      // HISTORY would wrongly report this page as reviewed and drop it off the
+      // officer's board entirely.
+      t.set('2026-03-01T12:00:00.000Z');
+      t.publish({ ppr: null, curfew: '2300-0600 local' });
+
+      expect(
+        pageConfirmationSummary(t.store.snapshot().versions, confirmations, '2026-04-01')
+          .neverConfirmed,
+      ).toBe(true);
+    });
+
+    it('goes back to never-confirmed when the confirmed field is edited', () => {
+      const t = ctx();
+      const v1 = t.publish({ ppr: 'PPR 24h' });
+      const confirmations = [confirmation('ppr', '2026-01-15T09:00:00.000Z', v1.id)];
+
+      t.set('2026-03-01T12:00:00.000Z');
+      t.publish({ ppr: 'PPR 48h' });
+
+      // Their confirmation attests the old wording; nobody has checked the new one.
+      expect(
+        pageConfirmationSummary(t.store.snapshot().versions, confirmations, '2026-04-01')
+          .neverConfirmed,
+      ).toBe(true);
+    });
+
     it('reports the oldest confirmed field as the page-level date', () => {
       const t = ctx();
       t.publish({ curfew: '2300-0600 local' });
