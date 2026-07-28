@@ -116,6 +116,44 @@ function DeclaredDistancesTable({ runway }: { runway: RunwayRecord }) {
   );
 }
 
+/**
+ * Plain-language reading of the five-part code, per IAC 8 §5.1.4.3.12.
+ * See ref-pavement-strength-reporting.
+ */
+const PAVEMENT_TYPE: Record<string, string> = { R: 'rigid', F: 'flexible' };
+const SUBGRADE: Record<string, string> = {
+  A: 'high subgrade',
+  B: 'medium subgrade',
+  C: 'low subgrade',
+  D: 'ultra-low subgrade',
+};
+const TIRE_PRESSURE: Record<string, string> = {
+  W: 'no tire-pressure limit',
+  X: 'tire pressure to 254 psi',
+  Y: 'tire pressure to 181 psi',
+  Z: 'tire pressure to 73 psi',
+};
+const METHOD: Record<string, string> = {
+  T: 'technically evaluated',
+  U: 'rated from using aircraft',
+};
+
+function decodePavement(c: {
+  pavementTypeCode: string;
+  subgradeStrengthCode: string;
+  tirePressureCode: string;
+  evaluationMethodCode: string;
+}): string {
+  return [
+    PAVEMENT_TYPE[c.pavementTypeCode],
+    SUBGRADE[c.subgradeStrengthCode],
+    TIRE_PRESSURE[c.tirePressureCode],
+    METHOD[c.evaluationMethodCode],
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
 function PavementBlock({ runway }: { runway: RunwayRecord }) {
   const { classification, alsoPublished, grossWeight } = runway.pavement;
 
@@ -134,6 +172,12 @@ function PavementBlock({ runway }: { runway: RunwayRecord }) {
         ) : (
           <NotPublished what="The FAA publishes no PCN or PCR for this runway" />
         )}
+        {classification ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {decodePavement(classification)}. Compared against an aircraft&rsquo;s ACR, not against a
+            weight — myGFO holds no ACR tables for this fleet, so it makes no suitability call here.
+          </p>
+        ) : null}
         {alsoPublished ? (
           <div className="mt-2 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -153,24 +197,23 @@ function PavementBlock({ runway }: { runway: RunwayRecord }) {
             <div className="flex flex-wrap gap-x-6 gap-y-1 font-medium tabular-nums">
               {(
                 [
-                  ['Single wheel', grossWeight.singleWheel],
-                  ['Dual wheel', grossWeight.dualWheel],
-                  ['Two dual tandem', grossWeight.twoDualWheelsTandem],
-                  ['Two dual double tandem', grossWeight.twoDualWheelsDoubleTandem],
+                  ['Single wheel', grossWeight.singleWheelLb],
+                  ['Dual wheel', grossWeight.dualWheelLb],
+                  ['Two dual tandem', grossWeight.twoDualWheelsTandemLb],
+                  ['Two dual double tandem', grossWeight.twoDualWheelsDoubleTandemLb],
                 ] as const
               )
                 .filter(([, value]) => value !== null)
                 .map(([label, value]) => (
                   <span key={label}>
                     <span className="text-sm text-muted-foreground">{label} </span>
-                    {value}
+                    {value!.toLocaleString()} lb
                   </span>
                 ))}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Values are shown exactly as the FAA publishes them. No FAA document in the NASR
-              bundle states their unit, so no unit is displayed and no comparison against aircraft
-              weight is made here.
+              A gear configuration with no figure is one the FAA has not published a number for — not
+              one the runway cannot take.
             </p>
           </>
         ) : (

@@ -300,6 +300,90 @@ describe('ProposalWorkflow — publish', () => {
   });
 });
 
+describe('ProposalWorkflow — self-approval (D52)', () => {
+  it('lets the proposer approve their own proposal', () => {
+    const ctx = makeWorkflow();
+    const proposal = ctx.workflow.submit({
+      icao: 'KTEB',
+      submittedBy: 'evaluator-1',
+      reason: 'FBO changed hands',
+      changes: { fboPreference: 'Atlantic' },
+    });
+
+    const after = ctx.workflow.decide({
+      proposalId: proposal.id,
+      role: 'airport-evaluator',
+      reviewerOid: 'evaluator-1',
+      decision: 'approve',
+    });
+
+    expect(after.status).toBe('approved');
+  });
+
+  it('marks the decision as self-approved so the record shows no second pair of eyes', () => {
+    const ctx = makeWorkflow();
+    const proposal = ctx.workflow.submit({
+      icao: 'KTEB',
+      submittedBy: 'evaluator-1',
+      reason: 'FBO changed hands',
+      changes: { fboPreference: 'Atlantic' },
+    });
+    const after = ctx.workflow.decide({
+      proposalId: proposal.id,
+      role: 'airport-evaluator',
+      reviewerOid: 'evaluator-1',
+      decision: 'approve',
+    });
+
+    expect(after.decisions[0].selfApproved).toBe(true);
+  });
+
+  it('does not mark a decision by someone else as self-approved', () => {
+    const ctx = makeWorkflow();
+    const proposal = ctx.workflow.submit({
+      icao: 'KTEB',
+      submittedBy: 'pilot-1',
+      reason: 'FBO changed hands',
+      changes: { fboPreference: 'Atlantic' },
+    });
+    const after = ctx.workflow.decide({
+      proposalId: proposal.id,
+      role: 'airport-evaluator',
+      reviewerOid: 'evaluator-1',
+      decision: 'approve',
+    });
+
+    expect(after.decisions[0].selfApproved).toBe(false);
+  });
+
+  it('still refuses to let one person satisfy BOTH approvals on a safety field', () => {
+    // Self-approval is permitted; one person standing in for two approvers is not.
+    // A safety change still needs a genuine second person.
+    const ctx = makeWorkflow();
+    const proposal = ctx.workflow.submit({
+      icao: 'KASE',
+      submittedBy: 'evaluator-1',
+      reason: 'curfew',
+      changes: { curfew: 'No departures 2200-0600' },
+    });
+    ctx.workflow.decide({
+      proposalId: proposal.id,
+      role: 'airport-evaluator',
+      reviewerOid: 'evaluator-1',
+      decision: 'approve',
+    });
+
+    expect(() =>
+      ctx.workflow.decide({
+        proposalId: proposal.id,
+        role: 'chief-pilot',
+        reviewerOid: 'evaluator-1',
+        decision: 'approve',
+      }),
+    ).toThrow(SameReviewerTwiceError);
+  });
+});
+
 describe('ProposalWorkflow — surviving a reload', () => {
   it('round-trips in-flight proposals through a snapshot', () => {
     // A submitted proposal that disappears on refresh is worse than no workflow:

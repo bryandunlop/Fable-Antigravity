@@ -34,6 +34,15 @@ export interface ProposalDecision {
   decision: 'approve' | 'deny';
   comments?: string;
   decidedAtUtc: string;
+  /**
+   * The decider is also the proposer (D52).
+   *
+   * Bryan's call: permitted, because in a small flight department the officer is
+   * often the only person who knows the airport — but recorded, because the
+   * record must not read as though two people looked at it. Anyone auditing this
+   * later can see at a glance which changes had no second pair of eyes.
+   */
+  selfApproved: boolean;
 }
 
 export interface CompanyAirportProposal {
@@ -186,6 +195,7 @@ export class ProposalWorkflow {
       decision: request.decision,
       comments: request.comments,
       decidedAtUtc: this.clock.now(),
+      selfApproved: request.reviewerOid === proposal.submittedBy,
     });
 
     // One denial ends it. Requiring the remaining approvers to also weigh in on

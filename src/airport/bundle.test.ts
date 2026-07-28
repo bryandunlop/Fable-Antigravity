@@ -66,16 +66,33 @@ describe('KTEB — pavement strength published only as a remark', () => {
     });
   });
 
-  it('kept the gross weights flagged as unit-unconfirmed (TL-31)', () => {
+  it('converted the gross weights to pounds, matching what the FAA publishes', () => {
     const runway = teb.runways.find((r) => r.runwayId === '01/19');
 
+    // NASR carries SW=50 / DW=100 in thousands of pounds; the FAA's own NFDC
+    // display renders this exact runway as 50,000 lbs / 100,000 lbs.
     expect(runway?.pavement.grossWeight).toEqual({
-      singleWheel: 50,
-      dualWheel: 100,
-      twoDualWheelsTandem: null,
-      twoDualWheelsDoubleTandem: null,
-      unitConfirmed: false,
+      singleWheelLb: 50_000,
+      dualWheelLb: 100_000,
+      twoDualWheelsTandemLb: null,
+      twoDualWheelsDoubleTandemLb: null,
+      unit: 'lb',
     });
+  });
+
+  it('keeps dual-wheel limits in a plausible range for a jet directory', () => {
+    const index = readIndex();
+    const limits = index.airports
+      .slice(0, 400)
+      .map((entry) => readAirport(entry.id))
+      .flatMap((a) => a.runways.map((r) => r.pavement.grossWeight?.dualWheelLb))
+      .filter((v): v is number => typeof v === 'number');
+
+    // A missed 1000x conversion would show up instantly as a runway rated to
+    // carry 100 lb, or one rated for 595 million.
+    expect(limits.length).toBeGreaterThan(0);
+    expect(Math.min(...limits)).toBeGreaterThan(1_000);
+    expect(Math.max(...limits)).toBeLessThan(2_000_000);
   });
 
   it('kept LDA distinct from TORA — 838 ft that a single length field would lose', () => {

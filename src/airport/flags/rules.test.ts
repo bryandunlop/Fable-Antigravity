@@ -127,12 +127,26 @@ describe('airportFacts', () => {
 });
 
 describe('the field allow-list', () => {
-  it('excludes weight-bearing fields until the unit is confirmed (TL-31)', () => {
-    // A rule comparing an unlabelled number against an aircraft weight is exactly
-    // the 1000x error TL-31 exists to prevent, so the field must not be offerable.
-    const names = FLAG_FIELDS.map((field) => field.key.toLowerCase());
+  it('offers weight limits in pounds, now the unit is sourced (TL-31 closed)', () => {
+    const weightFields = FLAG_FIELDS.filter((field) => field.key.toLowerCase().includes('weight'));
 
-    expect(names.some((n) => n.includes('weight') || n.includes('grosswt'))).toBe(false);
+    expect(weightFields.length).toBeGreaterThan(0);
+    // The unit must be in the label. A weight field a rule author cannot read the
+    // unit off is how the 1000x error gets made anyway.
+    expect(weightFields.every((field) => field.label.includes('(lb)'))).toBe(true);
+  });
+
+  it('offers no field that invites comparing a PCN/PCR against a weight (TL-32)', () => {
+    // PCR is compared to an aircraft's ACR, never to pounds, and we hold no
+    // G650ER ACR tables. Publishing a numeric PCR field here would invite exactly
+    // the comparison that cannot be made.
+    const pcrNumeric = FLAG_FIELDS.filter(
+      (field) =>
+        (field.key.toLowerCase().includes('pcn') || field.key.toLowerCase().includes('pcr')) &&
+        field.type === 'number',
+    );
+
+    expect(pcrNumeric).toEqual([]);
   });
 
   it('offers only operators that suit the field type', () => {

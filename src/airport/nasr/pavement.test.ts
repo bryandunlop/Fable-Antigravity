@@ -141,7 +141,7 @@ describe('resolveRunwayPavement — remarks that are not classifications', () =>
 });
 
 describe('resolveRunwayPavement — gross weight capacity', () => {
-  it('parses the four gear configurations, including decimal values', () => {
+  it('converts the four gear configurations from thousands of pounds to pounds', () => {
     const result = resolveRunwayPavement({
       ...noColumnPcn,
       grossWtSw: '50',
@@ -151,27 +151,45 @@ describe('resolveRunwayPavement — gross weight capacity', () => {
       pcnRemarks: [],
     });
 
+    // NASR publishes thousands of pounds — IAC 8 §5.1.4.3.11, and the FAA's own
+    // NFDC display renders KTEB's SW=50 as "50,000 lbs" (TL-31).
     expect(result.grossWeight).toEqual({
-      singleWheel: 50,
-      dualWheel: 43.5,
-      twoDualWheelsTandem: null,
-      twoDualWheelsDoubleTandem: 595,
-      unitConfirmed: false,
+      singleWheelLb: 50_000,
+      dualWheelLb: 43_500,
+      twoDualWheelsTandemLb: null,
+      twoDualWheelsDoubleTandemLb: 595_000,
+      unit: 'lb',
     });
   });
 
-  it('marks the unit unconfirmed — no FAA document in the bundle states it (TL-31)', () => {
+  it('reports KTEB dual-wheel as 100,000 lb, matching what the FAA publishes', () => {
     const result = resolveRunwayPavement({
       ...noColumnPcn,
       ...emptyGrossWeights,
+      grossWtSw: '50',
       grossWtDw: '100',
       pcnRemarks: [],
     });
 
-    // A 1000x error in the permissive direction on a weight-bearing field puts an
-    // aircraft on a ramp that cannot carry it. Until a primary source states the
-    // unit, the value travels verbatim and carries this flag with it.
-    expect(result.grossWeight?.unitConfirmed).toBe(false);
+    // KTEB's own NASR remark reads "ACFT CAPABLE OF OPERATING ABV 100,000 POUNDS
+    // MUST SUBMIT CERTIFICATION TO AMGR" — the same figure, in words.
+    expect(result.grossWeight?.dualWheelLb).toBe(100_000);
+  });
+
+  it('leaves an unpublished gear configuration null — a blank is not a zero', () => {
+    const result = resolveRunwayPavement({
+      ...noColumnPcn,
+      ...emptyGrossWeights,
+      grossWtDw: '210',
+      pcnRemarks: [],
+    });
+
+    // IAC 8: "Blank spaces after S or D indicate that the runway has weight
+    // bearing capacity ... but definite figures are not available." KJFK's
+    // single-wheel field is blank on a runway that plainly accepts them, so a
+    // null must never read as "cannot accept".
+    expect(result.grossWeight?.singleWheelLb).toBeNull();
+    expect(result.grossWeight?.dualWheelLb).toBe(210_000);
   });
 
   it('returns null gross weight when no gear configuration was published', () => {

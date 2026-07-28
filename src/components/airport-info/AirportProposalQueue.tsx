@@ -95,6 +95,11 @@ function ProposalCard({
           {proposal.decisions.map((d, i) => (
             <p key={i}>
               {ROLE_LABEL[d.role]} {d.decision === 'approve' ? 'approved' : 'denied'} — {d.reviewerOid}
+              {d.selfApproved ? (
+                <span className="ml-1 rounded bg-amber-50 px-1 py-0.5 text-amber-800">
+                  self-approved
+                </span>
+              ) : null}
               {d.comments ? ` · ${d.comments}` : ''}
             </p>
           ))}
@@ -108,6 +113,12 @@ function ProposalCard({
         </p>
       ) : (
         <>
+          {proposal.submittedBy === currentUserOid ? (
+            <p className="mt-3 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">
+              You submitted this. You may approve it, and the record will show it was
+              self-approved.
+            </p>
+          ) : null}
           <Textarea
             className="mt-3"
             rows={2}

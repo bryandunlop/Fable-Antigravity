@@ -43,26 +43,30 @@ export interface PavementClassification {
 }
 
 export interface GrossWeightCapacity {
-  singleWheel: number | null;
-  dualWheel: number | null;
-  twoDualWheelsTandem: number | null;
-  twoDualWheelsDoubleTandem: number | null;
   /**
-   * Always false, and deliberately not optional.
+   * All four are in **POUNDS**, already scaled from the NASR value.
    *
-   * No FAA document in the 28-day bundle states the unit for GROSS_WT_*:
-   * APT_DATA_LAYOUT gives only a prose field name and APT_CSV_DATA_STRUCTURE
-   * gives only NUMBER(5,1). The value distribution (261 distinct values, 30-250
-   * typical, 595 max) implies thousands of pounds, but that is an inference and
-   * a 1000x error here in the permissive direction puts an aircraft on a ramp
-   * that cannot carry it.
+   * NASR publishes these in thousands of pounds — confirmed from primary sources
+   * (TL-31, ref-pavement-strength-reporting): IAC 8 §5.1.4.3.11 states "A weight
+   * bearing capacity in thousands of pounds shall be shown for each runway",
+   * FAA Form 5010-3 prints the fields as "(IN THSDS)", and the FAA's own NFDC
+   * display renders KTEB's NASR row SW=50/DW=100 as 50,000 lbs / 100,000 lbs.
    *
-   * So the number travels verbatim, carrying this flag, and callers must not
-   * scale it, label it with a unit, or compare it against aircraft weight.
-   * Tracked as TL-31; promote it by reading a primary source, not by reasoning
-   * from the distribution.
+   * Scaling happens here, once, at the boundary — so nothing downstream ever
+   * holds an unlabelled number that could be read as pounds.
    */
-  unitConfirmed: false;
+  singleWheelLb: number | null;
+  dualWheelLb: number | null;
+  twoDualWheelsTandemLb: number | null;
+  twoDualWheelsDoubleTandemLb: number | null;
+  /**
+   * Null means the FAA did not publish a figure — NEVER that the runway cannot
+   * take that gear. IAC 8 §5.1.4.3.11: "Blank spaces after S or D indicate that
+   * the runway has weight bearing capacity to sustain aircraft with the type
+   * landing gear configuration shown, but definite figures are not available."
+   * KJFK's single-wheel field is blank on a runway that plainly accepts them.
+   */
+  readonly unit: 'lb';
 }
 
 export interface RunwayPavement {
@@ -147,25 +151,33 @@ function parseWeight(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** NASR publishes thousands of pounds; convert at the boundary, once. */
+const THOUSANDS_OF_POUNDS = 1000;
+
+function parseWeightLb(value: string): number | null {
+  const thousands = parseWeight(value);
+  return thousands === null ? null : thousands * THOUSANDS_OF_POUNDS;
+}
+
 function resolveGrossWeight(raw: RawRunwayPavement): GrossWeightCapacity | null {
-  const singleWheel = parseWeight(raw.grossWtSw);
-  const dualWheel = parseWeight(raw.grossWtDw);
-  const twoDualWheelsTandem = parseWeight(raw.grossWtDtw);
-  const twoDualWheelsDoubleTandem = parseWeight(raw.grossWtDdtw);
+  const singleWheelLb = parseWeightLb(raw.grossWtSw);
+  const dualWheelLb = parseWeightLb(raw.grossWtDw);
+  const twoDualWheelsTandemLb = parseWeightLb(raw.grossWtDtw);
+  const twoDualWheelsDoubleTandemLb = parseWeightLb(raw.grossWtDdtw);
 
   const published =
-    singleWheel !== null ||
-    dualWheel !== null ||
-    twoDualWheelsTandem !== null ||
-    twoDualWheelsDoubleTandem !== null;
+    singleWheelLb !== null ||
+    dualWheelLb !== null ||
+    twoDualWheelsTandemLb !== null ||
+    twoDualWheelsDoubleTandemLb !== null;
   if (!published) return null;
 
   return {
-    singleWheel,
-    dualWheel,
-    twoDualWheelsTandem,
-    twoDualWheelsDoubleTandem,
-    unitConfirmed: false,
+    singleWheelLb,
+    dualWheelLb,
+    twoDualWheelsTandemLb,
+    twoDualWheelsDoubleTandemLb,
+    unit: 'lb',
   };
 }
 

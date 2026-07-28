@@ -65,6 +65,18 @@ export interface AirportFacts {
   shortestToraFt: number | null;
   hasDeclaredDistances: boolean;
   hasPavementClassification: boolean;
+  /**
+   * Lowest published dual-wheel bearing capacity across the runways, in POUNDS.
+   *
+   * Directly comparable to aircraft weight — the unit is confirmed
+   * (ref-pavement-strength-reporting). Null means the FAA published no figure,
+   * which is NOT the same as "cannot take it".
+   *
+   * PCR is deliberately absent from this list: it is compared to an aircraft's
+   * ACR, never to a weight, and we hold no G650ER ACR tables (TL-32).
+   */
+  lowestDualWheelWeightLb: number | null;
+  lowestSingleWheelWeightLb: number | null;
   elevationFt: number | null;
   surfaces: string[];
   fuelTypes: string[];
@@ -96,7 +108,18 @@ export const FLAG_FIELDS: readonly FlagField[] = [
   },
   { key: 'shortestToraFt', label: 'Shortest published TORA (ft)', type: 'number' },
   { key: 'hasDeclaredDistances', label: 'Declared distances published', type: 'boolean' },
-  { key: 'hasPavementClassification', label: 'Pavement strength published', type: 'boolean' },
+  { key: 'hasPavementClassification', label: 'PCN/PCR published', type: 'boolean' },
+  {
+    key: 'lowestDualWheelWeightLb',
+    label: 'Dual-wheel weight limit (lb)',
+    type: 'number',
+    hint: 'Published for about half the set. Blank means the FAA gave no figure, not that the runway cannot take the aircraft.',
+  },
+  {
+    key: 'lowestSingleWheelWeightLb',
+    label: 'Single-wheel weight limit (lb)',
+    type: 'number',
+  },
   { key: 'elevationFt', label: 'Field elevation (ft)', type: 'number' },
   { key: 'surfaces', label: 'Runway surfaces', type: 'stringList' },
   { key: 'fuelTypes', label: 'Fuel grades', type: 'stringList' },
@@ -160,6 +183,12 @@ export function airportFacts(airport: AirportRecord): AirportFacts {
     shortestToraFt: minOf(published.map((d) => d!.toraFt)),
     hasDeclaredDistances: published.length > 0,
     hasPavementClassification: airport.runways.some((r) => r.pavement.classification !== null),
+    lowestDualWheelWeightLb: minOf(
+      airport.runways.map((r) => r.pavement.grossWeight?.dualWheelLb ?? null),
+    ),
+    lowestSingleWheelWeightLb: minOf(
+      airport.runways.map((r) => r.pavement.grossWeight?.singleWheelLb ?? null),
+    ),
     elevationFt: airport.elevationFt,
     surfaces: airport.runways
       .map((r) => r.surfaceTypeCode)
