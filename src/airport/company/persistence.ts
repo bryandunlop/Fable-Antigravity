@@ -26,6 +26,8 @@ import {
   type AcknowledgeRequest,
   type CompanyAirportPageSnapshot,
   type CompanyAirportPageVersion,
+  type ConfirmFieldRequest,
+  type FieldConfirmation,
   type PublishRequest,
   type StoreClock,
 } from './pageStore';
@@ -44,6 +46,10 @@ function hydrate(storage: StorageLike): CompanyAirportPageSnapshot | undefined {
     return {
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
       acknowledgements: Array.isArray(parsed.acknowledgements) ? parsed.acknowledgements : [],
+      // Absent in blobs written before D54. Missing confirmations degrade to
+      // "publish time is the last confirmation", which is the correct reading of
+      // a page nobody had yet been able to confirm.
+      confirmations: Array.isArray(parsed.confirmations) ? parsed.confirmations : [],
     };
   } catch {
     return undefined;
@@ -70,6 +76,14 @@ export class PersistentCompanyAirportPageStore extends InMemoryCompanyAirportPag
     const acknowledgement = super.acknowledge(request);
     this.flush();
     return acknowledgement;
+  }
+
+  confirm(request: ConfirmFieldRequest): FieldConfirmation {
+    // A confirmation is the evidence that someone checked a fact. Losing it to a
+    // debounce would silently roll the field back to looking unreviewed.
+    const confirmation = super.confirm(request);
+    this.flush();
+    return confirmation;
   }
 
   private flush(): void {

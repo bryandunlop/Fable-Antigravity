@@ -103,6 +103,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // but still routed because it owns the propose/review/publish screens until those are
   // rewired onto real state (D46).
   { path: '/airport-evaluations/legacy', label: 'Airport Information (legacy mock)', domain: 'flight-ops', icon: MapPin, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
+  { path: '/airport-evaluations/worklist', label: 'Airport Worklist', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['airport', 'worklist', 'review', 'stale', 'overdue', 'never reviewed'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
   { path: '/airport-evaluations/review', label: 'Airport Page Review', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['airport', 'proposal', 'approve', 'company page'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
   { path: '/airport-evaluations/flags', label: 'Airport Flags', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['flag', 'rule', 'short runway', 'noise abatement'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
   { path: '/fuel-load-request', label: 'Fuel Load Request', domain: 'flight-ops', icon: Fuel, primary: false, roles: ['pilot', 'admin'] },

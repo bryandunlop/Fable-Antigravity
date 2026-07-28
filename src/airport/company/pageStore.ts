@@ -46,6 +46,46 @@ export interface CompanyAirportPageContent {
   referenceAnnotations: ReferenceAnnotation[];
 }
 
+/**
+ * The fields a human can confirm as still true (D54). Reference annotations are
+ * excluded — they already carry their own reviewer sign-off.
+ */
+export type ConfirmableField =
+  | 'ppr'
+  | 'curfew'
+  | 'opsNotes'
+  | 'fboPreference'
+  | 'rampHandlingLimits';
+
+export const CONFIRMABLE_FIELDS: readonly ConfirmableField[] = [
+  'ppr',
+  'curfew',
+  'opsNotes',
+  'fboPreference',
+  'rampHandlingLimits',
+];
+
+/** Where an explicit confirmation came from. A publish is synthesised, never stored. */
+export type ConfirmationSource = 'officer' | 'crew' | 'debrief';
+
+/**
+ * "This fact was checked and is still true on date X" (D54) — distinct from a
+ * page version, which only says it was CHANGED on date X, and from an
+ * acknowledgement, which says only that someone READ it.
+ */
+export interface FieldConfirmation {
+  id: string;
+  icao: string;
+  field: ConfirmableField;
+  confirmedBy: string;
+  /** Server-stamped. Client times are advisory and are not accepted here. */
+  confirmedAtUtc: string;
+  source: ConfirmationSource;
+  /** The version whose value was confirmed — reusing D47's pin rather than inventing a second one. */
+  versionIdSeen: string;
+  note?: string;
+}
+
 export interface CompanyAirportPageVersion {
   id: string;
   icao: string;
@@ -89,6 +129,27 @@ export interface AcknowledgeRequest {
   nasrCycleEffDate: string | null;
 }
 
+export interface ConfirmFieldRequest {
+  icao: string;
+  field: ConfirmableField;
+  confirmedBy: string;
+  source: ConfirmationSource;
+  note?: string;
+}
+
+export class NothingToConfirmError extends Error {
+  constructor(
+    readonly icao: string,
+    readonly field: ConfirmableField,
+  ) {
+    super(
+      `Cannot confirm ${field} for ${icao}: the field carries no value. ` +
+        'Confirmation attests that a stated fact is still true; there is no fact here.',
+    );
+    this.name = 'NothingToConfirmError';
+  }
+}
+
 export class StaleBaseVersionError extends Error {
   constructor(
     readonly icao: string,
@@ -106,10 +167,16 @@ export class StaleBaseVersionError extends Error {
 export interface CompanyAirportPageStore {
   publish(request: PublishRequest): CompanyAirportPageVersion;
   acknowledge(request: AcknowledgeRequest): AirportReviewAcknowledgement;
+  confirm(request: ConfirmFieldRequest): FieldConfirmation;
   getLatest(icao: string): CompanyAirportPageVersion | null;
   getVersion(icao: string, version: number): CompanyAirportPageVersion | null;
   getVersionById(id: string): CompanyAirportPageVersion | null;
+  /** Every version for an airport, oldest first — what the confirmation engine walks. */
+  versionsFor(icao: string): CompanyAirportPageVersion[];
+  /** Airports that have ever had a page published. The worklist's roster. */
+  icaosWithPages(): string[];
   acknowledgementsFor(icao: string): AirportReviewAcknowledgement[];
+  confirmationsFor(icao: string): FieldConfirmation[];
 }
 
 export interface StoreClock {
@@ -137,11 +204,13 @@ function copyVersion(version: CompanyAirportPageVersion): CompanyAirportPageVers
 export interface CompanyAirportPageSnapshot {
   versions: CompanyAirportPageVersion[];
   acknowledgements: AirportReviewAcknowledgement[];
+  confirmations: FieldConfirmation[];
 }
 
 export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore {
   protected readonly versions: CompanyAirportPageVersion[] = [];
   protected readonly acknowledgements: AirportReviewAcknowledgement[] = [];
+  protected readonly confirmations: FieldConfirmation[] = [];
 
   constructor(
     protected readonly clock: StoreClock,
@@ -150,6 +219,9 @@ export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore 
     if (seed) {
       this.versions.push(...seed.versions.map(copyVersion));
       this.acknowledgements.push(...seed.acknowledgements.map((a) => ({ ...a })));
+      // Nullable on read: confirmations arrived after the first pages were
+      // written, so an older stored blob has no such key.
+      this.confirmations.push(...(seed.confirmations ?? []).map((c) => ({ ...c })));
     }
   }
 
@@ -158,6 +230,7 @@ export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore 
     return {
       versions: this.versions.map(copyVersion),
       acknowledgements: this.acknowledgements.map((a) => ({ ...a })),
+      confirmations: this.confirmations.map((c) => ({ ...c })),
     };
   }
 
@@ -201,6 +274,51 @@ export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore 
 
     this.acknowledgements.push(acknowledgement);
     return { ...acknowledgement };
+  }
+
+  confirm(request: ConfirmFieldRequest): FieldConfirmation {
+    const current = this.getLatest(request.icao);
+    if (!current) {
+      throw new Error(
+        `Cannot confirm ${request.field} for ${request.icao}: no published company page exists for it.`,
+      );
+    }
+    // Confirming an empty field would assert that nothing is still nothing, and
+    // would then age on the worklist as if it were a fact needing review.
+    if (current.content[request.field] === null) {
+      throw new NothingToConfirmError(request.icao, request.field);
+    }
+
+    const confirmation: FieldConfirmation = {
+      id: this.clock.nextId(),
+      icao: request.icao,
+      field: request.field,
+      confirmedBy: request.confirmedBy,
+      confirmedAtUtc: this.clock.now(),
+      source: request.source,
+      versionIdSeen: current.id,
+      note: request.note,
+    };
+
+    this.confirmations.push(confirmation);
+    return { ...confirmation };
+  }
+
+  versionsFor(icao: string): CompanyAirportPageVersion[] {
+    return this.versions
+      .filter((version) => version.icao === icao)
+      .sort((a, b) => a.version - b.version)
+      .map(copyVersion);
+  }
+
+  icaosWithPages(): string[] {
+    return [...new Set(this.versions.map((version) => version.icao))].sort();
+  }
+
+  confirmationsFor(icao: string): FieldConfirmation[] {
+    return this.confirmations
+      .filter((confirmation) => confirmation.icao === icao)
+      .map((confirmation) => ({ ...confirmation }));
   }
 
   getLatest(icao: string): CompanyAirportPageVersion | null {
