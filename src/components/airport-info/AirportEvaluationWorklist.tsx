@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -315,8 +316,10 @@ export default function AirportEvaluationWorklist({
                     safety field
                   </span>
                 ) : null}
+                {/* A router Link, not an anchor. Auth is in-memory React state,
+                    so a full page load drops the user back to role selection. */}
                 <Button size="sm" variant="outline" asChild>
-                  <a href="/airport-evaluations/review">Review</a>
+                  <Link to="/airport-evaluations/review">Review</Link>
                 </Button>
               </div>
             </Card>

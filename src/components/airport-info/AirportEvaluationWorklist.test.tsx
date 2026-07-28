@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import AirportEvaluationWorklist from './AirportEvaluationWorklist';
@@ -43,15 +44,20 @@ function renderWorklist(
   seed: (company: ReturnType<typeof useCompanyAirport>) => void,
   todayIso = '2026-01-02',
 ) {
+  // A real router: the board links to the review queue, and those must be
+  // router Links — a plain anchor would full-page-load and drop the in-memory
+  // auth back to role selection.
   return render(
-    <CompanyAirportProvider>
-      <Seed run={seed} />
-      <AirportEvaluationWorklist
-        role="airport-evaluator"
-        currentUserOid="officer-1"
-        todayIso={todayIso}
-      />
-    </CompanyAirportProvider>,
+    <MemoryRouter>
+      <CompanyAirportProvider>
+        <Seed run={seed} />
+        <AirportEvaluationWorklist
+          role="airport-evaluator"
+          currentUserOid="officer-1"
+          todayIso={todayIso}
+        />
+      </CompanyAirportProvider>
+    </MemoryRouter>,
   );
 }
 
