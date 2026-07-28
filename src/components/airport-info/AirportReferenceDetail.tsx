@@ -19,6 +19,7 @@ import { Card } from '../ui/card';
 import { AirportFlags } from './AirportFlags';
 import { useCompanyAirport } from './CompanyAirportContext';
 import { NotPublished, ProvenanceChip } from './ProvenanceChip';
+import { RunwayDiagram } from './RunwayDiagram';
 
 interface AirportReferenceDetailProps {
   airport: AirportRecord;
@@ -56,6 +57,56 @@ function Field({
     <div>
       <p className="text-sm text-muted-foreground mb-1">{label}</p>
       <div className="font-medium">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * The handful of facts a crew checks first, above the fold and without scrolling.
+ * Deliberately short — a tile row that tries to show everything is another table.
+ */
+function AirportGlance({ airport }: { airport: AirportRecord }) {
+  const longest = Math.max(0, ...airport.runways.map((r) => r.lengthFt ?? 0));
+  const weights = airport.runways
+    .map((r) => r.pavement.grossWeight?.dualWheelLb)
+    .filter((v): v is number => typeof v === 'number');
+
+  const tiles: { label: string; value: React.ReactNode; muted?: boolean }[] = [
+    { label: 'Longest runway', value: longest ? `${longest.toLocaleString()} ft` : '—' },
+    {
+      label: 'Elevation',
+      value: airport.elevationFt !== null ? `${Math.round(airport.elevationFt).toLocaleString()} ft` : '—',
+    },
+    {
+      label: 'Dual-wheel limit',
+      value: weights.length ? `${Math.min(...weights).toLocaleString()} lb` : 'not published',
+      muted: weights.length === 0,
+    },
+    { label: 'Tower', value: airport.towerTypeCode ?? 'none', muted: !airport.towerTypeCode },
+    {
+      label: 'Customs',
+      value: airport.customsAvailable ? 'yes' : 'no',
+      muted: !airport.customsAvailable,
+    },
+    {
+      label: 'Fuel',
+      value: airport.fuelTypes.length ? airport.fuelTypes.join(', ') : 'not published',
+      muted: airport.fuelTypes.length === 0,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      {tiles.map((tile) => (
+        <div key={tile.label} className="rounded border bg-muted/30 p-3">
+          <p className="text-xs text-muted-foreground">{tile.label}</p>
+          <p
+            className={`mt-0.5 font-medium tabular-nums ${tile.muted ? 'text-muted-foreground' : ''}`}
+          >
+            {tile.value}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -312,6 +363,10 @@ export default function AirportReferenceDetail({
     .map((slot) => `${slot.month}/${slot.day} ${slot.hour}`)
     .join(', ');
 
+  // Every runway is drawn against the airport's longest, so they are comparable
+  // with each other rather than each filling the width.
+  const longestRunwayFt = Math.max(1, ...airport.runways.map((r) => r.lengthFt ?? 0));
+
   return (
     <div className="space-y-6">
       <div>
@@ -368,6 +423,8 @@ export default function AirportReferenceDetail({
           </div>
         </div>
       </div>
+
+      <AirportGlance airport={airport} />
 
       <AirportFlags airport={airport} />
 
@@ -450,6 +507,8 @@ export default function AirportReferenceDetail({
                   <span className="text-muted-foreground">· {runway.lightingCode} intensity</span>
                 ) : null}
               </div>
+
+              <RunwayDiagram runway={runway} scaleMax={longestRunwayFt} />
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <div>
