@@ -617,6 +617,21 @@ export type ChecklistPhase = 'PREFLIGHT' | 'POSTFLIGHT';
 export type ChecklistItemKind = 'CHECK' | 'MEASUREMENT' | 'NOTE';
 export type TemplateStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
+/**
+ * D58 — how a template's items are worked, per template.
+ *
+ * `CLAIM_COMPLETE` is the original two-tap model: tap 1 claims (`OPEN → IN_PROGRESS`, stamping
+ * *who* holds the item so a second tech does not double up), tap 2 completes. `SINGLE_TAP` is
+ * `OPEN → DONE` in one tap — the completion stamp still carries attribution, only the claim
+ * signal goes, because a single-actor crew checklist has nobody to signal to.
+ *
+ * ABSENT MEANS `CLAIM_COMPLETE`. Every template and in-flight instance that predates D58 keeps
+ * exactly the behavior it had; the mode is read through `interactionModeOf`, never `t.interactionMode`
+ * directly. It lives on the template — which instances version-pin — so an instance's interaction
+ * model is frozen the moment it is created, like the rest of its content.
+ */
+export type ChecklistInteractionMode = 'SINGLE_TAP' | 'CLAIM_COMPLETE';
+
 export interface MeasurementFieldDef {
   id: string;
   label: string;
@@ -648,6 +663,8 @@ export interface ChecklistTemplate {
   aodReference?: string;
   version: number;
   status: TemplateStatus;
+  /** D58 — absent = `CLAIM_COMPLETE`. Read it via `interactionModeOf`, never raw. */
+  interactionMode?: ChecklistInteractionMode;
   effectiveFrom?: string;
   clonedFromTemplateId?: string;
   clonedFromVersion?: number;

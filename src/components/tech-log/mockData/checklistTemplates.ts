@@ -19,6 +19,31 @@ function sec(id: string, title: string, items: ChecklistItemDef[]): ChecklistSec
 const CREATED_BY = 'USR002'; // Sarah Wilson (DOM) — seed author
 const CREATED_AT = '2026-06-01T00:00:00.000Z';
 
+/**
+ * D58 interaction mode — OPEN CLASSIFICATION CALL, deliberately left at the safe default.
+ *
+ * D58 splits checklists into crew forms (single-tap + batch) and maintenance servicing forms
+ * (unchanged claim/complete). All four templates below are servicing forms on every piece of
+ * evidence available in the codebase:
+ *   • each is AOD-numbered (AOD-13/14/24/25) — D58 names the AOD forms as servicing;
+ *   • the work is servicing work — oxygen PSI, engine oil quarts, hydraulic replenishers, fuel
+ *     sump draining, SSPC pulls — and "Crew Brief & MX Release" appears as an *item* maintenance
+ *     performs, not as the form's owner;
+ *   • both runners are maintenance-gated: `BriefingPanel`'s DRAFT editor is `isMaint`-only (the
+ *     pilot only acknowledges the released briefing) and `PostflightPanel` tells anyone else
+ *     "Maintenance performs the postflight on return".
+ *
+ * No crew-owned checklist template exists in this build. So the plan's second heuristic — "anything
+ * the briefing/postflight flow runs is crew" — and its first — "the AOD-numbered servicing forms
+ * are servicing" — point at the same four rows and disagree. That is a product call, not a code
+ * one, so every template keeps `interactionMode` UNSET (= `CLAIM_COMPLETE`, byte-identical to
+ * pre-D58 behavior) until Bryan rules.
+ *
+ * Flipping one is a one-line change here (`interactionMode: 'SINGLE_TAP'`) — or a mode change in
+ * Admin → Checklists, which publishes it as a new version and leaves in-flight instances alone.
+ * `checklistTemplates.test.ts` pins the current classification so a flip is deliberate and visible.
+ */
+
 const G650ER_PREFLIGHT: ChecklistTemplate = {
   id: 'cl-g650er-preflight', aircraftType: 'G650ER', phase: 'PREFLIGHT', aodReference: 'AOD-13',
   version: 1, status: 'PUBLISHED', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,

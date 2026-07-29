@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pencil, Plus } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
-import { latestPublishedTemplate, canEditChecklistTemplates } from '../engine/checklist';
+import { latestPublishedTemplate, canEditChecklistTemplates, interactionModeOf } from '../engine/checklist';
 import type { AircraftType, ChecklistPhase, ChecklistTemplate } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { ChecklistTemplateEditor } from '../components/checklist/ChecklistTemplateEditor';
@@ -40,7 +40,7 @@ export default function AdminChecklists() {
                         {t ? <Badge variant="secondary">v{t.version}</Badge> : <Badge variant="outline">none</Badge>}
                       </div>
                       {t
-                        ? <div className="text-xs text-muted-foreground">{t.aodReference ?? '—'} · {t.sections.reduce((n, s) => n + s.items.length, 0)} items</div>
+                        ? <div className="text-xs text-muted-foreground">{t.aodReference ?? '—'} · {t.sections.reduce((n, s) => n + s.items.length, 0)} items · {interactionModeOf(t) === 'SINGLE_TAP' ? 'single tap' : 'claim + complete'}</div>
                         : <div className="text-xs text-muted-foreground">No checklist published yet.</div>}
                       {canEdit && (
                         <Button size="sm" variant="outline" onClick={() => setTarget({ aircraftType, phase, existing: t })}>
