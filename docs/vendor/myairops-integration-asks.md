@@ -4,6 +4,11 @@ Status: draft for the myairops conversation. Companion to the generated
 [capability matrix](./myairops-capability-matrix.md), which is the per-operation evidence
 behind everything asserted here.
 
+> **The consolidated list to send myairops is
+> [myairops-write-scope-request.md](./myairops-write-scope-request.md)** — every write we
+> want, split into scope requests (operations that exist), build requests (that do not) and
+> spec requests (APIs we cannot assess), with the deliberate exclusions.
+
 > **See also [push scenarios](./myairops-push-scenarios.md)** — the capabilities we intend to
 > build over the next year, each mapped to a verdict and a gating ask. It adds ASK 9–12 and
 > revises the priority order below; where the two disagree, the push-scenario ordering wins
