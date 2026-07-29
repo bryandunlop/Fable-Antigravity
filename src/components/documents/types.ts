@@ -2,7 +2,7 @@
 // Model: a Doc is an identity; a DocRevision is the publishable unit; the ack
 // requirement is a property of the published revision; a DocAcknowledgment is
 // scoped to (doc, revision, user) so publishing a new revision re-arms it.
-import type { Signature } from '../tech-log/types';
+import type { Signature, AircraftType, CasColor } from '../tech-log/types';
 import type { BulletinImage, BulletinVideo, BulletinLink } from '../bulletins/types';
 
 export type AckLevel = 'none' | 'initials' | 'signature';
@@ -24,7 +24,12 @@ export interface DocBlock {
   md: string;                 // block content as markdown (GFM)
   calloutKind?: 'note' | 'caution' | 'warning';
   splitFrom?: string;         // lineage when a block is split (set by the editor in Slice 3)
-  effectivity?: string[];     // per-tail/type applicability — field now, UI later (spec D-12)
+  /** Per-tail/type applicability of THIS BLOCK — field now, UI later (spec D-12).
+   * Not the same axis as `Doc.fleetTypes` (D60), which is doc-level: "this whole
+   * entry is about the G500". A block-level effectivity says "this paragraph
+   * applies only to these tails inside an otherwise shared document". Both can
+   * coexist; neither supersedes the other, so this is not a fork. */
+  effectivity?: string[];
   figureRef?: string;         // image src for 'figure' blocks
   /** Regulation requirement ids this block satisfies (into regCatalog) — G1
    * compliance linking. Part of block content, so it rides the four-eyes revision. */
@@ -37,6 +42,30 @@ export interface DocSection {
   number: string;              // display number '3.1' or '' when the heading has none
   title: string;
   blocks: DocBlock[];
+}
+
+/**
+ * D60 — the structured half of a CAS tribal-knowledge entry: what the message is
+ * called and what colour tier the flight deck shows it in. Present only on
+ * tribal-knowledge docs that describe ONE CAS message; a freeform article
+ * (startup CAS stack, nuisance notes) carries `fleetTypes` and no `casMeta`.
+ *
+ * This is REFERENCE content. It is adjacent to airworthiness records and never
+ * part of one — a defect's own `casMessage`/`casColor` are captured on the signed
+ * defect (D57) and are not read from here. The catalog only ever *offers* values
+ * at intake; nothing here can change what a signed record says.
+ */
+export interface DocCasMeta {
+  casMessage: string;
+  casColor: CasColor;
+  /**
+   * Related CMC/MAU fault codes — **hand-curated only.** Bryan explicitly rejected
+   * rolling codes recorded during troubleshooting into tribal knowledge (D60,
+   * answer 13): this class is for known issues, while defect/work-card CMC capture
+   * is intake and diagnosis. Nothing in the app writes this field automatically,
+   * and no intake path should be wired into it.
+   */
+  cmcCodes?: string[];
 }
 
 export interface Doc {
@@ -57,6 +86,21 @@ export interface Doc {
   /** ISO date; staleness / overdue-for-review derives from this. */
   nextReviewDate?: string;
   createdDate: string;
+  /**
+   * D60 — fleet-type applicability of the whole entry, canonical strings
+   * (`'G650ER' | 'G500' | 'G800'`). Drives the tail page's Reference tab and the
+   * defect-form CAS picker: a tail only ever sees knowledge tagged for its own type.
+   *
+   * ONE field for both kinds of entry. D60's shape put `fleetTypes` inside
+   * `casMeta`, but freeform articles need the same applicability with no `casMeta`
+   * at all — two fields carrying the same fact would be the fork D29 exists to
+   * avoid, so applicability lives here and `casMeta` carries only the structured
+   * CAS half. Absent/empty = not fleet-scoped (every existing entry, e.g. the KTEB
+   * ramp note), and such an entry is never offered under a fleet filter.
+   */
+  fleetTypes?: AircraftType[];
+  /** D60 — set only on a structured CAS entry; absent on freeform articles. */
+  casMeta?: DocCasMeta;
 }
 
 export interface DocRevision {
