@@ -52,4 +52,21 @@ describe('report-defect entry points', () => {
     await userEvent.click(screen.getByRole('button', { name: /report defect/i }));
     expect(screen.getByTestId('shared-report-defect-dialog')).toBeInTheDocument();
   });
+
+  /**
+   * D55 removed `Defect.severity`. The correction dialog is NOT the shared dialog and is not
+   * covered by the stub above — it is hand-rolled on this page and had its own Severity select.
+   * Nothing else catches a stray one: `tsc` is baseline-tracked rather than a merge gate, and the
+   * Vite build does not typecheck, so a re-added `cDraft.severity` would ship and render blank.
+   */
+  it('the correction dialog offers no Severity control (D55)', async () => {
+    renderRoute('/tech-log/defects', '/tech-log/defects', <Defects />);
+
+    const correct = screen.getAllByRole('button', { name: /correct/i });
+    expect(correct.length).toBeGreaterThan(0);
+    await userEvent.click(correct[0]);
+
+    expect(screen.getByText(/correct defect/i)).toBeInTheDocument();
+    expect(screen.queryByText(/severity/i)).not.toBeInTheDocument();
+  });
 });
