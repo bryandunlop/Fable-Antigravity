@@ -2,7 +2,7 @@ import type {
   TechLogState, Defect, Deferral, Signature, AuditEntry, FlightLog, MaintenanceRelease,
   WorkCard, PartUsage, LaborEntry, RecurringCheck, RecurringCheckAccomplishment,
   IntermittentFault, IntermittentFaultOccurrence, Trip, FlightBriefing,
-  MaintenanceProject, TechVacation,
+  MaintenanceProject, TechVacation, MelItem,
 } from '../types';
 import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
@@ -11,6 +11,32 @@ import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from 
 import { makeSignature } from '../engine/signing';
 import { buildBriefingDisclosure } from '../engine/briefingDisclosure';
 import { campForecast } from '../integration/campClient';
+
+/**
+ * D59 — `MelItem.crewActionRequired` is an OPERATOR decision, authored by the DOM or Chief
+ * Inspector when a MEL is entered. `mel.ts` is auto-generated from the manufacturer MELs, so the
+ * flag does not belong in that file: a regeneration would wipe it, and the extracted content cannot
+ * express an operator judgement in the first place. It is applied here as a thin overlay instead.
+ *
+ * Only a handful of items are authored, on purpose. Everything else is left ABSENT so the demo also
+ * exercises the legacy fallback (`Boolean(oProcedure)`), which is what the other 984 rows and every
+ * pre-D59 deferral will actually hit. `crew-action: false` on an item that carries (O) text is the
+ * interesting case — it is the only way the flag can ever REDUCE gating, and it must come from the
+ * DOM, never from line maintenance at the deferral.
+ */
+const AUTHORED_CREW_ACTIONS: Record<string, boolean> = {
+  // Carries (O) text and the DOM has confirmed it is a real crew action (the gating case).
+  'mel-g500-35-02-02': true,      // Cabin Oxygen ON Warning Systems — only-(O), Cat C
+  'mel-g500-21-01-01': true,      // CPCS — (O) prior-to-taxi checks, Cat B
+  'mel-g650er-21-20-02': true,    // Ram Air System, unpressurized configuration — only-(O), Cat C
+  // Carries (O) text that is a pointer to the AFM, not an action the crew performs before flight.
+  // The DOM has said so explicitly, which is the only thing that can turn the gate off.
+  'mel-g500-30-01-03': false,  // Cowl Anti-Ice pressure indication — AFM reference, no crew action
+};
+
+function withAuthoredCrewActions(items: MelItem[]): MelItem[] {
+  return items.map(m => (m.id in AUTHORED_CREW_ACTIONS ? { ...m, crewActionRequired: AUTHORED_CREW_ACTIONS[m.id] } : m));
+}
 
 /**
  * Builds the seeded demo world. Dates are RELATIVE to "now" so the AMBER aircraft
@@ -495,7 +521,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
 
   return {
     aircraft: SEED_AIRCRAFT,
-    melItems: [...SEED_MEL, ...SEED_MEL_G800],
+    melItems: withAuthoredCrewActions([...SEED_MEL, ...SEED_MEL_G800]),
     personnel,
     flightLogs,
     defects,

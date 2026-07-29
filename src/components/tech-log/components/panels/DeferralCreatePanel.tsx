@@ -7,6 +7,7 @@ import { GOVERNING_ZONE_OPTIONS, isOverride, validateGoverningOverride } from '.
 import { formatRegulatoryCompact, formatRegulatoryInstant, formatRegulatoryLabel } from '../../util/displayZone';
 import { utcFromWallTime, wallTimeFromUtc } from '../../util/entryZone';
 import { canDeferDefect } from '../../engine/disposition';
+import { crewActionRequiredForMelItem, resolveDeferralCrewAction, entersPendingPlacard } from '../../engine/crewAction';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
 import { newId } from '../../util/id';
@@ -67,6 +68,11 @@ export function DeferralCreatePanel({
   // seen at 2330Z and written up the next morning would otherwise start its clock a day late.
   // Maintenance can still adjust it here, before signing; after signing the deferral is immutable.
   const [dayOfDiscoveryUtc, setDayOfDiscoveryUtc] = useState(defect.occurredAtUtc);
+  // D59 crew action. `addCrewAction` is the ADD-ONLY override: it can turn a crew action ON where
+  // the MEL item does not carry one, and it is not even rendered when the item does — an inherited
+  // requirement is corrected in MEL management (D23 four-eyes), never unticked here.
+  const [addCrewAction, setAddCrewAction] = useState(false);
+  const [crewActionInstructions, setCrewActionInstructions] = useState('');
 
   const melMatches = useMemo(() => {
     if (!aircraft) return [];
@@ -78,7 +84,19 @@ export function DeferralCreatePanel({
   }, [state.melItems, aircraft, query]);
 
   const selectedMel = state.melItems.find(m => m.id === selectedMelId);
-  const willGate = !!(selectedMel?.mProcedure?.trim() || selectedMel?.placardText?.trim());
+  // D59: the flag is AUTHORED on the MEL item by the DOM / Chief Inspector at MEL entry; the
+  // deferral inherits it. Legacy/auto-extracted items with no authored flag fall back to
+  // Boolean(oProcedure) — conservative in the gating direction.
+  const crewActionInherited = selectedMel ? crewActionRequiredForMelItem(selectedMel) : false;
+  // The requested value is `inherited || added` rather than `added` alone, because the UI cannot
+  // express "remove": the checkbox is not rendered when the item carries the flag. The engine call
+  // stays anyway — it is where the add-only rule lives, and it must hold for any future caller.
+  const { crewActionRequired } = resolveDeferralCrewAction(crewActionInherited, crewActionInherited || addCrewAction);
+  const willGate = entersPendingPlacard({
+    mProcedureRequired: !!selectedMel?.mProcedure?.trim(),
+    placardRequired: !!selectedMel?.placardText?.trim(),
+    crewActionRequired,
+  });
   const cat = selectedMel?.category;
 
   // D24: live preview of the PL-25 clock under the chosen governing zone, so the signer sees the
@@ -147,6 +165,10 @@ export function DeferralCreatePanel({
       melSubItemNumber: selectedMel.subItemNumber, melTitle: selectedMel.title,
       // TL-16: the (O) procedure too — it decides whether the PIC must acknowledge this item.
       melOProcedure: selectedMel.oProcedure,
+      // D59: and the crew-action flag, frozen for the same reason — an EDIT_MEL_ITEM must never be
+      // able to make a mandatory crew action vanish from an already-signed deferral.
+      crewActionRequired,
+      crewActionInstructions: crewActionRequired ? (crewActionInstructions.trim() || undefined) : undefined,
       category: selectedMel.category, dayOfDiscoveryUtc, clockStartDateUtc: clockStart,
       governingTimezone: zone,
       governingTimezoneOverrideReason: isOverride(zone) ? overrideReason.trim() : undefined,
@@ -154,7 +176,10 @@ export function DeferralCreatePanel({
       restrictionText: restriction.trim() || selectedMel.provisos, placardRequired,
       mProcedureRequired, placardLocation: selectedMel.placardLocation, extensionUsed: false,
       riiRequired: false, melReviewAcknowledged: true, signedByOid: user.oid, signatureId: sig.id,
-      status: (mProcedureRequired || placardRequired) ? 'PENDING_PLACARD' : 'ACTIVE',
+      // D59: a crew action gates first release exactly as an (M) procedure or a placard does. Before
+      // this, a deferral whose ONLY requirement was an (O) procedure went straight to ACTIVE and the
+      // aircraft was dispatchable with a mandatory crew action nobody had done.
+      status: entersPendingPlacard({ mProcedureRequired, placardRequired, crewActionRequired }) ? 'PENDING_PLACARD' : 'ACTIVE',
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig as any });
     dispatch({ type: 'SUPERSEDE_DEFECT', payload: supDefect });
@@ -217,8 +242,41 @@ export function DeferralCreatePanel({
 
               <div className={`rounded-md p-2 text-xs ${willGate ? 'bg-[var(--gfo-error,#EF3340)]/10' : 'bg-[var(--gfo-warning,#F1B434)]/15'}`}>
                 {willGate
-                  ? 'This item requires an (M) procedure and/or a placard → the deferral starts PENDING_PLACARD and the aircraft stays RED until the gating discharge is signed.'
-                  : 'No (M) procedure or placard → the deferral goes ACTIVE on signing and the aircraft moves to AMBER (dispatchable under restriction).'}
+                  ? 'This item requires an (M) procedure, a placard and/or a crew action → the deferral starts PENDING_PLACARD and the aircraft stays RED until the gating discharge is signed.'
+                  : 'No (M) procedure, placard or crew action → the deferral goes ACTIVE on signing and the aircraft moves to AMBER (dispatchable under restriction).'}
+              </div>
+
+              {/* D59 — crew action. Provenance is the point: the requirement is authored on the MEL
+                  item by the DOM / Chief Inspector, so when it is inherited there is deliberately NO
+                  control to clear it here. Line maintenance may only ADD one. */}
+              <div className="rounded-md border p-2">
+                {crewActionInherited ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="destructive">Crew action</Badge>
+                      <span className="text-xs text-muted-foreground">per MEL item — DOM/CI</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      The crew (or maintenance) must accomplish the (O) procedure and mark it complied before this
+                      aircraft is released on this MEL. A wrongly-flagged item is corrected in MEL management,
+                      not on the deferral.
+                    </p>
+                  </>
+                ) : (
+                  <label className="flex items-start gap-2">
+                    <input id="deferral-add-crew-action" type="checkbox" className="mt-1" checked={addCrewAction} onChange={e => setAddCrewAction(e.target.checked)} />
+                    <span className="text-xs">
+                      <span className="font-medium">Crew action required</span> — this MEL item carries none; add one for this deferral.
+                    </span>
+                  </label>
+                )}
+                {crewActionRequired && (
+                  <div className="mt-2">
+                    <label className="text-xs font-medium" htmlFor="deferral-crew-instructions">Crew instructions (addendum, optional)</label>
+                    <Textarea id="deferral-crew-instructions" className="mt-1" value={crewActionInstructions} onChange={e => setCrewActionInstructions(e.target.value)}
+                      placeholder="Anything beyond the (O) procedure text the crew needs — the (O) text itself is carried automatically." />
+                  </div>
+                )}
               </div>
 
               <div>

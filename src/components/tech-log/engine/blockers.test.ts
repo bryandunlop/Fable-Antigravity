@@ -92,6 +92,38 @@ describe('buildBlockers — every grounding cause is a listed, actionable row', 
     expect(b!.actions).toContain('SIGN_GATING');
   });
 
+  // ── D59 — a pending crew action is a listed, actionable obstacle, not a hidden one ──
+  it('names the outstanding crew action on the pending-gate row and offers MARK_CREW_ACTION', () => {
+    const onlyO = deferral({ status: 'PENDING_PLACARD', crewActionRequired: true, melOProcedure: 'Pull CB 3-J14 before each flight' });
+    const r = buildBlockers('ac1', { ...empty, defects: [defect({ status: 'DEFERRED' })], deferrals: [onlyO] }, NOW);
+    const b = r.blockers.find(x => x.kind === 'DEFERRAL_PENDING_PLACARD')!;
+    expect(b).toBeDefined();
+    expect(b.title).toMatch(/crew action/i);
+    expect(b.actions).toContain('MARK_CREW_ACTION');
+    // the release is still the thing that clears it — marking is evidence, not authority
+    expect(b.actions).toContain('SIGN_GATING');
+    expect(b.clearsWhen).toMatch(/release/i);
+  });
+
+  it('drops MARK_CREW_ACTION once the action is marked, leaving the release as the only action', () => {
+    const marked = deferral({
+      status: 'PENDING_PLACARD', crewActionRequired: true, melOProcedure: 'Pull CB 3-J14',
+      crewActionCompliance: { id: 'cac1', byOid: 'p', byName: 'Capt Reed', atUtc: NOW, signatureId: 'sig1' },
+    });
+    const r = buildBlockers('ac1', { ...empty, defects: [defect({ status: 'DEFERRED' })], deferrals: [marked] }, NOW);
+    const b = r.blockers.find(x => x.kind === 'DEFERRAL_PENDING_PLACARD')!;
+    expect(b.actions).not.toContain('MARK_CREW_ACTION');
+    expect(b.actions).toEqual(['SIGN_GATING']);
+    expect(b.detail).toMatch(/Capt Reed/);
+  });
+
+  it('a placard-only pending gate is unchanged — no crew-action wording, no extra action', () => {
+    const r = buildBlockers('ac1', { ...empty, defects: [defect({ status: 'DEFERRED' })], deferrals: [deferral({ status: 'PENDING_PLACARD', placardRequired: true })] }, NOW);
+    const b = r.blockers.find(x => x.kind === 'DEFERRAL_PENDING_PLACARD')!;
+    expect(b.title).not.toMatch(/crew action/i);
+    expect(b.actions).toEqual(['SIGN_GATING']);
+  });
+
   it('rule 4 — an ACTIVE deferral is a restriction, not a blocker', () => {
     const r = buildBlockers('ac1', { ...empty, defects: [defect({ status: 'DEFERRED' })], deferrals: [deferral()] }, NOW);
     expect(r.status).toBe('AMBER');

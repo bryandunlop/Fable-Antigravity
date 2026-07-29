@@ -53,8 +53,16 @@ export const VERSION_KEY = 'tech-log-data-version';
  * would render broken dates and seed an MEL repair clock from nothing. The field was added in an
  * earlier commit of this batch and was inert only because nothing had read a hydrated old row yet;
  * this bump is what actually closes it.
+ *
+ * v18 (D59): `MelItem` gained `crewActionRequired`, authored on a handful of seeded items
+ * (`scenarios.ts#AUTHORED_CREW_ACTIONS`). A stored blob predating this carries the old, unauthored
+ * MEL rows, so every item would silently fall back to `Boolean(oProcedure)` and the DOM's explicit
+ * "no crew action" on 30-01-03 would read as a crew action — i.e. the seeded authoring would simply
+ * not exist for a returning user. Reseeding is the fix. (The new `Deferral` columns need no
+ * migration: absent reads as "no crew action", which is correct for rows signed under the old rule
+ * and is never reinterpreted.)
  */
-export const DATA_VERSION = '2026-07-29-v17';
+export const DATA_VERSION = '2026-07-29-v18';
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Wrench, ShieldCheck } from 'lucide-react';
+import { Wrench, ShieldCheck, ClipboardCheck, CheckCircle2 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { validateCrs } from '../../engine/signing';
-import { canSignPlacardDischarge, canDischargeGating } from '../../engine/disposition';
+import { resolveGatingSignability } from '../../engine/disposition';
 import { INTENT } from '../../constants';
 import { mockPdfBlobUri } from '../../util/printRecord';
 import { newId } from '../../util/id';
@@ -13,7 +13,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 
 /** (M)/placard gating-discharge body (RED → AMBER). Maintenance signs a CRS discharge; an authorized
- *  crew member signs a non-CRS placard attestation for a placard-ONLY deferral. Same state-machine flip. */
+ *  crew member signs a non-CRS placard attestation for a placard-ONLY deferral. Same state-machine flip.
+ *
+ *  Two things this panel deliberately does NOT do:
+ *
+ *  - It does not judge the `deferral` prop it was handed. Every gate question goes to
+ *    `resolveGatingSignability`, which resolves the CHAIN HEAD from the ledger by id — at render AND
+ *    again inside the signature ceremony's `validate`. That is the Workflow Logic Findings §1a fix:
+ *    the check used to run once against a captured row and never re-ask whether the deferral was
+ *    still PENDING_PLACARD, so two actors could both discharge the same gate.
+ *  - It does not let a deferral through while its D59 crew action is unmarked. Marking is somebody
+ *    else's (or the same person's) job and carries no authority — but until it exists, this
+ *    signature is the wrong one to give. */
 export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: Deferral; onDone: () => void; onCancel: () => void }) {
   const { state, dispatch } = useTechLog();
   const user = useCurrentUser();
@@ -26,22 +37,37 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
 
   if (!aircraft) return null;
 
-  const now = new Date().toISOString();
-  const stillDischargeable = canDischargeGating(deferral, now, { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles });
-  const canSign = canSignPlacardDischarge(user, deferral) && stillDischargeable;
-  const crewAttestation = !isMaint && canSign; // an *authorized* crew member signs a non-CRS placard attestation
+  const airframeNow = { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles };
+  /** Asked fresh every time — never cached, never taken from the prop. */
+  const signability = () => resolveGatingSignability({
+    deferralId: deferral.id, deferrals: state.deferrals, person: user,
+    asOfUtc: new Date().toISOString(), airframeNow,
+  });
+
+  const gate = signability();
+  // The live row, for display. Falls back to the prop only so a not-found row still renders a card.
+  const current = gate.ok ? gate.deferral : (gate.deferral ?? deferral);
+  const canSign = gate.ok;
+  // An *authorized* crew member signs a non-CRS placard attestation.
+  const crewAttestation = !isMaint && canSign;
+  const mark = current.crewActionCompliance;
 
   const begin = () => {
-    if (!stillDischargeable) return toast.error('This deferral already passed its repair-due condition (EXPIRED) — it cannot be discharged to ACTIVE. Route via extension or correction.');
-    if (!canSign) return toast.error(isMaint ? 'Cannot sign this discharge.' : 'An (M) procedure requires maintenance — crew may only attest a placard-only item.');
+    const g = signability();
+    if (!g.ok) return toast.error(g.reason);
     setPendingReleaseId(newId('rel'));
     setSignOpen(true);
   };
 
   const finalize = (sig: Signature) => {
+    // Defense in depth behind the ceremony's own `validate` — a signature must never be able to
+    // produce a release against a deferral that moved while the dialog was open.
+    const g = signability();
+    if (!g.ok) return toast.error(g.reason);
+    const target = g.deferral;
     const now = new Date().toISOString();
     const release: MaintenanceRelease = {
-      id: pendingReleaseId, aircraftId: aircraft.id, signoffType: 'DEFERRAL', linkedDeferralId: deferral.id,
+      id: pendingReleaseId, aircraftId: aircraft.id, signoffType: 'DEFERRAL', linkedDeferralId: target.id,
       isGatingDischarge: true,
       workDescription: crewAttestation ? `Placard installed (crew attestation) for MEL ${mel?.subItemNumber ?? ''}` : `(M)/placard discharge for MEL ${mel?.subItemNumber ?? ''}`,
       completionDateUtc: now,
@@ -49,7 +75,7 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
       certifyingTechOid: user.oid, apCertificateNumber: crewAttestation ? '' : (user.apCertificateNumber ?? ''), riiRequired: false,
       pdfBlobUri: mockPdfBlobUri('crs', pendingReleaseId), signatureId: sig.id,
     };
-    const flipped: Deferral = { ...deferral, id: newId('df'), supersedesId: deferral.id, status: 'ACTIVE', gatingReleaseId: release.id, placardInstalled: true };
+    const flipped: Deferral = { ...target, id: newId('df'), supersedesId: target.id, status: 'ACTIVE', gatingReleaseId: release.id, placardInstalled: true };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig });
     dispatch({ type: 'ADD_RELEASE', payload: release });
     dispatch({ type: 'SUPERSEDE_DEFERRAL', payload: flipped });
@@ -63,23 +89,49 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
       <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4" /> Gating-discharge release — step 2 of 2</CardTitle></CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div className="rounded bg-[var(--gfo-error,#EF3340)]/10 p-2 text-xs">
-          {aircraft.tailNumber} is <strong>GROUNDED (RED)</strong>: the deferral is PENDING_PLACARD until the required {deferral.mProcedureRequired ? '(M) procedure / placard' : 'placard'} is accomplished and signed.
+          {aircraft.tailNumber} is <strong>GROUNDED (RED)</strong>: the deferral is PENDING_PLACARD until the required {[current.mProcedureRequired ? '(M) procedure' : null, current.placardRequired ? 'placard' : null, current.crewActionRequired ? 'crew action' : null].filter(Boolean).join(' / ') || 'placard'} is accomplished and signed.
         </div>
         {mel?.mProcedure && <p className="rounded-md border p-3 text-xs"><strong>(M):</strong> {mel.mProcedure}</p>}
         {mel?.placardLocation && <p className="text-xs text-muted-foreground"><strong>Placard:</strong> {mel.placardLocation}</p>}
+
+        {/* D59 — the crew action, read off the frozen deferral row (never a live MelItem join). */}
+        {current.crewActionRequired && (
+          mark ? (
+            <p className="flex items-start gap-1.5 rounded-md border p-2 text-xs">
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--gfo-success,#00B140)]" />
+              <span>Crew action marked complied by <strong>{mark.byName}</strong>{mark.note ? ` — ${mark.note}` : ''}. That mark is evidence; your signature below is what releases the aircraft.</span>
+            </p>
+          ) : (
+            <p className="flex items-start gap-1.5 rounded-md border border-[var(--gfo-error,#EF3340)]/40 p-2 text-xs">
+              <ClipboardCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>The crew action on this deferral <strong>has not been marked complied</strong>. A pilot or maintenance user must record it before this release can be signed.</span>
+            </p>
+          )
+        )}
+
         {crewAttestation && <p className="rounded bg-[var(--gfo-warning,#F1B434)]/15 p-2 text-xs">Crew placard attestation (non-CRS). Items carrying an (M) procedure require maintenance.</p>}
         <div className="flex gap-2">
           <Button variant="outline" onClick={onCancel}>Later</Button>
           <Button onClick={begin} disabled={!canSign}><ShieldCheck className="mr-1.5 h-4 w-4" /> {crewAttestation ? 'Attest placard installed' : 'Sign discharge release'}</Button>
         </div>
-        {!stillDischargeable && <p className="text-xs text-[var(--gfo-error,#EF3340)]">This deferral already passed its repair-due condition and reads EXPIRED — discharging it now would silently un-ground an overdue item. Use an extension or correction instead.</p>}
-        {stillDischargeable && !canSign && !isMaint && <p className="text-xs text-[var(--gfo-error,#EF3340)]">This item needs an (M) procedure — maintenance must sign. The aircraft stays RED until then.</p>}
+        {!gate.ok && gate.code === 'EXPIRED' && <p className="text-xs text-[var(--gfo-error,#EF3340)]">This deferral already passed its repair-due condition and reads EXPIRED — discharging it now would silently un-ground an overdue item. Use an extension or correction instead.</p>}
+        {/* CREW_ACTION_PENDING has its own block above, with the (O) context — repeating the reason
+            here would say the same sentence twice on one card. */}
+        {!gate.ok && gate.code !== 'EXPIRED' && gate.code !== 'CREW_ACTION_PENDING' && <p className="text-xs text-[var(--gfo-error,#EF3340)]">{gate.reason}</p>}
         <p className="text-xs text-muted-foreground">On signing, the deferral flips PENDING_PLACARD → ACTIVE and the aircraft moves RED → AMBER.</p>
       </CardContent>
       <SignCeremonyDialog open={signOpen} onOpenChange={setSignOpen} signer={user}
         signedEntity={crewAttestation ? 'DEFERRAL' : 'CRS'} signedEntityId={pendingReleaseId}
         intentStatement={crewAttestation ? INTENT.PLACARD_ATTESTATION : INTENT.GATING_RELEASE}
-        requireStepUp={!crewAttestation} validate={crewAttestation ? undefined : () => validateCrs(user)}
+        requireStepUp={!crewAttestation}
+        // Re-asked AT THE MOMENT OF SIGNING, from the ledger: the §1a race fix. `validate` runs
+        // before the signature is minted, so a deferral someone else discharged mid-ceremony blocks
+        // here rather than producing a second release.
+        validate={() => {
+          const g = signability();
+          if (!g.ok) return { ok: false, error: g.reason };
+          return crewAttestation ? { ok: true } : validateCrs(user);
+        }}
         onSigned={finalize} title={crewAttestation ? 'Attest placard installed' : 'Sign (M)/placard release'} />
     </Card>
   );

@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Wrench, FilePlus, Clock, ShieldAlert, CheckCircle2, CalendarClock, Plus,
-  Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, CloudDownload, ShieldCheck,
+  Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, ClipboardCheck, CloudDownload, ShieldCheck,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
 import { formatRegulatoryCompact, type DisplayZoneMode } from '../util/displayZone';
@@ -15,6 +15,7 @@ import { currentRows } from '../engine/supersede';
 import { isDeferralExpired, DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
 import { canSignPlacardDischarge } from '../engine/disposition';
+import { canMarkCrewAction, crewActionPending } from '../engine/crewAction';
 import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
@@ -36,6 +37,7 @@ import { PostflightPanel } from '../components/PostflightPanel';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
 import { RectifyPanel } from '../components/panels/RectifyPanel';
 import { GatingReleasePanel } from '../components/panels/GatingReleasePanel';
+import { CrewActionPanel } from '../components/panels/CrewActionPanel';
 import { ExtendDeferralDialog } from '../components/panels/ExtendDeferralDialog';
 import { LifecycleStepper, type StepKey } from '../components/LifecycleStepper';
 import { ActivityFeed } from '../components/ActivityFeed';
@@ -65,6 +67,7 @@ const ACTION_LABEL: Record<BlockerAction, string> = {
   RAISE_CARD: 'Raise work card',
   SIGN_RELEASE: 'Sign release now',
   SIGN_GATING: 'Sign (M)/placard release',
+  MARK_CREW_ACTION: 'Mark crew action complied',
   ACCOMPLISH: 'Accomplish & sign',
   EXTEND: 'Extend',
   OPEN_CARD: 'Open card',
@@ -142,7 +145,7 @@ const TABS: { key: WorkspaceTab; label: string }[] = [
   { key: 'audit', label: 'Audit' },
 ];
 
-type Inline = { kind: 'defer' | 'rectify' | 'gating'; id: string } | null;
+type Inline = { kind: 'defer' | 'rectify' | 'gating' | 'crewAction'; id: string } | null;
 
 export default function AircraftDetail() {
   const { tail } = useParams();
@@ -156,7 +159,7 @@ export default function AircraftDetail() {
   const isMaint = user.role === 'MAINTENANCE';
 
   const tab = (params.get('tab') as WorkspaceTab) || 'workspace';
-  const setTab = (t: WorkspaceTab) => setParams(prev => { const p = new URLSearchParams(prev); p.set('tab', t); p.delete('deferral'); p.delete('gating'); p.delete('defect'); return p; }, { replace: true });
+  const setTab = (t: WorkspaceTab) => setParams(prev => { const p = new URLSearchParams(prev); p.set('tab', t); p.delete('deferral'); p.delete('gating'); p.delete('crewAction'); p.delete('defect'); return p; }, { replace: true });
 
   const [inline, setInline] = useState<Inline>(null);
   const [reportOpen, setReportOpen] = useState(false);
@@ -184,10 +187,14 @@ export default function AircraftDetail() {
   const [activeStep, setActiveStep] = useState<StepKey>('PREFLIGHT');
   useEffect(() => { if (step) setActiveStep(prev => (prev === 'PREFLIGHT' ? step : prev)); }, [step]);
 
-  // Deep-link: ?tab=deferrals&deferral=ID&gating=1 auto-opens the inline gating panel.
+  // Deep-link: ?tab=deferrals&deferral=ID&gating=1 auto-opens the inline gating panel;
+  // &crewAction=1 opens the D59 crew-action panel the same way (both personas' notifications link
+  // to it, so it must be reachable without hunting through the deferrals list).
   useEffect(() => {
     const dfr = params.get('deferral');
-    if (params.get('gating') === '1' && dfr) setInline({ kind: 'gating', id: dfr });
+    if (!dfr) return;
+    if (params.get('gating') === '1') setInline({ kind: 'gating', id: dfr });
+    else if (params.get('crewAction') === '1') setInline({ kind: 'crewAction', id: dfr });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -296,6 +303,12 @@ export default function AircraftDetail() {
         if (!row.deferral) return;
         setTab('deferrals');
         return setInline({ kind: 'gating', id: row.deferral.id });
+      // D59: recording the crew action is evidence, not a release — it opens its own panel, and the
+      // gating release still has to be signed afterwards.
+      case 'MARK_CREW_ACTION':
+        if (!row.deferral) return;
+        setTab('deferrals');
+        return setInline({ kind: 'crewAction', id: row.deferral.id });
       case 'ACCOMPLISH': return row.check ? beginAccomplish(row.check.id) : undefined;
       case 'EXTEND': return row.deferral ? setExtendFor(row.deferral) : undefined;
       case 'OPEN_CARD': return row.workCard ? navigate(`/tech-log/work-cards/${row.workCard.id}`) : undefined;
@@ -595,6 +608,15 @@ export default function AircraftDetail() {
               <GatingReleasePanel deferral={df} onCancel={() => setInline(null)} onDone={() => setInline(null)} />
             </div>
           ) : null; })()}
+          {/* D59 — takes the id, not the row: the panel re-resolves the chain head itself, and the
+              id survives its own superseding insert (the row's id does not). */}
+          {inline && inline.kind === 'crewAction' && (
+            <div className="max-w-2xl rounded-lg border-2 border-primary/40 p-3">
+              {/* No onDone: the panel stays open on the recorded mark, which is the evidence the
+                  next person (maintenance) needs to see before signing the release. */}
+              <CrewActionPanel deferralId={inline.id} onCancel={() => setInline(null)} />
+            </div>
+          )}
           {deferrals.length === 0 && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No active deferrals. Defer an open defect from the Defects tab.</CardContent></Card>}
           {deferrals.map(d => {
             const expired = isDeferralExpired(d, now, airframe);
@@ -608,6 +630,13 @@ export default function AircraftDetail() {
                       <Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge>
                       <Badge variant="outline">Cat {d.category}</Badge>
                       <Badge variant={effective === 'ACTIVE' ? 'secondary' : 'destructive'}>{effective}</Badge>
+                      {/* D59 — the crew action reads off the frozen deferral row, so a later MEL
+                          revision cannot repaint it. */}
+                      {d.crewActionRequired && (
+                        <Badge variant={crewActionPending(d) ? 'destructive' : 'outline'}>
+                          {crewActionPending(d) ? 'Crew action pending' : `Crew action complied · ${d.crewActionCompliance!.byName}`}
+                        </Badge>
+                      )}
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'}</p>
                     {d.repairDueDateUtc && (
@@ -617,8 +646,17 @@ export default function AircraftDetail() {
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
+                    {/* D59 — open to BOTH personas by design: on the road the pilots perform and
+                        mark the (O) action, at base maintenance often does. Neither is releasing
+                        anything by clicking it. */}
+                    {effective === 'PENDING_PLACARD' && canMarkCrewAction(user, d) && (
+                      <Button size="sm" variant="secondary" onClick={() => setInline({ kind: 'crewAction', id: d.id })}><ClipboardCheck className="mr-1.5 h-4 w-4" /> Mark crew action complied</Button>
+                    )}
+                    {effective === 'PENDING_PLACARD' && d.crewActionCompliance && (
+                      <Button size="sm" variant="ghost" onClick={() => setInline({ kind: 'crewAction', id: d.id })}><ClipboardCheck className="mr-1.5 h-4 w-4" /> Crew action record</Button>
+                    )}
                     {effective === 'PENDING_PLACARD' && canSignPlacardDischarge(user, d) && (
-                      <Button size="sm" onClick={() => setInline({ kind: 'gating', id: d.id })}><Wrench className="mr-1.5 h-4 w-4" /> {user.role === 'MAINTENANCE' ? 'Sign (M)/placard release' : 'Attest placard'}</Button>
+                      <Button size="sm" disabled={crewActionPending(d)} title={crewActionPending(d) ? 'The crew action must be marked complied first.' : undefined} onClick={() => setInline({ kind: 'gating', id: d.id })}><Wrench className="mr-1.5 h-4 w-4" /> {user.role === 'MAINTENANCE' ? 'Sign (M)/placard release' : 'Attest placard'}</Button>
                     )}
                     {effective === 'ACTIVE' && isMaint && extendable(d) && (
                       <Button size="sm" variant="outline" onClick={() => setExtendFor(d)}><TimerReset className="mr-1.5 h-4 w-4" /> Extend</Button>

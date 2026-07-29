@@ -90,6 +90,20 @@ export interface MelItem {
   numberRequired: number | null;
   oProcedure?: string;
   mProcedure?: string;
+  /**
+   * D59 — does a deferral against this item carry a CREW ACTION the crew (or maintenance) must
+   * accomplish and mark before the aircraft is first released to fly on it?
+   *
+   * Authored HERE, on the MEL item, by the DOM or Chief Inspector when the MEL is entered — not
+   * decided per-deferral by line maintenance. A wrongly-flagged item is corrected through MEL
+   * management (D23 four-eyes), never at the deferral. Deferrals inherit it, snapshotted at signing
+   * alongside `melOProcedure`.
+   *
+   * Nullable per the ledger rule for added columns. Absent (legacy / auto-extracted seed content)
+   * falls back to `Boolean(oProcedure)` at inheritance time — conservative in the gating direction.
+   * See `engine/crewAction.ts#crewActionRequiredForMelItem`.
+   */
+  crewActionRequired?: boolean;
   placardText?: string;
   placardLocation?: string;
   provisos?: string;
@@ -99,6 +113,32 @@ export interface MelItem {
 }
 
 export type DeferralStatus = 'PROPOSED' | 'PENDING_PLACARD' | 'ACTIVE' | 'CLEARED' | 'EXPIRED';
+
+/**
+ * D59 — the record that the deferral's crew action was accomplished. **Evidence, not authority**:
+ * it flips no state (D16 — regulatory state is never crew-decided; D17 — pilots do not self-certify
+ * airworthiness). Maintenance's gating-discharge signature remains the sole act that moves
+ * PENDING_PLACARD → ACTIVE.
+ *
+ * Written by a SUPERSEDING INSERT of the whole Deferral row, never by editing a signed one. A
+ * mistaken mark is corrected the same way, with `supersedesId` pointing at the mark it replaces so
+ * the evidence chain is readable end-to-end. (Who may supersede whose mark follows Q5 when
+ * answered; today anyone who may mark may correct, and the correction names its author.)
+ */
+export interface CrewActionCompliance {
+  id: string;
+  byOid: string;
+  /** TL-16: frozen at marking. Never a live Personnel join — a rename must not repaint the record. */
+  byName: string;
+  atUtc: string;
+  note?: string;
+  /** Optional photo(s). Each SHA-256 is folded into the signed payload (D18). */
+  attachments?: Attachment[];
+  /** The signature covering this mark. No step-up (D26). */
+  signatureId: string;
+  /** Set on a correction — the compliance record this one supersedes. */
+  supersedesId?: string;
+}
 
 export interface Deferral {
   id: string;
@@ -124,6 +164,21 @@ export interface Deferral {
    * adversarial verifier, 2026-07-26. Nullable per the ledger rule.
    */
   melOProcedure?: string;
+  /**
+   * D59 — inherited from the MEL item at signing and frozen here, exactly like `melOProcedure`
+   * above and for exactly the same reason: reading the flag live off `MelItem` would let a later
+   * EDIT_MEL_ITEM make a mandatory crew action vanish from an already-signed deferral.
+   *
+   * Line maintenance may ADD one (set it true where the item lacks it) but may NEVER clear an
+   * inherited true — see `engine/crewAction.ts#resolveDeferralCrewAction`. Nullable per the ledger
+   * rule; a row predating this column reads as "no crew action", which is correct: those deferrals
+   * were signed under the pre-D59 rule and are never reinterpreted.
+   */
+  crewActionRequired?: boolean;
+  /** D59 — maintenance's free-text addendum to the snapshotted (O) text. Instructions, not authority. */
+  crewActionInstructions?: string;
+  /** D59 — the complied mark. Present ⇒ the release gate is satisfied; it changes nothing else. */
+  crewActionCompliance?: CrewActionCompliance;
   category: MelCategory;
   dayOfDiscoveryUtc: string;
   clockStartDateUtc: string;
@@ -183,6 +238,7 @@ export type SignedEntity =
   | 'WORK_CARD'
   | 'BRIEFING'
   | 'POSTFLIGHT'
+  | 'CREW_ACTION' // D59: the non-authoritative complied mark on a deferral's (O) crew action
   | 'DOC_ACK'; // documents module: signature-level read-and-understood acknowledgment
 
 // ── Phase 3: work-card execution + parts/labor (D10) ──

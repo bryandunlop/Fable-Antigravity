@@ -66,6 +66,21 @@ describe('serviceability §14.2', () => {
     const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'DEFERRED' }), watch], deferrals: [deferral({ status: 'ACTIVE' })] }, NOW);
     expect(r.status).toBe('AMBER'); expect(r.drivingDeferralId).toBe('df1');
   });
+  // D59 — the hole this closes: before D59 a deferral whose only requirement was an (O) procedure
+  // went straight to ACTIVE, so the tail read AMBER with a mandatory crew action nobody had done.
+  // Serviceability itself is UNCHANGED — PENDING_PLACARD already contributed RED. What changed is
+  // that an only-(O) deferral now enters PENDING_PLACARD at all.
+  it('RED: an only-(O) deferral (crew action pending) holds the aircraft RED until the gating release is signed', () => {
+    const onlyO = deferral({ status: 'PENDING_PLACARD', mProcedureRequired: false, placardRequired: false, crewActionRequired: true, melOProcedure: 'Pull CB 3-J14 before each flight' });
+    const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'DEFERRED' })], deferrals: [onlyO] }, NOW);
+    expect(r.status).toBe('RED');
+    expect(r.activeDeferrals).toBe(0);
+  });
+  it('AMBER: the same deferral once released — marking alone would not have done it', () => {
+    const released = deferral({ status: 'ACTIVE', crewActionRequired: true, crewActionCompliance: { id: 'cac1', byOid: 'p', byName: 'Capt Reed', atUtc: NOW, signatureId: 'sig1' }, gatingReleaseId: 'rel1' });
+    const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'DEFERRED' })], deferrals: [released] }, NOW);
+    expect(r.status).toBe('AMBER');
+  });
   it('RED defense-in-depth: a contract-violating WATCHLISTED row still marked airworthiness-affecting grounds', () => {
     const r = deriveServiceability('ac1', { ...base, defects: [defect({ status: 'WATCHLISTED', airworthinessAffecting: true })], deferrals: [] }, NOW);
     expect(r.status).toBe('RED'); expect(r.governingRule).toBe(1);
