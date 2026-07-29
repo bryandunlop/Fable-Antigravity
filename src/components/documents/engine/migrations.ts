@@ -7,7 +7,7 @@
 // graceful degradation, never data loss. New seed content for existing stores
 // is also a migration step's job (a fresh install gets it from the seeds).
 import type { DocumentsState } from '../types';
-import { safetyReadSeed } from '../mockData';
+import { safetyReadSeed, casKnowledgeSeed } from '../mockData';
 
 export interface StoredStateMigration {
   /** The DATA_VERSION this step upgrades TO. Steps run in ascending order. */
@@ -33,6 +33,29 @@ export const STORED_STATE_MIGRATIONS: StoredStateMigration[] = [
       const { doc, rev } = safetyReadSeed();
       if (s.docs.some((d) => d.id === doc.id)) return s;
       return { ...s, docs: [...s.docs, doc], revisions: [...s.revisions, rev] };
+    },
+  },
+  {
+    // D60 — the per-fleet CAS knowledge seeds. This is the whole reason the catalog is
+    // homed in the documents store: an existing store is brought FORWARD to the new
+    // content, where a tech-log DATA_VERSION bump would have wiped and re-seeded (and
+    // taken any curated entry with it).
+    //
+    // Idempotent, and per-doc rather than all-or-nothing: an entry a curator has since
+    // ARCHIVED or revised is left exactly as it is, and only genuinely absent ones are
+    // added. Injecting the whole set on an id collision would silently overwrite a
+    // curator's own edits to a seeded entry.
+    to: '2026-07-29-cas-knowledge-v1',
+    migrate: (s) => {
+      const { docs, revisions } = casKnowledgeSeed();
+      const missing = docs.filter((d) => !s.docs.some((x) => x.id === d.id));
+      if (missing.length === 0) return s;
+      const missingIds = new Set(missing.map((d) => d.id));
+      return {
+        ...s,
+        docs: [...s.docs, ...missing],
+        revisions: [...s.revisions, ...revisions.filter((r) => missingIds.has(r.docId))],
+      };
     },
   },
 ];

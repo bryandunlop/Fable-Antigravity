@@ -27,7 +27,11 @@ import { eventStore } from '../../notifications/events';
 
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
-export const DATA_VERSION = '2026-07-14-safety-reads-v1';
+/** Bumped for D60's CAS knowledge seeds + the new `Doc.fleetTypes` / `Doc.casMeta`
+ *  fields. Both fields are optional and absent reads correctly, so this is not a
+ *  broken-render risk — the bump exists so a RETURNING user's store gains the new
+ *  curated content, which the matching step in engine/migrations.ts injects. */
+export const DATA_VERSION = '2026-07-29-cas-knowledge-v1';
 /** Set once the legacy 'bulletins-state' store has been imported — a later
  * re-seed must never resurrect stale pre-migration bulletins (C5). */
 export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';
