@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock, PlayCircle, PackageSearch, ClipboardCheck, Hourglass } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock, PlayCircle, PackageSearch, ClipboardCheck, Hourglass, BookOpen, Cpu, X } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
-import { currentRows } from '../engine/supersede';
+import { currentRows, latestFor } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
 import { riiStepsComplete, pendingRiiSteps } from '../engine/rii';
 import { appendStatusTag, statusDurations, currentTag } from '../engine/statusTags';
@@ -13,10 +13,13 @@ import { rectificationClosePush } from '../engine/rectification';
 import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
+import { workCardReferenceSections } from '../util/workCardPrint';
 import { newId } from '../util/id';
 import type { WorkCard, PartUsage, LaborEntry, LaborCategory, MaintenanceRelease, Defect, Deferral, Signature, WorkCardStatusTag } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
+import { CasChip } from '../components/CasChip';
+import { SymptomNote } from '../components/SymptomNote';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -59,6 +62,8 @@ export default function WorkCardDetail() {
   const [ldesc, setLdesc] = useState('');
   const [lcat, setLcat] = useState<LaborCategory>('WRENCH');
   const [lnote, setLnote] = useState('');
+  // CMC fault-code entry (LG-99) — the code being typed, not yet on the card
+  const [cmcDraft, setCmcDraft] = useState('');
   // status-tag control (QM4/D27) — POO demands a note (what part, from whom)
   const [pooNote, setPooNote] = useState('');
   const [pooPromptOpen, setPooPromptOpen] = useState(false);
@@ -103,6 +108,47 @@ export default function WorkCardDetail() {
   const hasRiiSteps = card.steps.some(s => s.riiRequired);
   const needsRii = card.riiRequired || hasRiiSteps;
   const riiStepsDone = riiStepsComplete(card.steps);
+
+  /**
+   * LG-108 — the defect this card was raised against, resolved through the SUPERSEDING CHAIN.
+   *
+   * Defects are an append-only ledger: a correction is a new row with a new id pointing back at the
+   * one it replaces. `card.linkedDefectId` still names the ORIGINAL, so `currentRows(...).find(d =>
+   * d.id === card.linkedDefectId)` — the idiom used elsewhere on this page — returns **undefined**
+   * the moment anyone corrects the defect, and the narrative would silently vanish from the card.
+   * `latestFor` walks the chain from an origin id to whatever row is current, which is what "the
+   * linked defect" has always meant. (The same bare-`.find()` sits in `finalize` below and in three
+   * engine modules; that is a pre-existing gap, flagged rather than fixed here.)
+   */
+  const linkedDefect = card.linkedDefectId ? latestFor(state.defects, card.linkedDefectId) : undefined;
+
+  // ── AMM reference + CMC fault codes (LG-98/99) ──
+  // These are the FIRST card-level editable scalars on a work card: everything else editable here is
+  // a collection (steps / parts / labor) or a status tag. The pattern being set is the page's own
+  // read-only gate, `{!completed && isMaint && …}`, with the locked rendering being plain text
+  // rather than a disabled input — a complied-with card must not look like something you could
+  // still type into. Both fields are hand-entered (D22); nothing here touches CAMP.
+  const cmcCodes = card.cmcFaultCodes ?? [];
+  const setAmmReference = (v: string) =>
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, ammReference: v.trim() ? v : undefined } });
+  const addCmcCode = (raw: string) => {
+    const code = raw.trim();
+    if (!code) return;
+    if (cmcCodes.some(c => c.toLowerCase() === code.toLowerCase())) {
+      setCmcDraft('');
+      return toast.error(`${code} is already on this card.`);
+    }
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, cmcFaultCodes: [...cmcCodes, code] } });
+    setCmcDraft('');
+  };
+  const removeCmcCode = (code: string) => {
+    const next = cmcCodes.filter(c => c !== code);
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, cmcFaultCodes: next.length ? next : undefined } });
+  };
+  // The pilot's single reported code (LG-99) is a starting hint, never an automatic entry: what the
+  // crew read off the CMC page is their observation, and putting it on the card is a maintenance act.
+  const pilotCode = linkedDefect?.cmcFaultCode?.trim();
+  const pilotHint = pilotCode && !cmcCodes.some(c => c.toLowerCase() === pilotCode.toLowerCase()) ? pilotCode : undefined;
 
   const toggleStep = (stepId: string) => {
     if (completed || !isMaint) return;
@@ -261,6 +307,8 @@ export default function WorkCardDetail() {
           { label: 'Card', value: card.cardNumber }, { label: 'CAMP WO', value: card.woNumber ?? '—' },
           { label: 'ATA', value: card.ataChapter }, { label: 'Type', value: card.scheduled ? 'Scheduled' : 'Corrective' },
         ], body: card.title },
+        // LG-98/99 — shared with the other two CRS call sites; see `util/workCardPrint.ts`.
+        ...workCardReferenceSections(card),
         { heading: 'Steps', body: card.steps.map(s => `${s.done ? '☑' : '☐'} ${s.text}`).join('\n') },
         { heading: 'Parts', body: parts.length ? parts.map(p => `${p.partNumber} (${p.description}) ×${p.qty}${p.serialNumber ? ` S/N ${p.serialNumber}` : ''}${p.removedPartNumber ? ` — removed ${p.removedPartNumber}${p.removedSerialNumber ? `/${p.removedSerialNumber}` : ''}` : ''}`).join('\n') : 'None' },
         // Frozen at entry (TL-16) — never a live Personnel join on a signed release.
@@ -296,6 +344,101 @@ export default function WorkCardDetail() {
             </Badge>
           )}
           <span className="ml-auto text-xs text-muted-foreground">steps {stepsDone}/{card.steps.length} · labor {totalLabor} h · {parts.length} part(s)</span>
+        </CardContent>
+        {/* LG-108 — what was actually reported, in the header a tech reads before troubleshooting.
+            The `linked defect` badge above has never carried anything but the word: no description,
+            no annunciation, no narrative. The narrative in particular ("started as a flicker on
+            taxi, went solid after rotation") is the one thing the structured CAS message cannot
+            say, and until now it reached no screen at all. */}
+        {linkedDefect && (
+          <CardContent className="border-t p-4 pt-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reported defect</span>
+              <Badge variant="outline">ATA {linkedDefect.ataChapter}</Badge>
+              <CasChip message={linkedDefect.casMessage} color={linkedDefect.casColor} observed={linkedDefect.casObserved} />
+            </div>
+            <p className="mt-1">{linkedDefect.description}</p>
+            <SymptomNote symptom={linkedDefect.symptom} source={linkedDefect.source} />
+          </CardContent>
+        )}
+      </Card>
+
+      {/* ── Troubleshooting references: AMM ref + CMC fault codes (LG-98/99) ── */}
+      <Card className="mb-4" data-testid="work-card-references">
+        <CardContent className="space-y-3 p-4 text-sm">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Troubleshooting references</span>
+            <span className="text-xs text-muted-foreground">manual entry — not sourced from CAMP</span>
+          </div>
+
+          {/* AMM reference — free text, because the reference is whatever document the tech actually
+              worked to (AMM / CMM / SB) and there is no manual index in the app to validate against. */}
+          {!completed && isMaint ? (
+            <div>
+              <Label htmlFor="wc-amm-ref" className="text-xs">AMM reference</Label>
+              <Input
+                id="wc-amm-ref"
+                className="mt-1"
+                placeholder="e.g. AMM 32-30-00"
+                value={card.ammReference ?? ''}
+                onChange={e => setAmmReference(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div>
+              <div className="text-xs text-muted-foreground">AMM reference</div>
+              {card.ammReference
+                ? <span className="font-medium">{card.ammReference}</span>
+                : <span className="text-muted-foreground">Not recorded.</span>}
+            </div>
+          )}
+
+          {/* CMC fault codes — a real add/remove chip list. Deliberately NOT the comma-separated
+              string in a single `<Input>` that `AdminPersonnel` uses for `riiAuthorizedAta`: one
+              stray comma there silently splits a value, there is no way to remove a single entry
+              without re-typing the line, and nothing can render an individual code as its own
+              object. The precedent followed instead is the attachments grid in `DefectFields`. */}
+          <div>
+            <div className="text-xs text-muted-foreground">CMC fault codes</div>
+            {cmcCodes.length === 0 && <p className="mt-1 text-muted-foreground">None recorded.</p>}
+            {cmcCodes.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {cmcCodes.map(code => (
+                  <span key={code} className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-xs">
+                    {code}
+                    {!completed && isMaint && (
+                      <button type="button" aria-label={`Remove CMC code ${code}`} title="Remove" onClick={() => removeCmcCode(code)}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+            {!completed && isMaint && (
+              <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center">
+                <Input
+                  aria-label="Add CMC fault code"
+                  className="md:max-w-xs"
+                  placeholder="e.g. 32-3120-04"
+                  value={cmcDraft}
+                  onChange={e => setCmcDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCmcCode(cmcDraft); } }}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" disabled={!cmcDraft.trim()} onClick={() => addCmcCode(cmcDraft)}>
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add code
+                  </Button>
+                  {pilotHint && (
+                    <Button size="sm" variant="ghost" aria-label={`Add pilot-reported code ${pilotHint}`} onClick={() => addCmcCode(pilotHint)}>
+                      <Cpu className="mr-1.5 h-3.5 w-3.5" /> Pilot reported {pilotHint}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

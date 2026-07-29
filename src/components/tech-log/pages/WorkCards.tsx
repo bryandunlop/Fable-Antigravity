@@ -131,6 +131,9 @@ export default function WorkCards() {
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO status: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}
                         {labor > 0 ? ` · ${labor} h logged` : ''}
+                        {/* LG-98: the AMM reference on the row itself, so "which procedure is this
+                            card working to" is answerable without opening every card. */}
+                        {w.ammReference ? ` · ${w.ammReference}` : ''}
                       </p>
                     </div>
                     <div className="shrink-0 text-xs text-muted-foreground">

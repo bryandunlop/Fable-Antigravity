@@ -19,14 +19,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
  * one). They used to be hand-rolled copies of each other, so every field change had to be made
  * more than once and the copies drifted.
  *
- * "Shared" means the component lives here, NOT that both dialogs render it. Three of the seven are
+ * "Shared" means the component lives here, NOT that both dialogs render it. Three of the eight are
  * mounted by `ReportDefectDialog` alone — the correction dialog has no control for them at all.
  *
  * **Here AND rendered by both dialogs — change once, both follow:** description
  * (`DefectDescriptionField`), symptom (`DefectSymptomField`), the CAS annunciation
- * (`DefectCasField` — D57 split the old conflated "Symptom / CAS" input into those two), and
- * free-text location notes (`DefectLocationNotesField` — standalone in the correction dialog,
- * nested inside `DefectLocationSection` in the report dialog).
+ * (`DefectCasField` — D57 split the old conflated "Symptom / CAS" input into those two), the CMC
+ * fault code (`DefectCmcCodeField`), and free-text location notes (`DefectLocationNotesField` —
+ * standalone in the correction dialog, nested inside `DefectLocationSection` in the report dialog).
  *
  * **Here but rendered by `ReportDefectDialog` ONLY:** the occurrence timestamp (`OccurredAtField`),
  * the structured-location box (`DefectLocationSection`), and attachments
@@ -72,6 +72,40 @@ export function DefectSymptomField({ value, onChange, label = 'Symptom', placeho
     <div>
       <Label>{label}</Label>
       <Input className="mt-1" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
+/**
+ * LG-99 — the CMC/MAU fault code as the reporter read it off the maintenance-computer page.
+ *
+ * `Defect.cmcFaultCode` was added to the type by an earlier slice of this batch and shipped with
+ * **zero writers and zero readers**: the field existed, nothing could set it, and the work card's
+ * "start from the code the pilot reported" hint therefore had nothing to start from. This is that
+ * missing input.
+ *
+ * ONE code here, a LIST on the work card. That is not an oversight to be tidied up later — they are
+ * different facts. This is what the crew saw on one page at one moment; `WorkCard.cmcFaultCodes` is
+ * what maintenance interrogated out of the box afterwards, which is routinely several codes.
+ *
+ * Hand-typed (D22). Nothing in this build sources a fault code from CAMP.
+ */
+export function DefectCmcCodeField({ value, onChange, label = 'CMC fault code (optional)', placeholder = 'e.g. 32-3120-04' }: {
+  value: string;
+  onChange: (v: string) => void;
+  label?: string;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <Label htmlFor="defect-cmc-code">{label}</Label>
+      <Input
+        id="defect-cmc-code"
+        className="mt-1"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { UserCheck, Printer } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
 import { currentRows } from '../engine/supersede';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
+import { workCardReferenceSections } from '../util/workCardPrint';
 import type { MaintenanceRelease } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { RectifyPanel } from '../components/panels/RectifyPanel';
@@ -67,6 +68,9 @@ export default function Releases() {
     const perf = sigById(r.signatureId);
     const rii = sigById(r.riiSignatureId);
     const sigs = [perf, rii].filter(Boolean).map(s => ({ role: s!.signerRole, name: s!.signerName, cert: s!.certNumber, hash: s!.mockContentHash, signedAtUtc: s!.signedAtUtc, amr: s!.amr.join('+') }));
+    // LG-98/99: a WORKCARD release names the card it came from; a rectification or an (M)/placard
+    // discharge does not, and the helper prints nothing in that case.
+    const card = r.linkedWorkCardId ? state.workCards.find(w => w.id === r.linkedWorkCardId) : undefined;
     printSignedRecord({
       docTitle: r.signoffType === 'DEFERRAL' ? '(M) / Placard Discharge Release' : 'Certificate of Release to Service',
       recordType: r.isGatingDischarge ? 'Gating discharge' : r.signoffType,
@@ -75,6 +79,7 @@ export default function Releases() {
       pdfBlobUri: r.pdfBlobUri ?? mockPdfBlobUri('crs', r.id),
       sections: [
         { heading: 'Work performed (14 CFR 91.417(a)(1)(i))', body: r.workDescription },
+        ...workCardReferenceSections(card),
         { heading: 'Return to service', fields: [
           { label: 'Completed', value: new Date(r.completionDateUtc).toLocaleString() },
           // TL-16 / DM-3: read the name frozen into the Signature this release was signed with.

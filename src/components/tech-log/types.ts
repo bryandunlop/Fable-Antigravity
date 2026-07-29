@@ -304,6 +304,25 @@ export interface WorkCard {
   completedAtUtc?: string;
   statusTags?: StatusTagEvent[]; // QM4/D27 work/wait history (chronological; last entry is current)
   campExpected?: CampExpectedItem[]; // expected parts/tools/consumables mirrored from the CAMP WO
+  /**
+   * LG-98 — where the fix procedure lives, e.g. `AMM 32-30-00`. **Hand-typed (D22).** Nothing in
+   * this build sources it from CAMP; `campExpected` above is the only CAMP-mirrored field on this
+   * card and the two must not be conflated. Free text on purpose: the reference is whatever
+   * document the tech actually worked to (AMM, CMM, SB), and there is no manual index in the app
+   * to validate it against.
+   *
+   * The legacy `ammReference` in `src/types/maintenance.ts` is NOT prior art — that surface is
+   * do-not-extend (`docs/CANONICAL_MAINTENANCE_SURFACE.md`) and nothing canonical imports it. The
+   * name is reused; the implementation is not.
+   */
+  ammReference?: string;
+  /**
+   * LG-99 — the CMC/MAU fault codes maintenance found while troubleshooting. A LIST, because one
+   * squawk routinely interrogates into several codes — which is exactly why this cannot live on
+   * the defect: `Defect.cmcFaultCode` is the single code the *pilot* read off the CMC page, and it
+   * is the intake hint that seeds this list, not the same fact. Also hand-typed (D22).
+   */
+  cmcFaultCodes?: string[];
 }
 
 /** A part installed/removed under a work card. Removals feed MTBUR (§Phase 4). */

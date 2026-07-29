@@ -14,10 +14,11 @@ import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
 import {
-  DefectDescriptionField, DefectSymptomField, DefectCasField, DefectLocationNotesField,
-  casValueFor, casEntryIncomplete, casModeOf, type CasMode,
+  DefectDescriptionField, DefectSymptomField, DefectCasField, DefectCmcCodeField,
+  DefectLocationNotesField, casValueFor, casEntryIncomplete, casModeOf, type CasMode,
 } from '../components/panels/DefectFields';
 import { CasChip } from '../components/CasChip';
+import { SymptomNote } from '../components/SymptomNote';
 import { WatchlistDialog, EscalateWatchDialog } from '../components/panels/WatchlistPanel';
 import { ATA_CHAPTERS, INTENT } from '../constants';
 import { newId } from '../util/id';
@@ -181,6 +182,9 @@ export default function Defects() {
                   <span className="text-xs text-muted-foreground">{d.source}</span>
                 </div>
                 <p className="mt-1 text-sm">{d.description}</p>
+                {/* LG-108: the reporter's own narrative — the sentence the structured CAS message
+                    above cannot carry. Same atom on the aircraft workspace's Defects tab. */}
+                <SymptomNote symptom={d.symptom} source={d.source} />
                 {/* D56: occurrence first — it is what starts the MEL clock. Both stamps render
                     through the same D24 lens so they can actually be compared. */}
                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -268,6 +272,7 @@ export default function Defects() {
                 message={cCasMessage} onMessageChange={setCCasMessage}
                 color={cCasColor} onColorChange={setCCasColor}
               />
+              <DefectCmcCodeField label="CMC fault code" value={cDraft.cmcFaultCode ?? ''} onChange={v => setCDraft({ ...cDraft, cmcFaultCode: v.trim() || undefined })} />
               <DefectLocationNotesField label="Location notes" className="mt-1" value={cDraft.locationFreetext ?? ''} onChange={v => setCDraft({ ...cDraft, locationFreetext: v || undefined })} />
               {cDraft.attachments?.length ? <p className="text-xs text-muted-foreground">{cDraft.attachments.length} attachment(s) carried over from the original and re-covered by your signature.</p> : null}
             </div>

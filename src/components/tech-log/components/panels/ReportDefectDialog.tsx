@@ -7,8 +7,9 @@ import { newId } from '../../util/id';
 import type { Defect, DefectSource, Attachment, DefectLocationKind, CasColor } from '../../types';
 import { SignCeremonyDialog } from '../SignCeremonyDialog';
 import {
-  DefectDescriptionField, DefectSymptomField, DefectCasField, DefectLocationSection,
-  DefectAttachmentsField, OccurredAtField, casValueFor, casEntryIncomplete, type CasMode,
+  DefectDescriptionField, DefectSymptomField, DefectCasField, DefectCmcCodeField,
+  DefectLocationSection, DefectAttachmentsField, OccurredAtField,
+  casValueFor, casEntryIncomplete, type CasMode,
 } from './DefectFields';
 import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
@@ -56,6 +57,9 @@ export function ReportDefectDialog({
   const [casMode, setCasMode] = useState<CasMode>('NONE');
   const [casMessage, setCasMessage] = useState('');
   const [casColor, setCasColor] = useState<CasColor>('AMBER');
+  // LG-99: the single code the reporter read off the CMC page. Maintenance's own troubleshooting
+  // codes are a list on the work card — this is the intake hint that seeds it.
+  const [cmcFaultCode, setCmcFaultCode] = useState('');
   // D56: when it was NOTICED. Defaults to now and is back-datable; the filing stamp is taken
   // separately at signing.
   const [occurredAtUtc, setOccurredAtUtc] = useState(() => new Date().toISOString());
@@ -73,6 +77,7 @@ export function ReportDefectDialog({
     setDescription(prefill?.description ?? '');
     setSymptom(prefill?.symptom ?? '');
     setCasMode('NONE'); setCasMessage(''); setCasColor('AMBER');
+    setCmcFaultCode('');
     setOccurredAtUtc(new Date().toISOString());
     setLocKind('OTHER'); setCabinSeat(''); setZoneCode(''); setLocFreetext('');
     setAttachments([]);
@@ -110,6 +115,7 @@ export function ReportDefectDialog({
       id: pendingDefectId, aircraftId: ac.id, source, ataChapter: ata,
       description: description.trim(), symptom: symptom.trim() || undefined,
       ...casValueFor(casMode, casMessage, casColor),
+      cmcFaultCode: cmcFaultCode.trim() || undefined,
       locationKind: locKind,
       cabinSeat: locKind === 'CABIN' ? cabinSeat.trim() || undefined : undefined,
       zoneCode: locKind === 'STRUCTURAL' ? zoneCode.trim() || undefined : undefined,
@@ -164,6 +170,8 @@ export function ReportDefectDialog({
               message={casMessage} onMessageChange={setCasMessage}
               color={casColor} onColorChange={setCasColor}
             />
+
+            <DefectCmcCodeField value={cmcFaultCode} onChange={setCmcFaultCode} />
 
             <OccurredAtField valueUtc={occurredAtUtc} onChange={setOccurredAtUtc} />
 

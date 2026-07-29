@@ -19,6 +19,7 @@ import { canMarkCrewAction, crewActionPending } from '../engine/crewAction';
 import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
+import { workCardReferenceSections } from '../util/workCardPrint';
 import { newId } from '../util/id';
 import type {
   Signature, RecurringCheck, RecurringCheckAccomplishment, RecurringIntervalUnit, Deferral,
@@ -28,6 +29,7 @@ import { deriveCustody } from '../engine/custody';
 import { lifecycleStep } from '../engine/lifecycle';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
 import { CasChip } from '../components/CasChip';
+import { SymptomNote } from '../components/SymptomNote';
 import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
@@ -340,6 +342,9 @@ export default function AircraftDetail() {
   const printRelease = (r: MaintenanceRelease) => {
     const perf = sigById(r.signatureId);
     const rii = sigById(r.riiSignatureId);
+    // LG-98/99: a WORKCARD release names the card it came from; a rectification or an (M)/placard
+    // discharge does not, and the helper prints nothing in that case.
+    const releasedCard = r.linkedWorkCardId ? state.workCards.find(w => w.id === r.linkedWorkCardId) : undefined;
     printSignedRecord({
       docTitle: r.signoffType === 'DEFERRAL' ? '(M) / Placard Discharge Release' : 'Certificate of Release to Service',
       recordType: r.isGatingDischarge ? 'Gating discharge' : r.signoffType, reference: r.id,
@@ -347,6 +352,7 @@ export default function AircraftDetail() {
       pdfBlobUri: r.pdfBlobUri ?? mockPdfBlobUri('crs', r.id),
       sections: [
         { heading: 'Work performed (14 CFR 91.417(a)(1)(i))', body: r.workDescription },
+        ...workCardReferenceSections(releasedCard),
         { heading: 'Return to service', fields: [
           { label: 'Completed', value: new Date(r.completionDateUtc).toLocaleString() },
           { label: 'A&P / IA cert', value: r.apCertificateNumber || '—' },
@@ -575,6 +581,9 @@ export default function AircraftDetail() {
                       <span className="text-xs text-muted-foreground">{d.source}</span>
                     </div>
                     <p className="mt-1 text-sm">{d.description}</p>
+                    {/* LG-108: the reporter's own narrative. Same atom as the Defects list — there
+                        is no defect detail route, so these two cards ARE the defect detail. */}
+                    <SymptomNote symptom={d.symptom} source={d.source} />
                     {/* D56: occurrence first — it is what starts the MEL clock if this is deferred. */}
                     <p className="mt-0.5 text-xs text-muted-foreground">Noticed {formatRegulatoryCompact(d.occurredAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)} · reported {formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}{loc ? ` · ${loc}` : ''}</p>
                     {d.attachments?.length ? (
