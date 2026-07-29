@@ -877,6 +877,17 @@ export function useDocuments(): Ctx {
   return c;
 }
 
+/**
+ * Non-throwing read, for surfaces where the knowledge store is an ENHANCEMENT rather
+ * than a dependency (D60's CAS picker on the defect form). The defect form is mounted
+ * from five places and must keep working with no documents store at all — free text is
+ * D57's declared fallback — so a missing provider degrades the picker instead of
+ * crashing the intake form for a signed record.
+ */
+export function useDocumentsOptional(): Ctx | undefined {
+  return useContext(DocumentsContext);
+}
+
 /** Publish the point-in-time notification events for a revision that just went live.
  * Kept outside the reducer (side effect) — callers invoke after a successful publish. */
 export function publishRequiredReadEvent(doc: Doc, rev: DocRevision): void {

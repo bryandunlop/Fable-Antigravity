@@ -13,6 +13,7 @@ import { detectRepetitiveGroups } from '../engine/repetitive';
 import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
+import { useCasCatalog } from '../../documents/hooks/useCasCatalog';
 import {
   DefectDescriptionField, DefectSymptomField, DefectCasField, DefectCmcCodeField,
   DefectLocationNotesField, casValueFor, casEntryIncomplete, casModeOf, type CasMode,
@@ -60,6 +61,12 @@ export default function Defects() {
   // watch-list disposition state
   const [watchTarget, setWatchTarget] = useState<Defect | null>(null);
   const [escalateTarget, setEscalateTarget] = useState<Defect | null>(null);
+
+  // D60 — the CAS catalog for the aircraft the correction belongs to. Resolved from the defect being
+  // corrected, not from the page's tail filter: this list is not scoped to one aircraft, so the
+  // filter may be absent while the correction is still about a specific tail.
+  const correctionType = state.aircraft.find(a => a.id === correctOrig?.aircraftId)?.type;
+  const correctionCatalog = useCasCatalog(correctionType);
 
   const defects = useMemo(() => {
     let list = currentRows(state.defects);
@@ -281,10 +288,14 @@ export default function Defects() {
               </div>
               <DefectDescriptionField value={cDraft.description} onChange={v => setCDraft({ ...cDraft, description: v })} />
               <DefectSymptomField value={cDraft.symptom ?? ''} onChange={v => setCDraft({ ...cDraft, symptom: v || undefined })} />
+              {/* D60 — same catalog as the report dialog, scoped to the corrected defect's own
+                  aircraft type. A correction must be able to reach the curated message the original
+                  should have carried; free text stays available for anything not curated yet. */}
               <DefectCasField
                 mode={cCasMode} onModeChange={setCCasMode}
                 message={cCasMessage} onMessageChange={setCCasMessage}
                 color={cCasColor} onColorChange={setCCasColor}
+                catalog={correctionCatalog} fleetType={correctionType}
               />
               {/* Store the raw value and normalize once at signing (see `onCorrectionSigned`). Trimming
                   inside onChange on a CONTROLLED input silently eats the space keystroke, so a code

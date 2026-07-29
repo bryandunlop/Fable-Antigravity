@@ -1,5 +1,11 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Paperclip, Camera, MapPin, X, Clock, MonitorDot } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Paperclip, Camera, MapPin, X, Clock, MonitorDot, BookOpen } from 'lucide-react';
+// D60 — the CAS catalog is derived in the documents module (that is where the knowledge and its
+// forward-migrating store live). Pure functions and a type only: no context, no store, no provider
+// requirement — see `useCasCatalog` for the read side.
+import { matchCasCatalog, catalogEntryForMessage, type CasCatalogEntry } from '../../../documents/engine/casKnowledge';
+import { CasChip } from '../CasChip';
 import { mockSha256 } from '../../engine/signing';
 import { newId } from '../../util/id';
 import { ENTRY_ZONE_OPTIONS, entryZone, utcFromWallTime, wallTimeFromUtc, type EntryZoneMode } from '../../util/entryZone';
@@ -162,8 +168,18 @@ export const casModeOf = (d: { casMessage?: string; casObserved?: boolean }): Ca
 
 /**
  * D57 — the structured CAS annunciation: a segmented choice between the three states, with the
- * message + color inputs revealed only under "CAS message". Free text this slice; D60/slice 5
- * replaces the input with the CAS catalog picker.
+ * message + color inputs revealed only under "CAS message".
+ *
+ * D60 — the message input is now fed by the per-fleet CAS catalog when one is available: a
+ * type-scoped, substring-filtered list of curated messages, picking one of which fills in the
+ * message AND its colour. The shape follows the MEL picker in `DeferralCreatePanel` (the in-module
+ * precedent for a fleet-typed filtered list, cap included) rather than inventing a combobox — the
+ * repo has exactly one `role="combobox"` and it is hard-wired to inventory state.
+ *
+ * **Free entry stays, and stays first-class.** The catalog will be incomplete for a long time, and a
+ * pilot must be able to record an annunciation nobody has curated yet — that is what a defect report
+ * is for. `catalog` is optional; with none the field is exactly the free-text control D57 shipped.
+ * The picker is an aid to intake, never a constraint on it.
  *
  * The three states are **pressed toggles in a `role="group"`**, not a radiogroup — the same pattern
  * `DisplayZoneToggle` uses in `TechLogShell`. This was a hand-rolled `role="radiogroup"` of
@@ -173,14 +189,31 @@ export const casModeOf = (d: { casMessage?: string; casObserved?: boolean }): Ca
  * and needs no keyboard machinery beyond the button's own. Mutual exclusion is unchanged — it comes
  * from `mode` being one value, not from the ARIA role.
  */
-export function DefectCasField({ mode, onModeChange, message, onMessageChange, color, onColorChange }: {
+export function DefectCasField({
+  mode, onModeChange, message, onMessageChange, color, onColorChange, catalog = [], fleetType,
+}: {
   mode: CasMode;
   onModeChange: (m: CasMode) => void;
   message: string;
   onMessageChange: (v: string) => void;
   color: CasColor;
   onColorChange: (c: CasColor) => void;
+  /** D60 — curated messages for this tail's fleet type. Empty ⇒ free text only. */
+  catalog?: CasCatalogEntry[];
+  /** Display only, so the list says whose knowledge it is. */
+  fleetType?: string;
 }) {
+  const [query, setQuery] = useState('');
+  const matches = matchCasCatalog(catalog, query);
+  // When the typed message IS a curated one, offer the entry that explains it. Read-only for the
+  // pilot: "what maintenance knows about this message", not a second place to record the defect.
+  const known = catalogEntryForMessage(catalog, message);
+
+  const pick = (entry: CasCatalogEntry) => {
+    onMessageChange(entry.casMessage);
+    onColorChange(entry.casColor);
+  };
+
   return (
     <div className="rounded-md border p-3">
       <Label className="flex items-center gap-1.5"><MonitorDot className="h-3.5 w-3.5" /> CAS annunciation</Label>
@@ -201,22 +234,69 @@ export function DefectCasField({ mode, onModeChange, message, onMessageChange, c
         ))}
       </div>
       {mode === 'MESSAGE' && (
-        <div className="mt-2 flex gap-2">
-          <Input
-            aria-label="CAS message"
-            placeholder="CAS message, e.g. R ENG CHIP"
-            value={message}
-            onChange={e => onMessageChange(e.target.value)}
-          />
-          <select
-            aria-label="CAS color"
-            className="rounded-md border bg-background px-2 py-1 text-sm"
-            value={color}
-            onChange={e => onColorChange(e.target.value as CasColor)}
-          >
-            {CAS_COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        </div>
+        <>
+          <div className="mt-2 flex gap-2">
+            <Input
+              aria-label="CAS message"
+              placeholder="CAS message, e.g. R ENG CHIP"
+              value={message}
+              onChange={e => onMessageChange(e.target.value)}
+            />
+            <select
+              aria-label="CAS color"
+              className="rounded-md border bg-background px-2 py-1 text-sm"
+              value={color}
+              onChange={e => onColorChange(e.target.value as CasColor)}
+            >
+              {CAS_COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+
+          {catalog.length > 0 && (
+            <div className="mt-2 rounded-md border bg-muted/20 p-2">
+              <Label htmlFor="cas-catalog-search" className="text-xs">
+                Or pick from {fleetType ? `${fleetType} ` : ''}curated messages ({catalog.length})
+              </Label>
+              <Input
+                id="cas-catalog-search"
+                className="mt-1"
+                placeholder="Filter by message, entry title or CMC code…"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+              />
+              <div className="mt-1 max-h-40 space-y-1 overflow-y-auto">
+                {matches.map(e => (
+                  <button
+                    key={e.docId}
+                    type="button"
+                    onClick={() => pick(e)}
+                    className={
+                      'flex w-full items-center gap-2 rounded-md border p-2 text-left text-xs hover:bg-accent/40 ' +
+                      (e.casMessage === message ? 'border-primary bg-accent/40' : '')
+                    }
+                  >
+                    <CasChip message={e.casMessage} color={e.casColor} className="shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-muted-foreground">{e.title}</span>
+                  </button>
+                ))}
+                {matches.length === 0 && (
+                  <p className="p-1 text-xs text-muted-foreground">
+                    Nothing curated matches — type it in above; the catalog is not the limit of what you can report.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {known && (
+            <p className="mt-2 text-xs">
+              <Link to={`/documents/${known.docId}`} className="inline-flex items-center gap-1 underline">
+                <BookOpen className="h-3.5 w-3.5" /> What maintenance knows about {known.casMessage}
+              </Link>
+              <span className="text-muted-foreground"> — reference only; it does not change what you report.</span>
+            </p>
+          )}
+        </>
       )}
       <p className="mt-2 text-xs text-muted-foreground">
         {mode === 'OBSERVED'

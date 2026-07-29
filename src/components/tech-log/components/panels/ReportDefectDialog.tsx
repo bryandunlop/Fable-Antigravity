@@ -6,6 +6,7 @@ import { ATA_CHAPTERS, INTENT } from '../../constants';
 import { newId } from '../../util/id';
 import type { Defect, DefectSource, Attachment, DefectLocationKind, CasColor } from '../../types';
 import { SignCeremonyDialog } from '../SignCeremonyDialog';
+import { useCasCatalog } from '../../../documents/hooks/useCasCatalog';
 import {
   DefectDescriptionField, DefectSymptomField, DefectCasField, DefectCmcCodeField,
   DefectLocationSection, DefectAttachmentsField, OccurredAtField,
@@ -83,6 +84,13 @@ export function ReportDefectDialog({
     setAttachments([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // D60 — the CAS picker is scoped to the CHOSEN tail's fleet type and re-derives when the aircraft
+  // select changes, so switching from a G650ER to a G500 re-offers that type's curated messages
+  // rather than the previous one's. Empty when there is no knowledge store (the form is mounted from
+  // five places and must never depend on it) — free text is D57's fallback.
+  const selectedType = state.aircraft.find(a => a.tailNumber === tail)?.type;
+  const casCatalogForTail = useCasCatalog(selectedType);
 
   // Attachment digests are folded into the signed payload (AC 120-78B).
   const attachmentPayload = attachments.map(a => a.sha256).join(',');
@@ -169,6 +177,7 @@ export function ReportDefectDialog({
               mode={casMode} onModeChange={setCasMode}
               message={casMessage} onMessageChange={setCasMessage}
               color={casColor} onColorChange={setCasColor}
+              catalog={casCatalogForTail} fleetType={selectedType}
             />
 
             <DefectCmcCodeField value={cmcFaultCode} onChange={setCmcFaultCode} />
