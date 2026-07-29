@@ -64,10 +64,14 @@ export function CrewActionPanel({
 
   const mark = deferral.crewActionCompliance;
   const pending = crewActionPending(deferral);
+  // The row must still be standing at the gate. A deferral maintenance has released (ACTIVE) or
+  // rectified away (CLEARED) is a closed record — and the `?crewAction=1` deep link in the crew
+  // notification carries no status test, so a link held from before the closure lands right here.
+  const atGate = deferral.status === 'PENDING_PLACARD';
   // A correction re-opens the form on an already-marked deferral. `canMarkCrewAction` is about the
   // first mark, so the correction path is authorized separately — same audience, stated separately
   // so the two rules do not silently merge. Who may supersede WHOSE mark follows Q5 when answered.
-  const canAct = correcting ? Boolean(mark) : canMarkCrewAction(user, deferral);
+  const canAct = correcting ? (atGate && Boolean(mark)) : canMarkCrewAction(user, deferral);
 
   const begin = () => {
     if (!canAct) return toast.error('This deferral has no outstanding crew action.');
@@ -81,6 +85,12 @@ export function CrewActionPanel({
     // form sat open. Signing against the row we rendered would fork the ledger chain.
     const current = latestFor(state.deferrals, deferralId);
     if (!current) return toast.error('This deferral could not be found in the ledger.');
+    // Mirrors `resolveGatingSignability`'s status re-check on the sibling panel: not just "has anyone
+    // else marked it" but "is this row still the one at the gate". Maintenance may have rectified the
+    // defect and superseded the deferral to CLEARED while this form sat open.
+    if (current.status !== 'PENDING_PLACARD') {
+      return toast.error(`This deferral is no longer awaiting its gating release — it now reads ${current.status}. A crew action cannot be recorded against it.`);
+    }
     if (!correcting && !crewActionPending(current)) {
       return toast.error(`This crew action was already marked complied by ${current.crewActionCompliance?.byName ?? 'another user'}. Nothing to record.`);
     }
@@ -122,6 +132,11 @@ export function CrewActionPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
+        {!atGate && (
+          <p className="rounded bg-[var(--gfo-warning,#F1B434)]/15 p-2 text-xs">
+            This deferral is no longer awaiting its gating release — it now reads <strong>{deferral.status}</strong>. It is shown here as a record; nothing further can be marked against it.
+          </p>
+        )}
         <div className="rounded-md border p-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">(O) Operational procedure — as recorded on this deferral</div>
           <p className="mt-1 whitespace-pre-wrap text-sm">{deferral.melOProcedure ?? 'No (O) procedure text was recorded on this deferral.'}</p>
@@ -153,7 +168,7 @@ export function CrewActionPanel({
             <p className="mt-2 rounded bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
               This record is evidence that the action was done. It releases nothing — the aircraft stays grounded until maintenance signs the gating release.
             </p>
-            {!correcting && (
+            {!correcting && atGate && (
               <Button size="sm" variant="outline" className="mt-2" onClick={() => { setCorrecting(true); setNote(''); setAttachments([]); }}>
                 <Undo2 className="mr-1.5 h-4 w-4" /> Correct this mark
               </Button>

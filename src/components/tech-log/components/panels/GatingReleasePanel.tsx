@@ -12,6 +12,24 @@ import { SignCeremonyDialog } from '../SignCeremonyDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 
+/**
+ * The limbs that actually gated THIS deferral, in the order the state machine states them.
+ *
+ * Used twice, and it must be the same expression both times: once in the RED banner, and once —
+ * load-bearing — in the `workDescription` / `returnToServiceStatement` written into the signed
+ * `MaintenanceRelease`. That statement is printed under "Work performed (14 CFR 91.417(a)(1)(i))"
+ * and is append-only: a correction takes a superseding insert. Hard-coding "(M) procedure / placard"
+ * was accurate only while those two were the only limbs; D59's crew action made it possible to
+ * certify an (M) procedure and a placard the governing MEL item does not have.
+ */
+function gatingLimbs(d: Pick<Deferral, 'mProcedureRequired' | 'placardRequired' | 'crewActionRequired'>): string[] {
+  return [
+    d.mProcedureRequired ? '(M) procedure' : null,
+    d.placardRequired ? 'placard' : null,
+    d.crewActionRequired ? 'crew action' : null,
+  ].filter((x): x is string => x !== null);
+}
+
 /** (M)/placard gating-discharge body (RED → AMBER). Maintenance signs a CRS discharge; an authorized
  *  crew member signs a non-CRS placard attestation for a placard-ONLY deferral. Same state-machine flip.
  *
@@ -66,12 +84,16 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
     if (!g.ok) return toast.error(g.reason);
     const target = g.deferral;
     const now = new Date().toISOString();
+    // Composed from the limbs outstanding on the row being discharged — never a fixed sentence. This
+    // record is signed evidence of what was done; naming a limb this MEL item does not carry would be
+    // a false statement in an append-only regulatory record.
+    const limbs = gatingLimbs(target).join(' / ') || 'gating requirement';
     const release: MaintenanceRelease = {
       id: pendingReleaseId, aircraftId: aircraft.id, signoffType: 'DEFERRAL', linkedDeferralId: target.id,
       isGatingDischarge: true,
-      workDescription: crewAttestation ? `Placard installed (crew attestation) for MEL ${mel?.subItemNumber ?? ''}` : `(M)/placard discharge for MEL ${mel?.subItemNumber ?? ''}`,
+      workDescription: crewAttestation ? `Placard installed (crew attestation) for MEL ${mel?.subItemNumber ?? ''}` : `${limbs} discharge for MEL ${mel?.subItemNumber ?? ''}`,
       completionDateUtc: now,
-      returnToServiceStatement: crewAttestation ? 'Required placard installed per MEL provisions (crew attestation).' : 'Required (M) procedure / placard accomplished.',
+      returnToServiceStatement: crewAttestation ? 'Required placard installed per MEL provisions (crew attestation).' : `Required ${limbs} accomplished.`,
       certifyingTechOid: user.oid, apCertificateNumber: crewAttestation ? '' : (user.apCertificateNumber ?? ''), riiRequired: false,
       pdfBlobUri: mockPdfBlobUri('crs', pendingReleaseId), signatureId: sig.id,
     };
@@ -79,7 +101,7 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
     dispatch({ type: 'ADD_SIGNATURE', payload: sig });
     dispatch({ type: 'ADD_RELEASE', payload: release });
     dispatch({ type: 'SUPERSEDE_DEFERRAL', payload: flipped });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'GATING_RELEASE_SIGNED', entityType: 'Deferral', entityId: flipped.id, atUtc: now, summary: `${aircraft.tailNumber} ${crewAttestation ? 'placard attested by crew' : '(M)/placard discharged'} → deferral ACTIVE (AMBER)` } });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'GATING_RELEASE_SIGNED', entityType: 'Deferral', entityId: flipped.id, atUtc: now, summary: `${aircraft.tailNumber} ${crewAttestation ? 'placard attested by crew' : `${limbs} discharged`} → deferral ACTIVE (AMBER)` } });
     toast.success(`${aircraft.tailNumber} now AMBER — deferral ACTIVE under MEL ${mel?.subItemNumber}.`);
     onDone();
   };
@@ -89,7 +111,7 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
       <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4" /> Gating-discharge release — step 2 of 2</CardTitle></CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div className="rounded bg-[var(--gfo-error,#EF3340)]/10 p-2 text-xs">
-          {aircraft.tailNumber} is <strong>GROUNDED (RED)</strong>: the deferral is PENDING_PLACARD until the required {[current.mProcedureRequired ? '(M) procedure' : null, current.placardRequired ? 'placard' : null, current.crewActionRequired ? 'crew action' : null].filter(Boolean).join(' / ') || 'placard'} is accomplished and signed.
+          {aircraft.tailNumber} is <strong>GROUNDED (RED)</strong>: the deferral is PENDING_PLACARD until the required {gatingLimbs(current).join(' / ') || 'placard'} is accomplished and signed.
         </div>
         {mel?.mProcedure && <p className="rounded-md border p-3 text-xs"><strong>(M):</strong> {mel.mProcedure}</p>}
         {mel?.placardLocation && <p className="text-xs text-muted-foreground"><strong>Placard:</strong> {mel.placardLocation}</p>}

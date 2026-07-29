@@ -83,12 +83,19 @@ export function crewActionSatisfied(d: Pick<Deferral, 'crewActionRequired' | 'cr
  *
  * `person` is taken deliberately: it keeps the "any role" decision stated in one place instead of
  * implied by its absence, and gives the deactivated-account limb somewhere to live.
+ *
+ * `status` is read for the same reason `resolveGatingSignability` reads it: the row must still be the
+ * one standing at the gate. A deferral that has been released (ACTIVE), rectified (CLEARED) or run
+ * past its repair-due condition (EXPIRED) is closed to this mark — the gate it was evidence for is
+ * gone, and a signature against it certifies nothing while telling the signer that "maintenance signs
+ * the gating release to dispatch".
  */
 export function canMarkCrewAction(
   person: Personnel,
   d: Pick<Deferral, 'status' | 'crewActionRequired' | 'crewActionCompliance'>,
 ): boolean {
   if (person.active === false) return false;
+  if (d.status !== 'PENDING_PLACARD') return false;
   return crewActionPending(d);
 }
 

@@ -92,6 +92,13 @@ export function DeferralCreatePanel({
   // express "remove": the checkbox is not rendered when the item carries the flag. The engine call
   // stays anyway — it is where the add-only rule lives, and it must hold for any future caller.
   const { crewActionRequired } = resolveDeferralCrewAction(crewActionInherited, crewActionInherited || addCrewAction);
+  // D59 assumes the frozen (O) snapshot carries the instruction. On the ADD-ONLY path that premise
+  // does not hold: the checkbox is rendered only when the item lacks the authored flag, which for an
+  // unauthored item means it has no (O) text at all — so `melOProcedure` freezes as undefined and the
+  // addendum is the ONLY possible instruction. Empty, it produces a signed deferral that requires the
+  // crew to do something it never says, and the crew panel then renders "No (O) procedure text was
+  // recorded on this deferral" above a Sign button asserting it was "accomplished as described above".
+  const addendumRequired = crewActionRequired && !selectedMel?.oProcedure?.trim();
   const willGate = entersPendingPlacard({
     mProcedureRequired: !!selectedMel?.mProcedure?.trim(),
     placardRequired: !!selectedMel?.placardText?.trim(),
@@ -131,6 +138,9 @@ export function DeferralCreatePanel({
     if (!canDeferDefect(user, selectedMel)) return toast.error('You are not authorized to defer this MEL item.');
     const ovr = validateGoverningOverride(governingZone, overrideReason);
     if (!ovr.ok) return toast.error(ovr.error!);
+    if (addendumRequired && !crewActionInstructions.trim()) {
+      return toast.error('This MEL item carries no (O) procedure text — write the crew instructions, or the crew action says nothing.');
+    }
     // D56: a future day of discovery would push the whole repair clock forward — almost certainly a
     // mistyped year in the adjust field, never a real adjustment. Same guard as the report form.
     if (new Date(dayOfDiscoveryUtc).getTime() > Date.now() + 60_000) {
@@ -272,9 +282,18 @@ export function DeferralCreatePanel({
                 )}
                 {crewActionRequired && (
                   <div className="mt-2">
-                    <label className="text-xs font-medium" htmlFor="deferral-crew-instructions">Crew instructions (addendum, optional)</label>
+                    <label className="text-xs font-medium" htmlFor="deferral-crew-instructions">
+                      Crew instructions {addendumRequired ? '(required)' : '(addendum, optional)'}
+                    </label>
                     <Textarea id="deferral-crew-instructions" className="mt-1" value={crewActionInstructions} onChange={e => setCrewActionInstructions(e.target.value)}
-                      placeholder="Anything beyond the (O) procedure text the crew needs — the (O) text itself is carried automatically." />
+                      placeholder={addendumRequired
+                        ? 'What the crew must accomplish, and how it is verified — there is no (O) text to fall back on.'
+                        : 'Anything beyond the (O) procedure text the crew needs — the (O) text itself is carried automatically.'} />
+                    {addendumRequired && (
+                      <p className="mt-1 text-xs text-[var(--gfo-error,#EF3340)]">
+                        This item carries no (O) procedure text, so these instructions are the only thing the crew will be shown.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

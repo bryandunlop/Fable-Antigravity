@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { useEffect, type ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { TechLogProvider, useTechLog } from '../../TechLogContext';
 import { DeferralCreatePanel } from './DeferralCreatePanel';
 import { GatingReleasePanel } from './GatingReleasePanel';
 import { CrewActionPanel } from './CrewActionPanel';
+import AircraftDetail from '../../pages/AircraftDetail';
 import type { Defect, Deferral } from '../../types';
 
 /**
@@ -253,5 +255,161 @@ describe('D59 — the hard gate on the gating-discharge release', () => {
 
     expect(await screen.findByText(/no longer awaiting its gating release/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign discharge release/i })).toBeDisabled();
+  });
+});
+
+/**
+ * What the SIGNED release says it certifies.
+ *
+ * `MaintenanceRelease.returnToServiceStatement` is printed on the Releases page under "Work performed
+ * (14 CFR 91.417(a)(1)(i))" and is signed by an A&P into an append-only ledger — a correction needs a
+ * superseding insert. It was hard-coded to name an (M) procedure and a placard. That was true while
+ * PENDING_PLACARD required one of those two; D59's third limb made a crew-action-only deferral
+ * possible, and 182 of the 984 seeded MEL items are (O)-only against 3 carrying placard text, so the
+ * false wording was the modal case, not an edge.
+ */
+describe('D59 — the gating release names the limbs it actually discharged', () => {
+  /** Reads the release straight out of the ledger — the signed record, not the screen. */
+  function ReleaseProbe() {
+    const { state } = useTechLog();
+    const rel = state.releases.filter(r => r.isGatingDischarge && (r.linkedDeferralId ?? '').startsWith('df-ca'));
+    return <div data-testid="signed-release">{rel.map(r => `${r.workDescription} :: ${r.returnToServiceStatement}`).join('\n')}</div>;
+  }
+
+  /** Renders the panel over a marked deferral and signs the discharge as maintenance. */
+  const signDischarge = async (row: Deferral) => {
+    const user = userEvent.setup();
+    const marked: Deferral = {
+      ...row, id: 'df-ca-2', supersedesId: row.id,
+      crewActionCompliance: row.crewActionRequired
+        ? { id: 'cac1', byOid: 'USR001', byName: 'Capt Sarah Reed', atUtc: '2026-07-21T10:00:00.000Z', signatureId: 'sig-cac1' }
+        : undefined,
+    };
+    render(
+      <TechLogProvider userRole="maintenance">
+        <Seeded rows={[row, marked]}>
+          <GatingReleasePanel deferral={row} onDone={() => {}} onCancel={() => {}} />
+          <ReleaseProbe />
+        </Seeded>
+      </TechLogProvider>,
+    );
+    await user.click(await screen.findByRole('button', { name: /sign discharge release/i }));
+    await user.type(await screen.findByLabelText(/Step-up re-authentication/i), '1234');
+    await user.click(screen.getByRole('button', { name: 'Sign' }));
+    return screen.getByTestId('signed-release').textContent ?? '';
+  };
+
+  it('a CREW-ACTION-ONLY release does not certify an (M) procedure or a placard that never existed', async () => {
+    const text = await signDischarge(pendingDeferral());
+
+    expect(text).toContain('Required crew action accomplished.');
+    expect(text).not.toMatch(/\(M\)/);
+    expect(text).not.toMatch(/placard/i);
+    expect(text).toContain('crew action discharge for MEL 35-02-02');
+  });
+
+  it('still certifies exactly what an (M)+placard deferral required', async () => {
+    const text = await signDischarge(pendingDeferral({
+      crewActionRequired: false, mProcedureRequired: true, placardRequired: true,
+    }));
+
+    expect(text).toContain('Required (M) procedure / placard accomplished.');
+  });
+
+  it('names all three limbs when all three gated', async () => {
+    const text = await signDischarge(pendingDeferral({ mProcedureRequired: true, placardRequired: true }));
+
+    expect(text).toContain('Required (M) procedure / placard / crew action accomplished.');
+  });
+});
+
+/**
+ * A crew action with no instructions at all. The add-only checkbox is rendered ONLY when the MEL item
+ * lacks the authored flag — which, for an item with no authored flag, means it has no (O) text. The
+ * frozen `melOProcedure` is therefore undefined and the addendum is the only possible instruction: an
+ * empty one produces a signed deferral that requires the crew to do something it never says.
+ */
+describe('D59 — an added crew action must carry instructions', () => {
+  it('REFUSES to sign an added crew action with no (O) text and an empty addendum', async () => {
+    const { signed } = await signDeferral('24-07-02', async user => {
+      await user.click(screen.getByLabelText(/crew action required/i));
+    });
+
+    expect(signed).toBeUndefined();
+  });
+
+  it('says the addendum is required when the item carries no (O) text', async () => {
+    const user = userEvent.setup();
+    render(
+      <TechLogProvider userRole="maintenance">
+        <DeferralCreatePanel defect={openDefect()} onDone={() => {}} onCancel={() => {}} />
+      </TechLogProvider>,
+    );
+    await user.clear(screen.getByPlaceholderText(/Search by item number/i));
+    await user.type(screen.getByPlaceholderText(/Search by item number/i), '24-07-02');
+    await user.click(await screen.findByText('24-07-02'));
+    await user.click(screen.getByLabelText(/crew action required/i));
+
+    expect(screen.getByText(/this item carries no \(O\) procedure text/i)).toBeInTheDocument();
+  });
+
+  it('signs once the addendum says what the crew must do', async () => {
+    const { signed } = await signDeferral('24-07-02', async user => {
+      await user.click(screen.getByLabelText(/crew action required/i));
+      await user.type(screen.getByLabelText(/Crew instructions/i), 'Confirm battery voltage on the OHPTS before each start.');
+    });
+
+    expect(signed!.crewActionInstructions).toBe('Confirm battery voltage on the OHPTS before each start.');
+  });
+});
+
+/**
+ * A compliance mark against a CLOSED deferral. Reachable today: the pilot is notified, maintenance
+ * then rectifies the defect and supersedes the deferral to CLEARED (carrying `crewActionRequired`
+ * forward), and the pilot's still-held `?crewAction=1` deep link — which has no status test — renders
+ * the form and takes a signature against a record nobody can act on.
+ */
+describe('D59 — no compliance mark against a closed deferral', () => {
+  it('the panel will not take a mark once the deferral has been CLEARED', async () => {
+    const cleared = pendingDeferral({ status: 'CLEARED' });
+    render(
+      <TechLogProvider userRole="pilot">
+        <Seeded rows={[cleared]}>
+          <CrewActionPanel deferralId="df-ca" onDone={() => {}} onCancel={() => {}} />
+        </Seeded>
+      </TechLogProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: /mark complied/i })).toBeDisabled();
+    expect(screen.getByText(/no longer awaiting its gating release/i)).toBeInTheDocument();
+  });
+
+  it('nor once maintenance has already released it (ACTIVE)', async () => {
+    render(
+      <TechLogProvider userRole="pilot">
+        <Seeded rows={[pendingDeferral({ status: 'ACTIVE', gatingReleaseId: 'rel-1' })]}>
+          <CrewActionPanel deferralId="df-ca" onDone={() => {}} onCancel={() => {}} />
+        </Seeded>
+      </TechLogProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: /mark complied/i })).toBeDisabled();
+  });
+
+  // The actual route in: a notification's deep link, held after the deferral was closed. The link
+  // itself carries no status test — the panel it opens is what has to refuse.
+  it('the ?crewAction=1 deep link opens on a CLEARED deferral but takes no signature', async () => {
+    render(
+      <MemoryRouter initialEntries={['/tech-log/aircraft/N5PG?tab=deferrals&deferral=df-ca&crewAction=1']}>
+        <TechLogProvider userRole="pilot">
+          <Seeded rows={[pendingDeferral({ status: 'CLEARED' })]}>
+            <Routes><Route path="/tech-log/aircraft/:tail" element={<AircraftDetail />} /></Routes>
+          </Seeded>
+        </TechLogProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Crew action — MEL 35-02-02/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mark complied/i })).toBeDisabled();
   });
 });

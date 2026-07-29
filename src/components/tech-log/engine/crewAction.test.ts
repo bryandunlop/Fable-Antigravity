@@ -101,6 +101,17 @@ describe('D59 — the complied mark is evidence, not authority', () => {
     expect(canMarkCrewAction(maint(), deferral({ crewActionRequired: true, crewActionCompliance: { id: 'cac1', byOid: 'p', byName: 'P', atUtc: NOW, signatureId: 'sig1' } }))).toBe(false);
   });
 
+  it('nobody marks a CLOSED deferral — the mark would certify a gate that no longer exists', () => {
+    // Maintenance rectifies the defect and supersedes the deferral to CLEARED, carrying the
+    // crew-action flag forward with no compliance. A pilot holding the notification deep link must
+    // not be able to sign a compliance record against a record nobody can act on.
+    expect(canMarkCrewAction(pilot(), deferral({ crewActionRequired: true, status: 'CLEARED' }))).toBe(false);
+    expect(canMarkCrewAction(maint(), deferral({ crewActionRequired: true, status: 'CLEARED' }))).toBe(false);
+    // and not once maintenance has already signed the gating release
+    expect(canMarkCrewAction(pilot(), deferral({ crewActionRequired: true, status: 'ACTIVE' }))).toBe(false);
+    expect(canMarkCrewAction(pilot(), deferral({ crewActionRequired: true, status: 'EXPIRED' }))).toBe(false);
+  });
+
   it('marking FLIPS NO STATE — the superseding row is still PENDING_PLACARD (D16/D17)', () => {
     const before = deferral({ crewActionRequired: true });
     const after = markCrewActionComplied(before, {
