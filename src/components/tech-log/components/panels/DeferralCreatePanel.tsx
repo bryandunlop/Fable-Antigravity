@@ -4,7 +4,7 @@ import { Search, ClipboardCheck, ShieldAlert, Clock } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../../engine/pl25';
 import { GOVERNING_ZONE_OPTIONS, isOverride, validateGoverningOverride } from '../../util/governingZone';
-import { formatRegulatoryCompact } from '../../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryInstant, formatRegulatoryLabel } from '../../util/displayZone';
 import { utcFromWallTime, wallTimeFromUtc } from '../../util/entryZone';
 import { canDeferDefect } from '../../engine/disposition';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
@@ -17,6 +17,14 @@ import { Badge } from '../../../ui/badge';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
 import { Textarea } from '../../../ui/textarea';
+
+/**
+ * D56 — whole minutes, because that is all the day-of-discovery control can express. A defect's
+ * `occurredAtUtc` is stamped from `new Date()` and carries seconds; a `datetime-local` never does.
+ * Comparing the two as raw ISO strings made the "Adjusted" hint latch on after any edit that merely
+ * restored the value, reporting a change the signer had not made.
+ */
+const minuteOf = (iso: string) => Math.floor(new Date(iso).getTime() / 60_000);
 
 function dueFromCategory(mel: MelItem, clockStart: string, airframe: { hours: number; cycles: number }, zone: string) {
   if (mel.category === 'A') return { repairDueDateUtc: undefined, repairIntervalUnit: 'CALENDAR_DAY' as const, repairIntervalValue: 0 };
@@ -243,18 +251,32 @@ export function DeferralCreatePanel({
                     adjustable until the deferral is signed. */}
                 <div className="mt-2">
                   <label className="text-xs font-medium" htmlFor="deferral-day-of-discovery">Day of discovery</label>
-                  <Input
-                    id="deferral-day-of-discovery"
-                    type="datetime-local"
-                    className="mt-1"
-                    value={wallTimeFromUtc(dayOfDiscoveryUtc, governingZone)}
-                    onChange={e => {
-                      const utc = utcFromWallTime(e.target.value, governingZone);
-                      if (utc) setDayOfDiscoveryUtc(utc);
-                    }}
-                  />
+                  <div className="mt-1 flex gap-2">
+                    <Input
+                      id="deferral-day-of-discovery"
+                      type="datetime-local"
+                      value={wallTimeFromUtc(dayOfDiscoveryUtc, governingZone)}
+                      onChange={e => {
+                        const utc = utcFromWallTime(e.target.value, governingZone);
+                        if (utc) setDayOfDiscoveryUtc(utc);
+                      }}
+                    />
+                    {/* Mirrors OccurredAtField's zone control, but deliberately NOT a picker: these
+                        digits are read in the deferral's GOVERNING zone — the zone the PL-25 calendar
+                        day is judged in — so the only way to change their meaning is to change the
+                        governing zone above. Without the label, switching that zone silently
+                        reinterpreted digits the signer had already typed. */}
+                    <span
+                      aria-label="Day of discovery timezone"
+                      title="Read in the deferral's governing timezone — change it above, not here."
+                      className="inline-flex shrink-0 items-center rounded-md border bg-muted px-2 py-1 text-sm text-muted-foreground"
+                    >
+                      {formatRegulatoryInstant(dayOfDiscoveryUtc, 'GOVERNING', governingZone).zoneLabel}
+                    </span>
+                  </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {dayOfDiscoveryUtc === defect.occurredAtUtc
+                    Stored as {formatRegulatoryLabel(dayOfDiscoveryUtc, 'UTC', 'UTC')}.{' '}
+                    {minuteOf(dayOfDiscoveryUtc) === minuteOf(defect.occurredAtUtc)
                       ? 'Defaulted from when the defect was noticed. Adjust if maintenance establishes a different discovery time.'
                       : 'Adjusted — no longer the reported occurrence time.'}
                   </p>

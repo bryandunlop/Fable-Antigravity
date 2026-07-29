@@ -234,7 +234,7 @@ export default function WorkQueue() {
             {wq.watchItems.length === 0 ? empty : wq.watchItems.map(d => (
               <Row key={d.id} next="Review" onClick={() => open(tailOf(d.aircraftId), '?tab=defects')}>
                 <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><Badge variant="secondary"><Eye className="mr-1 h-3 w-3" />WATCH</Badge><span className="text-xs text-muted-foreground">{d.source}</span></div>
-                <p className="mt-0.5 truncate text-muted-foreground">{d.description} · reported {new Date(d.reportedAtUtc).toLocaleDateString()}</p>
+                <p className="mt-0.5 truncate text-muted-foreground">{d.description} · reported {formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}</p>
               </Row>
             ))}
           </Section>

@@ -62,8 +62,12 @@ async function signDeferral(defect: Defect, adjust?: () => void): Promise<Deferr
   return signed;
 }
 
+// Exact, not /day of discovery/i: the control now sits beside a zone indicator whose accessible
+// name also contains the phrase.
+const dayOfDiscoveryInput = () => screen.getByLabelText('Day of discovery');
+
 const adjustDayOfDiscovery = (wall: string) => () =>
-  fireEvent.change(screen.getByLabelText(/day of discovery/i), { target: { value: wall } });
+  fireEvent.change(dayOfDiscoveryInput(), { target: { value: wall } });
 
 describe('DeferralCreatePanel day-of-discovery default (D56)', () => {
   beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); vi.setSystemTime(SIGNED_AT); });
@@ -110,5 +114,82 @@ describe('DeferralCreatePanel day-of-discovery default (D56)', () => {
     const deferral = await signDeferral(openDefect(), adjustDayOfDiscovery('2062-07-10T08:00'));
 
     expect(deferral).toBeUndefined();
+  });
+});
+
+/**
+ * The same control, read rather than signed.
+ *
+ * The digits in it are interpreted in the deferral's GOVERNING zone, so without a zone shown next to
+ * them and the resulting instant read back, changing the governing zone silently reinterprets what
+ * the signer already typed. `OccurredAtField` on the report form shows both; this one showed neither.
+ */
+describe('DeferralCreatePanel day-of-discovery control — zone context and adjustment hint', () => {
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); vi.setSystemTime(SIGNED_AT); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  /** Render and select the seeded Cat C item, which is what reveals the review-and-sign column. */
+  async function openPanel(defect: Defect = openDefect()) {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(
+      <TechLogProvider userRole="maintenance">
+        <DeferralCreatePanel defect={defect} onDone={() => {}} onCancel={() => {}} />
+      </TechLogProvider>,
+    );
+    await user.click(await screen.findByText('21-01-02'));
+    return user;
+  }
+
+  const zoneIndicator = () => screen.getByLabelText('Day of discovery timezone');
+
+  it('labels the digits with the governing zone the deferral will actually use', async () => {
+    await openPanel();
+
+    // 2330Z on Jul 15 under the Eastern default — DST-correct, so EDT rather than EST.
+    expect(zoneIndicator()).toHaveTextContent('EDT');
+    expect(dayOfDiscoveryInput()).toHaveValue('2026-07-15T19:30');
+  });
+
+  it('reads the stored instant back in UTC, so the digits are never the only record on screen', async () => {
+    await openPanel();
+
+    expect(screen.getByText(/Stored as Jul 15, 2026 · 23:30 UTC/)).toBeInTheDocument();
+  });
+
+  it('follows a governing-zone override — the digits are re-read, and say so', async () => {
+    const user = await openPanel();
+    await user.click(screen.getByRole('button', { name: /^override$/i }));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'America/Los_Angeles' } });
+
+    expect(zoneIndicator()).toHaveTextContent('PDT');
+    expect(dayOfDiscoveryInput()).toHaveValue('2026-07-15T16:30');
+    // Same instant throughout — only the lens moved.
+    expect(screen.getByText(/Stored as Jul 15, 2026 · 23:30 UTC/)).toBeInTheDocument();
+  });
+
+  it('stays "defaulted" when the value is re-entered identically — the occurrence carries seconds the control cannot', async () => {
+    // A real `occurredAtUtc` is stamped from `new Date()`, so it has seconds and milliseconds; a
+    // `datetime-local` can only ever produce whole minutes. Comparing the two as raw ISO strings
+    // therefore latched "Adjusted" permanently after any edit, however it ended up.
+    await openPanel(openDefect({ occurredAtUtc: '2026-07-15T23:30:37.412Z' }));
+    expect(screen.getByText(/Defaulted from when the defect was noticed/)).toBeInTheDocument();
+
+    adjustDayOfDiscovery('2026-07-15T20:30')();
+    expect(screen.getByText(/Adjusted — no longer the reported occurrence time/)).toBeInTheDocument();
+
+    // Back to exactly what it was showing: 19:30 EDT is the same minute as the stored 23:30Z.
+    adjustDayOfDiscovery('2026-07-15T19:30')();
+
+    expect(screen.getByText(/Defaulted from when the defect was noticed/)).toBeInTheDocument();
+    expect(screen.queryByText(/Adjusted — no longer the reported occurrence time/)).not.toBeInTheDocument();
+  });
+
+  it('says "adjusted" when the discovery day genuinely moves', async () => {
+    await openPanel();
+
+    adjustDayOfDiscovery('2026-07-10T08:00')();
+
+    expect(screen.getByText(/Adjusted — no longer the reported occurrence time/)).toBeInTheDocument();
+    expect(screen.queryByText(/Defaulted from when the defect was noticed/)).not.toBeInTheDocument();
   });
 });

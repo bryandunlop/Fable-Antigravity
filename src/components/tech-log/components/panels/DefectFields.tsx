@@ -19,14 +19,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
  * one). They used to be hand-rolled copies of each other, so every field change had to be made
  * more than once and the copies drifted.
  *
- * **Shared here — change once, both dialogs follow:** description, symptom, occurrence timestamp,
- * location notes, the structured-location box, attachments.
+ * "Shared" means the component lives here, NOT that both dialogs render it. Three of the six are
+ * mounted by `ReportDefectDialog` alone — the correction dialog has no control for them at all.
  *
- * **NOT here — still hand-rolled separately in each dialog:** the aircraft select, and the ATA
- * chapter select. Changing those means editing `ReportDefectDialog.tsx` *and* the correction
- * dialog in `pages/Defects.tsx`. Grep before you assume a defect field lives in this file — an
- * earlier version of this comment claimed everything was shared, which was not true and was one
- * removed-field away from shipping a dialog bound to a property that no longer existed.
+ * **Here AND rendered by both dialogs — change once, both follow:** description
+ * (`DefectDescriptionField`), symptom/CAS (`DefectSymptomField`), and free-text location notes
+ * (`DefectLocationNotesField` — standalone in the correction dialog, nested inside
+ * `DefectLocationSection` in the report dialog).
+ *
+ * **Here but rendered by `ReportDefectDialog` ONLY:** the occurrence timestamp (`OccurredAtField`),
+ * the structured-location box (`DefectLocationSection`), and attachments
+ * (`DefectAttachmentsField`). A correction cannot restate when the defect was noticed — the
+ * occurrence instant is carried forward from the superseded row — so do not describe these as
+ * something "both dialogs follow".
+ *
+ * **NOT here — still hand-rolled separately in each dialog:** the aircraft select (report dialog
+ * only), and the ATA chapter select (written out twice). Changing the ATA select means editing
+ * `ReportDefectDialog.tsx` *and* the correction dialog in `pages/Defects.tsx`. Grep before you
+ * assume a defect field lives in this file — an earlier version of this comment claimed everything
+ * was shared, which was not true and was one removed-field away from shipping a dialog bound to a
+ * property that no longer existed.
  */
 
 export function DefectDescriptionField({ value, onChange, placeholder }: {

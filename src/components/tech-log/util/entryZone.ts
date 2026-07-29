@@ -38,6 +38,25 @@ const WALL_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
  * Wall-clock digits interpreted in `zone` -> the UTC ISO instant to store.
  * Returns null for an incomplete or unparseable entry, so a half-typed field can never be stored as
  * a plausible-looking wrong instant (the caller keeps the previous value and blocks the sign).
+ *
+ * ONE-WAY DURING A DST FALL-BACK REPEAT. A wall time inside the repeated hour names two instants,
+ * and this resolves it to the EARLIER (pre-transition) one. So `wallTimeFromUtc` and
+ * `utcFromWallTime` are NOT inverses for that hour: sending the displayed digits back through here
+ * unchanged — which is what a signer re-entering the value they were already shown does — moves the
+ * stored instant back by an hour. Verified: `2026-11-01T06:30:00.000Z` (01:30 EST, post-transition)
+ * renders as `"2026-11-01T01:30"`, which converts back to `2026-11-01T05:30:00.000Z` (01:30 EDT) —
+ * one hour earlier.
+ *
+ * THE BOUND — it cannot change a day of discovery or a repair-due date. An exhaustive scan of every
+ * 30-minute instant over five years (2024-2029) across all eleven zones in `GOVERNING_ZONE_OPTIONS`
+ * found 70 round-trip divergences and ZERO clock-start divergences: every DST zone in the governing
+ * set repeats somewhere in 01:00-02:59 local, and an hour subtracted inside that window cannot
+ * straddle local midnight, so the PL-25 calendar day is identical either way. The error is one hour
+ * of recorded precision on a value whose regulatory meaning is a calendar day.
+ *
+ * NOT FIXED, deliberately. A real fix means replacing `<input type="datetime-local">`, which has no
+ * way to express EST-vs-EDT — the control structurally cannot carry the disambiguation, so the only
+ * remedy is a different control. Not worth it for a bounded, non-regulatory one-hour discrepancy.
  */
 export function utcFromWallTime(wall: string, zone: string): string | null {
   const m = WALL_TIME.exec(wall.trim());
