@@ -4,6 +4,11 @@ Status: draft for the myairops conversation. Companion to the generated
 [capability matrix](./myairops-capability-matrix.md), which is the per-operation evidence
 behind everything asserted here.
 
+> **See also [push scenarios](./myairops-push-scenarios.md)** — the capabilities we intend to
+> build over the next year, each mapped to a verdict and a gating ask. It adds ASK 9–12 and
+> revises the priority order below; where the two disagree, the push-scenario ordering wins
+> because it is grounded in specific planned work.
+
 Two questions drove this: **which APIs are read-only, and which do we need to take to
 myairops to be able to push to?** The short answer is that the read/write split is not the
 constraint people expect it to be — and the real blockers are elsewhere.
