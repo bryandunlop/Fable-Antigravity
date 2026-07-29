@@ -42,7 +42,19 @@ export type { StorageLike };
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-26-v16'; // TL-16 adversarial-pass fixes — reseed so deferrals carry melOProcedure and briefings carry the frozen checklist
+/**
+ * Bump this whenever the persisted demo-data SHAPE changes. A mismatch drops the stored blob and
+ * reseeds (see `loadPersistedState`), which is the only migration this demo has.
+ *
+ * v17 (D55/D56/D57): `Defect` lost `severity` and gained a NON-OPTIONAL `occurredAtUtc` plus the
+ * structured CAS fields. A defect persisted before this batch has no `occurredAtUtc` at all, and it
+ * is now read on every defect row (`formatRegulatoryCompact` would be handed `undefined`) and used
+ * to default the PL-25 day of discovery in `DeferralCreatePanel` — so a returning user's stale rows
+ * would render broken dates and seed an MEL repair clock from nothing. The field was added in an
+ * earlier commit of this batch and was inert only because nothing had read a hydrated old row yet;
+ * this bump is what actually closes it.
+ */
+export const DATA_VERSION = '2026-07-29-v17';
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a

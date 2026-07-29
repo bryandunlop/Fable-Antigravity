@@ -13,11 +13,15 @@ import { detectRepetitiveGroups } from '../engine/repetitive';
 import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
-import { DefectDescriptionField, DefectSymptomField, DefectLocationNotesField } from '../components/panels/DefectFields';
+import {
+  DefectDescriptionField, DefectSymptomField, DefectCasField, DefectLocationNotesField,
+  casValueFor, casEntryIncomplete, casModeOf, type CasMode,
+} from '../components/panels/DefectFields';
+import { CasChip } from '../components/CasChip';
 import { WatchlistDialog, EscalateWatchDialog } from '../components/panels/WatchlistPanel';
 import { ATA_CHAPTERS, INTENT } from '../constants';
 import { newId } from '../util/id';
-import type { Defect } from '../types';
+import type { CasColor, Defect } from '../types';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -46,6 +50,12 @@ export default function Defects() {
   const [cDraft, setCDraft] = useState<Defect | null>(null);
   const [correctSignOpen, setCorrectSignOpen] = useState(false);
   const [pendingCorrectionId, setPendingCorrectionId] = useState('');
+  // D57 CAS state is held alongside `cDraft` rather than inside it: while the reporter is choosing,
+  // "CAS message with nothing typed yet" is a legitimate half-state, and the draft must never hold
+  // one — every value written back into it goes through `casValueFor`.
+  const [cCasMode, setCCasMode] = useState<CasMode>('NONE');
+  const [cCasMessage, setCCasMessage] = useState('');
+  const [cCasColor, setCCasColor] = useState<CasColor>('AMBER');
   // watch-list disposition state
   const [watchTarget, setWatchTarget] = useState<Defect | null>(null);
   const [escalateTarget, setEscalateTarget] = useState<Defect | null>(null);
@@ -81,11 +91,19 @@ export default function Defects() {
     if (!auth.ok) return toast.error(auth.error ?? 'Not authorized to correct this record.');
     setCorrectOrig(d);
     setCDraft({ ...d });
+    setCCasMode(casModeOf(d));
+    setCCasMessage(d.casMessage ?? '');
+    setCCasColor(d.casColor ?? 'AMBER');
     if (auth.thirdParty) toast.info(`Filing a third-party correction as ${auth.relationship}. The original signer is recorded.`);
   };
 
+  const closeCorrection = () => { setCorrectOrig(null); setCDraft(null); };
+
   const beginCorrectionSign = () => {
     if (!cDraft?.description.trim()) return toast.error('Description is required.');
+    if (casEntryIncomplete(cCasMode, cCasMessage)) {
+      return toast.error('Enter the CAS message, or choose “Observed (no CAS)”.');
+    }
     setPendingCorrectionId(newId('def'));
     setCorrectSignOpen(true);
   };
@@ -94,6 +112,9 @@ export default function Defects() {
     if (!correctOrig || !cDraft) return;
     const corrected: Defect = {
       ...cDraft,
+      // D57: all three CAS keys are always written, so switching the correction to "observed"
+      // clears the superseded row's message/color rather than carrying it forward.
+      ...casValueFor(cCasMode, cCasMessage, cCasColor),
       id: pendingCorrectionId,
       supersedesId: correctOrig.id,
       reportedAtUtc: correctOrig.reportedAtUtc, // keep original report time; correction fixes content
@@ -109,8 +130,7 @@ export default function Defects() {
     });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFECT_CORRECTED', entityType: 'Defect', entityId: corrected.id, atUtc: new Date().toISOString(), summary: `${tailOf(corrected.aircraftId)} ATA ${corrected.ataChapter} defect corrected (supersedes ${correctOrig.id})${signerOfDefect(correctOrig) !== user.oid ? ' — third-party correction' : ''}` } });
     toast.success('Correction signed — original retained, correction is now current.');
-    setCorrectOrig(null);
-    setCDraft(null);
+    closeCorrection();
   };
 
   return (
@@ -155,6 +175,9 @@ export default function Defects() {
                   <Badge variant={STATUS_VARIANT[d.status]}>{d.status === 'WATCHLISTED' ? <><Eye className="mr-1 h-3 w-3" />WATCH</> : d.status}</Badge>
                   {rep && <Badge variant="destructive" title={`Repeat ${rep.index} of ${rep.count} — same ATA on this aircraft`}><Repeat className="mr-1 h-3 w-3" />repeat ×{rep.count}</Badge>}
                   {d.attachments?.length ? <Badge variant="outline"><Paperclip className="mr-1 h-3 w-3" />{d.attachments.length}</Badge> : null}
+                  {/* D57: the CAS annunciation as the crew saw it. Its own visual axis — never the
+                      RAG status language, which is reserved for serviceability. */}
+                  <CasChip message={d.casMessage} color={d.casColor} observed={d.casObserved} />
                   <span className="text-xs text-muted-foreground">{d.source}</span>
                 </div>
                 <p className="mt-1 text-sm">{d.description}</p>
@@ -223,7 +246,7 @@ export default function Defects() {
       />
 
       {/* Correct (supersede) a signed defect */}
-      <Dialog open={!!correctOrig} onOpenChange={o => { if (!o) { setCorrectOrig(null); setCDraft(null); } }}>
+      <Dialog open={!!correctOrig} onOpenChange={o => { if (!o) closeCorrection(); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Pencil className="h-4 w-4" /> Correct defect</DialogTitle>
@@ -240,12 +263,17 @@ export default function Defects() {
               </div>
               <DefectDescriptionField value={cDraft.description} onChange={v => setCDraft({ ...cDraft, description: v })} />
               <DefectSymptomField value={cDraft.symptom ?? ''} onChange={v => setCDraft({ ...cDraft, symptom: v || undefined })} />
+              <DefectCasField
+                mode={cCasMode} onModeChange={setCCasMode}
+                message={cCasMessage} onMessageChange={setCCasMessage}
+                color={cCasColor} onColorChange={setCCasColor}
+              />
               <DefectLocationNotesField label="Location notes" className="mt-1" value={cDraft.locationFreetext ?? ''} onChange={v => setCDraft({ ...cDraft, locationFreetext: v || undefined })} />
               {cDraft.attachments?.length ? <p className="text-xs text-muted-foreground">{cDraft.attachments.length} attachment(s) carried over from the original and re-covered by your signature.</p> : null}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setCorrectOrig(null); setCDraft(null); }}>Cancel</Button>
+            <Button variant="outline" onClick={closeCorrection}>Cancel</Button>
             <Button onClick={beginCorrectionSign}>Continue to sign</Button>
           </DialogFooter>
         </DialogContent>

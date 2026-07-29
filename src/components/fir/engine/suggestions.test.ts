@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Defect } from '../../tech-log/types';
+import { getDefaultState } from '../../tech-log/mockData/scenarios';
 import type { TechLogEvidenceSlice } from './timeline';
 import {
   DEFAULT_FIR_SUGGESTION_CONFIG,
@@ -83,5 +84,40 @@ describe('buildDefectFirSuggestions', () => {
 
   it('respects dismissed keys', () => {
     expect(buildDefectFirSuggestions(slice([defect()]), [], ['defect:d1'], cfg, NOW)).toHaveLength(0);
+  });
+});
+
+/**
+ * The seeded demo world has to actually produce the nudge its own comment promises.
+ *
+ * `scenarios.ts` seeds N2PG as a fresh un-reported AOG "so the FIR §8 'Open an FIR?' nudge fires".
+ * That defect is ~6 h old — nowhere near the 24 h downtime threshold — so it can only fire through
+ * the immediate-escalation path. That path used to read `severity === 'CRITICAL'`; D55 deleted
+ * severity and it was re-pointed at `casColor === 'RED'`, at which point nothing wrote `casColor`
+ * and the seed comment quietly became false. This test is what keeps it honest: it drives the real
+ * seed builder rather than a fixture, so removing the RED CAS from `d-n2pg` — or moving it onto a
+ * rectified or non-grounding defect — fails here.
+ */
+describe('the seeded demo world fires the FIR nudge on N2PG', () => {
+  const state = getDefaultState();
+  const now = new Date().toISOString();
+  const seedSlice: TechLogEvidenceSlice = {
+    defects: state.defects, workCards: state.workCards, laborEntries: state.laborEntries,
+  };
+
+  it('d-n2pg carries the RED CAS the escalation path reads', () => {
+    const d = state.defects.find(x => x.id === 'd-n2pg')!;
+    expect(d.casColor).toBe('RED');
+    expect(d.status).toBe('OPEN');
+    expect(d.airworthinessAffecting).not.toBe(false); // still grounding
+  });
+
+  it('suggests an AOG FIR for d-n2pg on fresh seeds, well inside the downtime threshold', () => {
+    const out = buildDefectFirSuggestions(seedSlice, [], [], DEFAULT_FIR_SUGGESTION_CONFIG, now);
+    const n2 = out.find(s => s.defectId === 'd-n2pg');
+    expect(n2).toBeDefined();
+    expect(n2!.category).toBe('AOG');
+    expect(n2!.reason).toMatch(/critical/i); // the fast path, not the 24 h downtime path
+    expect(n2!.anchor).toEqual({ kind: 'DEFECT', refId: 'd-n2pg' });
   });
 });

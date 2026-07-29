@@ -1,10 +1,10 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Paperclip, Camera, MapPin, X, Clock } from 'lucide-react';
+import { Paperclip, Camera, MapPin, X, Clock, MonitorDot } from 'lucide-react';
 import { mockSha256 } from '../../engine/signing';
 import { newId } from '../../util/id';
 import { ENTRY_ZONE_OPTIONS, entryZone, utcFromWallTime, wallTimeFromUtc, type EntryZoneMode } from '../../util/entryZone';
 import { formatRegulatoryLabel } from '../../util/displayZone';
-import type { Attachment, DefectLocationKind } from '../../types';
+import type { Attachment, CasColor, DefectLocationKind } from '../../types';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
 import { Label } from '../../../ui/label';
@@ -19,13 +19,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
  * one). They used to be hand-rolled copies of each other, so every field change had to be made
  * more than once and the copies drifted.
  *
- * "Shared" means the component lives here, NOT that both dialogs render it. Three of the six are
+ * "Shared" means the component lives here, NOT that both dialogs render it. Three of the seven are
  * mounted by `ReportDefectDialog` alone — the correction dialog has no control for them at all.
  *
  * **Here AND rendered by both dialogs — change once, both follow:** description
- * (`DefectDescriptionField`), symptom/CAS (`DefectSymptomField`), and free-text location notes
- * (`DefectLocationNotesField` — standalone in the correction dialog, nested inside
- * `DefectLocationSection` in the report dialog).
+ * (`DefectDescriptionField`), symptom (`DefectSymptomField`), the CAS annunciation
+ * (`DefectCasField` — D57 split the old conflated "Symptom / CAS" input into those two), and
+ * free-text location notes (`DefectLocationNotesField` — standalone in the correction dialog,
+ * nested inside `DefectLocationSection` in the report dialog).
  *
  * **Here but rendered by `ReportDefectDialog` ONLY:** the occurrence timestamp (`OccurredAtField`),
  * the structured-location box (`DefectLocationSection`), and attachments
@@ -54,7 +55,14 @@ export function DefectDescriptionField({ value, onChange, placeholder }: {
   );
 }
 
-export function DefectSymptomField({ value, onChange, label = 'Symptom / CAS', placeholder }: {
+/**
+ * D57 — the narrative half of what used to be one field labeled "Symptom / CAS". That single input
+ * asked for two different things at once: a free-text account of what happened, and the CAS
+ * annunciation, which is a structured fact with a color. Seeds like "GEAR amber CAS during climb"
+ * show the result — the annunciation buried in prose where nothing can read it. The structured half
+ * moved to `DefectCasField`; this stays free text.
+ */
+export function DefectSymptomField({ value, onChange, label = 'Symptom', placeholder }: {
   value: string;
   onChange: (v: string) => void;
   label?: string;
@@ -64,6 +72,116 @@ export function DefectSymptomField({ value, onChange, label = 'Symptom / CAS', p
     <div>
       <Label>{label}</Label>
       <Input className="mt-1" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
+/** Which of the three CAS states the reporter is describing (D57). */
+export type CasMode = 'NONE' | 'MESSAGE' | 'OBSERVED';
+
+const CAS_MODES: { mode: CasMode; label: string }[] = [
+  { mode: 'NONE', label: 'None' },
+  { mode: 'MESSAGE', label: 'CAS message' },
+  { mode: 'OBSERVED', label: 'Observed (no CAS)' },
+];
+
+const CAS_COLORS: { value: CasColor; label: string }[] = [
+  { value: 'WHITE', label: 'White' },
+  { value: 'CYAN', label: 'Cyan' },
+  { value: 'AMBER', label: 'Amber' },
+  { value: 'RED', label: 'Red' },
+];
+
+/** The CAS half of a defect record. Never violates the D57 mutual exclusion — see `casValueFor`. */
+export interface CasValue {
+  casMessage: string | undefined;
+  casColor: CasColor | undefined;
+  casObserved: boolean | undefined;
+}
+
+/**
+ * The single place the D57 mutual exclusion is enforced: `casMessage`+`casColor` and `casObserved`
+ * are alternatives, and neither is required. "Observed (no CAS)" is a third STATE — the defect was
+ * seen with no annunciation at all — not a fifth color, so it carries no message and no color.
+ *
+ * All three keys are ALWAYS present (possibly `undefined`) so that spreading the result over an
+ * existing defect clears the branch not taken. The correction dialog does exactly that: without it,
+ * correcting a mis-entered CAS message to "observed" would leave the old message behind and produce
+ * a row claiming the crew both saw an annunciation and saw none.
+ *
+ * A blank message under `MESSAGE` yields no CAS rather than a colored empty one; the dialogs refuse
+ * to sign in that state so it is never a silent drop.
+ */
+export function casValueFor(mode: CasMode, message: string, color: CasColor): CasValue {
+  if (mode === 'OBSERVED') return { casMessage: undefined, casColor: undefined, casObserved: true };
+  const trimmed = message.trim();
+  if (mode === 'MESSAGE' && trimmed) return { casMessage: trimmed, casColor: color, casObserved: undefined };
+  return { casMessage: undefined, casColor: undefined, casObserved: undefined };
+}
+
+/** True when the reporter chose "CAS message" but typed none — block signing rather than drop it. */
+export const casEntryIncomplete = (mode: CasMode, message: string) => mode === 'MESSAGE' && !message.trim();
+
+/** Recover the mode from a stored defect, for the correction dialog's initial state. */
+export const casModeOf = (d: { casMessage?: string; casObserved?: boolean }): CasMode =>
+  d.casMessage ? 'MESSAGE' : d.casObserved ? 'OBSERVED' : 'NONE';
+
+/**
+ * D57 — the structured CAS annunciation: a segmented choice between the three states, with the
+ * message + color inputs revealed only under "CAS message". Free text this slice; D60/slice 5
+ * replaces the input with the CAS catalog picker.
+ */
+export function DefectCasField({ mode, onModeChange, message, onMessageChange, color, onColorChange }: {
+  mode: CasMode;
+  onModeChange: (m: CasMode) => void;
+  message: string;
+  onMessageChange: (v: string) => void;
+  color: CasColor;
+  onColorChange: (c: CasColor) => void;
+}) {
+  return (
+    <div className="rounded-md border p-3">
+      <Label className="flex items-center gap-1.5"><MonitorDot className="h-3.5 w-3.5" /> CAS annunciation</Label>
+      <div role="radiogroup" aria-label="CAS annunciation" className="mt-2 inline-flex rounded-md border p-0.5">
+        {CAS_MODES.map(o => (
+          <button
+            key={o.mode}
+            type="button"
+            role="radio"
+            aria-checked={mode === o.mode}
+            onClick={() => onModeChange(o.mode)}
+            className={
+              'rounded px-2.5 py-1 text-xs transition-colors ' +
+              (mode === o.mode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent')
+            }
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {mode === 'MESSAGE' && (
+        <div className="mt-2 flex gap-2">
+          <Input
+            aria-label="CAS message"
+            placeholder="CAS message, e.g. R ENG CHIP"
+            value={message}
+            onChange={e => onMessageChange(e.target.value)}
+          />
+          <select
+            aria-label="CAS color"
+            className="rounded-md border bg-background px-2 py-1 text-sm"
+            value={color}
+            onChange={e => onColorChange(e.target.value as CasColor)}
+          >
+            {CAS_COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+      )}
+      <p className="mt-2 text-xs text-muted-foreground">
+        {mode === 'OBSERVED'
+          ? 'Recorded as seen with no annunciation at all — that is a fact about the defect, not a missing field.'
+          : 'Optional. Record the annunciation as the crew saw it; "Observed (no CAS)" says there was none.'}
+      </p>
     </div>
   );
 }

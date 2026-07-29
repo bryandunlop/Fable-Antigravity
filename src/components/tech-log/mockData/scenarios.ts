@@ -17,7 +17,14 @@ import { campForecast } from '../integration/campClient';
  * stays mid-clock and the RED aircraft stays grounded whenever the demo is run or reset.
  *   N5PG -> GREEN   N6PG -> AMBER (active deferral mid-clock)   N1PG, N2PG -> RED (open defects)
  *   N3PG -> provisional G800 (no MEL approved)
- * N2PG's AOG is deliberately un-reported (no FIR) so the FIR §8 "Open an FIR?" nudge fires.
+ * N2PG's AOG is deliberately un-reported (no FIR) so the FIR §8 "Open an FIR?" nudge fires. That
+ * nudge's immediate-escalation path reads `casColor === 'RED'`, so N2PG's RED CAS below is what
+ * makes it fire before the 24 h downtime threshold — see `fir/engine/suggestions.ts`.
+ *
+ * CAS SEED CONTENT (D57) IS DEMO CONTENT. The message strings are lifted from the pre-split
+ * `symptom` prose in this file or are obviously-demo names, and the color assignments are chosen to
+ * exercise all four annunciator colors plus the "observed, no CAS" state. None of it asserts real
+ * Gulfstream G650ER/G500 CAS semantics — the sourced catalog arrives with D60.
  */
 export function getDefaultState(referenceNowMs: number = Date.now()): TechLogState {
   const nowMs = referenceNowMs;
@@ -33,38 +40,55 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   const deferrals: Deferral[] = [];
 
   // --- N1PG: RED (open, untriaged airworthiness defect) ---
+  // D57: the symptom prose used to read "GEAR amber CAS during climb" — an annunciation buried in
+  // free text where nothing could read it. Split: narrative in `symptom`, annunciation structured.
   const sigN1 = makeSignature({ id: 'sig-seed-d-n1pg', signedEntity: 'DEFECT', signedEntityId: 'd-n1pg', signer: pilot, intentStatement: 'seed', signedAtUtc: iso(3 * H) });
   signatures.push(sigN1);
   defects.push({
     id: 'd-n1pg', aircraftId: 'ac-n1pg', source: 'PIREP', ataChapter: '32',
     description: 'Left main landing gear unsafe indication intermittent on retraction.',
-    symptom: 'GEAR amber CAS during climb', airworthinessAffecting: true,
+    symptom: 'Came up during climb, cleared after a gear recycle.',
+    casMessage: 'GEAR UNSAFE', casColor: 'AMBER', airworthinessAffecting: true,
     status: 'OPEN', reportedByOid: pilot.oid,
-    occurredAtUtc: iso(3 * H), reportedAtUtc: iso(3 * H), signatureId: sigN1.id,
+    // D56: noticed ~45 min before it was written up.
+    occurredAtUtc: iso(3 * H + 45 * 60000), reportedAtUtc: iso(3 * H), signatureId: sigN1.id,
   });
 
   // --- N6PG: AMBER (active deferral mid-clock; Cat C, no (M)/placard -> straight to ACTIVE) ---
   const melAmber =
     SEED_MEL.find(m => m.aircraftType === 'G500' && m.category === 'C' && !m.mProcedure) ??
     SEED_MEL.find(m => m.id === 'mel-g500-21-01-01')!;
-  const discN6 = iso(2 * D + 8 * H);
-  const clockStart = computeClockStart(discN6);
+  // D56: the deferral's day of discovery is the instant the defect was NOTICED, not the instant it
+  // was filed — which is what `DeferralCreatePanel` now defaults from, so the seed has to agree.
+  //
+  // The occurrence instant is PINNED, and the filing stamp is what moves 30 min later to make the
+  // two distinguishable. Back-dating the occurrence instead looks equivalent and is not: this
+  // instant sits exactly on Eastern midnight, so any back-date at all rolls the PL-25 day of
+  // discovery into the previous calendar day and moves this deferral's repair-due boundary by a
+  // full day — which the myairops trip-alert fixtures are calibrated against (`tripAlerts.test.ts`
+  // pins a leg either side of it). Move it and those alerts change kind.
+  const occN6 = iso(2 * D + 8 * H);
+  const filedN6 = iso(2 * D + 7 * H + 30 * 60000);
+  const clockStart = computeClockStart(occN6);
   const due = computeRepairDue(melAmber.category, clockStart, melAmber, { hours: 990.7, cycles: 640 });
-  const sigDefN6 = makeSignature({ id: 'sig-seed-d-n6pg', signedEntity: 'DEFECT', signedEntityId: 'd-n6pg', signer: pilot, intentStatement: 'seed', signedAtUtc: discN6 });
+  const sigDefN6 = makeSignature({ id: 'sig-seed-d-n6pg', signedEntity: 'DEFECT', signedEntityId: 'd-n6pg', signer: pilot, intentStatement: 'seed', signedAtUtc: filedN6 });
   const sigDefrN6 = makeSignature({ id: 'sig-seed-df-n6pg', signedEntity: 'DEFERRAL', signedEntityId: 'df-n6pg', signer: dom, intentStatement: 'seed', signedAtUtc: iso(2 * D + 6 * H) });
   signatures.push(sigDefN6, sigDefrN6);
   defects.push({
     id: 'd-n6pg', aircraftId: 'ac-n6pg', source: 'PIREP', ataChapter: melAmber.ataReference,
     description: `${melAmber.title} — intermittent; deferred under MEL ${melAmber.subItemNumber}.`,
+    // D57 third state: seen, with no annunciation at all. Not a fifth color — a fact about the
+    // defect, and the reason the OBSERVED chip has its own muted, un-colored treatment.
+    casObserved: true,
     airworthinessAffecting: true, status: 'DEFERRED',
-    reportedByOid: pilot.oid, occurredAtUtc: discN6, reportedAtUtc: discN6, signatureId: sigDefN6.id,
+    reportedByOid: pilot.oid, occurredAtUtc: occN6, reportedAtUtc: filedN6, signatureId: sigDefN6.id,
   });
   deferrals.push({
     id: 'df-n6pg', defectId: 'd-n6pg', aircraftId: 'ac-n6pg', melItemId: melAmber.id,
     governingMmelRevision: melAmber.mmelRevision, governingEffectiveDate: melAmber.effectiveDate,
     melSubItemNumber: melAmber.subItemNumber, melTitle: melAmber.title, // D36 — frozen at signing
     melOProcedure: melAmber.oProcedure, // TL-16 — decides whether the PIC must acknowledge this item
-    category: melAmber.category, dayOfDiscoveryUtc: discN6, clockStartDateUtc: clockStart,
+    category: melAmber.category, dayOfDiscoveryUtc: occN6, clockStartDateUtc: clockStart,
     governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
     repairDueDateUtc: due.repairDueDateUtc, usageDueThreshold: due.usageDueThreshold,
     repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
@@ -81,9 +105,14 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   defects.push({
     id: 'd-n2pg', aircraftId: 'ac-n2pg', source: 'PIREP', ataChapter: '79',
     description: 'No. 2 engine magnetic chip detector warning — metal found on inspection, borescope required.',
-    symptom: 'R ENG CHIP CAS in cruise', airworthinessAffecting: true,
+    // D57: was the free-text symptom "R ENG CHIP CAS in cruise". The RED here is LOAD-BEARING, not
+    // decoration: this defect is ~6 h old, far short of the 24 h downtime threshold, so the FIR
+    // "Open an FIR?" nudge fires only via the immediate-escalation path, which reads `casColor`.
+    // Move the RED to a rectified or non-grounding defect and the demo above goes quiet.
+    symptom: 'In cruise at FL410; no other indications.',
+    casMessage: 'R ENG CHIP', casColor: 'RED', airworthinessAffecting: true,
     status: 'OPEN', reportedByOid: pilot.oid,
-    occurredAtUtc: discN2, reportedAtUtc: discN2, signatureId: sigN2.id,
+    occurredAtUtc: iso(6 * H + 30 * 60000), reportedAtUtc: discN2, signatureId: sigN2.id,
   });
 
   // ── Historical ledger (for Journey Log realism + Phase-4 analytics). None of this changes the
@@ -130,17 +159,20 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   // Historical RECTIFIED defects (+ their releases) — fuel for defect-trend / MTBUR / dispatch reliability.
   const releases: MaintenanceRelease[] = [];
   const histDefect = (
-    i: number, acId: string, ata: string, daysAgo: number, desc: string, work: string, signer = tech,
+    i: number, acId: string, ata: string, daysAgo: number, desc: string, work: string,
+    cas: Pick<Defect, 'casMessage' | 'casColor' | 'casObserved'> = {}, signer = tech,
   ) => {
     const reportedAt = iso(daysAgo * D + 6 * H);
+    // D56: noticed in flight, written up on the ground half an hour later.
+    const occurredAt = iso(daysAgo * D + 6 * H + 30 * 60000);
     const clearedAt = iso(daysAgo * D);
     const dSig = makeSignature({ id: `sig-hd-${i}`, signedEntity: 'DEFECT', signedEntityId: `hd-${i}`, signer: pilot, intentStatement: 'seed', signedAtUtc: reportedAt });
     const rSig = makeSignature({ id: `sig-hr-${i}`, signedEntity: 'CRS', signedEntityId: `hr-${i}`, signer: signer, intentStatement: 'seed', signedAtUtc: clearedAt, certNumber: signer.apCertificateNumber });
     signatures.push(dSig, rSig);
     defects.push({
-      id: `hd-${i}`, aircraftId: acId, source: 'PIREP', ataChapter: ata, description: desc,
+      id: `hd-${i}`, aircraftId: acId, source: 'PIREP', ataChapter: ata, description: desc, ...cas,
       airworthinessAffecting: true, status: 'RECTIFIED',
-      reportedByOid: pilot.oid, occurredAtUtc: reportedAt, reportedAtUtc: reportedAt, rectificationText: work,
+      reportedByOid: pilot.oid, occurredAtUtc: occurredAt, reportedAtUtc: reportedAt, rectificationText: work,
       clearedByOid: signer.oid, clearedTsUtc: clearedAt, signatureId: dSig.id,
     });
     releases.push({
@@ -151,9 +183,11 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       pdfBlobUri: `blob://mygfo-worm/crs/hr-${i}.pdf`, signatureId: rSig.id,
     });
   };
-  histDefect(1, 'ac-n5pg', '34', 18, 'GPS 1 intermittent loss of position', 'Replaced GPS antenna coax; ops check good.');
-  histDefect(2, 'ac-n2pg', '21', 30, 'Cabin temp control erratic', 'Recalibrated zone temp sensor; verified.');
-  histDefect(3, 'ac-n1pg', '32', 44, 'Nosewheel steering stiff on taxi', 'Serviced steering accumulator; functional check normal.');
+  // The CAS argument covers the remaining two annunciator colors (white/cyan) and, on hd-3/4/5,
+  // the perfectly ordinary case of a defect with no CAS aspect at all.
+  histDefect(1, 'ac-n5pg', '34', 18, 'GPS 1 intermittent loss of position', 'Replaced GPS antenna coax; ops check good.', { casMessage: 'GPS 1 ADVISORY', casColor: 'WHITE' });
+  histDefect(2, 'ac-n2pg', '21', 30, 'Cabin temp control erratic', 'Recalibrated zone temp sensor; verified.', { casMessage: 'CABIN TEMP', casColor: 'CYAN' });
+  histDefect(3, 'ac-n1pg', '32', 44, 'Nosewheel steering stiff on taxi', 'Serviced steering accumulator; functional check normal.', { casObserved: true });
   histDefect(4, 'ac-n6pg', '34', 11, 'FMS 2 map drift', 'Loaded latest nav DB; alignment normal.');
   histDefect(5, 'ac-n5pg', '49', 60, 'APU slow to start', 'Cleaned APU fuel control; start times normal.');
 
@@ -426,7 +460,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   const audit: AuditEntry[] = [
     { id: 'aud-seed-1', actorOid: pilot.oid, action: 'DEFECT_REPORTED', entityType: 'Defect', entityId: 'd-n1pg', atUtc: iso(3 * H), summary: 'PIREP N1PG ATA 32 — gear indication' },
     { id: 'aud-seed-brief', actorOid: tech.oid, action: 'BRIEFING_RELEASED', entityType: 'FlightBriefing', entityId: 'brief-1', atUtc: briefRelAt, summary: 'N2PG flight briefing released to crew' },
-    { id: 'aud-seed-2', actorOid: pilot.oid, action: 'DEFECT_REPORTED', entityType: 'Defect', entityId: 'd-n6pg', atUtc: discN6, summary: `PIREP N6PG ATA ${melAmber.ataReference}` },
+    { id: 'aud-seed-2', actorOid: pilot.oid, action: 'DEFECT_REPORTED', entityType: 'Defect', entityId: 'd-n6pg', atUtc: filedN6, summary: `PIREP N6PG ATA ${melAmber.ataReference}` },
     { id: 'aud-seed-3', actorOid: dom.oid, action: 'DEFERRAL_SIGNED', entityType: 'Deferral', entityId: 'df-n6pg', atUtc: iso(2 * D + 6 * H), summary: `Deferred N6PG under MEL ${melAmber.subItemNumber} (Cat ${melAmber.category})` },
     { id: 'aud-seed-4', actorOid: tech.oid, action: 'WORKCARD_COMPLETED', entityType: 'WorkCard', entityId: 'wc-1', atUtc: iso(15 * D), summary: 'N5PG WO-21-0231 complied with — pack valve replaced (RTS)' },
   ];

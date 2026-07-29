@@ -4,9 +4,12 @@ import { AlertTriangle } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { ATA_CHAPTERS, INTENT } from '../../constants';
 import { newId } from '../../util/id';
-import type { Defect, DefectSource, Attachment, DefectLocationKind } from '../../types';
+import type { Defect, DefectSource, Attachment, DefectLocationKind, CasColor } from '../../types';
 import { SignCeremonyDialog } from '../SignCeremonyDialog';
-import { DefectDescriptionField, DefectSymptomField, DefectLocationSection, DefectAttachmentsField, OccurredAtField } from './DefectFields';
+import {
+  DefectDescriptionField, DefectSymptomField, DefectCasField, DefectLocationSection,
+  DefectAttachmentsField, OccurredAtField, casValueFor, casEntryIncomplete, type CasMode,
+} from './DefectFields';
 import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../ui/dialog';
@@ -48,6 +51,11 @@ export function ReportDefectDialog({
   const [ata, setAta] = useState(prefill?.ata ?? '32');
   const [description, setDescription] = useState(prefill?.description ?? '');
   const [symptom, setSymptom] = useState(prefill?.symptom ?? '');
+  // D57: the CAS annunciation, structured and separate from the symptom narrative. The mode is what
+  // makes casMessage/casColor and casObserved mutually exclusive — see `casValueFor`.
+  const [casMode, setCasMode] = useState<CasMode>('NONE');
+  const [casMessage, setCasMessage] = useState('');
+  const [casColor, setCasColor] = useState<CasColor>('AMBER');
   // D56: when it was NOTICED. Defaults to now and is back-datable; the filing stamp is taken
   // separately at signing.
   const [occurredAtUtc, setOccurredAtUtc] = useState(() => new Date().toISOString());
@@ -64,6 +72,7 @@ export function ReportDefectDialog({
     setAta(prefill?.ata ?? '32');
     setDescription(prefill?.description ?? '');
     setSymptom(prefill?.symptom ?? '');
+    setCasMode('NONE'); setCasMessage(''); setCasColor('AMBER');
     setOccurredAtUtc(new Date().toISOString());
     setLocKind('OTHER'); setCabinSeat(''); setZoneCode(''); setLocFreetext('');
     setAttachments([]);
@@ -82,6 +91,11 @@ export function ReportDefectDialog({
     if (new Date(occurredAtUtc).getTime() > Date.now() + 60_000) {
       return toast.error('The occurrence time cannot be in the future.');
     }
+    // D57: "CAS message" with nothing typed would silently record no CAS at all — and the colour
+    // the reporter did pick would go with it. Say so rather than drop it.
+    if (casEntryIncomplete(casMode, casMessage)) {
+      return toast.error('Enter the CAS message, or choose “Observed (no CAS)”.');
+    }
     setPendingDefectId(newId('def'));
     setSignOpen(true);
   };
@@ -95,6 +109,7 @@ export function ReportDefectDialog({
     const defect: Defect = {
       id: pendingDefectId, aircraftId: ac.id, source, ataChapter: ata,
       description: description.trim(), symptom: symptom.trim() || undefined,
+      ...casValueFor(casMode, casMessage, casColor),
       locationKind: locKind,
       cabinSeat: locKind === 'CABIN' ? cabinSeat.trim() || undefined : undefined,
       zoneCode: locKind === 'STRUCTURAL' ? zoneCode.trim() || undefined : undefined,
@@ -142,7 +157,13 @@ export function ReportDefectDialog({
               </div>
             </div>
             <DefectDescriptionField value={description} onChange={setDescription} placeholder="What was observed?" />
-            <DefectSymptomField label="Symptom / CAS (optional)" value={symptom} onChange={setSymptom} placeholder="e.g. GEAR amber CAS" />
+            <DefectSymptomField label="Symptom (optional)" value={symptom} onChange={setSymptom} placeholder="e.g. intermittent during climb, cleared after recycle" />
+
+            <DefectCasField
+              mode={casMode} onModeChange={setCasMode}
+              message={casMessage} onMessageChange={setCasMessage}
+              color={casColor} onColorChange={setCasColor}
+            />
 
             <OccurredAtField valueUtc={occurredAtUtc} onChange={setOccurredAtUtc} />
 

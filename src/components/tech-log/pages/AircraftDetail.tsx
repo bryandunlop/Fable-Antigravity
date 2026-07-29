@@ -26,6 +26,7 @@ import type {
 import { deriveCustody } from '../engine/custody';
 import { lifecycleStep } from '../engine/lifecycle';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
+import { CasChip } from '../components/CasChip';
 import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
@@ -96,6 +97,9 @@ function BlockerCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">{row.title}</span>
+            {/* D57: only defect-backed rows carry a CAS annunciation; the chip renders nothing
+                for the deferral/check/work-card kinds, so no per-kind conditional is needed. */}
+            <CasChip message={row.defect?.casMessage} color={row.defect?.casColor} observed={row.defect?.casObserved} />
             {row.governing && <Badge variant="outline" className="text-xs">why it's {tone === 'warn' ? 'restricted' : 'grounded'}</Badge>}
           </div>
           {row.dueUtc && (
@@ -552,6 +556,8 @@ export default function AircraftDetail() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">ATA {d.ataChapter}</Badge>
                       <Badge variant={d.status === 'OPEN' ? 'destructive' : d.status === 'DEFERRED' || d.status === 'WATCHLISTED' ? 'secondary' : 'outline'}>{d.status === 'WATCHLISTED' ? 'WATCH' : d.status}</Badge>
+                      {/* D57: annunciator, not a status pill — the CAS axis is not the RAG axis. */}
+                      <CasChip message={d.casMessage} color={d.casColor} observed={d.casObserved} />
                       <span className="text-xs text-muted-foreground">{d.source}</span>
                     </div>
                     <p className="mt-1 text-sm">{d.description}</p>

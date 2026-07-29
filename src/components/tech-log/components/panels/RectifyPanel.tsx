@@ -9,6 +9,7 @@ import { mockPdfBlobUri } from '../../util/printRecord';
 import { newId } from '../../util/id';
 import type { Defect, MaintenanceRelease, Signature } from '../../types';
 import { SignCeremonyDialog } from '../SignCeremonyDialog';
+import { CasChip } from '../CasChip';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Textarea } from '../../../ui/textarea';
@@ -87,7 +88,12 @@ export function RectifyPanel({
     <Card>
       <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CheckCircle2 className="h-4 w-4" /> Certificate of Release to Service</CardTitle></CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <div className="text-xs text-muted-foreground">ATA {defect.ataChapter} · {defect.description}</div>
+        {/* D57: the annunciation the crew reported travels with the defect into the rectification
+            record — it is often the only clue about which system actually complained. */}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>ATA {defect.ataChapter} · {defect.description}</span>
+          <CasChip message={defect.casMessage} color={defect.casColor} observed={defect.casObserved} />
+        </div>
         <div>
           <label className="text-xs font-medium">Work performed (91.417(a)(1)(i))</label>
           <Textarea className="mt-1" value={work} onChange={e => setWork(e.target.value)} placeholder="Describe the corrective action…" />

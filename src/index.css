@@ -692,6 +692,52 @@
   /* Custody status pill (board module header) — P&G-blue tint, off the RAG axis. */
   .gfo-pill-custody { background: color-mix(in srgb, var(--gfo-custody-crew) 12%, transparent); color: var(--gfo-custody-crew); }
 
+  /* ---- CAS annunciation (D57) — a flight-deck annunciator, deliberately NOT a status chip ----
+     CAS color is its own axis: what the crew saw annunciated, not whether the aircraft may
+     dispatch. D33 reserves amber for airworthiness serviceability, and the custody axis already
+     lost its gold dot for colliding with that amber (see .gfo-dot-maint above), so a CAS amber
+     rendered as a tinted RAG pill would repeat the same mistake. It therefore reads as the panel
+     does: squared dark tile, uppercase monospace glyph, self-lit color. The four values below are
+     annunciator colors and deliberately NOT --gfo-warning/--gfo-error — reusing those tokens is
+     the collision. Fixed tile in both themes: a flight deck does not have a light mode. */
+  .cas-tile {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.1875rem;
+    background: #12161C;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    padding: 0.1rem 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .cas-white { color: #F2F5F7; }
+  .cas-cyan  { color: #4FD8EE; }
+  .cas-amber { color: #FFB021; }
+  .cas-red   { color: #FF5147; }
+
+  /* "Observed with no annunciation" is a third STATE, not a fifth color — so it gets no tile and
+     no color: a dashed, muted outline that reads as the absence of a CAS. */
+  .cas-observed {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.1875rem;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--muted-foreground);
+    padding: 0.1rem 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+  }
+
   /* Stat tile brand moment — 3px Midnight top rule (rounded card kept) */
   .gfo-stat-rule { position: relative; }
   .gfo-stat-rule::before {
