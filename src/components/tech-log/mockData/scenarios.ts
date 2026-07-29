@@ -286,11 +286,14 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     ataChapter: '32', description: 'Corrective — intermittent gear-unsafe indication on retraction.', source: 'MANUAL', headerStatusCode: 1,
     scheduled: false, riiRequired: false, linkedDefectId: 'd-n1pg', createdAtUtc: iso(2.5 * H), status: 'IN_WORK',
     // LG-98/99 on a LIVE card: editable on screen, and the linked defect (d-n1pg) carries the
-    // pilot's single intake code so the "starting hint" relationship is visible out of the box.
-    // TWO codes here on purpose — one squawk interrogates into several, which is why the card holds
-    // a list and the defect holds one. Illustrative demo codes; not real CMC output.
+    // pilot's single intake code '32-31-14', which is deliberately NOT in this list — `pilotHint`
+    // (WorkCardDetail) suppresses itself once the code is already on the card, so seeding it here
+    // would make the one-tap "Pilot reported …" affordance invisible on a fresh load. Maintenance's
+    // own interrogation finding different codes than the crew read off the CMC page is also the
+    // realistic case. TWO codes because one squawk interrogates into several — which is why the card
+    // holds a list and the defect holds one. Illustrative demo codes; not real CMC output.
     ammReference: 'AMM 32-30-00',
-    cmcFaultCodes: ['32-31-14', '32-31-22'],
+    cmcFaultCodes: ['32-31-22', '32-31-40'],
     steps: [
       { id: 'wc3-s1', seq: 1, text: 'Interrogate MAU fault history; isolate sensor vs harness', done: true },
       { id: 'wc3-s2', seq: 2, text: 'Replace LMLG uplock proximity sensor', done: false },

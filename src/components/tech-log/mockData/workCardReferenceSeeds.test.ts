@@ -25,26 +25,39 @@ describe('work card AMM/CMC seeds (LG-98/99)', () => {
     expect(wc1!.status).toBe('COMPLETED');
     // A release is what makes this card reach the CRS print path at all.
     expect(wc1!.completedReleaseId).toBeTruthy();
-    expect(wc1!.ammReference).toBe('AMM 21-50-00');
-    expect(wc1!.cmcFaultCodes).toEqual(['21-51-03']);
+    // Assert the PROPERTY, not the literal — the values are labelled illustrative in the seed and an
+    // ordinary edit to them must not fail a guard that exists to protect demo visibility.
+    expect(wc1!.ammReference?.trim()).toBeTruthy();
+    expect(wc1!.cmcFaultCodes?.length).toBeGreaterThan(0);
   });
 
   it('seeds a live card carrying both references, so the editable path is reachable on load', () => {
     const wc3 = state.workCards.find(c => c.id === 'wc-3');
     expect(wc3).toBeDefined();
     expect(wc3!.status).not.toBe('COMPLETED');
-    expect(wc3!.ammReference).toBe('AMM 32-30-00');
+    expect(wc3!.ammReference?.trim()).toBeTruthy();
     // More than one, on purpose: one squawk interrogates into several codes.
     expect(wc3!.cmcFaultCodes!.length).toBeGreaterThan(1);
   });
 
-  it("seeds the pilot's single intake code on the defect the live card is fixing", () => {
+  /**
+   * THE ONE THAT ACTUALLY CAUGHT SOMETHING. The first version of this guard asserted that the card's
+   * list CONTAINED the pilot's code — which reads as "the hint relationship is wired up" but is
+   * exactly the state in which `pilotHint` returns undefined, because offering to add a code that is
+   * already there would be pointless. So the seeds satisfied the guard while making the slice's only
+   * new intake affordance invisible on a fresh load. Five independent review lenses caught it.
+   *
+   * The invariant that matters is REACHABILITY, not containment.
+   */
+  it("seeds the pilot's intake code so the one-tap hint is actually reachable on a fresh load", () => {
     const wc3 = state.workCards.find(c => c.id === 'wc-3')!;
     const defect = state.defects.find(d => d.id === wc3.linkedDefectId);
     expect(defect).toBeDefined();
-    expect(defect!.cmcFaultCode).toBe('32-31-14');
-    // The hint is only a hint if maintenance's list is a superset it can be added to.
-    expect(wc3.cmcFaultCodes).toContain(defect!.cmcFaultCode);
+    const pilotCode = defect!.cmcFaultCode?.trim();
+    expect(pilotCode).toBeTruthy();
+    // Mirrors `pilotHint` in WorkCardDetail: the control renders only while the code is absent.
+    const onCard = (wc3.cmcFaultCodes ?? []).some(c => c.toLowerCase() === pilotCode!.toLowerCase());
+    expect(onCard).toBe(false);
   });
 });
 

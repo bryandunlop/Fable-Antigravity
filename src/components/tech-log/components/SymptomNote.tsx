@@ -17,10 +17,12 @@ import { cn } from '../../ui/utils';
  * one shared atom is what keeps a wording or emphasis change from landing on only one of them.
  *
  * ATTRIBUTION IS DERIVED, NOT ASSUMED. The narrative is usually the pilot's, and calling it out as
- * such is the point — it is testimony, distinct from the structured facts beside it. But a `MAREP`
- * is written by maintenance, and labelling that "the pilot's account" would put a false attribution
- * on a record whose value is precisely that a named person said it. So the label follows
- * `Defect.source`.
+ * such is the point — it is testimony, distinct from the structured facts beside it. But labelling a
+ * narrative "the pilot's account" when it is not would put a false attribution on a record whose
+ * value is precisely that a named person said it. So the label follows `Defect.source` — and it
+ * enumerates rather than defaults, because `DefectSource` has FIVE members and only `PIREP` is a
+ * flight-crew report. An earlier revision special-cased `MAREP` alone, which silently attributed
+ * every CABIN, STRUCTURAL and NEF narrative to the pilot.
  *
  * Renders nothing for an absent or blank narrative, so call sites need no conditional.
  */
@@ -31,7 +33,13 @@ export function SymptomNote({ symptom, source, className }: {
 }) {
   const text = symptom?.trim();
   if (!text) return null;
-  const label = source === 'MAREP' ? 'Reported account' : "Pilot's account";
+  const label =
+    source === 'PIREP' ? "Pilot's account"
+    : source === 'MAREP' ? "Maintenance's account"
+    : source === 'CABIN' ? 'Cabin report'
+    : source === 'STRUCTURAL' ? 'Structural finding'
+    : source === 'NEF' ? 'NEF report'
+    : 'Reported account';
   return (
     <p
       data-testid="symptom-note"

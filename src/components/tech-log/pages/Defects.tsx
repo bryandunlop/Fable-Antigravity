@@ -116,6 +116,10 @@ export default function Defects() {
       // D57: all three CAS keys are always written, so switching the correction to "observed"
       // clears the superseded row's message/color rather than carrying it forward.
       ...casValueFor(cCasMode, cCasMessage, cCasColor),
+      // Normalize the hand-typed CMC code HERE, not in onChange — the field is controlled, so
+      // trimming per keystroke makes spaces untypeable. Matches ReportDefectDialog, which also
+      // trims once at submit.
+      cmcFaultCode: cDraft.cmcFaultCode?.trim() || undefined,
       id: pendingCorrectionId,
       supersedesId: correctOrig.id,
       reportedAtUtc: correctOrig.reportedAtUtc, // keep original report time; correction fixes content
@@ -185,6 +189,16 @@ export default function Defects() {
                 {/* LG-108: the reporter's own narrative — the sentence the structured CAS message
                     above cannot carry. Same atom on the aircraft workspace's Defects tab. */}
                 <SymptomNote symptom={d.symptom} source={d.source} />
+                {/* LG-99 — read the pilot's CMC code back. It gained two write surfaces in this slice
+                    and, until this line, no reader at all: the reporter typed a code and could never
+                    see it again. That is precisely the write-only trap LG-108 booked for `symptom`,
+                    and shipping a second instance of it in the commit that fixes the first would be
+                    absurd. Mirrored on the aircraft workspace's Defects tab. */}
+                {d.cmcFaultCode ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <span className="font-medium">CMC:</span> <span className="font-mono">{d.cmcFaultCode}</span>
+                  </p>
+                ) : null}
                 {/* D56: occurrence first — it is what starts the MEL clock. Both stamps render
                     through the same D24 lens so they can actually be compared. */}
                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -272,7 +286,10 @@ export default function Defects() {
                 message={cCasMessage} onMessageChange={setCCasMessage}
                 color={cCasColor} onColorChange={setCCasColor}
               />
-              <DefectCmcCodeField label="CMC fault code" value={cDraft.cmcFaultCode ?? ''} onChange={v => setCDraft({ ...cDraft, cmcFaultCode: v.trim() || undefined })} />
+              {/* Store the raw value and normalize once at signing (see `onCorrectionSigned`). Trimming
+                  inside onChange on a CONTROLLED input silently eats the space keystroke, so a code
+                  like "32-3120-04 CH A" is untypeable here while the report dialog accepts it. */}
+              <DefectCmcCodeField label="CMC fault code" value={cDraft.cmcFaultCode ?? ''} onChange={v => setCDraft({ ...cDraft, cmcFaultCode: v || undefined })} />
               <DefectLocationNotesField label="Location notes" className="mt-1" value={cDraft.locationFreetext ?? ''} onChange={v => setCDraft({ ...cDraft, locationFreetext: v || undefined })} />
               {cDraft.attachments?.length ? <p className="text-xs text-muted-foreground">{cDraft.attachments.length} attachment(s) carried over from the original and re-covered by your signature.</p> : null}
             </div>

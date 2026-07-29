@@ -306,8 +306,9 @@ export interface WorkCard {
   campExpected?: CampExpectedItem[]; // expected parts/tools/consumables mirrored from the CAMP WO
   /**
    * LG-98 — where the fix procedure lives, e.g. `AMM 32-30-00`. **Hand-typed (D22).** Nothing in
-   * this build sources it from CAMP; `campExpected` above is the only CAMP-mirrored field on this
-   * card and the two must not be conflated. Free text on purpose: the reference is whatever
+   * this build sources it from CAMP. Do not conflate it with the fields on this card that ARE
+   * CAMP-derived — `woNumber`, `headerStatusCode`, `forecastRef` and `campExpected` — because those
+   * arrive from the vendor and this one is typed by a person. Free text on purpose: the reference is whatever
    * document the tech actually worked to (AMM, CMM, SB), and there is no manual index in the app
    * to validate it against.
    *

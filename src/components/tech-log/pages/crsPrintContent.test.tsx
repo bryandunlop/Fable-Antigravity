@@ -25,8 +25,17 @@ import AircraftDetail from './AircraftDetail';
  * here: it cannot see a three-way fork, because all three forks read the same ledger row. So this
  * spies the renderer and asserts the argument, once per call site.
  *
- * Everything below is asserted at ALL THREE sites deliberately. Adding a CRS field at two of three
- * is the exact failure this file is here to make loud.
+ * WHAT IS AND IS NOT COVERED — read this before trusting the file. The POSITIVE case (an AMM ref and
+ * CMC codes present on the card DO reach the printed sections) is asserted at all three call sites,
+ * because adding a CRS field at two of three is the exact failure this file exists to make loud. The
+ * negative cases (absent fields emit no empty row) are asserted at one site each — they guard the
+ * shared builder in `util/workCardPrint.ts`, which all three call, so repeating them three times
+ * would test the same branch three times.
+ *
+ * NOT covered here, deliberately: the pre-existing drift itself. `AircraftDetail` still omits the
+ * frozen certifying-tech and RII-inspector rows that `Releases` carries. That is booked as vault
+ * LG-111 and was explicitly out of this slice's scope — this file would be the right place to pin it
+ * when it is fixed.
  */
 
 const printSpy = vi.fn<(input: PrintRecordInput) => void>();

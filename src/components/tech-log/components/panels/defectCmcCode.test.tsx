@@ -115,3 +115,42 @@ describe('CMC fault code on the correction (supersede) dialog', () => {
     expect(head.cmcFaultCode).toBe('32-3120-04');
   });
 });
+
+/**
+ * Regression — found by review, reproduced, fixed.
+ *
+ * The correction dialog originally normalized inside `onChange` (`v.trim() || undefined`) on a
+ * CONTROLLED input. Because the trim made the new state equal the old one on a trailing space, React
+ * restored the previous DOM value and the keystroke vanished: a code containing a space was
+ * untypeable HERE while `ReportDefectDialog` — which keeps raw local state and trims once at submit —
+ * accepted it. So the same fact was enterable on one write surface and not the other, and a
+ * correction could not reproduce what the report dialog had captured.
+ *
+ * The fix moves normalization to the signing step. These tests pin both halves: the raw value must
+ * survive typing, and the stored record must still be trimmed.
+ */
+describe('CMC code normalization happens at signing, not per keystroke', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('lets a space be typed into the correction dialog', async () => {
+    const user = renderDefectsPage({ ...DEFECT, cmcFaultCode: undefined });
+    await user.click(screen.getByRole('button', { name: /correct/i }));
+    const input = screen.getByLabelText(/CMC fault code/i);
+    await user.type(input, '32-3120-04 CH A');
+
+    // Pre-fix this was '32-3120-04CHA' — every space keystroke was swallowed.
+    expect(input).toHaveValue('32-3120-04 CH A');
+  });
+
+  it('still trims the stored value, so the signed row carries no stray whitespace', async () => {
+    const user = renderDefectsPage({ ...DEFECT, cmcFaultCode: undefined });
+    await user.click(screen.getByRole('button', { name: /correct/i }));
+    await user.type(screen.getByLabelText(/CMC fault code/i), '  32-3120-04  ');
+    await user.click(screen.getByRole('button', { name: /continue to sign/i }));
+    await user.click(await screen.findByRole('button', { name: 'Sign' }));
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    const head = stored.defects.find((d: Defect) => d.supersedesId === 'd-c1');
+    expect(head.cmcFaultCode).toBe('32-3120-04');
+  });
+});

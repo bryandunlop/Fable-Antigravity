@@ -114,3 +114,24 @@ describe('The narrative renders on both defect surfaces (there is no defect deta
     expect(screen.queryByTestId('symptom-note')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Regression — found by review. `DefectSource` has FIVE members and the first revision special-cased
+ * only `MAREP`, so CABIN, STRUCTURAL and NEF narratives all rendered as "Pilot's account". That put a
+ * false attribution on a signature-covered record, which is the opposite of this component's purpose.
+ * Enumerate, never default-to-pilot.
+ */
+describe('SymptomNote attribution covers every DefectSource', () => {
+  it('never attributes a non-flight-crew narrative to the pilot', () => {
+    for (const source of ['MAREP', 'CABIN', 'STRUCTURAL', 'NEF'] as const) {
+      const { container, unmount } = render(<SymptomNote symptom={NARRATIVE} source={source} />);
+      expect(container.textContent).not.toMatch(/pilot/i);
+      unmount();
+    }
+  });
+
+  it("attributes a PIREP to the pilot, since that is the whole point of the label", () => {
+    render(<SymptomNote symptom={NARRATIVE} source="PIREP" />);
+    expect(screen.getByTestId('symptom-note').textContent).toMatch(/pilot/i);
+  });
+});

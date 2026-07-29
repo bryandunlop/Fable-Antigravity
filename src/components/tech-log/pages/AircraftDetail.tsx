@@ -584,6 +584,13 @@ export default function AircraftDetail() {
                     {/* LG-108: the reporter's own narrative. Same atom as the Defects list — there
                         is no defect detail route, so these two cards ARE the defect detail. */}
                     <SymptomNote symptom={d.symptom} source={d.source} />
+                    {/* LG-99 — read the pilot's CMC code back; see the note on the Defects list. It had
+                        two write surfaces and no reader until this line. */}
+                    {d.cmcFaultCode ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        <span className="font-medium">CMC:</span> <span className="font-mono">{d.cmcFaultCode}</span>
+                      </p>
+                    ) : null}
                     {/* D56: occurrence first — it is what starts the MEL clock if this is deferred. */}
                     <p className="mt-0.5 text-xs text-muted-foreground">Noticed {formatRegulatoryCompact(d.occurredAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)} · reported {formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}{loc ? ` · ${loc}` : ''}</p>
                     {d.attachments?.length ? (
@@ -719,7 +726,13 @@ export default function AircraftDetail() {
                       <Badge variant={w.status === 'COMPLETED' ? 'outline' : w.status === 'IN_WORK' ? 'secondary' : 'destructive'}>{w.status}</Badge>
                     </div>
                     <p className="mt-1">{w.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}
+                      {/* LG-98 — the work-card list is FORKED (this tab and pages/WorkCards.tsx).
+                          The AMM ref landed on the other copy first; both need it, or "which
+                          procedure is this card working to" is answerable on only one screen. */}
+                      {w.ammReference ? ` · ${w.ammReference}` : ''}
+                    </p>
                   </div>
                   <Package className="h-4 w-4 text-muted-foreground" />
                 </CardContent>
