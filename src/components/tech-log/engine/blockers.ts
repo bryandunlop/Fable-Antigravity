@@ -124,13 +124,18 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
   }
 
   // ── deferrals: expired (rule 2), pending its gating release, or in force (rule 4) ──
+  /** A deferral row is *about* a defect, and the defect is what carries the CAS annunciation the
+   *  crew saw (D57) — so the row hands over both. Same tail-scoped current rows rule 1 reads; a
+   *  dangling defectId simply yields undefined and the chip renders nothing. */
+  const linkedDefect = (df: Deferral) => defects.find(d => d.id === df.defectId);
+
   for (const df of deferrals) {
     if (df.status === 'CLEARED') continue;
     const label = melLabel(df);
 
     if (df.status === 'EXPIRED' || expiredDeferral(df)) {
       blockers.push({
-        id: df.id, kind: 'DEFERRAL_EXPIRED', deferral: df,
+        id: df.id, kind: 'DEFERRAL_EXPIRED', deferral: df, defect: linkedDefect(df),
         title: `Deferral overdue — ${label}`,
         dueUtc: df.repairDueDateUtc,
         governingTimezone: df.governingTimezone,
@@ -145,7 +150,7 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
       const needs = [df.mProcedureRequired ? '(M) procedure' : null, df.placardRequired ? 'placard' : null]
         .filter(Boolean).join(' + ');
       blockers.push({
-        id: df.id, kind: 'DEFERRAL_PENDING_PLACARD', deferral: df,
+        id: df.id, kind: 'DEFERRAL_PENDING_PLACARD', deferral: df, defect: linkedDefect(df),
         title: `Awaiting its ${needs || '(M)/placard'} release — ${label}`,
         detail: 'The deferral decision is signed, but the aircraft stays grounded until the gating release is signed.',
         clearsWhen: 'The (M)/placard maintenance release is signed — the deferral then goes ACTIVE.',
@@ -157,7 +162,7 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
     if (df.status === 'ACTIVE') {
       const extendable = df.category !== 'A' && df.category !== 'D' && !df.extensionUsed;
       restrictions.push({
-        id: df.id, kind: 'DEFERRAL_ACTIVE', deferral: df,
+        id: df.id, kind: 'DEFERRAL_ACTIVE', deferral: df, defect: linkedDefect(df),
         title: label,
         dueUtc: df.repairDueDateUtc,
         governingTimezone: df.governingTimezone,

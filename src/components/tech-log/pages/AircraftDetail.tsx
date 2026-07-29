@@ -97,8 +97,9 @@ function BlockerCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">{row.title}</span>
-            {/* D57: only defect-backed rows carry a CAS annunciation; the chip renders nothing
-                for the deferral/check/work-card kinds, so no per-kind conditional is needed. */}
+            {/* D57: defect-backed AND deferral-backed rows carry the defect (a deferred defect's
+                CAS is still what the crew saw); the chip renders nothing for the check/work-card
+                kinds and for a defect with no CAS, so no per-kind conditional is needed. */}
             <CasChip message={row.defect?.casMessage} color={row.defect?.casColor} observed={row.defect?.casObserved} />
             {row.governing && <Badge variant="outline" className="text-xs">why it's {tone === 'warn' ? 'restricted' : 'grounded'}</Badge>}
           </div>

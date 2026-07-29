@@ -78,7 +78,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     id: 'd-n6pg', aircraftId: 'ac-n6pg', source: 'PIREP', ataChapter: melAmber.ataReference,
     description: `${melAmber.title} — intermittent; deferred under MEL ${melAmber.subItemNumber}.`,
     // D57 third state: seen, with no annunciation at all. Not a fifth color — a fact about the
-    // defect, and the reason the OBSERVED chip has its own muted, un-colored treatment.
+    // defect, and the reason the "NO CAS" chip has its own muted, un-colored treatment.
     casObserved: true,
     airworthinessAffecting: true, status: 'DEFERRED',
     reportedByOid: pilot.oid, occurredAtUtc: occN6, reportedAtUtc: filedN6, signatureId: sigDefN6.id,

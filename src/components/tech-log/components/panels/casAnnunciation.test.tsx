@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TechLogProvider } from '../../TechLogContext';
 import { ReportDefectDialog } from './ReportDefectDialog';
@@ -85,7 +85,13 @@ function renderDialog(): { reported: () => Defect | undefined; user: ReturnType<
 }
 
 const pickMode = async (user: ReturnType<typeof userEvent.setup>, name: RegExp) =>
-  user.click(screen.getByRole('radio', { name }));
+  user.click(screen.getByRole('button', { name }));
+
+const modeGroup = () => screen.getByRole('group', { name: /cas annunciation/i });
+const pressedModes = () =>
+  within(modeGroup()).getAllByRole('button')
+    .filter(b => b.getAttribute('aria-pressed') === 'true')
+    .map(b => b.textContent);
 
 const setColor = (color: CasColor) =>
   fireEvent.change(screen.getByLabelText(/cas color/i), { target: { value: color } });
@@ -108,11 +114,39 @@ describe('CAS annunciation in the report-defect form (D57)', () => {
 
   it('defaults to no CAS annunciation, and offers the message input only when asked for', async () => {
     const { user } = renderDialog();
-    expect(screen.getByRole('radio', { name: /^none$/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: /^none$/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByLabelText(/cas color/i)).not.toBeInTheDocument();
 
     await pickMode(user, /cas message/i);
     expect(screen.getByLabelText(/cas color/i)).toBeInTheDocument();
+  });
+
+  /**
+   * The chooser used to be a hand-rolled `role="radiogroup"` of `role="radio"` buttons with no
+   * roving tabindex and no key handler: it announced "radio button, 1 of 3", promised arrow keys,
+   * ignored them, and put all three in the tab order. Pressed toggles carry no such promise — the
+   * same pattern `DisplayZoneToggle` uses in `TechLogShell`.
+   */
+  it('is a pressed-toggle group — no radio semantics whose arrow keys do not exist', () => {
+    renderDialog();
+    const group = modeGroup();
+    expect(within(group).queryAllByRole('radio')).toHaveLength(0);
+    expect(within(group).getAllByRole('button')).toHaveLength(3);
+    for (const b of within(group).getAllByRole('button')) {
+      expect(b).toHaveAttribute('aria-pressed');
+      expect(b).not.toHaveAttribute('role', 'radio');
+    }
+  });
+
+  it('keeps the three modes mutually exclusive — exactly one is pressed at any time', async () => {
+    const { user } = renderDialog();
+    expect(pressedModes()).toEqual(['None']);
+    await pickMode(user, /cas message/i);
+    expect(pressedModes()).toEqual(['CAS message']);
+    await pickMode(user, /observed/i);
+    expect(pressedModes()).toEqual(['Observed (no CAS)']);
+    await pickMode(user, /^none$/i);
+    expect(pressedModes()).toEqual(['None']);
   });
 
   it('records a CAS message with its color, and nothing else', async () => {

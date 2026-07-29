@@ -130,6 +130,14 @@ export const casModeOf = (d: { casMessage?: string; casObserved?: boolean }): Ca
  * D57 — the structured CAS annunciation: a segmented choice between the three states, with the
  * message + color inputs revealed only under "CAS message". Free text this slice; D60/slice 5
  * replaces the input with the CAS catalog picker.
+ *
+ * The three states are **pressed toggles in a `role="group"`**, not a radiogroup — the same pattern
+ * `DisplayZoneToggle` uses in `TechLogShell`. This was a hand-rolled `role="radiogroup"` of
+ * `role="radio"` buttons, which announces "radio button, 1 of 3" and thereby promises arrow-key
+ * navigation and a single tab stop; it had neither a key handler nor roving `tabIndex`, so the
+ * arrow keys did nothing and all three sat in the tab order. `aria-pressed` makes no such promise
+ * and needs no keyboard machinery beyond the button's own. Mutual exclusion is unchanged — it comes
+ * from `mode` being one value, not from the ARIA role.
  */
 export function DefectCasField({ mode, onModeChange, message, onMessageChange, color, onColorChange }: {
   mode: CasMode;
@@ -142,13 +150,12 @@ export function DefectCasField({ mode, onModeChange, message, onMessageChange, c
   return (
     <div className="rounded-md border p-3">
       <Label className="flex items-center gap-1.5"><MonitorDot className="h-3.5 w-3.5" /> CAS annunciation</Label>
-      <div role="radiogroup" aria-label="CAS annunciation" className="mt-2 inline-flex rounded-md border p-0.5">
+      <div role="group" aria-label="CAS annunciation" className="mt-2 inline-flex rounded-md border p-0.5">
         {CAS_MODES.map(o => (
           <button
             key={o.mode}
             type="button"
-            role="radio"
-            aria-checked={mode === o.mode}
+            aria-pressed={mode === o.mode}
             onClick={() => onModeChange(o.mode)}
             className={
               'rounded px-2.5 py-1 text-xs transition-colors ' +

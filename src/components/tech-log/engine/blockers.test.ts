@@ -146,6 +146,36 @@ describe('buildBlockers — every grounding cause is a listed, actionable row', 
     }
   });
 
+  /**
+   * A deferral row is *about* a defect, and the defect is what carries the CAS annunciation the
+   * crew saw (D57). Populating only DEFECT_OPEN made a deferred defect's CAS invisible on the
+   * board — reachable on seed data, where the seeded deferral's defect is `casObserved`.
+   */
+  it('deferral-backed rows carry the linked defect, so its CAS annunciation is renderable', () => {
+    const d = defect({ status: 'DEFERRED', casMessage: 'CABIN TEMP', casColor: 'AMBER' });
+    const expired = deferral({ id: 'df-exp', status: 'ACTIVE', clockStartDateUtc: '2026-06-01T00:00:00Z', repairDueDateUtc: '2026-06-11T03:59:59Z' });
+    const pending = deferral({ id: 'df-pnd', status: 'PENDING_PLACARD', placardRequired: true });
+    const active = deferral({ id: 'df-act', status: 'ACTIVE' });
+
+    for (const df of [expired, pending, active]) {
+      const r = buildBlockers('ac1', { ...empty, defects: [d], deferrals: [df] }, NOW);
+      const row = [...r.blockers, ...r.restrictions].find(x => x.deferral?.id === df.id);
+      expect(row, `no row for ${df.status}`).toBeDefined();
+      expect(row!.defect?.id).toBe('d1');
+      expect(row!.defect?.casMessage).toBe('CABIN TEMP');
+      expect(row!.defect?.casColor).toBe('AMBER');
+    }
+  });
+
+  it('a deferral whose defect is not on this tail leaves defect undefined rather than mismatching', () => {
+    const r = buildBlockers(
+      'ac1',
+      { ...empty, deferrals: [deferral({ defectId: 'gone' })] },
+      NOW,
+    );
+    expect(r.restrictions[0].defect).toBeUndefined();
+  });
+
   it('every blocker states what clears it', () => {
     const r = buildBlockers(
       'ac1',
