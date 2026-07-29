@@ -10,12 +10,21 @@ import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 
 /**
- * The field internals of a defect record, as small shared pieces.
+ * *Some* of the field internals of a defect record, as small shared pieces.
  *
  * Both places that write defect content compose these: `ReportDefectDialog` (a new signed defect)
  * and the correction/supersede dialog on the Defects page (a superseding insert over an existing
  * one). They used to be hand-rolled copies of each other, so every field change had to be made
- * more than once and the copies drifted. A field added or removed here changes both.
+ * more than once and the copies drifted.
+ *
+ * **Shared here — change once, both dialogs follow:** description, symptom, location notes, the
+ * structured-location box, attachments.
+ *
+ * **NOT here — still hand-rolled separately in each dialog:** the aircraft select, and the ATA
+ * chapter select. Changing those means editing `ReportDefectDialog.tsx` *and* the correction
+ * dialog in `pages/Defects.tsx`. Grep before you assume a defect field lives in this file — an
+ * earlier version of this comment claimed everything was shared, which was not true and was one
+ * removed-field away from shipping a dialog bound to a property that no longer existed.
  */
 
 export function DefectDescriptionField({ value, onChange, placeholder }: {

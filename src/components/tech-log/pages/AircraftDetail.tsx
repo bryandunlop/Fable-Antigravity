@@ -550,7 +550,7 @@ export default function AircraftDetail() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">ATA {d.ataChapter}</Badge>
                       <Badge variant={d.status === 'OPEN' ? 'destructive' : d.status === 'DEFERRED' || d.status === 'WATCHLISTED' ? 'secondary' : 'outline'}>{d.status === 'WATCHLISTED' ? 'WATCH' : d.status}</Badge>
-                      <span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span>
+                      <span className="text-xs text-muted-foreground">{d.source}</span>
                     </div>
                     <p className="mt-1 text-sm">{d.description}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">Reported {new Date(d.reportedAtUtc).toLocaleString()}{loc ? ` · ${loc}` : ''}</p>

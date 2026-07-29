@@ -12,8 +12,8 @@ const NOW = '2026-06-21T00:00:00Z';
 function defect(p: Partial<Defect> = {}): Defect {
   return {
     id: 'd1', aircraftId: 'ac1', source: 'PIREP', ataChapter: '24', description: 'x',
-    severity: 'HIGH', airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u',
-    reportedAtUtc: NOW, signatureId: 's', ...p,
+    airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u',
+    occurredAtUtc: NOW, reportedAtUtc: NOW, signatureId: 's', ...p,
   };
 }
 function deferral(p: Partial<Deferral> = {}): Deferral {

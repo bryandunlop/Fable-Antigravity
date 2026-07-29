@@ -38,8 +38,9 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   defects.push({
     id: 'd-n1pg', aircraftId: 'ac-n1pg', source: 'PIREP', ataChapter: '32',
     description: 'Left main landing gear unsafe indication intermittent on retraction.',
-    symptom: 'GEAR amber CAS during climb', severity: 'HIGH', airworthinessAffecting: true,
-    status: 'OPEN', reportedByOid: pilot.oid, reportedAtUtc: iso(3 * H), signatureId: sigN1.id,
+    symptom: 'GEAR amber CAS during climb', airworthinessAffecting: true,
+    status: 'OPEN', reportedByOid: pilot.oid,
+    occurredAtUtc: iso(3 * H), reportedAtUtc: iso(3 * H), signatureId: sigN1.id,
   });
 
   // --- N6PG: AMBER (active deferral mid-clock; Cat C, no (M)/placard -> straight to ACTIVE) ---
@@ -55,8 +56,8 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   defects.push({
     id: 'd-n6pg', aircraftId: 'ac-n6pg', source: 'PIREP', ataChapter: melAmber.ataReference,
     description: `${melAmber.title} — intermittent; deferred under MEL ${melAmber.subItemNumber}.`,
-    severity: 'MEDIUM', airworthinessAffecting: true, status: 'DEFERRED',
-    reportedByOid: pilot.oid, reportedAtUtc: discN6, signatureId: sigDefN6.id,
+    airworthinessAffecting: true, status: 'DEFERRED',
+    reportedByOid: pilot.oid, occurredAtUtc: discN6, reportedAtUtc: discN6, signatureId: sigDefN6.id,
   });
   deferrals.push({
     id: 'df-n6pg', defectId: 'd-n6pg', aircraftId: 'ac-n6pg', melItemId: melAmber.id,
@@ -80,8 +81,9 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   defects.push({
     id: 'd-n2pg', aircraftId: 'ac-n2pg', source: 'PIREP', ataChapter: '79',
     description: 'No. 2 engine magnetic chip detector warning — metal found on inspection, borescope required.',
-    symptom: 'R ENG CHIP CAS in cruise', severity: 'CRITICAL', airworthinessAffecting: true,
-    status: 'OPEN', reportedByOid: pilot.oid, reportedAtUtc: discN2, signatureId: sigN2.id,
+    symptom: 'R ENG CHIP CAS in cruise', airworthinessAffecting: true,
+    status: 'OPEN', reportedByOid: pilot.oid,
+    occurredAtUtc: discN2, reportedAtUtc: discN2, signatureId: sigN2.id,
   });
 
   // ── Historical ledger (for Journey Log realism + Phase-4 analytics). None of this changes the
@@ -137,8 +139,8 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     signatures.push(dSig, rSig);
     defects.push({
       id: `hd-${i}`, aircraftId: acId, source: 'PIREP', ataChapter: ata, description: desc,
-      severity: 'MEDIUM', airworthinessAffecting: true, status: 'RECTIFIED',
-      reportedByOid: pilot.oid, reportedAtUtc: reportedAt, rectificationText: work,
+      airworthinessAffecting: true, status: 'RECTIFIED',
+      reportedByOid: pilot.oid, occurredAtUtc: reportedAt, reportedAtUtc: reportedAt, rectificationText: work,
       clearedByOid: signer.oid, clearedTsUtc: clearedAt, signatureId: dSig.id,
     });
     releases.push({

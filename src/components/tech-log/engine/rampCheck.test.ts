@@ -41,9 +41,10 @@ function deferral(over: Partial<Deferral> = {}): Deferral {
 function defect(over: Partial<Defect> = {}): Defect {
   return {
     id: 'def-1', aircraftId: 'ac-1', source: 'PIREP', ataChapter: '24',
-    description: 'APU generator inoperative', severity: 'MEDIUM',
+    description: 'APU generator inoperative',
     airworthinessAffecting: true, status: 'DEFERRED',
-    reportedByOid: 'oid-1', reportedAtUtc: '2026-07-05T18:00:00Z', signatureId: 'sig-0',
+    reportedByOid: 'oid-1', occurredAtUtc: '2026-07-05T18:00:00Z',
+    reportedAtUtc: '2026-07-05T18:00:00Z', signatureId: 'sig-0',
     ...over,
   };
 }

@@ -149,7 +149,7 @@ export default function WorkQueue() {
           <Section icon={<Inbox className="h-4 w-4" />} title="New squawks — awaiting triage" count={groundingSquawks.length}>
             {groundingSquawks.length === 0 ? empty : groundingSquawks.map(d => (
               <Row key={d.id} next="Defer or fix" onClick={() => open(tailOf(d.aircraftId), '?tab=defects')}>
-                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span></div>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><span className="text-xs text-muted-foreground">{d.source}</span></div>
                 <p className="mt-0.5 truncate">{d.description}</p>
               </Row>
             ))}
@@ -199,7 +199,7 @@ export default function WorkQueue() {
           <Section icon={<Inbox className="h-4 w-4" />} title="Non-airworthiness squawks — awaiting triage" count={otherSquawks.length}>
             {otherSquawks.length === 0 ? empty : otherSquawks.map(d => (
               <Row key={d.id} next="Triage" onClick={() => open(tailOf(d.aircraftId), '?tab=defects')}>
-                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span></div>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><span className="text-xs text-muted-foreground">{d.source}</span></div>
                 <p className="mt-0.5 truncate">{d.description}</p>
               </Row>
             ))}

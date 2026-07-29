@@ -19,7 +19,9 @@ export interface Aircraft {
 
 export type DefectSource = 'PIREP' | 'MAREP' | 'CABIN' | 'STRUCTURAL' | 'NEF';
 export type DefectStatus = 'OPEN' | 'DEFERRED' | 'RECTIFIED' | 'CLOSED' | 'WATCHLISTED';
-export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+/** Annunciator color of a CAS message, as displayed on the flight deck (D57). */
+export type CasColor = 'WHITE' | 'CYAN' | 'AMBER' | 'RED';
 
 /** An attachment is part of the signed payload — its SHA-256 is folded into the content hash (AC 120-78B). */
 export interface Attachment {
@@ -44,16 +46,21 @@ export interface Defect {
   ataSubchapter?: string;
   description: string;
   symptom?: string;
-  eicasMessage?: string;
+  // ── CAS annunciation (D57). `casMessage`+`casColor` and `casObserved` are mutually
+  //    exclusive, and neither is required: a defect can have no CAS aspect at all. ──
+  casMessage?: string;
+  casColor?: CasColor;         // required iff casMessage is set
+  casObserved?: boolean;       // true => observed with no CAS annunciation
+  cmcFaultCode?: string;       // pilot-optional CMC code (LG-99); maintenance codes live on the work card
   // ── structured location (§17.2) ──
   locationKind?: DefectLocationKind;
   cabinSeat?: string;          // LOPA seat, e.g. '12A'
   zoneCode?: string;           // structural zone, e.g. 'WING-L-STA-340'
   locationFreetext?: string;
-  severity: Severity;
   airworthinessAffecting: boolean | null; // null => treated as grounding
   status: DefectStatus;
   reportedByOid: string;
+  occurredAtUtc: string;       // when it was noticed (D56) — distinct from reportedAtUtc (when it was filed)
   reportedAtUtc: string;
   attachments?: Attachment[];  // each attachment's SHA-256 is covered by the signature
   repetitiveDefectGroupId?: string; // §3.1 — set by the repetitive-defect detector

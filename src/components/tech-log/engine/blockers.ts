@@ -114,7 +114,7 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
     blockers.push({
       id: d.id, kind: 'DEFECT_OPEN', defect: d,
       title: `ATA ${d.ataChapter} — ${d.description}`,
-      detail: `${d.severity} · reported via ${d.source}`,
+      detail: `Reported via ${d.source}`,
       clearsWhen: ac?.isProvisional
         ? 'Rectified and released to service (deferrals are blocked on this tail).'
         : 'Rectified and released to service, or deferred under an MEL item.',

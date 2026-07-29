@@ -6,7 +6,7 @@ const ac: Aircraft = { id: 'ac1', tailNumber: 'N1PG', type: 'G650ER', serialNumb
 const NOW = '2026-06-22T12:00:00Z';
 
 function defect(p: Partial<Defect> = {}): Defect {
-  return { id: 'd1', aircraftId: 'ac1', source: 'PIREP', ataChapter: '24', description: 'x', severity: 'HIGH', airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u', reportedAtUtc: NOW, signatureId: 's', ...p };
+  return { id: 'd1', aircraftId: 'ac1', source: 'PIREP', ataChapter: '24', description: 'x', airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u', occurredAtUtc: NOW, reportedAtUtc: NOW, signatureId: 's', ...p };
 }
 function leg(p: Partial<TripLeg> = {}): TripLeg {
   return { id: 'l1', sequence: 1, departureIcao: 'KASE', arrivalIcao: 'KTEB', departureTimeUtc: NOW, arrivalTimeUtc: NOW, fratStatus: 'COMPLETED', fratScore: 12, airportReviewed: true, ...p };

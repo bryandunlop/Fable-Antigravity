@@ -4,7 +4,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { ATA_CHAPTERS, INTENT } from '../../constants';
 import { newId } from '../../util/id';
-import type { Defect, Severity, DefectSource, Attachment, DefectLocationKind } from '../../types';
+import type { Defect, DefectSource, Attachment, DefectLocationKind } from '../../types';
 import { SignCeremonyDialog } from '../SignCeremonyDialog';
 import { DefectDescriptionField, DefectSymptomField, DefectLocationSection, DefectAttachmentsField } from './DefectFields';
 import { Button } from '../../../ui/button';
@@ -46,7 +46,6 @@ export function ReportDefectDialog({
   const [pendingDefectId, setPendingDefectId] = useState('');
   const [tail, setTail] = useState(lockTail ?? prefill?.tail ?? dispatchable[0]?.tailNumber ?? '');
   const [ata, setAta] = useState(prefill?.ata ?? '32');
-  const [severity, setSeverity] = useState<Severity>('HIGH');
   const [description, setDescription] = useState(prefill?.description ?? '');
   const [symptom, setSymptom] = useState(prefill?.symptom ?? '');
   const [locKind, setLocKind] = useState<DefectLocationKind>('OTHER');
@@ -60,7 +59,6 @@ export function ReportDefectDialog({
     if (!open) return;
     setTail(lockTail ?? prefill?.tail ?? dispatchable[0]?.tailNumber ?? '');
     setAta(prefill?.ata ?? '32');
-    setSeverity('HIGH');
     setDescription(prefill?.description ?? '');
     setSymptom(prefill?.symptom ?? '');
     setLocKind('OTHER'); setCabinSeat(''); setZoneCode(''); setLocFreetext('');
@@ -80,20 +78,24 @@ export function ReportDefectDialog({
   const onSigned = (sig: { id: string }) => {
     const ac = state.aircraft.find(a => a.tailNumber === tail)!;
     const source: DefectSource = isMaint ? 'MAREP' : 'PIREP';
+    // Slice 1a: occurrence defaults to the filing instant. Slice 1b replaces this with a
+    // back-datable OccurredAtField — until then the two stamps are deliberately identical.
+    const filedAtUtc = new Date().toISOString();
     const defect: Defect = {
       id: pendingDefectId, aircraftId: ac.id, source, ataChapter: ata,
-      description: description.trim(), symptom: symptom.trim() || undefined, severity,
+      description: description.trim(), symptom: symptom.trim() || undefined,
       locationKind: locKind,
       cabinSeat: locKind === 'CABIN' ? cabinSeat.trim() || undefined : undefined,
       zoneCode: locKind === 'STRUCTURAL' ? zoneCode.trim() || undefined : undefined,
       locationFreetext: locFreetext.trim() || undefined,
       attachments: attachments.length ? attachments : undefined,
       airworthinessAffecting: null,
-      status: 'OPEN', reportedByOid: user.oid, reportedAtUtc: new Date().toISOString(), signatureId: sig.id,
+      status: 'OPEN', reportedByOid: user.oid,
+      occurredAtUtc: filedAtUtc, reportedAtUtc: filedAtUtc, signatureId: sig.id,
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig as any });
     dispatch({ type: 'ADD_DEFECT', payload: defect });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFECT_REPORTED', entityType: 'Defect', entityId: defect.id, atUtc: defect.reportedAtUtc, summary: `${source} ${tail} ATA ${ata} — ${severity}${attachments.length ? ` · ${attachments.length} attachment(s)` : ''}` } });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFECT_REPORTED', entityType: 'Defect', entityId: defect.id, atUtc: defect.reportedAtUtc, summary: `${source} ${tail} ATA ${ata}${attachments.length ? ` · ${attachments.length} attachment(s)` : ''}` } });
     onOpenChange(false);
     toast.success(`Defect logged on ${tail} — aircraft now grounded (RED) pending maintenance triage.`);
     onReported?.(defect);
@@ -129,18 +131,7 @@ export function ReportDefectDialog({
               </div>
             </div>
             <DefectDescriptionField value={description} onChange={setDescription} placeholder="What was observed?" />
-            <div className="grid grid-cols-2 gap-3">
-              <DefectSymptomField label="Symptom / CAS (optional)" value={symptom} onChange={setSymptom} placeholder="e.g. GEAR amber CAS" />
-              <div>
-                <Label>Severity</Label>
-                <Select value={severity} onValueChange={(v: string) => setSeverity(v as Severity)}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as Severity[]).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <DefectSymptomField label="Symptom / CAS (optional)" value={symptom} onChange={setSymptom} placeholder="e.g. GEAR amber CAS" />
 
             <DefectLocationSection
               locKind={locKind} onLocKindChange={setLocKind}

@@ -15,7 +15,7 @@ import { DefectDescriptionField, DefectSymptomField, DefectLocationNotesField } 
 import { WatchlistDialog, EscalateWatchDialog } from '../components/panels/WatchlistPanel';
 import { ATA_CHAPTERS, INTENT } from '../constants';
 import { newId } from '../util/id';
-import type { Defect, Severity } from '../types';
+import type { Defect } from '../types';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -152,7 +152,7 @@ export default function Defects() {
                   <Badge variant={STATUS_VARIANT[d.status]}>{d.status === 'WATCHLISTED' ? <><Eye className="mr-1 h-3 w-3" />WATCH</> : d.status}</Badge>
                   {rep && <Badge variant="destructive" title={`Repeat ${rep.index} of ${rep.count} — same ATA on this aircraft`}><Repeat className="mr-1 h-3 w-3" />repeat ×{rep.count}</Badge>}
                   {d.attachments?.length ? <Badge variant="outline"><Paperclip className="mr-1 h-3 w-3" />{d.attachments.length}</Badge> : null}
-                  <span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span>
+                  <span className="text-xs text-muted-foreground">{d.source}</span>
                 </div>
                 <p className="mt-1 text-sm">{d.description}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -224,21 +224,12 @@ export default function Defects() {
           </DialogHeader>
           {cDraft && (
             <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>ATA chapter</Label>
-                  <Select value={cDraft.ataChapter} onValueChange={(v: string) => setCDraft({ ...cDraft, ataChapter: v })}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>{ATA_CHAPTERS.map(c => <SelectItem key={c.code} value={c.code}>{c.code} · {c.title}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Severity</Label>
-                  <Select value={cDraft.severity} onValueChange={(v: string) => setCDraft({ ...cDraft, severity: v as Severity })}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>{(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as Severity[]).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label>ATA chapter</Label>
+                <Select value={cDraft.ataChapter} onValueChange={(v: string) => setCDraft({ ...cDraft, ataChapter: v })}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>{ATA_CHAPTERS.map(c => <SelectItem key={c.code} value={c.code}>{c.code} · {c.title}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
               <DefectDescriptionField value={cDraft.description} onChange={v => setCDraft({ ...cDraft, description: v })} />
               <DefectSymptomField value={cDraft.symptom ?? ''} onChange={v => setCDraft({ ...cDraft, symptom: v || undefined })} />

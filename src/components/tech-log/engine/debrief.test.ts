@@ -4,9 +4,10 @@ import type { Defect, LaborEntry, WorkCard } from '../types';
 
 const defect = (over: Partial<Defect> = {}): Defect => ({
   id: 'def-1', aircraftId: 'ac-1', source: 'PIREP', ataChapter: '24',
-  description: 'Main battery will not hold charge', severity: 'HIGH',
+  description: 'Main battery will not hold charge',
   airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'p1',
-  reportedAtUtc: '2026-07-07T08:00:00.000Z', signatureId: 'sig-1', ...over,
+  occurredAtUtc: '2026-07-07T08:00:00.000Z', reportedAtUtc: '2026-07-07T08:00:00.000Z',
+  signatureId: 'sig-1', ...over,
 });
 
 const card = (over: Partial<WorkCard> = {}): WorkCard => ({

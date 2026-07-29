@@ -12,9 +12,10 @@ const NOW = '2026-07-13T00:00:00Z';
 const defect = (over: Partial<Defect> = {}): Defect =>
   ({
     id: 'd1', aircraftId: 'ac1', source: 'PIREP', ataChapter: '32',
-    description: 'LMLG unsafe indication', severity: 'HIGH',
+    description: 'LMLG unsafe indication',
     airworthinessAffecting: true, status: 'OPEN',
-    reportedByOid: 'USR001', reportedAtUtc: '2026-07-11T00:00:00Z', signatureId: 'sig1',
+    reportedByOid: 'USR001',
+    occurredAtUtc: '2026-07-11T00:00:00Z', reportedAtUtc: '2026-07-11T00:00:00Z', signatureId: 'sig1',
     ...over,
   }) as Defect;
 
@@ -41,24 +42,32 @@ describe('buildDefectFirSuggestions', () => {
     expect(out[0].reason).toMatch(/grounded/i);
   });
 
-  it('suggests a CRITICAL grounding defect even below the downtime threshold', () => {
-    const fresh = defect({ severity: 'CRITICAL', reportedAtUtc: '2026-07-12T23:00:00Z' }); // 1 h old
+  // D55 removed Defect.severity; the immediate-escalation trigger is now the RED CAS
+  // annunciation (D57). The behavior these two assert is unchanged: the most urgent tier of
+  // grounding defect nudges straight away, a routine one waits for the downtime threshold.
+  it('suggests a RED-CAS grounding defect even below the downtime threshold', () => {
+    const fresh = defect({ casMessage: 'L ENG FIRE', casColor: 'RED', reportedAtUtc: '2026-07-12T23:00:00Z' }); // 1 h old
     const out = buildDefectFirSuggestions(slice([fresh]), [], [], cfg, NOW);
     expect(out).toHaveLength(1);
     expect(out[0].reason).toMatch(/critical/i);
   });
 
-  it('does not suggest a short, non-critical downtime', () => {
-    const fresh = defect({ severity: 'MEDIUM', reportedAtUtc: '2026-07-12T22:00:00Z' }); // 2 h
+  it('does not suggest a short, non-urgent downtime', () => {
+    const fresh = defect({ casMessage: 'CABIN TEMP', casColor: 'AMBER', reportedAtUtc: '2026-07-12T22:00:00Z' }); // 2 h
+    expect(buildDefectFirSuggestions(slice([fresh]), [], [], cfg, NOW)).toHaveLength(0);
+  });
+
+  it('does not suggest a short downtime with no CAS annunciation at all', () => {
+    const fresh = defect({ casObserved: true, reportedAtUtc: '2026-07-12T22:00:00Z' }); // 2 h
     expect(buildDefectFirSuggestions(slice([fresh]), [], [], cfg, NOW)).toHaveLength(0);
   });
 
   it('only OPEN grounding defects trigger — deferred, watchlisted, rectified, closed, non-grounding, superseded all skip', () => {
-    const nonGrounding = defect({ id: 'd2', airworthinessAffecting: false, severity: 'CRITICAL' });
+    const nonGrounding = defect({ id: 'd2', airworthinessAffecting: false, casColor: 'RED' });
     const rectified = defect({ id: 'd3', status: 'RECTIFIED' });
     const closed = defect({ id: 'd4', status: 'CLOSED' });
-    const deferred = defect({ id: 'd7', status: 'DEFERRED', severity: 'CRITICAL' }); // dispatchable — not AOG
-    const watchlisted = defect({ id: 'd8', status: 'WATCHLISTED', severity: 'CRITICAL' }); // serviceability-neutral
+    const deferred = defect({ id: 'd7', status: 'DEFERRED', casColor: 'RED' }); // dispatchable — not AOG
+    const watchlisted = defect({ id: 'd8', status: 'WATCHLISTED', casColor: 'RED' }); // serviceability-neutral
     const oldRow = defect({ id: 'd5' });
     const newRow = defect({ id: 'd6', supersedesId: 'd5' }); // d5 is superseded by d6
     const out = buildDefectFirSuggestions(
