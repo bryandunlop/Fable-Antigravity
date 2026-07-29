@@ -95,6 +95,91 @@ Two residual races remain, and both need handling regardless:
 So the broadcast must promise an *offer*, not a seat, and the claim flow must be able to
 fail gracefully at the final write. Design that state in from the start.
 
+## CRM: façade over read-through, not a mirror
+
+**Context:** myairops has its own booking portal. The plan is to use it in the interim while
+their APIs mature, then replace it with ours. That interim — **both portals live at once** —
+is what decides the CRM strategy.
+
+**Recommendation: put our skin on top of CRM and read through. Do not mirror passenger data.**
+This is the opposite of the trips/legs decision, and the difference is not inconsistency:
+the two have genuinely different constraints.
+
+| | CRM (passengers, contacts, documents) | Booking (trips, legs, seats) |
+| --- | --- | --- |
+| Strategy | **Read-through façade** | **Mirror** |
+| Why | Two portals write concurrently; no change feed to reconcile a mirror | Empty-seat search is impossible live (1+N per query, no filters) |
+| Cost of a full read | **One call** — see below | Trip enumeration + one call per trip |
+| PII retention exposure | None on our side | N/A |
+
+### Read-through is cheap here — one call gets everything
+
+`GET /api/Contact/{id}` returns `ContactModel`, which **embeds** `addresses`,
+`contactMethods`, `idDocuments` (each with its `visas`), `executiveAssistants`,
+`executives`, `contactNotes`, `passengerNotes`, `crew` and `passenger`. A complete passenger
+profile — including travel documents — is a single request, not the four-plus-N I first
+assumed.
+
+The gap is batching: `GET /api/Contact` takes only `searchString` / `skip` / `limit`, so a
+12-passenger manifest is 12 parallel calls rather than one. Small N, tolerable, but it is why
+rate limits (ASK 6) matter more in this design.
+
+### Why a mirror would be actively wrong during the interim
+
+While both portals are live, **both write to CRM**. A mirror would have two writers and — with
+no webhook and no `modifiedSince` filter (ASK 3) — no way to reconcile drift except a full
+re-scan and diff. Read-through cannot drift: whatever their portal did, ours sees on the next
+request. The dual-portal period is precisely when mirroring is most dangerous.
+
+It also makes cutover free. When we retire their portal we stop pointing people at it —
+there is no data migration and no divergent mirror to reconcile.
+
+### Façade, not proxy — three jobs it must do
+
+A thin pass-through would be the failure mode: it puts the vendor's data model straight into
+our UI and builds nothing reusable. Our layer must:
+
+1. **Apply the confidentiality projection server-side.** Never expose a generic CRM
+   pass-through endpoint — someone will call it directly and bypass the masking that ASK 12
+   made entirely our responsibility.
+2. **Hold our workflow state locally.** Form submission, scheduling approval, rejection
+   reasons, currency status and expiry flags have no home in myairops. The clean split:
+   **we own process state, myairops owns record state.** Key our workflow rows by
+   `externalReference`, not by a copy of the passenger.
+3. **Enforce our validation before writing through** — form currency, the expiry block/flag
+   rules, lockout windows.
+
+### Risks accepted
+
+- **Availability coupling.** CRM down means our passenger views are down. Acceptable for a
+  booking portal; reconsider for a day-of-travel passenger app, which may justify a
+  short-TTL cache of just the documents for that trip — a cache, explicitly not a mirror,
+  and never authoritative.
+- **Our server holds an unscoped full-write CRM key** and now stands between a portal user
+  and `DELETE /api/Contact/...`. The capability guard matters *more* in this design, not
+  less, and **ASK 1 (scoped keys) becomes more urgent, not less.**
+
+### Bonus: their role model may already cover what we planned to build by hand
+
+`ContactModel` carries flags that map onto the manual role assignment described below:
+
+```
+isTripApprover, isTripRequestor, isBillingContact, isPassenger, isEmployee, isCrew,
+enabledForPersonalUse, securityConsideration, controlEmployee, subjectToSEA1934,
+externalReference, employeeId, defaultCostCentre
+```
+
+Three worth noting. `securityConsideration` is a per-contact VIP flag — a candidate input to
+the confidentiality projection, though **not** a substitute for it, since it does not hide
+anything on the vendor side. `enabledForPersonalUse` alongside `controlEmployee` and
+`subjectToSEA1934` suggests myairops already models the personal-use and securities-law
+dimension that the empty-seat `deadheadTax*` fields imply — worth understanding before we
+invent our own.
+
+> **Before building a parallel role model, check these.** Reusing vendor fields keeps the
+> source-of-truth rule intact and avoids two role systems disagreeing about who may approve
+> a trip.
+
 ## Passenger identity and the EA relationship
 
 **Decided:** eligibility is a manual process owned by scheduling. A passenger is attached as
