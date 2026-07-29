@@ -1,7 +1,9 @@
-import { useRef, type Dispatch, type SetStateAction } from 'react';
-import { Paperclip, Camera, MapPin, X } from 'lucide-react';
+import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { Paperclip, Camera, MapPin, X, Clock } from 'lucide-react';
 import { mockSha256 } from '../../engine/signing';
 import { newId } from '../../util/id';
+import { ENTRY_ZONE_OPTIONS, entryZone, utcFromWallTime, wallTimeFromUtc, type EntryZoneMode } from '../../util/entryZone';
+import { formatRegulatoryLabel } from '../../util/displayZone';
 import type { Attachment, DefectLocationKind } from '../../types';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
@@ -17,8 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
  * one). They used to be hand-rolled copies of each other, so every field change had to be made
  * more than once and the copies drifted.
  *
- * **Shared here — change once, both dialogs follow:** description, symptom, location notes, the
- * structured-location box, attachments.
+ * **Shared here — change once, both dialogs follow:** description, symptom, occurrence timestamp,
+ * location notes, the structured-location box, attachments.
  *
  * **NOT here — still hand-rolled separately in each dialog:** the aircraft select, and the ATA
  * chapter select. Changing those means editing `ReportDefectDialog.tsx` *and* the correction
@@ -50,6 +52,57 @@ export function DefectSymptomField({ value, onChange, label = 'Symptom / CAS', p
     <div>
       <Label>{label}</Label>
       <Input className="mt-1" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
+/**
+ * D56 — when the problem was *noticed*, which is not when the report is *filed*. Defaults to now and
+ * is back-datable, because a defect seen at 2330Z and written up the next morning otherwise starts
+ * its MEL repair clock a full calendar day late (`DeferralCreatePanel` defaults the PL-25 day of
+ * discovery from this value).
+ *
+ * The digits are typed in one of three zones — UTC, Eastern, or the device's own — and stored as a
+ * UTC instant. Switching the zone is a LENS, not a re-interpretation: the stored instant is
+ * unchanged and the digits re-render, mirroring how `displayZone.ts` treats the same instant on the
+ * read side. The UTC readback under the field makes that unambiguous.
+ */
+export function OccurredAtField({ valueUtc, onChange }: {
+  valueUtc: string;
+  onChange: (utcIso: string) => void;
+}) {
+  const [mode, setMode] = useState<EntryZoneMode>('UTC');
+  const zone = entryZone(mode);
+
+  return (
+    <div>
+      <Label htmlFor="defect-occurred-at" className="flex items-center gap-1.5">
+        <Clock className="h-3.5 w-3.5" /> When was it noticed?
+      </Label>
+      <div className="mt-1 flex gap-2">
+        <Input
+          id="defect-occurred-at"
+          type="datetime-local"
+          value={wallTimeFromUtc(valueUtc, zone)}
+          onChange={e => {
+            // A half-typed value parses to null; keep the last good instant rather than storing junk.
+            const utc = utcFromWallTime(e.target.value, zone);
+            if (utc) onChange(utc);
+          }}
+        />
+        <select
+          aria-label="Occurrence entry timezone"
+          className="rounded-md border bg-background px-2 py-1 text-sm"
+          value={mode}
+          onChange={e => setMode(e.target.value as EntryZoneMode)}
+        >
+          {ENTRY_ZONE_OPTIONS.map(o => <option key={o.mode} value={o.mode}>{o.label}</option>)}
+        </select>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Stored as {formatRegulatoryLabel(valueUtc, 'UTC', 'UTC')}. Back-date it if the problem was seen
+        earlier — this, not the filing time, starts the MEL repair clock if the defect is deferred.
+      </p>
     </div>
   );
 }

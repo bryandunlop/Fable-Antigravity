@@ -6,7 +6,7 @@ import { ATA_CHAPTERS, INTENT } from '../../constants';
 import { newId } from '../../util/id';
 import type { Defect, DefectSource, Attachment, DefectLocationKind } from '../../types';
 import { SignCeremonyDialog } from '../SignCeremonyDialog';
-import { DefectDescriptionField, DefectSymptomField, DefectLocationSection, DefectAttachmentsField } from './DefectFields';
+import { DefectDescriptionField, DefectSymptomField, DefectLocationSection, DefectAttachmentsField, OccurredAtField } from './DefectFields';
 import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../ui/dialog';
@@ -48,6 +48,9 @@ export function ReportDefectDialog({
   const [ata, setAta] = useState(prefill?.ata ?? '32');
   const [description, setDescription] = useState(prefill?.description ?? '');
   const [symptom, setSymptom] = useState(prefill?.symptom ?? '');
+  // D56: when it was NOTICED. Defaults to now and is back-datable; the filing stamp is taken
+  // separately at signing.
+  const [occurredAtUtc, setOccurredAtUtc] = useState(() => new Date().toISOString());
   const [locKind, setLocKind] = useState<DefectLocationKind>('OTHER');
   const [cabinSeat, setCabinSeat] = useState('');
   const [zoneCode, setZoneCode] = useState('');
@@ -61,6 +64,7 @@ export function ReportDefectDialog({
     setAta(prefill?.ata ?? '32');
     setDescription(prefill?.description ?? '');
     setSymptom(prefill?.symptom ?? '');
+    setOccurredAtUtc(new Date().toISOString());
     setLocKind('OTHER'); setCabinSeat(''); setZoneCode(''); setLocFreetext('');
     setAttachments([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,6 +75,13 @@ export function ReportDefectDialog({
 
   const beginSign = () => {
     if (!tail || !description.trim()) return toast.error('Aircraft and description are required.');
+    // D56: a future occurrence would push the MEL repair clock into the future, so reject it. One
+    // minute of slack covers the current minute plus ordinary device-clock skew. (The field itself
+    // can never be emptied — a half-typed value leaves the last good instant in place — so "required"
+    // needs no separate check.)
+    if (new Date(occurredAtUtc).getTime() > Date.now() + 60_000) {
+      return toast.error('The occurrence time cannot be in the future.');
+    }
     setPendingDefectId(newId('def'));
     setSignOpen(true);
   };
@@ -78,8 +89,8 @@ export function ReportDefectDialog({
   const onSigned = (sig: { id: string }) => {
     const ac = state.aircraft.find(a => a.tailNumber === tail)!;
     const source: DefectSource = isMaint ? 'MAREP' : 'PIREP';
-    // Slice 1a: occurrence defaults to the filing instant. Slice 1b replaces this with a
-    // back-datable OccurredAtField — until then the two stamps are deliberately identical.
+    // D56: two distinct stamps. `occurredAtUtc` is user-entered (when it was noticed, back-datable);
+    // this is the filing stamp, taken at the moment of signature.
     const filedAtUtc = new Date().toISOString();
     const defect: Defect = {
       id: pendingDefectId, aircraftId: ac.id, source, ataChapter: ata,
@@ -91,7 +102,7 @@ export function ReportDefectDialog({
       attachments: attachments.length ? attachments : undefined,
       airworthinessAffecting: null,
       status: 'OPEN', reportedByOid: user.oid,
-      occurredAtUtc: filedAtUtc, reportedAtUtc: filedAtUtc, signatureId: sig.id,
+      occurredAtUtc, reportedAtUtc: filedAtUtc, signatureId: sig.id,
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig as any });
     dispatch({ type: 'ADD_DEFECT', payload: defect });
@@ -132,6 +143,8 @@ export function ReportDefectDialog({
             </div>
             <DefectDescriptionField value={description} onChange={setDescription} placeholder="What was observed?" />
             <DefectSymptomField label="Symptom / CAS (optional)" value={symptom} onChange={setSymptom} placeholder="e.g. GEAR amber CAS" />
+
+            <OccurredAtField valueUtc={occurredAtUtc} onChange={setOccurredAtUtc} />
 
             <DefectLocationSection
               locKind={locKind} onLocKindChange={setLocKind}

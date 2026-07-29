@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FilePlus, Flag, Wrench, CheckCircle2, Paperclip, Repeat, Pencil, Eye, TriangleAlert } from 'lucide-react';
-import { useTechLog, useCurrentUser } from '../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
+import { formatRegulatoryCompact } from '../util/displayZone';
+import { DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { useIntegration } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
 import { currentRows } from '../engine/supersede';
@@ -31,6 +33,7 @@ export default function Defects() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { state, dispatch } = useTechLog();
+  const { displayZone } = useDisplayZone();
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
   const integration = useIntegration();
@@ -155,8 +158,12 @@ export default function Defects() {
                   <span className="text-xs text-muted-foreground">{d.source}</span>
                 </div>
                 <p className="mt-1 text-sm">{d.description}</p>
+                {/* D56: occurrence first — it is what starts the MEL clock. Both stamps render
+                    through the same D24 lens so they can actually be compared. */}
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Reported {new Date(d.reportedAtUtc).toLocaleString()}{loc ? ` · ${loc}` : ''}
+                  Noticed {formatRegulatoryCompact(d.occurredAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}
+                  {' · reported '}{formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}
+                  {loc ? ` · ${loc}` : ''}
                 </p>
                 {d.attachments?.length ? (
                   <div className="mt-2 flex flex-wrap gap-2">

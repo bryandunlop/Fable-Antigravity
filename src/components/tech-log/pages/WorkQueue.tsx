@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Inbox, AlertTriangle, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck, Eye } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
 import { formatRegulatoryCompact } from '../util/displayZone';
+import { DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { currentRows } from '../engine/supersede';
 import { buildWorkQueue } from '../engine/workqueue';
 import { deriveServiceability } from '../engine/serviceability';
@@ -59,7 +60,9 @@ export default function WorkQueue() {
                     <Badge variant={STATUS_VARIANT[d.status]}>{d.status === 'OPEN' ? 'AWAITING TRIAGE' : d.status === 'DEFERRED' ? 'DEFERRED (MEL)' : d.status === 'RECTIFIED' ? 'RECTIFIED' : d.status}</Badge>
                   </div>
                   <p className="mt-1">{d.description}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Reported {new Date(d.reportedAtUtc).toLocaleString()}</p>
+                  {/* D56: the triage queue is where a defect gets deferred, so the occurrence time —
+                      the instant that seeds the PL-25 clock — has to be visible here. */}
+                  <p className="mt-0.5 text-xs text-muted-foreground">Noticed {formatRegulatoryCompact(d.occurredAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)} · reported {formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </CardContent>

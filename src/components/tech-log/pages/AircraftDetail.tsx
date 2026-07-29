@@ -522,7 +522,9 @@ export default function AircraftDetail() {
           {inline && inline.kind === 'defer' && (() => { const d = allDefects.find(x => x.id === inline.id); return d ? (
             <div className="rounded-lg border-2 border-primary/40 p-3">
               <div className="mb-2 text-sm font-medium">Defer ATA {d.ataChapter} — {d.description}</div>
-              <DeferralCreatePanel defect={d} onCancel={() => setInline(null)}
+              {/* keyed by defect: the panel seeds regulatory state (D56 day of discovery) from the
+                  prop at mount, so a different defect must get a fresh panel, not the last one's. */}
+              <DeferralCreatePanel key={d.id} defect={d} onCancel={() => setInline(null)}
                 onDone={(deferral) => { if (deferral.status === 'PENDING_PLACARD') { toast.warning('Pending (M)/placard — sign the gating release to dispatch.'); setInline({ kind: 'gating', id: deferral.id }); } else { toast.success(`${ac.tailNumber} dispatchable under MEL (AMBER).`); setInline(null); } }} />
             </div>
           ) : null; })()}
@@ -553,7 +555,8 @@ export default function AircraftDetail() {
                       <span className="text-xs text-muted-foreground">{d.source}</span>
                     </div>
                     <p className="mt-1 text-sm">{d.description}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Reported {new Date(d.reportedAtUtc).toLocaleString()}{loc ? ` · ${loc}` : ''}</p>
+                    {/* D56: occurrence first — it is what starts the MEL clock if this is deferred. */}
+                    <p className="mt-0.5 text-xs text-muted-foreground">Noticed {formatRegulatoryCompact(d.occurredAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)} · reported {formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}{loc ? ` · ${loc}` : ''}</p>
                     {d.attachments?.length ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {d.attachments.filter(a => a.uri.startsWith('data:')).map(a => (

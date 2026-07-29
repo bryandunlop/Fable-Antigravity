@@ -5,6 +5,7 @@ import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../../engine/pl25';
 import { GOVERNING_ZONE_OPTIONS, isOverride, validateGoverningOverride } from '../../util/governingZone';
 import { formatRegulatoryCompact } from '../../util/displayZone';
+import { utcFromWallTime, wallTimeFromUtc } from '../../util/entryZone';
 import { canDeferDefect } from '../../engine/disposition';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
@@ -54,6 +55,10 @@ export function DeferralCreatePanel({
   const [governingZone, setGoverningZone] = useState(DEFAULT_GOVERNING_TIMEZONE);
   const [overrideReason, setOverrideReason] = useState('');
   const [showOverride, setShowOverride] = useState(false);
+  // D56: the PL-25 day of discovery defaults to when the defect was NOTICED, not to now — a defect
+  // seen at 2330Z and written up the next morning would otherwise start its clock a day late.
+  // Maintenance can still adjust it here, before signing; after signing the deferral is immutable.
+  const [dayOfDiscoveryUtc, setDayOfDiscoveryUtc] = useState(defect.occurredAtUtc);
 
   const melMatches = useMemo(() => {
     if (!aircraft) return [];
@@ -72,14 +77,14 @@ export function DeferralCreatePanel({
   // effect of an override before signing. Advisory only (the real clock is re-stamped at signing).
   const clockPreview = useMemo(() => {
     if (!selectedMel) return null;
-    const cs = computeClockStart(new Date().toISOString(), governingZone);
+    const cs = computeClockStart(dayOfDiscoveryUtc, governingZone);
     const due = dueFromCategory(selectedMel, cs, { hours: 0, cycles: 0 }, governingZone);
     return {
       start: formatRegulatoryCompact(cs, 'GOVERNING', governingZone),
       due: due.repairDueDateUtc ? formatRegulatoryCompact(due.repairDueDateUtc, 'GOVERNING', governingZone) : null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMelId, governingZone]);
+  }, [selectedMelId, governingZone, dayOfDiscoveryUtc]);
 
   if (!aircraft) return null;
 
@@ -100,6 +105,11 @@ export function DeferralCreatePanel({
     if (!canDeferDefect(user, selectedMel)) return toast.error('You are not authorized to defer this MEL item.');
     const ovr = validateGoverningOverride(governingZone, overrideReason);
     if (!ovr.ok) return toast.error(ovr.error!);
+    // D56: a future day of discovery would push the whole repair clock forward — almost certainly a
+    // mistyped year in the adjust field, never a real adjustment. Same guard as the report form.
+    if (new Date(dayOfDiscoveryUtc).getTime() > Date.now() + 60_000) {
+      return toast.error('The day of discovery cannot be in the future.');
+    }
     setPendingDeferralId(newId('df'));
     setSignOpen(true);
   };
@@ -110,8 +120,10 @@ export function DeferralCreatePanel({
     // D24: anchor the PL-25 clock to the governing zone (Eastern default, or a per-deferral override
     // to the aircraft operating-local zone). The stored governingTimezone must be the same zone the
     // clock was computed under; an override also records its reason.
+    // D56: the clock is fed the day of discovery (defaulted from the defect's occurrence, possibly
+    // adjusted above) — NOT `now`, which is when the deferral happens to be signed.
     const zone = governingZone;
-    const clockStart = computeClockStart(now, zone);
+    const clockStart = computeClockStart(dayOfDiscoveryUtc, zone);
     const airframe = { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles };
     const due = dueFromCategory(selectedMel, clockStart, airframe, zone);
     const mProcedureRequired = !!selectedMel.mProcedure?.trim();
@@ -127,7 +139,7 @@ export function DeferralCreatePanel({
       melSubItemNumber: selectedMel.subItemNumber, melTitle: selectedMel.title,
       // TL-16: the (O) procedure too — it decides whether the PIC must acknowledge this item.
       melOProcedure: selectedMel.oProcedure,
-      category: selectedMel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: clockStart,
+      category: selectedMel.category, dayOfDiscoveryUtc, clockStartDateUtc: clockStart,
       governingTimezone: zone,
       governingTimezoneOverrideReason: isOverride(zone) ? overrideReason.trim() : undefined,
       repairDueDateUtc: due.repairDueDateUtc, repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
@@ -226,6 +238,27 @@ export function DeferralCreatePanel({
                     )}
                   </div>
                 )}
+                {/* D56: defaulted from the defect's occurrence, shown as wall-clock digits in the
+                    governing zone (the zone the PL-25 calendar day is actually read in), and
+                    adjustable until the deferral is signed. */}
+                <div className="mt-2">
+                  <label className="text-xs font-medium" htmlFor="deferral-day-of-discovery">Day of discovery</label>
+                  <Input
+                    id="deferral-day-of-discovery"
+                    type="datetime-local"
+                    className="mt-1"
+                    value={wallTimeFromUtc(dayOfDiscoveryUtc, governingZone)}
+                    onChange={e => {
+                      const utc = utcFromWallTime(e.target.value, governingZone);
+                      if (utc) setDayOfDiscoveryUtc(utc);
+                    }}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {dayOfDiscoveryUtc === defect.occurredAtUtc
+                      ? 'Defaulted from when the defect was noticed. Adjust if maintenance establishes a different discovery time.'
+                      : 'Adjusted — no longer the reported occurrence time.'}
+                  </p>
+                </div>
                 {clockPreview && (
                   <p className="mt-2 text-xs text-muted-foreground">clock starts {clockPreview.start}{clockPreview.due ? ` · repair due ${clockPreview.due}` : ' · usage-based'}</p>
                 )}
