@@ -165,10 +165,13 @@ finding out from a phone call. Worth asking for the scope now even if we build i
 > aircraft availability and a first-class activity concept that changes where several
 > capabilities should live.
 
-> ### C2. Attachments API — full OpenAPI/Swagger document
-> Gates the ForeFlight document sync entirely. There are **zero** document endpoints in
-> Booking, CRM or MX, so trip sheets and EAPIS documents are unreachable today. Need **read**
-> (fetch generated documents) and probably **write** (attach our own documents to a trip).
+> ### C2. Attachments API — full OpenAPI/Swagger document *(nice-to-have, not a blocker)*
+> There are **zero** document endpoints in Booking, CRM or MX, so documents are unreachable
+> through the APIs we hold. But the document plan no longer depends on this: scheduling
+> downloads documents and uploads them to myGFO, which becomes the document store and drives
+> the ForeFlight sync. The Attachments API would let us **automate that download** — worth
+> having, but it gates nothing. Need **read** (fetch generated documents) and possibly
+> **write** (attach our documents to a trip).
 
 > ### C3. Auth model for both
 > Same `x-api-key`, or the Bearer/OAuth2 model used by the vendor-internal
@@ -203,8 +206,8 @@ the bare deletes discard.
 2. **B1 — crew duties write.** The most concrete ask; an existing endpoint missing verbs.
 3. **B3 — erasure.** Blocks pushing any passenger PII, and scheduling owns the retention
    policy they currently cannot execute.
-4. **C2 — Attachments spec.** Gates the ForeFlight document sync entirely.
-5. **B6 — scoped keys.** Makes every grant above safe to hold.
+4. **B6 — scoped keys.** Makes every grant above safe to hold.
+5. **C2 — Attachments spec.** No longer a blocker; would automate a manual download step.
 6. **A — scope on existing operations.** Mostly a permissions conversation, not a build.
 7. **B5, B4, B2** — concurrency, change feed, leg search. Each improves a design that can
    ship without it.

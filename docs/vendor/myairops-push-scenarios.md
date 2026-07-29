@@ -25,7 +25,7 @@ below depend entirely on them.
 | 3 | Passenger travel-form data → CRM | **Possible today** | ASK 11 (**no erasure path**) |
 | 3a | Retention purge after N years | **Blocked — no hard delete** | ASK 11 |
 | 3b | Booking flow: form currency, chase-ups | **Possible today** — mostly our logic | — |
-| 4 | myairops documents (trip sheet, EAPIS) → ForeFlight | **Blocked — no document endpoints** | ASK 5 (Attachments API spec) |
+| 4 | Documents → ForeFlight | **Not blocked** — myGFO is the document store | — |
 | 5 | Booking portal: hide VIP trips, show aircraft booked | **Must be ours** — **decided**, ASK 12 closed | — |
 | 6 | Passenger self-service view + shareable trip sheet | **Partly** — build the PDF ourselves | ASK 5 |
 | 7 | Alert on passenger-info change, then review | **Partly** — poll, no push | ASK 3 (webhooks) |
@@ -216,19 +216,43 @@ well-documented creates. It is gated on ASK 11 only because it pushes travel-doc
 
 ---
 
-## 4. myairops documents → ForeFlight — **blocked on the Attachments API**
+## 4. Documents → ForeFlight — **not blocked; myGFO becomes the document store**
 
-There are **no document, attachment, file, or report endpoints in Booking, CRM, or MX.**
-Zero. The only EAPIS-related field anywhere is `AccountModel.eapisAircraftOperatorCode` —
-an operator code, not a filing or a document.
+**Revised (Bryan):** EAPIS was an example of a document, not a committed use case, and the
+working assumption is that we probably *cannot* pull files from myairops. The fallback:
+**scheduling downloads documents and uploads them to myGFO**, which tracks them and drives
+the ForeFlight sync.
 
-So trip sheets and EAPIS documents are not reachable through any API we hold. They are
-presumably in the **Attachments API**, which we have no spec for.
+That is a better position than the one this section previously described, and it removes two
+blockers at once:
 
-The ForeFlight half is a separate integration (we already have `src/scheduling/foreflight/`).
-The dependency order is: get the Attachments spec → confirm documents are fetchable and
-carry a version/timestamp → then build the sync. The "if the info changes, update the
-document" requirement needs a change signal, which loops back to ASK 3.
+1. **The Attachments API stops being a dependency.** It becomes an optimisation — if it
+   turns out we *can* fetch documents, we automate the download step and nothing else about
+   the design changes. Build against the manual upload first.
+2. **The change signal problem disappears.** "If the info changes, update the document in
+   ForeFlight" needed a myairops change feed (ASK 3) when myairops held the document. With
+   scheduling uploading, **the upload itself is the trigger** — a new version lands, we push
+   it to ForeFlight. No webhook required.
+
+**Consequence: myGFO is the source of truth for documents**, a second documented exception
+to the source-of-truth rule alongside passenger travel data. That is consistent rather than
+awkward — myGFO owns what myairops cannot hold or cannot expose.
+
+What this needs is a document store with versioning (so "the trip sheet changed" is a real
+event), the ForeFlight push on new version, and an audit trail of who uploaded what. All
+myGFO-side, none of it gated on the vendor.
+
+### What the specs actually confirm
+
+There are **no document, attachment, file, or report endpoints in Booking, CRM, or MX** —
+zero. The only EAPIS-related field anywhere is `AccountModel.eapisAircraftOperatorCode`, an
+operator code rather than a filing or a document. So the assumption that files are not
+reachable through the APIs we hold is correct as far as those three go; only the Attachments
+API could change it.
+
+> ASK 5's Attachments half is therefore **downgraded from blocker to nice-to-have**. Still
+> worth requesting — automating a manual download is real value — but it no longer gates
+> anything.
 
 ---
 
@@ -314,7 +338,8 @@ accepted. ASK 3 (webhooks / `modifiedSince`) would turn it from adequate into go
 
 1. **Schedule API spec** (ASK 5) — gates crew vacation entirely, may redesign the booking
    portal. Highest value per unit of effort.
-2. **Attachments API spec** (ASK 5) — gates the ForeFlight document sync entirely.
+2. **Attachments API spec** (ASK 5) — no longer a blocker (see item 4), but automating
+   scheduling's manual download is real value.
 3. **Erasure and retention** (ASK 11) — blocks pushing any passenger PII. Must be answered
    *before* item 3, not after.
 4. **Scoped API keys** (ASK 1) — the push list above spans Booking, CRM and MX, so without
