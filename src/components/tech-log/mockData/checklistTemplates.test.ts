@@ -41,16 +41,21 @@ describe('SEED_CHECKLIST_TEMPLATES', () => {
   });
 
   /**
-   * D58 classification, pinned. Every seeded template is an AOD-numbered maintenance servicing
-   * form run from a maintenance-gated panel, so all four keep the two-tap claim/complete model —
-   * and they keep it by omitting the field entirely, which is what makes pre-D58 behavior
-   * byte-identical. Reclassifying one is a product call: this test is the tripwire that makes the
-   * change deliberate rather than incidental.
+   * D58 classification, pinned — resolved by Bryan 2026-07-29 (Q18, option A).
+   *
+   * The build session found every seeded template to be an AOD-numbered servicing form run from a
+   * maintenance-gated panel, so the crew/servicing split D58 assumed had no crew side. Bryan ruled
+   * that these four ARE the forms his feedback named, and flipped them to single-tap: per-line
+   * attribution survives (completedByOid/completedAtUtc still stamped), only the "in progress ·
+   * who" concurrency signal goes.
+   *
+   * This test remains the tripwire — reclassifying any of them is a product call, not an
+   * incidental edit.
    */
-  it('leaves every seeded template on the pre-D58 claim/complete model', () => {
+  it('runs every seeded template on the single-tap model per Q18', () => {
     for (const t of SEED_CHECKLIST_TEMPLATES) {
-      expect(t.interactionMode).toBeUndefined();
-      expect(interactionModeOf(t)).toBe('CLAIM_COMPLETE');
+      expect(t.interactionMode).toBe('SINGLE_TAP');
+      expect(interactionModeOf(t)).toBe('SINGLE_TAP');
     }
   });
 

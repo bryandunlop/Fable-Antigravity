@@ -20,11 +20,12 @@ const CREATED_BY = 'USR002'; // Sarah Wilson (DOM) — seed author
 const CREATED_AT = '2026-06-01T00:00:00.000Z';
 
 /**
- * D58 interaction mode — OPEN CLASSIFICATION CALL, deliberately left at the safe default.
+ * D58 interaction mode — classification RESOLVED by Bryan 2026-07-29 (Q18, option A):
+ * all four templates run single-tap.
  *
- * D58 splits checklists into crew forms (single-tap + batch) and maintenance servicing forms
- * (unchanged claim/complete). All four templates below are servicing forms on every piece of
- * evidence available in the codebase:
+ * D58 split checklists into crew forms (single-tap + batch) and maintenance servicing forms
+ * (unchanged claim/complete). The build session found that split has no crew side here — every
+ * template below is a servicing form on every piece of evidence in the codebase:
  *   • each is AOD-numbered (AOD-13/14/24/25) — D58 names the AOD forms as servicing;
  *   • the work is servicing work — oxygen PSI, engine oil quarts, hydraulic replenishers, fuel
  *     sump draining, SSPC pulls — and "Crew Brief & MX Release" appears as an *item* maintenance
@@ -33,20 +34,23 @@ const CREATED_AT = '2026-06-01T00:00:00.000Z';
  *     pilot only acknowledges the released briefing) and `PostflightPanel` tells anyone else
  *     "Maintenance performs the postflight on return".
  *
- * No crew-owned checklist template exists in this build. So the plan's second heuristic — "anything
- * the briefing/postflight flow runs is crew" — and its first — "the AOD-numbered servicing forms
- * are servicing" — point at the same four rows and disagree. That is a product call, not a code
- * one, so every template keeps `interactionMode` UNSET (= `CLAIM_COMPLETE`, byte-identical to
- * pre-D58 behavior) until Bryan rules.
+ * So the plan's two heuristics — "the AOD-numbered forms are servicing" and "anything the
+ * briefing/postflight flow runs is crew" — pointed at the same four rows and disagreed. Bryan
+ * ruled that these ARE the preflight/postflight forms his feedback named, and that the two-tap
+ * claim is friction on them regardless of who holds the iPad.
  *
- * Flipping one is a one-line change here (`interactionMode: 'SINGLE_TAP'`) — or a mode change in
- * Admin → Checklists, which publishes it as a new version and leaves in-flight instances alone.
- * `checklistTemplates.test.ts` pins the current classification so a flip is deliberate and visible.
+ * What single-tap does NOT cost: per-line attribution survives — completing an item still stamps
+ * `completedByOid`/`completedAtUtc`. Only the *claim* signal goes, i.e. the "in progress · who"
+ * render that stopped a second technician doubling up. If these forms turn out to be worked
+ * two-handed on the same aircraft, that is the signal to revisit (Q18 options B/C).
+ *
+ * A mode change in Admin → Checklists publishes a new version and leaves in-flight instances
+ * alone. `checklistTemplates.test.ts` pins this classification so any future flip is deliberate.
  */
 
 const G650ER_PREFLIGHT: ChecklistTemplate = {
   id: 'cl-g650er-preflight', aircraftType: 'G650ER', phase: 'PREFLIGHT', aodReference: 'AOD-13',
-  version: 1, status: 'PUBLISHED', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,
+  version: 1, status: 'PUBLISHED', interactionMode: 'SINGLE_TAP', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,
   sections: [
     sec('g650er-pre-exterior', 'EXTERIOR', [
       chk('g650er-pre-ext-1', 'Remove protective covers'),
@@ -100,7 +104,7 @@ const G650ER_PREFLIGHT: ChecklistTemplate = {
 
 const G650ER_POSTFLIGHT: ChecklistTemplate = {
   id: 'cl-g650er-postflight', aircraftType: 'G650ER', phase: 'POSTFLIGHT', aodReference: 'AOD-14',
-  version: 1, status: 'PUBLISHED', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,
+  version: 1, status: 'PUBLISHED', interactionMode: 'SINGLE_TAP', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,
   sections: [
     sec('g650er-post-cockpit', 'COCKPIT', [
       note('g650er-post-ckpt-1', 'APU hours', { requiredToRelease: false }),
@@ -175,7 +179,7 @@ const G650ER_POSTFLIGHT: ChecklistTemplate = {
 
 const G500_PREFLIGHT: ChecklistTemplate = {
   id: 'cl-g500-preflight', aircraftType: 'G500', phase: 'PREFLIGHT', aodReference: 'AOD-24',
-  version: 1, status: 'PUBLISHED', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,
+  version: 1, status: 'PUBLISHED', interactionMode: 'SINGLE_TAP', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,
   sections: [
     sec('g500-pre-fuel', 'FUEL', [
       measure('g500-pre-fuel-1', 'Fuel gallons', [fld('g500-pre-fuel-1-gal', 'Gallons', 'GAL')]),
@@ -228,7 +232,7 @@ const G500_PREFLIGHT: ChecklistTemplate = {
 
 const G500_POSTFLIGHT: ChecklistTemplate = {
   id: 'cl-g500-postflight', aircraftType: 'G500', phase: 'POSTFLIGHT', aodReference: 'AOD-25',
-  version: 1, status: 'PUBLISHED', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,
+  version: 1, status: 'PUBLISHED', interactionMode: 'SINGLE_TAP', effectiveFrom: CREATED_AT, createdByOid: CREATED_BY, createdAtUtc: CREATED_AT,
   sections: [
     sec('g500-post-arrival', 'ARRIVAL', [
       chk('g500-post-arr-1', 'LDG pins installed'),
