@@ -11,7 +11,9 @@ import { Textarea } from '../../ui/textarea';
 import { Checkbox } from '../../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { ROLE_CATEGORIES } from '../../../lib/mockUsers';
-import type { AckLevel, Doc, DocRevision, DocSection } from '../types';
+import type { AckLevel, Doc, DocCasMeta, DocRevision, DocSection } from '../types';
+import type { AircraftType, CasColor } from '../../tech-log/types';
+import { CAS_KNOWLEDGE_CLASS_ID } from '../engine/casKnowledge';
 import { DOC_CLASS_LIST, classFor, type DocumentClassConfig } from '../classes';
 import { useDocuments, identityFor, publishApprovalRequestedEvent, publishRequiredReadEvent } from '../DocumentsContext';
 import { canAuthor, validateSubmit, validateDirectPublish } from '../engine/lifecycle';
@@ -23,12 +25,21 @@ import { emptySection } from '../engine/blockEditor';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
 export type EditorMode =
-  | { kind: 'create'; classId?: string; prefill?: { content?: string; title?: string } }
+  | {
+      kind: 'create';
+      classId?: string;
+      /** D60: `fleetTypes` / `casMeta` seed a CAS reference entry created from a tail page. */
+      prefill?: { content?: string; title?: string; fleetTypes?: AircraftType[]; casMeta?: DocCasMeta };
+    }
   // 'content' is the interim textarea's markdown prefill — independent of DocRevision.sections.
   | { kind: 'revise'; doc: Doc; baseRev: DocRevision; prefill?: Partial<DocRevision> & { content?: string } }
   | { kind: 'edit-draft'; doc: Doc; rev: DocRevision };
 
 const ALL_ROLES = Object.values(ROLE_CATEGORIES).flat();
+
+/** D60 — canonical type strings ("500/650/800" is display shorthand only). */
+const FLEET_TYPES: AircraftType[] = ['G650ER', 'G500', 'G800'];
+const CAS_COLORS: CasColor[] = ['WHITE', 'CYAN', 'AMBER', 'RED'];
 
 function todayIso(): string {
   return operatorTodayIso(); // D24: operator calendar day, not UTC (C6)
@@ -69,6 +80,13 @@ export function DocEditorDialog({
   const [ackLevel, setAckLevel] = useState<AckLevel>('initials');
   const [ackDueDate, setAckDueDate] = useState('');
   const [tags, setTags] = useState('');
+  // D60 — CAS reference fields, only meaningful on the tribal-knowledge class.
+  const [fleetTypes, setFleetTypes] = useState<AircraftType[]>([]);
+  const [isCas, setIsCas] = useState(false);
+  const [casMessage, setCasMessage] = useState('');
+  const [casColor, setCasColor] = useState<CasColor>('AMBER');
+  const [cmcCodes, setCmcCodes] = useState<string[]>([]);
+  const [cmcDraft, setCmcDraft] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -88,6 +106,12 @@ export function DocEditorDialog({
       setAckLevel(cfg?.defaultAckLevel ?? 'initials');
       setAckDueDate(cfg?.defaultAckDueDays ? computeNextReviewDate(todayIso(), cfg.defaultAckDueDays) : '');
       setTags('');
+      setFleetTypes(mode.prefill?.fleetTypes ?? []);
+      setIsCas(!!mode.prefill?.casMeta);
+      setCasMessage(mode.prefill?.casMeta?.casMessage ?? '');
+      setCasColor(mode.prefill?.casMeta?.casColor ?? 'AMBER');
+      setCmcCodes(mode.prefill?.casMeta?.cmcCodes ?? []);
+      setCmcDraft('');
     } else {
       const doc = mode.doc;
       const rev = mode.kind === 'revise' ? mode.baseRev : mode.rev;
@@ -121,6 +145,15 @@ export function DocEditorDialog({
           : rev.ackDueDate ?? '',
       );
       setTags(meta.tags.join(', '));
+      // Doc-level CAS meta is not part of `proposedMeta` (that carries the four-eyes
+      // identity fields for CONTROLLED classes); tribal knowledge is uncontrolled, so
+      // these edit in place through UPDATE_DOC_META like tags do.
+      setFleetTypes(doc.fleetTypes ?? []);
+      setIsCas(!!doc.casMeta);
+      setCasMessage(doc.casMeta?.casMessage ?? '');
+      setCasColor(doc.casMeta?.casColor ?? 'AMBER');
+      setCmcCodes(doc.casMeta?.cmcCodes ?? []);
+      setCmcDraft('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -138,6 +171,22 @@ export function DocEditorDialog({
   const toggleRole = (r: string) =>
     setRoles((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev.filter((x) => x !== 'all'), r]));
 
+  const toggleFleetType = (t: AircraftType) =>
+    setFleetTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+
+  const addCmcCode = () => {
+    // Trimmed here, at commit — not in onChange, which on a controlled input eats keystrokes.
+    const code = cmcDraft.trim();
+    if (!code) return;
+    if (cmcCodes.some((c) => c.toLowerCase() === code.toLowerCase())) {
+      toast.error(`${code} is already listed.`);
+      setCmcDraft('');
+      return;
+    }
+    setCmcCodes((prev) => [...prev, code]);
+    setCmcDraft('');
+  };
+
   const buildRecords = (): { doc: Doc; rev: DocRevision; liveControlled: boolean } | null => {
     if (!cfg) return null;
     const hasContent = sections.some((s) => s.title.trim() || s.blocks.some((b) => b.md.trim()));
@@ -145,6 +194,25 @@ export function DocEditorDialog({
       toast.error('Title, content, and at least one audience role are required.');
       return null;
     }
+    const casEnabled = cfg.id === CAS_KNOWLEDGE_CLASS_ID;
+    // A CAS entry with no message would be a catalog row the picker cannot offer.
+    if (casEnabled && isCas && !casMessage.trim()) {
+      toast.error('A CAS entry needs the message as the flight deck shows it.');
+      return null;
+    }
+    if (casEnabled && isCas && fleetTypes.length === 0) {
+      toast.error('Name at least one fleet type — a CAS entry with no applicability reaches no tail.');
+      return null;
+    }
+    const casMeta: DocCasMeta | undefined =
+      casEnabled && isCas
+        ? { casMessage: casMessage.trim(), casColor, cmcCodes: cmcCodes.length ? cmcCodes : undefined }
+        : undefined;
+    // Applied only on the class that owns these fields, so an edit on any other
+    // class cannot blank them by omission.
+    const casFields = casEnabled
+      ? { fleetTypes: fleetTypes.length ? fleetTypes : undefined, casMeta }
+      : {};
     const { userId, userName } = identityFor(userRole);
     const effAckLevel: AckLevel = cfg.ackLevelLocked ? cfg.defaultAckLevel : requireAck ? ackLevel : 'none';
     const doc: Doc =
@@ -162,6 +230,7 @@ export function DocEditorDialog({
             isArchived: false,
             reviewCycleDays: cfg.defaultReviewCycleDays,
             createdDate: todayIso(),
+            ...casFields,
           }
         : {
             ...mode.doc,
@@ -169,6 +238,7 @@ export function DocEditorDialog({
             category,
             roles,
             tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+            ...casFields,
           };
     // C1: a live controlled doc's identity never changes on draft save — the
     // edits ride the revision (proposedMeta) and apply when it publishes.
@@ -247,6 +317,15 @@ export function DocEditorDialog({
   const publish = () => {
     const records = buildRecords();
     if (!records || !cfg) return;
+    // Defence in depth, not a live bug fix: the class picker only offers classes this
+    // user can author, and CREATE_DOC / CREATE_DRAFT enforce the gate in the reducer.
+    // The guard is here because PUBLISH_DIRECT takes no actorRoles at all (booked as
+    // LG-112 — fixing the shared reducer is its own change), so the direct-publish path
+    // must not rely on the reducer to refuse an unauthorized publisher.
+    if (!canAuthor(cfg, userRoles)) {
+      toast.error(`Publishing ${cfg.labelPlural} requires one of: ${cfg.authorRoles.join(', ')}.`);
+      return;
+    }
     const v = validateDirectPublish(cfg, records.rev);
     if (!v.ok) {
       toast.error(v.error);
@@ -374,6 +453,86 @@ export function DocEditorDialog({
             <Label htmlFor="docTags" className="text-xs">Tags (comma-separated)</Label>
             <Input id="docTags" value={tags} onChange={(e) => setTags(e.target.value)} className="mt-1" />
           </div>
+
+          {/* D60 — CAS reference metadata. Tribal knowledge only: it is the class whose entries a
+              tail page and the defect form draw on. Fleet applicability applies to BOTH kinds of
+              entry (article or structured CAS message); the message + colour + codes below are the
+              structured half, and leaving the toggle off makes this a freeform article. */}
+          {cfg?.id === CAS_KNOWLEDGE_CLASS_ID && (
+            <div className="rounded-md border border-border p-3">
+              <Label className="text-xs">Fleet applicability (D60)</Label>
+              <div className="mt-1 flex flex-wrap gap-3">
+                {FLEET_TYPES.map((t) => (
+                  <label key={t} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                    <Checkbox checked={fleetTypes.includes(t)} onCheckedChange={() => toggleFleetType(t)} />
+                    {t}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A tail only sees knowledge tagged for its own type. Leave all three clear for general
+                library content (airport notes and the like).
+              </p>
+
+              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
+                <Checkbox checked={isCas} onCheckedChange={() => setIsCas((v) => !v)} />
+                This entry explains one CAS message
+              </label>
+
+              {isCas && (
+                <div className="mt-2 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      aria-label="CAS message"
+                      placeholder="Message as the flight deck shows it, e.g. R ENG CHIP"
+                      value={casMessage}
+                      onChange={(e) => setCasMessage(e.target.value)}
+                      className="min-w-[16rem] flex-1"
+                    />
+                    <select
+                      aria-label="CAS colour"
+                      className="rounded-md border bg-background px-2 py-1 text-sm"
+                      value={casColor}
+                      onChange={(e) => setCasColor(e.target.value as CasColor)}
+                    >
+                      {CAS_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Related CMC codes (hand-curated)</Label>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      {cmcCodes.map((c) => (
+                        <span key={c} className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-xs">
+                          {c}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${c}`}
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => setCmcCodes((prev) => prev.filter((x) => x !== c))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <Input
+                        aria-label="Add CMC code"
+                        placeholder="e.g. 79-3100-02"
+                        value={cmcDraft}
+                        onChange={(e) => setCmcDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCmcCode(); } }}
+                        className="w-40"
+                      />
+                      <Button type="button" size="sm" variant="outline" onClick={addCmcCode}>Add</Button>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Curated by hand on purpose. Codes recorded while troubleshooting a defect are
+                      intake and diagnosis, not established knowledge, and are never rolled up here.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">

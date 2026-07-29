@@ -43,6 +43,11 @@ import { CrewActionPanel } from '../components/panels/CrewActionPanel';
 import { ExtendDeferralDialog } from '../components/panels/ExtendDeferralDialog';
 import { LifecycleStepper, type StepKey } from '../components/LifecycleStepper';
 import { ActivityFeed } from '../components/ActivityFeed';
+// D60 — the fleet CAS knowledge surface. The knowledge, its store and its curator gate all live in
+// the documents module; this page is only where it is mounted for a tail. See the component's own
+// note on why it lives over there rather than here.
+import { CasReferencePanel } from '../../documents/components/CasReferencePanel';
+import { documentsRolesForUserId } from '../../documents/roles';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -137,7 +142,13 @@ function BlockerCard({
   );
 }
 
-type WorkspaceTab = 'workspace' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
+type WorkspaceTab = 'workspace' | 'reference' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
+/**
+ * The RECORDS row. D60's reference tab is deliberately NOT in here: this list renders under a
+ * "Records" caption, and tribal knowledge is reference content adjacent to — never part of — the
+ * airworthiness record. Filing it under "Records" would blur exactly the line D60 rests on, so it
+ * gets its own button beside Workspace, which is already a tab that lives outside this list.
+ */
 const TABS: { key: WorkspaceTab; label: string }[] = [
   { key: 'defects', label: 'Defects' },
   { key: 'deferrals', label: 'Deferrals' },
@@ -221,6 +232,13 @@ export default function AircraftDetail() {
 
   const custody = deriveCustody(ac.id, state, now);
   const shownStep: StepKey = activeStep;
+
+  // D60 — the documents-vocabulary roles for the signed-in persona. Tech-log pages are handed no
+  // login role (the provider keeps it private and exposes a Personnel record whose role is only
+  // PILOT | MAINTENANCE, which says nothing about document authoring), so the curator gate is
+  // resolved from the persona's user id — see `documentsRolesForUserId` for why that reproduces the
+  // login's own role set rather than widening it.
+  const docsRoles = documentsRolesForUserId(user?.oid);
 
   // D42: one derived board of "what stands between this tail and dispatch". Replaces the old
   // three-box spine, which listed only open defects + work cards and so showed nothing for a tail
@@ -431,6 +449,14 @@ export default function AircraftDetail() {
         >
           Workspace
         </button>
+        {/* D60 — the fleet's curated CAS knowledge for THIS tail's type. Outside the Records row on
+            purpose (see the note on TABS): it is reference, not a record. */}
+        <button
+          onClick={() => setTab('reference')}
+          className={cn('rounded-md px-3 py-1.5', tab === 'reference' ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground')}
+        >
+          Reference
+        </button>
         <span className="ml-2 mr-1 text-xs uppercase tracking-wide text-muted-foreground/70">Records</span>
         {TABS.map(t => (
           <button
@@ -538,6 +564,16 @@ export default function AircraftDetail() {
 
           <ActivityFeed aircraft={ac} auditIds={acEntityIds} />
         </div>
+      )}
+
+      {/* ===== REFERENCE (D60 — curated CAS knowledge for this tail's fleet type) ===== */}
+      {tab === 'reference' && (
+        <CasReferencePanel
+          fleetType={ac.type}
+          tailNumber={ac.tailNumber}
+          userRole={docsRoles[0] ?? ''}
+          additionalRoles={docsRoles.slice(1)}
+        />
       )}
 
       {/* ===== DEFECTS (with inline triage) ===== */}
