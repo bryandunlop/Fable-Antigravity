@@ -5,7 +5,7 @@ import {
   ArrowLeft, Wrench, FilePlus, Clock, ShieldAlert, CheckCircle2, CalendarClock, Plus,
   Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, ClipboardCheck, CloudDownload, ShieldCheck,
 } from 'lucide-react';
-import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone, useLoginRoles } from '../TechLogContext';
 import { formatRegulatoryCompact, type DisplayZoneMode } from '../util/displayZone';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
@@ -47,7 +47,6 @@ import { ActivityFeed } from '../components/ActivityFeed';
 // the documents module; this page is only where it is mounted for a tail. See the component's own
 // note on why it lives over there rather than here.
 import { CasReferencePanel } from '../../documents/components/CasReferencePanel';
-import { documentsRolesForUserId } from '../../documents/roles';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -233,12 +232,12 @@ export default function AircraftDetail() {
   const custody = deriveCustody(ac.id, state, now);
   const shownStep: StepKey = activeStep;
 
-  // D60 — the documents-vocabulary roles for the signed-in persona. Tech-log pages are handed no
-  // login role (the provider keeps it private and exposes a Personnel record whose role is only
-  // PILOT | MAINTENANCE, which says nothing about document authoring), so the curator gate is
-  // resolved from the persona's user id — see `documentsRolesForUserId` for why that reproduces the
-  // login's own role set rather than widening it.
-  const docsRoles = documentsRolesForUserId(user?.oid);
+  // D60 — the roles the user actually SIGNED IN with, straight from the provider. This gate must
+  // never be derived from the resolved persona: `resolveFromLogin` falls back to `personnel[0]`
+  // (Captain John Smith, who holds `chief-pilot` — a tribal-knowledge curator) for every login role
+  // no `SYSTEM_USERS` entry holds, which is ~10 of the roles `LoginScreen` offers. A persona answers
+  // "who is standing at this aircraft", never "what may they publish".
+  const docsRoles = useLoginRoles();
 
   // D42: one derived board of "what stands between this tail and dispatch". Replaces the old
   // three-box spine, which listed only open defects + work cards and so showed nothing for a tail

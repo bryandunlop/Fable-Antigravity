@@ -205,7 +205,11 @@ export default function App() {
                     provider mounted per-subtree would remount between them and lose in-flight
                     proposals. */}
                 <CompanyAirportProvider>
-                <TechLogProvider userRole={userRole}>
+                {/* D60 fix pass — `additionalRoles` is the rest of the session's role set. Tech-log
+                    surfaces that gate on authority (the tail page's CAS Reference tab) read it via
+                    `useLoginRoles`; deriving roles from the resolved persona instead handed every
+                    login with no `SYSTEM_USERS` entry the fallback persona's `chief-pilot`. */}
+                <TechLogProvider userRole={userRole} additionalRoles={additionalRoles}>
                 <Router>
                   <Routes>
                     {/* Public Routes - No Authentication Required */}

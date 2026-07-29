@@ -29,8 +29,19 @@ export interface DocumentClassConfig {
 
 const APPROVERS = ['document-manager', 'lead', 'admin'];
 const BULLETIN_AUTHORS = ['admin', 'safety', 'lead', 'document-manager', 'procedural-specialist'];
-/** Curators per Bryan's call: document + procedural roles, lead-tier (Chief Pilot / DOM), admin. */
-const TK_CURATORS = ['document-manager', 'procedural-specialist', 'lead', 'chief-pilot', 'dom', 'admin'];
+/**
+ * Curators per Bryan's call: document + procedural roles, lead-tier (Chief Pilot / DOM), admin —
+ * plus plain `maintenance`.
+ *
+ * **D60 is the authority for the `'maintenance'` entry.** It specifies direct publish by any
+ * maintenance user; without the plain role a line technician (`USR008`, roles `['maintenance']`)
+ * got the tail page's Reference tab read-only. It only looked correct in the demo because the first
+ * `maintenance` login resolves to a persona who also holds `dom`. `casCuratorRoles.test.ts` pins
+ * that a `['maintenance']`-only user can author tribal knowledge.
+ *
+ * `'chief-pilot'` stays: Bryan considered removing it and declined.
+ */
+const TK_CURATORS = ['document-manager', 'procedural-specialist', 'lead', 'chief-pilot', 'dom', 'admin', 'maintenance'];
 
 export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
   'procedural-bulletin': {

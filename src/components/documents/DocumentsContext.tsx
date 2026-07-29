@@ -166,7 +166,7 @@ export type DocumentsAction =
         today: string;
       };
     }
-  | { type: 'PUBLISH_DIRECT'; payload: { revisionId: string; atUtc: string; today: string } }
+  | { type: 'PUBLISH_DIRECT'; payload: { revisionId: string; atUtc: string; today: string; actorRoles: string[] } }
   | { type: 'ACKNOWLEDGE'; payload: { ack: DocAcknowledgment; signature?: Signature } }
   | { type: 'ADD_COMMENT'; payload: DocComment }
   | { type: 'EDIT_COMMENT'; payload: { id: string; text: string; actorUserId: string; atUtc: string } }
@@ -414,6 +414,15 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       if (!rev) return state;
       const doc = state.docs.find((d) => d.id === rev.docId);
       if (!doc) return state;
+      // LG-112, closed by the D60 fix pass. This case used to take NO actorRoles, so the only thing
+      // standing between an unauthorized caller and a published revision was CREATE_DOC /
+      // CREATE_DRAFT refusing to make the draft first — an indirect gate that says nothing about
+      // this action. Direct publish skips four-eyes entirely; it carries its own gate now, the same
+      // C12 discipline as every other authority check in this reducer.
+      if (!canAuthor(classFor(doc.classId), p.actorRoles)) {
+        warnNoop(`publishing a ${classFor(doc.classId).label} requires an authoring role`);
+        return state;
+      }
       const v = validateDirectPublish(classFor(doc.classId), rev);
       if (!v.ok) {
         warnNoop(v.error);
@@ -609,7 +618,8 @@ interface Ctx {
     approve: boolean;
     reason?: string;
   }) => void;
-  publishDirect: (revisionId: string) => void;
+  /** Uncontrolled classes only. Role-gated in the reducer (LG-112) — pass the ACTOR's roles. */
+  publishDirect: (revisionId: string, actorRoles: string[]) => void;
   /** Lightweight checkbox+initials acknowledgment. */
   acknowledgeInitials: (doc: Doc, rev: DocRevision, initials: string, userRole: string) => void;
   /** High-consequence acknowledgment via the shared sign ceremony. */
@@ -858,8 +868,8 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     }, []),
     submitForApproval,
     decideApproval,
-    publishDirect: useCallback((revisionId) => {
-      dispatch({ type: 'PUBLISH_DIRECT', payload: { revisionId, atUtc: nowUtc(), today: todayIso() } });
+    publishDirect: useCallback((revisionId, actorRoles) => {
+      dispatch({ type: 'PUBLISH_DIRECT', payload: { revisionId, atUtc: nowUtc(), today: todayIso(), actorRoles } });
     }, []),
     acknowledgeInitials,
     acknowledgeSignature,

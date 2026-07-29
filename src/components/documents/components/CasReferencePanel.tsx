@@ -38,16 +38,23 @@ export function CasReferencePanel({
 }: {
   fleetType: AircraftType;
   tailNumber: string;
-  /** A documents-vocabulary role (see `documentsRolesForUserId` for the tech-log bridge). */
+  /**
+   * The user's PRIMARY LOGIN role — the same value `/documents` passes. On the tail page it comes
+   * from `useLoginRoles()[0]`, never from the resolved tech-log persona: the persona is a fallback
+   * for "who is standing at this aircraft" and reading its roles granted curator authority to
+   * logins that have none. It is also the identity a doc created here is attributed to
+   * (`identityFor`), so one curator authoring from a tail page and from `/documents` writes the
+   * same author instead of two.
+   */
   userRole: string;
   additionalRoles?: string[];
 }) {
   const { state } = useDocuments();
   const [creating, setCreating] = useState<'cas' | 'article' | null>(null);
-  const userRoles = [userRole, ...additionalRoles];
-  // The class's EXISTING curator gate, unchanged. Note the reducer's PUBLISH_DIRECT takes no roles,
-  // so any creation path must carry this check itself — here the create dialog's CREATE_DOC is the
-  // gate, and this only decides whether the affordance is offered at all.
+  const userRoles = [userRole, ...additionalRoles].filter(Boolean);
+  // The class's curator gate. Belt and braces only: CREATE_DOC and (since the D60 fix pass)
+  // PUBLISH_DIRECT both enforce it in the reducer, so hiding the affordance is a courtesy, not the
+  // gate.
   const curator = canAuthor(classFor(CAS_KNOWLEDGE_CLASS_ID), userRoles);
 
   const entries = useMemo(() => casCatalog(state.docs, state.revisions, fleetType), [state.docs, state.revisions, fleetType]);

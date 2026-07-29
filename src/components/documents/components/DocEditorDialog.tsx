@@ -317,11 +317,9 @@ export function DocEditorDialog({
   const publish = () => {
     const records = buildRecords();
     if (!records || !cfg) return;
-    // Defence in depth, not a live bug fix: the class picker only offers classes this
-    // user can author, and CREATE_DOC / CREATE_DRAFT enforce the gate in the reducer.
-    // The guard is here because PUBLISH_DIRECT takes no actorRoles at all (booked as
-    // LG-112 — fixing the shared reducer is its own change), so the direct-publish path
-    // must not rely on the reducer to refuse an unauthorized publisher.
+    // Defence in depth: PUBLISH_DIRECT is role-gated in the reducer as of the D60 fix pass
+    // (LG-112), so this is the message, not the gate — a refusal in the reducer is a silent
+    // console warning and the publisher deserves to be told why.
     if (!canAuthor(cfg, userRoles)) {
       toast.error(`Publishing ${cfg.labelPlural} requires one of: ${cfg.authorRoles.join(', ')}.`);
       return;
@@ -332,7 +330,7 @@ export function DocEditorDialog({
       return;
     }
     persistDraft(records);
-    publishDirect(records.rev.id);
+    publishDirect(records.rev.id, userRoles);
     publishRequiredReadEvent(records.doc, records.rev);
     toast.success('Published.');
     onOpenChange(false);

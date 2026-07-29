@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { TechLogProvider } from '../TechLogContext';
 import {
   DocumentsProvider,
+  identityFor,
   STORAGE_KEY as DOCS_KEY,
   VERSION_KEY as DOCS_VERSION_KEY,
   DATA_VERSION as DOCS_DATA_VERSION,
@@ -20,8 +21,17 @@ import AircraftDetail from './AircraftDetail';
  * fleet's annunciation is not a cosmetic mistake.
  *
  * Also pinned: the reference-only labelling D60 requires (this content sits adjacent to airworthiness
- * records, never inside one), and the curator gate on the create affordance — which is the class's
- * EXISTING gate, so a maintenance persona who is also DOM curates and a line pilot does not.
+ * records, never inside one), the tab's PLACEMENT outside the Records row, and the curator gate.
+ *
+ * **The curator gate is the reason this file exists in its current form.** It originally exercised
+ * only logins that `SYSTEM_USERS` happens to hold a persona for (`maintenance`, `standards`), and so
+ * missed an authority bypass: the gate read the roles of the persona `TechLogContext` resolved, and
+ * `resolveFromLogin` falls back to `personnel[0]` — Captain John Smith, a `chief-pilot` and
+ * therefore a tribal-knowledge curator — for EVERY login role no `SYSTEM_USERS` entry holds.
+ * `LoginScreen` offers about ten of those. A Scheduling login could publish fleet CAS knowledge
+ * attributed to a captain, which the defect-form picker then offered on a signed-record intake form.
+ * The `scheduling` / `hr` cases below are that regression; the `document-manager` case is the other
+ * direction, because a fix that locks out real curators is not a fix.
  */
 
 const tkDoc = (over: Partial<Doc> & { id: string }): Doc => ({
@@ -70,7 +80,7 @@ const DOCS: Doc[] = [
   tkDoc({ id: 'TK-903', title: 'Normal startup CAS stack — G500', fleetTypes: ['G500'] }),
 ];
 
-function renderTail(tail: string, loginRole = 'maintenance') {
+function renderTail(tail: string, loginRole = 'maintenance', additionalRoles: string[] = ['dom']) {
   const seed: Partial<DocumentsState> = {
     docs: DOCS,
     revisions: DOCS.map((d) => published(d.id)),
@@ -81,7 +91,9 @@ function renderTail(tail: string, loginRole = 'maintenance') {
   return render(
     <MemoryRouter initialEntries={[`/tech-log/aircraft/${tail}?tab=reference`]}>
       <DocumentsProvider>
-        <TechLogProvider userRole={loginRole}>
+        {/* Both props, exactly as `App` passes them — `additionalRoles` is what makes the gate read
+            the SESSION's roles instead of the resolved persona's. */}
+        <TechLogProvider userRole={loginRole} additionalRoles={additionalRoles}>
           <Routes><Route path="/tech-log/aircraft/:tail" element={<AircraftDetail />} /></Routes>
         </TechLogProvider>
       </DocumentsProvider>
@@ -132,18 +144,87 @@ describe('AircraftDetail — Reference tab (D60)', () => {
   });
 
   it('withholds it from a non-curator login (standards → FO Chen: pilot + standards)', () => {
-    renderTail('N1PG', 'standards');
+    renderTail('N1PG', 'standards', ['pilot']);
     expect(screen.queryByRole('button', { name: /new cas entry/i })).not.toBeInTheDocument();
     // Reading is unrestricted — the knowledge is for whoever is standing at the aircraft.
     expect(screen.getByText('R ENG CHIP on the 650 — what it means')).toBeInTheDocument();
   });
 
+  it('offers it to a plain ["maintenance"] login — a line tech, per Bryan on D60', () => {
+    renderTail('N1PG', 'maintenance', []);
+    expect(screen.getByRole('button', { name: /new cas entry/i })).toBeInTheDocument();
+  });
+
+  // ── the authority bypass: a login with NO SYSTEM_USERS persona ──
+  //
+  // `scheduling` and `hr` are real `LoginScreen` options that no `SYSTEM_USERS` entry holds, so
+  // `resolveFromLogin` seats them on `personnel[0]` — Captain John Smith, a `chief-pilot`. Reading
+  // that persona's roles handed them the curator gate. The tab must be READ-ONLY for both.
+  it.each([['scheduling'], ['hr']])(
+    'a %s login gets the Reference tab READ-ONLY — no persona fallback grants curator authority',
+    (role) => {
+      renderTail('N1PG', role, []);
+      expect(screen.queryByRole('button', { name: /new cas entry/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /new article/i })).not.toBeInTheDocument();
+      // Reading is still unrestricted — this is a gate on authoring, not on knowledge.
+      expect(screen.getByText('R ENG CHIP on the 650 — what it means')).toBeInTheDocument();
+    },
+  );
+
+  it('a document-manager login CAN author from the tail page — the fix must not lock out real curators', () => {
+    renderTail('N1PG', 'document-manager', []);
+    expect(screen.getByRole('button', { name: /new cas entry/i })).toBeInTheDocument();
+  });
+
+  it('attributes an entry authored here to the LOGIN, identically to /documents', async () => {
+    // One curator, one identity. The tail page used to pass the resolved persona's first role into
+    // `identityFor`, so a Document Manager authoring from a tail wrote `USR001 / Captain John Smith`
+    // while the same person authoring from /documents wrote `role:document-manager` — two authors in
+    // the store for one curator. Both surfaces now key off the primary LOGIN role.
+    const user = userEvent.setup();
+    renderTail('N1PG', 'document-manager', []);
+
+    await user.click(screen.getByRole('button', { name: /new cas entry/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Title'), 'WSHLD HEAT — 650 note');
+    await user.click(within(dialog).getByLabelText('Everyone'));
+    await user.type(within(dialog).getByLabelText('Block 1 content'), 'What the fleet has seen.');
+    await user.type(within(dialog).getByLabelText('CAS message'), 'WSHLD HEAT');
+    await user.click(within(dialog).getByRole('button', { name: /^Publish$/ }));
+
+    const expected = identityFor('document-manager');
+    // Sanity: this login has no SYSTEM_USERS persona, so its identity is role-keyed — which is
+    // exactly why the persona-derived version wrote a different author.
+    expect(expected.userId).toBe('role:document-manager');
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem(DOCS_KEY) ?? '{}') as DocumentsState;
+      const created = stored.docs?.find((d) => d.title === 'WSHLD HEAT — 650 note');
+      expect(created).toBeDefined();
+      expect(created!.ownerUserId).toBe(expected.userId);
+      expect(created!.ownerName).toBe(expected.userName);
+    });
+  });
+
   it('the tab is not filed under Records — reference content is not a record', async () => {
     const user = userEvent.setup();
     renderTail('N1PG');
-    // Reference sits before the Records caption; the tabs after it are the record lists.
+    // PLACEMENT, asserted rather than asserted-about. The tab row is one flex container: the
+    // "Records" caption divides it, everything before the caption is a non-record tab, and the
+    // record lists follow. Reference must be on the left of that caption — filing it under Records
+    // would blur the line D60 rests on (tribal knowledge sits ADJACENT to the airworthiness record).
     const reference = screen.getByRole('button', { name: 'Reference' });
-    expect(reference).toBeInTheDocument();
+    const row = reference.parentElement!;
+    // Scoped to the tab row — "Records" also appears in the shell's own navigation.
+    const caption = within(row).getByText('Records');
+    const order = Array.from(row.children);
+    expect(order.indexOf(reference)).toBeLessThan(order.indexOf(caption));
+    // Everything AFTER the caption is a record list, and Reference is not among them.
+    const afterCaption = order.slice(order.indexOf(caption) + 1).map((el) => el.textContent);
+    expect(afterCaption.some((t) => /Reference/.test(t ?? ''))).toBe(false);
+    expect(afterCaption.some((t) => /^Defects/.test(t ?? ''))).toBe(true);
+
+    // …and it really is a different panel, not a section of the records view.
     await user.click(screen.getByRole('button', { name: /^Defects/ }));
     expect(screen.queryByText(/Reference only\./)).not.toBeInTheDocument();
   });
