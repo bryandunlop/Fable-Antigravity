@@ -13,11 +13,19 @@ Typed boundary between the real myairops tenant APIs and myGFO domain models.
 - `fixtures/` — demo data typed against `gen/` so every mock response is schema-faithful. When real
   credentials arrive (Phase 2), the fixtures swap for HTTP transport; adapters and consumers do not
   change.
+- `capability.ts` — classifies every vendor operation by its effect on myairops state and refuses
+  mutating calls unless a policy grant permits them. Ships with `PULL_ONLY_POLICY` (zero grants).
+  The same classifier generates `docs/vendor/myairops-capability-matrix.md`
+  (`npm run gen:myairops-matrix`), so the document and the runtime guard cannot disagree.
 
 Rules (from the project working agreement):
-- **Pull-only.** myGFO never writes to myairops. The vendor APIs do expose writes; we do not call
-  them. Any future write path requires an explicit recorded decision (see LG-21/LG-23) — do not add
-  one here.
+- **Pull-only.** myGFO never writes to myairops. The vendor APIs do expose writes — 100 of the 176
+  operations across the three captured specs mutate vendor state — and we do not call them. Any
+  future write path requires an explicit recorded decision (see LG-21/LG-23) plus a grant in
+  `capability.ts`; the guard refuses the call until then.
+- **A single `x-api-key` per API, with no scopes.** There is no read-only credential: the key that
+  reads trips can delete them. The guard in `capability.ts` is the only thing enforcing our posture
+  until myairops can issue scoped keys — see ASK 1 in `docs/vendor/myairops-integration-asks.md`.
 - The **core Flight.SaltashApi is deliberately absent**: its access model (Bearer/OAuth2,
   vendor-internal) is unresolved — Open Question 2. Do not generate types for it or design against
   it until myairops confirms the supported surface.
