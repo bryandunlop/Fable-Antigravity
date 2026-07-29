@@ -75,6 +75,10 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     description: 'Left main landing gear unsafe indication intermittent on retraction.',
     symptom: 'Came up during climb, cleared after a gear recycle.',
     casMessage: 'GEAR UNSAFE', casColor: 'AMBER', airworthinessAffecting: true,
+    // LG-99 intake hint: the single code the PILOT read off the CMC page. Maintenance's own
+    // interrogation found more and they live on wc-3 as cmcFaultCodes — same squawk, different fact.
+    // Illustrative demo codes derived from the ATA chapter; not a claim about real CMC output.
+    cmcFaultCode: '32-31-14',
     status: 'OPEN', reportedByOid: pilot.oid,
     // D56: noticed ~45 min before it was written up.
     occurredAtUtc: iso(3 * H + 45 * 60000), reportedAtUtc: iso(3 * H), signatureId: sigN1.id,
@@ -240,6 +244,11 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       ataChapter: '21', description: 'PACK 1 FAULT recurring — replace flow control valve.', source: 'CAMP', headerStatusCode: 0,
       scheduled: false, riiRequired: false, createdAtUtc: iso(17 * D), completedAtUtc: completedAt, completedReleaseId: 'rel-wc-1',
       status: 'COMPLETED',
+      // LG-98/99 on a COMPLETED card: exercises the read-only path AND puts both references on the
+      // printed CRS (this card has a real release, rel-wc-1). Hand-typed (D22) — nothing sources
+      // these from CAMP. Matches the AMM ref already named in step 3 below.
+      ammReference: 'AMM 21-50-00',
+      cmcFaultCodes: ['21-51-03'],
       steps: [
         { id: 'wc1-s1', seq: 1, text: 'Remove pack 1 flow control valve', done: true },
         { id: 'wc1-s2', seq: 2, text: 'Install replacement valve', done: true },
@@ -276,6 +285,12 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     id: 'wc-3', cardNumber: 'WC-1015', aircraftId: 'ac-n1pg', title: 'LMLG unsafe indication — troubleshoot & repair',
     ataChapter: '32', description: 'Corrective — intermittent gear-unsafe indication on retraction.', source: 'MANUAL', headerStatusCode: 1,
     scheduled: false, riiRequired: false, linkedDefectId: 'd-n1pg', createdAtUtc: iso(2.5 * H), status: 'IN_WORK',
+    // LG-98/99 on a LIVE card: editable on screen, and the linked defect (d-n1pg) carries the
+    // pilot's single intake code so the "starting hint" relationship is visible out of the box.
+    // TWO codes here on purpose — one squawk interrogates into several, which is why the card holds
+    // a list and the defect holds one. Illustrative demo codes; not real CMC output.
+    ammReference: 'AMM 32-30-00',
+    cmcFaultCodes: ['32-31-14', '32-31-22'],
     steps: [
       { id: 'wc3-s1', seq: 1, text: 'Interrogate MAU fault history; isolate sensor vs harness', done: true },
       { id: 'wc3-s2', seq: 2, text: 'Replace LMLG uplock proximity sensor', done: false },

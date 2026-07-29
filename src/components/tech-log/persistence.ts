@@ -61,8 +61,15 @@ export const VERSION_KEY = 'tech-log-data-version';
  * not exist for a returning user. Reseeding is the fix. (The new `Deferral` columns need no
  * migration: absent reads as "no crew action", which is correct for rows signed under the old rule
  * and is never reinterpreted.)
+ *
+ * v19 (LG-98/99/108): `WorkCard` gained `ammReference` + `cmcFaultCodes`, and the seeds now populate
+ * them on wc-1 and wc-3 plus `Defect.cmcFaultCode` on d-n1pg. Unlike v17 this is NOT a
+ * broken-render risk — every new field is optional and absent reads correctly as "not recorded".
+ * The bump is for the SEEDS: a returning user's stored blob predates them, so the demo would show
+ * empty AMM/CMC panels and no pilot intake hint, and the CRS print test's fixtures would be the only
+ * place the feature was visible. Reseeding is what makes the slice demonstrable on a fresh load.
  */
-export const DATA_VERSION = '2026-07-29-v18';
+export const DATA_VERSION = '2026-07-29-v19';
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a
