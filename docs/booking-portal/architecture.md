@@ -95,6 +95,88 @@ Two residual races remain, and both need handling regardless:
 So the broadcast must promise an *offer*, not a seat, and the claim flow must be able to
 fail gracefully at the final write. Design that state in from the start.
 
+## Passenger identity and the EA relationship
+
+**Decided:** eligibility is a manual process owned by scheduling. A passenger is attached as
+lead passenger with roles, EAs are attached to that passenger with differing levels, and
+scheduling can override directly in myairops for edge cases. `leadPassenger` already exists
+on `TripPassengerBookingViewModel`, so that concept maps cleanly.
+
+### You do not need to build the EA↔executive relationship — CRM already has it
+
+```
+POST   /api/Contact/{id}/Assistant/{assistantId}     GET /api/Contact/{id}/Assistants
+POST   /api/Contact/{id}/Executive/{executiveId}     GET /api/Contact/{id}/Executives
+DELETE both
+```
+
+There is a dedicated `ContactExecutiveAssistantModel`. myairops models the
+executive/assistant link natively and in both directions, so the *relationship* should live
+there rather than being reinvented in myGFO. What does **not** exist is the notion of
+differing EA **permission levels** — that is ours, keyed off the vendor relationship.
+
+### Use `externalReference` as the join key, not email
+
+Email is the right *human-facing* identifier — it is what an EA types, where an invite goes,
+and how `GET /api/Passengers?searchString=` finds someone ("by name or email"). It is the
+wrong thing to *store as the key*:
+
+1. **It is mutable.** People change names and domains migrate. A join key that changes
+   silently either orphans the record or re-points it at the wrong person — and this key
+   guards passport data.
+2. **It is not first-class on the Booking passenger.** `PassengerViewModel` has no `email`
+   field at all; it has a `contactMethods` array. Only CRM has `primaryEmail`. Joining on it
+   means reaching into a collection and picking one.
+3. **`searchString` is search, not lookup.** It returns matches, with no uniqueness
+   guarantee. Two contacts can match one address.
+4. **`externalReference` exists for exactly this** — the vendor documents it as "third party
+   identifier" on both trips and passengers. It is the field designed to hold our id.
+
+So: **myGFO mints the passenger id and writes it to `externalReference`**; email is a
+matching hint on first link only, then never load-bearing again. `employeeId` is a good
+secondary check for staff, but does not cover family or guests.
+
+> ### ASK 15 — is `externalReference` unique and queryable on passengers?
+> Trips have `GET /api/Trips/externalref/{externalReference}`. Passengers appear to have no
+> equivalent lookup. Confirm whether passenger `externalReference` is enforced unique and
+> whether it can be queried directly — if not, every join costs a search plus a client-side
+> uniqueness check, and we need to know that before designing the sync.
+
+## Travel-document expiry
+
+**Decided:** flag, don't block, when a document is close to expiry; block only when travel
+occurs after expiry.
+
+```
+document expires AFTER last travel date, > 6 months out   → no action
+document expires AFTER last travel date, within 6 months   → FLAG, still bookable
+document expires BEFORE or DURING travel                   → BLOCK, state the reason
+```
+
+Evaluate against the **travel dates**, not today — a form filled last week on a passport
+expiring next month must still fail for a trip in two months.
+
+> **Worth checking before building the 6-month figure as a pure flag:** many countries
+> require a passport to remain valid for six months *beyond* the date of entry, and a
+> traveller who does not meet that is refused boarding. If that is the origin of the
+> six-month instinct, then for those destinations it is a **block**, not a flag — a warning
+> would let someone travel to a denied-boarding. Suggest confirming the destination rules
+> with scheduling and making the six-month threshold a per-country block/flag decision
+> rather than one global flag.
+
+## Aircraft-date holds ("standby for the fleet")
+
+**New requirement (Bryan):** when the whole fleet is committed, an EA should be able to
+register a hold on dates and be notified if something frees up, then submit a request.
+
+This is the same shape as the empty-seat waitlist one level up — a watch on *fleet
+availability* rather than on a seat. Build the two on one notion of "watch this
+availability, tell me when it changes" rather than as two features; the trigger differs
+(a trip cancels vs a seat frees) but the register/notify/claim mechanics are identical.
+
+Leaning on seat contention: **waitlist/standby with scheduling clearing people**, rather
+than first-claim-wins. Not decided.
+
 ## Passenger-change lockout
 
 Passenger modulation locks X hours before departure, with **different windows for domestic
@@ -190,6 +272,18 @@ it is the cheapest thing that could invalidate this design, and it costs one ema
 - **EAs modulate passengers in myGFO**, not in the vendor portal.
 - **Confidentiality is enforced by us** — EAs get myGFO and no myairops portal access.
 - **Form-currency window is configurable.** 24 months was illustrative.
+- **Travel-form approval is a review loop.** The EA or passenger submits to scheduling;
+  scheduling approves, or rejects with a reason and requests resubmission. Only an approved
+  form is pushed to myairops — so rejection reasons and resubmissions are myGFO-side state
+  the vendor never sees.
+- **After lockout, changes go through scheduling** rather than being hard-blocked. That
+  escape hatch needs an audit trail: who asked, who approved, when.
+- **The scheduling↔EA message board is per-request**, with everything kept against that
+  trip. Reconstructing why a trip changed should not require reading a global channel.
+- **Maintenance conflict rule:** myGFO wins on anything airworthiness-related (the tech log
+  is authoritative there); myairops wins on scheduling fields such as timing and location.
+- **Eligibility is manual, owned by scheduling**, with direct myairops override available
+  for edge cases.
 
 ## Open questions this note does not resolve
 
@@ -200,3 +294,8 @@ Carried into `CLAUDE.md` where they gate dependent work:
 - Whether the portal can confirm a seat or only request one (depends on ASK 4).
 - Whether empty-seat search is live or mirrored (depends on ASK 2 / ASK 5).
 - The real domestic and international lockout windows (scheduling owns these).
+- Seat contention: waitlist/standby (leaning) versus first-claim-wins.
+- Whether the "do not offer seats" rule is per-trip, per-passenger, or per-principal
+  ("anything with X aboard"). These are different rules and the model must express whichever
+  is chosen.
+- Whether claiming an empty seat must capture business/personal purpose — see below.
