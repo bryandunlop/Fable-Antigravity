@@ -58,6 +58,54 @@ Until ASK 4 is answered we cannot promise a seat at checkout. Design the flow so
 confirmation if myairops confirms overbooking is rejected server-side. Building the
 optimistic flow first and discovering it overbooks is the expensive order to do this in.
 
+## The empty-seat pipeline
+
+The agreed flow (Bryan), and the thing that makes it tractable:
+
+```
+all mirrored legs
+  └─ filter: remainingSeats > 0
+      └─ filter: exclude trips/passengers not eligible to be offered
+          └─ scheduling approves the offer
+              └─ EA or passenger approves
+                  └─ broadcast to the eligible-traveller roster
+                      └─ claimed → if never flown, auto-send the passenger form
+                          └─ on final approval, write the booking to myairops
+```
+
+**The eligibility filter and the VIP-confidentiality projection are the same mechanism.**
+"Trips we would not offer seats on" and "trips this person may not see" are one rule
+evaluated for different audiences — build it once, as a projection over the mirror, and both
+the portal view and the offer pipeline consume it. Two separate filters would drift, and the
+one that drifts silently is the one that leaks a trip.
+
+**Multi-stage approval largely defuses the last-seat race.** Because every stage before the
+final write lives in myGFO, seats can be *allocated in our own store* and only written to
+myairops once. This matters more here than in ordinary booking: a broadcast puts one seat in
+front of many people at once, so contention is the normal case rather than the edge case.
+
+Two residual races remain, and both need handling regardless:
+
+- **Ops-desk bookings.** Someone books the same leg directly in myairops. Our mirror will not
+  know until the next poll, so **re-read the leg at write time** (`GET /api/TripLegs/{id}`)
+  and treat our allocation as provisional until the vendor write succeeds.
+- **The write itself is unguarded.** `POST /api/TripLegs/{id}/passengerbookings` takes no
+  `If-Match` (ASK 4). Re-reading narrows the window; it does not close it.
+
+So the broadcast must promise an *offer*, not a seat, and the claim flow must be able to
+fail gracefully at the final write. Design that state in from the start.
+
+## Passenger-change lockout
+
+Passenger modulation locks X hours before departure, with **different windows for domestic
+and international** — configurable per trip type, never a constant.
+
+For international, the window should be anchored to whatever the actual filing deadline is
+rather than picked for convenience: once APIS data is filed, a passenger change means a
+refile, so the lockout exists to protect a regulatory submission and not merely to tidy the
+manifest. Get the real deadline from scheduling and store it as configuration alongside the
+domestic window.
+
 ## Direction is now a typed property of every call
 
 `src/integration/myairops/capability.ts` classifies every operation by its effect on vendor
@@ -132,10 +180,23 @@ availability or leg-level search, steps 1–2 above may be better served by it t
 enumerating Booking-API trips. **Get that spec before building the availability index** —
 it is the cheapest thing that could invalidate this design, and it costs one email.
 
+## Decided since this note was written
+
+- **myairops is the source of truth wherever it can be**; myGFO holds what it cannot.
+  Exception pending: passenger travel documents, because CRM has no erasure path — see the
+  source-of-truth collision in `../vendor/myairops-push-scenarios.md`.
+- **Requests stay in myGFO until approved**, with a scheduling/EA message board. Only
+  approved output reaches myairops, so the vendor write surface stays narrow.
+- **EAs modulate passengers in myGFO**, not in the vendor portal.
+- **Confidentiality is enforced by us** — EAs get myGFO and no myairops portal access.
+- **Form-currency window is configurable.** 24 months was illustrative.
+
 ## Open questions this note does not resolve
 
 Carried into `CLAUDE.md` where they gate dependent work:
 
-- Passenger identity model and PII residency (step 3 above).
+- Passenger identity model and PII residency — sharpened by the source-of-truth collision;
+  the passenger app will likely be externally hosted and API-connected, not yet designed.
 - Whether the portal can confirm a seat or only request one (depends on ASK 4).
 - Whether empty-seat search is live or mirrored (depends on ASK 2 / ASK 5).
+- The real domestic and international lockout windows (scheduling owns these).

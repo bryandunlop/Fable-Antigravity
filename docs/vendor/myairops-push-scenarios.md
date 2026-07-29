@@ -21,8 +21,7 @@ below depend entirely on them.
 | # | Capability | Verdict | Gating item |
 | --- | --- | --- | --- |
 | 1 | Aircraft down / scheduled maintenance → myairops | **Possible today** | ASK 9 (`id` on create), ASK 10 (type matching) |
-| 2a | Aircraft activities (payback stop, meet) → ops board | **Possible today** | ASK 13 (semantic overload) |
-| 2b | Crew vacation → myairops schedule | **Blocked — crew have no schedule** | ASK 5 (Schedule API spec) |
+| 2 | Activity codes (VAC, PBST, MEET) → crew duties | **Blocked — crew duties are GET-only** | ASK 14 (write access) |
 | 3 | Passenger travel-form data → CRM | **Possible today** | ASK 11 (**no erasure path**) |
 | 3a | Retention purge after N years | **Blocked — no hard delete** | ASK 11 |
 | 3b | Booking flow: form currency, chase-ups | **Possible today** — mostly our logic | — |
@@ -30,6 +29,45 @@ below depend entirely on them.
 | 5 | Booking portal: hide VIP trips, show aircraft booked | **Must be ours** — **decided**, ASK 12 closed | — |
 | 6 | Passenger self-service view + shareable trip sheet | **Partly** — build the PDF ourselves | ASK 5 |
 | 7 | Alert on passenger-info change, then review | **Partly** — poll, no push | ASK 3 (webhooks) |
+
+---
+
+## Decisions (Bryan, this session)
+
+Recorded here so they are not re-litigated in code review. Where one has a consequence the
+build must honour, it is stated.
+
+| Decision | Consequence |
+| --- | --- |
+| **myairops is the source of truth wherever it can be**; myGFO stores what myairops cannot hold. Duplicating in myGFO as well is acceptable. | **Collides with the retention problem — see below.** |
+| **Aircraft requests stay in myGFO until approved**, with a shared message board between scheduling and the EAs. Only on approval does anything move into myairops. | The write surface is narrow and event-driven: nothing hits myairops until a human approves. Speculative requests never pollute the vendor schedule. |
+| **EAs always modulate passengers in myGFO**, never in myairops. | myGFO owns the passenger-manifest workflow; myairops receives the outcome. |
+| **Passenger changes lock out X hours before departure**, with different windows for domestic and international. | Configurable per trip type, not a constant. See the architecture note. |
+| **Form-currency window is configurable** — 24 months was illustrative, not decided. | Never hard-code the period. |
+| **Scheduling owns records retention** and will supply the period. | ASK 11's *period* goes to scheduling; ASK 11's *erasure capability* goes to myairops. |
+| **A conflict rule for two-way maintenance edits is in scope.** | Build it; do not assume myGFO is the only writer of MX entries. |
+| **Passenger app will likely be externally hosted, connecting via API.** | Not designed yet. Deliberately deferred. |
+
+### ⚠ The source-of-truth decision collides with the erasure gap
+
+"myairops is the source of truth wherever possible" and "there is no hard delete in CRM"
+(item 3a) cannot both hold for passenger travel documents. If myairops is authoritative for
+passports and visas, we must push them there — and once pushed, **we have no API-level way
+to delete them**, so scheduling cannot execute the retention purge they now own.
+
+Three ways out, in order of preference:
+
+1. **myairops provides an erasure path** (ASK 11). Preserves the source-of-truth rule
+   intact. Ask first.
+2. **Travel documents are the documented exception**: myGFO is authoritative for passenger
+   PII, and myairops receives the minimum projection needed to operate a trip, refreshed
+   just-in-time. The source-of-truth rule holds everywhere else. This is the fallback if
+   ASK 11 comes back negative, and it is the only option that lets a purge actually run.
+3. Accept that pushed PII is permanent. **Not recommended** — it makes the retention policy
+   unexecutable by design, and it is scheduling's policy to answer for.
+
+**Until ASK 11 is answered, do not push travel-document data.** Everything else in item 3
+(the booking flow, form currency, chase-ups) can be built meanwhile, because it is our logic.
 
 ---
 
@@ -71,60 +109,51 @@ served by the existing trip mirror.
 
 ---
 
-## 2. Activity codes: payback stop and crew vacation — **splits in two**
+## 2. Activity codes (VAC, PBST, MEET) — **blocked: crew duties are GET-only**
 
-The requirement is an **activity code** (`VAC`, `PBST`, `MEET`) landing on the myairops
-schedule, not a bespoke endpoint. That mechanism exists in the MX API — but it is
-**aircraft-scoped**, which serves one half of the requirement and not the other.
+**Confirmed (Bryan):** these are **crew duties on the Schedule API**, not aircraft events,
+and that endpoint is **read-only today**. This is the clearest, most concrete ask on the
+whole list, because it names an existing endpoint and the exact thing missing from it:
 
-### 2a. Aircraft-blocking activities (PBST, MEET) — **possible today**
+> ### ASK 14 — write access to crew duties on the Schedule API *(supersedes ASK 13)*
+> The Schedule API exposes crew duties as **GET only**. We need to **create, update and
+> delete** them so an approved vacation, payback stop or meeting in myGFO lands on the
+> myairops schedule automatically. Specifically:
+> - `POST` / `PUT` / `DELETE` on crew duties, keyed by crew member and datetime range.
+> - Which **activity codes** are valid (`VAC`, `PBST`, `MEET`, …), whether the set is
+>   operator-configurable, and whether we can define our own.
+> - How a crew member is identified on a duty — the CRM contact id, a crew id, or a code?
+> - Does a duty block that crew member from being rostered, or is it display-only?
+>
+> Until this exists, approved vacation lives in myGFO only and schedulers must read it
+> there — the sync simply cannot be built.
 
-`MaintenanceTypeModel` is, in all but name, an activity-code definition for a scheduling
-board:
+### Rejected alternative: overloading MX maintenance types
 
-```
-name, category, defaultDuration, requiresLocation,
-opsBoardConfiguration: { blockColour, badge, showInContextMenu }
-```
+Worth recording so it is not re-proposed. The MX API *does* have an activity-code-shaped
+mechanism — `MaintenanceTypeModel` carries `name`, `category`, `defaultDuration`,
+`requiresLocation` and an `opsBoardConfiguration` of `blockColour`, `badge`,
+`showInContextMenu`, and `POST /api/MaintenanceTypes` declares no required fields. It would
+render as a coloured, badged block on the ops board.
 
-A colour, a badge, and a flag for whether it appears in the ops-board context menu. So:
-`POST /api/MaintenanceTypes` defines the code once, and `POST /api/MaintenanceEntries`
-places an instance on the board for a given aircraft with a scheduled start/end, an airport,
-and a description. That renders as the coloured, badged block the requirement describes.
+**We are not using it**, for two reasons:
 
-`POST /api/MaintenanceTypes` declares no required fields, so the shape is flexible.
+1. **Wrong scope.** `MaintenanceEntryModel` requires `aircraft`. These are crew events. The
+   only way through is a placeholder aircraft, which would put false blocks on real aircraft
+   schedules — corrupting the board it is meant to inform.
+2. **Wrong semantics.** `MaintenanceEntry` carries `released` / `cancelRelease`, which are
+   airworthiness-release concepts. A vacation is not released to service.
 
-### 2b. Crew vacation (VAC) — **still blocked**
+### Where crew data does exist
 
-`MaintenanceEntryModel` **requires `aircraft`**. A crew member's vacation is not an
-aircraft event, and the only way to force it through this path is to invent a placeholder
-aircraft — which would put false blocks on real aircraft schedules and corrupt the very
-board it is meant to inform. Not an option.
+CRM knows *who* the crew are — `CrewMember` (`crewSubType`, `isCrewAppRegistered`,
+`crewAppUsername`, `hasMedicalRestriction`) and `ContactModel.isCrew` — but nothing in
+Booking, CRM or MX expresses **when one is unavailable**. `TripLegViewModel.crew` /
+`.cabinCrew` are counts of seats consumed, not assignments.
 
-Nothing else fills the gap. There is **no crew, duty, roster, vacation, leave, or absence
-endpoint in any of the three captured APIs** — absent, not restricted. Crew exist as
-*people* (CRM `CrewMember`: `crewSubType`, `isCrewAppRegistered`, `hasMedicalRestriction`;
-`ContactModel.isCrew`), so myairops knows who they are, but nothing expresses when one is
-unavailable. `TripLegViewModel.crew` / `.cabinCrew` are *counts of seats consumed*, not
-assignments.
-
-So crew availability lives or dies on the **Schedule API**, which we have no spec for.
-
-> ### ASK 13 — is the MX type/entry pair the sanctioned way to post non-maintenance activities?
-> Using a *maintenance* type to represent a payback stop is semantic overloading. Before
-> building on it, confirm with myairops:
-> - Does it distort their MX reporting, dashboards, or due-list logic?
-> - `MaintenanceEntryModel` carries `released` / `cancelRelease`, which are airworthiness-release
->   semantics. What do those mean on a non-maintenance entry — are they simply ignored?
-> - What values does `category` take, and is there one that marks an entry as non-maintenance?
-> - **Does the Schedule API have a first-class activity/event concept** — crew-scoped as well
->   as aircraft-scoped? If it does, both 2a and 2b belong there instead, and 2a should not be
->   built against MX at all.
-
-> **The Schedule API spec remains the single highest-value ask.** It gates crew vacation
-> outright, may be the correct home for aircraft activities too, and may answer leg-level
-> availability search for the booking portal (ASK 2). One email; potentially a quarter of
-> misdirected work avoided.
+> **The Schedule API spec is still the highest-value ask** — we now know it holds crew
+> duties, and it may also answer leg-level availability search for the booking portal
+> (ASK 2). Ask for the spec and the write capability in the same conversation.
 
 ---
 
@@ -290,9 +319,10 @@ accepted. ASK 3 (webhooks / `modifiedSince`) would turn it from adequate into go
    *before* item 3, not after.
 4. **Scoped API keys** (ASK 1) — the push list above spans Booking, CRM and MX, so without
    scoping we hand every service full control of all three.
-5. **Activity-code semantics** (ASK 13) — whether the MX type/entry pair is the sanctioned
-   home for non-maintenance activities, or whether the Schedule API owns them.
+5. **Write access to crew duties** (ASK 14) — an existing GET-only endpoint that needs
+   POST/PUT/DELETE. The most concrete ask on the list; pair it with the spec request in 1.
 6. **Change notification** (ASK 3), **booking concurrency** (ASK 4), **MX create semantics**
    (ASK 9, 10), then the smaller items.
 
-*(ASK 12, vendor-side confidentiality, is closed — see item 5.)*
+*(ASK 12, vendor-side confidentiality, is closed — see item 5. ASK 13 is superseded by
+ASK 14: activity codes are crew duties on the Schedule API, not MX types.)*
