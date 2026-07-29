@@ -21,12 +21,13 @@ below depend entirely on them.
 | # | Capability | Verdict | Gating item |
 | --- | --- | --- | --- |
 | 1 | Aircraft down / scheduled maintenance → myairops | **Possible today** | ASK 9 (`id` on create), ASK 10 (type matching) |
-| 2 | Crew vacation + payback stop → myairops schedule | **Blocked — no endpoint exists** | ASK 5 (Schedule API spec) |
+| 2a | Aircraft activities (payback stop, meet) → ops board | **Possible today** | ASK 13 (semantic overload) |
+| 2b | Crew vacation → myairops schedule | **Blocked — crew have no schedule** | ASK 5 (Schedule API spec) |
 | 3 | Passenger travel-form data → CRM | **Possible today** | ASK 11 (**no erasure path**) |
 | 3a | Retention purge after N years | **Blocked — no hard delete** | ASK 11 |
 | 3b | Booking flow: form currency, chase-ups | **Possible today** — mostly our logic | — |
 | 4 | myairops documents (trip sheet, EAPIS) → ForeFlight | **Blocked — no document endpoints** | ASK 5 (Attachments API spec) |
-| 5 | Booking portal: hide VIP trips, show aircraft booked | **Must be ours** — vendor cannot enforce it | ASK 12 |
+| 5 | Booking portal: hide VIP trips, show aircraft booked | **Must be ours** — **decided**, ASK 12 closed | — |
 | 6 | Passenger self-service view + shareable trip sheet | **Partly** — build the PDF ourselves | ASK 5 |
 | 7 | Alert on passenger-info change, then review | **Partly** — poll, no push | ASK 3 (webhooks) |
 
@@ -70,25 +71,60 @@ served by the existing trip mirror.
 
 ---
 
-## 2. Crew vacation and payback stop — **blocked, and this is the biggest gap**
+## 2. Activity codes: payback stop and crew vacation — **splits in two**
 
-There is **no crew, duty, roster, vacation, leave, or absence endpoint in any of the
-three captured APIs.** Not restricted — absent.
+The requirement is an **activity code** (`VAC`, `PBST`, `MEET`) landing on the myairops
+schedule, not a bespoke endpoint. That mechanism exists in the MX API — but it is
+**aircraft-scoped**, which serves one half of the requirement and not the other.
 
-Crew exist as *people*: CRM has a `CrewMember` model (`crewSubType`, `isCrewAppRegistered`,
-`crewAppUsername`, `hasMedicalRestriction`) and `ContactModel.isCrew`. So myairops knows
-who the crew are. There is no documented way to tell it when one is unavailable.
+### 2a. Aircraft-blocking activities (PBST, MEET) — **possible today**
 
-`TripLegViewModel` has `crew` and `cabinCrew` — but those are *counts of seats consumed*,
-not assignments. They cannot express "Jane is on vacation 12–19 August".
+`MaintenanceTypeModel` is, in all but name, an activity-code definition for a scheduling
+board:
 
-This capability lives or dies on the **Schedule API**, which we have no spec for. It is the
-single most valuable unknown in the whole integration: it likely also answers leg-level
-availability search for the booking portal (ASK 2).
+```
+name, category, defaultDuration, requiresLocation,
+opsBoardConfiguration: { blockColour, badge, showInContextMenu }
+```
 
-> **Recommendation: make the Schedule API spec the first thing we ask for.** Two of the
-> capabilities on this list are entirely gated on it, and a third may be redesigned by it.
-> It costs one email and could save a quarter of misdirected work.
+A colour, a badge, and a flag for whether it appears in the ops-board context menu. So:
+`POST /api/MaintenanceTypes` defines the code once, and `POST /api/MaintenanceEntries`
+places an instance on the board for a given aircraft with a scheduled start/end, an airport,
+and a description. That renders as the coloured, badged block the requirement describes.
+
+`POST /api/MaintenanceTypes` declares no required fields, so the shape is flexible.
+
+### 2b. Crew vacation (VAC) — **still blocked**
+
+`MaintenanceEntryModel` **requires `aircraft`**. A crew member's vacation is not an
+aircraft event, and the only way to force it through this path is to invent a placeholder
+aircraft — which would put false blocks on real aircraft schedules and corrupt the very
+board it is meant to inform. Not an option.
+
+Nothing else fills the gap. There is **no crew, duty, roster, vacation, leave, or absence
+endpoint in any of the three captured APIs** — absent, not restricted. Crew exist as
+*people* (CRM `CrewMember`: `crewSubType`, `isCrewAppRegistered`, `hasMedicalRestriction`;
+`ContactModel.isCrew`), so myairops knows who they are, but nothing expresses when one is
+unavailable. `TripLegViewModel.crew` / `.cabinCrew` are *counts of seats consumed*, not
+assignments.
+
+So crew availability lives or dies on the **Schedule API**, which we have no spec for.
+
+> ### ASK 13 — is the MX type/entry pair the sanctioned way to post non-maintenance activities?
+> Using a *maintenance* type to represent a payback stop is semantic overloading. Before
+> building on it, confirm with myairops:
+> - Does it distort their MX reporting, dashboards, or due-list logic?
+> - `MaintenanceEntryModel` carries `released` / `cancelRelease`, which are airworthiness-release
+>   semantics. What do those mean on a non-maintenance entry — are they simply ignored?
+> - What values does `category` take, and is there one that marks an entry as non-maintenance?
+> - **Does the Schedule API have a first-class activity/event concept** — crew-scoped as well
+>   as aircraft-scoped? If it does, both 2a and 2b belong there instead, and 2a should not be
+>   built against MX at all.
+
+> **The Schedule API spec remains the single highest-value ask.** It gates crew vacation
+> outright, may be the correct home for aircraft activities too, and may answer leg-level
+> availability search for the booking portal (ASK 2). One email; potentially a quarter of
+> misdirected work avoided.
 
 ---
 
@@ -186,14 +222,27 @@ This is a second, independent argument for the mirror architecture — the empty
 constraint was the first. It also means the trip sheet in item 6 should be **ours**, because
 the redaction rules that govern who sees what have to be applied at document generation too.
 
-One caveat worth being clear-eyed about:
+### DECIDED — the confidentiality boundary is myGFO, and that is accepted
 
-> ### ASK 12 — confidentiality in myairops' own portal
-> Our masking only protects **our** portal. Anyone using the myairops portal or holding an
-> API key sees everything. Does myairops support trip-level confidentiality or per-user
-> visibility rules natively? If not, the requirement holds only for people who use our
-> portal, and we should decide deliberately whether that is acceptable — it may mean
-> restricting direct myairops access for some roles.
+**Resolved (Bryan, this session):** EAs are given the myGFO platform and *not* myairops
+portal access, so they never see the unmasked myairops schedule. Masking is entirely our
+logic. ASK 12 is closed — we do not need a vendor-side confidentiality feature.
+
+Three consequences that follow from that decision, and that the build has to honour:
+
+1. **The boundary moved inside myGFO.** Our sync service still ingests unmasked data with a
+   full-access key. So the confidentiality control is now our role model, and it has to hold
+   across *every* surface that touches the mirror — not just the portal page, but exports,
+   printed documents, search results, notifications, and any debug or admin view. This is
+   the argument for default-deny projection over filter-after-fetch: a filter you forget to
+   apply on a new surface leaks; a projection that never loads the field cannot.
+2. **Anyone with a myairops login still sees everything.** That is fine for operational
+   staff, and it is now an access-administration matter — the guarantee holds exactly as
+   long as the "EAs don't get myairops accounts" rule does. Worth writing down as policy
+   rather than leaving as a deployment accident.
+3. **myGFO has to be good enough to replace the portal for EAs.** If they have no myairops
+   access, everything they currently do there has to exist in ours. That is a scope
+   implication of the privacy decision, not a separate project.
 
 ---
 
@@ -241,7 +290,9 @@ accepted. ASK 3 (webhooks / `modifiedSince`) would turn it from adequate into go
    *before* item 3, not after.
 4. **Scoped API keys** (ASK 1) — the push list above spans Booking, CRM and MX, so without
    scoping we hand every service full control of all three.
-5. **Confidentiality model** (ASK 12) — determines whether the VIP-hiding requirement can
-   hold at all outside our own portal.
+5. **Activity-code semantics** (ASK 13) — whether the MX type/entry pair is the sanctioned
+   home for non-maintenance activities, or whether the Schedule API owns them.
 6. **Change notification** (ASK 3), **booking concurrency** (ASK 4), **MX create semantics**
    (ASK 9, 10), then the smaller items.
+
+*(ASK 12, vendor-side confidentiality, is closed — see item 5.)*
