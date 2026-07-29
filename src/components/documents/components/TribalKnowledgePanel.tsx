@@ -5,6 +5,7 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { GfoEmptyState } from '../../gfo';
 import { useDocuments } from '../DocumentsContext';
+import { isLiveComment } from '../types';
 import { classFor } from '../classes';
 import { canAuthor } from '../engine/lifecycle';
 import { currentRevision } from '../engine/revisions';
@@ -48,7 +49,8 @@ export function TribalKnowledgePanel({ userRole, additionalRoles = [] }: { userR
         <div className="grid gap-3 sm:grid-cols-2">
           {entries.map((doc) => {
             const rev = currentRevision(doc.id, state.revisions);
-            const comments = state.comments.filter((c) => c.docId === doc.id).length;
+            // A withdrawn comment is a tombstone, not a field note — don't count it.
+            const comments = state.comments.filter((c) => c.docId === doc.id && isLiveComment(c)).length;
             const stale = reviewStatus(doc, todayIso) === 'overdue';
             const sugs = suggestionCounts(state.suggestions, doc.id);
             return (

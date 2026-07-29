@@ -159,7 +159,16 @@ export interface DocAcknowledgment {
   superseded?: boolean;
 }
 
-/** Tribal-knowledge discussion thread entry. */
+/**
+ * Tribal-knowledge discussion thread entry.
+ *
+ * Working discussion, not a signed ledger record — but corrections are still
+ * MARKED, never silent. `DocSuggestionReply` is deliberately append-only for the
+ * same reason (a reader who acted on what a comment said must be able to see that
+ * it since changed), so an edit stamps `editedAtUtc` and a delete is a tombstone
+ * (`deletedAtUtc`) rather than a row disappearing out of a thread other people
+ * have replied to. Author-only, enforced in the reducer.
+ */
 export interface DocComment {
   id: string;
   docId: string;
@@ -168,6 +177,17 @@ export interface DocComment {
   role: string;
   text: string;
   createdAtUtc: string;
+  /** Set when the author revised the text — the thread says "edited". */
+  editedAtUtc?: string;
+  /** Set when the author withdrew it. The row is kept and rendered as a
+   *  tombstone; the text is cleared, since withdrawing is the author saying
+   *  "do not rely on what I wrote". */
+  deletedAtUtc?: string;
+}
+
+/** A comment still standing (not withdrawn) — the count crews are shown. */
+export function isLiveComment(c: DocComment): boolean {
+  return !c.deletedAtUtc;
 }
 
 /** Reader feedback routed to the doc owner (Comply365-style crew→manual loop). */

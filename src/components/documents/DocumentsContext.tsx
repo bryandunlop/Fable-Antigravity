@@ -165,6 +165,8 @@ export type DocumentsAction =
   | { type: 'PUBLISH_DIRECT'; payload: { revisionId: string; atUtc: string; today: string } }
   | { type: 'ACKNOWLEDGE'; payload: { ack: DocAcknowledgment; signature?: Signature } }
   | { type: 'ADD_COMMENT'; payload: DocComment }
+  | { type: 'EDIT_COMMENT'; payload: { id: string; text: string; actorUserId: string; atUtc: string } }
+  | { type: 'DELETE_COMMENT'; payload: { id: string; actorUserId: string; atUtc: string } }
   | { type: 'ADD_SUGGESTION'; payload: DocSuggestion }
   | { type: 'ADD_SUGGESTION_REPLY'; payload: DocSuggestionReply }
   | {
@@ -462,6 +464,50 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       }
       return { ...state, comments: [...state.comments, action.payload] };
     }
+    case 'EDIT_COMMENT':
+    case 'DELETE_COMMENT': {
+      // D60 audit finding: comment authors could not correct or withdraw their own
+      // field notes. Both mutations are AUTHOR-ONLY and the check lives HERE, not in
+      // the thread UI — the same C12 discipline every other gate in this reducer
+      // follows. Note the class gate is `commentsEnabled`, not `classId ===
+      // 'tribal-knowledge'`: tribal knowledge is the only comment-enabled class
+      // today, so this changes nothing else, but the gate is structural and any
+      // future comment-enabled class inherits it.
+      const p = action.payload;
+      const existing = state.comments.find((c) => c.id === p.id);
+      if (!existing) {
+        warnNoop(`no comment ${p.id}`);
+        return state;
+      }
+      const doc = state.docs.find((d) => d.id === existing.docId);
+      if (!doc || !classFor(doc.classId).commentsEnabled) {
+        warnNoop('comments are not enabled for this document class');
+        return state;
+      }
+      if (existing.authorUserId !== p.actorUserId) {
+        warnNoop('only the author may edit or withdraw their own comment');
+        return state;
+      }
+      if (existing.deletedAtUtc) {
+        warnNoop('a withdrawn comment cannot be changed');
+        return state;
+      }
+      const next: DocComment =
+        action.type === 'DELETE_COMMENT'
+          ? { ...existing, text: '', deletedAtUtc: p.atUtc }
+          : { ...existing, text: (action.payload as { text: string }).text.trim(), editedAtUtc: p.atUtc };
+      if (action.type === 'EDIT_COMMENT') {
+        const text = (action.payload as { text: string }).text.trim();
+        if (!text) {
+          warnNoop('a comment cannot be edited to empty — withdraw it instead');
+          return state;
+        }
+        // Re-saving the same text must not stamp "edited": that would claim a
+        // revision the author never made.
+        if (text === existing.text) return state;
+      }
+      return { ...state, comments: state.comments.map((c) => (c.id === p.id ? next : c)) };
+    }
     case 'ADD_SUGGESTION': {
       // Any reader may file a suggestion (no role gate), but it must target a
       // real doc + revision — structural guard, C12.
@@ -565,6 +611,10 @@ interface Ctx {
   /** High-consequence acknowledgment via the shared sign ceremony. */
   acknowledgeSignature: (doc: Doc, rev: DocRevision, signature: Signature, userRole: string) => void;
   addComment: (docId: string, text: string, userRole: string) => void;
+  /** Author-only; stamps `editedAtUtc` (reducer-enforced, never a silent rewrite). */
+  editComment: (commentId: string, text: string, userRole: string) => void;
+  /** Author-only; tombstones the row rather than dropping it. */
+  deleteComment: (commentId: string, userRole: string) => void;
   addSuggestion: (input: {
     doc: Doc;
     rev: DocRevision;
@@ -707,6 +757,16 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const editComment = useCallback<Ctx['editComment']>((commentId, text, userRole) => {
+    const { userId } = identityFor(userRole);
+    dispatch({ type: 'EDIT_COMMENT', payload: { id: commentId, text, actorUserId: userId, atUtc: nowUtc() } });
+  }, []);
+
+  const deleteComment = useCallback<Ctx['deleteComment']>((commentId, userRole) => {
+    const { userId } = identityFor(userRole);
+    dispatch({ type: 'DELETE_COMMENT', payload: { id: commentId, actorUserId: userId, atUtc: nowUtc() } });
+  }, []);
+
   const addSuggestion = useCallback<Ctx['addSuggestion']>((input) => {
     const { userId, userName } = identityFor(input.userRole);
     const suggestion: DocSuggestion = {
@@ -800,6 +860,8 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     acknowledgeInitials,
     acknowledgeSignature,
     addComment,
+    editComment,
+    deleteComment,
     addSuggestion,
     resolveSuggestion,
     addSuggestionReply,
