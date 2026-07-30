@@ -10,6 +10,15 @@
 // Pure derivation, no React and no storage: the catalog is never a stored list,
 // it is a projection of whatever tribal-knowledge entries are published right
 // now. Publishing a new entry makes it appear in the picker with no sync step.
+//
+// D65 — WHY EVERY LOOKUP HERE STARTS FROM A REVISION. The CAS facts hang off
+// `DocRevision`, not off the `Doc` identity row, and this file reaches them only
+// through `currentRevision()` (engine/revisions.ts), which returns a revision with
+// `status === 'published'` or nothing. So "the picker only ever offers published
+// knowledge" is not a filter this file applies and a future edit could drop — the
+// unpublished value has no path into the catalog at all. That matters because the
+// catalog feeds the intake form for a signed airworthiness record and the colour it
+// offers is what the FIR safety fast path reads.
 import type { AircraftType, CasColor } from '../../tech-log/types';
 import type { Doc, DocRevision } from '../types';
 import { currentRevision } from './revisions';
@@ -34,19 +43,25 @@ export interface CasCatalogEntry {
   fleetTypes: AircraftType[];
 }
 
-/** A structured CAS entry (has `casMeta`) as opposed to a freeform article. */
-export function isCasEntry(doc: Doc): boolean {
-  return !!doc.casMeta;
+/** A structured CAS entry (has `casMeta`) as opposed to a freeform article.
+ *  Takes the REVISION: which kind an entry is can change from one revision to the
+ *  next, and only the published answer counts. */
+export function isCasEntry(rev: DocRevision): boolean {
+  return !!rev.casMeta;
 }
 
-/** Doc-level fleet applicability. An entry with no `fleetTypes` is library
+/** Fleet applicability as PUBLISHED. A revision with no `fleetTypes` is library
  *  content, not fleet knowledge, and is never offered under a fleet filter. */
-export function appliesToFleet(doc: Doc, fleetType: AircraftType): boolean {
-  return !!doc.fleetTypes?.includes(fleetType);
+export function appliesToFleet(rev: DocRevision, fleetType: AircraftType): boolean {
+  return !!rev.fleetTypes?.includes(fleetType);
 }
 
-/** Tribal-knowledge entries for one fleet type that are live right now:
- *  correct class, not archived, and carrying a published revision. */
+/** Tribal-knowledge entries for one fleet type that are live right now: correct
+ *  class, not archived, and carrying a published revision that names the type.
+ *
+ *  The applicability test runs against the PUBLISHED revision, so re-scoping an
+ *  entry to another fleet only takes effect when that edit publishes — the same
+ *  boundary the message and colour get. */
 function liveFleetEntries(
   docs: Doc[],
   revisions: DocRevision[],
@@ -55,11 +70,11 @@ function liveFleetEntries(
   const out: { doc: Doc; rev: DocRevision }[] = [];
   for (const doc of docs) {
     if (doc.classId !== CAS_KNOWLEDGE_CLASS_ID || doc.isArchived) continue;
-    if (!appliesToFleet(doc, fleetType)) continue;
-    const rev = currentRevision(doc.id, revisions);
     // A draft a curator is still writing is not knowledge yet, and a withdrawn or
     // superseded revision is not what the fleet is told to rely on today.
+    const rev = currentRevision(doc.id, revisions);
     if (!rev) continue;
+    if (!appliesToFleet(rev, fleetType)) continue;
     out.push({ doc, rev });
   }
   return out;
@@ -77,15 +92,15 @@ function liveFleetEntries(
  */
 export function casCatalog(docs: Doc[], revisions: DocRevision[], fleetType: AircraftType): CasCatalogEntry[] {
   return liveFleetEntries(docs, revisions, fleetType)
-    .filter(({ doc }) => isCasEntry(doc))
+    .filter(({ rev }) => isCasEntry(rev))
     .map(({ doc, rev }) => ({
       docId: doc.id,
       revisionId: rev.id,
       title: doc.title,
-      casMessage: doc.casMeta!.casMessage,
-      casColor: doc.casMeta!.casColor,
-      cmcCodes: doc.casMeta!.cmcCodes ?? [],
-      fleetTypes: doc.fleetTypes ?? [],
+      casMessage: rev.casMeta!.casMessage,
+      casColor: rev.casMeta!.casColor,
+      cmcCodes: rev.casMeta!.cmcCodes ?? [],
+      fleetTypes: rev.fleetTypes ?? [],
     }))
     .sort(
       (a, b) =>
@@ -98,7 +113,7 @@ export function casCatalog(docs: Doc[], revisions: DocRevision[], fleetType: Air
  *  type that is NOT a single-CAS entry (startup stacks, nuisance notes). */
 export function fleetArticles(docs: Doc[], revisions: DocRevision[], fleetType: AircraftType): Doc[] {
   return liveFleetEntries(docs, revisions, fleetType)
-    .filter(({ doc }) => !isCasEntry(doc))
+    .filter(({ rev }) => !isCasEntry(rev))
     .map(({ doc }) => doc)
     .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || a.title.localeCompare(b.title));
 }

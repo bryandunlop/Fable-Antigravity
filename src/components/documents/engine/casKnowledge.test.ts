@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Doc, DocRevision } from '../types';
+import type { AircraftType } from '../../tech-log/types';
+import type { Doc, DocCasMeta, DocRevision } from '../types';
 import {
   appliesToFleet, casCatalog, fleetArticles, isCasEntry, matchCasCatalog, catalogEntryForMessage,
   catalogEntriesForMessage, duplicateCasMessages,
@@ -16,76 +17,97 @@ import {
  *   2. only a PUBLISHED revision counts (a draft entry a curator is still writing is not knowledge);
  *   3. an archived entry drops out;
  *   4. structured CAS entries and freeform articles are disjoint sets, split on `casMeta`.
+ *
+ * D65 — the CAS facts moved from the `Doc` row onto `DocRevision`, so an entry here is a
+ * (doc, revision) PAIR and every fixture below builds both. `casDraftBoundary.test.tsx` holds the
+ * property that shape exists for; these tests keep asserting the catalog's behaviour.
  */
 
-const doc = (over: Partial<Doc> & { id: string }): Doc => ({
-  classId: 'tribal-knowledge',
-  title: `Entry ${over.id}`,
-  category: 'Aircraft Quirks',
-  roles: ['all'],
-  ownerUserId: 'USR002',
-  ownerName: 'Sarah Wilson',
-  tags: [],
-  isPinned: false,
-  isArchived: false,
-  createdDate: '2026-07-01',
-  ...over,
+interface EntrySpec {
+  id: string;
+  title?: string;
+  classId?: string;
+  isArchived?: boolean;
+  status?: DocRevision['status'];
+  fleetTypes?: AircraftType[];
+  casMeta?: DocCasMeta;
+}
+
+const entry = ({ id, title, classId, isArchived, status, fleetTypes, casMeta }: EntrySpec): {
+  doc: Doc;
+  rev: DocRevision;
+} => ({
+  doc: {
+    id,
+    classId: classId ?? 'tribal-knowledge',
+    title: title ?? `Entry ${id}`,
+    category: 'Aircraft Quirks',
+    roles: ['all'],
+    ownerUserId: 'USR002',
+    ownerName: 'Sarah Wilson',
+    tags: [],
+    isPinned: false,
+    isArchived: isArchived ?? false,
+    createdDate: '2026-07-01',
+  },
+  rev: {
+    id: `${id}-r1`,
+    docId: id,
+    revision: '1.0',
+    status: status ?? 'published',
+    sections: [],
+    changeSummary: '',
+    effectiveDate: '2026-07-01',
+    authorUserId: 'USR002',
+    authorName: 'Sarah Wilson',
+    requireAcknowledgment: false,
+    ackLevel: 'none',
+    mockChecksum: 'abc',
+    fleetTypes,
+    casMeta,
+  },
 });
 
-const rev = (docId: string, status: DocRevision['status'] = 'published'): DocRevision => ({
-  id: `${docId}-r1`,
-  docId,
-  revision: '1.0',
-  status,
-  sections: [],
-  changeSummary: '',
-  effectiveDate: '2026-07-01',
-  authorUserId: 'USR002',
-  authorName: 'Sarah Wilson',
-  requireAcknowledgment: false,
-  ackLevel: 'none',
-  mockChecksum: 'abc',
-});
-
-const CAS_650 = doc({
+const CAS_650 = entry({
   id: 'TK-100',
   title: 'R ENG CHIP — what it means and what it does not',
   fleetTypes: ['G650ER'],
   casMeta: { casMessage: 'R ENG CHIP', casColor: 'RED', cmcCodes: ['79-3100-02'] },
 });
-const CAS_500 = doc({
+const CAS_500 = entry({
   id: 'TK-101',
   title: 'GPS 1 ADVISORY nuisance behaviour',
   fleetTypes: ['G500'],
   casMeta: { casMessage: 'GPS 1 ADVISORY', casColor: 'WHITE' },
 });
-const CAS_BOTH = doc({
+const CAS_BOTH = entry({
   id: 'TK-102',
   title: 'CABIN TEMP — zone controller quirks',
   fleetTypes: ['G650ER', 'G500'],
   casMeta: { casMessage: 'CABIN TEMP', casColor: 'CYAN' },
 });
-const ARTICLE_650 = doc({ id: 'TK-103', title: 'Normal startup CAS stack', fleetTypes: ['G650ER'] });
-const UNTAGGED = doc({ id: 'TK-104', title: 'KTEB ramp construction' });
+const ARTICLE_650 = entry({ id: 'TK-103', title: 'Normal startup CAS stack', fleetTypes: ['G650ER'] });
+const UNTAGGED = entry({ id: 'TK-104', title: 'KTEB ramp construction' });
 
-const REVS = [CAS_650, CAS_500, CAS_BOTH, ARTICLE_650, UNTAGGED].map((d) => rev(d.id));
-const DOCS = [CAS_650, CAS_500, CAS_BOTH, ARTICLE_650, UNTAGGED];
+const ALL = [CAS_650, CAS_500, CAS_BOTH, ARTICLE_650, UNTAGGED];
+const DOCS = ALL.map((e) => e.doc);
+const REVS = ALL.map((e) => e.rev);
 
 describe('appliesToFleet', () => {
   it('matches on the canonical type string', () => {
-    expect(appliesToFleet(CAS_650, 'G650ER')).toBe(true);
-    expect(appliesToFleet(CAS_650, 'G500')).toBe(false);
+    expect(appliesToFleet(CAS_650.rev, 'G650ER')).toBe(true);
+    expect(appliesToFleet(CAS_650.rev, 'G500')).toBe(false);
   });
 
   it('a multi-type entry applies to every type it names', () => {
-    expect(appliesToFleet(CAS_BOTH, 'G650ER')).toBe(true);
-    expect(appliesToFleet(CAS_BOTH, 'G500')).toBe(true);
-    expect(appliesToFleet(CAS_BOTH, 'G800')).toBe(false);
+    expect(appliesToFleet(CAS_BOTH.rev, 'G650ER')).toBe(true);
+    expect(appliesToFleet(CAS_BOTH.rev, 'G500')).toBe(true);
+    expect(appliesToFleet(CAS_BOTH.rev, 'G800')).toBe(false);
   });
 
   it('an untagged entry is not fleet-scoped and never matches a fleet filter', () => {
-    expect(appliesToFleet(UNTAGGED, 'G650ER')).toBe(false);
-    expect(appliesToFleet(doc({ id: 'TK-105', fleetTypes: [] }), 'G650ER')).toBe(false);
+    expect(appliesToFleet(UNTAGGED.rev, 'G650ER')).toBe(false);
+    expect(appliesToFleet(entry({ id: 'TK-105', fleetTypes: [] }).rev, 'G650ER')).toBe(false);
   });
 });
 
@@ -111,7 +133,7 @@ describe('casCatalog', () => {
   });
 
   it('excludes entries whose only revision is a draft', () => {
-    const draftOnly = [...REVS.filter((r) => r.docId !== 'TK-100'), rev('TK-100', 'draft')];
+    const draftOnly = REVS.map((r) => (r.docId === 'TK-100' ? { ...r, status: 'draft' as const } : r));
     expect(casCatalog(DOCS, draftOnly, 'G650ER').map((e) => e.docId)).not.toContain('TK-100');
   });
 
@@ -121,13 +143,13 @@ describe('casCatalog', () => {
   });
 
   it('ignores docs from other classes even if they somehow carry casMeta', () => {
-    const foreign = doc({
+    const foreign = entry({
       id: 'SOP-900',
       classId: 'sop',
       fleetTypes: ['G650ER'],
       casMeta: { casMessage: 'SHOULD NOT APPEAR', casColor: 'AMBER' },
     });
-    const entries = casCatalog([...DOCS, foreign], [...REVS, rev('SOP-900')], 'G650ER');
+    const entries = casCatalog([...DOCS, foreign.doc], [...REVS, foreign.rev], 'G650ER');
     expect(entries.map((e) => e.casMessage)).not.toContain('SHOULD NOT APPEAR');
   });
 
@@ -159,7 +181,7 @@ describe('fleetArticles', () => {
   });
 
   it('excludes an unpublished article', () => {
-    const drafted = [...REVS.filter((r) => r.docId !== 'TK-103'), rev('TK-103', 'draft')];
+    const drafted = REVS.map((r) => (r.docId === 'TK-103' ? { ...r, status: 'draft' as const } : r));
     expect(fleetArticles(DOCS, drafted, 'G650ER')).toEqual([]);
   });
 
@@ -170,8 +192,8 @@ describe('fleetArticles', () => {
 
 describe('isCasEntry', () => {
   it('splits the two kinds on casMeta', () => {
-    expect(isCasEntry(CAS_650)).toBe(true);
-    expect(isCasEntry(ARTICLE_650)).toBe(false);
+    expect(isCasEntry(CAS_650.rev)).toBe(true);
+    expect(isCasEntry(ARTICLE_650.rev)).toBe(false);
   });
 });
 
@@ -196,13 +218,13 @@ describe('matchCasCatalog', () => {
 
   it('caps the list the way the MEL picker does', () => {
     const many = Array.from({ length: 40 }, (_, i) =>
-      doc({
+      entry({
         id: `TK-2${String(i).padStart(2, '0')}`,
         fleetTypes: ['G800'],
         casMeta: { casMessage: `MSG ${i}`, casColor: 'AMBER' },
       }),
     );
-    const built = casCatalog(many, many.map((d) => rev(d.id)), 'G800');
+    const built = casCatalog(many.map((e) => e.doc), many.map((e) => e.rev), 'G800');
     expect(built.length).toBe(40);
     expect(matchCasCatalog(built, '').length).toBe(25);
   });
@@ -231,14 +253,14 @@ describe('catalogEntryForMessage', () => {
 describe('duplicate CAS messages across entries', () => {
   // Deliberately a HIGHER doc id than TK-100 and a DIFFERENT colour: if the tie-break were
   // accidental, or if a caller silently adopted a colour, this is the entry that would show it.
-  const DUPE = doc({
+  const DUPE = entry({
     id: 'TK-199',
     title: 'R ENG CHIP — second opinion from the night shift',
     fleetTypes: ['G650ER'],
     casMeta: { casMessage: 'r eng chip', casColor: 'AMBER' },
   });
-  const docs = [...DOCS, DUPE];
-  const revs = [...REVS, rev('TK-199')];
+  const docs = [...DOCS, DUPE.doc];
+  const revs = [...REVS, DUPE.rev];
   const dupEntries = casCatalog(docs, revs, 'G650ER');
 
   it('keeps BOTH entries in the catalog — neither curator is silently dropped', () => {

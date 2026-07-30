@@ -54,7 +54,7 @@ describe('DATA_VERSION', () => {
   // Pins the CURRENT version, so a bump is always a deliberate edit here too. The rule
   // that actually protects stored data — every live version ships a migration step — is
   // asserted in casKnowledgeSeeds.test.ts.
-  it('is the version this slice bumped to (D60 CAS knowledge)', () => {
-    expect(DATA_VERSION).toBe('2026-07-29-tk002-fleet-v1');
+  it('is the version this slice bumped to (D65 — CAS meta onto DocRevision)', () => {
+    expect(DATA_VERSION).toBe('2026-07-30-cas-on-revision-v1');
   });
 });

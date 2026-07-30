@@ -25,10 +25,10 @@ export interface DocBlock {
   calloutKind?: 'note' | 'caution' | 'warning';
   splitFrom?: string;         // lineage when a block is split (set by the editor in Slice 3)
   /** Per-tail/type applicability of THIS BLOCK — field now, UI later (spec D-12).
-   * Not the same axis as `Doc.fleetTypes` (D60), which is doc-level: "this whole
-   * entry is about the G500". A block-level effectivity says "this paragraph
-   * applies only to these tails inside an otherwise shared document". Both can
-   * coexist; neither supersedes the other, so this is not a fork. */
+   * Not the same axis as `DocRevision.fleetTypes` (D60/D65), which scopes the whole
+   * entry: "this entry is about the G500". A block-level effectivity says "this
+   * paragraph applies only to these tails inside an otherwise shared document".
+   * Both can coexist; neither supersedes the other, so this is not a fork. */
   effectivity?: string[];
   figureRef?: string;         // image src for 'figure' blocks
   /** Regulation requirement ids this block satisfies (into regCatalog) — G1
@@ -47,7 +47,7 @@ export interface DocSection {
 /**
  * D60 — the structured half of a CAS tribal-knowledge entry: what the message is
  * called and what colour tier the flight deck shows it in. Present only on
- * tribal-knowledge docs that describe ONE CAS message; a freeform article
+ * tribal-knowledge REVISIONS that describe ONE CAS message; a freeform article
  * (startup CAS stack, nuisance notes) carries `fleetTypes` and no `casMeta`.
  *
  * This is REFERENCE content. It is adjacent to airworthiness records and never
@@ -86,21 +86,8 @@ export interface Doc {
   /** ISO date; staleness / overdue-for-review derives from this. */
   nextReviewDate?: string;
   createdDate: string;
-  /**
-   * D60 — fleet-type applicability of the whole entry, canonical strings
-   * (`'G650ER' | 'G500' | 'G800'`). Drives the tail page's Reference tab and the
-   * defect-form CAS picker: a tail only ever sees knowledge tagged for its own type.
-   *
-   * ONE field for both kinds of entry. D60's shape put `fleetTypes` inside
-   * `casMeta`, but freeform articles need the same applicability with no `casMeta`
-   * at all — two fields carrying the same fact would be the fork D29 exists to
-   * avoid, so applicability lives here and `casMeta` carries only the structured
-   * CAS half. Absent/empty = not fleet-scoped (every existing entry, e.g. the KTEB
-   * ramp note), and such an entry is never offered under a fleet filter.
-   */
-  fleetTypes?: AircraftType[];
-  /** D60 — set only on a structured CAS entry; absent on freeform articles. */
-  casMeta?: DocCasMeta;
+  // D65 — `fleetTypes` and `casMeta` used to live HERE. They now ride DocRevision:
+  // see the note on those fields below.
 }
 
 export interface DocRevision {
@@ -136,6 +123,36 @@ export interface DocRevision {
    * through four-eyes; applied to the Doc when the revision publishes. A live
    * controlled doc's meta is never edited in place (C1). */
   proposedMeta?: { title: string; category: string; roles: string[]; tags: string[] };
+  /**
+   * D65 — fleet-type applicability of this entry, canonical strings
+   * (`'G650ER' | 'G500' | 'G800'`). Drives the tail page's Reference tab and the
+   * defect-form CAS picker: a tail only ever sees knowledge tagged for its own type.
+   * Absent/empty = not fleet-scoped (e.g. the KTEB ramp note), and such an entry is
+   * never offered under a fleet filter.
+   *
+   * **WHY THIS IS ON THE REVISION AND NOT ON THE `Doc` (D65).** The picker feeds the
+   * intake form for a SIGNED airworthiness record, and the colour it fills in is what
+   * the FIR safety fast path reads (`fir/engine/suggestions.ts`). "Only published
+   * knowledge is ever offered" therefore has to be a property of the engine. `Doc` is
+   * the mutable identity row — anything on it is live the moment it is written — so
+   * with these fields there, the property held only because one dialog footer happens
+   * not to render a "Save draft" button for this class. On the revision, `casCatalog`
+   * reaches them through `currentRevision()`, which returns a published revision or
+   * nothing: a draft's CAS facts are not filtered out, they are unreachable.
+   *
+   * ONE field for both kinds of entry. D60's shape put `fleetTypes` inside `casMeta`,
+   * but freeform articles need the same applicability with no `casMeta` at all — two
+   * fields carrying the same fact would be the fork D29 exists to avoid.
+   *
+   * This is NOT part of `proposedMeta`. That carries the four-eyes identity fields for
+   * CONTROLLED classes and is applied to the `Doc` by `applyPublish`; these fields are
+   * read off the revision itself and are never copied onto the doc, which is the whole
+   * point. The four controlled classes never set either field.
+   */
+  fleetTypes?: AircraftType[];
+  /** D60/D65 — set only on a structured CAS entry; absent on freeform articles.
+   *  Lives on the revision for the reason given on `fleetTypes` above. */
+  casMeta?: DocCasMeta;
   /** Legacy bulletins 'lastUpdated' display date — preserved for lossless round-trips. */
   lastUpdatedDate?: string;
   images?: BulletinImage[];

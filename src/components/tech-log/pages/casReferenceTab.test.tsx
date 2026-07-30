@@ -34,56 +34,65 @@ import AircraftDetail from './AircraftDetail';
  * direction, because a fix that locks out real curators is not a fix.
  */
 
-const tkDoc = (over: Partial<Doc> & { id: string }): Doc => ({
-  classId: 'tribal-knowledge',
-  title: `Entry ${over.id}`,
-  category: 'Aircraft Quirks',
-  roles: ['all'],
-  ownerUserId: 'USR002',
-  ownerName: 'Sarah Wilson',
-  tags: [],
-  isPinned: false,
-  isArchived: false,
-  createdDate: '2026-07-01',
-  ...over,
+/** D65 — the CAS facts ride the revision, so a fixture entry is a (doc, published revision) pair. */
+const entry = (over: {
+  id: string;
+  title: string;
+  fleetTypes?: DocRevision['fleetTypes'];
+  casMeta?: DocRevision['casMeta'];
+}): { doc: Doc; rev: DocRevision } => ({
+  doc: {
+    id: over.id,
+    classId: 'tribal-knowledge',
+    title: over.title,
+    category: 'Aircraft Quirks',
+    roles: ['all'],
+    ownerUserId: 'USR002',
+    ownerName: 'Sarah Wilson',
+    tags: [],
+    isPinned: false,
+    isArchived: false,
+    createdDate: '2026-07-01',
+  },
+  rev: {
+    id: `${over.id}-r1`,
+    docId: over.id,
+    revision: '1.0',
+    status: 'published',
+    sections: [],
+    changeSummary: '',
+    effectiveDate: '2026-07-01',
+    authorUserId: 'USR002',
+    authorName: 'Sarah Wilson',
+    requireAcknowledgment: false,
+    ackLevel: 'none',
+    mockChecksum: 'abc',
+    fleetTypes: over.fleetTypes,
+    casMeta: over.casMeta,
+  },
 });
 
-const published = (docId: string): DocRevision => ({
-  id: `${docId}-r1`,
-  docId,
-  revision: '1.0',
-  status: 'published',
-  sections: [],
-  changeSummary: '',
-  effectiveDate: '2026-07-01',
-  authorUserId: 'USR002',
-  authorName: 'Sarah Wilson',
-  requireAcknowledgment: false,
-  ackLevel: 'none',
-  mockChecksum: 'abc',
-});
-
-const DOCS: Doc[] = [
-  tkDoc({
+const ENTRIES = [
+  entry({
     id: 'TK-900',
     title: 'R ENG CHIP on the 650 — what it means',
     fleetTypes: ['G650ER'],
     casMeta: { casMessage: 'R ENG CHIP', casColor: 'RED', cmcCodes: ['79-3100-02'] },
   }),
-  tkDoc({
+  entry({
     id: 'TK-901',
     title: 'GPS 1 ADVISORY on the 500 — nuisance behaviour',
     fleetTypes: ['G500'],
     casMeta: { casMessage: 'GPS 1 ADVISORY', casColor: 'WHITE' },
   }),
-  tkDoc({ id: 'TK-902', title: 'Normal startup CAS stack — G650ER', fleetTypes: ['G650ER'] }),
-  tkDoc({ id: 'TK-903', title: 'Normal startup CAS stack — G500', fleetTypes: ['G500'] }),
+  entry({ id: 'TK-902', title: 'Normal startup CAS stack — G650ER', fleetTypes: ['G650ER'] }),
+  entry({ id: 'TK-903', title: 'Normal startup CAS stack — G500', fleetTypes: ['G500'] }),
 ];
 
 function renderTail(tail: string, loginRole = 'maintenance', additionalRoles: string[] = ['dom']) {
   const seed: Partial<DocumentsState> = {
-    docs: DOCS,
-    revisions: DOCS.map((d) => published(d.id)),
+    docs: ENTRIES.map((e) => e.doc),
+    revisions: ENTRIES.map((e) => e.rev),
     comments: [],
   };
   localStorage.setItem(DOCS_VERSION_KEY, DOCS_DATA_VERSION);

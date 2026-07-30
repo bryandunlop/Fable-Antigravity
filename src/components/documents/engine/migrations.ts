@@ -6,8 +6,20 @@
 // stored version has no matching step the state passes through unchanged —
 // graceful degradation, never data loss. New seed content for existing stores
 // is also a migration step's job (a fresh install gets it from the seeds).
-import type { DocumentsState } from '../types';
+import type { AircraftType } from '../../tech-log/types';
+import type { Doc, DocCasMeta, DocumentsState } from '../types';
 import { safetyReadSeed, casKnowledgeSeed, TK_002_FLEET_TYPES } from '../mockData';
+
+/**
+ * The PRE-D65 doc shape: D60 hung the CAS facts off the mutable `Doc` identity row.
+ *
+ * Kept as a type here and nowhere else, because a migration step describes the shape of the era it
+ * upgrades FROM — the '2026-07-29-tk002-fleet-v1' step below genuinely wrote a doc-level tag, and
+ * rewriting history to pretend otherwise would make the step lie about the stores it produced.
+ * Nothing outside this file may read these fields: the live shape is `DocRevision.fleetTypes` /
+ * `DocRevision.casMeta`.
+ */
+type LegacyCasDoc = Doc & { fleetTypes?: AircraftType[]; casMeta?: DocCasMeta };
 
 export interface StoredStateMigration {
   /** The DATA_VERSION this step upgrades TO. Steps run in ascending order. */
@@ -68,11 +80,65 @@ export const STORED_STATE_MIGRATIONS: StoredStateMigration[] = [
     // state this step is entitled to write.
     to: '2026-07-29-tk002-fleet-v1',
     migrate: (s) => {
-      const existing = s.docs.find((d) => d.id === 'TK-002');
+      const existing = s.docs.find((d) => d.id === 'TK-002') as LegacyCasDoc | undefined;
       if (!existing || existing.fleetTypes !== undefined) return s;
       return {
         ...s,
-        docs: s.docs.map((d) => (d.id === 'TK-002' ? { ...d, fleetTypes: [...TK_002_FLEET_TYPES] } : d)),
+        docs: s.docs.map((d) =>
+          d.id === 'TK-002' ? ({ ...d, fleetTypes: [...TK_002_FLEET_TYPES] } as Doc) : d,
+        ),
+      };
+    },
+  },
+  {
+    // D65 — move the CAS applicability/annunciation facts from the mutable `Doc` identity row
+    // onto `DocRevision`, so `casCatalog` reaches them only through `currentRevision()` and
+    // "the picker offers published knowledge only" becomes something the engine enforces
+    // rather than something a dialog footer happens to imply.
+    //
+    // LOSSLESS BY CONSTRUCTION, which is the point — the curated content in this store is the
+    // operator's own writing and the reason D60 homed it in documents rather than tech-log:
+    //   * the value is COPIED ONTO EVERY REVISION of the doc that does not already carry it.
+    //     Before this move there was exactly one value per doc and every revision carried it
+    //     implicitly, so there is no revision this fact was not true of and no choosing which
+    //     revision is "the" one — a doc whose published revision is r1 and whose draft is r2
+    //     comes forward with both intact, and whichever ends up published offers what the
+    //     curator wrote.
+    //   * revisions that ALREADY carry a value are left alone, so re-running this (or running
+    //     it over a store that has since been edited in the new shape) cannot overwrite a
+    //     curator's edit.
+    //   * only the two legacy KEYS are dropped from the doc row, and only once the value has
+    //     somewhere to land: a doc with NO revisions at all keeps them where they are rather than
+    //     having them deleted with nowhere to put them. Everything else on the doc — title, tags,
+    //     owner, pin/archive state — and every comment, revision, draft, acknowledgment and
+    //     signature in the store is passed through untouched.
+    to: '2026-07-30-cas-on-revision-v1',
+    migrate: (s) => {
+      const hasRevision = new Set(s.revisions.map((r) => r.docId));
+      const legacy = new Map<string, { fleetTypes?: AircraftType[]; casMeta?: DocCasMeta }>();
+      const docs = s.docs.map((d) => {
+        const { fleetTypes, casMeta, ...rest } = d as LegacyCasDoc;
+        if (fleetTypes === undefined && casMeta === undefined) return d;
+        if (!hasRevision.has(d.id)) return d;
+        legacy.set(d.id, { fleetTypes, casMeta });
+        return rest as Doc;
+      });
+      if (legacy.size === 0) return s;
+      return {
+        ...s,
+        docs,
+        revisions: s.revisions.map((r) => {
+          const carried = legacy.get(r.docId);
+          if (!carried) return r;
+          const next = { ...r };
+          if (next.fleetTypes === undefined && carried.fleetTypes !== undefined) {
+            next.fleetTypes = carried.fleetTypes;
+          }
+          if (next.casMeta === undefined && carried.casMeta !== undefined) {
+            next.casMeta = carried.casMeta;
+          }
+          return next;
+        }),
       };
     },
   },

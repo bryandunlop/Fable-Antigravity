@@ -279,6 +279,16 @@ const tk1r1: DocRevision = {
   ],
 };
 
+/**
+ * D60 fix pass — the fleet applicability of the pre-D60 tribal-knowledge entry `TK-002`
+ * ("G650 APU cold-soak starts"). Exported so the back-fill migration for stores created before
+ * this fix reads the same value the seed does, rather than restating it.
+ *
+ * Declared here rather than beside the CAS seeds below because `tk2r1` (immediately after this)
+ * reads it at module-init time; a `const` used before its declaration is a TDZ ReferenceError.
+ */
+export const TK_002_FLEET_TYPES: AircraftType[] = ['G650ER'];
+
 const tk2r1: DocRevision = {
   id: 'TK-002-r1',
   docId: 'TK-002',
@@ -293,6 +303,11 @@ const tk2r1: DocRevision = {
   ackLevel: 'none',
   mockChecksum: checksumForSections(sectionsFromMarkdown(TK2_CONTENT, 'TK-002')),
   publishedAtUtc: daysFromNow(-220) + 'T12:00:00.000Z',
+  // D60 fix pass — this entry predates the `fleetTypes` axis and is plainly G650-specific, so
+  // without the tag it was invisible on the very Reference tab built to surface fleet knowledge.
+  // The canonical string is 'G650ER'; 'G650' is display shorthand and not an `AircraftType`.
+  // D65 moved the tag from the doc row onto this, its published revision.
+  fleetTypes: TK_002_FLEET_TYPES,
 };
 
 // ── D60: per-fleet CAS tribal knowledge (curator direct-published, reference only) ──
@@ -315,13 +330,6 @@ target (\`Aircraft.standbyFuelLoadLb\`) is one of those values: the postflight *
 shows the figure for the tail you are working, and it is deliberately not repeated in this article.
 There is one source of truth for it and this is not it. (That field ships today as fleet record data
 with no editor of its own — so read it off the tail, never off a note.)`;
-
-/**
- * D60 fix pass — the fleet applicability of the pre-D60 tribal-knowledge entry `TK-002`
- * ("G650 APU cold-soak starts"). Exported so the back-fill migration for stores created before
- * this fix reads the same value the seed does, rather than restating it.
- */
-export const TK_002_FLEET_TYPES: AircraftType[] = ['G650ER'];
 
 interface CasSeed {
   id: string;
@@ -507,8 +515,6 @@ function casSeedDoc(s: CasSeed): Doc {
     reviewCycleDays: 180,
     nextReviewDate: daysFromNow(180 - s.ageDays),
     createdDate: daysFromNow(-s.ageDays),
-    fleetTypes: s.fleetTypes,
-    casMeta: s.casMeta,
   };
 }
 
@@ -528,6 +534,10 @@ function casSeedRevision(s: CasSeed): DocRevision {
     ackLevel: 'none',
     mockChecksum: checksumForSections(sections),
     publishedAtUtc: daysFromNow(-s.ageDays) + 'T12:00:00.000Z',
+    // D65 — the CAS facts ride the publishable unit, so a seeded entry is offerable
+    // for exactly as long as this revision is the published one.
+    fleetTypes: s.fleetTypes,
+    casMeta: s.casMeta,
   };
 }
 
@@ -617,10 +627,7 @@ const SEED_DOCS: Doc[] = [
     reviewCycleDays: 180,
     nextReviewDate: daysFromNow(-40), // stale — review overdue
     createdDate: daysFromNow(-220),
-    // D60 fix pass — this entry predates the `fleetTypes` axis and is plainly G650-specific, so
-    // without the tag it was invisible on the very Reference tab built to surface fleet knowledge.
-    // The canonical string is 'G650ER'; 'G650' is display shorthand and not an `AircraftType`.
-    fleetTypes: TK_002_FLEET_TYPES,
+    // D65 — the fleet tag this entry needed now lives on `tk2r1`, its published revision.
   },
   ...casKnowledgeSeed().docs,
 ];

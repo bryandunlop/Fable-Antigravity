@@ -145,14 +145,15 @@ export function DocEditorDialog({
           : rev.ackDueDate ?? '',
       );
       setTags(meta.tags.join(', '));
-      // Doc-level CAS meta is not part of `proposedMeta` (that carries the four-eyes
-      // identity fields for CONTROLLED classes); tribal knowledge is uncontrolled, so
-      // these edit in place through UPDATE_DOC_META like tags do.
-      setFleetTypes(doc.fleetTypes ?? []);
-      setIsCas(!!doc.casMeta);
-      setCasMessage(doc.casMeta?.casMessage ?? '');
-      setCasColor(doc.casMeta?.casColor ?? 'AMBER');
-      setCmcCodes(doc.casMeta?.cmcCodes ?? []);
+      // D65 — CAS facts ride the REVISION, so they are read off the revision being
+      // worked on: `revise` starts from what is published today, `edit-draft` from
+      // what the draft already says. Reading them off the doc would reintroduce the
+      // single mutable value the move exists to remove.
+      setFleetTypes(rev.fleetTypes ?? []);
+      setIsCas(!!rev.casMeta);
+      setCasMessage(rev.casMeta?.casMessage ?? '');
+      setCasColor(rev.casMeta?.casColor ?? 'AMBER');
+      setCmcCodes(rev.casMeta?.cmcCodes ?? []);
       setCmcDraft('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,8 +209,9 @@ export function DocEditorDialog({
       casEnabled && isCas
         ? { casMessage: casMessage.trim(), casColor, cmcCodes: cmcCodes.length ? cmcCodes : undefined }
         : undefined;
-    // Applied only on the class that owns these fields, so an edit on any other
-    // class cannot blank them by omission.
+    // D65 — these ride the REVISION, not the doc: they reach the catalog only when
+    // this revision publishes. Applied only on the class that owns them, so an edit
+    // on any other class cannot blank them by omission.
     const casFields = casEnabled
       ? { fleetTypes: fleetTypes.length ? fleetTypes : undefined, casMeta }
       : {};
@@ -230,7 +232,6 @@ export function DocEditorDialog({
             isArchived: false,
             reviewCycleDays: cfg.defaultReviewCycleDays,
             createdDate: todayIso(),
-            ...casFields,
           }
         : {
             ...mode.doc,
@@ -238,7 +239,6 @@ export function DocEditorDialog({
             category,
             roles,
             tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-            ...casFields,
           };
     // C1: a live controlled doc's identity never changes on draft save — the
     // edits ride the revision (proposedMeta) and apply when it publishes.
@@ -272,6 +272,7 @@ export function DocEditorDialog({
         liveControlled && metaChanged
           ? { title: doc.title, category: doc.category, roles: doc.roles, tags: doc.tags }
           : undefined,
+      ...casFields,
     };
     return { doc, rev, liveControlled };
   };

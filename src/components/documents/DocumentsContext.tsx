@@ -27,11 +27,12 @@ import { eventStore } from '../../notifications/events';
 
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
-/** Bumped for D60's CAS knowledge seeds + the new `Doc.fleetTypes` / `Doc.casMeta`
- *  fields. Both fields are optional and absent reads correctly, so this is not a
- *  broken-render risk — the bump exists so a RETURNING user's store gains the new
- *  curated content, which the matching step in engine/migrations.ts injects. */
-export const DATA_VERSION = '2026-07-29-tk002-fleet-v1';
+/** D65 — bumped to move `fleetTypes` / `casMeta` off the `Doc` row and onto
+ *  `DocRevision`. Both fields are optional and absent reads correctly, so this is not
+ *  a broken-render risk; the bump exists so a RETURNING user's curated CAS content is
+ *  carried onto its revisions by the matching step in engine/migrations.ts rather than
+ *  being stranded on a field nothing reads any more. */
+export const DATA_VERSION = '2026-07-30-cas-on-revision-v1';
 /** Set once the legacy 'bulletins-state' store has been imported — a later
  * re-seed must never resurrect stale pre-migration bulletins (C5). */
 export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';

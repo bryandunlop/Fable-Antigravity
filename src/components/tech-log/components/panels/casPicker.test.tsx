@@ -29,43 +29,54 @@ import { ReportDefectDialog } from './ReportDefectDialog';
  * depend on the knowledge store being present.
  */
 
-const tkDoc = (over: Partial<Doc> & { id: string }): Doc => ({
-  classId: 'tribal-knowledge',
-  title: `Entry ${over.id}`,
-  category: 'Aircraft Quirks',
-  roles: ['all'],
-  ownerUserId: 'USR002',
-  ownerName: 'Sarah Wilson',
-  tags: [],
-  isPinned: false,
-  isArchived: false,
-  createdDate: '2026-07-01',
-  ...over,
+/** D65 — the CAS facts ride the revision, so a fixture entry is a (doc, published revision) pair. */
+type Entry = { doc: Doc; rev: DocRevision };
+
+const entry = (over: {
+  id: string;
+  title: string;
+  fleetTypes?: DocRevision['fleetTypes'];
+  casMeta?: DocRevision['casMeta'];
+}): Entry => ({
+  doc: {
+    id: over.id,
+    classId: 'tribal-knowledge',
+    title: over.title,
+    category: 'Aircraft Quirks',
+    roles: ['all'],
+    ownerUserId: 'USR002',
+    ownerName: 'Sarah Wilson',
+    tags: [],
+    isPinned: false,
+    isArchived: false,
+    createdDate: '2026-07-01',
+  },
+  rev: {
+    id: `${over.id}-r1`,
+    docId: over.id,
+    revision: '1.0',
+    status: 'published',
+    sections: [],
+    changeSummary: '',
+    effectiveDate: '2026-07-01',
+    authorUserId: 'USR002',
+    authorName: 'Sarah Wilson',
+    requireAcknowledgment: false,
+    ackLevel: 'none',
+    mockChecksum: 'abc',
+    fleetTypes: over.fleetTypes,
+    casMeta: over.casMeta,
+  },
 });
 
-const published = (docId: string): DocRevision => ({
-  id: `${docId}-r1`,
-  docId,
-  revision: '1.0',
-  status: 'published',
-  sections: [],
-  changeSummary: '',
-  effectiveDate: '2026-07-01',
-  authorUserId: 'USR002',
-  authorName: 'Sarah Wilson',
-  requireAcknowledgment: false,
-  ackLevel: 'none',
-  mockChecksum: 'abc',
-});
-
-const DOCS: Doc[] = [
-  tkDoc({
+const ENTRIES: Entry[] = [
+  entry({
     id: 'TK-910',
     title: 'GEAR UNSAFE on the 650 — the squat-switch case',
     fleetTypes: ['G650ER'],
     casMeta: { casMessage: 'GEAR UNSAFE', casColor: 'RED', cmcCodes: ['32-3120-04'] },
   }),
-  tkDoc({
+  entry({
     id: 'TK-911',
     title: 'GPS 1 ADVISORY on the 500 — nuisance behaviour',
     fleetTypes: ['G500'],
@@ -73,7 +84,7 @@ const DOCS: Doc[] = [
   }),
   // A SECOND G650ER entry, at a different tier — without one, "the colour follows the message"
   // cannot be told apart from "the colour never changes after the first pick".
-  tkDoc({
+  entry({
     id: 'TK-912',
     title: 'CABIN TEMP on the 650 — nuisance in the descent',
     fleetTypes: ['G650ER'],
@@ -81,18 +92,22 @@ const DOCS: Doc[] = [
   }),
 ];
 
-function seedDocs(docs: Doc[] = DOCS) {
-  const seed: Partial<DocumentsState> = { docs, revisions: docs.map((d) => published(d.id)), comments: [] };
+function seedDocs(entries: Entry[] = ENTRIES) {
+  const seed: Partial<DocumentsState> = {
+    docs: entries.map((e) => e.doc),
+    revisions: entries.map((e) => e.rev),
+    comments: [],
+  };
   localStorage.setItem(DOCS_VERSION_KEY, DOCS_DATA_VERSION);
   localStorage.setItem(DOCS_KEY, JSON.stringify(seed));
 }
 
 /** N1PG is a G650ER in the seeded fleet. `lockTail: null` leaves the Aircraft select enabled —
  *  note a plain `undefined` cannot express that, since it would take the default below. */
-function renderForm(opts: { withDocuments?: boolean; lockTail?: string | null; docs?: Doc[] } = {}) {
-  const { withDocuments = true, docs } = opts;
+function renderForm(opts: { withDocuments?: boolean; lockTail?: string | null; entries?: Entry[] } = {}) {
+  const { withDocuments = true, entries } = opts;
   const lockTail = 'lockTail' in opts ? opts.lockTail ?? undefined : 'N1PG';
-  if (withDocuments) seedDocs(docs);
+  if (withDocuments) seedDocs(entries);
   const form = (
     <TechLogProvider userRole="pilot">
       <ReportDefectDialog open onOpenChange={() => {}} lockTail={lockTail} />
@@ -340,9 +355,9 @@ describe('defect form CAS colour follows the message (D60)', () => {
   it('links every entry and adopts no colour when two curators disagree', async () => {
     const user = userEvent.setup();
     renderForm({
-      docs: [
-        ...DOCS,
-        tkDoc({
+      entries: [
+        ...ENTRIES,
+        entry({
           id: 'TK-913',
           title: 'GEAR UNSAFE — second opinion from the night shift',
           fleetTypes: ['G650ER'],
@@ -378,8 +393,8 @@ describe('defect form CAS colour follows the message (D60)', () => {
 describe('defect form CAS picker cap (D60)', () => {
   /** 30 G650ER entries. Zero-padded messages so `casCatalog`'s localeCompare order matches the
    *  index — entry 29 is genuinely the one past the cap. */
-  const MANY: Doc[] = Array.from({ length: 30 }, (_, i) =>
-    tkDoc({
+  const MANY: Entry[] = Array.from({ length: 30 }, (_, i) =>
+    entry({
       id: `TK-9${String(i + 20).padStart(2, '0')}`,
       title: `Entry number ${i}`,
       fleetTypes: ['G650ER'],
@@ -390,7 +405,7 @@ describe('defect form CAS picker cap (D60)', () => {
 
   it('says how many of how many it is showing, and flags the truncation', async () => {
     const user = userEvent.setup();
-    renderForm({ docs: MANY });
+    renderForm({ entries: MANY });
     await chooseMessageMode(user);
 
     expect(screen.getByText(/curated messages \(25 of 30\)/)).toBeInTheDocument();
@@ -400,7 +415,7 @@ describe('defect form CAS picker cap (D60)', () => {
 
   it('search reaches an entry past the cap', async () => {
     const user = userEvent.setup();
-    renderForm({ docs: MANY });
+    renderForm({ entries: MANY });
     await chooseMessageMode(user);
 
     await user.type(screen.getByLabelText(/curated messages/i), lastMessage);
