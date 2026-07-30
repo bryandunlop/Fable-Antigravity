@@ -68,8 +68,15 @@ export const VERSION_KEY = 'tech-log-data-version';
  * The bump is for the SEEDS: a returning user's stored blob predates them, so the demo would show
  * empty AMM/CMC panels and no pilot intake hint, and the CRS print test's fixtures would be the only
  * place the feature was visible. Reseeding is what makes the slice demonstrable on a fresh load.
+ *
+ * v20 (D61/D62/D63, LG-100): `WorkCard` gained `statusTags` states (DIAGNOSING, WAITING_TECH_REP,
+ * WAITING_CONTRACT_MX, WAITING_OTHER, GAP), the per-gap include/exclude flag, `partsOrders`, and the
+ * `timeAudit` trail. Every new field is optional and absent reads correctly, so like v19 this is not
+ * a broken-render risk — the bump exists so a returning user's stored blob is replaced by seeds that
+ * actually carry a logged overnight gap and a delivered parts order. Without it the include/exclude
+ * control and the metrics page have nothing to act on and the slice is invisible on their machine.
  */
-export const DATA_VERSION = '2026-07-29-v19';
+export const DATA_VERSION = '2026-07-30-v20';
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a

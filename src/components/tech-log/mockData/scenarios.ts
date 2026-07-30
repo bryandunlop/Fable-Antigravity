@@ -299,15 +299,79 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       { id: 'wc3-s2', seq: 2, text: 'Replace LMLG uplock proximity sensor', done: false },
       { id: 'wc3-s3', seq: 3, text: 'Gear swing / retraction check per AMM 32-30-00', done: false },
     ],
+    // D61 — the live AOG card opens with a diagnosis span, so the first thing a demo viewer sees is
+    // that "how long to work out what was wrong" is a real, separately answerable number.
     statusTags: [
-      { tag: 'IN_WORK', atUtc: iso(2.5 * H), byOid: tech.oid },
-      { tag: 'WAITING_PARTS', atUtc: iso(1 * H), byOid: tech.oid, note: 'POO — LMLG uplock proximity sensor from Gulfstream Savannah, ETA tomorrow 10:00' },
+      { tag: 'DIAGNOSING', atUtc: iso(2.5 * H), byOid: tech.oid, note: 'MAU fault history + harness continuity on the aircraft' },
+      { tag: 'IN_WORK', atUtc: iso(1.5 * H), byOid: tech.oid },
+      { tag: 'WAITING_PARTS', atUtc: iso(1 * H), byOid: tech.oid, note: 'POO — LMLG uplock proximity sensor from Gulfstream Savannah, ETA tomorrow 10:00', partsOrderId: 'po-wc3-1' },
     ],
+    // LG-100 — the structured order behind that POO note. Deliberately still OPEN so the metrics
+    // page shows an "and counting" lead time as well as delivered ones.
+    partsOrders: [{
+      id: 'po-wc3-1', description: 'LMLG uplock proximity sensor', partNumber: '1159SCB412-3',
+      vendor: 'Gulfstream', orderedAtUtc: iso(1 * H), note: 'AOG desk — promised ETA tomorrow 10:00',
+    }],
   });
   laborEntries.push(
     { id: 'lb-3', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 1.5, dateUtc: iso(1 * H), description: 'Fault isolation — MAU history + harness continuity', category: 'TROUBLESHOOTING', note: 'Intermittent only under gear load; 1.5 h isolating to the uplock prox sensor with tech ops on the line' },
     { id: 'lb-4', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 0.5, dateUtc: iso(1 * H), description: 'Sourced replacement sensor, raised purchase order', category: 'PARTS_ORDERING' },
   );
+
+  /**
+   * D61/LG-100 — the whole arc, written up after the fact the way D61 says it will be: diagnose →
+   * order → wait → receive → install → complete, with an **overnight gap the technician logged and
+   * chose not to count**. That gap is the demo's whole point. Before D61 the 13 h between going
+   * home and coming back accrued silently to wrench time, and the fleet's "install hours" number
+   * was quietly wrong. Here it is visible, attributed, and excluded — so the include/exclude
+   * control has something to act on the moment somebody opens the card on a fresh load.
+   *
+   * On N6PG so the metrics rollup has a second tail and is not a one-line table.
+   */
+  {
+    const raisedAt = iso(9 * D + 6 * H);
+    const completedAt = iso(6 * D + 11 * H);
+    const wc4Rel = makeSignature({ id: 'sig-wc-rel-4', signedEntity: 'WORK_CARD', signedEntityId: 'rel-wc-4', signer: tech, intentStatement: 'seed', signedAtUtc: completedAt, certNumber: tech.apCertificateNumber });
+    signatures.push(wc4Rel);
+    releases.push({
+      id: 'rel-wc-4', aircraftId: 'ac-n6pg', signoffType: 'WORKCARD', linkedWorkCardId: 'wc-4',
+      isGatingDischarge: false, workDescription: 'WO-34-0512 — replaced No. 1 air data module; ops check normal.',
+      completionDateUtc: completedAt,
+      returnToServiceStatement: 'Work card complied with; aircraft approved for return to service (14 CFR 91.417).',
+      certifyingTechOid: tech.oid, apCertificateNumber: tech.apCertificateNumber ?? '', riiRequired: false,
+      pdfBlobUri: 'blob://mygfo-worm/crs/rel-wc-4.pdf', signatureId: wc4Rel.id,
+    });
+    workCards.push({
+      id: 'wc-4', cardNumber: 'WC-1019', woNumber: 'WO-34-0512', aircraftId: 'ac-n6pg',
+      title: 'ADM 1 disagree — troubleshoot & replace air data module',
+      ataChapter: '34', description: 'Corrective — intermittent ADM 1 disagree on climb-out.',
+      source: 'CAMP', headerStatusCode: 0, scheduled: false, riiRequired: false,
+      createdAtUtc: raisedAt, completedAtUtc: completedAt, completedReleaseId: 'rel-wc-4',
+      status: 'COMPLETED', ammReference: 'AMM 34-11-00', cmcFaultCodes: ['34-11-07'],
+      steps: [
+        { id: 'wc4-s1', seq: 1, text: 'Interrogate MAU; compare ADM 1/2 pressure outputs', done: true },
+        { id: 'wc4-s2', seq: 2, text: 'Replace No. 1 air data module', done: true },
+        { id: 'wc4-s3', seq: 3, text: 'Pitot-static leak and correspondence check per AMM 34-11-00', done: true },
+      ],
+      statusTags: [
+        { tag: 'DIAGNOSING', atUtc: iso(9 * D + 5 * H), byOid: tech.oid, note: 'ADM 1/2 output comparison on the aircraft' },
+        { tag: 'WAITING_TECH_REP', atUtc: iso(9 * D + 2 * H), byOid: tech.oid, note: 'Gulfstream tech rep confirming the correspondence tolerance before committing to the module' },
+        { tag: 'WAITING_PARTS', atUtc: iso(9 * D), byOid: tech.oid, note: 'POO — No. 1 air data module from Gulfstream Savannah', partsOrderId: 'po-wc4-1' },
+        { tag: 'IN_WORK', atUtc: iso(6 * D + 21 * H), byOid: tech.oid },
+        { tag: 'GAP', atUtc: iso(6 * D + 16 * H), byOid: tech.oid, gapReason: 'END_OF_SHIFT', note: 'Went home; hangar closed overnight', includeInTotals: false },
+        { tag: 'IN_WORK', atUtc: iso(6 * D + 3 * H), byOid: tech.oid },
+      ],
+      partsOrders: [{
+        id: 'po-wc4-1', description: 'Air data module No. 1', partNumber: '1159SCT204-1',
+        vendor: 'Gulfstream', orderedAtUtc: iso(9 * D), receivedAtUtc: iso(6 * D + 22 * H),
+        note: 'AOG freight, Savannah → KLUK',
+      }],
+    });
+    laborEntries.push(
+      { id: 'lb-5', workCardId: 'wc-4', techOid: tech.oid, techName: tech.displayName, hours: 3, dateUtc: iso(9 * D), description: 'Fault isolation — ADM output comparison', category: 'TROUBLESHOOTING', note: 'Correspondence within limits on the ground; needed the tech rep to confirm the in-flight tolerance before ordering' },
+      { id: 'lb-6', workCardId: 'wc-4', techOid: tech.oid, techName: tech.displayName, hours: 4.5, dateUtc: completedAt, description: 'R&R air data module, pitot-static leak check', category: 'WRENCH' },
+    );
+  }
 
   // ── D28 maintenance planners: packages of work per tail, staged while the aircraft is away. ──
   const ahead = (msAhead: number) => new Date(nowMs + msAhead).toISOString();
