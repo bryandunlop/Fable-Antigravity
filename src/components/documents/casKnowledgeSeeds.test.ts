@@ -88,6 +88,33 @@ describe('D60 CAS knowledge seeds', () => {
     }
   });
 
+  /**
+   * The pre-existing tribal-knowledge entry predates D60's `fleetTypes` axis. It is plainly
+   * G650-specific ("G650 APU cold-soak starts"), so without the tag it is invisible on the very tab
+   * D60 built to surface fleet knowledge. `G650ER` is the canonical string; `G650` is not a type.
+   */
+  it('the pre-D60 G650 field-notes entry is fleet-typed, so it reaches the G650ER tab', () => {
+    const tk2 = seed.docs.find((d) => d.id === 'TK-002');
+    expect(tk2, 'TK-002 is still seeded').toBeDefined();
+    expect(tk2!.fleetTypes).toEqual(['G650ER']);
+    expect(fleetArticles(seed.docs, seed.revisions, 'G650ER').map((d) => d.id)).toContain('TK-002');
+    // ...and only there. A G500 crew must not be shown G650 APU notes.
+    expect(fleetArticles(seed.docs, seed.revisions, 'G500').map((d) => d.id)).not.toContain('TK-002');
+  });
+
+  /** Generalises the above: a seeded entry that names a type in its tags must carry the axis the
+   *  Reference tab actually filters on, or it is knowledge nobody can find. */
+  it('no seeded tribal-knowledge entry names a fleet in its tags without carrying fleetTypes', () => {
+    const TAG_TO_TYPE: Record<string, AircraftType> = { g650: 'G650ER', g500: 'G500', g800: 'G800' };
+    for (const doc of seed.docs.filter((d) => d.classId === CAS_KNOWLEDGE_CLASS_ID)) {
+      const implied = doc.tags.map((t) => TAG_TO_TYPE[t.toLowerCase()]).filter(Boolean);
+      if (implied.length === 0) continue;
+      expect(doc.fleetTypes ?? [], `${doc.id} tags [${doc.tags.join(', ')}]`).toEqual(
+        expect.arrayContaining(implied),
+      );
+    }
+  });
+
   it('articles link config values rather than restating a number', () => {
     const articleBodies = casKnowledgeSeed()
       .revisions.filter((r) => !casKnowledgeSeed().docs.find((d) => d.id === r.docId)?.casMeta)
@@ -187,5 +214,18 @@ describe('D60 seed migration', () => {
     expect(kept.isArchived).toBe(true);
     // …and it is present exactly once.
     expect(after.docs.filter((d) => d.id === edited.id)).toHaveLength(1);
+  });
+
+  it('back-fills fleetTypes on the pre-D60 TK-002 in an existing store', () => {
+    const tk2 = { ...getSeedState().docs.find((d) => d.id === 'TK-002')! };
+    delete tk2.fleetTypes; // the shape a store created before this fix actually holds
+    const after = migrateStoredState({ ...emptyStore(), docs: [tk2] }, '2026-07-29-cas-knowledge-v1');
+    expect(after.docs.find((d) => d.id === 'TK-002')?.fleetTypes).toEqual(['G650ER']);
+  });
+
+  it('leaves a curator’s own fleet tagging of TK-002 alone', () => {
+    const tk2 = { ...getSeedState().docs.find((d) => d.id === 'TK-002')!, fleetTypes: ['G500'] as AircraftType[] };
+    const after = migrateStoredState({ ...emptyStore(), docs: [tk2] }, '2026-07-29-cas-knowledge-v1');
+    expect(after.docs.find((d) => d.id === 'TK-002')?.fleetTypes).toEqual(['G500']);
   });
 });

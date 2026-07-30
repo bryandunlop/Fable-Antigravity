@@ -316,6 +316,13 @@ shows the figure for the tail you are working, and it is deliberately not repeat
 There is one source of truth for it and this is not it. (That field ships today as fleet record data
 with no editor of its own — so read it off the tail, never off a note.)`;
 
+/**
+ * D60 fix pass — the fleet applicability of the pre-D60 tribal-knowledge entry `TK-002`
+ * ("G650 APU cold-soak starts"). Exported so the back-fill migration for stores created before
+ * this fix reads the same value the seed does, rather than restating it.
+ */
+export const TK_002_FLEET_TYPES: AircraftType[] = ['G650ER'];
+
 interface CasSeed {
   id: string;
   title: string;
@@ -610,6 +617,10 @@ const SEED_DOCS: Doc[] = [
     reviewCycleDays: 180,
     nextReviewDate: daysFromNow(-40), // stale — review overdue
     createdDate: daysFromNow(-220),
+    // D60 fix pass — this entry predates the `fleetTypes` axis and is plainly G650-specific, so
+    // without the tag it was invisible on the very Reference tab built to surface fleet knowledge.
+    // The canonical string is 'G650ER'; 'G650' is display shorthand and not an `AircraftType`.
+    fleetTypes: TK_002_FLEET_TYPES,
   },
   ...casKnowledgeSeed().docs,
 ];

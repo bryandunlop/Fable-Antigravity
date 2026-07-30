@@ -7,7 +7,7 @@
 // graceful degradation, never data loss. New seed content for existing stores
 // is also a migration step's job (a fresh install gets it from the seeds).
 import type { DocumentsState } from '../types';
-import { safetyReadSeed, casKnowledgeSeed } from '../mockData';
+import { safetyReadSeed, casKnowledgeSeed, TK_002_FLEET_TYPES } from '../mockData';
 
 export interface StoredStateMigration {
   /** The DATA_VERSION this step upgrades TO. Steps run in ascending order. */
@@ -55,6 +55,24 @@ export const STORED_STATE_MIGRATIONS: StoredStateMigration[] = [
         ...s,
         docs: [...s.docs, ...missing],
         revisions: [...s.revisions, ...revisions.filter((r) => missingIds.has(r.docId))],
+      };
+    },
+  },
+  {
+    // D60 fix pass — back-fill `fleetTypes` on `TK-002`, the tribal-knowledge entry that predates
+    // the fleet axis. A fresh install gets it from the seed; an existing store would otherwise keep
+    // a plainly G650-specific entry invisible on the Reference tab forever.
+    //
+    // Only fills an ABSENT value. A curator who has since tagged the entry (including tagging it for
+    // a different type) keeps their edit — `undefined` means "never asked", and that is the only
+    // state this step is entitled to write.
+    to: '2026-07-29-tk002-fleet-v1',
+    migrate: (s) => {
+      const existing = s.docs.find((d) => d.id === 'TK-002');
+      if (!existing || existing.fleetTypes !== undefined) return s;
+      return {
+        ...s,
+        docs: s.docs.map((d) => (d.id === 'TK-002' ? { ...d, fleetTypes: [...TK_002_FLEET_TYPES] } : d)),
       };
     },
   },
