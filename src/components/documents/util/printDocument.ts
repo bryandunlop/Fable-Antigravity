@@ -5,7 +5,7 @@
 import type { Doc, DocRevision } from '../types';
 import { classFor } from '../classes';
 import { sectionsToHtml, escapeHtml } from '../engine/exportHtml';
-import { operatorTodayIso } from '../../../lib/operatorDate';
+import { operatorTodayIso, formatDateOnly } from '../../../lib/operatorDate';
 
 /** Returns false if the browser blocked the pop-up (caller shows a toast). */
 export function printDocument(doc: Doc, rev: DocRevision): boolean {
@@ -13,8 +13,10 @@ export function printDocument(doc: Doc, rev: DocRevision): boolean {
   if (!w) return false;
 
   const cfg = classFor(doc.classId);
-  const eff = new Date(rev.effectiveDate).toLocaleDateString();
-  const printed = new Date(operatorTodayIso()).toLocaleDateString();
+  // LG-117: both are date-only. Parsed bare, they printed a day early — and the
+  // printed copy is the one that ends up in a binder.
+  const eff = formatDateOnly(rev.effectiveDate);
+  const printed = formatDateOnly(operatorTodayIso());
   const body = sectionsToHtml(rev.sections);
 
   w.document.write(`<!doctype html><html><head><meta charset="utf-8" />

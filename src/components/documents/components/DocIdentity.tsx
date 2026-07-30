@@ -2,13 +2,16 @@ import { Badge } from '../../ui/badge';
 import { FileCheck2, PenLine } from 'lucide-react';
 import type { Doc, DocRevision } from '../types';
 import { classFor } from '../classes';
+import { formatDateOnly } from '../../../lib/operatorDate';
 
 // The one way a controlled document is identified everywhere: TITLE + doc number
 // + revision + effective date (the TripIdentity pattern). Crews recognize "the
 // stabilized approach SOP, rev 2" — the doc number is secondary reference text.
 
+// This file had the LG-117 fix inline and was therefore correct, while print and the
+// .docx export were not. One helper now, so "correct here, broken there" can't recur.
 const fmtDate = (iso: string) =>
-  new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  formatDateOnly(iso, { month: 'short', day: 'numeric', year: 'numeric' });
 
 /** Compact one-line identity for list rows. */
 export function DocIdentityLine({ doc, rev }: { doc: Doc; rev?: DocRevision }) {
