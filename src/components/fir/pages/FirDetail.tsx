@@ -12,7 +12,7 @@ import { GfoEmptyState, GfoPanel } from '../../gfo';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import { useFir } from '../FirContext';
 import { canSeeFir, isFirLeadership, visibleStatements } from '../engine/access';
-import { buildImpactSnapshot, defectDebriefs, deriveSystemEntries, impactSegments, mergeTimeline } from '../engine/timeline';
+import { buildImpactSnapshot, defectDebriefs, deriveSystemEntries, impactDiverged, impactSegments, mergeTimeline } from '../engine/timeline';
 import { StatusHoursBar } from '../../tech-log/components/StatusHoursBar';
 import { FirCategoryChip, FirStatusChip } from '../components/chips';
 import { StatementsTab } from '../components/StatementsTab';
@@ -90,9 +90,21 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
    *  after approval. Surface it rather than hiding it. */
   const publishedDowntime = publishedSnapshot?.downtimeHours ?? publishedSnapshot?.elapsedHours;
   const liveDowntime = fir.impact.downtimeHours ?? derivedDowntimeHours;
-  const snapshotDiverged =
-    publishedSnapshot != null && liveDowntime != null && publishedDowntime != null &&
-    Math.abs(publishedDowntime - liveDowntime) >= 0.1;
+
+  /**
+   * Divergence must mean **somebody corrected the logged time**, not "the clock moved".
+   *
+   * Two ways the first cut was wrong. It fired for any report published while its event was still
+   * ongoing, because elapsed keeps climbing on its own — so the notice asserting a retrospective
+   * correction had landed appeared when nothing had been corrected, and a notice that cries wolf is
+   * one nobody reads. And it compared the downtime SCALAR only, so a re-labelling that moved hours
+   * between states without changing the total — exactly what happens when a tech reclassifies a
+   * stretch as waiting-on-contract-mx — was surfaced nowhere.
+   *
+   * So: composition is compared always (it cannot drift with wall clock), and the scalar only once
+   * the event is closed.
+   */
+  const snapshotDiverged = impactDiverged(publishedSnapshot, segments, liveDowntime, ongoing);
 
   // Access split (§7): owner/opener/leadership assemble & see everything; a requestee
   // gets a scoped view (timeline + their own statement only — no narrative/impact).
@@ -224,7 +236,22 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
               leadership={leadership}
               personnel={techLog.personnel}
               timeline={merged}
-              impactSnapshot={() => buildImpactSnapshot(debriefs, liveDowntime, new Date().toISOString())}
+              /* D63 — recompute at the CLICK, not from the render-time `debriefs`. `now` is
+                 memoised at mount, so on an ongoing event a reviewer who opened the report at 09:00
+                 and approved at 14:00 froze 09:00 figures under a `capturedAtUtc` claiming 14:00 —
+                 the published revision then showed "figures as at publication" over numbers five
+                 hours stale. The whole value of a frozen figure is that it was true at the instant
+                 it was stamped. `impactSegments` runs inside `buildImpactSnapshot`, so the stored
+                 bar is recomputed with it. */
+              impactSnapshot={() => {
+                const at = new Date().toISOString();
+                const fresh = defectDebriefs(fir, techLog, at);
+                const freshDowntime = fir.impact.downtimeHours
+                  ?? (fresh.length
+                    ? Math.round(fresh.reduce((s, d) => s + d.countedDowntimeHours, 0) * 10) / 10
+                    : undefined);
+                return buildImpactSnapshot(fresh, freshDowntime, at);
+              }}
               barSegments={segments}
               user={user ? { oid: user.oid, displayName: user.displayName } : undefined}
               nameOf={nameOf}

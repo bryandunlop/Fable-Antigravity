@@ -61,6 +61,40 @@ export function impactSegments(debriefs: DowntimeDebrief[]): { key: string; labe
 }
 
 /**
+ * D63 — has a published revision's frozen impact actually been OVERTAKEN by a correction?
+ *
+ * "Diverged" must mean somebody corrected the logged time, not that the clock moved. Two failure
+ * modes to avoid, both of which the first cut had:
+ *
+ *  - **Crying wolf.** On an event that is still ongoing, elapsed climbs on its own, so a scalar
+ *    comparison flags every such report the moment it is published. A notice asserting that a
+ *    retrospective correction landed, shown when nothing was corrected, is one nobody reads.
+ *  - **Missing the real case.** Comparing the downtime SCALAR alone hides a re-labelling that moves
+ *    hours between states without changing the total — precisely what happens when a technician
+ *    reclassifies a stretch as waiting-on-contract-maintenance.
+ *
+ * So composition is compared always (it cannot drift with wall clock), and the scalar only once the
+ * event is closed.
+ */
+export function impactDiverged(
+  published: FirImpactSnapshot | undefined,
+  liveSegments: { key: string; hours: number }[],
+  liveDowntimeHours: number | undefined,
+  ongoing: boolean,
+): boolean {
+  if (!published) return false;
+  const live = new Map(liveSegments.map(s => [s.key, s.hours]));
+  const composition = (published.segments ?? []).some(
+    s => Math.abs((live.get(s.key) ?? 0) - s.hours) >= 0.1,
+  );
+  const publishedDowntime = published.downtimeHours ?? published.elapsedHours;
+  const scalar =
+    !ongoing && liveDowntimeHours != null && publishedDowntime != null &&
+    Math.abs(publishedDowntime - liveDowntimeHours) >= 0.1;
+  return composition || scalar;
+}
+
+/**
  * D63 — freeze the impact figures at publication. Called at the moment of four-eyes approval, not
  * during curation: the number a revision carries must be the number that was true when it was
  * approved.
