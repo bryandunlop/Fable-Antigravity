@@ -125,15 +125,24 @@ Both registers carry it — this is a periodic re-attestation of the *register*,
 
 An audit cannot be closed with a non-empty intake queue for that group. That is what makes §6 a process rather than a dashboard.
 
-## 9. Distribution — the ForeFlight content pack
+## 9. Distribution — the ForeFlight content pack is a mirrored folder
 
-Both registers feed the Pilot / Content Pack folder (dotted), which feeds ForeFlight. Note what the ForeFlight box actually lists: `GOM`, `Pilot Folder` (`Standards`, `Training`, `MEL`, `LoA`), `PB`, `Reg & Comp`. That is **a pilot-facing subset, not a mirror of the registers** — no Mx, no Scheduling, no FA. So:
+> **Corrected 2026-07-30 (Bryan).** The ForeFlight integration on this board is **Documents**, and it is *not* the ForeFlight surface this repo already talks to. `src/utils/foreflight/` and `src/scheduling/foreflight/` are the **Files** path — trip sheets, passenger documents, flight data — a different product surface with a different API. **None of it is reusable here and none of it should be extended for this.** ForeFlight Documents is pointed at a **OneDrive folder by path** — that is what the `/` in "Pilot / Content Pack folder" means — and it **mirrors** that folder.
 
-**The content pack is a projection: register entries × `distributeToForeFlight` × pilot audience.** It is a per-entry opt-in, not a folder-location rule, so a Safety document meant for crew can be included without moving it out of the Safety group. The pack's folder tree is authored (it maps to the ForeFlight box's structure), not derived from the group tree — pilots see `Pilot Folder/Standards`, not `Pilots/CTL`.
+Both registers feed the pack (the board draws both dotted arrows). What the ForeFlight box lists is `GOM`, `Pilot Folder` (`Standards`, `Training`, `MEL`, `LoA`), `PB`, `Reg & Comp` — **a pilot-facing subset, not a mirror of the registers**; no Mx, no Scheduling, no FA. So inclusion stays a per-entry opt-in (`distributeToForeFlight`), not a folder-location rule: a Safety document meant for crew is included without moving out of the Safety group. The pack's tree is **authored** to match the ForeFlight box, not derived from the group tree — pilots see `Pilot Folder/Standards`, never `Pilots/CTL`.
 
-Uncontrolled documents *are* eligible (the whiteboard draws both dotted arrows). A controlled document publishes into the pack on revision publish; an uncontrolled one on change. Every pack build is stamped with the register revision it was built from, so "which revision is on the iPad" is answerable without asking the iPad.
+The mirror changes the engineering on both sides of the ledger.
 
-`src/utils/foreflight/client.ts` has an `uploadFile` seam; whether the real content-pack path is that API or a synced folder is [[Q5]].
+**There is no integration to build.** No API, no upload, no credentials, no push queue, no retry/backoff, no `uploadFile` seam. myGFO's entire job is to *make the folder correct*; ForeFlight picks it up. Distribution is a filesystem-shaped problem, which is the cheapest possible answer and removes a whole class of failure.
+
+**But the folder is the interface, and a mirror is dumb.** Four consequences, all of which have to be designed for:
+
+1. **Deletion is part of publishing.** A mirror propagates removals as faithfully as additions, and *only* removals remove. Superseding a revision therefore has to **delete the old file** from the pack folder, or pilots keep reading it. So a pack build is a **reconcile of the folder to the desired state — add / replace / delete — never an append.** This is the single most likely way to ship a wrong document to a flight deck.
+2. **The mirror has no notion of controlled.** It will carry whatever is in the folder. So the pack folder needs the same protection as the CTL bucket (§5): written only by myGFO's publish identity, read-only to humans. A native drop into the pack folder is distribution to *every pilot* with no register entry, no revision and no audit — the highest-consequence version of the §6 `unclassified` case. **The pack folder is therefore in reconcile scope too**, and drift there is an incident, not a change.
+3. **There is no receipt.** You cannot ask a mirror what it delivered, so "which revision is on the iPad" has no API answer. Make the pack **self-describing instead**: myGFO writes a manifest into the folder alongside the content — document id, revision, effective date, checksum, build timestamp. It rides the mirror like any other file, so the question is answerable from the same folder the pilots are reading, and an auditor can diff it against the register.
+4. **Timing is the mirror's, not ours.** Publish completes when the folder is correct; arrival on a device is eventually-consistent and outside myGFO's control. Nothing in the register may treat "published" as "received" — and if a revision ever needs a positive confirmation that a crew has it, that is `DocAcknowledgment` in the Document Center, not an inference from the pack.
+
+*Assumed one-way (OneDrive → ForeFlight). If Documents ever writes back, that is a different design and needs raising.*
 
 ## 10. What exists, what's new
 
@@ -144,7 +153,8 @@ Uncontrolled documents *are* eligible (the whiteboard draws both dotted arrows).
 2. `DocDriveBinding` on the document identity — `{ groupId, driveId, itemId, classification: 'controlled' | 'uncontrolled', contentHash, lastSyncedAtUtc }`. Classification moves here **as a per-document property**. Today `controlled` is per-class, which cannot express "this Safety PDF is controlled, that one isn't" within one class. Class stays the default; the binding is the authority.
 3. `DriveSyncEngine` (pure) — `reconcile(driveItems, registerEntries) → { unclassified, drifted, orphaned, registered }`. Pure and unit-tested; the Graph client is a thin caller, mockable, exactly as `SchedulingService` wraps the pure scheduling engine.
 4. `RegisterAudit` — the (group, register, period) attestation record.
-5. **Surfaces:** a Registers page (two lists, filterable by group, the auditor's view); a per-group Intake queue; an audit panel. Reader stays the Document Center — D66 already ruled it the only reader.
+5. `packReconcile` (pure) — desired pack tree vs actual folder → `{ add, replace, delete }`, plus the manifest writer (§9). Same shape as `DriveSyncEngine`, and the **only** ForeFlight-facing code: the pack folder is written with the ordinary Graph drive calls, not through any ForeFlight API.
+6. **Surfaces:** a Registers page (two lists, filterable by group, the auditor's view); a per-group Intake queue; an audit panel. Reader stays the Document Center — D66 already ruled it the only reader.
 
 **Config keys** (naming per the CLAUDE.md contract; nothing wired until approved): `Graph__TenantId`, `Graph__ClientId`, `Graph__GroupDriveMap`, `Graph__DeltaSweepMinutes`, `Graph__SubscriptionRenewalHours`, `Documents__RegisterAuditMonths` = `12`. **No Graph secret is introduced** — app-only auth via the API's managed identity with `Sites.Selected`, granted per site. If [[Q3]] lands on personal OneDrive, that changes and the scope discussion in §4.2 has to be reopened explicitly.
 
@@ -152,11 +162,13 @@ Uncontrolled documents *are* eligible (the whiteboard draws both dotted arrows).
 
 ## 11. Open questions — answer before a plan is cut
 
+> **Resolved since the first draft.** *[[Q5]] ForeFlight path* — **answered 2026-07-30 (Bryan):** ForeFlight **Documents**, connected to a OneDrive folder by path, mirroring it. Not an API push, and not the Files integration this repo already has. §9 is rewritten accordingly; the questions below keep their original numbers so earlier references still resolve.
+
 1. **[[Q1]] Working vs Shared Folder.** Is my §5 reading right — Working = pre-process drafting (on no register), Shared = cross-group published surface? Or is Shared also a staging area?
 2. **[[Q2]] `Master`.** A ninth peer group (corporate/all-hands), or the union/index of the other eight?
 3. **[[Q3]] Drive topology.** One SharePoint site with eight libraries, one library with eight folders, or eight sites? Drives the `Sites.Selected` grant and the sync-scope story. Also: confirm SharePoint-backed rather than personal OneDrive (§4).
 4. **[[Q4]] Who classifies?** Per-group document owner, the central document manager, or either? And who may *reclassify* Un-CTL → CTL — that promotion is the moment a document acquires regulatory weight.
-5. **[[Q5]] ForeFlight path.** Content-pack API upload, or a synced folder ForeFlight ingests? Decides whether §9 is a push with a receipt or a file drop.
+5. **[[Q5a]] Pack folder placement.** Where does the mirrored pack folder live — its own library, or a folder inside the Pilots group? It is written only by myGFO either way (§9.2), but it is the one folder whose contents reach a flight deck, so it may deserve its own permission boundary rather than inheriting Pilots'.
 6. **[[Q6]] Scope of Phase 1 here.** Full reconcile against a mocked Graph, or registers + intake UI over the existing mock store with the drive layer stubbed? My recommendation: the latter first — the pure `DriveSyncEngine` and both registers are the valuable, testable half, and they are what makes the Graph work mechanical when it comes.
 7. **[[Q7]] Retention.** Does the 12-month register audit have a retention requirement of its own (Part 91 record-keeping), or is it an internal quality artifact?
 
@@ -165,5 +177,5 @@ Uncontrolled documents *are* eligible (the whiteboard draws both dotted arrows).
 - **Slice 1 — registers over the mock store.** `DocGroup` config, `DocDriveBinding`, both register views, per-document classification. No Graph.
 - **Slice 2 — reconcile + intake.** Pure `DriveSyncEngine` + tests (unclassified / drifted / orphaned / CTL-drift-is-an-incident), intake queue UI, mock drive fixtures.
 - **Slice 3 — the 12-month audit.** `RegisterAudit`, the "cannot close with a non-empty queue" rule, the audit artifact.
-- **Slice 4 — content pack projection.** `distributeToForeFlight`, authored pack tree, build stamped with register revision.
+- **Slice 4 — content pack folder.** `distributeToForeFlight`, authored pack tree, and a pure `packReconcile(desired, actual) → { add, replace, delete }` with the delete arm tested hardest — a superseded revision left behind in the folder is a wrong document on a flight deck (§9.1). Plus the manifest, and the pack folder folded into reconcile scope.
 - **Slice 5 — real Graph.** Delta + subscriptions + renewal behind the seam Slice 2 defined. Separate call, separate review.
