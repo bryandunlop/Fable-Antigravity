@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { DocSection, DocBlock } from '../types';
 import { ComplianceBadges } from './ComplianceBadges';
+import { stepNumbers, stepBody } from '../engine/blocks';
 
 const CALLOUT_STYLES: Record<NonNullable<DocBlock['calloutKind']>, string> = {
   // Amber/caution styling stays on document surfaces only — never the RAG status palette.
@@ -11,7 +12,25 @@ const CALLOUT_STYLES: Record<NonNullable<DocBlock['calloutKind']>, string> = {
   warning: 'border-orange-300 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20',
 };
 
-export function BlockBody({ block }: { block: DocBlock }) {
+export function BlockBody({ block, stepNumber }: { block: DocBlock; stepNumber?: number }) {
+  if (block.type === 'step') {
+    return (
+      <div data-step={stepNumber} className="my-3 flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-medium text-accent-foreground"
+        >
+          {stepNumber}
+        </span>
+        {/* The step's photo rides in `md` as an ordinary image, so it renders here without the
+            renderer having to reach for figureRef — that field exists for other consumers. */}
+        <div className="min-w-0 flex-1 [&_img]:mt-2 [&_img]:rounded-md [&_img]:border [&_img]:border-border">
+          <span className="sr-only">Step {stepNumber}. </span>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{stepBody(block.md)}</ReactMarkdown>
+        </div>
+      </div>
+    );
+  }
   if (block.type === 'callout') {
     const kind = block.calloutKind ?? 'note';
     // Strip the '> [!KIND]' marker line; render the remaining quoted text.
@@ -42,27 +61,31 @@ export function SectionedContent({
 }) {
   return (
     <>
-      {sections.map((section) => (
-        <section key={section.id} data-section-id={section.id}>
-          {(section.title || section.number) &&
-            (section.level <= 1 ? (
-              <h1>{section.number ? `${section.number} ` : ''}{section.title}</h1>
-            ) : (
-              <h2>{section.number ? `${section.number} ` : ''}{section.title}</h2>
+      {sections.map((section) => {
+        // Per section, so two task cards in one document each start at 1.
+        const steps = stepNumbers(section.blocks);
+        return (
+          <section key={section.id} data-section-id={section.id}>
+            {(section.title || section.number) &&
+              (section.level <= 1 ? (
+                <h1>{section.number ? `${section.number} ` : ''}{section.title}</h1>
+              ) : (
+                <h2>{section.number ? `${section.number} ` : ''}{section.title}</h2>
+              ))}
+            {section.blocks.map((block) => (
+              <div
+                key={block.id}
+                data-block-id={block.id}
+                className={renderBlockGutter ? 'group relative pr-10' : undefined}
+              >
+                <BlockBody block={block} stepNumber={steps.get(block.id)} />
+                <ComplianceBadges refs={block.complianceRefs} />
+                {renderBlockGutter?.(block.id)}
+              </div>
             ))}
-          {section.blocks.map((block) => (
-            <div
-              key={block.id}
-              data-block-id={block.id}
-              className={renderBlockGutter ? 'group relative pr-10' : undefined}
-            >
-              <BlockBody block={block} />
-              <ComplianceBadges refs={block.complianceRefs} />
-              {renderBlockGutter?.(block.id)}
-            </div>
-          ))}
-        </section>
-      ))}
+          </section>
+        );
+      })}
     </>
   );
 }

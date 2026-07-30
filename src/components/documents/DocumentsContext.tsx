@@ -10,7 +10,7 @@ import type {
   DocumentsState,
 } from './types';
 import type { Signature } from '../tech-log/types';
-import { classFor } from './classes';
+import { classFor, docReaderPath } from './classes';
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision } from './engine/revisions';
 import { canAuthor, validateSubmit, validateDecision, validateDirectPublish } from './engine/lifecycle';
@@ -918,7 +918,7 @@ export function publishRequiredReadEvent(doc: Doc, rev: DocRevision): void {
     title: `New required read: ${doc.title}`,
     detail: `${doc.id} rev ${rev.revision} — read & ${rev.ackLevel === 'signature' ? 'sign' : 'initial'} required`,
     module: 'Documents',
-    link: classFor(doc.classId).readerRoute === '/documents' ? `/documents/${doc.id}` : classFor(doc.classId).readerRoute,
+    link: docReaderPath(doc.id),
     audienceRoles: expandAudience(doc.roles),
   });
 }

@@ -8,6 +8,8 @@ import {
   Header, Footer, Table, TableRow, TableCell, WidthType, PageNumber,
 } from 'docx';
 import type { Doc, DocRevision, DocBlock } from '../types';
+import { stepNumbers, stepBody } from './blocks';
+import { formatDateOnly } from '../../../lib/operatorDate';
 
 /** Machine-readable, human-invisible block-ID marker. */
 export function idMarker(blockId: string): TextRun {
@@ -41,9 +43,16 @@ function tableFor(md: string): Table | Paragraph {
 }
 
 /** A block -> docx children (Paragraph/Table). The block ID marker leads the first child. */
-export function blockToDocx(block: DocBlock): (Paragraph | Table)[] {
+export function blockToDocx(block: DocBlock, stepNumber?: number): (Paragraph | Table)[] {
   const lead = [idMarker(block.id)];
   switch (block.type) {
+    case 'step': {
+      // The reviewer's .docx has no card layout, so the number has to be in the text or it is lost.
+      const body = stepBody(block.md).split('\n').filter((l) => l.trim() && !/^!\[/.test(l.trim())).join(' ');
+      return [new Paragraph({
+        children: [...lead, new TextRun({ text: `Step ${stepNumber ?? ''}. `, bold: true }), ...runs(body)],
+      })];
+    }
     case 'heading': {
       const m = /^(#{3,6})\s+(.*)$/.exec(block.md.trim());
       return [new Paragraph({ heading: HeadingLevel.HEADING_3, children: runs(m ? m[2] : block.md, lead) })];
@@ -75,12 +84,17 @@ export function blockToDocx(block: DocBlock): (Paragraph | Table)[] {
 export function buildReviewDocx(doc: Doc, rev: DocRevision): Promise<Blob> {
   const children: (Paragraph | Table)[] = [
     new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(doc.title)] }),
-    new Paragraph({ children: [new TextRun({ text: `${doc.id} · Revision ${rev.revision} · effective ${new Date(rev.effectiveDate).toLocaleDateString()}`, color: '666666', size: 18 })] }),
+    new Paragraph({ children: [new TextRun({ text: `${doc.id} · Revision ${rev.revision} · effective ${formatDateOnly(rev.effectiveDate)}`, color: '666666', size: 18 })] }),
     new Paragraph({ children: [new TextRun({ text: `Review copy — edit with tracked changes ON; do not remove the hidden block markers. sha256 ${rev.mockChecksum.slice(0, 12)}…`, italics: true, color: '999999', size: 16 })] }),
-    ...rev.sections.flatMap((s) => [
-      new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(`${s.number ? `${s.number} ` : ''}${s.title}`)] }),
-      ...s.blocks.flatMap(blockToDocx),
-    ]),
+    ...rev.sections.flatMap((s) => {
+      // NOT `flatMap(blockToDocx)`: flatMap passes the array index as the second argument, which
+      // would land in `stepNumber` and number steps by block position instead of step position.
+      const steps = stepNumbers(s.blocks);
+      return [
+        new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(`${s.number ? `${s.number} ` : ''}${s.title}`)] }),
+        ...s.blocks.flatMap((b) => blockToDocx(b, steps.get(b.id))),
+      ];
+    }),
   ];
 
   const document = new Document({

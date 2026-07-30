@@ -46,3 +46,29 @@ describe('sectionsToHtml', () => {
     expect(h).toContain('<p>x</p>');
   });
 });
+
+describe('step blocks', () => {
+  it('renders a step with its number and lifts the photo out of the prose', () => {
+    const html = blockToHtml(b({ type: 'step', md: '[!STEP] Open the panel.\n![panel](/img/x.jpg)' }), 3);
+    expect(html).toContain('class="step"');
+    expect(html).toContain('<p class="step-n">3</p>');
+    expect(html).toContain('Open the panel.');
+    expect(html).not.toContain('[!STEP]');
+    expect(html).toContain('src="/img/x.jpg"');
+  });
+
+  it('numbers steps per section, and a note between them consumes no number', () => {
+    const s: DocSection[] = [{
+      id: 's', level: 2, number: '', title: 'Reset the cabin wifi',
+      blocks: [
+        b({ id: 'b0', type: 'step', md: '[!STEP] One.' }),
+        b({ id: 'b1', type: 'callout', calloutKind: 'caution', md: '> [!CAUTION]\n> Careful.' }),
+        b({ id: 'b2', type: 'step', md: '[!STEP] Two.' }),
+      ],
+    }];
+    const html = sectionsToHtml(s);
+    expect(html).toContain('<p class="step-n">1</p>');
+    expect(html).toContain('<p class="step-n">2</p>');
+    expect(html).not.toContain('<p class="step-n">3</p>');
+  });
+});

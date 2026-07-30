@@ -32,3 +32,14 @@ describe('buildReviewDocx', () => {
     expect(blob.size).toBeGreaterThan(500);
   });
 });
+
+describe('step blocks', () => {
+  it('prefixes the instruction with its step number rather than dropping it', () => {
+    const out = blockToDocx({ id: 'b', type: 'step', md: '[!STEP] Open the panel.' }, 2);
+    expect(out).toHaveLength(1);
+    const json = JSON.stringify(out);
+    expect(json).toContain('Step 2.');
+    expect(json).toContain('Open the panel.');
+    expect(json).not.toContain('[!STEP]');
+  });
+});

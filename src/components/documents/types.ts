@@ -16,7 +16,10 @@ export type RevisionStatus =
   | 'rejected'
   | 'withdrawn'; // author/manager pulled it before publication — kept as a tombstone (C7)
 
-export type BlockType = 'paragraph' | 'heading' | 'list' | 'table' | 'callout' | 'figure';
+/** 'step' is one numbered instruction in a task card — see `stepNumbers` in engine/blocks.
+ *  It carries no new field: the instruction is `md`, its photo is `figureRef`, and an attached
+ *  note is the following 'callout' block. So the canonical checksum shape is unchanged (D64). */
+export type BlockType = 'paragraph' | 'heading' | 'list' | 'table' | 'callout' | 'figure' | 'step';
 
 export interface DocBlock {
   id: string;                 // stable across revisions; '<sectionId>::b<ordinal>' this slice

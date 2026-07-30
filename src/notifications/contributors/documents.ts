@@ -2,7 +2,7 @@ import type { FeedItem } from '../types';
 import { defaultStorage, type StorageLike } from '../storage';
 import { resolveUserId } from '../identity';
 import type { DocumentsState } from '../../components/documents/types';
-import { DOC_CLASSES } from '../../components/documents/classes';
+import { DOC_CLASSES, docReaderPath } from '../../components/documents/classes';
 import { unacknowledgedRequiredReads, isOverdue } from '../../components/documents/engine/acknowledgments';
 import { docsDueForReview } from '../../components/documents/engine/review';
 import { canApprove } from '../../components/documents/engine/lifecycle';
@@ -47,11 +47,6 @@ export function buildDocumentsFeed(
   const todayIso = _nowUtc.slice(0, 10);
   const items: FeedItem[] = [];
 
-  const linkFor = (docId: string, classId: string): string => {
-    const route = DOC_CLASSES[classId]?.readerRoute ?? '/documents';
-    return route === '/documents' ? `/documents/${docId}` : route;
-  };
-
   // 1. Required reads the user still owes.
   for (const { doc, rev } of unacknowledgedRequiredReads(
     state.docs, state.revisions, state.acknowledgments, userRole, userId,
@@ -66,7 +61,7 @@ export function buildDocumentsFeed(
         rev.ackDueDate ? `${overdue ? ' · OVERDUE since' : ' · due'} ${rev.ackDueDate}` : ''
       }`,
       module: 'Documents',
-      link: linkFor(doc.id, doc.classId),
+      link: docReaderPath(doc.id),
     });
   }
 
@@ -80,7 +75,7 @@ export function buildDocumentsFeed(
       title: `Periodic review due: ${doc.title}`,
       detail: `${doc.id} · next review ${doc.nextReviewDate}`,
       module: 'Documents',
-      link: linkFor(doc.id, doc.classId),
+      link: docReaderPath(doc.id),
     });
   }
 

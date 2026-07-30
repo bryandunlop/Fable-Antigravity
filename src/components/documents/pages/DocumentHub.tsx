@@ -12,7 +12,7 @@ import { Label } from '../../ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../ui/accordion';
 import { GfoPageHeader, GfoStatCard, GfoEmptyState } from '../../gfo';
 import { useDocuments, identityFor } from '../DocumentsContext';
-import { classFor, DOC_CLASS_LIST } from '../classes';
+import { classFor, DOC_CLASS_LIST, docReaderPath } from '../classes';
 import { canApprove, canAuthor } from '../engine/lifecycle';
 import { currentRevision } from '../engine/revisions';
 import { unacknowledgedRequiredReads } from '../engine/acknowledgments';
@@ -270,7 +270,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
                       {docs.map((doc) => {
                         const rev = currentRevision(doc.id, state.revisions);
                         const cfg = classFor(doc.classId);
-                        const to = cfg.readerRoute === '/documents' ? `/documents/${doc.id}` : cfg.readerRoute;
+                        const to = docReaderPath(doc.id);
                         const summary = rev && rev.requireAcknowledgment && rev.ackLevel !== 'none'
                           ? complianceSummary(rev, readersFor(doc, universe), state.acknowledgments, todayIso)
                           : undefined;
