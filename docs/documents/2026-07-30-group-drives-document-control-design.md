@@ -1,7 +1,7 @@
 # Group Drives + Document Control — SharePoint / OneDrive under the controlled-list process — Design Spec
 
 - **Date:** 2026-07-30
-- **Status:** **Draft for review — NOT approved for implementation.** Written from the 2026-07-30 whiteboard photo + Bryan's steer. §11 lists what has to be answered before a plan is cut.
+- **Status:** **Draft for review — NOT approved for implementation.** Written from the 2026-07-30 whiteboard photo + Bryan's steer. §12 lists what has to be answered before a plan is cut.
 - **Author:** Bryan Dunlop (whiteboard) + Claude
 - **Branch:** `claude/sharepoint-onedrive-drive-management-e9d5n2`
 - **Surface:** extends the existing Document Compliance module (`src/components/documents/`)
@@ -116,14 +116,19 @@ The documents module already implements the left column — `DocumentClassConfig
 
 **Point-in-time durability.** "What was the effective revision on date X" must not depend on SharePoint version history — a tenant admin can prune it, and retention policy is not our policy. On publish of a controlled revision, snapshot the rendered file to the WORM blob container the project already specifies (`Storage__SignedDocsContainerUri`). The register entry cites the blob; SharePoint holds the working copy.
 
-## 8. The 12-month audit
+## 8. Forced review — 12 months controlled, 24 months uncontrolled
 
-Both registers carry it — this is a periodic re-attestation of the *register*, distinct from the per-document review cycle that already exists (`Doc.reviewCycleDays`, `nextReviewDate`, `DocReviewRecord`).
+> **Refined 2026-07-30 (Bryan).** The board wrote "12 month audit" over both registers. The two reviews ask **different questions**, and the uncontrolled one runs on a longer clock — **24 months** as a working figure ([[Q8]] holds the exact number open; it is one config value, `Documents__UncontrolledReviewMonths`).
 
-- **Per-document review** (built): "is this document still correct?" — cadence per class, 365 days on `sop`/`manual`.
-- **Register audit** (new): "is this list still the truth?" — for each group, for each register: every entry accounted for, no unclassified backlog, every drive item on a list, classifications still right, owners still employed. Produces one dated, attributable audit record per (group, register) — the artifact you hand an auditor.
+**Controlled — 12 months — *attest*.** The owner is walked through every controlled document in their group and has to answer, per document: it is present, it is current, it is correct. Outcomes: **reaffirm** (clock resets) or **start a revision** (into the four-eyes pipeline that already exists). The point is that it is a *forcing function on a named human* — the review exists so that nobody can claim a document is current by saying nothing about it for three years.
 
-An audit cannot be closed with a non-empty intake queue for that group. That is what makes §6 a process rather than a dashboard.
+**Uncontrolled — 24 months — *cull*.** Different verb, different question: not "is this correct" but "does this still need to exist." Outcomes: **keep** (clock resets) or **delete**. Uncontrolled documents are not regulatory records, so deleting one is a legitimate outcome — but it is **tombstoned on the register, never silently vanished**, so "where did that go?" has an answer and the removal is attributable to a person and a date. Without the tombstone, a cull is indistinguishable from a file going missing, which is the thing an uncontrolled pile does to itself already.
+
+**Overdue flags; it never hides.** A controlled document whose review has lapsed is *still the effective revision* and stays readable. Withdrawing a manual because an owner missed a calendar reminder would ground the operation to solve a paperwork problem. Overdue is loud — on the register row, in the owner's queue, and on the document wherever it is read (§10) — and it escalates. It does not remove.
+
+**Mostly already modelled.** `Doc.reviewCycleDays`, `nextReviewDate` and `DocReviewRecord` (`outcome: 'reaffirmed' | 'revision-started'`) are this mechanism, with 365 days already the default on `sop`/`manual`. What is new: the queue is **owned per group** rather than per document, the cull adds `'kept' | 'deleted'` to `DocReviewRecord.outcome`, and the cadence becomes a function of classification rather than of class.
+
+**The group roll-up is the auditable artifact.** Per (group, register, period): every entry attested, nothing overdue, every drive item on a list, no unclassified backlog. **A period cannot be closed while that group's intake queue is non-empty** — that is what makes §6 a process rather than a dashboard, and it is what you hand an auditor.
 
 ## 9. Distribution — the ForeFlight content pack is a mirrored folder
 
@@ -144,7 +149,61 @@ The mirror changes the engineering on both sides of the ledger.
 
 *Assumed one-way (OneDrive → ForeFlight). If Documents ever writes back, that is a different design and needs raising.*
 
-## 10. What exists, what's new
+## 10. Access — how users actually get to the documents
+
+> Bryan flagged this as the open problem: *"we need to figure out a way for the users to be able to access this, and that's what I'm trying to understand — the best way to do that."* This section is a recommendation, not a transcription. [[Q9]] and [[Q10]] are the two facts that would change it.
+
+### 10.1 There is no single reader, because there is no single user
+
+| Who | Where they are | What they need |
+|---|---|---|
+| **Pilot**, airborne or on the road | iPad, often offline, no appetite for a login | the current pilot-facing set, always, with no thought required |
+| **Anyone at a desk** doing their job | already in Teams / Explorer / Office | to open the file and get on with it |
+| **Anyone who must *rely* on a document** | anywhere | to know it is current and controlled, and whether they owe an acknowledgment |
+
+Funnelling all three through one door fails in a predictable direction. The desk population will keep using SharePoint because it is already open, and **a reader nobody uses is worse than no reader** — it becomes the place where the register is true while the drive is what people actually read. That gap is the failure mode this whole design exists to prevent, so the access model must not reintroduce it.
+
+### 10.2 Recommendation — one truth, rendered in three places
+
+**myGFO owns the register. It does not own the reading experience.**
+
+The move that makes this coherent: **myGFO writes the register onto the drive items as SharePoint metadata columns** — `Classification`, `Revision`, `EffectiveDate`, `NextReview`, `Owner`, `Status`. The native library view then *is* a register view: sortable, filterable, searchable columns instead of a folder of filenames. Someone who never opens myGFO still sees, **at the moment they open the file**, whether what they are holding is controlled and whether it is current.
+
+This is the read-side twin of §6. We cannot stop people reading natively, so instead of fighting it, push the truth to where they already are. The alternative — myGFO proxying file bytes so everyone is forced through our UI — buys nothing the metadata does not, and costs a download path, a second permission model, an offline story, and a viewer for every file type Office already renders.
+
+So:
+- **Pilots →** ForeFlight Documents via the mirrored folder (§9). Offline by construction, no login.
+- **Desk users →** native SharePoint / OneDrive, every item carrying myGFO's metadata. Offline via OneDrive sync.
+- **Anyone asking a question *about* a document →** the myGFO Document Center.
+
+### 10.3 What the myGFO reader is actually for
+
+Not a file browser competing with SharePoint. It is where you go when the question is **about** the document rather than **inside** it:
+
+- **Cross-group search over the register** — one query across all eight groups, filtered by audience. "Every controlled document I own that is overdue" is a register question; SharePoint search across eight libraries answers it badly.
+- **"What do I owe?"** — the acknowledgment queue. Purely a myGFO concept; no drive can produce it.
+- **Revision history and point-in-time** — what was effective on date X, off the WORM snapshot (§7).
+- **The owner queues** — 12-month attestation and 24-month cull (§8).
+- **The suggestion loop** — crew → owner, already built.
+
+### 10.4 Two kinds of document, one register
+
+Worth stating plainly, because it decides how much of the existing module carries over:
+
+- **Authored in myGFO** — SOPs, bulletins, manuals as `DocSection`/`DocBlock` trees. myGFO renders them; the drive receives a published rendering as the readable artifact.
+- **Files that live in the drive** — PDFs, Word, spreadsheets, forms produced elsewhere. myGFO registers, classifies, versions and reviews them but does **not** render them; it links out and Office renders.
+
+**One register, one classification model, one review cadence, across both.** The reader differs; the control does not. This is what lets the eight groups put the files they already have under control without re-authoring anything — which is plausibly the difference between this being adopted and being ignored.
+
+### 10.5 Permissions: the drive enforces, myGFO targets
+
+There are now two places that decide who sees what, and only one of them actually stops anyone. **The drive's permissions are the enforcement. `Doc.roles` is audience targeting** — who *should* see it, for surfacing and notification. It is not a security boundary and must not be treated as one.
+
+They have to agree, and the clean way to make them agree is **one Entra group per GFO group**, used as both the SharePoint permission principal and the myGFO audience. One object, one place to change when someone moves teams, no drift between the two by construction.
+
+**A link myGFO shows that the user cannot open is a defect** — and a detectable one: a permission mismatch is a reconcile finding like any other (§6).
+
+## 11. What exists, what's new
 
 **Reuse as-is:** `DocRevision` + status machine, four-eyes reducer enforcement, `DocAcknowledgment`, `DocReviewRecord`, `DocSuggestion` (crew→owner loop), `mockChecksum`, the Document Center reader (`docReaderPath`), `DOC_CLASSES` as config.
 
@@ -160,7 +219,7 @@ The mirror changes the engineering on both sides of the ledger.
 
 **Guardrails that apply** (from CLAUDE.md): file names and item ids are loggable, file *contents* are not; a published controlled revision is append-only and corrected by superseding revision, never by editing the drive item; drive items are not airworthiness records and nothing here touches the tech-log ledger.
 
-## 11. Open questions — answer before a plan is cut
+## 12. Open questions — answer before a plan is cut
 
 > **Resolved since the first draft.** *[[Q5]] ForeFlight path* — **answered 2026-07-30 (Bryan):** ForeFlight **Documents**, connected to a OneDrive folder by path, mirroring it. Not an API push, and not the Files integration this repo already has. §9 is rewritten accordingly; the questions below keep their original numbers so earlier references still resolve.
 
@@ -168,14 +227,18 @@ The mirror changes the engineering on both sides of the ledger.
 2. **[[Q2]] `Master`.** A ninth peer group (corporate/all-hands), or the union/index of the other eight?
 3. **[[Q3]] Drive topology.** One SharePoint site with eight libraries, one library with eight folders, or eight sites? Drives the `Sites.Selected` grant and the sync-scope story. Also: confirm SharePoint-backed rather than personal OneDrive (§4).
 4. **[[Q4]] Who classifies?** Per-group document owner, the central document manager, or either? And who may *reclassify* Un-CTL → CTL — that promotion is the moment a document acquires regulatory weight.
-5. **[[Q5a]] Pack folder placement.** Where does the mirrored pack folder live — its own library, or a folder inside the Pilots group? It is written only by myGFO either way (§9.2), but it is the one folder whose contents reach a flight deck, so it may deserve its own permission boundary rather than inheriting Pilots'.
+5. **[[Q5a]] Pack folder placement.** Where does the mirrored pack folder live — its own library, or a folder inside the Pilots group? It is written only by myGFO either way (§9, consequence 2), but it is the one folder whose contents reach a flight deck, so it may deserve its own permission boundary rather than inheriting Pilots'.
 6. **[[Q6]] Scope of Phase 1 here.** Full reconcile against a mocked Graph, or registers + intake UI over the existing mock store with the drive layer stubbed? My recommendation: the latter first — the pure `DriveSyncEngine` and both registers are the valuable, testable half, and they are what makes the Graph work mechanical when it comes.
-7. **[[Q7]] Retention.** Does the 12-month register audit have a retention requirement of its own (Part 91 record-keeping), or is it an internal quality artifact?
+7. **[[Q7]] Retention.** Does the group review roll-up have a retention requirement of its own (Part 91 record-keeping), or is it an internal quality artifact?
+8. **[[Q8]] Uncontrolled cull cadence.** 24 months is Bryan's working figure ("I'm not sure of the timeline — let's just say 24 months"). Confirm, or set it per group. It is one config value either way, so this gates nothing — but the number should be someone's decision rather than a placeholder that hardened by default.
+9. **[[Q9]] Where do people actually work today?** The §10.2 recommendation rests on this. If GFO already lives in Teams / SharePoint day-to-day, pushing metadata to the native view is clearly right. If most people's day starts in myGFO and SharePoint is only where files happen to sit, the balance shifts toward the myGFO reader and native access becomes the exception rather than the main road. **This is the single most useful thing to tell me**, and it is an observation about how the departments work, not a technical choice.
+10. **[[Q10]] Metadata columns — acceptable?** §10.2 assumes myGFO may write columns onto drive items and that an admin will provision them per library. Needs write scope on the item and a small amount of SharePoint administration. If that is unwelcome, the fallback is a per-folder index file written by myGFO — visible, but not sortable, searchable or filterable, so it is a materially weaker version of the same idea. Also: is one Entra group per GFO group (§10.5) workable with how GFO manages groups today?
 
-## 12. Suggested slicing (once §11 is answered)
+## 13. Suggested slicing (once §12 is answered)
 
 - **Slice 1 — registers over the mock store.** `DocGroup` config, `DocDriveBinding`, both register views, per-document classification. No Graph.
 - **Slice 2 — reconcile + intake.** Pure `DriveSyncEngine` + tests (unclassified / drifted / orphaned / CTL-drift-is-an-incident), intake queue UI, mock drive fixtures.
-- **Slice 3 — the 12-month audit.** `RegisterAudit`, the "cannot close with a non-empty queue" rule, the audit artifact.
-- **Slice 4 — content pack folder.** `distributeToForeFlight`, authored pack tree, and a pure `packReconcile(desired, actual) → { add, replace, delete }` with the delete arm tested hardest — a superseded revision left behind in the folder is a wrong document on a flight deck (§9.1). Plus the manifest, and the pack folder folded into reconcile scope.
+- **Slice 3 — the review cycles.** Owner queues per group: 12-month controlled attestation and 24-month uncontrolled cull, the delete tombstone, overdue-flags-but-never-hides, and the group roll-up with the "cannot close with a non-empty queue" rule.
+- **Slice 3b — access.** The register surfaced where people read: metadata columns on drive items, deep links both directions, cross-group register search, the "what do I owe" queue. Sequenced right after the review cycles because an overdue flag is worth little if it is only visible to someone who already opened myGFO.
+- **Slice 4 — content pack folder.** `distributeToForeFlight`, authored pack tree, and a pure `packReconcile(desired, actual) → { add, replace, delete }` with the delete arm tested hardest — a superseded revision left behind in the folder is a wrong document on a flight deck (§9, consequence 1). Plus the manifest, and the pack folder folded into reconcile scope.
 - **Slice 5 — real Graph.** Delta + subscriptions + renewal behind the seam Slice 2 defined. Separate call, separate review.
