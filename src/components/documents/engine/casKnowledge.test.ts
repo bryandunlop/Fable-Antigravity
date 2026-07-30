@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Doc, DocRevision } from '../types';
 import {
   appliesToFleet, casCatalog, fleetArticles, isCasEntry, matchCasCatalog, catalogEntryForMessage,
+  catalogEntriesForMessage, duplicateCasMessages,
 } from './casKnowledge';
 
 /**
@@ -217,5 +218,47 @@ describe('catalogEntryForMessage', () => {
   it('returns undefined for free text that is not in the catalog', () => {
     expect(catalogEntryForMessage(entries, 'SOMETHING NEW')).toBeUndefined();
     expect(catalogEntryForMessage(entries, '')).toBeUndefined();
+  });
+});
+
+/**
+ * A CAS message is NOT a key. The tribal-knowledge class is uncontrolled direct-publish (D60), so
+ * there is no approval step at which a second entry for `R ENG CHIP` would be caught, and dropping
+ * one silently would hide a curator's work behind an entry they cannot see is shadowing it. So the
+ * engine keeps both, resolves the singular lookup by a STATED tie-break, and offers callers a way
+ * to detect the duplication instead of guessing.
+ */
+describe('duplicate CAS messages across entries', () => {
+  // Deliberately a HIGHER doc id than TK-100 and a DIFFERENT colour: if the tie-break were
+  // accidental, or if a caller silently adopted a colour, this is the entry that would show it.
+  const DUPE = doc({
+    id: 'TK-199',
+    title: 'R ENG CHIP — second opinion from the night shift',
+    fleetTypes: ['G650ER'],
+    casMeta: { casMessage: 'r eng chip', casColor: 'AMBER' },
+  });
+  const docs = [...DOCS, DUPE];
+  const revs = [...REVS, rev('TK-199')];
+  const dupEntries = casCatalog(docs, revs, 'G650ER');
+
+  it('keeps BOTH entries in the catalog — neither curator is silently dropped', () => {
+    expect(catalogEntriesForMessage(dupEntries, 'R ENG CHIP').map((e) => e.docId)).toEqual(['TK-100', 'TK-199']);
+  });
+
+  it('resolves the singular lookup to the earliest-curated entry (lowest doc id), always', () => {
+    expect(catalogEntryForMessage(dupEntries, 'R ENG CHIP')?.docId).toBe('TK-100');
+    // Deterministic for the catalog, not for the order the docs happened to arrive in.
+    const reversed = casCatalog([...docs].reverse(), [...revs].reverse(), 'G650ER');
+    expect(catalogEntryForMessage(reversed, 'R ENG CHIP')?.docId).toBe('TK-100');
+  });
+
+  it('reports the duplicated messages so a guard can refuse to ship them', () => {
+    expect(duplicateCasMessages(dupEntries)).toEqual(['r eng chip']);
+    expect(duplicateCasMessages(casCatalog(DOCS, REVS, 'G650ER'))).toEqual([]);
+  });
+
+  it('matches case-insensitively and ignores padding on the plural lookup too', () => {
+    expect(catalogEntriesForMessage(dupEntries, '  R Eng Chip ')).toHaveLength(2);
+    expect(catalogEntriesForMessage(dupEntries, '')).toEqual([]);
   });
 });

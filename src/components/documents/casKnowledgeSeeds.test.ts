@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { getSeedState, casKnowledgeSeed } from './mockData';
 import { STORED_STATE_MIGRATIONS, migrateStoredState } from './engine/migrations';
 import { DATA_VERSION } from './DocumentsContext';
-import { casCatalog, fleetArticles, isCasEntry, catalogEntryForMessage, CAS_KNOWLEDGE_CLASS_ID } from './engine/casKnowledge';
+import {
+  casCatalog, fleetArticles, isCasEntry, catalogEntryForMessage, duplicateCasMessages,
+  CAS_KNOWLEDGE_CLASS_ID,
+} from './engine/casKnowledge';
 import { currentRevision, nextDocId } from './engine/revisions';
 import { classFor } from './classes';
 import { SEED_AIRCRAFT } from '../tech-log/mockData/fleet';
@@ -115,15 +118,63 @@ describe('D60 CAS knowledge seeds', () => {
     }
   });
 
-  it('articles link config values rather than restating a number', () => {
-    const articleBodies = casKnowledgeSeed()
-      .revisions.filter((r) => !casKnowledgeSeed().docs.find((d) => d.id === r.docId)?.casMeta)
+  /**
+   * D60's config clause is TWO claims: aircraft config "is displayed/linked by articles, **never
+   * restated in prose**". This guard used to test a proxy for neither — it required EVERY freeform
+   * body to name `standbyFuelLoadLb`, which D60 does not ask and which a correct future article
+   * (nuisance CAS messages, a startup stack) would fail for having nothing to do with fuel.
+   *
+   * What is asserted now:
+   *   1. **Universal** — no article restates a config number, with the numbers derived from
+   *      `SEED_AIRCRAFT` rather than written here. A literal in a test agreeing with a literal in a
+   *      seed is exactly how this batch has been burned before.
+   *   2. **Conditional** — an article that RAISES the subject points at where the value lives.
+   *   3. **Existential** — at least one does raise it, so claim 1 cannot pass vacuously.
+   */
+  const articleBodies = () => {
+    const { docs, revisions } = casKnowledgeSeed();
+    const articleIds = new Set(docs.filter((d) => !d.casMeta).map((d) => d.id));
+    return revisions
+      .filter((r) => articleIds.has(r.docId))
       .map((r) => r.sections.flatMap((s) => s.blocks.map((b) => b.md)).join('\n'));
-    expect(articleBodies.length).toBeGreaterThan(0);
-    for (const body of articleBodies) {
-      expect(body).toMatch(/standbyFuelLoadLb/);
-      // D60: never restate the number in prose. The fleet seeds use 6,000 and 8,000 lb.
-      expect(body).not.toMatch(/\b[68],?000\s*lb/i);
+  };
+
+  /** The `standbyFuelLoadLb` figures the fleet actually holds — derived, never typed. */
+  const CONFIG_NUMBERS = [
+    ...new Set(SEED_AIRCRAFT.map((a) => a.standbyFuelLoadLb).filter((n): n is number => typeof n === 'number')),
+  ];
+
+  it('the fleet actually carries the config value this clause is about', () => {
+    expect(CONFIG_NUMBERS.length, 'SEED_AIRCRAFT sets standbyFuelLoadLb somewhere').toBeGreaterThan(0);
+  });
+
+  it('no article restates a config number in prose', () => {
+    const bodies = articleBodies();
+    expect(bodies.length).toBeGreaterThan(0);
+    for (const body of bodies) {
+      const digits = body.replace(/,/g, ''); // "8,000" and "8000" are the same restatement
+      for (const n of CONFIG_NUMBERS) {
+        expect(new RegExp(`(?<!\\d)${n}(?!\\d)`).test(digits), `an article restates ${n}`).toBe(false);
+      }
+    }
+  });
+
+  it('an article that raises the standby fuel load points at where the value lives', () => {
+    const raising = articleBodies().filter((b) => /standby fuel|standbyFuelLoadLb/i.test(b));
+    // Existential half: if nothing raises it, the rule above is passing vacuously.
+    expect(raising.length, 'at least one seeded article discusses the config value').toBeGreaterThan(0);
+    for (const body of raising) {
+      expect(body, 'names the field it is pointing at').toMatch(/standbyFuelLoadLb/);
+      expect(body, 'says where to read it').toMatch(/aircraft record|postflight/i);
+    }
+  });
+
+  it('no fleet type has the same CAS message curated twice', () => {
+    // A duplicate is a curation defect the engine deliberately does NOT resolve silently
+    // (`duplicateCasMessages`), so the demo must not ship one — it would make the defect form's
+    // deep link plural and leave the colour to the reporter for no good reason.
+    for (const type of FLEET_TYPES) {
+      expect(duplicateCasMessages(casCatalog(seed.docs, seed.revisions, type)), `duplicates on ${type}`).toEqual([]);
     }
   });
 });

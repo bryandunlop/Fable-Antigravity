@@ -331,6 +331,33 @@ describe('defect form CAS colour follows the message (D60)', () => {
     expect(colorSelect()).toHaveValue('AMBER');
   });
 
+  /**
+   * Two entries curating one annunciation is a curation defect the class cannot prevent (uncontrolled
+   * direct publish, no approval step). The engine refuses to resolve it silently, and so does the
+   * form: every entry is linked, and a colour the curators disagree on is left to the reporter
+   * rather than guessed onto a signed record.
+   */
+  it('links every entry and adopts no colour when two curators disagree', async () => {
+    const user = userEvent.setup();
+    renderForm({
+      docs: [
+        ...DOCS,
+        tkDoc({
+          id: 'TK-913',
+          title: 'GEAR UNSAFE — second opinion from the night shift',
+          fleetTypes: ['G650ER'],
+          casMeta: { casMessage: 'GEAR UNSAFE', casColor: 'AMBER' },
+        }),
+      ],
+    });
+    await chooseMessageMode(user);
+    await user.type(messageInput(), 'GEAR UNSAFE');
+
+    expect(screen.getAllByRole('link', { name: /what maintenance knows about GEAR UNSAFE/i })).toHaveLength(2);
+    expect(screen.getByText(/2 entries curate this message/)).toBeInTheDocument();
+    expect(colorSelect()).toHaveValue('AMBER'); // the reporter's, untouched — RED was not guessed
+  });
+
   it('does not touch the colour for a message nobody has curated', async () => {
     const user = userEvent.setup();
     renderForm();

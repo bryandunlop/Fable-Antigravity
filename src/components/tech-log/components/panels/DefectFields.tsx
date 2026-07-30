@@ -5,7 +5,7 @@ import { Paperclip, Camera, MapPin, X, Clock, MonitorDot, BookOpen } from 'lucid
 // forward-migrating store live). Pure functions and a type only: no context, no store, no provider
 // requirement — see `useCasCatalog` for the read side.
 import {
-  matchCasCatalog, catalogEntryForMessage, CAS_PICKER_LIMIT, type CasCatalogEntry,
+  matchCasCatalog, catalogEntriesForMessage, CAS_PICKER_LIMIT, type CasCatalogEntry,
 } from '../../../documents/engine/casKnowledge';
 import { CasChip } from '../CasChip';
 import { mockSha256 } from '../../engine/signing';
@@ -210,9 +210,14 @@ export function DefectCasField({
   // the cap; the cap is a rendering limit, not a search limit, and the list says so below.
   const filtered = matchCasCatalog(catalog, query, Number.MAX_SAFE_INTEGER);
   const matches = filtered.slice(0, CAS_PICKER_LIMIT);
-  // When the typed message IS a curated one, offer the entry that explains it. Read-only for the
+  // When the typed message IS a curated one, offer the entries that explain it. Read-only for the
   // pilot: "what maintenance knows about this message", not a second place to record the defect.
-  const known = catalogEntryForMessage(catalog, message);
+  //
+  // ALL of them, not the first. A CAS message is not a key in the catalog (see
+  // `catalogEntriesForMessage`) — an uncontrolled direct-publish class has no approval step where a
+  // duplicate would be caught. Linking to whichever one sorted first would make the pointer depend
+  // on doc-id order, which the reader has no way to know about.
+  const known = catalogEntriesForMessage(catalog, message);
 
   /**
    * D60 fix pass — the colour follows the message, in BOTH directions.
@@ -250,15 +255,19 @@ export function DefectCasField({
 
   const changeMessage = (next: string) => {
     onMessageChange(next);
-    const before = catalogEntryForMessage(catalog, message);
-    const after = catalogEntryForMessage(catalog, next);
-    if (after) {
-      if (before?.docId !== after.docId && after.casColor !== color) onColorChange(after.casColor);
+    const before = catalogEntriesForMessage(catalog, message);
+    const after = catalogEntriesForMessage(catalog, next);
+    if (after.length) {
+      // Only when the curators AGREE. Two entries for one annunciation at different tiers is a
+      // curation defect, and picking one of them to write onto a signed record would be the engine
+      // guessing on a safety field — `casColor` feeds the FIR fast path. Left to the reporter.
+      const agreed = after.every((e) => e.casColor === after[0].casColor) ? after[0].casColor : undefined;
+      if (agreed && before[0]?.docId !== after[0].docId && agreed !== color) onColorChange(agreed);
       return;
     }
     // The message just stopped being the curated one whose colour is on screen — give the
     // reporter's own colour back rather than leave another annunciation's tier behind.
-    if (before && color !== manualColor.current) onColorChange(manualColor.current);
+    if (before.length && color !== manualColor.current) onColorChange(manualColor.current);
   };
 
   const pick = (entry: CasCatalogEntry) => {
@@ -353,16 +362,23 @@ export function DefectCasField({
             </div>
           )}
 
-          {known && (
-            <p className="mt-2 text-xs">
-              <Link to={`/documents/${known.docId}`} className="inline-flex items-center gap-1 underline">
-                <BookOpen className="h-3.5 w-3.5" /> What maintenance knows about {known.casMessage}
-              </Link>
-              <span className="text-muted-foreground">
-                {' '}— reference only; it does not change what you report. The colour above is the
-                curated one for this message; change it if the flight deck showed something else.
-              </span>
-            </p>
+          {known.length > 0 && (
+            <div className="mt-2 space-y-1 text-xs">
+              {known.map(entry => (
+                <p key={entry.docId}>
+                  <Link to={`/documents/${entry.docId}`} className="inline-flex items-center gap-1 underline">
+                    <BookOpen className="h-3.5 w-3.5" /> What maintenance knows about {entry.casMessage}
+                  </Link>
+                  {known.length > 1 && <span className="text-muted-foreground"> — {entry.title}</span>}
+                </p>
+              ))}
+              <p className="text-muted-foreground">
+                Reference only; it does not change what you report.{' '}
+                {known.length > 1
+                  ? `${known.length} entries curate this message, so the colour is left to you — record what the flight deck showed.`
+                  : 'The colour above is the curated one for this message; change it if the flight deck showed something else.'}
+              </p>
+            </div>
           )}
         </>
       )}

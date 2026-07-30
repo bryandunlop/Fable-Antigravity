@@ -66,8 +66,14 @@ function liveFleetEntries(
 }
 
 /**
- * The CAS messages a tail of this fleet type can be offered at intake, sorted by
- * message so the order does not depend on doc creation order.
+ * The CAS messages a tail of this fleet type can be offered at intake.
+ *
+ * Ordered by message CASE-INSENSITIVELY, then by `docId`. The case-folding is not cosmetic: every
+ * lookup in this file matches messages case-insensitively, so a raw `localeCompare` put
+ * `r eng chip` and `R ENG CHIP` — the same annunciation as far as any caller is concerned — in an
+ * order decided by locale tertiary weighting, and the `docId` tie-break below was then unreachable
+ * for exactly the case `catalogEntryForMessage` documents it for. Fold first, and the stated rule
+ * ("the earliest-curated entry wins") is the rule that actually runs.
  */
 export function casCatalog(docs: Doc[], revisions: DocRevision[], fleetType: AircraftType): CasCatalogEntry[] {
   return liveFleetEntries(docs, revisions, fleetType)
@@ -81,7 +87,11 @@ export function casCatalog(docs: Doc[], revisions: DocRevision[], fleetType: Air
       cmcCodes: doc.casMeta!.cmcCodes ?? [],
       fleetTypes: doc.fleetTypes ?? [],
     }))
-    .sort((a, b) => a.casMessage.localeCompare(b.casMessage) || a.docId.localeCompare(b.docId));
+    .sort(
+      (a, b) =>
+        a.casMessage.trim().toLowerCase().localeCompare(b.casMessage.trim().toLowerCase()) ||
+        a.docId.localeCompare(b.docId),
+    );
 }
 
 /** The freeform reference articles for a fleet type — everything tagged for the
@@ -113,12 +123,53 @@ export function matchCasCatalog(
 }
 
 /**
- * The catalog entry a typed CAS message corresponds to, if any. Free text stays
- * legal (the catalog will be incomplete for a long time) — this is only how the
- * form knows whether it can offer "what maintenance knows about this message".
+ * EVERY catalog entry curating a typed CAS message, in catalog order.
+ *
+ * **A CAS message is not a key here, and deliberately so.** Nothing stops two curators from writing
+ * separate entries for `GEAR UNSAFE` on the same fleet — the class is uncontrolled direct-publish by
+ * design (D60), so there is no approval step where a duplicate would be caught, and silently
+ * dropping one would hide a curator's work behind an entry they cannot see is shadowing it. The
+ * catalog therefore keeps both, the picker shows both, and callers that need a single answer say so
+ * explicitly by calling `catalogEntryForMessage` and accepting its documented tie-break.
+ *
+ * Free text stays legal regardless (the catalog will be incomplete for a long time) — this is only
+ * how a form knows whether it can offer "what maintenance knows about this message".
+ */
+export function catalogEntriesForMessage(entries: CasCatalogEntry[], message: string): CasCatalogEntry[] {
+  const m = message.trim().toLowerCase();
+  if (!m) return [];
+  return entries.filter((e) => e.casMessage.trim().toLowerCase() === m);
+}
+
+/**
+ * The single entry a typed CAS message resolves to, if any.
+ *
+ * **Tie-break, stated rather than inherited:** when more than one entry curates the message this
+ * returns the one `casCatalog` orders first, which — since the sort's second key is `docId` — is the
+ * LOWEST doc id, i.e. the earliest-curated entry. That is a real choice, not an accident of `find`:
+ * the oldest entry is the one the fleet has had longest and is likeliest to have been linked to from
+ * elsewhere. It is deterministic for a given catalog and pinned by test.
+ *
+ * A caller that would be MISLED by picking one of several — a deep link, or adopting a curated
+ * colour onto a signed record — should use `catalogEntriesForMessage` and handle the plural case
+ * rather than lean on this tie-break.
  */
 export function catalogEntryForMessage(entries: CasCatalogEntry[], message: string): CasCatalogEntry | undefined {
-  const m = message.trim().toLowerCase();
-  if (!m) return undefined;
-  return entries.find((e) => e.casMessage.trim().toLowerCase() === m);
+  return catalogEntriesForMessage(entries, message)[0];
+}
+
+/**
+ * The CAS messages this catalog curates more than once, lower-cased and sorted.
+ *
+ * Duplication is a curation defect, not a data-model feature: two entries for one annunciation mean
+ * two places to look and a real chance they disagree on the colour. The engine will not resolve it
+ * silently, so this is how a guard (or a future curator-facing warning) can surface it.
+ */
+export function duplicateCasMessages(entries: CasCatalogEntry[]): string[] {
+  const seen = new Map<string, number>();
+  for (const e of entries) {
+    const k = e.casMessage.trim().toLowerCase();
+    seen.set(k, (seen.get(k) ?? 0) + 1);
+  }
+  return [...seen.entries()].filter(([, n]) => n > 1).map(([k]) => k).sort();
 }
