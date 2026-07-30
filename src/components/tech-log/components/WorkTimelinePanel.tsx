@@ -259,7 +259,14 @@ export function WorkTimelinePanel({ card, canEdit, user, nameOf, onSave }: Props
               {audit.map((a, i) => (
                 <div key={i} className="border-b py-1 text-xs text-muted-foreground last:border-0">
                   <div>
-                    {nameOf(a.byOid) || a.byName} · {new Date(a.atUtc).toLocaleString()}
+                    {/* The FROZEN name wins, exactly as Deferral.melTitle and
+                        CrewActionCompliance.byName do (TL-16): this row is provenance on a card a
+                        signed release points at, and a live Personnel join lets a rename — or a
+                        tech leaving the roster — repaint who edited it. The old
+                        `nameOf(a.byOid) || a.byName` could never reach the fallback, because
+                        `nameOf` returns the raw oid on a miss rather than undefined, so the frozen
+                        snapshot was unreachable code and the trail resolved live. */}
+                    {a.byName ?? nameOf(a.byOid)} · {new Date(a.atUtc).toLocaleString()}
                     {a.afterCompletion && (
                       <Badge variant="outline" className="ml-1.5 text-[10px]">after the card was signed off</Badge>
                     )}

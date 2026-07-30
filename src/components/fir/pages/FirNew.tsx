@@ -10,6 +10,7 @@ import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import { currentRows } from '../../tech-log/engine/supersede';
 import { buildDowntimeDebrief } from '../../tech-log/engine/debrief';
+import { STATUS_TAG_LABELS, STATUS_TAG_ORDER } from '../../tech-log/engine/statusTags';
 import { useFir } from '../FirContext';
 import { buildFir } from '../engine/create';
 import { nextFirRef } from '../engine/refs';
@@ -90,9 +91,15 @@ export function FirNew() {
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <Badge variant="outline"><FileText className="mr-1 h-3 w-3" />DEFECT · ATA {defect.ataChapter}</Badge>
             <Badge variant="outline">{debrief.elapsedHours} h elapsed{debrief.ongoing ? ' · ongoing' : ''}</Badge>
-            <Badge variant="outline">in work {debrief.stateHours.IN_WORK} h</Badge>
-            <Badge variant="outline">parts {debrief.stateHours.WAITING_PARTS} h</Badge>
-            <Badge variant="outline">inspection {debrief.stateHours.WAITING_INSPECTION} h</Badge>
+            {/* Data-driven for the same reason as the AOG board: a hand-written trio silently
+                dropped every hour D61's five new states attribute, so the badges the VP reads
+                before opening a report did not add up to elapsed. */}
+            {STATUS_TAG_ORDER.filter(t => debrief.stateHours[t] > 0).map(t => (
+              <Badge key={t} variant="outline">{STATUS_TAG_LABELS[t]} {debrief.stateHours[t]} h</Badge>
+            ))}
+            {debrief.excludedGapHours > 0 && (
+              <Badge variant="outline">excluded gap {debrief.excludedGapHours} h</Badge>
+            )}
             <Badge variant="outline">unattributed {debrief.untaggedHours} h</Badge>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{defect.description}</p>

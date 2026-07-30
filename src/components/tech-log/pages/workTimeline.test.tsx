@@ -200,3 +200,67 @@ describe('LG-100 — parts orders are structured, and offered rather than forced
     expect(screen.getByText('Main ship battery — ordered from Gulfstream')).toBeInTheDocument();
   });
 });
+
+/**
+ * Review findings F and I.
+ *
+ * F: `PartsOrdersPanel` was gated `!completed && isMaint` while the timeline beside it was gated on
+ * `isMaint` alone. An order nobody marked received before the card was signed off could therefore
+ * never be closed — its lead time stayed wrong permanently and the vendor metric inherited the
+ * error. Under D62 a parts order belongs to the same retrospective record as the timeline.
+ *
+ * I: the audit row read `nameOf(a.byOid) || a.byName`, and `nameOf` returns the raw oid on a miss
+ * rather than undefined — so the `||` could never fire and the FROZEN name, added precisely so the
+ * actor survives a roster change (the TL-16 precedent), was unreachable code.
+ */
+const SIGNED_OFF_WITH_OPEN_ORDER: WorkCard = {
+  ...COMPLETED_CARD,
+  id: 'wc-t3', cardNumber: 'WC-9003',
+  partsOrders: [{
+    id: 'po-t3', description: 'Air data module No. 1', partNumber: '1159SCT204-1',
+    vendor: 'Gulfstream', orderedAtUtc: '2026-07-28T09:00:00.000Z',
+  }],
+};
+
+const SIGNED_OFF_WITH_AUDIT: WorkCard = {
+  ...COMPLETED_CARD,
+  id: 'wc-t4', cardNumber: 'WC-9004',
+  timeAudit: [{
+    atUtc: '2026-07-29T18:00:00.000Z',
+    byOid: 'USR-GONE',            // deliberately absent from state.personnel
+    byName: 'Ghost Tech',          // frozen at the edit, per TL-16
+    before: '2026-07-29T08:00:00.000Z IN_WORK',
+    after: '2026-07-29T07:00:00.000Z IN_WORK',
+    afterCompletion: true,
+  }],
+};
+
+describe('D62 — the retrospective record stays open on a complied-with card', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('lets a parts order be closed after the card was signed off', async () => {
+    const user = userEvent.setup();
+    renderCard('wc-t3', [SIGNED_OFF_WITH_OPEN_ORDER]);
+    expect(screen.getByText(/Air data module/)).toBeInTheDocument();
+
+    // Open, so the lead time is still running.
+    expect(screen.getByText(/and counting/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /mark received/i }));
+
+    // Closed: a settled lead time, and the control flips to Undo. Asserted through the DOM rather
+    // than localStorage because EDIT_WORK_CARD is not a durable action — its write is debounced.
+    expect(await screen.findByText(/lead time/)).toBeInTheDocument();
+    expect(screen.queryByText(/and counting/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /undo received/i })).toBeInTheDocument();
+  });
+
+  it('shows the frozen editor name rather than resolving it live against personnel', async () => {
+    const user = userEvent.setup();
+    renderCard('wc-t4', [SIGNED_OFF_WITH_AUDIT]);
+    await user.click(screen.getByText(/Time-history edits/));
+    // A live join would print the raw oid, because nameOf falls back to it.
+    expect(screen.getByText(/Ghost Tech/)).toBeInTheDocument();
+    expect(screen.queryByText(/USR-GONE/)).not.toBeInTheDocument();
+  });
+});

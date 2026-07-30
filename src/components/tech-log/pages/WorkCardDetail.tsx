@@ -511,9 +511,14 @@ export default function WorkCardDetail() {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* D62 — `isMaint`, NOT `!completed && isMaint`. A parts order belongs to the same
+            retrospective record as the timeline above, and is gated the same way for the same
+            reason: an order nobody marked received before the card was signed off could otherwise
+            never be closed, so its lead time stayed wrong permanently and the vendor metric
+            inherited the error. */}
         <PartsOrdersPanel
           card={card}
-          canEdit={!completed && isMaint}
+          canEdit={isMaint}
           onSave={next => dispatch({ type: 'EDIT_WORK_CARD', payload: next })}
           waitingPartsAlready={tagNow === 'WAITING_PARTS'}
           onOfferWaitingParts={setOfferedOrder}
