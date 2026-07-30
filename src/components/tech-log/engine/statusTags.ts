@@ -39,9 +39,16 @@ const zeroHours = (): Record<WorkCardStatusTag, number> => ({
 /** States whose `note` is not optional — a wait nobody described is an un-answerable hole later. */
 const NOTE_REQUIRED: WorkCardStatusTag[] = ['WAITING_PARTS', 'WAITING_OTHER'];
 
+/** The state the card is in **now**: the chronologically last span, not the last array element.
+ * Those two diverge the moment somebody retrospectively inserts a span — D61's primary path — and
+ * `statusDurations().openTag` has always reported the chronological one. While they disagreed, the
+ * duplicate guard in `appendStatusTag` and `WorkCardDetail`'s chip disabled-states both acted on
+ * the wrong "current" state. */
 export function currentTag(card: WorkCard): WorkCardStatusTag | undefined {
   const tags = card.statusTags;
-  return tags && tags.length ? tags[tags.length - 1].tag : undefined;
+  if (!tags || tags.length === 0) return undefined;
+  const seq = sorted(tags);
+  return seq[seq.length - 1].tag;
 }
 
 /** Chronological copy. `statusDurations` walks this rather than the raw array so a legacy or
@@ -54,11 +61,21 @@ function sorted(tags: StatusTagEvent[]): StatusTagEvent[] {
 
 /** One-line rendering of a span history for the D62 audit trail. Deliberately human-readable and
  * deliberately raw UTC: this is a provenance string, not a display surface, so it must not depend
- * on a locale or a formatter (D42 — engines never bake display timestamps into their output). */
+ * on a locale or a formatter (D42 — engines never bake display timestamps into their output).
+ *
+ * It renders **every** field of `StatusTagEvent`, and that is load-bearing rather than verbose. The
+ * trail records before → after strings; a field this function omits is a field whose edit produces
+ * two identical strings, i.e. an audit entry saying something changed without saying what — on a
+ * card a signed `MaintenanceRelease` points at. If `StatusTagEvent` gains a field, add it here. */
 export function describeTimeline(tags: StatusTagEvent[] | undefined): string {
   if (!tags || tags.length === 0) return '(no time history)';
   return sorted(tags)
-    .map(t => `${t.atUtc} ${t.tag}${t.tag === 'GAP' && t.includeInTotals === false ? ' (excluded)' : ''}`)
+    .map(t => `${t.atUtc} ${t.tag}`
+      + (t.gapReason ? `/${t.gapReason}` : '')
+      + (t.includeInTotals === false ? ' (excluded)' : '')
+      + ` by:${t.byOid || '—'}`
+      + (t.partsOrderId ? ` po:${t.partsOrderId}` : '')
+      + (t.note?.trim() ? ` "${t.note.trim()}"` : ''))
     .join(' · ');
 }
 
@@ -77,7 +94,23 @@ function validate(tags: StatusTagEvent[], card: WorkCard): string | undefined {
     // Adjacency is checked AFTER sorting, which is the point: the pre-D61 guard inspected only the
     // last element, so inserting a span between two others could create the very adjacent duplicate
     // it was written to prevent.
-    if (i > 0 && seq[i - 1].tag === t.tag) return 'Two spans in a row are the same state — merge them, or change one.';
+    //
+    // GAP is exempt when the two gaps differ. A gap is not a state the card is *in* — it is an
+    // annotation on a stretch where nobody worked, and D61 §4 names an away period that is not
+    // uniform: the shop goes home Friday (our own shift pattern, counted) and the contract crew then
+    // leaves with no replacement (dead time nobody owns, excluded). Back-to-back GAP spans are the
+    // only way to say that. Two gaps that agree on both reason and include-flag are still one gap
+    // typed twice, and are still refused.
+    if (i > 0 && seq[i - 1].tag === t.tag) {
+      const prev = seq[i - 1];
+      const distinguishableGaps = t.tag === 'GAP'
+        && (prev.gapReason !== t.gapReason || (prev.includeInTotals !== false) !== (t.includeInTotals !== false));
+      if (!distinguishableGaps) {
+        return t.tag === 'GAP'
+          ? 'Two identical gaps in a row — merge them, or give one a different reason or include/exclude choice.'
+          : 'Two spans in a row are the same state — merge them, or change one.';
+      }
+    }
     if (card.completedAtUtc && t.atUtc > card.completedAtUtc) {
       return 'A span cannot start after the card was complied with.';
     }

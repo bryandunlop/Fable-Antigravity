@@ -194,6 +194,9 @@ describe('LG-100 — parts orders are structured, and offered rather than forced
     await user.click(screen.getByRole('button', { name: /^Tag waiting on parts$/ }));
 
     expect(screen.getByText('Waiting on parts (POO)')).toBeInTheDocument();
-    expect(screen.getByText(/Main ship battery — ordered from Gulfstream/)).toBeInTheDocument();
+    // Exact text, not a substring: the D62 audit string now quotes the note too (it has to — an
+    // entry that omits a field records that something changed without recording what), so a regex
+    // would match the trail as well as the span this is asserting about.
+    expect(screen.getByText('Main ship battery — ordered from Gulfstream')).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { appendStatusTag, statusDurations, writeStatusTimeline, describeTimeline } from './statusTags';
+import { appendStatusTag, currentTag, statusDurations, writeStatusTimeline, describeTimeline } from './statusTags';
 import type { StatusTagEvent, WorkCard } from '../types';
 
 const card = (over: Partial<WorkCard> = {}): WorkCard => ({
@@ -283,5 +283,137 @@ describe('D61/D62 — the retrospective timeline writer validates, re-sorts and 
     const s = describeTimeline([ev('GAP', '2026-07-08T18:00:00.000Z', { gapReason: 'END_OF_SHIFT', includeInTotals: false })]);
     expect(s).toContain('excluded');
     expect(describeTimeline(undefined)).toBe('(no time history)');
+  });
+
+  /**
+   * D62's trail is only defensible if it records WHAT changed. `describeTimeline` used to render
+   * `atUtc` + `tag` + the excluded flag only, so re-typing a POO note, re-classifying a gap's
+   * reason, or reassigning who logged a span produced an audit entry whose before and after were
+   * byte-identical — a record that something moved, on a card a signed release points at, with no
+   * record of what moved.
+   */
+  describe('the audit string covers every field an edit can change', () => {
+    const editing = (from: StatusTagEvent, to: StatusTagEvent) => {
+      const a = writeStatusTimeline(card(), [from], by, '2026-07-08T20:00:00.000Z');
+      if (!a.ok) throw new Error('setup');
+      const b = writeStatusTimeline(a.card, [to], by, '2026-07-08T21:00:00.000Z');
+      if (!b.ok) throw new Error(b.error);
+      const entry = b.card.timeAudit![1];
+      return { before: entry.before, after: entry.after };
+    };
+
+    it('a re-typed note is visible in before → after', () => {
+      const { before, after } = editing(
+        ev('WAITING_PARTS', '2026-07-08T10:00:00.000Z', { note: 'POO — battery, GAC Savannah' }),
+        ev('WAITING_PARTS', '2026-07-08T10:00:00.000Z', { note: 'POO — battery, Duncan Aviation' }),
+      );
+      expect(before).not.toBe(after);
+      expect(before).toContain('GAC Savannah');
+      expect(after).toContain('Duncan Aviation');
+    });
+
+    it('a re-classified gap reason is visible in before → after', () => {
+      const { before, after } = editing(
+        ev('GAP', '2026-07-08T18:00:00.000Z', { gapReason: 'END_OF_SHIFT' }),
+        ev('GAP', '2026-07-08T18:00:00.000Z', { gapReason: 'CONTRACT_MX_AWAY' }),
+      );
+      expect(before).not.toBe(after);
+      expect(after).toContain('CONTRACT_MX_AWAY');
+    });
+
+    it('a reassigned span owner is visible in before → after', () => {
+      const { before, after } = editing(
+        ev('IN_WORK', '2026-07-08T10:00:00.000Z', { byOid: 'm1' }),
+        ev('IN_WORK', '2026-07-08T10:00:00.000Z', { byOid: 'm2' }),
+      );
+      expect(before).not.toBe(after);
+      expect(after).toContain('m2');
+    });
+
+    it('flipping a gap from counted to excluded is visible in before → after', () => {
+      const { before, after } = editing(
+        ev('GAP', '2026-07-08T18:00:00.000Z', { gapReason: 'END_OF_SHIFT', includeInTotals: true }),
+        ev('GAP', '2026-07-08T18:00:00.000Z', { gapReason: 'END_OF_SHIFT', includeInTotals: false }),
+      );
+      expect(before).not.toBe(after);
+      expect(after).toContain('excluded');
+    });
+
+    it('a re-pointed parts order is visible in before → after', () => {
+      const { before, after } = editing(
+        ev('WAITING_PARTS', '2026-07-08T10:00:00.000Z', { note: 'POO', partsOrderId: 'po-1' }),
+        ev('WAITING_PARTS', '2026-07-08T10:00:00.000Z', { note: 'POO', partsOrderId: 'po-2' }),
+      );
+      expect(before).not.toBe(after);
+      expect(after).toContain('po-2');
+    });
+  });
+
+  /**
+   * D61 §4 names a single away period that is not uniform: the shop goes home Friday (counted — our
+   * own shift pattern) and the contract crew then leaves with no replacement (excluded), or the
+   * other way round. Two `GAP` spans back to back is the only way to say that, and the
+   * adjacent-duplicate guard used to forbid it outright.
+   */
+  describe('D61 §4 — consecutive gaps', () => {
+    it('accepts two gaps in a row when they differ in reason or in whether they count', () => {
+      const r = writeStatusTimeline(card(), [
+        ev('IN_WORK', '2026-07-08T09:00:00.000Z'),
+        ev('GAP', '2026-07-08T17:00:00.000Z', { gapReason: 'END_OF_SHIFT', includeInTotals: true }),
+        ev('GAP', '2026-07-09T08:00:00.000Z', { gapReason: 'CONTRACT_MX_AWAY', includeInTotals: false }),
+        ev('IN_WORK', '2026-07-10T09:00:00.000Z'),
+      ], by, '2026-07-10T20:00:00.000Z');
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const d = statusDurations(r.card, '2026-07-10T09:00:00.000Z');
+      // Hand-computed: 08 Jul 09:00→17:00 = 8 h IN_WORK. 08 Jul 17:00→09 Jul 08:00 = 15 h gap,
+      // COUNTED. 09 Jul 08:00→10 Jul 09:00 = 25 h gap, EXCLUDED. The final IN_WORK opens exactly at
+      // asOf, so 0 h.
+      expect(d.hours.IN_WORK).toBe(8);
+      expect(d.hours.GAP).toBe(15);
+      expect(d.excludedGapHours).toBe(25);
+    });
+
+    it('still rejects two identical gaps in a row — that is one gap typed twice', () => {
+      const r = writeStatusTimeline(card(), [
+        ev('GAP', '2026-07-08T17:00:00.000Z', { gapReason: 'END_OF_SHIFT' }),
+        ev('GAP', '2026-07-09T08:00:00.000Z', { gapReason: 'END_OF_SHIFT' }),
+      ], by, '2026-07-09T20:00:00.000Z');
+      expect(r.ok).toBe(false);
+    });
+
+    it('still rejects two identical non-gap states in a row', () => {
+      const r = writeStatusTimeline(card(), [
+        ev('IN_WORK', '2026-07-08T09:00:00.000Z'),
+        ev('IN_WORK', '2026-07-08T11:00:00.000Z'),
+      ], by, '2026-07-08T20:00:00.000Z');
+      expect(r.ok).toBe(false);
+    });
+  });
+
+  /**
+   * `currentTag` read the LAST ARRAY ELEMENT while `statusDurations` reports the chronologically
+   * last span. After a retrospective insert the two disagreed, so the duplicate guard and the chip
+   * disabled-states on `WorkCardDetail` acted on the wrong "current" state.
+   */
+  describe('currentTag is the chronologically last span, not the last array element', () => {
+    const outOfOrder = () => card({
+      statusTags: [
+        ev('WAITING_PARTS', '2026-07-08T14:00:00.000Z', { note: 'POO — battery' }),
+        ev('IN_WORK', '2026-07-08T09:00:00.000Z'),   // logged earlier, appended to the array later
+      ],
+    });
+
+    it('agrees with statusDurations.openTag on an out-of-order array', () => {
+      expect(currentTag(outOfOrder())).toBe('WAITING_PARTS');
+      expect(statusDurations(outOfOrder(), '2026-07-08T20:00:00.000Z').openTag).toBe('WAITING_PARTS');
+    });
+
+    it('the duplicate guard acts on the chronologically current state', () => {
+      // Re-tagging WAITING_PARTS is the no-op the guard exists to refuse …
+      expect(appendStatusTag(outOfOrder(), 'WAITING_PARTS', 'm1', '2026-07-08T16:00:00.000Z', { note: 'POO' }).ok).toBe(false);
+      // … and IN_WORK is a real transition, even though it is the last array element.
+      expect(appendStatusTag(outOfOrder(), 'IN_WORK', 'm1', '2026-07-08T16:00:00.000Z').ok).toBe(true);
+    });
   });
 });
