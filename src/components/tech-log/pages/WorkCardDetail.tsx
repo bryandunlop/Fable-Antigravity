@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock, PlayCircle, PackageSearch, ClipboardCheck, Hourglass, BookOpen, Cpu, X } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock, PlayCircle, PackageSearch, ClipboardCheck, Hourglass, BookOpen, Cpu, X, Stethoscope, PhoneCall, Building2 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { currentRows, latestFor } from '../engine/supersede';
@@ -15,11 +15,13 @@ import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { workCardReferenceSections } from '../util/workCardPrint';
 import { newId } from '../util/id';
-import type { WorkCard, PartUsage, LaborEntry, LaborCategory, MaintenanceRelease, Defect, Deferral, Signature, WorkCardStatusTag } from '../types';
+import type { WorkCard, PartUsage, PartsOrder, LaborEntry, LaborCategory, MaintenanceRelease, Defect, Deferral, Signature, WorkCardStatusTag } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { CasChip } from '../components/CasChip';
 import { SymptomNote } from '../components/SymptomNote';
+import { WorkTimelinePanel } from '../components/WorkTimelinePanel';
+import { PartsOrdersPanel } from '../components/PartsOrdersPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -65,6 +67,8 @@ export default function WorkCardDetail() {
   // status-tag control (QM4/D27) — POO demands a note (what part, from whom)
   const [pooNote, setPooNote] = useState('');
   const [pooPromptOpen, setPooPromptOpen] = useState(false);
+  // A just-raised parts order awaiting the "shall I tag the card?" offer (LG-100 — offer, don't force)
+  const [offeredOrder, setOfferedOrder] = useState<PartsOrder | null>(null);
   // completion sign
   const [inspectorOid, setInspectorOid] = useState('');
   const [crsOpen, setCrsOpen] = useState(false);
@@ -189,8 +193,8 @@ export default function WorkCardDetail() {
   // ── work/wait status tags (QM4/D27) ──
   const tagNow = currentTag(card);
   const durations = statusDurations(card, new Date().toISOString());
-  const setStatusTag = (tag: WorkCardStatusTag, note?: string) => {
-    const r = appendStatusTag(card, tag, user.oid, new Date().toISOString(), { note, byName: user.displayName });
+  const setStatusTag = (tag: WorkCardStatusTag, note?: string, partsOrderId?: string) => {
+    const r = appendStatusTag(card, tag, user.oid, new Date().toISOString(), { note, byName: user.displayName, partsOrderId });
     if (!r.ok) return toast.error(r.error);
     dispatch({ type: 'EDIT_WORK_CARD', payload: r.card });
     setPooPromptOpen(false); setPooNote('');
@@ -440,39 +444,80 @@ export default function WorkCardDetail() {
         </CardContent>
       </Card>
 
-      {/* Work/wait time attribution (QM4/D27) — in work / waiting on parts (POO) / waiting on inspection */}
-      <Card className="mb-4">
-        <CardContent className="flex flex-col gap-3 p-4 text-sm md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <Hourglass className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">Time attribution</span>
-            <Badge variant="outline"><PlayCircle className="mr-1 h-3 w-3" />in work {durations.hours.IN_WORK} h</Badge>
-            <Badge variant="outline" className={durations.openTag === 'WAITING_PARTS' ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]' : ''}><PackageSearch className="mr-1 h-3 w-3" />parts (POO) {durations.hours.WAITING_PARTS} h</Badge>
-            <Badge variant="outline"><ClipboardCheck className="mr-1 h-3 w-3" />inspection wait {durations.hours.WAITING_INSPECTION} h</Badge>
-            {durations.openTag && <span className="text-xs text-muted-foreground">accruing now: {TAG_LABELS[durations.openTag]}</span>}
-          </div>
-          {!completed && isMaint && (
+      {/**
+        * D61's primary time-entry surface: the editable, reconstructed-after-the-fact timeline.
+        * Available on a complied-with card too (D62) — the write-up happens at end of shift.
+        */}
+      <WorkTimelinePanel
+        card={card}
+        canEdit={isMaint}
+        user={{ oid: user.oid, displayName: user.displayName }}
+        nameOf={nameOf}
+        onSave={next => dispatch({ type: 'EDIT_WORK_CARD', payload: next })}
+      />
+
+      {/* One-tap chips (QM4/D27) — the CONVENIENCE path per D61, never the source of truth. */}
+      {!completed && isMaint && (
+        <Card className="mb-4">
+          <CardContent className="flex flex-col gap-3 p-4 text-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <Hourglass className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Tag as you go</span>
+              <span className="text-xs text-muted-foreground">
+                optional — the timeline above is what the numbers come from
+              </span>
+              {durations.openTag && <Badge variant="outline">now: {TAG_LABELS[durations.openTag]}</Badge>}
+            </div>
             <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant={tagNow === 'DIAGNOSING' ? 'secondary' : 'outline'} disabled={tagNow === 'DIAGNOSING'} onClick={() => setStatusTag('DIAGNOSING')}><Stethoscope className="mr-1.5 h-3.5 w-3.5" /> Diagnosing</Button>
               <Button size="sm" variant={tagNow === 'IN_WORK' ? 'secondary' : 'outline'} disabled={tagNow === 'IN_WORK'} onClick={() => setStatusTag('IN_WORK')}><PlayCircle className="mr-1.5 h-3.5 w-3.5" /> In work</Button>
               <Button size="sm" variant={tagNow === 'WAITING_PARTS' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_PARTS'} onClick={() => setPooPromptOpen(true)}><PackageSearch className="mr-1.5 h-3.5 w-3.5" /> Waiting on parts</Button>
+              <Button size="sm" variant={tagNow === 'WAITING_TECH_REP' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_TECH_REP'} onClick={() => setStatusTag('WAITING_TECH_REP')}><PhoneCall className="mr-1.5 h-3.5 w-3.5" /> Waiting on tech rep</Button>
+              <Button size="sm" variant={tagNow === 'WAITING_CONTRACT_MX' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_CONTRACT_MX'} onClick={() => setStatusTag('WAITING_CONTRACT_MX')}><Building2 className="mr-1.5 h-3.5 w-3.5" /> Waiting on contract mx</Button>
               <Button size="sm" variant={tagNow === 'WAITING_INSPECTION' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_INSPECTION'} onClick={() => setStatusTag('WAITING_INSPECTION')}><ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Waiting on inspection</Button>
             </div>
-          )}
-        </CardContent>
-        {pooPromptOpen && !completed && (
-          <CardContent className="border-t p-3">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center">
-              <Input autoFocus placeholder="POO note — what part, ordered from whom (e.g. battery, GAC Savannah, ETA Fri)" value={pooNote} onChange={e => setPooNote(e.target.value)} />
-              <div className="flex shrink-0 gap-2">
-                <Button size="sm" onClick={() => setStatusTag('WAITING_PARTS', pooNote)}>Tag POO</Button>
-                <Button size="sm" variant="ghost" onClick={() => { setPooPromptOpen(false); setPooNote(''); }}>Cancel</Button>
+          </CardContent>
+          {pooPromptOpen && (
+            <CardContent className="border-t p-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                <Input autoFocus placeholder="POO note — what part, ordered from whom (e.g. battery, GAC Savannah, ETA Fri)" value={pooNote} onChange={e => setPooNote(e.target.value)} />
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" onClick={() => setStatusTag('WAITING_PARTS', pooNote)}>Tag POO</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setPooPromptOpen(false); setPooNote(''); }}>Cancel</Button>
+                </div>
               </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* Offer, never force (LG-100): raising an order may set WAITING_PARTS, and satisfies that
+          tag's mandatory what/from-whom note by reference to the order. */}
+      {offeredOrder && !completed && (
+        <Card className="mb-4 border-dashed">
+          <CardContent className="flex flex-col gap-2 p-3 text-sm md:flex-row md:items-center md:justify-between">
+            <span>
+              Order raised with {offeredOrder.vendor}. Tag the card <strong>waiting on parts</strong> from now?
+            </span>
+            <div className="flex shrink-0 gap-2">
+              <Button size="sm" onClick={() => {
+                setStatusTag('WAITING_PARTS', `${offeredOrder.description} — ordered from ${offeredOrder.vendor}`, offeredOrder.id);
+                setOfferedOrder(null);
+              }}>Tag waiting on parts</Button>
+              <Button size="sm" variant="ghost" onClick={() => setOfferedOrder(null)}>No, keep the current state</Button>
             </div>
           </CardContent>
-        )}
-      </Card>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <PartsOrdersPanel
+          card={card}
+          canEdit={!completed && isMaint}
+          onSave={next => dispatch({ type: 'EDIT_WORK_CARD', payload: next })}
+          waitingPartsAlready={tagNow === 'WAITING_PARTS'}
+          onOfferWaitingParts={setOfferedOrder}
+        />
         {/* Steps */}
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4" /> Task steps</CardTitle></CardHeader>
