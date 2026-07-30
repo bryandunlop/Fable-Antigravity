@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { TechLogProvider } from '../tech-log/TechLogContext';
@@ -216,5 +216,90 @@ describe('D60/D65 — the CAS picker offers published knowledge only', () => {
     expect(screen.getByRole('button', { name: /publish/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /save draft/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /submit for approval/i })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Review finding (Important) — THE CARRY-FORWARD, which was the mechanism nobody asserted.
+ *
+ * Before D65 the CAS facts lived on the one mutable `Doc` row, so a new revision inherited them
+ * **structurally**: there was nothing to carry, because there was only ever one value. After the
+ * move they must be explicitly copied from the revision being worked on onto the revision being
+ * built (`DocEditorDialog` lines ~152-156 seeding the form, and `...casFields` writing it back).
+ *
+ * That is new, load-bearing, and was covered by exactly nothing: the only test that drove the real
+ * editor used the CREATE flow, and deleting `...casFields` turned just that one test red. The
+ * failure it left open is quiet and bad — a curator revises "GEAR UNSAFE" to fix a typo in the
+ * body, republishes, and the entry silently loses its message, colour and fleet tags, disappearing
+ * from the tail Reference tab and the defect-form picker.
+ */
+describe('D65 — revising an entry carries its CAS facts onto the new revision', () => {
+  const DOC = tkDoc({ id: 'TK-940', title: 'GEAR UNSAFE — what it means' });
+  const PUBLISHED = revision('TK-940', 'published', {
+    id: 'TK-940-r1',
+    fleetTypes: ['G650ER'],
+    casMeta: { casMessage: 'GEAR UNSAFE', casColor: 'AMBER', cmcCodes: ['32-31-14'] },
+    sections: [{ id: 'TK-940::what-it-means', level: 2, number: '', title: 'What it means', blocks: [{ id: 'TK-940::what-it-means::b1', type: 'paragraph', md: 'Original body.' }] }],
+  });
+
+  const seedPublished = () => {
+    localStorage.clear();
+    localStorage.setItem(VERSION_KEY, DATA_VERSION);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ docs: [DOC], revisions: [PUBLISHED] } as Partial<DocumentsState>));
+  };
+
+  it('seeds the editor from the revision being revised, not from a doc row that no longer holds it', async () => {
+    seedPublished();
+    render(
+      <MemoryRouter>
+        <DocumentsProvider>
+          <DocEditorDialog
+            open
+            onOpenChange={() => {}}
+            mode={{ kind: 'revise', doc: DOC, baseRev: PUBLISHED }}
+            userRole="maintenance"
+          />
+        </DocumentsProvider>
+      </MemoryRouter>,
+    );
+
+    // If the editor still read the (now removed) doc-level fields these would be blank.
+    expect(await screen.findByLabelText('CAS message')).toHaveValue('GEAR UNSAFE');
+    expect(screen.getByLabelText('CAS colour')).toHaveValue('AMBER');
+  });
+
+  it('publishes a NEW revision that still carries the message, colour and fleet tags', async () => {
+    const user = userEvent.setup();
+    seedPublished();
+    render(
+      <MemoryRouter>
+        <DocumentsProvider>
+          <DocEditorDialog
+            open
+            onOpenChange={() => {}}
+            mode={{ kind: 'revise', doc: DOC, baseRev: PUBLISHED }}
+            userRole="maintenance"
+          />
+        </DocumentsProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /^Publish$/ }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as DocumentsState;
+      const published = (stored.revisions ?? []).filter(r => r.docId === 'TK-940' && r.status === 'published');
+      expect(published).toHaveLength(1);          // the single-published invariant still holds
+      const head = published[0];
+      expect(head.id).not.toBe('TK-940-r1');      // and it IS a new revision
+      expect(head.casMeta?.casMessage).toBe('GEAR UNSAFE');
+      expect(head.casMeta?.casColor).toBe('AMBER');
+      expect(head.casMeta?.cmcCodes).toEqual(['32-31-14']);
+      expect(head.fleetTypes).toEqual(['G650ER']);
+
+      // And the catalog — the thing that actually matters — still offers it.
+      expect(casCatalog(stored.docs ?? [], stored.revisions ?? [], 'G650ER').map(e => e.casMessage))
+        .toContain('GEAR UNSAFE');
+    });
   });
 });

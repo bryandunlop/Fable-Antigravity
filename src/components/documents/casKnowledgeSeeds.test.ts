@@ -12,7 +12,7 @@ import { SEED_AIRCRAFT } from '../tech-log/mockData/fleet';
 import { getDefaultState } from '../tech-log/mockData/scenarios';
 import { currentRows } from '../tech-log/engine/supersede';
 import type { AircraftType } from '../tech-log/types';
-import type { Doc, DocCasMeta, DocComment, DocRevision, DocumentsState } from './types';
+import type { Doc, DocAcknowledgment, DocCasMeta, DocComment, DocRevision, DocumentsState } from './types';
 
 /**
  * D60 seed guard.
@@ -366,6 +366,17 @@ describe('D65 — CAS meta moves onto the revision without losing curated conten
     };
   };
 
+  const ack: DocAcknowledgment = {
+    docId: 'TK-500', revisionId: 'TK-500-r2', revision: '2.0',
+    userId: 'USR008', userName: 'Tom Parker', role: 'maintenance',
+    level: 'initials', initials: 'TP', acknowledgedAtUtc: '2026-07-20T09:00:00.000Z',
+  };
+  const signature = {
+    id: 'sig-tk500-ack', signedEntity: 'DOC_ACK', signedEntityId: 'TK-500-r2',
+    signerOid: 'USR008', signerName: 'Tom Parker', signedAtUtc: '2026-07-20T09:00:00.000Z',
+    intentStatement: 'seed', contentHash: 'deadbeef',
+  } as unknown as DocumentsState['signatures'][number];
+
   function storedBeforeD65(): DocumentsState {
     const seedEdit = retitledSeed();
     return {
@@ -376,12 +387,16 @@ describe('D65 — CAS meta moves onto the revision without losing curated conten
         curatorRev('TK-500-r3', 'draft'),
         seedEdit.rev,
       ],
-      acknowledgments: [],
+      // A real acknowledgment and its signature, because the docstring above claims this store has
+      // been USED and a claim a fixture does not back is worse than no claim. They also close a
+      // concrete gap: this step returns `{ ...s, docs, revisions }`, and a maintainer who later
+      // rewrote it as a projection would silently drop every collection nobody asserts on.
+      acknowledgments: [ack],
       comments: [comment],
       suggestions: [],
       suggestionReplies: [],
       reviews: [],
-      signatures: [],
+      signatures: [signature],
     };
   }
 
@@ -393,6 +408,9 @@ describe('D65 — CAS meta moves onto the revision without losing curated conten
     expect(after.docs.map((d) => d.id).sort()).toEqual(before.docs.map((d) => d.id).sort());
     expect(after.revisions.map((r) => r.id).sort()).toEqual(before.revisions.map((r) => r.id).sort());
     expect(after.comments).toEqual(before.comments);
+    // The two collections the docstring claims and nothing previously checked.
+    expect(after.acknowledgments).toEqual(before.acknowledgments);
+    expect(after.signatures).toEqual(before.signatures);
     const kept = after.docs.find((d) => d.id === 'TK-500')!;
     expect(kept.title).toBe(curatorDoc.title);
     expect(kept.isPinned).toBe(true);
