@@ -10,9 +10,16 @@ export interface TechLogEvidenceSlice {
   laborEntries: LaborEntry[];
 }
 
-/** One downtime debrief per distinct defect chain among the FIR's DEFECT anchors (§6).
+/** One downtime debrief per distinct defect chain among the FIR's anchors (§6).
  * Anchors resolving into the same supersede chain dedupe to a single debrief, and the
- * FIR's event window caps attribution: evidence never accrues past eventEndUtc. */
+ * FIR's event window caps attribution: evidence never accrues past eventEndUtc.
+ *
+ * A `WORK_CARD` anchor resolves through the card's `linkedDefectId`: the debrief is keyed by defect
+ * chain, and a card is evidence about the defect it was raised against. `FirAnchorKind` has always
+ * accepted `WORK_CARD` but nothing resolved it, so a FIR anchored only to a card produced no
+ * timeline and no bar at all — which D61 §5 ("the VP embeds the bar in an FIR") needs. A scheduled
+ * card with no linked defect is skipped rather than fabricating an event: there is no downtime
+ * event to debrief. */
 export function defectDebriefs(
   fir: FlightIrregularityReport,
   slice: TechLogEvidenceSlice,
@@ -23,8 +30,13 @@ export function defectDebriefs(
   const out: DowntimeDebrief[] = [];
   const seenChains = new Set<string>();
   for (const anchor of fir.anchors) {
-    if (anchor.kind !== 'DEFECT' || !known.has(anchor.refId)) continue;
-    const dbf = buildDowntimeDebrief(anchor.refId, slice, asOf);
+    let defectId: string | undefined;
+    if (anchor.kind === 'DEFECT') defectId = anchor.refId;
+    else if (anchor.kind === 'WORK_CARD') {
+      defectId = slice.workCards.find(c => c.id === anchor.refId)?.linkedDefectId;
+    }
+    if (!defectId || !known.has(defectId)) continue;
+    const dbf = buildDowntimeDebrief(defectId, slice, asOf);
     if (seenChains.has(dbf.defectId)) continue; // same chain, already pulled
     seenChains.add(dbf.defectId);
     out.push(dbf);

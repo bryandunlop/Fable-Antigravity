@@ -135,3 +135,31 @@ describe('a published revision freezes its figures; a draft keeps recomputing', 
     expect(next.firs[0].status).toBe('IN_REVIEW');
   });
 });
+
+/**
+ * `FirAnchorKind` has always accepted 'WORK_CARD' and nothing resolved it, so a FIR anchored only
+ * to a card produced no timeline and no bar — which is what D61 §5 asks the VP to embed.
+ */
+describe('a WORK_CARD anchor resolves to its defect chain', () => {
+  it('produces the same debrief as anchoring the defect directly', () => {
+    const byCard = defectDebriefs(fir({ anchors: [{ kind: 'WORK_CARD', refId: 'wc-1' }] }), slice([card()]), asOf);
+    const byDefect = defectDebriefs(fir(), slice([card()]), asOf);
+    expect(byCard).toHaveLength(1);
+    expect(byCard[0].defectId).toBe(byDefect[0].defectId);
+    expect(byCard[0].elapsedHours).toBe(byDefect[0].elapsedHours);
+  });
+
+  it('anchoring BOTH the card and its defect dedupes to one debrief, not two', () => {
+    const both = defectDebriefs(
+      fir({ anchors: [{ kind: 'DEFECT', refId: 'def-1' }, { kind: 'WORK_CARD', refId: 'wc-1' }] }),
+      slice([card()]), asOf,
+    );
+    expect(both).toHaveLength(1);
+  });
+
+  it('a scheduled card with no linked defect contributes nothing rather than an invented event', () => {
+    const scheduled = card({ id: 'wc-9', linkedDefectId: undefined, scheduled: true });
+    const out = defectDebriefs(fir({ anchors: [{ kind: 'WORK_CARD', refId: 'wc-9' }] }), slice([scheduled]), asOf);
+    expect(out).toEqual([]);
+  });
+});
