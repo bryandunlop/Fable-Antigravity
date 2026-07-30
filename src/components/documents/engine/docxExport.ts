@@ -8,6 +8,7 @@ import {
   Header, Footer, Table, TableRow, TableCell, WidthType, PageNumber,
 } from 'docx';
 import type { Doc, DocRevision, DocBlock } from '../types';
+import { formatDateOnly } from '../../../lib/operatorDate';
 
 /** Machine-readable, human-invisible block-ID marker. */
 export function idMarker(blockId: string): TextRun {
@@ -75,7 +76,7 @@ export function blockToDocx(block: DocBlock): (Paragraph | Table)[] {
 export function buildReviewDocx(doc: Doc, rev: DocRevision): Promise<Blob> {
   const children: (Paragraph | Table)[] = [
     new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(doc.title)] }),
-    new Paragraph({ children: [new TextRun({ text: `${doc.id} · Revision ${rev.revision} · effective ${new Date(rev.effectiveDate).toLocaleDateString()}`, color: '666666', size: 18 })] }),
+    new Paragraph({ children: [new TextRun({ text: `${doc.id} · Revision ${rev.revision} · effective ${formatDateOnly(rev.effectiveDate)}`, color: '666666', size: 18 })] }),
     new Paragraph({ children: [new TextRun({ text: `Review copy — edit with tracked changes ON; do not remove the hidden block markers. sha256 ${rev.mockChecksum.slice(0, 12)}…`, italics: true, color: '999999', size: 16 })] }),
     ...rev.sections.flatMap((s) => [
       new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(`${s.number ? `${s.number} ` : ''}${s.title}`)] }),

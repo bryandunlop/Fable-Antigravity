@@ -18,3 +18,35 @@ const dayFormat = new Intl.DateTimeFormat('en-CA', {
 export function operatorTodayIso(now: Date = new Date()): string {
   return dayFormat.format(now);
 }
+
+/**
+ * Display a **date-only** field (`effectiveDate`, `expirationDate`, `ackDueDate`,
+ * `nextReviewDate`) — a calendar day, not an instant.
+ *
+ * LG-117: `new Date('2024-11-01')` is parsed as UTC midnight per ECMA-262, so
+ * `toLocaleDateString()` renders it as Oct 31 anywhere west of Greenwich. That shipped:
+ * one controlled publication read "Nov 1, 2024" in the Document Center and "10/31/2024"
+ * on the legacy bulletins page and in the printed copy. An effective date is a
+ * regulatory attribute — the binder copy and the screen must not disagree.
+ *
+ * Parsing the components explicitly (rather than `new Date(\`${iso}T00:00:00\`)`) keeps
+ * this independent of how the host parses date strings, and lets a malformed value fall
+ * through as itself instead of rendering "Invalid Date" on a controlled publication.
+ *
+ * For a real timestamp (a `*AtUtc` field) use `new Date(utc).toLocaleString()` — those
+ * ARE instants and should render in the reader's local zone.
+ */
+export function formatDateOnly(
+  iso: string,
+  options?: Intl.DateTimeFormatOptions,
+  locale = 'en-US',
+): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const [, y, mo, d] = m.map(Number);
+  const date = new Date(y, mo - 1, d); // local midnight — no zone shift
+  // Round-trip guard: JS rolls 2024-13-45 over into 2025. A silently shifted date is
+  // exactly the failure this function exists to prevent, so reject rather than display.
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return iso;
+  return date.toLocaleDateString(locale, options);
+}

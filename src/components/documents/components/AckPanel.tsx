@@ -10,6 +10,7 @@ import { SignCeremonyDialog } from '../../tech-log/components/SignCeremonyDialog
 import type { Doc, DocRevision } from '../types';
 import { useDocuments, identityFor } from '../DocumentsContext';
 import { isAcknowledged, acknowledgedFor, isTargetRole } from '../engine/acknowledgments';
+import { formatDateOnly } from '../../../lib/operatorDate';
 
 /**
  * Level-aware acknowledgment capture:
@@ -78,7 +79,7 @@ export function AckPanel({ doc, rev, userRole }: { doc: Doc; rev: DocRevision; u
         <p className="flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
           <PenLine className="h-4 w-4" />
           {rev.ackLevel === 'signature' ? 'Signature acknowledgment required' : 'Acknowledgment required'}
-          {rev.ackDueDate && <span className="font-normal">· due {new Date(`${rev.ackDueDate}T00:00:00`).toLocaleDateString()}</span>}
+          {rev.ackDueDate && <span className="font-normal">· due {formatDateOnly(rev.ackDueDate)}</span>}
         </p>
 
         {rev.ackLevel === 'initials' ? (
