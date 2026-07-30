@@ -3,6 +3,7 @@
 // output string is embedded into a print window (see util/printDocument.ts) and
 // is unit-tested. All text is HTML-escaped before inline markdown is applied.
 import type { DocSection, DocBlock } from '../types';
+import { stepNumbers, stepBody } from './blocks';
 
 export function escapeHtml(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -53,8 +54,21 @@ function figureHtml(block: DocBlock): string {
   return `<figure><img src="${m[2]}" alt="${escapeHtml(m[1])}" />${m[1] ? `<figcaption>${escapeHtml(m[1])}</figcaption>` : ''}</figure>`;
 }
 
-export function blockToHtml(block: DocBlock): string {
+function stepHtml(block: DocBlock, n: number | undefined): string {
+  const lines = stepBody(block.md).split('\n');
+  const prose: string[] = [];
+  const figures: string[] = [];
+  for (const l of lines) {
+    const m = /^!\[([^\]]*)\]\(([^)]+)\)$/.exec(l.trim());
+    if (m) figures.push(`<img src="${m[2]}" alt="${escapeHtml(m[1])}" />`);
+    else if (l.trim()) prose.push(`<p>${line(l)}</p>`);
+  }
+  return `<div class="step"><p class="step-n">${n ?? ''}</p><div class="step-b">${prose.join('')}${figures.join('')}</div></div>`;
+}
+
+export function blockToHtml(block: DocBlock, stepNumber?: number): string {
   switch (block.type) {
+    case 'step': return stepHtml(block, stepNumber);
     case 'callout': return calloutHtml(block);
     case 'figure': return figureHtml(block);
     case 'table': return tableHtml(block.md);
@@ -75,7 +89,8 @@ export function sectionsToHtml(sections: DocSection[]): string {
       const heading = s.title || s.number
         ? `<h2 class="sec">${escapeHtml(`${s.number ? `${s.number} ` : ''}${s.title}`)}</h2>`
         : '';
-      const blocks = s.blocks.map(blockToHtml).join('\n');
+      const steps = stepNumbers(s.blocks);
+      const blocks = s.blocks.map((b) => blockToHtml(b, steps.get(b.id))).join('\n');
       return `<section>${heading}${blocks}</section>`;
     })
     .join('\n');

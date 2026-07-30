@@ -11,6 +11,9 @@ const HEADING = /^(#{1,6})\s+(.*)$/;
 const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;
 const IMAGE_ONLY = /^!\[[^\]]*\]\(([^)]+)\)$/;
 const ALERT = /^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i;
+/** A task-card step. Deliberately NOT a blockquote (a step is an instruction, not a quote) and
+ *  deliberately NOT an ordered list, so `1.` keeps meaning an ordinary list. */
+export const STEP_MARKER = /^\[!STEP\]\s*/i;
 
 function calloutKindFor(tag: string): DocBlock['calloutKind'] {
   const t = tag.toUpperCase();
@@ -63,6 +66,12 @@ function classify(chunk: string): { type: BlockType; calloutKind?: DocBlock['cal
   const lines = chunk.split('\n');
   const alert = ALERT.exec(lines[0]);
   if (alert) return { type: 'callout', calloutKind: calloutKindFor(alert[1]) };
+  if (STEP_MARKER.test(lines[0])) {
+    // A step may carry one photo on its own line; lift it so the renderer can place it
+    // beside the instruction rather than leaving it inline in the prose.
+    const img = lines.slice(1).map((l) => IMAGE_ONLY.exec(l.trim())).find(Boolean);
+    return img ? { type: 'step', figureRef: img[1] } : { type: 'step' };
+  }
   const img = IMAGE_ONLY.exec(chunk.trim());
   if (img && lines.length === 1) return { type: 'figure', figureRef: img[1] };
   if (lines.length >= 2 && lines[0].includes('|') && /^\s*\|?\s*:?-{2,}/.test(lines[1])) return { type: 'table' };
@@ -101,6 +110,26 @@ export function sectionsFromMarkdown(markdown: string, docId: string): DocSectio
     });
     return { id, level: raw.level, number: raw.number, title: raw.title, blocks };
   });
+}
+
+/** Step number by block id, counted from position among the section's 'step' blocks.
+ *
+ * The ONE source of truth for step numbering — the reader, the HTML export and the .docx export all
+ * read it, so a step is never numbered twice by two different rules. Numbering is positional on
+ * purpose: inserting or deleting a step renumbers the rest with no author action, which is the
+ * whole reason authors don't hand-maintain "step 4 of 9". Non-step blocks are absent from the map,
+ * so a note sitting between two steps does not consume a number. */
+export function stepNumbers(blocks: DocBlock[]): Map<string, number> {
+  const out = new Map<string, number>();
+  let n = 0;
+  for (const b of blocks) if (b.type === 'step') out.set(b.id, ++n);
+  return out;
+}
+
+/** The instruction text with the `[!STEP]` marker removed. The marker stays literal in `md` so the
+ * block round-trips through markdown; only the presentation strips it. */
+export function stepBody(md: string): string {
+  return md.replace(STEP_MARKER, '');
 }
 
 export function sectionsToMarkdown(sections: DocSection[]): string {
