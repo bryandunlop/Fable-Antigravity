@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
@@ -69,11 +69,18 @@ export function ReportDefectDialog({
   const [zoneCode, setZoneCode] = useState('');
   const [locFreetext, setLocFreetext] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  /** The fleet type the CAS fields were last filled against — see the reset effect below. */
+  const lastFleetTypeRef = useRef<string | undefined>(undefined);
 
   // Re-seed from prefill/lockTail whenever the dialog opens.
   useEffect(() => {
     if (!open) return;
-    setTail(lockTail ?? prefill?.tail ?? dispatchable[0]?.tailNumber ?? '');
+    const nextTail = lockTail ?? prefill?.tail ?? dispatchable[0]?.tailNumber ?? '';
+    setTail(nextTail);
+    // Seed the fleet-type watermark from the SAME tail this effect just chose. Reading it from
+    // `selectedType` instead would leave the previous session's type in the ref for one commit and
+    // fire the reset below on a freshly opened, empty form.
+    lastFleetTypeRef.current = state.aircraft.find(a => a.tailNumber === nextTail)?.type;
     setAta(prefill?.ata ?? '32');
     setDescription(prefill?.description ?? '');
     setSymptom(prefill?.symptom ?? '');
@@ -91,6 +98,41 @@ export function ReportDefectDialog({
   // five places and must never depend on it) — free text is D57's fallback.
   const selectedType = state.aircraft.find(a => a.tailNumber === tail)?.type;
   const casCatalogForTail = useCasCatalog(selectedType);
+
+  /**
+   * D60 fix pass — a curated CAS message and its colour belong to ONE fleet's knowledge, so they do
+   * not survive a change of fleet.
+   *
+   * The form re-seeds only on open. Before this, a message + colour picked out of the G650ER catalog
+   * stayed in the fields after the reporter changed the aircraft to a G500 and could be signed onto
+   * that tail's defect: an annunciation the type does not have, at a tier borrowed from another
+   * fleet. `casColor` is not decoration — the FIR safety fast path reads it
+   * (`fir/engine/suggestions.ts`).
+   *
+   * Keyed on the fleet TYPE, not the tail. N1PG → N2PG offers the identical catalog, so there is
+   * nothing stale and no reason to make the reporter retype. The MODE is deliberately left alone:
+   * "Observed (no CAS)" and "None" are facts about the event, not about the fleet. Clearing the
+   * message under MESSAGE therefore lands in the incomplete state `casEntryIncomplete` already
+   * refuses to sign — the loud failure this file prefers to a silent drop.
+   */
+  useEffect(() => {
+    if (!open) return;
+    if (lastFleetTypeRef.current === selectedType) return;
+    const from = lastFleetTypeRef.current;
+    lastFleetTypeRef.current = selectedType;
+    if (casMode !== 'MESSAGE') return;
+    const stale = casMessage.trim();
+    if (!stale && casColor === 'AMBER') return;
+    setCasMessage('');
+    setCasColor('AMBER');
+    if (stale) {
+      toast.info(
+        `CAS annunciation cleared — “${stale}” was ${from ?? 'another type'} knowledge and this tail is ${selectedType ?? 'a different type'}.`,
+      );
+    }
+    // The watermark is the guard; re-running on every CAS keystroke would only re-check it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, selectedType]);
 
   // Attachment digests are folded into the signed payload (AC 120-78B).
   const attachmentPayload = attachments.map(a => a.sha256).join(',');

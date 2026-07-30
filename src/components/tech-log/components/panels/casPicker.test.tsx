@@ -79,8 +79,11 @@ function seedDocs() {
   localStorage.setItem(DOCS_KEY, JSON.stringify(seed));
 }
 
-/** N1PG is a G650ER in the seeded fleet. */
-function renderForm({ withDocuments = true, lockTail = 'N1PG' }: { withDocuments?: boolean; lockTail?: string } = {}) {
+/** N1PG is a G650ER in the seeded fleet. `lockTail: null` leaves the Aircraft select enabled —
+ *  note a plain `undefined` cannot express that, since it would take the default below. */
+function renderForm(opts: { withDocuments?: boolean; lockTail?: string | null } = {}) {
+  const { withDocuments = true } = opts;
+  const lockTail = 'lockTail' in opts ? opts.lockTail ?? undefined : 'N1PG';
   if (withDocuments) seedDocs();
   const form = (
     <TechLogProvider userRole="pilot">
@@ -96,6 +99,26 @@ function renderForm({ withDocuments = true, lockTail = 'N1PG' }: { withDocuments
 
 const chooseMessageMode = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole('button', { name: 'CAS message' }));
+};
+
+/**
+ * Radix's `Select` calls pointer-capture APIs and `scrollIntoView`, none of which jsdom implements.
+ * Stubbed here rather than in the shared `src/test/setup.ts` so the rest of the suite keeps running
+ * against jsdom's real element surface. Without these the aircraft select cannot be opened at all,
+ * which is why the tail-switch behaviour below had no coverage in the first place.
+ */
+function installRadixSelectStubs() {
+  const proto = Element.prototype as unknown as Record<string, unknown>;
+  proto.hasPointerCapture = () => false;
+  proto.setPointerCapture = () => {};
+  proto.releasePointerCapture = () => {};
+  proto.scrollIntoView = () => {};
+}
+
+/** Move the (unlocked) Aircraft select to `tail`. */
+const chooseAircraft = async (user: ReturnType<typeof userEvent.setup>, tail: string) => {
+  await user.click(screen.getAllByRole('combobox')[0]);
+  await user.click(await screen.findByRole('option', { name: new RegExp(`^${tail}`) }));
 };
 
 describe('defect form CAS picker (D60)', () => {
@@ -164,6 +187,51 @@ describe('defect form CAS picker (D60)', () => {
 
     expect(screen.getByText('GPS 1 ADVISORY on the 500 — nuisance behaviour')).toBeInTheDocument();
     expect(screen.queryByText('GEAR UNSAFE on the 650 — the squat-switch case')).not.toBeInTheDocument();
+  });
+
+  it('re-scopes the offered list when the aircraft select moves to another fleet type', async () => {
+    installRadixSelectStubs();
+    const user = userEvent.setup();
+    renderForm({ lockTail: null }); // N1PG (G650ER) by default, select enabled
+    await chooseMessageMode(user);
+    expect(screen.getByText('GEAR UNSAFE on the 650 — the squat-switch case')).toBeInTheDocument();
+
+    await chooseAircraft(user, 'N5PG'); // G500
+
+    expect(screen.getByText('GPS 1 ADVISORY on the 500 — nuisance behaviour')).toBeInTheDocument();
+    expect(screen.queryByText('GEAR UNSAFE on the 650 — the squat-switch case')).not.toBeInTheDocument();
+  });
+
+  it('drops a curated message and its colour when the aircraft moves to another fleet type', async () => {
+    installRadixSelectStubs();
+    const user = userEvent.setup();
+    renderForm({ lockTail: null });
+    await chooseMessageMode(user);
+    await user.click(screen.getByText('GEAR UNSAFE on the 650 — the squat-switch case'));
+    expect(screen.getByLabelText('CAS message')).toHaveValue('GEAR UNSAFE');
+    expect(screen.getByLabelText('CAS color')).toHaveValue('RED');
+
+    await chooseAircraft(user, 'N5PG'); // G500 — GEAR UNSAFE is not this type's knowledge
+
+    // The whole risk: a RED tier borrowed from a G650ER entry, signed onto a G500 defect. `casColor`
+    // is read by the FIR safety fast path, so this is not cosmetic.
+    expect(screen.getByLabelText('CAS message')).toHaveValue('');
+    expect(screen.getByLabelText('CAS color')).toHaveValue('AMBER');
+    // …and the deep link to the other fleet's entry goes with it.
+    expect(screen.queryByText(/what maintenance knows/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps the entry when the new tail is the SAME fleet type — the catalog is identical', async () => {
+    installRadixSelectStubs();
+    const user = userEvent.setup();
+    renderForm({ lockTail: null });
+    await chooseMessageMode(user);
+    await user.click(screen.getByText('GEAR UNSAFE on the 650 — the squat-switch case'));
+
+    await chooseAircraft(user, 'N2PG'); // also G650ER
+
+    expect(screen.getByLabelText('CAS message')).toHaveValue('GEAR UNSAFE');
+    expect(screen.getByLabelText('CAS color')).toHaveValue('RED');
   });
 
   it('degrades to plain free text with no documents store mounted', async () => {
