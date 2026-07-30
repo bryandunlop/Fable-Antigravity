@@ -43,6 +43,30 @@ export interface PerspectiveStatement {
   declineReason?: string;
 }
 
+/**
+ * D63 — the impact figures as they stood at the moment a revision was published.
+ *
+ * A deliberate, narrow exception to this module's "evidence is anchored and derived at render,
+ * never stored" rule (see the file header). It exists because D61 made the underlying tech-log time
+ * history freely editable after the fact: without a snapshot, a technician correcting a start time
+ * at end of shift would silently rewrite the headline downtime number on a four-eyes-approved
+ * report months later, with no notice to the approvers. Keep the exception narrow — nothing else
+ * about a FIR is frozen this way.
+ *
+ * `segments` carries its own labels rather than keys to look up. A frozen record whose labels
+ * resolved live would repaint itself the day the tech-log state vocabulary changes, which is
+ * precisely the class of silent drift this snapshot exists to prevent.
+ */
+export interface FirImpactSnapshot {
+  capturedAtUtc: string;
+  /** The headline figure as published — the owner's override if they set one, else derived. */
+  downtimeHours?: number;
+  elapsedHours: number;
+  segments: { key: string; label: string; hours: number }[];
+  /** Gap hours whoever entered the time chose not to count (D61 §4), as they stood at publish. */
+  excludedGapHours: number;
+}
+
 /** Curated, de-identified published content — roles only, never names (§7). While
  * being curated (and while IN_REVIEW) it lives on the FIR as `pendingPublished`;
  * on four-eyes approval it is stamped into a `FirPublished` revision. */
@@ -52,6 +76,9 @@ export interface FirPublishedDraft {
   timeline: { atUtc: string; label: string }[]; // curated subset, times + labels only
   lessons: string[];
   ackLevel: 'none' | 'initials'; // default 'none'; DOM may raise per report (§12 Q3)
+  /** D61 §5 — the curator chose to publish the stacked "where the hours went" bar. Bryan: "I
+   * really like the bar and the VP should be able to add it into the FIR. Its a great snapshot." */
+  includeImpactBar?: boolean;
 }
 
 /** An approved, published revision (documents-engine revision semantics). */
@@ -59,6 +86,9 @@ export interface FirPublished extends FirPublishedDraft {
   revision: number;
   approvedByOid: string; // four-eyes approver, ≠ the submitter
   publishedAtUtc: string;
+  /** D63 — frozen at approval. Absent on revisions published before this shipped; those fall back
+   * to whatever the reader derives, which is exactly the pre-D63 behaviour. */
+  impactSnapshot?: FirImpactSnapshot;
 }
 
 /** All-employees read acknowledgement, recorded only when ackLevel = 'initials'. */

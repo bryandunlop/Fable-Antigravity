@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Anchor, ClipboardCheck, Flag, HelpCircle, PackageSearch, PlayCircle, Plus, UserRoundPen } from 'lucide-react';
+import { Archive, ArrowLeft, Anchor, Flag, Plus, UserRoundPen } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Input } from '../../ui/input';
@@ -12,7 +12,8 @@ import { GfoEmptyState, GfoPanel } from '../../gfo';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import { useFir } from '../FirContext';
 import { canSeeFir, isFirLeadership, visibleStatements } from '../engine/access';
-import { defectDebriefs, deriveSystemEntries, mergeTimeline } from '../engine/timeline';
+import { buildImpactSnapshot, defectDebriefs, deriveSystemEntries, impactSegments, mergeTimeline } from '../engine/timeline';
+import { StatusHoursBar } from '../../tech-log/components/StatusHoursBar';
 import { FirCategoryChip, FirStatusChip } from '../components/chips';
 import { StatementsTab } from '../components/StatementsTab';
 import { NarrativeTab } from '../components/NarrativeTab';
@@ -25,15 +26,6 @@ const toLocalInput = (iso: string) => {
   const d = new Date(iso);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
-
-/** Aggregate state-hours across the FIR's defect debriefs for the summary bar.
- * Deliberately NOT the RAG palette: these are effort/wait states, not serviceability. */
-const BAR_SEGMENTS = [
-  { key: 'IN_WORK', label: 'In work', icon: PlayCircle, bar: 'bg-gfo-midnight dark:bg-gfo-daylight' },
-  { key: 'WAITING_PARTS', label: 'Waiting on parts (POO)', icon: PackageSearch, bar: 'bg-slate-500 dark:bg-slate-400' },
-  { key: 'WAITING_INSPECTION', label: 'Waiting on inspection', icon: ClipboardCheck, bar: 'bg-slate-300 dark:bg-slate-600' },
-  { key: 'UNTAGGED', label: 'Unattributed', icon: HelpCircle, bar: 'bg-muted' },
-] as const;
 
 export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: string; additionalRoles?: string[] }) {
   const { id } = useParams<{ id: string }>();
@@ -84,15 +76,23 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
   const merged = mergeTimeline(deriveSystemEntries(fir, techLog, now), fir.manualTimeline);
   const ongoing = debriefs.some(d => d.ongoing) || !fir.eventEndUtc;
 
-  const hours: Record<(typeof BAR_SEGMENTS)[number]['key'], number> = {
-    IN_WORK: debriefs.reduce((s, d) => s + d.stateHours.IN_WORK, 0),
-    WAITING_PARTS: debriefs.reduce((s, d) => s + d.stateHours.WAITING_PARTS, 0),
-    WAITING_INSPECTION: debriefs.reduce((s, d) => s + d.stateHours.WAITING_INSPECTION, 0),
-    UNTAGGED: debriefs.reduce((s, d) => s + d.untaggedHours, 0),
-  };
-  const totalHours = Object.values(hours).reduce((a, b) => a + b, 0);
+  // The stacked bar (now a shared component — the work card and the metrics page render the same
+  // one, so the three cannot drift).
+  const segments = impactSegments(debriefs);
   const elapsedHours = Math.round(debriefs.reduce((s, d) => s + d.elapsedHours, 0) * 10) / 10;
-  const derivedDowntimeHours = debriefs.length ? elapsedHours : undefined;
+  const excludedGapHours = Math.round(debriefs.reduce((s, d) => s + d.excludedGapHours, 0) * 10) / 10;
+  // D61 §4 — the downtime a report stands behind is elapsed LESS the gaps whoever entered the time
+  // chose not to count (the Friday-to-Monday where contract maintenance left with no replacement).
+  const countedDowntimeHours = Math.round(debriefs.reduce((s, d) => s + d.countedDowntimeHours, 0) * 10) / 10;
+  const derivedDowntimeHours = debriefs.length ? countedDowntimeHours : undefined;
+  const publishedSnapshot = fir.publishedRevision?.impactSnapshot;
+  /** D63 — published and draft may visibly disagree, and that is the evidence a correction landed
+   *  after approval. Surface it rather than hiding it. */
+  const publishedDowntime = publishedSnapshot?.downtimeHours ?? publishedSnapshot?.elapsedHours;
+  const liveDowntime = fir.impact.downtimeHours ?? derivedDowntimeHours;
+  const snapshotDiverged =
+    publishedSnapshot != null && liveDowntime != null && publishedDowntime != null &&
+    Math.abs(publishedDowntime - liveDowntime) >= 0.1;
 
   // Access split (§7): owner/opener/leadership assemble & see everything; a requestee
   // gets a scoped view (timeline + their own statement only — no narrative/impact).
@@ -212,7 +212,7 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
 
         {fullAccess && (
           <TabsContent value="impact" className="mt-4">
-            <ImpactTab fir={fir} canEdit={canAssemble} derivedDowntimeHours={derivedDowntimeHours} dispatch={dispatch} />
+            <ImpactTab fir={fir} canEdit={canAssemble} derivedDowntimeHours={derivedDowntimeHours} publishedSnapshot={publishedSnapshot} dispatch={dispatch} />
           </TabsContent>
         )}
 
@@ -224,6 +224,8 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
               leadership={leadership}
               personnel={techLog.personnel}
               timeline={merged}
+              impactSnapshot={() => buildImpactSnapshot(debriefs, liveDowntime, new Date().toISOString())}
+              barSegments={segments}
               user={user ? { oid: user.oid, displayName: user.displayName } : undefined}
               nameOf={nameOf}
               dispatch={dispatch}
@@ -237,28 +239,25 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
             <GfoPanel title="Where the hours went">
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <Badge variant="outline">{elapsedHours} h elapsed{ongoing ? ' · ongoing' : ''}</Badge>
-                {BAR_SEGMENTS.map(s => (
-                  <Badge key={s.key} variant="outline">
-                    <s.icon className="mr-1 h-3 w-3" />
-                    {s.label} {Math.round(hours[s.key] * 10) / 10} h
-                  </Badge>
+                {segments.filter(s => s.hours > 0).map(s => (
+                  <Badge key={s.key} variant="outline">{s.label} {s.hours} h</Badge>
                 ))}
+                {excludedGapHours > 0 && (
+                  <Badge variant="outline" className="border-dashed">{excludedGapHours} h excluded by the enterer</Badge>
+                )}
               </div>
-              {totalHours > 0 && (
-                <div
-                  className="mt-3 flex h-3 w-full overflow-hidden rounded-full border border-border"
-                  role="img"
-                  aria-label={BAR_SEGMENTS.map(s => `${s.label} ${hours[s.key]} h`).join(', ')}
-                >
-                  {BAR_SEGMENTS.filter(s => hours[s.key] > 0).map(s => (
-                    <div
-                      key={s.key}
-                      className={s.bar}
-                      style={{ width: `${(hours[s.key] / totalHours) * 100}%` }}
-                      title={`${s.label} — ${hours[s.key]} h`}
-                    />
-                  ))}
-                </div>
+              <StatusHoursBar segments={segments} className="mt-3" />
+              {excludedGapHours > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Downtime counted for this report is {countedDowntimeHours} h — the {excludedGapHours} h of logged gap
+                  time whoever entered it set aside is shown, not counted.
+                </p>
+              )}
+              {snapshotDiverged && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  The published revision froze downtime at {publishedDowntime} h; the tech log now reads {liveDowntime} h.
+                  A correction landed after approval — publish a new revision if the report should carry the new figure.
+                </p>
               )}
             </GfoPanel>
           )}

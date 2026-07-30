@@ -8,6 +8,7 @@ import { GfoEmptyState } from '../../gfo';
 import { useCurrentUser } from '../../tech-log/TechLogContext';
 import { useFir } from '../FirContext';
 import { CATEGORY_LABEL } from '../components/chips';
+import { StatusHoursBar } from '../../tech-log/components/StatusHoursBar';
 
 /** The published FIR as all employees read it (§7, §9): roles only, no owner
  * controls, with an optional initials acknowledgement when the report requires it. */
@@ -78,6 +79,28 @@ export function PublishedFirReader() {
                   </div>
                 ))}
               </div>
+            </section>
+          )}
+
+          {/* D61 §5 / D63 — the stacked bar the VP chose to embed, rendered from the snapshot
+              frozen at approval. It carries its own labels, so a later change to the tech-log
+              state vocabulary cannot repaint a published record. */}
+          {rev.includeImpactBar && rev.impactSnapshot && (
+            <section>
+              <h2 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Where the hours went</h2>
+              <StatusHoursBar segments={rev.impactSnapshot.segments} />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {rev.impactSnapshot.segments.filter(s => s.hours > 0).map(s => (
+                  <Badge key={s.key} variant="outline">{s.label} {s.hours} h</Badge>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {rev.impactSnapshot.elapsedHours} h elapsed
+                {rev.impactSnapshot.excludedGapHours > 0
+                  ? `, of which ${rev.impactSnapshot.excludedGapHours} h was logged as time nobody was working and set aside`
+                  : ''}
+                . Figures as at publication, {new Date(rev.impactSnapshot.capturedAtUtc).toLocaleDateString()}.
+              </p>
             </section>
           )}
 

@@ -11,7 +11,8 @@ import { Checkbox } from '../../ui/checkbox';
 import { GfoPanel } from '../../gfo';
 import type { Personnel } from '../../tech-log/types';
 import type { FirAction } from '../reducer';
-import type { FirPublishedDraft, FirTimelineEntry, FlightIrregularityReport } from '../types';
+import type { FirImpactSnapshot, FirPublishedDraft, FirTimelineEntry, FlightIrregularityReport } from '../types';
+import { StatusHoursBar, type BarSegment } from '../../tech-log/components/StatusHoursBar';
 import { isDraftComplete } from '../engine/lifecycle';
 import { applyRedaction, detectNames, hasUnredactedRosterNames } from '../engine/redaction';
 
@@ -23,6 +24,11 @@ interface Props {
   leadership: boolean;
   personnel: Personnel[];
   timeline: FirTimelineEntry[]; // merged SYSTEM + MANUAL (internal), source for the curated subset
+  /** D63 — evaluated at the instant of approval, never earlier: a revision must carry the figures
+   *  that were true when it was approved, not the ones showing when curation started. */
+  impactSnapshot: () => FirImpactSnapshot;
+  /** The live bar, for the curator's preview of what "include the bar" will publish. */
+  barSegments: BarSegment[];
   user?: { oid: string; displayName?: string };
   nameOf: (oid?: string, fallback?: string) => string;
   dispatch: React.Dispatch<FirAction>;
@@ -52,7 +58,7 @@ function Highlighted({ text, personnel }: { text: string; personnel: Personnel[]
   return <>{out}</>;
 }
 
-export function PublishTab({ fir, viewer, leadership, personnel, timeline, user, nameOf, dispatch, onViewPublished }: Props) {
+export function PublishTab({ fir, viewer, leadership, personnel, timeline, impactSnapshot, barSegments, user, nameOf, dispatch, onViewPublished }: Props) {
   const draft = fir.pendingPublished ?? EMPTY_DRAFT;
   const patch = (p: Partial<FirPublishedDraft>) =>
     dispatch({ type: 'UPDATE_PUBLISHED_DRAFT', payload: { firId: fir.id, draft: { ...draft, ...p } } });
@@ -119,7 +125,7 @@ export function PublishTab({ fir, viewer, leadership, personnel, timeline, user,
     const decide = (type: 'APPROVE_PUBLISH' | 'REQUEST_CHANGES') => {
       if (!user) return;
       const base = { firId: fir.id, byOid: user.oid, byName: user.displayName, byRoles: viewer.roles, atUtc: new Date().toISOString() };
-      if (type === 'APPROVE_PUBLISH') dispatch({ type, payload: base });
+      if (type === 'APPROVE_PUBLISH') dispatch({ type, payload: { ...base, impactSnapshot: impactSnapshot() } });
       else dispatch({ type, payload: { ...base, note } });
       setNote('');
     };
@@ -130,7 +136,7 @@ export function PublishTab({ fir, viewer, leadership, personnel, timeline, user,
           In review — submitted by {nameOf(fir.reviewSubmittedByOid)}.{' '}
           {isReviewer ? 'You are reviewing; the author cannot self-approve.' : 'Awaiting a leadership approver other than the submitter.'}
         </div>
-        <PublishedPreview draft={draft} />
+        <PublishedPreview draft={draft} barSegments={barSegments} />
         {isReviewer && (
           <GfoPanel title="Confirm before publishing">
             <ul className="mb-3 space-y-1.5 text-sm">
@@ -265,6 +271,31 @@ export function PublishTab({ fir, viewer, leadership, personnel, timeline, user,
         </div>
       </GfoPanel>
 
+      <GfoPanel title="Where the hours went">
+        <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+          <Checkbox checked={draft.includeImpactBar === true}
+            onCheckedChange={(v: boolean | 'indeterminate') => patch({ includeImpactBar: v === true })} />
+          Publish the stacked downtime bar with this report
+        </label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Hours only — no tail number, no names. The figures freeze at the moment the report is approved,
+          so a later tech-log correction cannot move an approved report's numbers.
+        </p>
+        {draft.includeImpactBar && (
+          <div className="mt-3">
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {barSegments.filter(s => s.hours > 0).map(s => (
+                <Badge key={s.key} variant="outline">{s.label} {s.hours} h</Badge>
+              ))}
+            </div>
+            <StatusHoursBar segments={barSegments} />
+            {barSegments.every(s => s.hours <= 0) && (
+              <p className="text-xs text-muted-foreground">No attributed hours to show yet.</p>
+            )}
+          </div>
+        )}
+      </GfoPanel>
+
       {rosterNamesRemain && (
         <p className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300">
           <EyeOff className="h-3.5 w-3.5" /> A known name is still in the draft — resolve the chips above before submitting.
@@ -275,7 +306,7 @@ export function PublishTab({ fir, viewer, leadership, personnel, timeline, user,
 }
 
 /** Read-only render of a curated draft — used in the review gate and the submitter's view. */
-function PublishedPreview({ draft }: { draft: FirPublishedDraft }) {
+function PublishedPreview({ draft, barSegments }: { draft: FirPublishedDraft; barSegments: BarSegment[] }) {
   return (
     <GfoPanel title="Published draft">
       <p className="text-sm font-medium">{draft.summary || <span className="text-muted-foreground">No summary</span>}</p>
@@ -285,6 +316,12 @@ function PublishedPreview({ draft }: { draft: FirPublishedDraft }) {
           {draft.timeline.map((t, i) => (
             <div key={i} className="text-xs"><span className="tabular-nums text-muted-foreground">{new Date(t.atUtc).toLocaleString()} — </span>{t.label}</div>
           ))}
+        </div>
+      )}
+      {draft.includeImpactBar && (
+        <div className="mt-3">
+          <div className="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Where the hours went</div>
+          <StatusHoursBar segments={barSegments} />
         </div>
       )}
       {draft.lessons.length > 0 && (

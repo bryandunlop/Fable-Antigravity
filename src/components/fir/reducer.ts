@@ -1,5 +1,6 @@
 import type {
   FirImpact,
+  FirImpactSnapshot,
   FirPublishedDraft,
   FirState,
   FirTimelineEntry,
@@ -38,7 +39,10 @@ export type FirAction =
   | { type: 'UPDATE_IMPACT'; payload: { firId: string; impact: FirImpact } }
   | { type: 'UPDATE_PUBLISHED_DRAFT'; payload: { firId: string; draft: FirPublishedDraft } }
   | { type: 'SUBMIT_FOR_REVIEW'; payload: Omit<Actor, 'byRoles'> }
-  | { type: 'APPROVE_PUBLISH'; payload: Actor }
+  /** D63 — the approver's UI computes the impact snapshot from live tech-log state at the instant
+   *  of approval and hands it in. The reducer cannot derive it: FIR state has no tech-log slice,
+   *  and "at the instant of approval" is the whole point of the freeze. */
+  | { type: 'APPROVE_PUBLISH'; payload: Actor & { impactSnapshot?: FirImpactSnapshot } }
   | { type: 'REQUEST_CHANGES'; payload: Actor & { note: string } }
   | { type: 'CLOSE_INTERNAL'; payload: Actor }
   | { type: 'REOPEN_FIR'; payload: Actor }
@@ -208,7 +212,10 @@ export function firReducer(state: FirState, action: FirAction): FirState {
         ...f,
         status: 'PUBLISHED',
         reviewSubmittedByOid: undefined,
-        publishedRevision: { ...draft, revision, approvedByOid: p.byOid, publishedAtUtc: p.atUtc },
+        publishedRevision: {
+          ...draft, revision, approvedByOid: p.byOid, publishedAtUtc: p.atUtc,
+          impactSnapshot: p.impactSnapshot,
+        },
         publishedAcks: [],
         audit: [...f.audit, { kind: 'PUBLISHED', atUtc: p.atUtc, byOid: p.byOid, byName: p.byName, detail: `Approved and published revision ${revision}` }],
       }));
