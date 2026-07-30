@@ -5,6 +5,7 @@ export const SEED_AIRCRAFT: Aircraft[] = [
   { id: 'ac-n2pg', tailNumber: 'N2PG', type: 'G650ER', serialNumber: '6264', status: 'ACTIVE', isProvisional: false, homeBase: 'KLUK', airframeTotalHours: 2310.2, airframeTotalCycles: 905, standbyFuelLoadLb: 8000 },
   { id: 'ac-n5pg', tailNumber: 'N5PG', type: 'G500', serialNumber: '72157', status: 'ACTIVE', isProvisional: false, homeBase: 'KLUK', airframeTotalHours: 1180.0, airframeTotalCycles: 760, standbyFuelLoadLb: 6000 },
   { id: 'ac-n6pg', tailNumber: 'N6PG', type: 'G500', serialNumber: '72175', status: 'ACTIVE', isProvisional: false, homeBase: 'KLUK', airframeTotalHours: 990.7, airframeTotalCycles: 640, standbyFuelLoadLb: 6000 },
+  { id: 'ac-n7pg', tailNumber: 'N7PG', type: 'G500', serialNumber: '72188', status: 'ACTIVE', isProvisional: false, homeBase: 'KLUK', airframeTotalHours: 640.3, airframeTotalCycles: 410, standbyFuelLoadLb: 6000 },
   // Incoming provisional G800 (S/N 88041 known; registration TBD — editable via Admin > Fleet).
   // Expected to replace N1PG/N2PG as they come online (unconfirmed).
   { id: 'ac-g800-1', tailNumber: 'N3PG', type: 'G800', serialNumber: '88041', status: 'PROVISIONAL', isProvisional: true, homeBase: 'KLUK', airframeTotalHours: 12.0, airframeTotalCycles: 6, standbyFuelLoadLb: 8000 },

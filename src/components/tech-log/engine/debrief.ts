@@ -1,8 +1,11 @@
 import type { Defect, LaborEntry, WorkCard, WorkCardStatusTag } from '../types';
-import { statusDurations } from './statusTags';
+import { statusDurations, excludedGapIntervals, unionHours, STATUS_TAG_LABELS, STATUS_TAG_ORDER } from './statusTags';
 import { laborRollup, type LaborRollup } from './labor';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+
+const zeroStateHours = (): Record<WorkCardStatusTag, number> =>
+  Object.fromEntries(STATUS_TAG_ORDER.map(t => [t, 0])) as Record<WorkCardStatusTag, number>;
 
 export type DebriefEventKind = 'REPORTED' | 'CARD_RAISED' | 'TAG' | 'CARD_COMPLETED' | 'CLEARED';
 
@@ -22,9 +25,16 @@ export interface DowntimeDebrief {
   startUtc: string;
   endUtc: string;
   ongoing: boolean;
+  /** Raw wall clock, reported → cleared. A fact about the calendar, never reduced by a choice. */
   elapsedHours: number;
   stateHours: Record<WorkCardStatusTag, number>;
   untaggedHours: number;     // elapsed time nobody attributed to a state (incl. pre-triage)
+  /** Gap hours whoever entered the time chose not to count (D61 §4) — e.g. the Friday-to-Monday
+   * where contract maintenance left with no replacement. Reported, never silently dropped. */
+  excludedGapHours: number;
+  /** `elapsedHours` less the excluded gaps — the downtime figure the operator stands behind, and
+   * what the FIR offers as its default. Equals `elapsedHours` when nothing was excluded. */
+  countedDowntimeHours: number;
   labor: LaborRollup;
   events: DebriefEvent[];    // chronological
 }
@@ -57,19 +67,37 @@ export function buildDowntimeDebrief(defectId: string, state: Slice, asOfUtc: st
   const cardIds = new Set(cards.map(c => c.id));
   const labor = laborRollup(state.laborEntries.filter(l => cardIds.has(l.workCardId)));
 
-  const stateHours: Record<WorkCardStatusTag, number> = { IN_WORK: 0, WAITING_PARTS: 0, WAITING_INSPECTION: 0 };
+  const stateHours = zeroStateHours();
   for (const c of cards) {
     // Attribution stops at event end — an open tag never accrues past a cleared defect.
     const d = statusDurations(c, endUtc);
-    stateHours.IN_WORK += d.hours.IN_WORK;
-    stateHours.WAITING_PARTS += d.hours.WAITING_PARTS;
-    stateHours.WAITING_INSPECTION += d.hours.WAITING_INSPECTION;
+    (Object.keys(stateHours) as WorkCardStatusTag[]).forEach(k => { stateHours[k] += d.hours[k]; });
   }
   (Object.keys(stateHours) as WorkCardStatusTag[]).forEach(k => { stateHours[k] = round1(stateHours[k]); });
 
+  /**
+   * Excluded-gap hours are the UNION of the intervals, never the sum of each card's total.
+   *
+   * A defect can carry several work cards, and when a job spans two of them the normal way to
+   * record "everybody was away over the weekend" is to log that same calendar gap on both. Summing
+   * subtracted it TWICE from a single wall clock: a 63 h event with the same 60 h weekend logged on
+   * two cards produced 120 h excluded, and `countedDowntimeHours` — the headline downtime figure,
+   * which reaches a published FIR — collapsed to zero. Clamped to the event window so a gap logged
+   * either side of it cannot subtract time the event never contained.
+   */
+  const excludedGapHours = unionHours(
+    cards.flatMap(c => excludedGapIntervals(c, endUtc)),
+    startUtc,
+    endUtc,
+  );
+
   const elapsedHours = round1(Math.max(0, (new Date(endUtc).getTime() - new Date(startUtc).getTime()) / 3600000));
-  const attributed = stateHours.IN_WORK + stateHours.WAITING_PARTS + stateHours.WAITING_INSPECTION;
-  const untaggedHours = round1(Math.max(0, elapsedHours - attributed));
+  const attributed = (Object.values(stateHours) as number[]).reduce((a, b) => a + b, 0);
+  // Excluded gap hours are their own bucket: neither attributed to a state nor left looking like
+  // time nobody accounted for. Without this subtraction the exclusion would simply reappear as
+  // "unattributed" and the toggle would move nothing.
+  const untaggedHours = round1(Math.max(0, elapsedHours - attributed - excludedGapHours));
+  const countedDowntimeHours = round1(Math.max(0, elapsedHours - excludedGapHours));
 
   const events: DebriefEvent[] = [
     { kind: 'REPORTED', atUtc: startUtc, byOid: head?.reportedByOid, label: `Defect reported — ATA ${head?.ataChapter}: ${head?.description ?? ''}` },
@@ -88,14 +116,13 @@ export function buildDowntimeDebrief(defectId: string, state: Slice, asOfUtc: st
   }
   events.sort((a, b) => a.atUtc.localeCompare(b.atUtc) || ORDER[a.kind] - ORDER[b.kind]);
 
-  return { defectId: head?.id ?? defectId, startUtc, endUtc, ongoing, elapsedHours, stateHours, untaggedHours, labor, events };
+  return {
+    defectId: head?.id ?? defectId, startUtc, endUtc, ongoing,
+    elapsedHours, stateHours, untaggedHours, excludedGapHours, countedDowntimeHours, labor, events,
+  };
 }
 
-const TAG_LABEL: Record<WorkCardStatusTag, string> = {
-  IN_WORK: 'In work',
-  WAITING_PARTS: 'Waiting on parts (POO)',
-  WAITING_INSPECTION: 'Waiting on inspection',
-};
+const TAG_LABEL = STATUS_TAG_LABELS;
 
 // Same-instant ties resolve in narrative order (a card completes before the defect clears).
 const ORDER: Record<DebriefEventKind, number> = { REPORTED: 0, CARD_RAISED: 1, TAG: 2, CARD_COMPLETED: 3, CLEARED: 4 };

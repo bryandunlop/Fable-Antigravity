@@ -20,6 +20,9 @@ export const GROUPS_PILOT: NavGroup[] = [
   },
   { key: 'fleet', label: 'Fleet', to: '/tech-log/fleet', match: pilotFleetMatch, badge: 'red' },
   { key: 'workqueue', label: 'Work Queue', to: '/tech-log/work-queue', match: sw('/tech-log/work-queue'), badge: 'urgent' },
+  // D61 §5 — Bryan on who sees the maintenance-time rollup: "I think all." Pilots get it as a
+  // top-level link because the pilot nav has no records group to hang it under.
+  { key: 'metrics', label: 'Metrics', to: '/tech-log/metrics', match: sw('/tech-log/metrics') },
 ];
 
 export const GROUPS_MAINT: NavGroup[] = [
@@ -40,12 +43,13 @@ export const GROUPS_MAINT: NavGroup[] = [
   },
   {
     key: 'records', label: 'Records', to: '/tech-log/mel',
-    match: (p) => melReadMatch(p) || ['/tech-log/releases', '/tech-log/analytics', '/tech-log/audit', '/tech-log/trips', '/tech-log/intermittent', '/tech-log/defects', '/tech-log/deferrals'].some(r => p.startsWith(r)),
+    match: (p) => melReadMatch(p) || ['/tech-log/releases', '/tech-log/analytics', '/tech-log/metrics', '/tech-log/audit', '/tech-log/trips', '/tech-log/intermittent', '/tech-log/defects', '/tech-log/deferrals'].some(r => p.startsWith(r)),
     sub: [
       { label: 'MEL', to: '/tech-log/mel', match: melReadMatch },
       { label: 'Releases', to: '/tech-log/releases' },
       { label: 'Audit', to: '/tech-log/audit' },
       { label: 'Analytics', to: '/tech-log/analytics' },
+      { label: 'Maintenance time', to: '/tech-log/metrics' },
       { label: 'Trips', to: '/tech-log/trips' },
       { label: 'Intermittent', to: '/tech-log/intermittent' },
     ],

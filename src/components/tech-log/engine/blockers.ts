@@ -1,6 +1,7 @@
 import type { Defect, Deferral, WorkCard, RecurringCheck, TechLogState, Serviceability } from '../types';
 import { currentRows } from './supersede';
 import { isDeferralExpired } from './pl25';
+import { crewActionPending } from './crewAction';
 import { projectCheck } from './recurringChecks';
 import { deriveServiceability } from './serviceability';
 
@@ -35,6 +36,7 @@ export type BlockerAction =
   | 'RAISE_CARD'     // open a work card and go do the work
   | 'SIGN_RELEASE'   // sign the CRS now (work already done)
   | 'SIGN_GATING'    // sign the (M)/placard release that flips PENDING_PLACARD → ACTIVE
+  | 'MARK_CREW_ACTION' // D59: record the deferral's (O) crew action as complied — evidence, not authority
   | 'ACCOMPLISH'     // accomplish & sign a recurring check
   | 'EXTEND'         // extend a Cat B/C deferral (once)
   | 'OPEN_CARD';     // navigate to an existing work card
@@ -114,7 +116,7 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
     blockers.push({
       id: d.id, kind: 'DEFECT_OPEN', defect: d,
       title: `ATA ${d.ataChapter} — ${d.description}`,
-      detail: `${d.severity} · reported via ${d.source}`,
+      detail: `Reported via ${d.source}`,
       clearsWhen: ac?.isProvisional
         ? 'Rectified and released to service (deferrals are blocked on this tail).'
         : 'Rectified and released to service, or deferred under an MEL item.',
@@ -124,13 +126,18 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
   }
 
   // ── deferrals: expired (rule 2), pending its gating release, or in force (rule 4) ──
+  /** A deferral row is *about* a defect, and the defect is what carries the CAS annunciation the
+   *  crew saw (D57) — so the row hands over both. Same tail-scoped current rows rule 1 reads; a
+   *  dangling defectId simply yields undefined and the chip renders nothing. */
+  const linkedDefect = (df: Deferral) => defects.find(d => d.id === df.defectId);
+
   for (const df of deferrals) {
     if (df.status === 'CLEARED') continue;
     const label = melLabel(df);
 
     if (df.status === 'EXPIRED' || expiredDeferral(df)) {
       blockers.push({
-        id: df.id, kind: 'DEFERRAL_EXPIRED', deferral: df,
+        id: df.id, kind: 'DEFERRAL_EXPIRED', deferral: df, defect: linkedDefect(df),
         title: `Deferral overdue — ${label}`,
         dueUtc: df.repairDueDateUtc,
         governingTimezone: df.governingTimezone,
@@ -142,22 +149,36 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
       continue;
     }
     if (df.status === 'PENDING_PLACARD') {
-      const needs = [df.mProcedureRequired ? '(M) procedure' : null, df.placardRequired ? 'placard' : null]
-        .filter(Boolean).join(' + ');
+      // D59: the crew action is a third obligation alongside (M) and placard — and the one that
+      // used to be invisible, because an only-(O) deferral never entered this status at all.
+      const caPending = crewActionPending(df);
+      const needs = [
+        df.mProcedureRequired ? '(M) procedure' : null,
+        df.placardRequired ? 'placard' : null,
+        df.crewActionRequired ? 'crew action' : null,
+      ].filter(Boolean).join(' + ');
+      const mark = df.crewActionCompliance;
       blockers.push({
-        id: df.id, kind: 'DEFERRAL_PENDING_PLACARD', deferral: df,
+        id: df.id, kind: 'DEFERRAL_PENDING_PLACARD', deferral: df, defect: linkedDefect(df),
         title: `Awaiting its ${needs || '(M)/placard'} release — ${label}`,
-        detail: 'The deferral decision is signed, but the aircraft stays grounded until the gating release is signed.',
+        detail: caPending
+          ? 'The crew action has not been marked complied — a pilot or maintenance user must mark it, then maintenance signs the release.'
+          // TL-16: the marker's name comes off the frozen compliance record, never a Personnel join.
+          : mark
+            ? `Crew action marked complied by ${mark.byName} — maintenance reviews and signs the release.`
+            : 'The deferral decision is signed, but the aircraft stays grounded until the gating release is signed.',
         clearsWhen: 'The (M)/placard maintenance release is signed — the deferral then goes ACTIVE.',
         governing: sv.governingRule === 1 && sv.drivingDefectId === df.defectId,
-        actions: ['SIGN_GATING'],
+        // Marking is offered first while it is outstanding because it is what unblocks the release —
+        // but SIGN_GATING stays on the row throughout: the mark is evidence, the release is authority.
+        actions: caPending ? ['MARK_CREW_ACTION', 'SIGN_GATING'] : ['SIGN_GATING'],
       });
       continue;
     }
     if (df.status === 'ACTIVE') {
       const extendable = df.category !== 'A' && df.category !== 'D' && !df.extensionUsed;
       restrictions.push({
-        id: df.id, kind: 'DEFERRAL_ACTIVE', deferral: df,
+        id: df.id, kind: 'DEFERRAL_ACTIVE', deferral: df, defect: linkedDefect(df),
         title: label,
         dueUtc: df.repairDueDateUtc,
         governingTimezone: df.governingTimezone,

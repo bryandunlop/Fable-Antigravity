@@ -33,7 +33,20 @@ export function firAnchorsDefect(firs: Pick<FlightIrregularityReport, 'anchors'>
 /** A grounding defect (airworthinessAffecting !== false; null is treated as grounding). */
 const isGrounding = (d: Defect) => d.airworthinessAffecting !== false;
 
-/** Defect suggestions: a current grounding defect that is CRITICAL, or whose downtime
+/**
+ * The "escalate immediately" tier — a grounding defect urgent enough to nudge an FIR before the
+ * downtime threshold is reached.
+ *
+ * This used to read `Defect.severity === 'CRITICAL'`. D55 removed severity from the defect record
+ * on the grounds that it was decorative; this call site was the one place it actually drove
+ * behavior, and it was missed by that decision. Re-pointed at the RED CAS annunciation (D57,
+ * added in the same slice) as the nearest severity-free signal for "warning tier, immediate crew
+ * action". **NOT RATIFIED — see the LG-104 audit note; Bryan decides whether RED CAS is the right
+ * successor trigger or whether this fast path should be defined some other way.**
+ */
+const isImmediateEscalation = (d: Defect) => d.casColor === 'RED';
+
+/** Defect suggestions: a current grounding defect that is urgent, or whose downtime
  * has crossed the threshold, and isn't already covered by an FIR or dismissed. */
 export function buildDefectFirSuggestions(
   slice: TechLogEvidenceSlice,
@@ -55,7 +68,7 @@ export function buildDefectFirSuggestions(
     if (!isGrounding(d)) continue;
 
     const debrief = buildDowntimeDebrief(d.id, slice, nowUtc);
-    const critical = d.severity === 'CRITICAL';
+    const critical = isImmediateEscalation(d);
     const overDowntime = debrief.elapsedHours >= config.downtimeHours;
     if (!critical && !overDowntime) continue;
 

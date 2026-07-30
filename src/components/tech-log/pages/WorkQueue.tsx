@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Inbox, AlertTriangle, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck, Eye } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
 import { formatRegulatoryCompact } from '../util/displayZone';
+import { DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { currentRows } from '../engine/supersede';
 import { buildWorkQueue } from '../engine/workqueue';
 import { deriveServiceability } from '../engine/serviceability';
 import { TechLogShell } from '../components/TechLogShell';
+import { CasChip } from '../components/CasChip';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -57,9 +59,12 @@ export default function WorkQueue() {
                     <span className="font-semibold">{tailOf(d.aircraftId)}</span>
                     <Badge variant="outline">ATA {d.ataChapter}</Badge>
                     <Badge variant={STATUS_VARIANT[d.status]}>{d.status === 'OPEN' ? 'AWAITING TRIAGE' : d.status === 'DEFERRED' ? 'DEFERRED (MEL)' : d.status === 'RECTIFIED' ? 'RECTIFIED' : d.status}</Badge>
+                    <CasChip message={d.casMessage} color={d.casColor} observed={d.casObserved} />
                   </div>
                   <p className="mt-1">{d.description}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Reported {new Date(d.reportedAtUtc).toLocaleString()}</p>
+                  {/* D56: the triage queue is where a defect gets deferred, so the occurrence time —
+                      the instant that seeds the PL-25 clock — has to be visible here. */}
+                  <p className="mt-0.5 text-xs text-muted-foreground">Noticed {formatRegulatoryCompact(d.occurredAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)} · reported {formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </CardContent>
@@ -149,7 +154,7 @@ export default function WorkQueue() {
           <Section icon={<Inbox className="h-4 w-4" />} title="New squawks — awaiting triage" count={groundingSquawks.length}>
             {groundingSquawks.length === 0 ? empty : groundingSquawks.map(d => (
               <Row key={d.id} next="Defer or fix" onClick={() => open(tailOf(d.aircraftId), '?tab=defects')}>
-                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span></div>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><CasChip message={d.casMessage} color={d.casColor} observed={d.casObserved} /><span className="text-xs text-muted-foreground">{d.source}</span></div>
                 <p className="mt-0.5 truncate">{d.description}</p>
               </Row>
             ))}
@@ -199,7 +204,7 @@ export default function WorkQueue() {
           <Section icon={<Inbox className="h-4 w-4" />} title="Non-airworthiness squawks — awaiting triage" count={otherSquawks.length}>
             {otherSquawks.length === 0 ? empty : otherSquawks.map(d => (
               <Row key={d.id} next="Triage" onClick={() => open(tailOf(d.aircraftId), '?tab=defects')}>
-                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span></div>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><CasChip message={d.casMessage} color={d.casColor} observed={d.casObserved} /><span className="text-xs text-muted-foreground">{d.source}</span></div>
                 <p className="mt-0.5 truncate">{d.description}</p>
               </Row>
             ))}
@@ -230,8 +235,8 @@ export default function WorkQueue() {
           <Section icon={<Eye className="h-4 w-4" />} title="Watch items — tracked, non-airworthiness" count={wq.counts.watchItems}>
             {wq.watchItems.length === 0 ? empty : wq.watchItems.map(d => (
               <Row key={d.id} next="Review" onClick={() => open(tailOf(d.aircraftId), '?tab=defects')}>
-                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><Badge variant="secondary"><Eye className="mr-1 h-3 w-3" />WATCH</Badge><span className="text-xs text-muted-foreground">{d.source}</span></div>
-                <p className="mt-0.5 truncate text-muted-foreground">{d.description} · reported {new Date(d.reportedAtUtc).toLocaleDateString()}</p>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">ATA {d.ataChapter}</Badge><Badge variant="secondary"><Eye className="mr-1 h-3 w-3" />WATCH</Badge><CasChip message={d.casMessage} color={d.casColor} observed={d.casObserved} /><span className="text-xs text-muted-foreground">{d.source}</span></div>
+                <p className="mt-0.5 truncate text-muted-foreground">{d.description} · reported {formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}</p>
               </Row>
             ))}
           </Section>

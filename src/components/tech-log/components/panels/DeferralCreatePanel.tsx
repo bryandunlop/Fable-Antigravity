@@ -4,8 +4,10 @@ import { Search, ClipboardCheck, ShieldAlert, Clock } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../../engine/pl25';
 import { GOVERNING_ZONE_OPTIONS, isOverride, validateGoverningOverride } from '../../util/governingZone';
-import { formatRegulatoryCompact } from '../../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryInstant, formatRegulatoryLabel } from '../../util/displayZone';
+import { utcFromWallTime, wallTimeFromUtc } from '../../util/entryZone';
 import { canDeferDefect } from '../../engine/disposition';
+import { crewActionRequiredForMelItem, resolveDeferralCrewAction, entersPendingPlacard } from '../../engine/crewAction';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
 import { newId } from '../../util/id';
@@ -16,6 +18,14 @@ import { Badge } from '../../../ui/badge';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
 import { Textarea } from '../../../ui/textarea';
+
+/**
+ * D56 — whole minutes, because that is all the day-of-discovery control can express. A defect's
+ * `occurredAtUtc` is stamped from `new Date()` and carries seconds; a `datetime-local` never does.
+ * Comparing the two as raw ISO strings made the "Adjusted" hint latch on after any edit that merely
+ * restored the value, reporting a change the signer had not made.
+ */
+const minuteOf = (iso: string) => Math.floor(new Date(iso).getTime() / 60_000);
 
 function dueFromCategory(mel: MelItem, clockStart: string, airframe: { hours: number; cycles: number }, zone: string) {
   if (mel.category === 'A') return { repairDueDateUtc: undefined, repairIntervalUnit: 'CALENDAR_DAY' as const, repairIntervalValue: 0 };
@@ -54,6 +64,15 @@ export function DeferralCreatePanel({
   const [governingZone, setGoverningZone] = useState(DEFAULT_GOVERNING_TIMEZONE);
   const [overrideReason, setOverrideReason] = useState('');
   const [showOverride, setShowOverride] = useState(false);
+  // D56: the PL-25 day of discovery defaults to when the defect was NOTICED, not to now — a defect
+  // seen at 2330Z and written up the next morning would otherwise start its clock a day late.
+  // Maintenance can still adjust it here, before signing; after signing the deferral is immutable.
+  const [dayOfDiscoveryUtc, setDayOfDiscoveryUtc] = useState(defect.occurredAtUtc);
+  // D59 crew action. `addCrewAction` is the ADD-ONLY override: it can turn a crew action ON where
+  // the MEL item does not carry one, and it is not even rendered when the item does — an inherited
+  // requirement is corrected in MEL management (D23 four-eyes), never unticked here.
+  const [addCrewAction, setAddCrewAction] = useState(false);
+  const [crewActionInstructions, setCrewActionInstructions] = useState('');
 
   const melMatches = useMemo(() => {
     if (!aircraft) return [];
@@ -65,21 +84,40 @@ export function DeferralCreatePanel({
   }, [state.melItems, aircraft, query]);
 
   const selectedMel = state.melItems.find(m => m.id === selectedMelId);
-  const willGate = !!(selectedMel?.mProcedure?.trim() || selectedMel?.placardText?.trim());
+  // D59: the flag is AUTHORED on the MEL item by the DOM / Chief Inspector at MEL entry; the
+  // deferral inherits it. Legacy/auto-extracted items with no authored flag fall back to
+  // Boolean(oProcedure) — conservative in the gating direction.
+  const crewActionInherited = selectedMel ? crewActionRequiredForMelItem(selectedMel) : false;
+  // The requested value is `inherited || added` rather than `added` alone, because the UI cannot
+  // express "remove": the checkbox is not rendered when the item carries the flag. The engine call
+  // stays anyway — it is where the add-only rule lives, and it must hold for any future caller.
+  const { crewActionRequired } = resolveDeferralCrewAction(crewActionInherited, crewActionInherited || addCrewAction);
+  // D59 assumes the frozen (O) snapshot carries the instruction. On the ADD-ONLY path that premise
+  // does not hold: the checkbox is rendered only when the item lacks the authored flag, which for an
+  // unauthored item means it has no (O) text at all — so `melOProcedure` freezes as undefined and the
+  // addendum is the ONLY possible instruction. Empty, it produces a signed deferral that requires the
+  // crew to do something it never says, and the crew panel then renders "No (O) procedure text was
+  // recorded on this deferral" above a Sign button asserting it was "accomplished as described above".
+  const addendumRequired = crewActionRequired && !selectedMel?.oProcedure?.trim();
+  const willGate = entersPendingPlacard({
+    mProcedureRequired: !!selectedMel?.mProcedure?.trim(),
+    placardRequired: !!selectedMel?.placardText?.trim(),
+    crewActionRequired,
+  });
   const cat = selectedMel?.category;
 
   // D24: live preview of the PL-25 clock under the chosen governing zone, so the signer sees the
   // effect of an override before signing. Advisory only (the real clock is re-stamped at signing).
   const clockPreview = useMemo(() => {
     if (!selectedMel) return null;
-    const cs = computeClockStart(new Date().toISOString(), governingZone);
+    const cs = computeClockStart(dayOfDiscoveryUtc, governingZone);
     const due = dueFromCategory(selectedMel, cs, { hours: 0, cycles: 0 }, governingZone);
     return {
       start: formatRegulatoryCompact(cs, 'GOVERNING', governingZone),
       due: due.repairDueDateUtc ? formatRegulatoryCompact(due.repairDueDateUtc, 'GOVERNING', governingZone) : null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMelId, governingZone]);
+  }, [selectedMelId, governingZone, dayOfDiscoveryUtc]);
 
   if (!aircraft) return null;
 
@@ -100,6 +138,14 @@ export function DeferralCreatePanel({
     if (!canDeferDefect(user, selectedMel)) return toast.error('You are not authorized to defer this MEL item.');
     const ovr = validateGoverningOverride(governingZone, overrideReason);
     if (!ovr.ok) return toast.error(ovr.error!);
+    if (addendumRequired && !crewActionInstructions.trim()) {
+      return toast.error('This MEL item carries no (O) procedure text — write the crew instructions, or the crew action says nothing.');
+    }
+    // D56: a future day of discovery would push the whole repair clock forward — almost certainly a
+    // mistyped year in the adjust field, never a real adjustment. Same guard as the report form.
+    if (new Date(dayOfDiscoveryUtc).getTime() > Date.now() + 60_000) {
+      return toast.error('The day of discovery cannot be in the future.');
+    }
     setPendingDeferralId(newId('df'));
     setSignOpen(true);
   };
@@ -110,8 +156,10 @@ export function DeferralCreatePanel({
     // D24: anchor the PL-25 clock to the governing zone (Eastern default, or a per-deferral override
     // to the aircraft operating-local zone). The stored governingTimezone must be the same zone the
     // clock was computed under; an override also records its reason.
+    // D56: the clock is fed the day of discovery (defaulted from the defect's occurrence, possibly
+    // adjusted above) — NOT `now`, which is when the deferral happens to be signed.
     const zone = governingZone;
-    const clockStart = computeClockStart(now, zone);
+    const clockStart = computeClockStart(dayOfDiscoveryUtc, zone);
     const airframe = { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles };
     const due = dueFromCategory(selectedMel, clockStart, airframe, zone);
     const mProcedureRequired = !!selectedMel.mProcedure?.trim();
@@ -127,14 +175,21 @@ export function DeferralCreatePanel({
       melSubItemNumber: selectedMel.subItemNumber, melTitle: selectedMel.title,
       // TL-16: the (O) procedure too — it decides whether the PIC must acknowledge this item.
       melOProcedure: selectedMel.oProcedure,
-      category: selectedMel.category, dayOfDiscoveryUtc: now, clockStartDateUtc: clockStart,
+      // D59: and the crew-action flag, frozen for the same reason — an EDIT_MEL_ITEM must never be
+      // able to make a mandatory crew action vanish from an already-signed deferral.
+      crewActionRequired,
+      crewActionInstructions: crewActionRequired ? (crewActionInstructions.trim() || undefined) : undefined,
+      category: selectedMel.category, dayOfDiscoveryUtc, clockStartDateUtc: clockStart,
       governingTimezone: zone,
       governingTimezoneOverrideReason: isOverride(zone) ? overrideReason.trim() : undefined,
       repairDueDateUtc: due.repairDueDateUtc, repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
       restrictionText: restriction.trim() || selectedMel.provisos, placardRequired,
       mProcedureRequired, placardLocation: selectedMel.placardLocation, extensionUsed: false,
       riiRequired: false, melReviewAcknowledged: true, signedByOid: user.oid, signatureId: sig.id,
-      status: (mProcedureRequired || placardRequired) ? 'PENDING_PLACARD' : 'ACTIVE',
+      // D59: a crew action gates first release exactly as an (M) procedure or a placard does. Before
+      // this, a deferral whose ONLY requirement was an (O) procedure went straight to ACTIVE and the
+      // aircraft was dispatchable with a mandatory crew action nobody had done.
+      status: entersPendingPlacard({ mProcedureRequired, placardRequired, crewActionRequired }) ? 'PENDING_PLACARD' : 'ACTIVE',
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: sig as any });
     dispatch({ type: 'SUPERSEDE_DEFECT', payload: supDefect });
@@ -197,8 +252,50 @@ export function DeferralCreatePanel({
 
               <div className={`rounded-md p-2 text-xs ${willGate ? 'bg-[var(--gfo-error,#EF3340)]/10' : 'bg-[var(--gfo-warning,#F1B434)]/15'}`}>
                 {willGate
-                  ? 'This item requires an (M) procedure and/or a placard → the deferral starts PENDING_PLACARD and the aircraft stays RED until the gating discharge is signed.'
-                  : 'No (M) procedure or placard → the deferral goes ACTIVE on signing and the aircraft moves to AMBER (dispatchable under restriction).'}
+                  ? 'This item requires an (M) procedure, a placard and/or a crew action → the deferral starts PENDING_PLACARD and the aircraft stays RED until the gating discharge is signed.'
+                  : 'No (M) procedure, placard or crew action → the deferral goes ACTIVE on signing and the aircraft moves to AMBER (dispatchable under restriction).'}
+              </div>
+
+              {/* D59 — crew action. Provenance is the point: the requirement is authored on the MEL
+                  item by the DOM / Chief Inspector, so when it is inherited there is deliberately NO
+                  control to clear it here. Line maintenance may only ADD one. */}
+              <div className="rounded-md border p-2">
+                {crewActionInherited ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="destructive">Crew action</Badge>
+                      <span className="text-xs text-muted-foreground">per MEL item — DOM/CI</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      The crew (or maintenance) must accomplish the (O) procedure and mark it complied before this
+                      aircraft is released on this MEL. A wrongly-flagged item is corrected in MEL management,
+                      not on the deferral.
+                    </p>
+                  </>
+                ) : (
+                  <label className="flex items-start gap-2">
+                    <input id="deferral-add-crew-action" type="checkbox" className="mt-1" checked={addCrewAction} onChange={e => setAddCrewAction(e.target.checked)} />
+                    <span className="text-xs">
+                      <span className="font-medium">Crew action required</span> — this MEL item carries none; add one for this deferral.
+                    </span>
+                  </label>
+                )}
+                {crewActionRequired && (
+                  <div className="mt-2">
+                    <label className="text-xs font-medium" htmlFor="deferral-crew-instructions">
+                      Crew instructions {addendumRequired ? '(required)' : '(addendum, optional)'}
+                    </label>
+                    <Textarea id="deferral-crew-instructions" className="mt-1" value={crewActionInstructions} onChange={e => setCrewActionInstructions(e.target.value)}
+                      placeholder={addendumRequired
+                        ? 'What the crew must accomplish, and how it is verified — there is no (O) text to fall back on.'
+                        : 'Anything beyond the (O) procedure text the crew needs — the (O) text itself is carried automatically.'} />
+                    {addendumRequired && (
+                      <p className="mt-1 text-xs text-[var(--gfo-error,#EF3340)]">
+                        This item carries no (O) procedure text, so these instructions are the only thing the crew will be shown.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -226,6 +323,41 @@ export function DeferralCreatePanel({
                     )}
                   </div>
                 )}
+                {/* D56: defaulted from the defect's occurrence, shown as wall-clock digits in the
+                    governing zone (the zone the PL-25 calendar day is actually read in), and
+                    adjustable until the deferral is signed. */}
+                <div className="mt-2">
+                  <label className="text-xs font-medium" htmlFor="deferral-day-of-discovery">Day of discovery</label>
+                  <div className="mt-1 flex gap-2">
+                    <Input
+                      id="deferral-day-of-discovery"
+                      type="datetime-local"
+                      value={wallTimeFromUtc(dayOfDiscoveryUtc, governingZone)}
+                      onChange={e => {
+                        const utc = utcFromWallTime(e.target.value, governingZone);
+                        if (utc) setDayOfDiscoveryUtc(utc);
+                      }}
+                    />
+                    {/* Mirrors OccurredAtField's zone control, but deliberately NOT a picker: these
+                        digits are read in the deferral's GOVERNING zone — the zone the PL-25 calendar
+                        day is judged in — so the only way to change their meaning is to change the
+                        governing zone above. Without the label, switching that zone silently
+                        reinterpreted digits the signer had already typed. */}
+                    <span
+                      aria-label="Day of discovery timezone"
+                      title="Read in the deferral's governing timezone — change it above, not here."
+                      className="inline-flex shrink-0 items-center rounded-md border bg-muted px-2 py-1 text-sm text-muted-foreground"
+                    >
+                      {formatRegulatoryInstant(dayOfDiscoveryUtc, 'GOVERNING', governingZone).zoneLabel}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Stored as {formatRegulatoryLabel(dayOfDiscoveryUtc, 'UTC', 'UTC')}.{' '}
+                    {minuteOf(dayOfDiscoveryUtc) === minuteOf(defect.occurredAtUtc)
+                      ? 'Defaulted from when the defect was noticed. Adjust if maintenance establishes a different discovery time.'
+                      : 'Adjusted — no longer the reported occurrence time.'}
+                  </p>
+                </div>
                 {clockPreview && (
                   <p className="mt-2 text-xs text-muted-foreground">clock starts {clockPreview.start}{clockPreview.due ? ` · repair due ${clockPreview.due}` : ' · usage-based'}</p>
                 )}

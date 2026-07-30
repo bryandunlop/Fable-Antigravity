@@ -4,9 +4,10 @@ import type { Defect, LaborEntry, WorkCard } from '../types';
 
 const defect = (over: Partial<Defect> = {}): Defect => ({
   id: 'def-1', aircraftId: 'ac-1', source: 'PIREP', ataChapter: '24',
-  description: 'Main battery will not hold charge', severity: 'HIGH',
+  description: 'Main battery will not hold charge',
   airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'p1',
-  reportedAtUtc: '2026-07-07T08:00:00.000Z', signatureId: 'sig-1', ...over,
+  occurredAtUtc: '2026-07-07T08:00:00.000Z', reportedAtUtc: '2026-07-07T08:00:00.000Z',
+  signatureId: 'sig-1', ...over,
 });
 
 const card = (over: Partial<WorkCard> = {}): WorkCard => ({
@@ -74,5 +75,107 @@ describe('downtime debrief (QM5 — the C-suite "why and when" answer)', () => {
     const d = buildDowntimeDebrief('def-9', slice([defect(), corrected], [card()]), asOf);
     expect(d.stateHours.WAITING_PARTS).toBe(24);
     expect(d.labor.totalHours).toBe(3);
+  });
+});
+
+describe('downtime debrief — D61 states and gap handling', () => {
+  const asOf = '2026-07-08T12:00:00.000Z';
+
+  it('picks up DIAGNOSING in the state decomposition without being told to', () => {
+    const c = card({
+      statusTags: [
+        { tag: 'DIAGNOSING', atUtc: '2026-07-07T09:00:00.000Z', byOid: 'm1' },
+        { tag: 'IN_WORK', atUtc: '2026-07-07T13:00:00.000Z', byOid: 'm1' },
+      ],
+    });
+    const d = buildDowntimeDebrief('def-1', slice([defect()], [c]), asOf);
+    expect(d.stateHours.DIAGNOSING).toBe(4);
+    expect(d.stateHours.IN_WORK).toBe(23);
+    expect(d.untaggedHours).toBe(1);
+  });
+
+  it('an INCLUDED gap is attributed to GAP, and the downtime figure is unchanged', () => {
+    const c = card({
+      statusTags: [
+        { tag: 'IN_WORK', atUtc: '2026-07-07T09:00:00.000Z', byOid: 'm1' },
+        { tag: 'GAP', atUtc: '2026-07-07T18:00:00.000Z', byOid: 'm1', gapReason: 'END_OF_SHIFT' },
+        { tag: 'IN_WORK', atUtc: '2026-07-08T08:00:00.000Z', byOid: 'm1' },
+      ],
+    });
+    const d = buildDowntimeDebrief('def-1', slice([defect()], [c]), asOf);
+    expect(d.stateHours.GAP).toBe(14);
+    expect(d.excludedGapHours).toBe(0);
+    expect(d.countedDowntimeHours).toBe(d.elapsedHours);
+  });
+
+  it('an EXCLUDED gap comes off the counted downtime and does not resurface as unattributed time', () => {
+    const c = card({
+      statusTags: [
+        { tag: 'IN_WORK', atUtc: '2026-07-07T09:00:00.000Z', byOid: 'm1' },
+        { tag: 'GAP', atUtc: '2026-07-07T18:00:00.000Z', byOid: 'm1', gapReason: 'END_OF_SHIFT', includeInTotals: false },
+        { tag: 'IN_WORK', atUtc: '2026-07-08T08:00:00.000Z', byOid: 'm1' },
+      ],
+    });
+    const d = buildDowntimeDebrief('def-1', slice([defect()], [c]), asOf);
+    expect(d.elapsedHours).toBe(28);          // the calendar is still the calendar
+    expect(d.excludedGapHours).toBe(14);
+    expect(d.countedDowntimeHours).toBe(14);
+    expect(d.stateHours.GAP).toBe(0);
+    expect(d.untaggedHours).toBe(1);          // still just the pre-triage hour — NOT 15
+  });
+});
+
+/**
+ * Review finding (Critical), reproduced and fixed.
+ *
+ * `excludedGapHours` was summed across every card on the defect chain and then subtracted from a
+ * single wall-clock `elapsedHours`. Two cards that log the SAME calendar gap — which is the normal
+ * way to record "everybody was away over the weekend" when a job spans two cards — subtracted it
+ * twice, and `countedDowntimeHours` (the headline downtime figure, which reaches a published FIR)
+ * collapsed toward zero.
+ *
+ * Worked example below, by hand:
+ *   reported Fri 2026-07-10T17:00Z, cleared Mon 2026-07-13T08:00Z          → elapsed      63 h
+ *   both cards log GAP 07-10T18:00Z → 07-13T06:00Z, excluded               → union        60 h
+ *   summing instead of unioning gave 120 h, so counted downtime read 0 h.
+ *   correct: counted = 63 − 60                                            → counted       3 h
+ */
+describe('downtime debrief — the same gap logged on two cards is counted once', () => {
+  const WEEKEND = [
+    { tag: 'GAP' as const, atUtc: '2026-07-10T18:00:00.000Z', byOid: 'm1', includeInTotals: false },
+    { tag: 'IN_WORK' as const, atUtc: '2026-07-13T06:00:00.000Z', byOid: 'm1' },
+  ];
+  const d = defect({ status: 'CLOSED', reportedAtUtc: '2026-07-10T17:00:00.000Z', clearedTsUtc: '2026-07-13T08:00:00.000Z' });
+  const twoCards = [
+    card({ id: 'wc-a', cardNumber: 'WC-A', title: 'Avionics', createdAtUtc: '2026-07-10T17:30:00.000Z', statusTags: WEEKEND }),
+    card({ id: 'wc-b', cardNumber: 'WC-B', title: 'Gear', createdAtUtc: '2026-07-10T17:30:00.000Z', statusTags: WEEKEND }),
+  ];
+
+  it('unions the excluded gap rather than subtracting it once per card', () => {
+    const out = buildDowntimeDebrief('def-1', slice([d], twoCards), '2026-07-13T08:00:00.000Z');
+    expect(out.elapsedHours).toBe(63);
+    expect(out.excludedGapHours).toBe(60);          // was 120 — the same weekend, twice
+    expect(out.countedDowntimeHours).toBe(3);       // was 0
+  });
+
+  it('never lets the excluded total exceed the event it sits inside', () => {
+    const out = buildDowntimeDebrief('def-1', slice([d], twoCards), '2026-07-13T08:00:00.000Z');
+    expect(out.excludedGapHours).toBeLessThanOrEqual(out.elapsedHours);
+  });
+
+  it('still counts two DIFFERENT gaps on two cards separately', () => {
+    const cards = [
+      card({ id: 'wc-a', cardNumber: 'WC-A', createdAtUtc: '2026-07-10T17:30:00.000Z', statusTags: [
+        { tag: 'GAP', atUtc: '2026-07-10T18:00:00.000Z', byOid: 'm1', includeInTotals: false },
+        { tag: 'IN_WORK', atUtc: '2026-07-10T22:00:00.000Z', byOid: 'm1' },
+      ] }),
+      card({ id: 'wc-b', cardNumber: 'WC-B', createdAtUtc: '2026-07-10T17:30:00.000Z', statusTags: [
+        { tag: 'GAP', atUtc: '2026-07-11T02:00:00.000Z', byOid: 'm1', includeInTotals: false },
+        { tag: 'IN_WORK', atUtc: '2026-07-11T05:00:00.000Z', byOid: 'm1' },
+      ] }),
+    ];
+    // 4 h + 3 h, disjoint — the union must NOT collapse them.
+    const out = buildDowntimeDebrief('def-1', slice([d], cards), '2026-07-13T08:00:00.000Z');
+    expect(out.excludedGapHours).toBe(7);
   });
 });

@@ -27,7 +27,12 @@ import { eventStore } from '../../notifications/events';
 
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
-export const DATA_VERSION = '2026-07-14-safety-reads-v1';
+/** D65 — bumped to move `fleetTypes` / `casMeta` off the `Doc` row and onto
+ *  `DocRevision`. Both fields are optional and absent reads correctly, so this is not
+ *  a broken-render risk; the bump exists so a RETURNING user's curated CAS content is
+ *  carried onto its revisions by the matching step in engine/migrations.ts rather than
+ *  being stranded on a field nothing reads any more. */
+export const DATA_VERSION = '2026-07-30-cas-on-revision-v1';
 /** Set once the legacy 'bulletins-state' store has been imported — a later
  * re-seed must never resurrect stale pre-migration bulletins (C5). */
 export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';
@@ -162,9 +167,11 @@ export type DocumentsAction =
         today: string;
       };
     }
-  | { type: 'PUBLISH_DIRECT'; payload: { revisionId: string; atUtc: string; today: string } }
+  | { type: 'PUBLISH_DIRECT'; payload: { revisionId: string; atUtc: string; today: string; actorRoles: string[] } }
   | { type: 'ACKNOWLEDGE'; payload: { ack: DocAcknowledgment; signature?: Signature } }
   | { type: 'ADD_COMMENT'; payload: DocComment }
+  | { type: 'EDIT_COMMENT'; payload: { id: string; text: string; actorUserId: string; atUtc: string } }
+  | { type: 'DELETE_COMMENT'; payload: { id: string; actorUserId: string; atUtc: string } }
   | { type: 'ADD_SUGGESTION'; payload: DocSuggestion }
   | { type: 'ADD_SUGGESTION_REPLY'; payload: DocSuggestionReply }
   | {
@@ -408,6 +415,15 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       if (!rev) return state;
       const doc = state.docs.find((d) => d.id === rev.docId);
       if (!doc) return state;
+      // LG-112, closed by the D60 fix pass. This case used to take NO actorRoles, so the only thing
+      // standing between an unauthorized caller and a published revision was CREATE_DOC /
+      // CREATE_DRAFT refusing to make the draft first — an indirect gate that says nothing about
+      // this action. Direct publish skips four-eyes entirely; it carries its own gate now, the same
+      // C12 discipline as every other authority check in this reducer.
+      if (!canAuthor(classFor(doc.classId), p.actorRoles)) {
+        warnNoop(`publishing a ${classFor(doc.classId).label} requires an authoring role`);
+        return state;
+      }
       const v = validateDirectPublish(classFor(doc.classId), rev);
       if (!v.ok) {
         warnNoop(v.error);
@@ -461,6 +477,55 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         return state;
       }
       return { ...state, comments: [...state.comments, action.payload] };
+    }
+    case 'EDIT_COMMENT':
+    case 'DELETE_COMMENT': {
+      // D60 audit finding: comment authors could not correct or withdraw their own
+      // field notes. Both mutations are AUTHOR-ONLY and the check lives HERE, not in
+      // the thread UI — the same C12 discipline every other gate in this reducer
+      // follows. Note the class gate is `commentsEnabled`, not `classId ===
+      // 'tribal-knowledge'`: tribal knowledge is the only comment-enabled class
+      // today, so this changes nothing else, but the gate is structural and any
+      // future comment-enabled class inherits it.
+      const p = action.payload;
+      const existing = state.comments.find((c) => c.id === p.id);
+      if (!existing) {
+        warnNoop(`no comment ${p.id}`);
+        return state;
+      }
+      const doc = state.docs.find((d) => d.id === existing.docId);
+      if (!doc || !classFor(doc.classId).commentsEnabled) {
+        warnNoop('comments are not enabled for this document class');
+        return state;
+      }
+      if (existing.authorUserId !== p.actorUserId) {
+        warnNoop('only the author may edit or withdraw their own comment');
+        return state;
+      }
+      if (existing.deletedAtUtc) {
+        warnNoop('a withdrawn comment cannot be changed');
+        return state;
+      }
+      const next: DocComment =
+        action.type === 'DELETE_COMMENT'
+          // The TEXT SURVIVES a withdrawal. Clearing it, as this did, is a delete wearing the word
+          // "tombstone": the record can no longer say what was withdrawn, and someone may already
+          // have acted on what it said. Withdrawing is the author saying "do not rely on this" —
+          // which the mark communicates — not "this was never written". Same append-only discipline
+          // as `DocSuggestionReply`. Readers get `isLiveComment` to exclude it from counts.
+          ? { ...existing, deletedAtUtc: p.atUtc }
+          : { ...existing, text: (action.payload as { text: string }).text.trim(), editedAtUtc: p.atUtc };
+      if (action.type === 'EDIT_COMMENT') {
+        const text = (action.payload as { text: string }).text.trim();
+        if (!text) {
+          warnNoop('a comment cannot be edited to empty — withdraw it instead');
+          return state;
+        }
+        // Re-saving the same text must not stamp "edited": that would claim a
+        // revision the author never made.
+        if (text === existing.text) return state;
+      }
+      return { ...state, comments: state.comments.map((c) => (c.id === p.id ? next : c)) };
     }
     case 'ADD_SUGGESTION': {
       // Any reader may file a suggestion (no role gate), but it must target a
@@ -559,12 +624,17 @@ interface Ctx {
     approve: boolean;
     reason?: string;
   }) => void;
-  publishDirect: (revisionId: string) => void;
+  /** Uncontrolled classes only. Role-gated in the reducer (LG-112) — pass the ACTOR's roles. */
+  publishDirect: (revisionId: string, actorRoles: string[]) => void;
   /** Lightweight checkbox+initials acknowledgment. */
   acknowledgeInitials: (doc: Doc, rev: DocRevision, initials: string, userRole: string) => void;
   /** High-consequence acknowledgment via the shared sign ceremony. */
   acknowledgeSignature: (doc: Doc, rev: DocRevision, signature: Signature, userRole: string) => void;
   addComment: (docId: string, text: string, userRole: string) => void;
+  /** Author-only; stamps `editedAtUtc` (reducer-enforced, never a silent rewrite). */
+  editComment: (commentId: string, text: string, userRole: string) => void;
+  /** Author-only; tombstones the row rather than dropping it. */
+  deleteComment: (commentId: string, userRole: string) => void;
   addSuggestion: (input: {
     doc: Doc;
     rev: DocRevision;
@@ -707,6 +777,16 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const editComment = useCallback<Ctx['editComment']>((commentId, text, userRole) => {
+    const { userId } = identityFor(userRole);
+    dispatch({ type: 'EDIT_COMMENT', payload: { id: commentId, text, actorUserId: userId, atUtc: nowUtc() } });
+  }, []);
+
+  const deleteComment = useCallback<Ctx['deleteComment']>((commentId, userRole) => {
+    const { userId } = identityFor(userRole);
+    dispatch({ type: 'DELETE_COMMENT', payload: { id: commentId, actorUserId: userId, atUtc: nowUtc() } });
+  }, []);
+
   const addSuggestion = useCallback<Ctx['addSuggestion']>((input) => {
     const { userId, userName } = identityFor(input.userRole);
     const suggestion: DocSuggestion = {
@@ -794,12 +874,14 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     }, []),
     submitForApproval,
     decideApproval,
-    publishDirect: useCallback((revisionId) => {
-      dispatch({ type: 'PUBLISH_DIRECT', payload: { revisionId, atUtc: nowUtc(), today: todayIso() } });
+    publishDirect: useCallback((revisionId, actorRoles) => {
+      dispatch({ type: 'PUBLISH_DIRECT', payload: { revisionId, atUtc: nowUtc(), today: todayIso(), actorRoles } });
     }, []),
     acknowledgeInitials,
     acknowledgeSignature,
     addComment,
+    editComment,
+    deleteComment,
     addSuggestion,
     resolveSuggestion,
     addSuggestionReply,
@@ -813,6 +895,17 @@ export function useDocuments(): Ctx {
   const c = useContext(DocumentsContext);
   if (!c) throw new Error('useDocuments must be used within DocumentsProvider');
   return c;
+}
+
+/**
+ * Non-throwing read, for surfaces where the knowledge store is an ENHANCEMENT rather
+ * than a dependency (D60's CAS picker on the defect form). The defect form is mounted
+ * from five places and must keep working with no documents store at all — free text is
+ * D57's declared fallback — so a missing provider degrades the picker instead of
+ * crashing the intake form for a signed record.
+ */
+export function useDocumentsOptional(): Ctx | undefined {
+  return useContext(DocumentsContext);
 }
 
 /** Publish the point-in-time notification events for a revision that just went live.

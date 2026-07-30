@@ -6,23 +6,35 @@ import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import { GfoPanel } from '../../gfo';
 import type { FirAction } from '../reducer';
-import type { FirImpact, FlightIrregularityReport } from '../types';
+import type { FirImpact, FirImpactSnapshot, FlightIrregularityReport } from '../types';
 
 interface Props {
   fir: FlightIrregularityReport;
   canEdit: boolean;
-  /** Sum of debrief elapsed-hours — offered as the default downtime, owner can override. */
+  /** Elapsed hours less the gaps the enterer excluded (D61 §4) — offered as the default downtime,
+   *  owner can override. */
   derivedDowntimeHours?: number;
+  /** D63 — the figures frozen on the published revision, when there is one. */
+  publishedSnapshot?: FirImpactSnapshot;
   dispatch: React.Dispatch<FirAction>;
 }
 
 const numOrUndef = (v: string): number | undefined => (v === '' ? undefined : Number(v));
 
-export function ImpactTab({ fir, canEdit, derivedDowntimeHours, dispatch }: Props) {
+export function ImpactTab({ fir, canEdit, derivedDowntimeHours, publishedSnapshot, dispatch }: Props) {
   const [draft, setDraft] = useState<FirImpact>(fir.impact);
   useEffect(() => { setDraft(fir.impact); }, [fir.id, fir.impact]);
 
   const shownDowntime = fir.impact.downtimeHours ?? derivedDowntimeHours;
+  const frozen = publishedSnapshot?.downtimeHours ?? publishedSnapshot?.elapsedHours;
+  /** D63 — published and draft CAN disagree, and that is the evidence a correction landed after
+   *  four-eyes approval. Say so on the tab where the number lives rather than quietly reconciling. */
+  const divergence = publishedSnapshot && frozen != null && shownDowntime != null && Math.abs(frozen - shownDowntime) >= 0.1 ? (
+    <p className="mt-3 border-t pt-2 text-xs text-amber-700 dark:text-amber-300">
+      Published revision froze downtime at {frozen} h on {new Date(publishedSnapshot.capturedAtUtc).toLocaleDateString()};
+      the tech log now reads {shownDowntime} h. The published figure does not move — publish a new revision to carry the correction.
+    </p>
+  ) : null;
 
   if (!canEdit) {
     const rows: [string, string | number | undefined][] = [
@@ -43,6 +55,7 @@ export function ImpactTab({ fir, canEdit, derivedDowntimeHours, dispatch }: Prop
         ) : (
           <p className="text-sm text-muted-foreground">No impact recorded yet.</p>
         )}
+        {divergence}
       </GfoPanel>
     );
   }
@@ -90,6 +103,7 @@ export function ImpactTab({ fir, canEdit, derivedDowntimeHours, dispatch }: Prop
           Downtime defaults to {derivedDowntimeHours} h from the anchored debrief; override above if the operational number differs.
         </p>
       )}
+      {divergence}
     </GfoPanel>
   );
 }

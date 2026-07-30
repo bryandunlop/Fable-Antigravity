@@ -23,6 +23,11 @@ export const INTENT = {
     'I certify the required (M) procedure and/or placard installation for this deferral was accomplished.',
   PLACARD_ATTESTATION:
     'I confirm the required placard is installed per the MEL provisions for this deferral.',
+  // D59 — deliberately a statement of FACT, not of authority. It records that the (O) crew action
+  // was accomplished; it does not certify airworthiness and it flips no state. Maintenance's
+  // gating-discharge signature is what releases the aircraft on this MEL.
+  CREW_ACTION_COMPLIANCE:
+    'I confirm the crew action required by this MEL deferral was accomplished as described above. This record is evidence of the action only — it does not release the aircraft; maintenance signs the gating release.',
   RII:
     'I have independently inspected the required item and find it correctly accomplished.',
   ACCEPTANCE:

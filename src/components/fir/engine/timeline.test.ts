@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { defectDebriefs, deriveSystemEntries, mergeTimeline } from './timeline';
+import { defectDebriefs, deriveSystemEntries, impactDiverged, mergeTimeline } from './timeline';
 import type { Defect, LaborEntry, WorkCard } from '../../tech-log/types';
 import type { FirTimelineEntry, FlightIrregularityReport } from '../types';
 
 const defect = (over: Partial<Defect> = {}): Defect => ({
   id: 'def-1', aircraftId: 'ac-1', source: 'PIREP', ataChapter: '24',
-  description: 'Main battery will not hold charge', severity: 'HIGH',
+  description: 'Main battery will not hold charge',
   airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'p1',
-  reportedAtUtc: '2026-07-07T08:00:00.000Z', signatureId: 'sig-1', ...over,
+  occurredAtUtc: '2026-07-07T08:00:00.000Z', reportedAtUtc: '2026-07-07T08:00:00.000Z',
+  signatureId: 'sig-1', ...over,
 });
 
 const card = (over: Partial<WorkCard> = {}): WorkCard => ({
@@ -102,5 +103,53 @@ describe('FIR merged timeline (feed merge-and-sort pattern)', () => {
     const system: FirTimelineEntry[] = [{ source: 'SYSTEM', atUtc: '2026-07-07T10:00:00.000Z', label: 'sys' }];
     const tie: FirTimelineEntry[] = [{ source: 'MANUAL', atUtc: '2026-07-07T10:00:00.000Z', label: 'man' }];
     expect(mergeTimeline(system, tie).map(e => e.label)).toEqual(['sys', 'man']);
+  });
+});
+
+/**
+ * D63 divergence — review findings D/E.
+ *
+ * The rule must mean "somebody corrected the logged time", never "the clock moved". The first cut
+ * fired on any report published while its event was still ongoing (elapsed climbs by itself, so the
+ * notice appeared when nothing had been corrected) and compared the downtime SCALAR only, so a
+ * re-labelling that shifted hours between states without changing the total went unreported.
+ */
+describe('impactDiverged — a correction, not the passage of time', () => {
+  const snap = (segments: { key: string; hours: number }[], downtimeHours: number) => ({
+    capturedAtUtc: '2026-07-20T00:00:00.000Z',
+    downtimeHours,
+    elapsedHours: downtimeHours,
+    excludedGapHours: 0,
+    segments: segments.map(s => ({ ...s, label: s.key })),
+  });
+
+  const PUBLISHED = snap([{ key: 'IN_WORK', hours: 6 }, { key: 'WAITING_PARTS', hours: 4 }], 10);
+
+  it('stays silent when nothing changed', () => {
+    const live = [{ key: 'IN_WORK', hours: 6 }, { key: 'WAITING_PARTS', hours: 4 }];
+    expect(impactDiverged(PUBLISHED, live, 10, false)).toBe(false);
+  });
+
+  it('does NOT cry wolf on an ongoing event whose elapsed has merely advanced', () => {
+    const live = [{ key: 'IN_WORK', hours: 6 }, { key: 'WAITING_PARTS', hours: 4 }];
+    // Same composition, bigger scalar — that is the clock, not a correction.
+    expect(impactDiverged(PUBLISHED, live, 25, true)).toBe(false);
+  });
+
+  it('reports a scalar change once the event is closed', () => {
+    const live = [{ key: 'IN_WORK', hours: 6 }, { key: 'WAITING_PARTS', hours: 4 }];
+    expect(impactDiverged(PUBLISHED, live, 12, false)).toBe(true);
+  });
+
+  it('reports a RE-LABELLING that moves hours between states without changing the total', () => {
+    // 10 h either way — the scalar comparison alone saw nothing.
+    const live = [{ key: 'IN_WORK', hours: 3 }, { key: 'WAITING_PARTS', hours: 4 }, { key: 'WAITING_CONTRACT_MX', hours: 3 }];
+    expect(impactDiverged(PUBLISHED, live, 10, false)).toBe(true);
+    // ...and it is caught even while the event is still running.
+    expect(impactDiverged(PUBLISHED, live, 10, true)).toBe(true);
+  });
+
+  it('is false when there is no published revision to diverge from', () => {
+    expect(impactDiverged(undefined, [{ key: 'IN_WORK', hours: 99 }], 99, false)).toBe(false);
   });
 });

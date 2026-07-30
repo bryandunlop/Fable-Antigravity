@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import type { AircraftType, ChecklistItemDef, ChecklistItemKind, ChecklistPhase, ChecklistSectionDef, ChecklistTemplate } from '../../types';
-import { nextVersionFor, publishTemplate, cloneTemplateForType } from '../../engine/checklist';
+import type { AircraftType, ChecklistInteractionMode, ChecklistItemDef, ChecklistItemKind, ChecklistPhase, ChecklistSectionDef, ChecklistTemplate } from '../../types';
+import { nextVersionFor, publishTemplate, cloneTemplateForType, interactionModeOf } from '../../engine/checklist';
 import { newId } from '../../util/id';
 import { useCurrentUser, useTechLog } from '../../TechLogContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../ui/dialog';
@@ -109,6 +109,30 @@ export function ChecklistTemplateEditor({
             </Select>
           </div>
         )}
+
+        {/* D58 — how this template's items are worked. The mode belongs to the template, so
+            publishing a change makes a new version and every in-flight instance keeps the mode it
+            started under. */}
+        <div className="rounded-lg border p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor="interaction-mode" className="shrink-0">Item interaction</Label>
+            <Select
+              value={interactionModeOf(draft)}
+              onValueChange={(v: ChecklistInteractionMode) => setDraft(d => ({ ...d, interactionMode: v }))}
+            >
+              <SelectTrigger id="interaction-mode" className="w-64"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CLAIM_COMPLETE">Claim, then complete (two taps)</SelectItem>
+                <SelectItem value="SINGLE_TAP">Single tap to complete</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {interactionModeOf(draft) === 'SINGLE_TAP'
+              ? 'One tap marks an item done and records who did it. A "mark remaining done" action completes the plain checks in bulk; measurements and notes always stay for typed entry. Intended for single-actor crew checklists.'
+              : 'Tap one claims the item and shows "in progress · who" so a second technician does not double up; tap two completes it. Intended for maintenance servicing checklists worked by more than one person.'}
+          </p>
+        </div>
 
         <div className="space-y-4">
           {draft.sections.map((section, secIdx) => (

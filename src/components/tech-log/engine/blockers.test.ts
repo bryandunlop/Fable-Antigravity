@@ -15,8 +15,8 @@ const empty = {
 function defect(p: Partial<Defect> = {}): Defect {
   return {
     id: 'd1', aircraftId: 'ac1', source: 'PIREP', ataChapter: '32', description: 'gear unsafe',
-    severity: 'HIGH', airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u',
-    reportedAtUtc: NOW, signatureId: 's', ...p,
+    airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u',
+    occurredAtUtc: NOW, reportedAtUtc: NOW, signatureId: 's', ...p,
   };
 }
 function deferral(p: Partial<Deferral> = {}): Deferral {
@@ -92,6 +92,38 @@ describe('buildBlockers — every grounding cause is a listed, actionable row', 
     expect(b!.actions).toContain('SIGN_GATING');
   });
 
+  // ── D59 — a pending crew action is a listed, actionable obstacle, not a hidden one ──
+  it('names the outstanding crew action on the pending-gate row and offers MARK_CREW_ACTION', () => {
+    const onlyO = deferral({ status: 'PENDING_PLACARD', crewActionRequired: true, melOProcedure: 'Pull CB 3-J14 before each flight' });
+    const r = buildBlockers('ac1', { ...empty, defects: [defect({ status: 'DEFERRED' })], deferrals: [onlyO] }, NOW);
+    const b = r.blockers.find(x => x.kind === 'DEFERRAL_PENDING_PLACARD')!;
+    expect(b).toBeDefined();
+    expect(b.title).toMatch(/crew action/i);
+    expect(b.actions).toContain('MARK_CREW_ACTION');
+    // the release is still the thing that clears it — marking is evidence, not authority
+    expect(b.actions).toContain('SIGN_GATING');
+    expect(b.clearsWhen).toMatch(/release/i);
+  });
+
+  it('drops MARK_CREW_ACTION once the action is marked, leaving the release as the only action', () => {
+    const marked = deferral({
+      status: 'PENDING_PLACARD', crewActionRequired: true, melOProcedure: 'Pull CB 3-J14',
+      crewActionCompliance: { id: 'cac1', byOid: 'p', byName: 'Capt Reed', atUtc: NOW, signatureId: 'sig1' },
+    });
+    const r = buildBlockers('ac1', { ...empty, defects: [defect({ status: 'DEFERRED' })], deferrals: [marked] }, NOW);
+    const b = r.blockers.find(x => x.kind === 'DEFERRAL_PENDING_PLACARD')!;
+    expect(b.actions).not.toContain('MARK_CREW_ACTION');
+    expect(b.actions).toEqual(['SIGN_GATING']);
+    expect(b.detail).toMatch(/Capt Reed/);
+  });
+
+  it('a placard-only pending gate is unchanged — no crew-action wording, no extra action', () => {
+    const r = buildBlockers('ac1', { ...empty, defects: [defect({ status: 'DEFERRED' })], deferrals: [deferral({ status: 'PENDING_PLACARD', placardRequired: true })] }, NOW);
+    const b = r.blockers.find(x => x.kind === 'DEFERRAL_PENDING_PLACARD')!;
+    expect(b.title).not.toMatch(/crew action/i);
+    expect(b.actions).toEqual(['SIGN_GATING']);
+  });
+
   it('rule 4 — an ACTIVE deferral is a restriction, not a blocker', () => {
     const r = buildBlockers('ac1', { ...empty, defects: [defect({ status: 'DEFERRED' })], deferrals: [deferral()] }, NOW);
     expect(r.status).toBe('AMBER');
@@ -144,6 +176,36 @@ describe('buildBlockers — every grounding cause is a listed, actionable row', 
       expect(text).not.toContain(due);
       expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
     }
+  });
+
+  /**
+   * A deferral row is *about* a defect, and the defect is what carries the CAS annunciation the
+   * crew saw (D57). Populating only DEFECT_OPEN made a deferred defect's CAS invisible on the
+   * board — reachable on seed data, where the seeded deferral's defect is `casObserved`.
+   */
+  it('deferral-backed rows carry the linked defect, so its CAS annunciation is renderable', () => {
+    const d = defect({ status: 'DEFERRED', casMessage: 'CABIN TEMP', casColor: 'AMBER' });
+    const expired = deferral({ id: 'df-exp', status: 'ACTIVE', clockStartDateUtc: '2026-06-01T00:00:00Z', repairDueDateUtc: '2026-06-11T03:59:59Z' });
+    const pending = deferral({ id: 'df-pnd', status: 'PENDING_PLACARD', placardRequired: true });
+    const active = deferral({ id: 'df-act', status: 'ACTIVE' });
+
+    for (const df of [expired, pending, active]) {
+      const r = buildBlockers('ac1', { ...empty, defects: [d], deferrals: [df] }, NOW);
+      const row = [...r.blockers, ...r.restrictions].find(x => x.deferral?.id === df.id);
+      expect(row, `no row for ${df.status}`).toBeDefined();
+      expect(row!.defect?.id).toBe('d1');
+      expect(row!.defect?.casMessage).toBe('CABIN TEMP');
+      expect(row!.defect?.casColor).toBe('AMBER');
+    }
+  });
+
+  it('a deferral whose defect is not on this tail leaves defect undefined rather than mismatching', () => {
+    const r = buildBlockers(
+      'ac1',
+      { ...empty, deferrals: [deferral({ defectId: 'gone' })] },
+      NOW,
+    );
+    expect(r.restrictions[0].defect).toBeUndefined();
   });
 
   it('every blocker states what clears it', () => {

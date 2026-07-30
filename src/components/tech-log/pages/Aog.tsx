@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plane, Clock, Check, RefreshCw, BellRing, FileText, Flag, PlayCircle, PackageSearch, ClipboardCheck, HelpCircle, Users } from 'lucide-react';
+import { Plane, Clock, Check, RefreshCw, BellRing, FileText, Flag, HelpCircle, Users, MoonStar } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { deriveServiceability } from '../engine/serviceability';
 import { currentRows } from '../engine/supersede';
 import { buildDowntimeDebrief } from '../engine/debrief';
+import { STATUS_TAG_LABELS, STATUS_TAG_ORDER } from '../engine/statusTags';
 import type { AogAck } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { FirSuggestions } from '../../fir/components/FirSuggestions';
@@ -109,9 +110,16 @@ export default function Aog() {
                         <Flag className="mr-1.5 h-3.5 w-3.5" /> Open FIR
                       </Button>
                       <Badge variant="outline">{dbf.elapsedHours} h elapsed{dbf.ongoing ? ' · ongoing' : ''}</Badge>
-                      <Badge variant="outline"><PlayCircle className="mr-1 h-3 w-3" />in work {dbf.stateHours.IN_WORK} h</Badge>
-                      <Badge variant="outline"><PackageSearch className="mr-1 h-3 w-3" />parts (POO) {dbf.stateHours.WAITING_PARTS} h</Badge>
-                      <Badge variant="outline"><ClipboardCheck className="mr-1 h-3 w-3" />inspection {dbf.stateHours.WAITING_INSPECTION} h</Badge>
+                      {/* Driven off STATUS_TAG_ORDER, not a hand-written trio. This row listed only
+                          IN_WORK / WAITING_PARTS / WAITING_INSPECTION, so every hour D61 attributed
+                          to the five new states rendered NOWHERE and the badges stopped adding up
+                          to elapsed. A future state must not be able to vanish the same way. */}
+                      {STATUS_TAG_ORDER.filter(t => dbf.stateHours[t] > 0).map(t => (
+                        <Badge key={t} variant="outline">{STATUS_TAG_LABELS[t]} {dbf.stateHours[t]} h</Badge>
+                      ))}
+                      {dbf.excludedGapHours > 0 && (
+                        <Badge variant="outline"><MoonStar className="mr-1 h-3 w-3" />excluded gap {dbf.excludedGapHours} h</Badge>
+                      )}
                       <Badge variant="outline"><HelpCircle className="mr-1 h-3 w-3" />unattributed {dbf.untaggedHours} h</Badge>
                       <Badge variant="outline"><Users className="mr-1 h-3 w-3" />labor {dbf.labor.totalHours} man-h</Badge>
                     </div>

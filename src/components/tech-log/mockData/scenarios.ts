@@ -2,7 +2,7 @@ import type {
   TechLogState, Defect, Deferral, Signature, AuditEntry, FlightLog, MaintenanceRelease,
   WorkCard, PartUsage, LaborEntry, RecurringCheck, RecurringCheckAccomplishment,
   IntermittentFault, IntermittentFaultOccurrence, Trip, FlightBriefing,
-  MaintenanceProject, TechVacation,
+  MaintenanceProject, TechVacation, MelItem,
 } from '../types';
 import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
@@ -13,11 +13,47 @@ import { buildBriefingDisclosure } from '../engine/briefingDisclosure';
 import { campForecast } from '../integration/campClient';
 
 /**
+ * D59 — `MelItem.crewActionRequired` is an OPERATOR decision, authored by the DOM or Chief
+ * Inspector when a MEL is entered. `mel.ts` is auto-generated from the manufacturer MELs, so the
+ * flag does not belong in that file: a regeneration would wipe it, and the extracted content cannot
+ * express an operator judgement in the first place. It is applied here as a thin overlay instead.
+ *
+ * Only a handful of items are authored, on purpose. Everything else is left ABSENT so the demo also
+ * exercises the legacy fallback (`Boolean(oProcedure)`), which is what the other 984 rows and every
+ * pre-D59 deferral will actually hit. `crew-action: false` on an item that carries (O) text is the
+ * interesting case — it is the only way the flag can ever REDUCE gating, and it must come from the
+ * DOM, never from line maintenance at the deferral.
+ */
+const AUTHORED_CREW_ACTIONS: Record<string, boolean> = {
+  // Carries (O) text and the DOM has confirmed it is a real crew action (the gating case).
+  'mel-g500-35-02-02': true,      // Cabin Oxygen ON Warning Systems — only-(O), Cat C
+  'mel-g500-21-01-01': true,      // CPCS — (O) prior-to-taxi checks, Cat B
+  'mel-g650er-21-20-02': true,    // Ram Air System, unpressurized configuration — only-(O), Cat C
+  // Carries (O) text that is a pointer to the AFM, not an action the crew performs before flight.
+  // The DOM has said so explicitly, which is the only thing that can turn the gate off.
+  'mel-g500-30-01-03': false,  // Cowl Anti-Ice pressure indication — AFM reference, no crew action
+};
+
+function withAuthoredCrewActions(items: MelItem[]): MelItem[] {
+  return items.map(m => (m.id in AUTHORED_CREW_ACTIONS ? { ...m, crewActionRequired: AUTHORED_CREW_ACTIONS[m.id] } : m));
+}
+
+/**
  * Builds the seeded demo world. Dates are RELATIVE to "now" so the AMBER aircraft
  * stays mid-clock and the RED aircraft stays grounded whenever the demo is run or reset.
  *   N5PG -> GREEN   N6PG -> AMBER (active deferral mid-clock)   N1PG, N2PG -> RED (open defects)
+ *   N7PG -> PENDING_PLACARD on an outstanding crew action (LG-110/D59; PENDING_PLACARD already
+ *           contributes RED — this tail exists so demonstrating the gate does not require flipping
+ *           the colour of a tail whose fixtures are calibrated against it)
  *   N3PG -> provisional G800 (no MEL approved)
- * N2PG's AOG is deliberately un-reported (no FIR) so the FIR §8 "Open an FIR?" nudge fires.
+ * N2PG's AOG is deliberately un-reported (no FIR) so the FIR §8 "Open an FIR?" nudge fires. That
+ * nudge's immediate-escalation path reads `casColor === 'RED'`, so N2PG's RED CAS below is what
+ * makes it fire before the 24 h downtime threshold — see `fir/engine/suggestions.ts`.
+ *
+ * CAS SEED CONTENT (D57) IS DEMO CONTENT. The message strings are lifted from the pre-split
+ * `symptom` prose in this file or are obviously-demo names, and the color assignments are chosen to
+ * exercise all four annunciator colors plus the "observed, no CAS" state. None of it asserts real
+ * Gulfstream G650ER/G500 CAS semantics — the sourced catalog arrives with D60.
  */
 export function getDefaultState(referenceNowMs: number = Date.now()): TechLogState {
   const nowMs = referenceNowMs;
@@ -33,37 +69,59 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   const deferrals: Deferral[] = [];
 
   // --- N1PG: RED (open, untriaged airworthiness defect) ---
+  // D57: the symptom prose used to read "GEAR amber CAS during climb" — an annunciation buried in
+  // free text where nothing could read it. Split: narrative in `symptom`, annunciation structured.
   const sigN1 = makeSignature({ id: 'sig-seed-d-n1pg', signedEntity: 'DEFECT', signedEntityId: 'd-n1pg', signer: pilot, intentStatement: 'seed', signedAtUtc: iso(3 * H) });
   signatures.push(sigN1);
   defects.push({
     id: 'd-n1pg', aircraftId: 'ac-n1pg', source: 'PIREP', ataChapter: '32',
     description: 'Left main landing gear unsafe indication intermittent on retraction.',
-    symptom: 'GEAR amber CAS during climb', severity: 'HIGH', airworthinessAffecting: true,
-    status: 'OPEN', reportedByOid: pilot.oid, reportedAtUtc: iso(3 * H), signatureId: sigN1.id,
+    symptom: 'Came up during climb, cleared after a gear recycle.',
+    casMessage: 'GEAR UNSAFE', casColor: 'AMBER', airworthinessAffecting: true,
+    // LG-99 intake hint: the single code the PILOT read off the CMC page. Maintenance's own
+    // interrogation found more and they live on wc-3 as cmcFaultCodes — same squawk, different fact.
+    // Illustrative demo codes derived from the ATA chapter; not a claim about real CMC output.
+    cmcFaultCode: '32-31-14',
+    status: 'OPEN', reportedByOid: pilot.oid,
+    // D56: noticed ~45 min before it was written up.
+    occurredAtUtc: iso(3 * H + 45 * 60000), reportedAtUtc: iso(3 * H), signatureId: sigN1.id,
   });
 
   // --- N6PG: AMBER (active deferral mid-clock; Cat C, no (M)/placard -> straight to ACTIVE) ---
   const melAmber =
     SEED_MEL.find(m => m.aircraftType === 'G500' && m.category === 'C' && !m.mProcedure) ??
     SEED_MEL.find(m => m.id === 'mel-g500-21-01-01')!;
-  const discN6 = iso(2 * D + 8 * H);
-  const clockStart = computeClockStart(discN6);
+  // D56: the deferral's day of discovery is the instant the defect was NOTICED, not the instant it
+  // was filed — which is what `DeferralCreatePanel` now defaults from, so the seed has to agree.
+  //
+  // The occurrence instant is PINNED, and the filing stamp is what moves 30 min later to make the
+  // two distinguishable. Back-dating the occurrence instead looks equivalent and is not: this
+  // instant sits exactly on Eastern midnight, so any back-date at all rolls the PL-25 day of
+  // discovery into the previous calendar day and moves this deferral's repair-due boundary by a
+  // full day — which the myairops trip-alert fixtures are calibrated against (`tripAlerts.test.ts`
+  // pins a leg either side of it). Move it and those alerts change kind.
+  const occN6 = iso(2 * D + 8 * H);
+  const filedN6 = iso(2 * D + 7 * H + 30 * 60000);
+  const clockStart = computeClockStart(occN6);
   const due = computeRepairDue(melAmber.category, clockStart, melAmber, { hours: 990.7, cycles: 640 });
-  const sigDefN6 = makeSignature({ id: 'sig-seed-d-n6pg', signedEntity: 'DEFECT', signedEntityId: 'd-n6pg', signer: pilot, intentStatement: 'seed', signedAtUtc: discN6 });
+  const sigDefN6 = makeSignature({ id: 'sig-seed-d-n6pg', signedEntity: 'DEFECT', signedEntityId: 'd-n6pg', signer: pilot, intentStatement: 'seed', signedAtUtc: filedN6 });
   const sigDefrN6 = makeSignature({ id: 'sig-seed-df-n6pg', signedEntity: 'DEFERRAL', signedEntityId: 'df-n6pg', signer: dom, intentStatement: 'seed', signedAtUtc: iso(2 * D + 6 * H) });
   signatures.push(sigDefN6, sigDefrN6);
   defects.push({
     id: 'd-n6pg', aircraftId: 'ac-n6pg', source: 'PIREP', ataChapter: melAmber.ataReference,
     description: `${melAmber.title} — intermittent; deferred under MEL ${melAmber.subItemNumber}.`,
-    severity: 'MEDIUM', airworthinessAffecting: true, status: 'DEFERRED',
-    reportedByOid: pilot.oid, reportedAtUtc: discN6, signatureId: sigDefN6.id,
+    // D57 third state: seen, with no annunciation at all. Not a fifth color — a fact about the
+    // defect, and the reason the "NO CAS" chip has its own muted, un-colored treatment.
+    casObserved: true,
+    airworthinessAffecting: true, status: 'DEFERRED',
+    reportedByOid: pilot.oid, occurredAtUtc: occN6, reportedAtUtc: filedN6, signatureId: sigDefN6.id,
   });
   deferrals.push({
     id: 'df-n6pg', defectId: 'd-n6pg', aircraftId: 'ac-n6pg', melItemId: melAmber.id,
     governingMmelRevision: melAmber.mmelRevision, governingEffectiveDate: melAmber.effectiveDate,
     melSubItemNumber: melAmber.subItemNumber, melTitle: melAmber.title, // D36 — frozen at signing
     melOProcedure: melAmber.oProcedure, // TL-16 — decides whether the PIC must acknowledge this item
-    category: melAmber.category, dayOfDiscoveryUtc: discN6, clockStartDateUtc: clockStart,
+    category: melAmber.category, dayOfDiscoveryUtc: occN6, clockStartDateUtc: clockStart,
     governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
     repairDueDateUtc: due.repairDueDateUtc, usageDueThreshold: due.usageDueThreshold,
     repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
@@ -73,6 +131,55 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     melReviewAcknowledged: true, signedByOid: dom.oid, signatureId: sigDefrN6.id, status: 'ACTIVE',
   });
 
+  /**
+   * --- N7PG: LG-110 — a dedicated demo tail carrying a PENDING crew action (D59) ---
+   *
+   * D59 shipped the crew-action gate and nothing on a fresh load exercised it: the deferral that
+   * demonstrates it has to sit in PENDING_PLACARD with the (O) action outstanding, and putting that
+   * on an existing tail would have flipped its serviceability colour and re-pinned the fixtures
+   * calibrated against it (N6PG's clock in particular — see the note above). Hence its own tail.
+   *
+   * The MEL item is picked by PROPERTY, not by id: an only-(O) G500 item the DOM has authored as a
+   * real crew action. `AUTHORED_CREW_ACTIONS` at the top of this file is where that authorship
+   * lives, so if the overlay changes this seed follows it rather than going quietly stale.
+   */
+  {
+    const melCrew =
+      SEED_MEL.find(m => m.aircraftType === 'G500' && AUTHORED_CREW_ACTIONS[m.id] === true && m.oProcedure && !m.mProcedure) ??
+      SEED_MEL.find(m => m.id === 'mel-g500-35-02-02')!;
+    const occN7 = iso(1 * D + 5 * H);
+    const filedN7 = iso(1 * D + 4 * H);
+    const clockStartN7 = computeClockStart(occN7);
+    const dueN7 = computeRepairDue(melCrew.category, clockStartN7, melCrew, { hours: 640.3, cycles: 410 });
+    const sigDefN7 = makeSignature({ id: 'sig-seed-d-n7pg', signedEntity: 'DEFECT', signedEntityId: 'd-n7pg', signer: pilot, intentStatement: 'seed', signedAtUtc: filedN7 });
+    const sigDefrN7 = makeSignature({ id: 'sig-seed-df-n7pg', signedEntity: 'DEFERRAL', signedEntityId: 'df-n7pg', signer: dom, intentStatement: 'seed', signedAtUtc: iso(1 * D + 3 * H) });
+    signatures.push(sigDefN7, sigDefrN7);
+    defects.push({
+      id: 'd-n7pg', aircraftId: 'ac-n7pg', source: 'PIREP', ataChapter: melCrew.ataReference,
+      description: `${melCrew.title} — deferred under MEL ${melCrew.subItemNumber}; crew action outstanding.`,
+      casObserved: true, airworthinessAffecting: true, status: 'DEFERRED',
+      reportedByOid: pilot.oid, occurredAtUtc: occN7, reportedAtUtc: filedN7, signatureId: sigDefN7.id,
+    });
+    deferrals.push({
+      id: 'df-n7pg', defectId: 'd-n7pg', aircraftId: 'ac-n7pg', melItemId: melCrew.id,
+      governingMmelRevision: melCrew.mmelRevision, governingEffectiveDate: melCrew.effectiveDate,
+      melSubItemNumber: melCrew.subItemNumber, melTitle: melCrew.title,
+      melOProcedure: melCrew.oProcedure,
+      category: melCrew.category, dayOfDiscoveryUtc: occN7, clockStartDateUtc: clockStartN7,
+      governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
+      repairDueDateUtc: dueN7.repairDueDateUtc, usageDueThreshold: dueN7.usageDueThreshold,
+      repairIntervalUnit: dueN7.repairIntervalUnit, repairIntervalValue: dueN7.repairIntervalValue,
+      restrictionText: melCrew.provisos ?? 'Operate per MEL provisos.',
+      // The ONLY outstanding limb is the crew action. That is the modal D59 case (182 of 984 seeded
+      // items) and the one the gate was written for: before D59 this deferral went straight to
+      // ACTIVE and the aircraft was dispatchable with a mandatory crew action nobody had performed.
+      placardRequired: false, mProcedureRequired: false, placardInstalled: false,
+      crewActionRequired: true,
+      placardLocation: melCrew.placardLocation, extensionUsed: false, riiRequired: false,
+      melReviewAcknowledged: true, signedByOid: dom.oid, signatureId: sigDefrN7.id, status: 'PENDING_PLACARD',
+    });
+  }
+
   // --- N2PG: RED (fresh, un-reported AOG — no FIR yet, so the FIR §8 "Open an FIR?" nudge fires) ---
   const discN2 = iso(6 * H);
   const sigN2 = makeSignature({ id: 'sig-seed-d-n2pg', signedEntity: 'DEFECT', signedEntityId: 'd-n2pg', signer: pilot, intentStatement: 'seed', signedAtUtc: discN2 });
@@ -80,8 +187,14 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   defects.push({
     id: 'd-n2pg', aircraftId: 'ac-n2pg', source: 'PIREP', ataChapter: '79',
     description: 'No. 2 engine magnetic chip detector warning — metal found on inspection, borescope required.',
-    symptom: 'R ENG CHIP CAS in cruise', severity: 'CRITICAL', airworthinessAffecting: true,
-    status: 'OPEN', reportedByOid: pilot.oid, reportedAtUtc: discN2, signatureId: sigN2.id,
+    // D57: was the free-text symptom "R ENG CHIP CAS in cruise". The RED here is LOAD-BEARING, not
+    // decoration: this defect is ~6 h old, far short of the 24 h downtime threshold, so the FIR
+    // "Open an FIR?" nudge fires only via the immediate-escalation path, which reads `casColor`.
+    // Move the RED to a rectified or non-grounding defect and the demo above goes quiet.
+    symptom: 'In cruise at FL410; no other indications.',
+    casMessage: 'R ENG CHIP', casColor: 'RED', airworthinessAffecting: true,
+    status: 'OPEN', reportedByOid: pilot.oid,
+    occurredAtUtc: iso(6 * H + 30 * 60000), reportedAtUtc: discN2, signatureId: sigN2.id,
   });
 
   // ── Historical ledger (for Journey Log realism + Phase-4 analytics). None of this changes the
@@ -128,17 +241,20 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   // Historical RECTIFIED defects (+ their releases) — fuel for defect-trend / MTBUR / dispatch reliability.
   const releases: MaintenanceRelease[] = [];
   const histDefect = (
-    i: number, acId: string, ata: string, daysAgo: number, desc: string, work: string, signer = tech,
+    i: number, acId: string, ata: string, daysAgo: number, desc: string, work: string,
+    cas: Pick<Defect, 'casMessage' | 'casColor' | 'casObserved'> = {}, signer = tech,
   ) => {
     const reportedAt = iso(daysAgo * D + 6 * H);
+    // D56: noticed in flight, written up on the ground half an hour later.
+    const occurredAt = iso(daysAgo * D + 6 * H + 30 * 60000);
     const clearedAt = iso(daysAgo * D);
     const dSig = makeSignature({ id: `sig-hd-${i}`, signedEntity: 'DEFECT', signedEntityId: `hd-${i}`, signer: pilot, intentStatement: 'seed', signedAtUtc: reportedAt });
     const rSig = makeSignature({ id: `sig-hr-${i}`, signedEntity: 'CRS', signedEntityId: `hr-${i}`, signer: signer, intentStatement: 'seed', signedAtUtc: clearedAt, certNumber: signer.apCertificateNumber });
     signatures.push(dSig, rSig);
     defects.push({
-      id: `hd-${i}`, aircraftId: acId, source: 'PIREP', ataChapter: ata, description: desc,
-      severity: 'MEDIUM', airworthinessAffecting: true, status: 'RECTIFIED',
-      reportedByOid: pilot.oid, reportedAtUtc: reportedAt, rectificationText: work,
+      id: `hd-${i}`, aircraftId: acId, source: 'PIREP', ataChapter: ata, description: desc, ...cas,
+      airworthinessAffecting: true, status: 'RECTIFIED',
+      reportedByOid: pilot.oid, occurredAtUtc: occurredAt, reportedAtUtc: reportedAt, rectificationText: work,
       clearedByOid: signer.oid, clearedTsUtc: clearedAt, signatureId: dSig.id,
     });
     releases.push({
@@ -149,9 +265,11 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       pdfBlobUri: `blob://mygfo-worm/crs/hr-${i}.pdf`, signatureId: rSig.id,
     });
   };
-  histDefect(1, 'ac-n5pg', '34', 18, 'GPS 1 intermittent loss of position', 'Replaced GPS antenna coax; ops check good.');
-  histDefect(2, 'ac-n2pg', '21', 30, 'Cabin temp control erratic', 'Recalibrated zone temp sensor; verified.');
-  histDefect(3, 'ac-n1pg', '32', 44, 'Nosewheel steering stiff on taxi', 'Serviced steering accumulator; functional check normal.');
+  // The CAS argument covers the remaining two annunciator colors (white/cyan) and, on hd-3/4/5,
+  // the perfectly ordinary case of a defect with no CAS aspect at all.
+  histDefect(1, 'ac-n5pg', '34', 18, 'GPS 1 intermittent loss of position', 'Replaced GPS antenna coax; ops check good.', { casMessage: 'GPS 1 ADVISORY', casColor: 'WHITE' });
+  histDefect(2, 'ac-n2pg', '21', 30, 'Cabin temp control erratic', 'Recalibrated zone temp sensor; verified.', { casMessage: 'CABIN TEMP', casColor: 'CYAN' });
+  histDefect(3, 'ac-n1pg', '32', 44, 'Nosewheel steering stiff on taxi', 'Serviced steering accumulator; functional check normal.', { casObserved: true });
   histDefect(4, 'ac-n6pg', '34', 11, 'FMS 2 map drift', 'Loaded latest nav DB; alignment normal.');
   histDefect(5, 'ac-n5pg', '49', 60, 'APU slow to start', 'Cleaned APU fuel control; start times normal.');
 
@@ -178,6 +296,11 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       ataChapter: '21', description: 'PACK 1 FAULT recurring — replace flow control valve.', source: 'CAMP', headerStatusCode: 0,
       scheduled: false, riiRequired: false, createdAtUtc: iso(17 * D), completedAtUtc: completedAt, completedReleaseId: 'rel-wc-1',
       status: 'COMPLETED',
+      // LG-98/99 on a COMPLETED card: exercises the read-only path AND puts both references on the
+      // printed CRS (this card has a real release, rel-wc-1). Hand-typed (D22) — nothing sources
+      // these from CAMP. Matches the AMM ref already named in step 3 below.
+      ammReference: 'AMM 21-50-00',
+      cmcFaultCodes: ['21-51-03'],
       steps: [
         { id: 'wc1-s1', seq: 1, text: 'Remove pack 1 flow control valve', done: true },
         { id: 'wc1-s2', seq: 2, text: 'Install replacement valve', done: true },
@@ -214,20 +337,125 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     id: 'wc-3', cardNumber: 'WC-1015', aircraftId: 'ac-n1pg', title: 'LMLG unsafe indication — troubleshoot & repair',
     ataChapter: '32', description: 'Corrective — intermittent gear-unsafe indication on retraction.', source: 'MANUAL', headerStatusCode: 1,
     scheduled: false, riiRequired: false, linkedDefectId: 'd-n1pg', createdAtUtc: iso(2.5 * H), status: 'IN_WORK',
+    // LG-98/99 on a LIVE card: editable on screen, and the linked defect (d-n1pg) carries the
+    // pilot's single intake code '32-31-14', which is deliberately NOT in this list — `pilotHint`
+    // (WorkCardDetail) suppresses itself once the code is already on the card, so seeding it here
+    // would make the one-tap "Pilot reported …" affordance invisible on a fresh load. Maintenance's
+    // own interrogation finding different codes than the crew read off the CMC page is also the
+    // realistic case. TWO codes because one squawk interrogates into several — which is why the card
+    // holds a list and the defect holds one. Illustrative demo codes; not real CMC output.
+    ammReference: 'AMM 32-30-00',
+    cmcFaultCodes: ['32-31-22', '32-31-40'],
     steps: [
       { id: 'wc3-s1', seq: 1, text: 'Interrogate MAU fault history; isolate sensor vs harness', done: true },
       { id: 'wc3-s2', seq: 2, text: 'Replace LMLG uplock proximity sensor', done: false },
       { id: 'wc3-s3', seq: 3, text: 'Gear swing / retraction check per AMM 32-30-00', done: false },
     ],
+    // D61 — the live AOG card opens with a diagnosis span, so the first thing a demo viewer sees is
+    // that "how long to work out what was wrong" is a real, separately answerable number.
     statusTags: [
-      { tag: 'IN_WORK', atUtc: iso(2.5 * H), byOid: tech.oid },
-      { tag: 'WAITING_PARTS', atUtc: iso(1 * H), byOid: tech.oid, note: 'POO — LMLG uplock proximity sensor from Gulfstream Savannah, ETA tomorrow 10:00' },
+      { tag: 'DIAGNOSING', atUtc: iso(2.5 * H), byOid: tech.oid, note: 'MAU fault history + harness continuity on the aircraft' },
+      { tag: 'IN_WORK', atUtc: iso(1.5 * H), byOid: tech.oid },
+      { tag: 'WAITING_PARTS', atUtc: iso(1 * H), byOid: tech.oid, note: 'POO — LMLG uplock proximity sensor from Gulfstream Savannah, ETA tomorrow 10:00', partsOrderId: 'po-wc3-1' },
     ],
+    // LG-100 — the structured order behind that POO note. Deliberately still OPEN so the metrics
+    // page shows an "and counting" lead time as well as delivered ones.
+    partsOrders: [{
+      id: 'po-wc3-1', description: 'LMLG uplock proximity sensor', partNumber: '1159SCB412-3',
+      vendor: 'Gulfstream', orderedAtUtc: iso(1 * H), note: 'AOG desk — promised ETA tomorrow 10:00',
+    }],
   });
   laborEntries.push(
     { id: 'lb-3', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 1.5, dateUtc: iso(1 * H), description: 'Fault isolation — MAU history + harness continuity', category: 'TROUBLESHOOTING', note: 'Intermittent only under gear load; 1.5 h isolating to the uplock prox sensor with tech ops on the line' },
     { id: 'lb-4', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 0.5, dateUtc: iso(1 * H), description: 'Sourced replacement sensor, raised purchase order', category: 'PARTS_ORDERING' },
   );
+
+  /**
+   * D61/LG-100 — the whole arc, written up after the fact the way D61 says it will be: diagnose →
+   * order → wait → receive → install → complete, with an **overnight gap the technician logged and
+   * chose not to count**. That gap is the demo's whole point. Before D61 the 13 h between going
+   * home and coming back accrued silently to wrench time, and the fleet's "install hours" number
+   * was quietly wrong. Here it is visible, attributed, and excluded — so the include/exclude
+   * control has something to act on the moment somebody opens the card on a fresh load.
+   *
+   * On N6PG so the metrics rollup has a second tail and is not a one-line table.
+   */
+  {
+    /**
+     * `iso(x)` is "x ago", so a SMALLER offset is a LATER instant. The first cut of this seed read
+     * naturally and was wrong for exactly that reason: `completedAt` was `6D+11H` while the last
+     * `IN_WORK` was `6D+3H`, i.e. the install began eight hours AFTER the card was signed off. The
+     * consequences were all silent — the final install span computed to −8 h and clamped to 0, the
+     * excluded gap ran five hours past the return to service, and `writeStatusTimeline`'s own
+     * validator would have refused the history the seed was handing the demo. Five review lenses
+     * caught it independently.
+     *
+     * Every offset below therefore descends, and the last one is `completedAt`.
+     */
+    const raisedAt = iso(9 * D + 6 * H);
+    const completedAt = iso(5 * D + 19 * H);
+    const wc4Rel = makeSignature({ id: 'sig-wc-rel-4', signedEntity: 'WORK_CARD', signedEntityId: 'rel-wc-4', signer: tech, intentStatement: 'seed', signedAtUtc: completedAt, certNumber: tech.apCertificateNumber });
+    signatures.push(wc4Rel);
+
+    // The squawk this card was raised against. RECTIFIED and cleared at the release, so it is
+    // history rather than anything that touches N6PG's current serviceability — the same shape the
+    // histDefect helper above uses. It exists so the downtime debrief and the FIR WORK_CARD anchor
+    // have a chain to resolve; without it the card is an orphan.
+    const wc4DefSig = makeSignature({ id: 'sig-d-wc4', signedEntity: 'DEFECT', signedEntityId: 'd-wc4', signer: pilot, intentStatement: 'seed', signedAtUtc: iso(9 * D + 7 * H) });
+    signatures.push(wc4DefSig);
+    defects.push({
+      id: 'd-wc4', aircraftId: 'ac-n6pg', source: 'PIREP', ataChapter: '34',
+      description: 'ADM 1 disagree — intermittent on climb-out.',
+      symptom: 'Came and went above 10,000 ft; airspeed split maybe 4 knots, cleared in the descent.',
+      cmcFaultCode: '34-11-07',
+      airworthinessAffecting: true, status: 'RECTIFIED', reportedByOid: pilot.oid,
+      occurredAtUtc: iso(9 * D + 8 * H), reportedAtUtc: iso(9 * D + 7 * H),
+      rectificationText: 'Replaced No. 1 air data module; pitot-static leak and correspondence check normal.',
+      clearedByOid: tech.oid, clearedTsUtc: completedAt, signatureId: wc4DefSig.id,
+    });
+    releases.push({
+      id: 'rel-wc-4', aircraftId: 'ac-n6pg', signoffType: 'WORKCARD', linkedWorkCardId: 'wc-4',
+      isGatingDischarge: false, workDescription: 'WO-34-0512 — replaced No. 1 air data module; ops check normal.',
+      completionDateUtc: completedAt,
+      returnToServiceStatement: 'Work card complied with; aircraft approved for return to service (14 CFR 91.417).',
+      certifyingTechOid: tech.oid, apCertificateNumber: tech.apCertificateNumber ?? '', riiRequired: false,
+      pdfBlobUri: 'blob://mygfo-worm/crs/rel-wc-4.pdf', signatureId: wc4Rel.id,
+    });
+    workCards.push({
+      id: 'wc-4', cardNumber: 'WC-1019', woNumber: 'WO-34-0512', aircraftId: 'ac-n6pg',
+      title: 'ADM 1 disagree — troubleshoot & replace air data module',
+      ataChapter: '34', description: 'Corrective — intermittent ADM 1 disagree on climb-out.',
+      source: 'CAMP', headerStatusCode: 0, scheduled: false, riiRequired: false,
+      createdAtUtc: raisedAt, completedAtUtc: completedAt, completedReleaseId: 'rel-wc-4',
+      // Without this the card holding the gap, the delivered parts order and the whole arc is
+      // invisible to buildDowntimeDebrief AND to the FIR WORK_CARD anchor — i.e. the flagship demo
+      // card was unreachable by both features it exists to demonstrate.
+      linkedDefectId: 'd-wc4',
+      status: 'COMPLETED', ammReference: 'AMM 34-11-00', cmcFaultCodes: ['34-11-07'],
+      steps: [
+        { id: 'wc4-s1', seq: 1, text: 'Interrogate MAU; compare ADM 1/2 pressure outputs', done: true },
+        { id: 'wc4-s2', seq: 2, text: 'Replace No. 1 air data module', done: true },
+        { id: 'wc4-s3', seq: 3, text: 'Pitot-static leak and correspondence check per AMM 34-11-00', done: true },
+      ],
+      statusTags: [
+        { tag: 'DIAGNOSING', atUtc: iso(9 * D + 5 * H), byOid: tech.oid, note: 'ADM 1/2 output comparison on the aircraft' },
+        { tag: 'WAITING_TECH_REP', atUtc: iso(9 * D + 2 * H), byOid: tech.oid, note: 'Gulfstream tech rep confirming the correspondence tolerance before committing to the module' },
+        { tag: 'WAITING_PARTS', atUtc: iso(9 * D), byOid: tech.oid, note: 'POO — No. 1 air data module from Gulfstream Savannah', partsOrderId: 'po-wc4-1' },
+        { tag: 'IN_WORK', atUtc: iso(6 * D + 21 * H), byOid: tech.oid },
+        { tag: 'GAP', atUtc: iso(6 * D + 16 * H), byOid: tech.oid, gapReason: 'END_OF_SHIFT', note: 'Went home; hangar closed overnight', includeInTotals: false },
+        { tag: 'IN_WORK', atUtc: iso(5 * D + 22 * H), byOid: tech.oid },
+      ],
+      partsOrders: [{
+        id: 'po-wc4-1', description: 'Air data module No. 1', partNumber: '1159SCT204-1',
+        vendor: 'Gulfstream', orderedAtUtc: iso(9 * D), receivedAtUtc: iso(6 * D + 22 * H),
+        note: 'AOG freight, Savannah → KLUK',
+      }],
+    });
+    laborEntries.push(
+      { id: 'lb-5', workCardId: 'wc-4', techOid: tech.oid, techName: tech.displayName, hours: 3, dateUtc: iso(9 * D), description: 'Fault isolation — ADM output comparison', category: 'TROUBLESHOOTING', note: 'Correspondence within limits on the ground; needed the tech rep to confirm the in-flight tolerance before ordering' },
+      { id: 'lb-6', workCardId: 'wc-4', techOid: tech.oid, techName: tech.displayName, hours: 4.5, dateUtc: completedAt, description: 'R&R air data module, pitot-static leak check', category: 'WRENCH' },
+    );
+  }
 
   // ── D28 maintenance planners: packages of work per tail, staged while the aircraft is away. ──
   const ahead = (msAhead: number) => new Date(nowMs + msAhead).toISOString();
@@ -424,7 +652,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   const audit: AuditEntry[] = [
     { id: 'aud-seed-1', actorOid: pilot.oid, action: 'DEFECT_REPORTED', entityType: 'Defect', entityId: 'd-n1pg', atUtc: iso(3 * H), summary: 'PIREP N1PG ATA 32 — gear indication' },
     { id: 'aud-seed-brief', actorOid: tech.oid, action: 'BRIEFING_RELEASED', entityType: 'FlightBriefing', entityId: 'brief-1', atUtc: briefRelAt, summary: 'N2PG flight briefing released to crew' },
-    { id: 'aud-seed-2', actorOid: pilot.oid, action: 'DEFECT_REPORTED', entityType: 'Defect', entityId: 'd-n6pg', atUtc: discN6, summary: `PIREP N6PG ATA ${melAmber.ataReference}` },
+    { id: 'aud-seed-2', actorOid: pilot.oid, action: 'DEFECT_REPORTED', entityType: 'Defect', entityId: 'd-n6pg', atUtc: filedN6, summary: `PIREP N6PG ATA ${melAmber.ataReference}` },
     { id: 'aud-seed-3', actorOid: dom.oid, action: 'DEFERRAL_SIGNED', entityType: 'Deferral', entityId: 'df-n6pg', atUtc: iso(2 * D + 6 * H), summary: `Deferred N6PG under MEL ${melAmber.subItemNumber} (Cat ${melAmber.category})` },
     { id: 'aud-seed-4', actorOid: tech.oid, action: 'WORKCARD_COMPLETED', entityType: 'WorkCard', entityId: 'wc-1', atUtc: iso(15 * D), summary: 'N5PG WO-21-0231 complied with — pack valve replaced (RTS)' },
   ];
@@ -459,7 +687,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
 
   return {
     aircraft: SEED_AIRCRAFT,
-    melItems: [...SEED_MEL, ...SEED_MEL_G800],
+    melItems: withAuthoredCrewActions([...SEED_MEL, ...SEED_MEL_G800]),
     personnel,
     flightLogs,
     defects,

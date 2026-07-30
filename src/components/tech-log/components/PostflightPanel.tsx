@@ -96,7 +96,9 @@ export function PostflightPanel({ aircraft }: { aircraft: Aircraft }) {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><PlaneLanding className="h-4 w-4" /> Postflight — reclaim {aircraft.tailNumber}</CardTitle></CardHeader>
         <CardContent>
-          {instance && instanceTemplate && <ChecklistRunner aircraft={aircraft} template={instanceTemplate} instance={instance} onChange={next => dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: next })} />}
+          {/* Once the postflight is signed the instance is a signed record — the engine refuses to
+              mutate it, so the runner is disabled rather than left offering taps that do nothing. */}
+          {instance && instanceTemplate && <ChecklistRunner aircraft={aircraft} template={instanceTemplate} instance={instance} onChange={next => dispatch({ type: 'EDIT_CHECKLIST_INSTANCE', payload: next })} disabled={!!instance.signatureId} />}
         </CardContent>
       </Card>
 

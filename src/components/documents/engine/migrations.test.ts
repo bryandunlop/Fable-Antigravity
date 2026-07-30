@@ -62,7 +62,13 @@ describe('TL-6 / D29 — safety read injected into pre-existing stores', () => {
   it('is idempotent — a store already containing the safety read is unchanged (no duplicate)', () => {
     const { doc, rev } = safetyReadSeed();
     const stored = emptyState({ docs: [doc], revisions: [rev] });
-    const out = migrateStoredState(stored, OLD);
+    // Scoped to the safety-read step on purpose. Running the whole registry also applies
+    // every LATER step (D60's CAS knowledge seeds, and whatever comes after), so the
+    // whole-state equality below would fail for a reason that has nothing to do with this
+    // step's idempotency — which is what this test is about.
+    const safetyStep = STORED_STATE_MIGRATIONS.filter((m) => m.to === NEW);
+    expect(safetyStep).toHaveLength(1);
+    const out = migrateStoredState(stored, OLD, safetyStep);
     expect(out.docs.filter((d) => d.id === 'GOM-SMS')).toHaveLength(1);
     expect(out).toEqual(stored);
   });

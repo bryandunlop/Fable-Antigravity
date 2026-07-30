@@ -39,6 +39,30 @@ export function buildNotifications(
   const deferrals = currentRows(state.deferrals);
   const isMaint = user.role === 'MAINTENANCE';
 
+  // ── D59: the crew action cuts across both personas, so it sits OUTSIDE the maintenance/pilot
+  //    split below. On the road the pilots perform and mark it; at base it is often maintenance —
+  //    either may mark, so both are told. Marking it is evidence; only maintenance can then act on
+  //    it, so the "review and release" half is maintenance-only. ──
+  for (const d of deferrals.filter(x => x.status === 'PENDING_PLACARD' && x.crewActionRequired)) {
+    const tail = tailOf(d.aircraftId);
+    const link = `/tech-log/aircraft/${tail}?tab=deferrals&deferral=${d.id}&crewAction=1`;
+    if (!d.crewActionCompliance) {
+      out.push({
+        id: `ca:${d.id}`, severity: 'critical', tail, link,
+        title: `Crew action required — ${tail}`,
+        detail: `MEL ${d.melSubItemNumber ?? 'item'} — the (O) procedure must be accomplished and marked before the aircraft can be released.`,
+      });
+    } else if (isMaint) {
+      out.push({
+        id: `cac:${d.id}`, severity: 'warn', tail, link,
+        // TL-16: the marker's name off the frozen record, never a live Personnel join.
+        title: `Crew action complied — review and release ${tail}`,
+        detail: `Marked by ${d.crewActionCompliance.byName}. Your gating-discharge signature is what flips the deferral to ACTIVE.`,
+        atUtc: d.crewActionCompliance.atUtc,
+      });
+    }
+  }
+
   if (isMaint) {
     for (const d of defects.filter(x => x.status === 'OPEN')) {
       const tail = tailOf(d.aircraftId);

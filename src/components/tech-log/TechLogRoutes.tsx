@@ -11,6 +11,7 @@ import MelBrowser from './pages/MelBrowser';
 import WorkCards from './pages/WorkCards';
 import WorkCardDetail from './pages/WorkCardDetail';
 import Analytics from './pages/Analytics';
+import Metrics from './pages/Metrics';
 import Airworthiness from './pages/Airworthiness';
 import ComingDue from './pages/ComingDue';
 import IntermittentFaults from './pages/IntermittentFaults';
@@ -47,6 +48,9 @@ export default function TechLogRoutes() {
         <Route path="work-cards/:id" element={<WorkCardDetail />} />
         <Route path="mel" element={<MelBrowser />} />
         <Route path="analytics" element={<Analytics />} />
+        {/* D61 §5 — the maintenance-time rollup is for everyone, not maintenance only. This file
+            applies no role gating; that is the mechanism, and it is deliberate here. */}
+        <Route path="metrics" element={<Metrics />} />
         <Route path="airworthiness/forecast" element={<ComingDue />} />
         <Route path="airworthiness/times" element={<Airworthiness view="times" />} />
         <Route path="airworthiness/adsb" element={<Airworthiness view="adsb" />} />

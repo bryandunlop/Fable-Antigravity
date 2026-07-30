@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { detectRepetitiveGroups } from './repetitive';
 import type { Defect } from '../types';
 
-const d = (id: string, aircraftId: string, ata: string, daysAgo: number): Defect => ({
-  id, aircraftId, source: 'PIREP', ataChapter: ata, description: 'x', severity: 'MEDIUM',
-  airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u',
-  reportedAtUtc: new Date(Date.UTC(2026, 5, 21) - daysAgo * 86400000).toISOString(), signatureId: 's',
-});
+const d = (id: string, aircraftId: string, ata: string, daysAgo: number): Defect => {
+  const at = new Date(Date.UTC(2026, 5, 21) - daysAgo * 86400000).toISOString();
+  return {
+    id, aircraftId, source: 'PIREP', ataChapter: ata, description: 'x',
+    airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u',
+    occurredAtUtc: at, reportedAtUtc: at, signatureId: 's',
+  };
+};
 
 describe('repetitive-defect detection (§3.1)', () => {
   it('flags 3 same-ATA defects on one aircraft within the window as a group', () => {

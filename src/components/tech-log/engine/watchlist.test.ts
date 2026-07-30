@@ -8,8 +8,8 @@ const defect = (p: Partial<Defect> = {}): Pick<Defect, 'status'> & Partial<Defec
 
 const row = (p: Partial<Defect> = {}): Defect => ({
   id: 'd1', aircraftId: 'ac1', source: 'CABIN', ataChapter: '25', description: 'seat 3A recline inop',
-  severity: 'LOW', airworthinessAffecting: false, status: 'WATCHLISTED', reportedByOid: 'm',
-  reportedAtUtc: '2026-06-21T00:00:00Z', signatureId: 's', ...p,
+  airworthinessAffecting: false, status: 'WATCHLISTED', reportedByOid: 'm',
+  occurredAtUtc: '2026-06-21T00:00:00Z', reportedAtUtc: '2026-06-21T00:00:00Z', signatureId: 's', ...p,
 });
 
 describe('canWatchlistDefect', () => {

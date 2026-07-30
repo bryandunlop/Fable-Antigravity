@@ -39,7 +39,10 @@ export default function Deferrals() {
   if (defect && aircraft) {
     return (
       <TechLogShell title={`Defer defect — ${aircraft.tailNumber}`} subtitle={`ATA ${defect.ataChapter} · ${defect.description}`}>
+        {/* keyed by defect: the panel seeds regulatory state (D56 day of discovery) from the prop at
+            mount, so a different defect must get a fresh panel, not the last one's. */}
         <DeferralCreatePanel
+          key={defect.id}
           defect={defect}
           onCancel={() => navigate('/tech-log/defects')}
           onDone={(deferral) => {

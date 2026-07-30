@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useRef, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState, useCallback, ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { TechLogState, TechLogAction, Personnel, AuditEntry, PendingApproval, SupersedeEntityType } from './types';
 import { getDefaultState } from './mockData/scenarios';
@@ -216,6 +216,21 @@ interface Ctx {
   loading: boolean;
   displayZone: DisplayZoneMode;                       // D24: lens for regulatory times (default GOVERNING)
   setDisplayZone: (mode: DisplayZoneMode) => void;
+  /**
+   * The roles the user actually signed in with — `[userRole, ...additionalRoles]` exactly as
+   * `LoginScreen` produced them, deduped and in that order (so `loginRoles[0]` is the primary
+   * login role). `[]` when the provider is mounted without a role.
+   *
+   * SEPARATE FROM `state.currentUserOid` / `useCurrentUser()` ON PURPOSE. The persona is a
+   * `Personnel` record whose role vocabulary is `PILOT | MAINTENANCE`, and `resolveFromLogin`
+   * FALLS BACK to `personnel[0]` for any login role no `SYSTEM_USERS` entry holds (`scheduling`,
+   * `hr`, `document-manager`, `procedural-specialist`, `training`, `assistant-chief-pilot`,
+   * `reg-comp`, `scheduling-manager`, `lead-scheduler` — all offered by `LoginScreen`). That
+   * fallback is fine for "who is standing here", but it is NOT an authority claim: reading the
+   * fallback persona's roles handed ~10 logins Captain John Smith's `chief-pilot`. Any authority
+   * decision on a tech-log surface must read THIS, never the persona.
+   */
+  loginRoles: string[];
 }
 const TechLogContext = createContext<Ctx | undefined>(undefined);
 
@@ -233,9 +248,24 @@ function resolveFromLogin(userRole: string | undefined, personnel: Personnel[]):
   };
 }
 
-export function TechLogProvider({ children, userRole }: { children: ReactNode; userRole?: string }) {
+export function TechLogProvider({
+  children,
+  userRole,
+  additionalRoles,
+}: {
+  children: ReactNode;
+  userRole?: string;
+  /** The rest of the session's role set, as `LoginScreen` derived it. See `Ctx.loginRoles`. */
+  additionalRoles?: string[];
+}) {
   const [state, rawDispatch] = useReducer(reducer, undefined, loadInitialState);
   const [loading] = useState(false);
+  const additionalKey = (additionalRoles ?? []).join('|');
+  const loginRoles = useMemo(
+    () => (userRole ? [...new Set([userRole, ...(additionalRoles ?? [])])] : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [userRole, additionalKey],
+  );
 
   /**
    * TL-26 — set by a dispatch that produces a signed/regulated record, so the persistence effect
@@ -301,7 +331,7 @@ export function TechLogProvider({ children, userRole }: { children: ReactNode; u
   // is why the synchronous write above, not this, is the actual fix.
   useEffect(() => () => persistState(browserStorage(), latestStateRef.current), []);
 
-  return <TechLogContext.Provider value={{ state, dispatch, loading, displayZone, setDisplayZone }}>{children}</TechLogContext.Provider>;
+  return <TechLogContext.Provider value={{ state, dispatch, loading, displayZone, setDisplayZone, loginRoles }}>{children}</TechLogContext.Provider>;
 }
 
 /** D24 display-zone lens for regulatory times + its setter. */
@@ -314,6 +344,14 @@ export function useTechLog(): Ctx {
   const c = useContext(TechLogContext);
   if (!c) throw new Error('useTechLog must be used within TechLogProvider');
   return c;
+}
+
+/**
+ * The signed-in session's REAL role set (`[userRole, ...additionalRoles]`). Use this — never the
+ * persona's roles — for any authority decision on a tech-log surface. See `Ctx.loginRoles`.
+ */
+export function useLoginRoles(): string[] {
+  return useTechLog().loginRoles;
 }
 
 /** Current persona (Personnel record) derived from state.currentUserOid. */

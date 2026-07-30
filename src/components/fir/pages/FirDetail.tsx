@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Anchor, ClipboardCheck, Flag, HelpCircle, PackageSearch, PlayCircle, Plus, UserRoundPen } from 'lucide-react';
+import { Archive, ArrowLeft, Anchor, Flag, Plus, UserRoundPen } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Input } from '../../ui/input';
@@ -12,7 +12,8 @@ import { GfoEmptyState, GfoPanel } from '../../gfo';
 import { useTechLog, useCurrentUser } from '../../tech-log/TechLogContext';
 import { useFir } from '../FirContext';
 import { canSeeFir, isFirLeadership, visibleStatements } from '../engine/access';
-import { defectDebriefs, deriveSystemEntries, mergeTimeline } from '../engine/timeline';
+import { buildImpactSnapshot, defectDebriefs, deriveSystemEntries, impactDiverged, impactSegments, mergeTimeline } from '../engine/timeline';
+import { StatusHoursBar } from '../../tech-log/components/StatusHoursBar';
 import { FirCategoryChip, FirStatusChip } from '../components/chips';
 import { StatementsTab } from '../components/StatementsTab';
 import { NarrativeTab } from '../components/NarrativeTab';
@@ -25,15 +26,6 @@ const toLocalInput = (iso: string) => {
   const d = new Date(iso);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
-
-/** Aggregate state-hours across the FIR's defect debriefs for the summary bar.
- * Deliberately NOT the RAG palette: these are effort/wait states, not serviceability. */
-const BAR_SEGMENTS = [
-  { key: 'IN_WORK', label: 'In work', icon: PlayCircle, bar: 'bg-gfo-midnight dark:bg-gfo-daylight' },
-  { key: 'WAITING_PARTS', label: 'Waiting on parts (POO)', icon: PackageSearch, bar: 'bg-slate-500 dark:bg-slate-400' },
-  { key: 'WAITING_INSPECTION', label: 'Waiting on inspection', icon: ClipboardCheck, bar: 'bg-slate-300 dark:bg-slate-600' },
-  { key: 'UNTAGGED', label: 'Unattributed', icon: HelpCircle, bar: 'bg-muted' },
-] as const;
 
 export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: string; additionalRoles?: string[] }) {
   const { id } = useParams<{ id: string }>();
@@ -84,15 +76,35 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
   const merged = mergeTimeline(deriveSystemEntries(fir, techLog, now), fir.manualTimeline);
   const ongoing = debriefs.some(d => d.ongoing) || !fir.eventEndUtc;
 
-  const hours: Record<(typeof BAR_SEGMENTS)[number]['key'], number> = {
-    IN_WORK: debriefs.reduce((s, d) => s + d.stateHours.IN_WORK, 0),
-    WAITING_PARTS: debriefs.reduce((s, d) => s + d.stateHours.WAITING_PARTS, 0),
-    WAITING_INSPECTION: debriefs.reduce((s, d) => s + d.stateHours.WAITING_INSPECTION, 0),
-    UNTAGGED: debriefs.reduce((s, d) => s + d.untaggedHours, 0),
-  };
-  const totalHours = Object.values(hours).reduce((a, b) => a + b, 0);
+  // The stacked bar (now a shared component — the work card and the metrics page render the same
+  // one, so the three cannot drift).
+  const segments = impactSegments(debriefs);
   const elapsedHours = Math.round(debriefs.reduce((s, d) => s + d.elapsedHours, 0) * 10) / 10;
-  const derivedDowntimeHours = debriefs.length ? elapsedHours : undefined;
+  const excludedGapHours = Math.round(debriefs.reduce((s, d) => s + d.excludedGapHours, 0) * 10) / 10;
+  // D61 §4 — the downtime a report stands behind is elapsed LESS the gaps whoever entered the time
+  // chose not to count (the Friday-to-Monday where contract maintenance left with no replacement).
+  const countedDowntimeHours = Math.round(debriefs.reduce((s, d) => s + d.countedDowntimeHours, 0) * 10) / 10;
+  const derivedDowntimeHours = debriefs.length ? countedDowntimeHours : undefined;
+  const publishedSnapshot = fir.publishedRevision?.impactSnapshot;
+  /** D63 — published and draft may visibly disagree, and that is the evidence a correction landed
+   *  after approval. Surface it rather than hiding it. */
+  const publishedDowntime = publishedSnapshot?.downtimeHours ?? publishedSnapshot?.elapsedHours;
+  const liveDowntime = fir.impact.downtimeHours ?? derivedDowntimeHours;
+
+  /**
+   * Divergence must mean **somebody corrected the logged time**, not "the clock moved".
+   *
+   * Two ways the first cut was wrong. It fired for any report published while its event was still
+   * ongoing, because elapsed keeps climbing on its own — so the notice asserting a retrospective
+   * correction had landed appeared when nothing had been corrected, and a notice that cries wolf is
+   * one nobody reads. And it compared the downtime SCALAR only, so a re-labelling that moved hours
+   * between states without changing the total — exactly what happens when a tech reclassifies a
+   * stretch as waiting-on-contract-mx — was surfaced nowhere.
+   *
+   * So: composition is compared always (it cannot drift with wall clock), and the scalar only once
+   * the event is closed.
+   */
+  const snapshotDiverged = impactDiverged(publishedSnapshot, segments, liveDowntime, ongoing);
 
   // Access split (§7): owner/opener/leadership assemble & see everything; a requestee
   // gets a scoped view (timeline + their own statement only — no narrative/impact).
@@ -212,7 +224,7 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
 
         {fullAccess && (
           <TabsContent value="impact" className="mt-4">
-            <ImpactTab fir={fir} canEdit={canAssemble} derivedDowntimeHours={derivedDowntimeHours} dispatch={dispatch} />
+            <ImpactTab fir={fir} canEdit={canAssemble} derivedDowntimeHours={derivedDowntimeHours} publishedSnapshot={publishedSnapshot} dispatch={dispatch} />
           </TabsContent>
         )}
 
@@ -224,6 +236,23 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
               leadership={leadership}
               personnel={techLog.personnel}
               timeline={merged}
+              /* D63 — recompute at the CLICK, not from the render-time `debriefs`. `now` is
+                 memoised at mount, so on an ongoing event a reviewer who opened the report at 09:00
+                 and approved at 14:00 froze 09:00 figures under a `capturedAtUtc` claiming 14:00 —
+                 the published revision then showed "figures as at publication" over numbers five
+                 hours stale. The whole value of a frozen figure is that it was true at the instant
+                 it was stamped. `impactSegments` runs inside `buildImpactSnapshot`, so the stored
+                 bar is recomputed with it. */
+              impactSnapshot={() => {
+                const at = new Date().toISOString();
+                const fresh = defectDebriefs(fir, techLog, at);
+                const freshDowntime = fir.impact.downtimeHours
+                  ?? (fresh.length
+                    ? Math.round(fresh.reduce((s, d) => s + d.countedDowntimeHours, 0) * 10) / 10
+                    : undefined);
+                return buildImpactSnapshot(fresh, freshDowntime, at);
+              }}
+              barSegments={segments}
               user={user ? { oid: user.oid, displayName: user.displayName } : undefined}
               nameOf={nameOf}
               dispatch={dispatch}
@@ -237,28 +266,25 @@ export function FirDetail({ userRole, additionalRoles = [] }: { userRole?: strin
             <GfoPanel title="Where the hours went">
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <Badge variant="outline">{elapsedHours} h elapsed{ongoing ? ' · ongoing' : ''}</Badge>
-                {BAR_SEGMENTS.map(s => (
-                  <Badge key={s.key} variant="outline">
-                    <s.icon className="mr-1 h-3 w-3" />
-                    {s.label} {Math.round(hours[s.key] * 10) / 10} h
-                  </Badge>
+                {segments.filter(s => s.hours > 0).map(s => (
+                  <Badge key={s.key} variant="outline">{s.label} {s.hours} h</Badge>
                 ))}
+                {excludedGapHours > 0 && (
+                  <Badge variant="outline" className="border-dashed">{excludedGapHours} h excluded by the enterer</Badge>
+                )}
               </div>
-              {totalHours > 0 && (
-                <div
-                  className="mt-3 flex h-3 w-full overflow-hidden rounded-full border border-border"
-                  role="img"
-                  aria-label={BAR_SEGMENTS.map(s => `${s.label} ${hours[s.key]} h`).join(', ')}
-                >
-                  {BAR_SEGMENTS.filter(s => hours[s.key] > 0).map(s => (
-                    <div
-                      key={s.key}
-                      className={s.bar}
-                      style={{ width: `${(hours[s.key] / totalHours) * 100}%` }}
-                      title={`${s.label} — ${hours[s.key]} h`}
-                    />
-                  ))}
-                </div>
+              <StatusHoursBar segments={segments} className="mt-3" />
+              {excludedGapHours > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Downtime counted for this report is {countedDowntimeHours} h — the {excludedGapHours} h of logged gap
+                  time whoever entered it set aside is shown, not counted.
+                </p>
+              )}
+              {snapshotDiverged && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  The published revision froze downtime at {publishedDowntime} h; the tech log now reads {liveDowntime} h.
+                  A correction landed after approval — publish a new revision if the report should carry the new figure.
+                </p>
               )}
             </GfoPanel>
           )}

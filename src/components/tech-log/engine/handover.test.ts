@@ -6,7 +6,7 @@ const NOW = '2026-06-22T00:00:00Z';
 const ac: Aircraft = { id: 'ac1', tailNumber: 'N5PG', type: 'G500', serialNumber: '72157', status: 'ACTIVE', isProvisional: false, homeBase: 'KLUK', airframeTotalHours: 1200, airframeTotalCycles: 800 };
 const mel = (p: Partial<MelItem> = {}): MelItem => ({ id: 'm1', aircraftType: 'G500', mmelRevision: 'Rev 1', effectiveDate: NOW, approvalState: 'APPROVED', ataReference: '24', itemNumber: '24-01', subItemNumber: '24-01-01', title: 'x', category: 'C', numberInstalled: null, numberRequired: null, ...p });
 const deferral = (p: Partial<Deferral> = {}): Deferral => ({ id: 'df1', defectId: 'd1', aircraftId: 'ac1', melItemId: 'm1', governingMmelRevision: 'Rev 1', governingEffectiveDate: NOW, category: 'C', dayOfDiscoveryUtc: NOW, clockStartDateUtc: NOW, governingTimezone: 'America/New_York', repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10, placardRequired: false, mProcedureRequired: false, extensionUsed: false, riiRequired: false, melReviewAcknowledged: true, signedByOid: 'u', signatureId: 's', status: 'ACTIVE', ...p });
-const open = (p: Partial<Defect> = {}): Defect => ({ id: 'd1', aircraftId: 'ac1', source: 'PIREP', ataChapter: '24', description: 'x', severity: 'HIGH', airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u', reportedAtUtc: NOW, signatureId: 's', ...p });
+const open = (p: Partial<Defect> = {}): Defect => ({ id: 'd1', aircraftId: 'ac1', source: 'PIREP', ataChapter: '24', description: 'x', airworthinessAffecting: true, status: 'OPEN', reportedByOid: 'u', occurredAtUtc: NOW, reportedAtUtc: NOW, signatureId: 's', ...p });
 
 describe('deferralsRequiringAck', () => {
   it('includes an ACTIVE deferral with a restriction', () => {

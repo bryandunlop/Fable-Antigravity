@@ -1,22 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock, PlayCircle, PackageSearch, ClipboardCheck, Hourglass } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Wrench, Clock, Package, Trash2, Plus, ShieldCheck, UserCheck, Printer, CheckCircle2, CloudDownload, CalendarClock, PlayCircle, PackageSearch, ClipboardCheck, Hourglass, BookOpen, Cpu, X, Stethoscope, PhoneCall, Building2 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
-import { currentRows } from '../engine/supersede';
+import { currentRows, latestFor } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
 import { riiStepsComplete, pendingRiiSteps } from '../engine/rii';
-import { appendStatusTag, statusDurations, currentTag } from '../engine/statusTags';
+import { appendStatusTag, statusDurations, currentTag, STATUS_TAG_LABELS } from '../engine/statusTags';
 import { whyNoteRequired } from '../engine/labor';
 import { rectificationClosePush } from '../engine/rectification';
 import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
+import { workCardReferenceSections } from '../util/workCardPrint';
 import { newId } from '../util/id';
-import type { WorkCard, PartUsage, LaborEntry, LaborCategory, MaintenanceRelease, Defect, Deferral, Signature, WorkCardStatusTag } from '../types';
+import type { WorkCard, PartUsage, PartsOrder, LaborEntry, LaborCategory, MaintenanceRelease, Defect, Deferral, Signature, WorkCardStatusTag } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
+import { CasChip } from '../components/CasChip';
+import { SymptomNote } from '../components/SymptomNote';
+import { WorkTimelinePanel } from '../components/WorkTimelinePanel';
+import { PartsOrdersPanel } from '../components/PartsOrdersPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -28,9 +33,7 @@ const LABOR_CATEGORY_LABELS: Record<LaborCategory, string> = {
   WRENCH: 'Wrench time', TROUBLESHOOTING: 'Troubleshooting', TECH_OPS_CALL: 'Tech-ops call',
   PARTS_ORDERING: 'Parts ordering', INSPECTION: 'Inspection', OTHER: 'Other',
 };
-const TAG_LABELS: Record<WorkCardStatusTag, string> = {
-  IN_WORK: 'in work', WAITING_PARTS: 'waiting on parts (POO)', WAITING_INSPECTION: 'waiting on inspection',
-};
+const TAG_LABELS = STATUS_TAG_LABELS;
 
 export default function WorkCardDetail() {
   const { id } = useParams();
@@ -59,9 +62,13 @@ export default function WorkCardDetail() {
   const [ldesc, setLdesc] = useState('');
   const [lcat, setLcat] = useState<LaborCategory>('WRENCH');
   const [lnote, setLnote] = useState('');
+  // CMC fault-code entry (LG-99) — the code being typed, not yet on the card
+  const [cmcDraft, setCmcDraft] = useState('');
   // status-tag control (QM4/D27) — POO demands a note (what part, from whom)
   const [pooNote, setPooNote] = useState('');
   const [pooPromptOpen, setPooPromptOpen] = useState(false);
+  // A just-raised parts order awaiting the "shall I tag the card?" offer (LG-100 — offer, don't force)
+  const [offeredOrder, setOfferedOrder] = useState<PartsOrder | null>(null);
   // completion sign
   const [inspectorOid, setInspectorOid] = useState('');
   const [crsOpen, setCrsOpen] = useState(false);
@@ -104,6 +111,47 @@ export default function WorkCardDetail() {
   const needsRii = card.riiRequired || hasRiiSteps;
   const riiStepsDone = riiStepsComplete(card.steps);
 
+  /**
+   * LG-108 — the defect this card was raised against, resolved through the SUPERSEDING CHAIN.
+   *
+   * Defects are an append-only ledger: a correction is a new row with a new id pointing back at the
+   * one it replaces. `card.linkedDefectId` still names the ORIGINAL, so `currentRows(...).find(d =>
+   * d.id === card.linkedDefectId)` — the idiom used elsewhere on this page — returns **undefined**
+   * the moment anyone corrects the defect, and the narrative would silently vanish from the card.
+   * `latestFor` walks the chain from an origin id to whatever row is current, which is what "the
+   * linked defect" has always meant. (The same bare-`.find()` sits in `finalize` below and in three
+   * engine modules; that is a pre-existing gap, flagged rather than fixed here.)
+   */
+  const linkedDefect = card.linkedDefectId ? latestFor(state.defects, card.linkedDefectId) : undefined;
+
+  // ── AMM reference + CMC fault codes (LG-98/99) ──
+  // These are the FIRST card-level editable scalars on a work card: everything else editable here is
+  // a collection (steps / parts / labor) or a status tag. The pattern being set is the page's own
+  // read-only gate, `{!completed && isMaint && …}`, with the locked rendering being plain text
+  // rather than a disabled input — a complied-with card must not look like something you could
+  // still type into. Both fields are hand-entered (D22); nothing here touches CAMP.
+  const cmcCodes = card.cmcFaultCodes ?? [];
+  const setAmmReference = (v: string) =>
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, ammReference: v.trim() ? v : undefined } });
+  const addCmcCode = (raw: string) => {
+    const code = raw.trim();
+    if (!code) return;
+    if (cmcCodes.some(c => c.toLowerCase() === code.toLowerCase())) {
+      setCmcDraft('');
+      return toast.error(`${code} is already on this card.`);
+    }
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, cmcFaultCodes: [...cmcCodes, code] } });
+    setCmcDraft('');
+  };
+  const removeCmcCode = (code: string) => {
+    const next = cmcCodes.filter(c => c !== code);
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, cmcFaultCodes: next.length ? next : undefined } });
+  };
+  // The pilot's single reported code (LG-99) is a starting hint, never an automatic entry: what the
+  // crew read off the CMC page is their observation, and putting it on the card is a maintenance act.
+  const pilotCode = linkedDefect?.cmcFaultCode?.trim();
+  const pilotHint = pilotCode && !cmcCodes.some(c => c.toLowerCase() === pilotCode.toLowerCase()) ? pilotCode : undefined;
+
   const toggleStep = (stepId: string) => {
     if (completed || !isMaint) return;
     const steps = card.steps.map(s => (s.id === stepId ? { ...s, done: !s.done } : s));
@@ -145,8 +193,8 @@ export default function WorkCardDetail() {
   // ── work/wait status tags (QM4/D27) ──
   const tagNow = currentTag(card);
   const durations = statusDurations(card, new Date().toISOString());
-  const setStatusTag = (tag: WorkCardStatusTag, note?: string) => {
-    const r = appendStatusTag(card, tag, user.oid, new Date().toISOString(), note);
+  const setStatusTag = (tag: WorkCardStatusTag, note?: string, partsOrderId?: string) => {
+    const r = appendStatusTag(card, tag, user.oid, new Date().toISOString(), { note, byName: user.displayName, partsOrderId });
     if (!r.ok) return toast.error(r.error);
     dispatch({ type: 'EDIT_WORK_CARD', payload: r.card });
     setPooPromptOpen(false); setPooNote('');
@@ -261,6 +309,8 @@ export default function WorkCardDetail() {
           { label: 'Card', value: card.cardNumber }, { label: 'CAMP WO', value: card.woNumber ?? '—' },
           { label: 'ATA', value: card.ataChapter }, { label: 'Type', value: card.scheduled ? 'Scheduled' : 'Corrective' },
         ], body: card.title },
+        // LG-98/99 — shared with the other two CRS call sites; see `util/workCardPrint.ts`.
+        ...workCardReferenceSections(card),
         { heading: 'Steps', body: card.steps.map(s => `${s.done ? '☑' : '☐'} ${s.text}`).join('\n') },
         { heading: 'Parts', body: parts.length ? parts.map(p => `${p.partNumber} (${p.description}) ×${p.qty}${p.serialNumber ? ` S/N ${p.serialNumber}` : ''}${p.removedPartNumber ? ` — removed ${p.removedPartNumber}${p.removedSerialNumber ? `/${p.removedSerialNumber}` : ''}` : ''}`).join('\n') : 'None' },
         // Frozen at entry (TL-16) — never a live Personnel join on a signed release.
@@ -297,41 +347,182 @@ export default function WorkCardDetail() {
           )}
           <span className="ml-auto text-xs text-muted-foreground">steps {stepsDone}/{card.steps.length} · labor {totalLabor} h · {parts.length} part(s)</span>
         </CardContent>
-      </Card>
-
-      {/* Work/wait time attribution (QM4/D27) — in work / waiting on parts (POO) / waiting on inspection */}
-      <Card className="mb-4">
-        <CardContent className="flex flex-col gap-3 p-4 text-sm md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <Hourglass className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">Time attribution</span>
-            <Badge variant="outline"><PlayCircle className="mr-1 h-3 w-3" />in work {durations.hours.IN_WORK} h</Badge>
-            <Badge variant="outline" className={durations.openTag === 'WAITING_PARTS' ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]' : ''}><PackageSearch className="mr-1 h-3 w-3" />parts (POO) {durations.hours.WAITING_PARTS} h</Badge>
-            <Badge variant="outline"><ClipboardCheck className="mr-1 h-3 w-3" />inspection wait {durations.hours.WAITING_INSPECTION} h</Badge>
-            {durations.openTag && <span className="text-xs text-muted-foreground">accruing now: {TAG_LABELS[durations.openTag]}</span>}
-          </div>
-          {!completed && isMaint && (
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant={tagNow === 'IN_WORK' ? 'secondary' : 'outline'} disabled={tagNow === 'IN_WORK'} onClick={() => setStatusTag('IN_WORK')}><PlayCircle className="mr-1.5 h-3.5 w-3.5" /> In work</Button>
-              <Button size="sm" variant={tagNow === 'WAITING_PARTS' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_PARTS'} onClick={() => setPooPromptOpen(true)}><PackageSearch className="mr-1.5 h-3.5 w-3.5" /> Waiting on parts</Button>
-              <Button size="sm" variant={tagNow === 'WAITING_INSPECTION' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_INSPECTION'} onClick={() => setStatusTag('WAITING_INSPECTION')}><ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Waiting on inspection</Button>
+        {/* LG-108 — what was actually reported, in the header a tech reads before troubleshooting.
+            The `linked defect` badge above has never carried anything but the word: no description,
+            no annunciation, no narrative. The narrative in particular ("started as a flicker on
+            taxi, went solid after rotation") is the one thing the structured CAS message cannot
+            say, and until now it reached no screen at all. */}
+        {linkedDefect && (
+          <CardContent className="border-t p-4 pt-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reported defect</span>
+              <Badge variant="outline">ATA {linkedDefect.ataChapter}</Badge>
+              <CasChip message={linkedDefect.casMessage} color={linkedDefect.casColor} observed={linkedDefect.casObserved} />
             </div>
-          )}
-        </CardContent>
-        {pooPromptOpen && !completed && (
-          <CardContent className="border-t p-3">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center">
-              <Input autoFocus placeholder="POO note — what part, ordered from whom (e.g. battery, GAC Savannah, ETA Fri)" value={pooNote} onChange={e => setPooNote(e.target.value)} />
-              <div className="flex shrink-0 gap-2">
-                <Button size="sm" onClick={() => setStatusTag('WAITING_PARTS', pooNote)}>Tag POO</Button>
-                <Button size="sm" variant="ghost" onClick={() => { setPooPromptOpen(false); setPooNote(''); }}>Cancel</Button>
-              </div>
-            </div>
+            <p className="mt-1">{linkedDefect.description}</p>
+            <SymptomNote symptom={linkedDefect.symptom} source={linkedDefect.source} />
           </CardContent>
         )}
       </Card>
 
+      {/* ── Troubleshooting references: AMM ref + CMC fault codes (LG-98/99) ── */}
+      <Card className="mb-4" data-testid="work-card-references">
+        <CardContent className="space-y-3 p-4 text-sm">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Troubleshooting references</span>
+            <span className="text-xs text-muted-foreground">manual entry — not sourced from CAMP</span>
+          </div>
+
+          {/* AMM reference — free text, because the reference is whatever document the tech actually
+              worked to (AMM / CMM / SB) and there is no manual index in the app to validate against. */}
+          {!completed && isMaint ? (
+            <div>
+              <Label htmlFor="wc-amm-ref" className="text-xs">AMM reference</Label>
+              <Input
+                id="wc-amm-ref"
+                className="mt-1"
+                placeholder="e.g. AMM 32-30-00"
+                value={card.ammReference ?? ''}
+                onChange={e => setAmmReference(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div>
+              <div className="text-xs text-muted-foreground">AMM reference</div>
+              {card.ammReference
+                ? <span className="font-medium">{card.ammReference}</span>
+                : <span className="text-muted-foreground">Not recorded.</span>}
+            </div>
+          )}
+
+          {/* CMC fault codes — a real add/remove chip list. Deliberately NOT the comma-separated
+              string in a single `<Input>` that `AdminPersonnel` uses for `riiAuthorizedAta`: one
+              stray comma there silently splits a value, there is no way to remove a single entry
+              without re-typing the line, and nothing can render an individual code as its own
+              object. The precedent followed instead is the attachments grid in `DefectFields`. */}
+          <div>
+            <div className="text-xs text-muted-foreground">CMC fault codes</div>
+            {cmcCodes.length === 0 && <p className="mt-1 text-muted-foreground">None recorded.</p>}
+            {cmcCodes.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {cmcCodes.map(code => (
+                  <span key={code} className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-xs">
+                    {code}
+                    {!completed && isMaint && (
+                      <button type="button" aria-label={`Remove CMC code ${code}`} title="Remove" onClick={() => removeCmcCode(code)}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+            {!completed && isMaint && (
+              <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center">
+                <Input
+                  aria-label="Add CMC fault code"
+                  className="md:max-w-xs"
+                  placeholder="e.g. 32-3120-04"
+                  value={cmcDraft}
+                  onChange={e => setCmcDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCmcCode(cmcDraft); } }}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" disabled={!cmcDraft.trim()} onClick={() => addCmcCode(cmcDraft)}>
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add code
+                  </Button>
+                  {pilotHint && (
+                    <Button size="sm" variant="ghost" aria-label={`Add pilot-reported code ${pilotHint}`} onClick={() => addCmcCode(pilotHint)}>
+                      <Cpu className="mr-1.5 h-3.5 w-3.5" /> Pilot reported {pilotHint}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/**
+        * D61's primary time-entry surface: the editable, reconstructed-after-the-fact timeline.
+        * Available on a complied-with card too (D62) — the write-up happens at end of shift.
+        */}
+      <WorkTimelinePanel
+        card={card}
+        canEdit={isMaint}
+        user={{ oid: user.oid, displayName: user.displayName }}
+        nameOf={nameOf}
+        onSave={next => dispatch({ type: 'EDIT_WORK_CARD', payload: next })}
+      />
+
+      {/* One-tap chips (QM4/D27) — the CONVENIENCE path per D61, never the source of truth. */}
+      {!completed && isMaint && (
+        <Card className="mb-4">
+          <CardContent className="flex flex-col gap-3 p-4 text-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <Hourglass className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Tag as you go</span>
+              <span className="text-xs text-muted-foreground">
+                optional — the timeline above is what the numbers come from
+              </span>
+              {durations.openTag && <Badge variant="outline">now: {TAG_LABELS[durations.openTag]}</Badge>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant={tagNow === 'DIAGNOSING' ? 'secondary' : 'outline'} disabled={tagNow === 'DIAGNOSING'} onClick={() => setStatusTag('DIAGNOSING')}><Stethoscope className="mr-1.5 h-3.5 w-3.5" /> Diagnosing</Button>
+              <Button size="sm" variant={tagNow === 'IN_WORK' ? 'secondary' : 'outline'} disabled={tagNow === 'IN_WORK'} onClick={() => setStatusTag('IN_WORK')}><PlayCircle className="mr-1.5 h-3.5 w-3.5" /> In work</Button>
+              <Button size="sm" variant={tagNow === 'WAITING_PARTS' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_PARTS'} onClick={() => setPooPromptOpen(true)}><PackageSearch className="mr-1.5 h-3.5 w-3.5" /> Waiting on parts</Button>
+              <Button size="sm" variant={tagNow === 'WAITING_TECH_REP' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_TECH_REP'} onClick={() => setStatusTag('WAITING_TECH_REP')}><PhoneCall className="mr-1.5 h-3.5 w-3.5" /> Waiting on tech rep</Button>
+              <Button size="sm" variant={tagNow === 'WAITING_CONTRACT_MX' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_CONTRACT_MX'} onClick={() => setStatusTag('WAITING_CONTRACT_MX')}><Building2 className="mr-1.5 h-3.5 w-3.5" /> Waiting on contract mx</Button>
+              <Button size="sm" variant={tagNow === 'WAITING_INSPECTION' ? 'secondary' : 'outline'} disabled={tagNow === 'WAITING_INSPECTION'} onClick={() => setStatusTag('WAITING_INSPECTION')}><ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Waiting on inspection</Button>
+            </div>
+          </CardContent>
+          {pooPromptOpen && (
+            <CardContent className="border-t p-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                <Input autoFocus placeholder="POO note — what part, ordered from whom (e.g. battery, GAC Savannah, ETA Fri)" value={pooNote} onChange={e => setPooNote(e.target.value)} />
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" onClick={() => setStatusTag('WAITING_PARTS', pooNote)}>Tag POO</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setPooPromptOpen(false); setPooNote(''); }}>Cancel</Button>
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* Offer, never force (LG-100): raising an order may set WAITING_PARTS, and satisfies that
+          tag's mandatory what/from-whom note by reference to the order. */}
+      {offeredOrder && !completed && (
+        <Card className="mb-4 border-dashed">
+          <CardContent className="flex flex-col gap-2 p-3 text-sm md:flex-row md:items-center md:justify-between">
+            <span>
+              Order raised with {offeredOrder.vendor}. Tag the card <strong>waiting on parts</strong> from now?
+            </span>
+            <div className="flex shrink-0 gap-2">
+              <Button size="sm" onClick={() => {
+                setStatusTag('WAITING_PARTS', `${offeredOrder.description} — ordered from ${offeredOrder.vendor}`, offeredOrder.id);
+                setOfferedOrder(null);
+              }}>Tag waiting on parts</Button>
+              <Button size="sm" variant="ghost" onClick={() => setOfferedOrder(null)}>No, keep the current state</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* D62 — `isMaint`, NOT `!completed && isMaint`. A parts order belongs to the same
+            retrospective record as the timeline above, and is gated the same way for the same
+            reason: an order nobody marked received before the card was signed off could otherwise
+            never be closed, so its lead time stayed wrong permanently and the vendor metric
+            inherited the error. */}
+        <PartsOrdersPanel
+          card={card}
+          canEdit={isMaint}
+          onSave={next => dispatch({ type: 'EDIT_WORK_CARD', payload: next })}
+          waitingPartsAlready={tagNow === 'WAITING_PARTS'}
+          onOfferWaitingParts={setOfferedOrder}
+        />
         {/* Steps */}
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4" /> Task steps</CardTitle></CardHeader>

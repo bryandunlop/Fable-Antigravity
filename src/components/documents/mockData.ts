@@ -3,7 +3,7 @@
 // clocks stay meaningful (a DATA_VERSION bump migrates the stored state
 // forward — see engine/migrations.ts; only a fresh install re-seeds).
 import type { Doc, DocRevision, DocAcknowledgment, DocComment, DocSuggestion, DocSuggestionReply, DocumentsState } from './types';
-import type { Signature } from '../tech-log/types';
+import type { Signature, AircraftType, CasColor } from '../tech-log/types';
 import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
 import { mockSha256 } from '../tech-log/engine/signing';
@@ -279,6 +279,16 @@ const tk1r1: DocRevision = {
   ],
 };
 
+/**
+ * D60 fix pass — the fleet applicability of the pre-D60 tribal-knowledge entry `TK-002`
+ * ("G650 APU cold-soak starts"). Exported so the back-fill migration for stores created before
+ * this fix reads the same value the seed does, rather than restating it.
+ *
+ * Declared here rather than beside the CAS seeds below because `tk2r1` (immediately after this)
+ * reads it at module-init time; a `const` used before its declaration is a TDZ ReferenceError.
+ */
+export const TK_002_FLEET_TYPES: AircraftType[] = ['G650ER'];
+
 const tk2r1: DocRevision = {
   id: 'TK-002-r1',
   docId: 'TK-002',
@@ -293,7 +303,254 @@ const tk2r1: DocRevision = {
   ackLevel: 'none',
   mockChecksum: checksumForSections(sectionsFromMarkdown(TK2_CONTENT, 'TK-002')),
   publishedAtUtc: daysFromNow(-220) + 'T12:00:00.000Z',
+  // D60 fix pass — this entry predates the `fleetTypes` axis and is plainly G650-specific, so
+  // without the tag it was invisible on the very Reference tab built to surface fleet knowledge.
+  // The canonical string is 'G650ER'; 'G650' is display shorthand and not an `AircraftType`.
+  // D65 moved the tag from the doc row onto this, its published revision.
+  fleetTypes: TK_002_FLEET_TYPES,
 };
+
+// ── D60: per-fleet CAS tribal knowledge (curator direct-published, reference only) ──
+//
+// Obviously-demo content. The CAS messages deliberately match the ones the tech-log seeds put on
+// defects (GEAR UNSAFE / R ENG CHIP on the G650ER, GPS 1 ADVISORY on the G500, CABIN TEMP on both),
+// because the feature is only demonstrable if the picker can offer the message a demo defect
+// carries and the "what maintenance knows" deep link therefore resolves. Colours match the seeded
+// defects' colours for the same reason — a catalog that disagreed with the record would be teaching
+// the wrong tier. `casKnowledgeSeeds.test.ts` pins those PROPERTIES rather than these strings.
+//
+// The G800 entries exist because N3PG is in the fleet seed (provisional) and its Reference tab must
+// not be empty; the CAS one is tied to the drafted G800 brake-temperature MEL item.
+
+/** Shared closing section: config values are LINKED, never restated (D60). */
+const CONFIG_POINTER = `
+## Related configuration — do not restate numbers here
+Per-tail configuration lives on the aircraft record (Tech Log → Admin → Fleet). The standby fuel
+target (\`Aircraft.standbyFuelLoadLb\`) is one of those values: the postflight **Fuel load** step
+shows the figure for the tail you are working, and it is deliberately not repeated in this article.
+There is one source of truth for it and this is not it. (That field ships today as fleet record data
+with no editor of its own — so read it off the tail, never off a note.)`;
+
+interface CasSeed {
+  id: string;
+  title: string;
+  fleetTypes: AircraftType[];
+  casMeta?: { casMessage: string; casColor: CasColor; cmcCodes?: string[] };
+  category: string;
+  body: string;
+  ageDays: number;
+}
+
+/**
+ * THE `TK-9xx` RANGE IS RESERVED FOR SEEDS, and this is not cosmetic.
+ *
+ * These entries shipped as `TK-003`…`TK-010`. `nextDocId` (engine/revisions) allocates
+ * max-suffix + 1, and the pre-slice tribal-knowledge seeds stop at `TK-002` — so `TK-003` is
+ * precisely the id the FIRST curator-created entry got, and creating one was reachable before this
+ * slice. The forward migration adds a seed only when its id is ABSENT, so on a returning store where
+ * a curator had written one entry, seed `TK-003` was silently dropped: the seeded N1PG defect
+ * carrying GEAR UNSAFE then resolved no catalog entry and the "what maintenance knows" deep link
+ * never appeared. Two prior entries swallowed `TK-004` as well, and so on down the list.
+ *
+ * Seeds now live above anything the allocator will hand out for a very long time. The visible
+ * consequence is that `nextDocId` returns `TK-909` for the next curator entry on a seeded store,
+ * which is the correct trade: a demo id that looks high beats seeded knowledge that vanishes.
+ * `casKnowledgeSeeds.test.ts` runs the migration against a store already holding a curator-authored
+ * `TK-003` and asserts every seed still lands.
+ */
+const CAS_SEEDS: CasSeed[] = [
+  {
+    id: 'TK-901',
+    title: 'GEAR UNSAFE — the intermittent squat-switch case (DEMO)',
+    fleetTypes: ['G650ER'],
+    casMeta: { casMessage: 'GEAR UNSAFE', casColor: 'AMBER', cmcCodes: ['32-31-14'] },
+    category: 'Aircraft Quirks',
+    ageDays: 60,
+    body: `# GEAR UNSAFE — the intermittent squat-switch case (DEMO)
+
+**Demonstration content.** Field notes, not procedure — the AMM and the MEL govern.
+
+**What the fleet has seen.** An amber GEAR UNSAFE that appears during retraction and clears on a
+recycle has, on this fleet, more often been a proximity/squat-switch rigging symptom than a gear
+problem. It has also been genuine. Never assume the benign case from the annunciation alone.
+
+**What to record.** Whether it cleared on the recycle, at what point in the retraction it lit, and
+the CMC code as read off the page — that is what maintenance starts from.
+
+**What this note is not.** It is not a dispatch decision. An open airworthiness defect grounds the
+aircraft until maintenance defers or rectifies it.`,
+  },
+  {
+    id: 'TK-902',
+    title: 'R ENG CHIP — treat as an engine event until proven otherwise (DEMO)',
+    fleetTypes: ['G650ER'],
+    casMeta: { casMessage: 'R ENG CHIP', casColor: 'RED', cmcCodes: ['79-3100-02'] },
+    category: 'Aircraft Quirks',
+    ageDays: 45,
+    body: `# R ENG CHIP — treat as an engine event until proven otherwise (DEMO)
+
+**Demonstration content.** Field notes, not procedure.
+
+A red CHIP annunciation is not a nuisance category on this fleet. It has driven an AOG and a
+borescope. Land, log it, and expect the chip detector to be pulled and inspected.
+
+**Why it is here.** So that "has anyone seen this before" has an answer that is not a group chat.
+The safety report and the tech-log entry are still the records; this is context.`,
+  },
+  {
+    id: 'TK-903',
+    title: 'CABIN TEMP — zone controller drift on both fleets (DEMO)',
+    fleetTypes: ['G650ER', 'G500'],
+    casMeta: { casMessage: 'CABIN TEMP', casColor: 'CYAN' },
+    category: 'Cabin',
+    ageDays: 30,
+    body: `# CABIN TEMP — zone controller drift on both fleets (DEMO)
+
+**Demonstration content**, and deliberately tagged for BOTH types — the same advisory behaves the
+same way on the 650 and the 500, and an entry that applies to two fleets should say so rather than
+be written twice.
+
+A cyan CABIN TEMP after a long cold soak has usually been zone-sensor calibration drift. It is an
+advisory, not a dispatch item, but it is worth a squawk if the cabin cannot hold a selected
+temperature — that is what gets the sensor recalibrated instead of re-reported every leg.`,
+  },
+  {
+    id: 'TK-904',
+    title: 'GPS 1 ADVISORY — known nuisance window (DEMO)',
+    fleetTypes: ['G500'],
+    casMeta: { casMessage: 'GPS 1 ADVISORY', casColor: 'WHITE' },
+    category: 'Aircraft Quirks',
+    ageDays: 20,
+    body: `# GPS 1 ADVISORY — known nuisance window (DEMO)
+
+**Demonstration content.** Field notes, not procedure.
+
+A white GPS 1 advisory that self-clears within a minute or two has been seen during receiver
+reacquisition. It has also preceded a genuine antenna-coax failure that needed the antenna replaced,
+so a repeat on the same tail is worth a squawk rather than a shrug.
+
+Record how long it stood and whether position was lost — the repeat-defect detector needs those two
+facts to be worth anything.`,
+  },
+  {
+    id: 'TK-905',
+    title: 'BRK TEMP HIGH — G800 onboarding note (DEMO)',
+    fleetTypes: ['G800'],
+    casMeta: { casMessage: 'BRK TEMP HIGH', casColor: 'AMBER' },
+    category: 'Aircraft Quirks',
+    ageDays: 10,
+    body: `# BRK TEMP HIGH — G800 onboarding note (DEMO)
+
+**Demonstration content**, and the fleet has no G800 experience yet — which is the point of the
+entry existing at all.
+
+The type's brake-temperature monitoring is a drafted MEL item pending FSDO approval, so it cannot be
+deferred against yet. Until the type's D195 is approved, a brake-temperature annunciation on the
+provisional tail is a maintenance conversation, not a deferral.
+
+Add what you learn as the type comes online. An empty fleet reference is how tribal knowledge ends up
+in a group chat instead.`,
+  },
+  {
+    id: 'TK-906',
+    title: 'Normal startup CAS stack — G650ER (DEMO)',
+    fleetTypes: ['G650ER'],
+    category: 'Operations',
+    ageDays: 50,
+    body: `# Normal startup CAS stack — G650ER (DEMO)
+
+**Demonstration content.** What the crew normally sees on the ground before the first start, so that
+what is NOT normal stands out. A freeform article: no single CAS message owns it, which is why it
+carries no structured CAS metadata.
+
+The typical ground stack clears progressively as systems come up. Worth a second look:
+- anything amber or red still standing after the second engine start;
+- an advisory that has never appeared on this tail before;
+- anything the last crew's postflight note also mentions.
+${CONFIG_POINTER}`,
+  },
+  {
+    id: 'TK-907',
+    title: 'Normal startup CAS stack — G500 (DEMO)',
+    fleetTypes: ['G500'],
+    category: 'Operations',
+    ageDays: 40,
+    body: `# Normal startup CAS stack — G500 (DEMO)
+
+**Demonstration content**, the G500 counterpart to the 650 note — the stacks differ enough that one
+shared article would teach the wrong thing on one of the two fleets.
+
+Same rule: know the normal stack, so the abnormal one is obvious. Anything still standing after the
+second start belongs in the tech log, not in the next crew's memory.
+${CONFIG_POINTER}`,
+  },
+  {
+    id: 'TK-908',
+    title: 'Normal startup CAS stack — G800 (DEMO)',
+    fleetTypes: ['G800'],
+    category: 'Operations',
+    ageDays: 8,
+    body: `# Normal startup CAS stack — G800 (DEMO)
+
+**Demonstration content**, and mostly a placeholder: the G800 is in onboarding (the fleet's G800 tail
+is provisional) and nobody has flown it enough to know its normal stack.
+
+Fill this in as the type comes online, rather than starting a new note somewhere else.
+${CONFIG_POINTER}`,
+  },
+];
+
+function casSeedDoc(s: CasSeed): Doc {
+  return {
+    id: s.id,
+    classId: 'tribal-knowledge',
+    title: s.title,
+    category: s.category,
+    roles: ['all'],
+    ownerUserId: 'USR002',
+    ownerName: 'Sarah Wilson',
+    tags: ['cas', 'demo', ...s.fleetTypes.map((t) => t.toLowerCase())],
+    isPinned: false,
+    isArchived: false,
+    reviewCycleDays: 180,
+    nextReviewDate: daysFromNow(180 - s.ageDays),
+    createdDate: daysFromNow(-s.ageDays),
+  };
+}
+
+function casSeedRevision(s: CasSeed): DocRevision {
+  const sections = sectionsFromMarkdown(s.body, s.id);
+  return {
+    id: `${s.id}-r1`,
+    docId: s.id,
+    revision: '1.0',
+    status: 'published',
+    sections,
+    changeSummary: '',
+    effectiveDate: daysFromNow(-s.ageDays),
+    authorUserId: 'USR002',
+    authorName: 'Sarah Wilson',
+    requireAcknowledgment: false,
+    ackLevel: 'none',
+    mockChecksum: checksumForSections(sections),
+    publishedAtUtc: daysFromNow(-s.ageDays) + 'T12:00:00.000Z',
+    // D65 — the CAS facts ride the publishable unit, so a seeded entry is offerable
+    // for exactly as long as this revision is the published one.
+    fleetTypes: s.fleetTypes,
+    casMeta: s.casMeta,
+  };
+}
+
+/**
+ * D60 CAS knowledge seeds. Exported so the store migration can inject them into stores created
+ * before this slice — new seed content otherwise reaches only a fresh install, because
+ * `loadInitialState` spreads the persisted state over the seeds. Same mechanism as
+ * {@link safetyReadSeed}.
+ */
+export function casKnowledgeSeed(): { docs: Doc[]; revisions: DocRevision[] } {
+  return { docs: CAS_SEEDS.map(casSeedDoc), revisions: CAS_SEEDS.map(casSeedRevision) };
+}
+
 
 const SEED_DOCS: Doc[] = [
   {
@@ -370,10 +627,17 @@ const SEED_DOCS: Doc[] = [
     reviewCycleDays: 180,
     nextReviewDate: daysFromNow(-40), // stale — review overdue
     createdDate: daysFromNow(-220),
+    // D65 — the fleet tag this entry needed now lives on `tk2r1`, its published revision.
   },
+  ...casKnowledgeSeed().docs,
 ];
 
-const SEED_REVISIONS: DocRevision[] = [sop1r1, sop1r2, sop2r1, gom3r1, gomSmsR1, tk1r1, tk2r1];
+const SEED_REVISIONS: DocRevision[] = [
+  sop1r1, sop1r2, sop2r1, gom3r1, gomSmsR1, tk1r1, tk2r1,
+  // D60 CAS knowledge — a fresh install gets these here; an existing store gets them
+  // from the version-keyed migration step (engine/migrations.ts).
+  ...casKnowledgeSeed().revisions,
+];
 
 // Seeded signature-level ack on SOP-001 r2 from the Lead reader (partial compliance;
 // the pilot login still owes the signature ceremony — the demo moment).

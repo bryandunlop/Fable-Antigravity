@@ -117,7 +117,7 @@ describe('documentsReducer four-eyes guards (no-ops on invalid transitions)', ()
 
   it('PUBLISH_DIRECT on a controlled class is a no-op', () => {
     const s = state({ revisions: [rev({ status: 'draft' })] });
-    const out = documentsReducer(s, { type: 'PUBLISH_DIRECT', payload: { revisionId: 'SOP-001-r1', atUtc: NOW, today: TODAY } });
+    const out = documentsReducer(s, { type: 'PUBLISH_DIRECT', payload: { revisionId: 'SOP-001-r1', atUtc: NOW, today: TODAY, actorRoles: ['admin'] } });
     expect(out.revisions[0].status).toBe('draft');
   });
 
@@ -126,7 +126,7 @@ describe('documentsReducer four-eyes guards (no-ops on invalid transitions)', ()
       docs: [doc({ id: 'TK-009', classId: 'tribal-knowledge' })],
       revisions: [rev({ id: 'TK-009-r1', docId: 'TK-009', status: 'draft', ackLevel: 'none', requireAcknowledgment: false })],
     });
-    const out = documentsReducer(s, { type: 'PUBLISH_DIRECT', payload: { revisionId: 'TK-009-r1', atUtc: NOW, today: TODAY } });
+    const out = documentsReducer(s, { type: 'PUBLISH_DIRECT', payload: { revisionId: 'TK-009-r1', atUtc: NOW, today: TODAY, actorRoles: ['dom'] } });
     expect(out.revisions[0].status).toBe('published');
   });
 

@@ -4,8 +4,8 @@ import type { Deferral, Defect, WorkCard } from '../types';
 
 const defect = (over: Partial<Defect> = {}): Defect => ({
   id: 'def-1', aircraftId: 'ac-1', ataChapter: '24', description: 'Gen 2 offline',
-  status: 'DEFERRED', severity: 'HIGH', source: 'PIREP', reportedByOid: 'U1',
-  reportedAtUtc: 'now', signatureId: 'sig-d',
+  status: 'DEFERRED', source: 'PIREP', reportedByOid: 'U1',
+  occurredAtUtc: 'now', reportedAtUtc: 'now', signatureId: 'sig-d',
   ...over,
 } as Defect);
 

@@ -42,7 +42,41 @@ export type { StorageLike };
 
 export const STORAGE_KEY = 'tech-log-state';
 export const VERSION_KEY = 'tech-log-data-version';
-export const DATA_VERSION = '2026-07-26-v16'; // TL-16 adversarial-pass fixes — reseed so deferrals carry melOProcedure and briefings carry the frozen checklist
+/**
+ * Bump this whenever the persisted demo-data SHAPE changes. A mismatch drops the stored blob and
+ * reseeds (see `loadPersistedState`), which is the only migration this demo has.
+ *
+ * v17 (D55/D56/D57): `Defect` lost `severity` and gained a NON-OPTIONAL `occurredAtUtc` plus the
+ * structured CAS fields. A defect persisted before this batch has no `occurredAtUtc` at all, and it
+ * is now read on every defect row (`formatRegulatoryCompact` would be handed `undefined`) and used
+ * to default the PL-25 day of discovery in `DeferralCreatePanel` — so a returning user's stale rows
+ * would render broken dates and seed an MEL repair clock from nothing. The field was added in an
+ * earlier commit of this batch and was inert only because nothing had read a hydrated old row yet;
+ * this bump is what actually closes it.
+ *
+ * v18 (D59): `MelItem` gained `crewActionRequired`, authored on a handful of seeded items
+ * (`scenarios.ts#AUTHORED_CREW_ACTIONS`). A stored blob predating this carries the old, unauthored
+ * MEL rows, so every item would silently fall back to `Boolean(oProcedure)` and the DOM's explicit
+ * "no crew action" on 30-01-03 would read as a crew action — i.e. the seeded authoring would simply
+ * not exist for a returning user. Reseeding is the fix. (The new `Deferral` columns need no
+ * migration: absent reads as "no crew action", which is correct for rows signed under the old rule
+ * and is never reinterpreted.)
+ *
+ * v19 (LG-98/99/108): `WorkCard` gained `ammReference` + `cmcFaultCodes`, and the seeds now populate
+ * them on wc-1 and wc-3 plus `Defect.cmcFaultCode` on d-n1pg. Unlike v17 this is NOT a
+ * broken-render risk — every new field is optional and absent reads correctly as "not recorded".
+ * The bump is for the SEEDS: a returning user's stored blob predates them, so the demo would show
+ * empty AMM/CMC panels and no pilot intake hint, and the CRS print test's fixtures would be the only
+ * place the feature was visible. Reseeding is what makes the slice demonstrable on a fresh load.
+ *
+ * v20 (D61/D62/D63, LG-100): `WorkCard` gained `statusTags` states (DIAGNOSING, WAITING_TECH_REP,
+ * WAITING_CONTRACT_MX, WAITING_OTHER, GAP), the per-gap include/exclude flag, `partsOrders`, and the
+ * `timeAudit` trail. Every new field is optional and absent reads correctly, so like v19 this is not
+ * a broken-render risk — the bump exists so a returning user's stored blob is replaced by seeds that
+ * actually carry a logged overnight gap and a delivered parts order. Without it the include/exclude
+ * control and the metrics page have nothing to act on and the slice is invisible on their machine.
+ */
+export const DATA_VERSION = '2026-07-30-v20';
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a

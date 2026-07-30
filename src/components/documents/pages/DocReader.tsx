@@ -18,6 +18,7 @@ import { AckPanel } from '../components/AckPanel';
 import { ComplianceRoster } from '../components/ComplianceRoster';
 import { SuggestionDialog } from '../components/SuggestionDialog';
 import { CommentThread } from '../components/CommentThread';
+import { CasMetaBanner } from '../components/CasMetaBanner';
 import { DocIdentityHeader } from '../components/DocIdentity';
 import { DocEditorDialog, type EditorMode } from '../components/DocEditorDialog';
 import { RevisionTimeline } from '../components/RevisionTimeline';
@@ -225,6 +226,10 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
       </div>
 
       {headerRev && <DocIdentityHeader doc={doc} rev={headerRev} />}
+
+      {/* D60/D65 — the entry's fleet applicability and curated CAS facts, read back to the reader.
+          `rev` is the CURRENT PUBLISHED revision, so this shows exactly what the catalog offers. */}
+      <CasMetaBanner rev={rev} />
 
       {showChangeSummary && rev && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/10">

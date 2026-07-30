@@ -3,9 +3,9 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Wrench, FilePlus, Clock, ShieldAlert, CheckCircle2, CalendarClock, Plus,
-  Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, CloudDownload, ShieldCheck,
+  Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, ClipboardCheck, CloudDownload, ShieldCheck,
 } from 'lucide-react';
-import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
+import { useTechLog, useCurrentUser, useDisplayZone, useLoginRoles } from '../TechLogContext';
 import { formatRegulatoryCompact, type DisplayZoneMode } from '../util/displayZone';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
@@ -15,9 +15,11 @@ import { currentRows } from '../engine/supersede';
 import { isDeferralExpired, DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { projectCheck } from '../engine/recurringChecks';
 import { canSignPlacardDischarge } from '../engine/disposition';
+import { canMarkCrewAction, crewActionPending } from '../engine/crewAction';
 import { INTENT } from '../constants';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
+import { workCardReferenceSections } from '../util/workCardPrint';
 import { newId } from '../util/id';
 import type {
   Signature, RecurringCheck, RecurringCheckAccomplishment, RecurringIntervalUnit, Deferral,
@@ -26,6 +28,8 @@ import type {
 import { deriveCustody } from '../engine/custody';
 import { lifecycleStep } from '../engine/lifecycle';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
+import { CasChip } from '../components/CasChip';
+import { SymptomNote } from '../components/SymptomNote';
 import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
@@ -35,9 +39,14 @@ import { PostflightPanel } from '../components/PostflightPanel';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
 import { RectifyPanel } from '../components/panels/RectifyPanel';
 import { GatingReleasePanel } from '../components/panels/GatingReleasePanel';
+import { CrewActionPanel } from '../components/panels/CrewActionPanel';
 import { ExtendDeferralDialog } from '../components/panels/ExtendDeferralDialog';
 import { LifecycleStepper, type StepKey } from '../components/LifecycleStepper';
 import { ActivityFeed } from '../components/ActivityFeed';
+// D60 — the fleet CAS knowledge surface. The knowledge, its store and its curator gate all live in
+// the documents module; this page is only where it is mounted for a tail. See the component's own
+// note on why it lives over there rather than here.
+import { CasReferencePanel } from '../../documents/components/CasReferencePanel';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -64,6 +73,7 @@ const ACTION_LABEL: Record<BlockerAction, string> = {
   RAISE_CARD: 'Raise work card',
   SIGN_RELEASE: 'Sign release now',
   SIGN_GATING: 'Sign (M)/placard release',
+  MARK_CREW_ACTION: 'Mark crew action complied',
   ACCOMPLISH: 'Accomplish & sign',
   EXTEND: 'Extend',
   OPEN_CARD: 'Open card',
@@ -96,6 +106,10 @@ function BlockerCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">{row.title}</span>
+            {/* D57: defect-backed AND deferral-backed rows carry the defect (a deferred defect's
+                CAS is still what the crew saw); the chip renders nothing for the check/work-card
+                kinds and for a defect with no CAS, so no per-kind conditional is needed. */}
+            <CasChip message={row.defect?.casMessage} color={row.defect?.casColor} observed={row.defect?.casObserved} />
             {row.governing && <Badge variant="outline" className="text-xs">why it's {tone === 'warn' ? 'restricted' : 'grounded'}</Badge>}
           </div>
           {row.dueUtc && (
@@ -127,7 +141,13 @@ function BlockerCard({
   );
 }
 
-type WorkspaceTab = 'workspace' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
+type WorkspaceTab = 'workspace' | 'reference' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
+/**
+ * The RECORDS row. D60's reference tab is deliberately NOT in here: this list renders under a
+ * "Records" caption, and tribal knowledge is reference content adjacent to — never part of — the
+ * airworthiness record. Filing it under "Records" would blur exactly the line D60 rests on, so it
+ * gets its own button beside Workspace, which is already a tab that lives outside this list.
+ */
 const TABS: { key: WorkspaceTab; label: string }[] = [
   { key: 'defects', label: 'Defects' },
   { key: 'deferrals', label: 'Deferrals' },
@@ -137,7 +157,7 @@ const TABS: { key: WorkspaceTab; label: string }[] = [
   { key: 'audit', label: 'Audit' },
 ];
 
-type Inline = { kind: 'defer' | 'rectify' | 'gating'; id: string } | null;
+type Inline = { kind: 'defer' | 'rectify' | 'gating' | 'crewAction'; id: string } | null;
 
 export default function AircraftDetail() {
   const { tail } = useParams();
@@ -151,7 +171,7 @@ export default function AircraftDetail() {
   const isMaint = user.role === 'MAINTENANCE';
 
   const tab = (params.get('tab') as WorkspaceTab) || 'workspace';
-  const setTab = (t: WorkspaceTab) => setParams(prev => { const p = new URLSearchParams(prev); p.set('tab', t); p.delete('deferral'); p.delete('gating'); p.delete('defect'); return p; }, { replace: true });
+  const setTab = (t: WorkspaceTab) => setParams(prev => { const p = new URLSearchParams(prev); p.set('tab', t); p.delete('deferral'); p.delete('gating'); p.delete('crewAction'); p.delete('defect'); return p; }, { replace: true });
 
   const [inline, setInline] = useState<Inline>(null);
   const [reportOpen, setReportOpen] = useState(false);
@@ -179,10 +199,14 @@ export default function AircraftDetail() {
   const [activeStep, setActiveStep] = useState<StepKey>('PREFLIGHT');
   useEffect(() => { if (step) setActiveStep(prev => (prev === 'PREFLIGHT' ? step : prev)); }, [step]);
 
-  // Deep-link: ?tab=deferrals&deferral=ID&gating=1 auto-opens the inline gating panel.
+  // Deep-link: ?tab=deferrals&deferral=ID&gating=1 auto-opens the inline gating panel;
+  // &crewAction=1 opens the D59 crew-action panel the same way (both personas' notifications link
+  // to it, so it must be reachable without hunting through the deferrals list).
   useEffect(() => {
     const dfr = params.get('deferral');
-    if (params.get('gating') === '1' && dfr) setInline({ kind: 'gating', id: dfr });
+    if (!dfr) return;
+    if (params.get('gating') === '1') setInline({ kind: 'gating', id: dfr });
+    else if (params.get('crewAction') === '1') setInline({ kind: 'crewAction', id: dfr });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -207,6 +231,13 @@ export default function AircraftDetail() {
 
   const custody = deriveCustody(ac.id, state, now);
   const shownStep: StepKey = activeStep;
+
+  // D60 — the roles the user actually SIGNED IN with, straight from the provider. This gate must
+  // never be derived from the resolved persona: `resolveFromLogin` falls back to `personnel[0]`
+  // (Captain John Smith, who holds `chief-pilot` — a tribal-knowledge curator) for every login role
+  // no `SYSTEM_USERS` entry holds, which is ~10 of the roles `LoginScreen` offers. A persona answers
+  // "who is standing at this aircraft", never "what may they publish".
+  const docsRoles = useLoginRoles();
 
   // D42: one derived board of "what stands between this tail and dispatch". Replaces the old
   // three-box spine, which listed only open defects + work cards and so showed nothing for a tail
@@ -291,6 +322,12 @@ export default function AircraftDetail() {
         if (!row.deferral) return;
         setTab('deferrals');
         return setInline({ kind: 'gating', id: row.deferral.id });
+      // D59: recording the crew action is evidence, not a release — it opens its own panel, and the
+      // gating release still has to be signed afterwards.
+      case 'MARK_CREW_ACTION':
+        if (!row.deferral) return;
+        setTab('deferrals');
+        return setInline({ kind: 'crewAction', id: row.deferral.id });
       case 'ACCOMPLISH': return row.check ? beginAccomplish(row.check.id) : undefined;
       case 'EXTEND': return row.deferral ? setExtendFor(row.deferral) : undefined;
       case 'OPEN_CARD': return row.workCard ? navigate(`/tech-log/work-cards/${row.workCard.id}`) : undefined;
@@ -322,6 +359,9 @@ export default function AircraftDetail() {
   const printRelease = (r: MaintenanceRelease) => {
     const perf = sigById(r.signatureId);
     const rii = sigById(r.riiSignatureId);
+    // LG-98/99: a WORKCARD release names the card it came from; a rectification or an (M)/placard
+    // discharge does not, and the helper prints nothing in that case.
+    const releasedCard = r.linkedWorkCardId ? state.workCards.find(w => w.id === r.linkedWorkCardId) : undefined;
     printSignedRecord({
       docTitle: r.signoffType === 'DEFERRAL' ? '(M) / Placard Discharge Release' : 'Certificate of Release to Service',
       recordType: r.isGatingDischarge ? 'Gating discharge' : r.signoffType, reference: r.id,
@@ -329,6 +369,7 @@ export default function AircraftDetail() {
       pdfBlobUri: r.pdfBlobUri ?? mockPdfBlobUri('crs', r.id),
       sections: [
         { heading: 'Work performed (14 CFR 91.417(a)(1)(i))', body: r.workDescription },
+        ...workCardReferenceSections(releasedCard),
         { heading: 'Return to service', fields: [
           { label: 'Completed', value: new Date(r.completionDateUtc).toLocaleString() },
           { label: 'A&P / IA cert', value: r.apCertificateNumber || '—' },
@@ -406,6 +447,14 @@ export default function AircraftDetail() {
           className={cn('rounded-md px-3 py-1.5', tab === 'workspace' ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground')}
         >
           Workspace
+        </button>
+        {/* D60 — the fleet's curated CAS knowledge for THIS tail's type. Outside the Records row on
+            purpose (see the note on TABS): it is reference, not a record. */}
+        <button
+          onClick={() => setTab('reference')}
+          className={cn('rounded-md px-3 py-1.5', tab === 'reference' ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground')}
+        >
+          Reference
         </button>
         <span className="ml-2 mr-1 text-xs uppercase tracking-wide text-muted-foreground/70">Records</span>
         {TABS.map(t => (
@@ -516,13 +565,25 @@ export default function AircraftDetail() {
         </div>
       )}
 
+      {/* ===== REFERENCE (D60 — curated CAS knowledge for this tail's fleet type) ===== */}
+      {tab === 'reference' && (
+        <CasReferencePanel
+          fleetType={ac.type}
+          tailNumber={ac.tailNumber}
+          userRole={docsRoles[0] ?? ''}
+          additionalRoles={docsRoles.slice(1)}
+        />
+      )}
+
       {/* ===== DEFECTS (with inline triage) ===== */}
       {tab === 'defects' && (
         <div className="space-y-3">
           {inline && inline.kind === 'defer' && (() => { const d = allDefects.find(x => x.id === inline.id); return d ? (
             <div className="rounded-lg border-2 border-primary/40 p-3">
               <div className="mb-2 text-sm font-medium">Defer ATA {d.ataChapter} — {d.description}</div>
-              <DeferralCreatePanel defect={d} onCancel={() => setInline(null)}
+              {/* keyed by defect: the panel seeds regulatory state (D56 day of discovery) from the
+                  prop at mount, so a different defect must get a fresh panel, not the last one's. */}
+              <DeferralCreatePanel key={d.id} defect={d} onCancel={() => setInline(null)}
                 onDone={(deferral) => { if (deferral.status === 'PENDING_PLACARD') { toast.warning('Pending (M)/placard — sign the gating release to dispatch.'); setInline({ kind: 'gating', id: deferral.id }); } else { toast.success(`${ac.tailNumber} dispatchable under MEL (AMBER).`); setInline(null); } }} />
             </div>
           ) : null; })()}
@@ -550,10 +611,23 @@ export default function AircraftDetail() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">ATA {d.ataChapter}</Badge>
                       <Badge variant={d.status === 'OPEN' ? 'destructive' : d.status === 'DEFERRED' || d.status === 'WATCHLISTED' ? 'secondary' : 'outline'}>{d.status === 'WATCHLISTED' ? 'WATCH' : d.status}</Badge>
-                      <span className="text-xs text-muted-foreground">{d.severity} · {d.source}</span>
+                      {/* D57: annunciator, not a status pill — the CAS axis is not the RAG axis. */}
+                      <CasChip message={d.casMessage} color={d.casColor} observed={d.casObserved} />
+                      <span className="text-xs text-muted-foreground">{d.source}</span>
                     </div>
                     <p className="mt-1 text-sm">{d.description}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Reported {new Date(d.reportedAtUtc).toLocaleString()}{loc ? ` · ${loc}` : ''}</p>
+                    {/* LG-108: the reporter's own narrative. Same atom as the Defects list — there
+                        is no defect detail route, so these two cards ARE the defect detail. */}
+                    <SymptomNote symptom={d.symptom} source={d.source} />
+                    {/* LG-99 — read the pilot's CMC code back; see the note on the Defects list. It had
+                        two write surfaces and no reader until this line. */}
+                    {d.cmcFaultCode ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        <span className="font-medium">CMC:</span> <span className="font-mono">{d.cmcFaultCode}</span>
+                      </p>
+                    ) : null}
+                    {/* D56: occurrence first — it is what starts the MEL clock if this is deferred. */}
+                    <p className="mt-0.5 text-xs text-muted-foreground">Noticed {formatRegulatoryCompact(d.occurredAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)} · reported {formatRegulatoryCompact(d.reportedAtUtc, displayZone, DEFAULT_GOVERNING_TIMEZONE)}{loc ? ` · ${loc}` : ''}</p>
                     {d.attachments?.length ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {d.attachments.filter(a => a.uri.startsWith('data:')).map(a => (
@@ -585,6 +659,15 @@ export default function AircraftDetail() {
               <GatingReleasePanel deferral={df} onCancel={() => setInline(null)} onDone={() => setInline(null)} />
             </div>
           ) : null; })()}
+          {/* D59 — takes the id, not the row: the panel re-resolves the chain head itself, and the
+              id survives its own superseding insert (the row's id does not). */}
+          {inline && inline.kind === 'crewAction' && (
+            <div className="max-w-2xl rounded-lg border-2 border-primary/40 p-3">
+              {/* No onDone: the panel stays open on the recorded mark, which is the evidence the
+                  next person (maintenance) needs to see before signing the release. */}
+              <CrewActionPanel deferralId={inline.id} onCancel={() => setInline(null)} />
+            </div>
+          )}
           {deferrals.length === 0 && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No active deferrals. Defer an open defect from the Defects tab.</CardContent></Card>}
           {deferrals.map(d => {
             const expired = isDeferralExpired(d, now, airframe);
@@ -598,6 +681,13 @@ export default function AircraftDetail() {
                       <Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge>
                       <Badge variant="outline">Cat {d.category}</Badge>
                       <Badge variant={effective === 'ACTIVE' ? 'secondary' : 'destructive'}>{effective}</Badge>
+                      {/* D59 — the crew action reads off the frozen deferral row, so a later MEL
+                          revision cannot repaint it. */}
+                      {d.crewActionRequired && (
+                        <Badge variant={crewActionPending(d) ? 'destructive' : 'outline'}>
+                          {crewActionPending(d) ? 'Crew action pending' : `Crew action complied · ${d.crewActionCompliance!.byName}`}
+                        </Badge>
+                      )}
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'}</p>
                     {d.repairDueDateUtc && (
@@ -607,8 +697,17 @@ export default function AircraftDetail() {
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
+                    {/* D59 — open to BOTH personas by design: on the road the pilots perform and
+                        mark the (O) action, at base maintenance often does. Neither is releasing
+                        anything by clicking it. */}
+                    {effective === 'PENDING_PLACARD' && canMarkCrewAction(user, d) && (
+                      <Button size="sm" variant="secondary" onClick={() => setInline({ kind: 'crewAction', id: d.id })}><ClipboardCheck className="mr-1.5 h-4 w-4" /> Mark crew action complied</Button>
+                    )}
+                    {effective === 'PENDING_PLACARD' && d.crewActionCompliance && (
+                      <Button size="sm" variant="ghost" onClick={() => setInline({ kind: 'crewAction', id: d.id })}><ClipboardCheck className="mr-1.5 h-4 w-4" /> Crew action record</Button>
+                    )}
                     {effective === 'PENDING_PLACARD' && canSignPlacardDischarge(user, d) && (
-                      <Button size="sm" onClick={() => setInline({ kind: 'gating', id: d.id })}><Wrench className="mr-1.5 h-4 w-4" /> {user.role === 'MAINTENANCE' ? 'Sign (M)/placard release' : 'Attest placard'}</Button>
+                      <Button size="sm" disabled={crewActionPending(d)} title={crewActionPending(d) ? 'The crew action must be marked complied first.' : undefined} onClick={() => setInline({ kind: 'gating', id: d.id })}><Wrench className="mr-1.5 h-4 w-4" /> {user.role === 'MAINTENANCE' ? 'Sign (M)/placard release' : 'Attest placard'}</Button>
                     )}
                     {effective === 'ACTIVE' && isMaint && extendable(d) && (
                       <Button size="sm" variant="outline" onClick={() => setExtendFor(d)}><TimerReset className="mr-1.5 h-4 w-4" /> Extend</Button>
@@ -662,7 +761,13 @@ export default function AircraftDetail() {
                       <Badge variant={w.status === 'COMPLETED' ? 'outline' : w.status === 'IN_WORK' ? 'secondary' : 'destructive'}>{w.status}</Badge>
                     </div>
                     <p className="mt-1">{w.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}
+                      {/* LG-98 — the work-card list is FORKED (this tab and pages/WorkCards.tsx).
+                          The AMM ref landed on the other copy first; both need it, or "which
+                          procedure is this card working to" is answerable on only one screen. */}
+                      {w.ammReference ? ` · ${w.ammReference}` : ''}
+                    </p>
                   </div>
                   <Package className="h-4 w-4 text-muted-foreground" />
                 </CardContent>

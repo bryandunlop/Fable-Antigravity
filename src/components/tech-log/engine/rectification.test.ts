@@ -5,8 +5,8 @@ import type { Defect } from '../types';
 
 const defect = (over: Partial<Defect> = {}): Defect => ({
   id: 'def-1', aircraftId: 'ac-1', ataChapter: '32', description: 'MLG downlock light flickering',
-  status: 'OPEN', severity: 'HIGH', source: 'PIREP', reportedByOid: 'USR1',
-  reportedAtUtc: '2026-06-25T00:00:00.000Z',
+  status: 'OPEN', source: 'PIREP', reportedByOid: 'USR1',
+  occurredAtUtc: '2026-06-25T00:00:00.000Z', reportedAtUtc: '2026-06-25T00:00:00.000Z',
   ...over,
 } as Defect);
 
