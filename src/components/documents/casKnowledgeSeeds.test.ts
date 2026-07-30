@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { getSeedState, casKnowledgeSeed } from './mockData';
 import { STORED_STATE_MIGRATIONS, migrateStoredState } from './engine/migrations';
 import { DATA_VERSION } from './DocumentsContext';
-import { casCatalog, fleetArticles, isCasEntry, catalogEntryForMessage } from './engine/casKnowledge';
-import { currentRevision } from './engine/revisions';
+import { casCatalog, fleetArticles, isCasEntry, catalogEntryForMessage, CAS_KNOWLEDGE_CLASS_ID } from './engine/casKnowledge';
+import { currentRevision, nextDocId } from './engine/revisions';
+import { classFor } from './classes';
 import { SEED_AIRCRAFT } from '../tech-log/mockData/fleet';
 import { getDefaultState } from '../tech-log/mockData/scenarios';
 import { currentRows } from '../tech-log/engine/supersede';
@@ -131,6 +132,45 @@ describe('D60 seed migration', () => {
     const twice = migrateStoredState(once, '2026-07-14-safety-reads-v1');
     expect(twice.docs).toHaveLength(once.docs.length);
     expect(twice.revisions).toHaveLength(once.revisions.length);
+  });
+
+  it('lands every seed on a store where a curator already used the low TK ids', () => {
+    // The regression: seeds shipped as TK-003…TK-010, and `nextDocId` hands the FIRST
+    // curator-created tribal-knowledge entry exactly TK-003 (the pre-slice seeds stop at TK-002).
+    // The migration adds a seed only when its id is absent, so a curator who had written one entry
+    // silently lost seed TK-003 — and with it the catalog entry the seeded GEAR UNSAFE defect on
+    // N1PG resolves to. Two prior entries swallowed TK-004 as well.
+    const curatorDoc = {
+      id: nextDocId(classFor(CAS_KNOWLEDGE_CLASS_ID), [{ id: 'TK-001' }, { id: 'TK-002' }]),
+      classId: CAS_KNOWLEDGE_CLASS_ID,
+      title: 'A curator wrote this before the seeds shipped',
+      category: 'Aircraft Quirks',
+      roles: ['all'],
+      ownerUserId: 'USR008',
+      ownerName: 'Tom Parker',
+      tags: [],
+      isPinned: false,
+      isArchived: false,
+      createdDate: '2026-07-01',
+    };
+    // Guard the premise of this test rather than trusting the comment above it.
+    expect(curatorDoc.id).toBe('TK-003');
+
+    const store: DocumentsState = { ...emptyStore(), docs: [curatorDoc] };
+    const after = migrateStoredState(store, '2026-07-14-safety-reads-v1');
+
+    for (const seeded of casKnowledgeSeed().docs) {
+      expect(after.docs.find((d) => d.id === seeded.id), `seed ${seeded.id} landed`).toBeDefined();
+      expect(
+        after.revisions.find((r) => r.docId === seeded.id),
+        `seed ${seeded.id} kept its revision`,
+      ).toBeDefined();
+    }
+    // The curator's own entry is untouched, and every fleet type still has knowledge.
+    expect(after.docs.find((d) => d.id === 'TK-003')?.title).toBe(curatorDoc.title);
+    for (const type of FLEET_TYPES) {
+      expect(casCatalog(after.docs, after.revisions, type), `catalog for ${type}`).not.toHaveLength(0);
+    }
   });
 
   it('never overwrites a curator’s own edit to a seeded entry', () => {

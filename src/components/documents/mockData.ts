@@ -326,9 +326,26 @@ interface CasSeed {
   ageDays: number;
 }
 
+/**
+ * THE `TK-9xx` RANGE IS RESERVED FOR SEEDS, and this is not cosmetic.
+ *
+ * These entries shipped as `TK-003`…`TK-010`. `nextDocId` (engine/revisions) allocates
+ * max-suffix + 1, and the pre-slice tribal-knowledge seeds stop at `TK-002` — so `TK-003` is
+ * precisely the id the FIRST curator-created entry got, and creating one was reachable before this
+ * slice. The forward migration adds a seed only when its id is ABSENT, so on a returning store where
+ * a curator had written one entry, seed `TK-003` was silently dropped: the seeded N1PG defect
+ * carrying GEAR UNSAFE then resolved no catalog entry and the "what maintenance knows" deep link
+ * never appeared. Two prior entries swallowed `TK-004` as well, and so on down the list.
+ *
+ * Seeds now live above anything the allocator will hand out for a very long time. The visible
+ * consequence is that `nextDocId` returns `TK-909` for the next curator entry on a seeded store,
+ * which is the correct trade: a demo id that looks high beats seeded knowledge that vanishes.
+ * `casKnowledgeSeeds.test.ts` runs the migration against a store already holding a curator-authored
+ * `TK-003` and asserts every seed still lands.
+ */
 const CAS_SEEDS: CasSeed[] = [
   {
-    id: 'TK-003',
+    id: 'TK-901',
     title: 'GEAR UNSAFE — the intermittent squat-switch case (DEMO)',
     fleetTypes: ['G650ER'],
     casMeta: { casMessage: 'GEAR UNSAFE', casColor: 'AMBER', cmcCodes: ['32-31-14'] },
@@ -349,7 +366,7 @@ the CMC code as read off the page — that is what maintenance starts from.
 aircraft until maintenance defers or rectifies it.`,
   },
   {
-    id: 'TK-004',
+    id: 'TK-902',
     title: 'R ENG CHIP — treat as an engine event until proven otherwise (DEMO)',
     fleetTypes: ['G650ER'],
     casMeta: { casMessage: 'R ENG CHIP', casColor: 'RED', cmcCodes: ['79-3100-02'] },
@@ -366,7 +383,7 @@ borescope. Land, log it, and expect the chip detector to be pulled and inspected
 The safety report and the tech-log entry are still the records; this is context.`,
   },
   {
-    id: 'TK-005',
+    id: 'TK-903',
     title: 'CABIN TEMP — zone controller drift on both fleets (DEMO)',
     fleetTypes: ['G650ER', 'G500'],
     casMeta: { casMessage: 'CABIN TEMP', casColor: 'CYAN' },
@@ -383,7 +400,7 @@ advisory, not a dispatch item, but it is worth a squawk if the cabin cannot hold
 temperature — that is what gets the sensor recalibrated instead of re-reported every leg.`,
   },
   {
-    id: 'TK-006',
+    id: 'TK-904',
     title: 'GPS 1 ADVISORY — known nuisance window (DEMO)',
     fleetTypes: ['G500'],
     casMeta: { casMessage: 'GPS 1 ADVISORY', casColor: 'WHITE' },
@@ -401,7 +418,7 @@ Record how long it stood and whether position was lost — the repeat-defect det
 facts to be worth anything.`,
   },
   {
-    id: 'TK-007',
+    id: 'TK-905',
     title: 'BRK TEMP HIGH — G800 onboarding note (DEMO)',
     fleetTypes: ['G800'],
     casMeta: { casMessage: 'BRK TEMP HIGH', casColor: 'AMBER' },
@@ -420,7 +437,7 @@ Add what you learn as the type comes online. An empty fleet reference is how tri
 in a group chat instead.`,
   },
   {
-    id: 'TK-008',
+    id: 'TK-906',
     title: 'Normal startup CAS stack — G650ER (DEMO)',
     fleetTypes: ['G650ER'],
     category: 'Operations',
@@ -438,7 +455,7 @@ The typical ground stack clears progressively as systems come up. Worth a second
 ${CONFIG_POINTER}`,
   },
   {
-    id: 'TK-009',
+    id: 'TK-907',
     title: 'Normal startup CAS stack — G500 (DEMO)',
     fleetTypes: ['G500'],
     category: 'Operations',
@@ -453,7 +470,7 @@ second start belongs in the tech log, not in the next crew's memory.
 ${CONFIG_POINTER}`,
   },
   {
-    id: 'TK-010',
+    id: 'TK-908',
     title: 'Normal startup CAS stack — G800 (DEMO)',
     fleetTypes: ['G800'],
     category: 'Operations',
