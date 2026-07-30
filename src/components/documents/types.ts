@@ -179,9 +179,10 @@ export interface DocComment {
   createdAtUtc: string;
   /** Set when the author revised the text — the thread says "edited". */
   editedAtUtc?: string;
-  /** Set when the author withdrew it. The row is kept and rendered as a
-   *  tombstone; the text is cleared, since withdrawing is the author saying
-   *  "do not rely on what I wrote". */
+  /** Set when the author withdrew it. The row AND its text are kept and rendered
+   *  as a tombstone: withdrawing is the author saying "do not rely on what I
+   *  wrote", not "I never wrote it", and the record has to be able to say what
+   *  was withdrawn. Use `isLiveComment` to exclude it from counts. */
   deletedAtUtc?: string;
 }
 

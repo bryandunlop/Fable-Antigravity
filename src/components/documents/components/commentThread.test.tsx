@@ -97,13 +97,44 @@ describe('CommentThread — author controls', () => {
   it('a withdrawal leaves a named tombstone, not a hole in the thread', async () => {
     const user = userEvent.setup();
     renderThread();
-    await user.click(within(rowFor(MINE.text)).getByRole('button', { name: /withdraw/i }));
+    await user.click(within(rowFor(MINE.text)).getByRole('button', { name: 'Withdraw' }));
+    await user.click(screen.getByRole('button', { name: 'Withdraw it' }));
 
-    expect(screen.queryByText(MINE.text)).not.toBeInTheDocument();
     expect(screen.getByText(/Comment withdrawn by Captain John Smith/)).toBeInTheDocument();
     // The other author's note is untouched.
     expect(screen.getByText(THEIRS.text)).toBeInTheDocument();
     // A tombstone offers no further controls.
     expect(screen.queryByRole('button', { name: /withdraw/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * The withdrawal used to clear `text`, which is a DELETE wearing the word "tombstone": the record
+   * could no longer say what was withdrawn, and the brief asked for content preserved and marked,
+   * mirroring `DocSuggestionReply`'s append-only discipline. Someone may already have flown on the
+   * strength of the note.
+   */
+  it('withdrawing PRESERVES the text on the record rather than blanking it', async () => {
+    const user = userEvent.setup();
+    renderThread();
+    await user.click(within(rowFor(MINE.text)).getByRole('button', { name: 'Withdraw' }));
+    await user.click(screen.getByRole('button', { name: 'Withdraw it' }));
+
+    const kept = screen.getByText(MINE.text);
+    expect(kept).toBeInTheDocument();
+    // ...and it is rendered as withdrawn, not as a standing note.
+    expect(kept.className).toContain('line-through');
+  });
+
+  it('asks before withdrawing — one misclick does not destroy a field note', async () => {
+    const user = userEvent.setup();
+    renderThread();
+    await user.click(within(rowFor(MINE.text)).getByRole('button', { name: 'Withdraw' }));
+
+    // Nothing has happened yet: no tombstone, and a way out.
+    expect(screen.queryByText(/Comment withdrawn by/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Keep it' }));
+
+    expect(screen.queryByText(/Comment withdrawn by/)).not.toBeInTheDocument();
+    expect(within(rowFor(MINE.text)).getByRole('button', { name: 'Withdraw' })).toBeInTheDocument();
   });
 });

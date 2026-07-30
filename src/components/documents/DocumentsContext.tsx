@@ -507,7 +507,12 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       }
       const next: DocComment =
         action.type === 'DELETE_COMMENT'
-          ? { ...existing, text: '', deletedAtUtc: p.atUtc }
+          // The TEXT SURVIVES a withdrawal. Clearing it, as this did, is a delete wearing the word
+          // "tombstone": the record can no longer say what was withdrawn, and someone may already
+          // have acted on what it said. Withdrawing is the author saying "do not rely on this" —
+          // which the mark communicates — not "this was never written". Same append-only discipline
+          // as `DocSuggestionReply`. Readers get `isLiveComment` to exclude it from counts.
+          ? { ...existing, deletedAtUtc: p.atUtc }
           : { ...existing, text: (action.payload as { text: string }).text.trim(), editedAtUtc: p.atUtc };
       if (action.type === 'EDIT_COMMENT') {
         const text = (action.payload as { text: string }).text.trim();

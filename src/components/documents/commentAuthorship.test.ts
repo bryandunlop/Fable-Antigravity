@@ -14,9 +14,9 @@ import { isLiveComment, type Doc, type DocComment, type DocumentsState } from '.
  *    comment-enabled class today so this changes nothing else, but a future comment-enabled class
  *    inherits the rule for free — and a doc class that never allowed comments must not gain comment
  *    mutations through the back door.
- *  - **Nothing is silently rewritten and nothing vanishes.** An edit stamps `editedAtUtc`; a delete
- *    is a tombstone with the text cleared. `DocSuggestionReply` is append-only for the same reason:
- *    someone may already have acted on what the comment said.
+ *  - **Nothing is silently rewritten and nothing vanishes.** An edit stamps `editedAtUtc`; a
+ *    withdrawal stamps `deletedAtUtc` and KEEPS the text. `DocSuggestionReply` is append-only for
+ *    the same reason: someone may already have acted on what the comment said.
  */
 
 const TK_DOC: Doc = {
@@ -108,17 +108,22 @@ describe('EDIT_COMMENT', () => {
   it('refuses to change a withdrawn comment', () => {
     const gone = documentsReducer(state([COMMENT]), withdraw());
     const s = documentsReducer(gone, edit('Un-withdrawing myself.'));
-    expect(s.comments[0].text).toBe('');
+    // The withdrawn note keeps exactly what it said — the edit is refused outright, so the
+    // withdrawn text is neither replaced nor blanked.
+    expect(s.comments[0].text).toBe(COMMENT.text);
     expect(s.comments[0].deletedAtUtc).toBe(NOW);
   });
 });
 
 describe('DELETE_COMMENT', () => {
-  it('tombstones rather than dropping the row, and clears the text', () => {
+  it('tombstones rather than dropping the row, and KEEPS the text', () => {
     const s = documentsReducer(state([COMMENT]), withdraw());
     expect(s.comments).toHaveLength(1);
     expect(s.comments[0].deletedAtUtc).toBe(NOW);
-    expect(s.comments[0].text).toBe('');
+    // Clearing the text here was a delete wearing the word "tombstone": the record could no longer
+    // say what was withdrawn, and people may already have acted on what it said. Withdrawing means
+    // "do not rely on this" — which the mark communicates — not "this was never written".
+    expect(s.comments[0].text).toBe(COMMENT.text);
     // Authorship survives so the thread can say who withdrew it.
     expect(s.comments[0].authorName).toBe('Captain John Smith');
   });
