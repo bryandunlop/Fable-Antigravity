@@ -75,7 +75,7 @@ export function BlockEditRow({
         onChange={(e) => onEditMd(e.target.value)}
         rows={Math.max(2, block.md.split('\n').length)}
         className="font-mono text-xs"
-        placeholder="Block markdown (GFM). Use `> [!WARNING]` for a callout, `![alt](src)` for a figure."
+        placeholder="Block markdown (GFM). Use `> [!WARNING]` for a callout, `![alt](src)` for a figure, `[!STEP]` for a numbered step (put its photo on the next line; numbering is automatic)."
         aria-label={`Block ${index + 1} content`}
       />
       <ComplianceBadges refs={block.complianceRefs} />

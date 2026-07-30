@@ -6,6 +6,7 @@ import {
   checksumForSections,
   sectionsPlainText,
   classifyBlockMd,
+  stepNumbers,
 } from './blocks';
 
 describe('classifyBlockMd', () => {
@@ -163,5 +164,73 @@ describe('sectionsPlainText', () => {
   });
   it('is empty for an empty tree', () => {
     expect(sectionsPlainText([]).trim()).toBe('');
+  });
+});
+
+describe('step blocks (Ship Notes task cards)', () => {
+  const WIFI = [
+    '## Reset the cabin wifi',
+    '',
+    '[!STEP] Open the aft left cabinet and locate the CMS router panel.',
+    '![router panel](/img/n1pg-router.jpg)',
+    '',
+    '[!STEP] Hold the reset pin for 10 seconds until the amber light blinks twice.',
+    '',
+    '> [!CAUTION]',
+    '> A shorter press reboots without clearing the stored password.',
+    '',
+    '[!STEP] Rejoin from a phone to confirm, then update the galley password card.',
+  ].join('\n');
+
+  it('classifies a [!STEP] chunk as a step and lifts its image into figureRef', () => {
+    const c = classifyBlockMd('[!STEP] Open the panel.\n![panel](/img/x.jpg)');
+    expect(c.type).toBe('step');
+    expect(c.figureRef).toBe('/img/x.jpg');
+  });
+
+  it('classifies a step with no image, leaving figureRef unset', () => {
+    const c = classifyBlockMd('[!STEP] Hold the reset pin for 10 seconds.');
+    expect(c.type).toBe('step');
+    expect(c.figureRef).toBeUndefined();
+  });
+
+  it('does not mistake an ordinary paragraph or an ordered list for a step', () => {
+    expect(classifyBlockMd('Open the panel.').type).toBe('paragraph');
+    expect(classifyBlockMd('1. Open the panel.\n2. Close it.').type).toBe('list');
+  });
+
+  it('numbers steps from position within the section, skipping non-step blocks', () => {
+    const [section] = sectionsFromMarkdown(WIFI, 'TK-9');
+    const nums = stepNumbers(section.blocks);
+    const steps = section.blocks.filter((b) => b.type === 'step');
+    expect(steps).toHaveLength(3);
+    expect(steps.map((b) => nums.get(b.id))).toEqual([1, 2, 3]);
+    // The caution between steps 2 and 3 is not a step and gets no number.
+    const callout = section.blocks.find((b) => b.type === 'callout')!;
+    expect(nums.get(callout.id)).toBeUndefined();
+  });
+
+  it('renumbers with no author action when a middle step is removed', () => {
+    const [section] = sectionsFromMarkdown(WIFI, 'TK-9');
+    const steps = section.blocks.filter((b) => b.type === 'step');
+    const without = section.blocks.filter((b) => b.id !== steps[1].id);
+    const nums = stepNumbers(without);
+    const remaining = without.filter((b) => b.type === 'step');
+    expect(remaining.map((b) => nums.get(b.id))).toEqual([1, 2]);
+  });
+
+  it('round-trips through markdown, keeping the step marker literal', () => {
+    const [section] = sectionsFromMarkdown(WIFI, 'TK-9');
+    const back = sectionsFromMarkdown(sectionsToMarkdown([section]), 'TK-9');
+    expect(back[0].blocks.map((b) => b.type)).toEqual(section.blocks.map((b) => b.type));
+  });
+
+  it('leaves the canonical checksum shape unchanged — step adds no new field', () => {
+    const [section] = sectionsFromMarkdown(WIFI, 'TK-9');
+    const keys = Object.keys(JSON.parse(canonicalizeSections([section]))[0].blocks[0]);
+    expect(keys.sort()).toEqual(
+      ['calloutKind', 'effectivity', 'figureRef', 'id', 'md', 'splitFrom', 'type'].sort(),
+    );
+    expect(checksumForSections([section])).toMatch(/^[0-9a-f]+$/);
   });
 });
