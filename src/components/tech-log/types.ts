@@ -248,14 +248,89 @@ export type WorkCardSource = 'CAMP' | 'MANUAL';
 /** Task-level work/wait state (QM4/D27): what this card's elapsed time is currently being spent on.
  * The DOM's shop vocabulary: in work, waiting on parts ("POO" — parts on order), waiting on
  * inspection. Off-ledger WIP state on the card — wrench-vs-elapsed analytics derive from the
- * timestamped history, never from a timer. */
-export type WorkCardStatusTag = 'IN_WORK' | 'WAITING_PARTS' | 'WAITING_INSPECTION';
+ * timestamped history, never from a timer.
+ *
+ * D61 added the diagnosis and away states. Note the deliberate overlap with `LaborCategory` below:
+ * that union also carries `TROUBLESHOOTING` and `PARTS_ORDERING`. **This is not duplication to be
+ * tidied away.** `LaborCategory` classifies *man-hours* — who spent how many, two techs for three
+ * hours is six. These tags classify *elapsed wall-clock* — the same three hours is three. The two
+ * axes answer different questions and are rendered side by side (`engine/debrief.ts`, `pages/Aog.tsx`).
+ * Do not collapse one into the other.
+ *
+ * `DIAGNOSING` and `WAITING_TECH_REP` are shipped as separate states on purpose (D61 §2): Bryan
+ * expects they are really one, but splitting later loses history while merging later is a two-way
+ * door — so use decides. `WAITING_OTHER` is the escape hatch (D61 §3); what people free-type into
+ * its note is the evidence backlog for the next round of named states. */
+export type WorkCardStatusTag =
+  | 'IN_WORK'
+  | 'DIAGNOSING'            // on-aircraft troubleshooting — fault not yet identified
+  | 'WAITING_PARTS'         // POO — parts on order
+  | 'WAITING_INSPECTION'
+  | 'WAITING_TECH_REP'      // on the phone / waiting for the OEM tech rep to come back
+  | 'WAITING_CONTRACT_MX'   // waiting on a contract maintenance provider
+  | 'WAITING_OTHER'         // named by the enterer in `note` (D61 §3)
+  | 'GAP';                  // nobody was working — see StatusTagEvent.gapReason
+
+/** Why nobody was working during a `GAP` span (D61 §4). `CONTRACT_MX_AWAY` is the case Bryan named
+ * specifically — the aircraft is away, the contract shop left with no replacement, and it is dead
+ * time nobody owns. It is exactly what disappears from a system that records only hands-on hours. */
+export type WorkGapReason = 'END_OF_SHIFT' | 'WEEKEND_HOLIDAY' | 'CONTRACT_MX_AWAY' | 'AWAITING_SLOT' | 'OTHER';
 
 export interface StatusTagEvent {
   tag: WorkCardStatusTag;
   atUtc: string;
   byOid: string;
-  note?: string;   // required for WAITING_PARTS — what part, from whom (the POO record)
+  note?: string;   // required for WAITING_PARTS (what part, from whom — the POO record) and WAITING_OTHER
+  /** GAP only — required. */
+  gapReason?: WorkGapReason;
+  /**
+   * GAP only. Whether this gap's hours count toward the card's totals (D61 §4): "we should add a way
+   * to include or not this data by the user at the end. Sometimes they might want to include it
+   * other times no." Absent reads as **included** — a gap is logged and counted unless somebody
+   * consciously excludes it, and excluded hours are still reported separately, never deleted.
+   */
+  includeInTotals?: boolean;
+  /** The parts order this wait is against, when the enterer raised one (LG-100). Display-only join. */
+  partsOrderId?: string;
+}
+
+/**
+ * D62 — the work card's first audit trail, scoped to its **time history only**. This is not general
+ * work-card versioning: the card is updatable WIP (see `WorkCard` below) and always has been. The
+ * trail exists because a signed, immutable `MaintenanceRelease` points at the mutable card via
+ * `linkedWorkCardId`, so before this the downtime figures under a signed certificate could move
+ * with no trace. Anyone asking "was this edited after the CRS was signed, and by whom?" can now
+ * answer it.
+ */
+export interface WorkCardTimeAuditEvent {
+  atUtc: string;
+  byOid: string;
+  byName?: string;          // display snapshot (LaborEntry.techName precedent) — oids stay canonical
+  /** Human-readable before → after of the span history. Absent `before` means the history was empty. */
+  before?: string;
+  after: string;
+  /** True when the card was already complied with — the D61 write-up-at-end-of-shift case. */
+  afterCompletion: boolean;
+}
+
+/**
+ * A part on order against a work card (LG-100 — "how long does Gulfstream take to send parts").
+ * Distinct from `PartUsage` (what was physically installed/removed under the signed CRS) and from
+ * `CampExpectedItem` (what the CAMP work order says the job needs). This is the *procurement* fact:
+ * raised when, from whom, received when.
+ *
+ * Existing `WAITING_PARTS` notes are free text by long-standing convention ("what part, ordered
+ * from whom") and are deliberately **not** migrated into this structure — a prose note is not
+ * reliably parseable into a vendor and a part number, and guessing would invent procurement facts.
+ */
+export interface PartsOrder {
+  id: string;
+  description: string;
+  partNumber?: string;
+  vendor: string;              // free text; defaults to Gulfstream in the UI, not in the type
+  orderedAtUtc: string;
+  receivedAtUtc?: string;      // absent = still open; lead time reports elapsed-so-far
+  note?: string;
 }
 
 export interface WorkStep {
@@ -303,6 +378,14 @@ export interface WorkCard {
   completedReleaseId?: string; // MaintenanceRelease produced on completion
   completedAtUtc?: string;
   statusTags?: StatusTagEvent[]; // QM4/D27 work/wait history (chronological; last entry is current)
+  /**
+   * D62 — append-only record of every edit to `statusTags`. Written by `engine/statusTags.ts`, which
+   * is the only sanctioned writer of the time history; nothing else should mutate `statusTags`
+   * directly. Scoped to the time history: the rest of the card stays plain updatable WIP.
+   */
+  timeAudit?: WorkCardTimeAuditEvent[];
+  /** Parts raised against this card (LG-100). Ordering used to live only as prose in a POO note. */
+  partsOrders?: PartsOrder[];
   campExpected?: CampExpectedItem[]; // expected parts/tools/consumables mirrored from the CAMP WO
   /**
    * LG-98 — where the fix procedure lives, e.g. `AMM 32-30-00`. **Hand-typed (D22).** Nothing in
@@ -345,7 +428,11 @@ export interface PartUsage {
 }
 
 /** What the hours were spent on (QM1/D27) — man-hours must be answerable beyond wrench time:
- * troubleshooting, calls to tech ops, ordering parts. Legacy rows without a category read as WRENCH. */
+ * troubleshooting, calls to tech ops, ordering parts. Legacy rows without a category read as WRENCH.
+ *
+ * `TROUBLESHOOTING` / `TECH_OPS_CALL` / `PARTS_ORDERING` read like duplicates of the `DIAGNOSING` /
+ * `WAITING_TECH_REP` / `WAITING_PARTS` members of `WorkCardStatusTag`. They are not — see the note
+ * on that union. This axis is man-hours; that one is elapsed wall-clock. Do not unify them. */
 export type LaborCategory = 'WRENCH' | 'TROUBLESHOOTING' | 'TECH_OPS_CALL' | 'PARTS_ORDERING' | 'INSPECTION' | 'OTHER';
 
 export interface LaborEntry {

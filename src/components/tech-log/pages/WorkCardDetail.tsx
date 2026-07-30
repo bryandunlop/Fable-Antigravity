@@ -7,7 +7,7 @@ import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { currentRows, latestFor } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
 import { riiStepsComplete, pendingRiiSteps } from '../engine/rii';
-import { appendStatusTag, statusDurations, currentTag } from '../engine/statusTags';
+import { appendStatusTag, statusDurations, currentTag, STATUS_TAG_LABELS } from '../engine/statusTags';
 import { whyNoteRequired } from '../engine/labor';
 import { rectificationClosePush } from '../engine/rectification';
 import { INTENT } from '../constants';
@@ -31,9 +31,7 @@ const LABOR_CATEGORY_LABELS: Record<LaborCategory, string> = {
   WRENCH: 'Wrench time', TROUBLESHOOTING: 'Troubleshooting', TECH_OPS_CALL: 'Tech-ops call',
   PARTS_ORDERING: 'Parts ordering', INSPECTION: 'Inspection', OTHER: 'Other',
 };
-const TAG_LABELS: Record<WorkCardStatusTag, string> = {
-  IN_WORK: 'in work', WAITING_PARTS: 'waiting on parts (POO)', WAITING_INSPECTION: 'waiting on inspection',
-};
+const TAG_LABELS = STATUS_TAG_LABELS;
 
 export default function WorkCardDetail() {
   const { id } = useParams();
@@ -192,7 +190,7 @@ export default function WorkCardDetail() {
   const tagNow = currentTag(card);
   const durations = statusDurations(card, new Date().toISOString());
   const setStatusTag = (tag: WorkCardStatusTag, note?: string) => {
-    const r = appendStatusTag(card, tag, user.oid, new Date().toISOString(), note);
+    const r = appendStatusTag(card, tag, user.oid, new Date().toISOString(), { note, byName: user.displayName });
     if (!r.ok) return toast.error(r.error);
     dispatch({ type: 'EDIT_WORK_CARD', payload: r.card });
     setPooPromptOpen(false); setPooNote('');

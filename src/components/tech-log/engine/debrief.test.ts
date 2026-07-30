@@ -77,3 +77,50 @@ describe('downtime debrief (QM5 — the C-suite "why and when" answer)', () => {
     expect(d.labor.totalHours).toBe(3);
   });
 });
+
+describe('downtime debrief — D61 states and gap handling', () => {
+  const asOf = '2026-07-08T12:00:00.000Z';
+
+  it('picks up DIAGNOSING in the state decomposition without being told to', () => {
+    const c = card({
+      statusTags: [
+        { tag: 'DIAGNOSING', atUtc: '2026-07-07T09:00:00.000Z', byOid: 'm1' },
+        { tag: 'IN_WORK', atUtc: '2026-07-07T13:00:00.000Z', byOid: 'm1' },
+      ],
+    });
+    const d = buildDowntimeDebrief('def-1', slice([defect()], [c]), asOf);
+    expect(d.stateHours.DIAGNOSING).toBe(4);
+    expect(d.stateHours.IN_WORK).toBe(23);
+    expect(d.untaggedHours).toBe(1);
+  });
+
+  it('an INCLUDED gap is attributed to GAP, and the downtime figure is unchanged', () => {
+    const c = card({
+      statusTags: [
+        { tag: 'IN_WORK', atUtc: '2026-07-07T09:00:00.000Z', byOid: 'm1' },
+        { tag: 'GAP', atUtc: '2026-07-07T18:00:00.000Z', byOid: 'm1', gapReason: 'END_OF_SHIFT' },
+        { tag: 'IN_WORK', atUtc: '2026-07-08T08:00:00.000Z', byOid: 'm1' },
+      ],
+    });
+    const d = buildDowntimeDebrief('def-1', slice([defect()], [c]), asOf);
+    expect(d.stateHours.GAP).toBe(14);
+    expect(d.excludedGapHours).toBe(0);
+    expect(d.countedDowntimeHours).toBe(d.elapsedHours);
+  });
+
+  it('an EXCLUDED gap comes off the counted downtime and does not resurface as unattributed time', () => {
+    const c = card({
+      statusTags: [
+        { tag: 'IN_WORK', atUtc: '2026-07-07T09:00:00.000Z', byOid: 'm1' },
+        { tag: 'GAP', atUtc: '2026-07-07T18:00:00.000Z', byOid: 'm1', gapReason: 'END_OF_SHIFT', includeInTotals: false },
+        { tag: 'IN_WORK', atUtc: '2026-07-08T08:00:00.000Z', byOid: 'm1' },
+      ],
+    });
+    const d = buildDowntimeDebrief('def-1', slice([defect()], [c]), asOf);
+    expect(d.elapsedHours).toBe(28);          // the calendar is still the calendar
+    expect(d.excludedGapHours).toBe(14);
+    expect(d.countedDowntimeHours).toBe(14);
+    expect(d.stateHours.GAP).toBe(0);
+    expect(d.untaggedHours).toBe(1);          // still just the pre-triage hour — NOT 15
+  });
+});
