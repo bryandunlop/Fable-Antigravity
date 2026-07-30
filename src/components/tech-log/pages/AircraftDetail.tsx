@@ -46,7 +46,7 @@ import { ActivityFeed } from '../components/ActivityFeed';
 // D60 — the fleet CAS knowledge surface. The knowledge, its store and its curator gate all live in
 // the documents module; this page is only where it is mounted for a tail. See the component's own
 // note on why it lives over there rather than here.
-import { CasReferencePanel } from '../../documents/components/CasReferencePanel';
+import { ShipNotesPanel } from '../../documents/components/ShipNotesPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -141,7 +141,7 @@ function BlockerCard({
   );
 }
 
-type WorkspaceTab = 'workspace' | 'reference' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
+type WorkspaceTab = 'workspace' | 'shipnotes' | 'defects' | 'deferrals' | 'releases' | 'workcards' | 'flights' | 'audit';
 /**
  * The RECORDS row. D60's reference tab is deliberately NOT in here: this list renders under a
  * "Records" caption, and tribal knowledge is reference content adjacent to — never part of — the
@@ -451,10 +451,10 @@ export default function AircraftDetail() {
         {/* D60 — the fleet's curated CAS knowledge for THIS tail's type. Outside the Records row on
             purpose (see the note on TABS): it is reference, not a record. */}
         <button
-          onClick={() => setTab('reference')}
-          className={cn('rounded-md px-3 py-1.5', tab === 'reference' ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground')}
+          onClick={() => setTab('shipnotes')}
+          className={cn('rounded-md px-3 py-1.5', tab === 'shipnotes' ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground')}
         >
-          Reference
+          Ship Notes
         </button>
         <span className="ml-2 mr-1 text-xs uppercase tracking-wide text-muted-foreground/70">Records</span>
         {TABS.map(t => (
@@ -566,8 +566,8 @@ export default function AircraftDetail() {
       )}
 
       {/* ===== REFERENCE (D60 — curated CAS knowledge for this tail's fleet type) ===== */}
-      {tab === 'reference' && (
-        <CasReferencePanel
+      {tab === 'shipnotes' && (
+        <ShipNotesPanel
           fleetType={ac.type}
           tailNumber={ac.tailNumber}
           userRole={docsRoles[0] ?? ''}

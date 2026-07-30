@@ -79,3 +79,61 @@ describe('TL-6 / D29 — safety read injected into pre-existing stores', () => {
     expect(out.docs.some((d) => d.id === 'GOM-SMS')).toBe(false);
   });
 });
+
+describe('D64 — ship-note section vocabulary', () => {
+  const STEP = '2026-07-30-ship-note-sections-v1';
+  const base = (over: Partial<DocumentsState> = {}): DocumentsState => ({
+    docs: [], revisions: [], acknowledgments: [], comments: [], suggestions: [],
+    suggestionReplies: [], reviews: [], signatures: [], ...over,
+  });
+  const d = (id: string, category: string, classId = 'tribal-knowledge') => ({
+    id, classId, title: id, category, roles: ['all'], ownerUserId: 'u', ownerName: 'O',
+    tags: [], isPinned: false, isArchived: false, createdDate: '2026-07-01',
+  });
+  const r = (docId: string, fleetTypes?: string[]) => ({
+    id: `${docId}-r1`, docId, revision: '1.0', status: 'published' as const, sections: [],
+    changeSummary: '', effectiveDate: '2026-07-01', authorUserId: 'u', authorName: 'A',
+    requireAcknowledgment: false, ackLevel: 'none' as const, mockChecksum: 'x',
+    ...(fleetTypes ? { fleetTypes } : {}),
+  });
+  const run = (s: DocumentsState) =>
+    migrateStoredState(s, '2026-07-30-cas-on-revision-v1', STORED_STATE_MIGRATIONS.filter((m) => m.to === STEP));
+
+  it('remaps a fleet-scoped entry off the retired department categories', () => {
+    const s = base({
+      docs: [d('TK-1', 'Maintenance'), d('TK-2', 'Cabin'), d('TK-3', 'Aircraft Quirks')] as never,
+      revisions: [r('TK-1', ['G650ER']), r('TK-2', ['G650ER']), r('TK-3', ['G500'])] as never,
+    });
+    const out = run(s);
+    expect(out.docs.map((x) => x.category)).toEqual([
+      'Messages & faults', 'Cabin & connectivity', 'Quirks & field notes',
+    ]);
+  });
+
+  it('leaves the surviving library categories alone', () => {
+    const s = base({
+      docs: [d('TK-9', 'Airports & FBOs'), d('TK-7', 'Operations')] as never,
+      revisions: [r('TK-9'), r('TK-7')] as never,
+    });
+    expect(run(s).docs.map((x) => x.category)).toEqual(['Airports & FBOs', 'Operations']);
+  });
+
+  it('retires the old names even on library content, so nothing is left on a category no picker offers', () => {
+    const s = base({ docs: [d('TK-8', 'Aircraft Quirks')] as never, revisions: [r('TK-8')] as never });
+    expect(run(s).docs[0].category).toBe('Quirks & field notes');
+  });
+
+  it('does not touch other document classes', () => {
+    const s = base({
+      docs: [d('SOP-1', 'Maintenance', 'sop')] as never,
+      revisions: [r('SOP-1', ['G650ER'])] as never,
+    });
+    expect(run(s).docs[0].category).toBe('Maintenance');
+  });
+
+  it('is idempotent — re-running leaves an already-migrated store unchanged', () => {
+    const s = base({ docs: [d('TK-1', 'Maintenance')] as never, revisions: [r('TK-1', ['G650ER'])] as never });
+    const once = run(s);
+    expect(run(once).docs[0].category).toBe(once.docs[0].category);
+  });
+});

@@ -2,7 +2,7 @@
 // content; dates are computed relative to load time so the demo's review/ack
 // clocks stay meaningful (a DATA_VERSION bump migrates the stored state
 // forward — see engine/migrations.ts; only a fresh install re-seeds).
-import type { Doc, DocRevision, DocAcknowledgment, DocComment, DocSuggestion, DocSuggestionReply, DocumentsState } from './types';
+import type { Doc, DocRevision, DocAcknowledgment, DocComment, DocSuggestion, DocSuggestionReply, DocumentsState, DocCmcRow } from './types';
 import type { Signature, AircraftType, CasColor } from '../tech-log/types';
 import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
@@ -187,6 +187,49 @@ const sop2r1: DocRevision = {
   submittedAtUtc: daysFromNow(-1) + 'T16:20:00.000Z',
 };
 
+/**
+ * SOP-003 — D64's controlled procedure, fleet-scoped so the tail page can link to it.
+ *
+ * NO REGULATORY CITATION APPEARS HERE, deliberately. Navigation-database currency very likely has
+ * a regulatory hook, but no primary source has been read for it, and this project does not guess a
+ * citation into an SOP. Add one only behind an `authoritative` reference note.
+ */
+const SOP3_CONTENT = `## Charts and navigation database load — G650ER
+
+**Demonstration content.** Steps and effectivity are illustrative, not an approved procedure.
+
+[!STEP] Confirm the aircraft is on ground power and the avionics are in maintenance mode.
+
+[!STEP] Verify the cycle you are about to load is the one currently effective, not the next one.
+
+> [!CAUTION]
+> Loading the wrong cycle is not obvious afterwards — the box reports success either way.
+
+[!STEP] Insert the loader and follow the on-screen prompts to completion.
+
+[!STEP] Record the loaded cycle and confirm it reads back correctly on both sides.`;
+
+const sop3r1: DocRevision = {
+  id: 'SOP-003-r1',
+  docId: 'SOP-003',
+  revision: '1.0',
+  status: 'published',
+  sections: sectionsFromMarkdown(SOP3_CONTENT, 'SOP-003'),
+  changeSummary: '',
+  effectiveDate: daysFromNow(-7),
+  authorUserId: 'role:procedural-specialist',
+  authorName: 'Procedural Specialist Alvarez',
+  requireAcknowledgment: false,
+  ackLevel: 'none',
+  mockChecksum: checksumForSections(sectionsFromMarkdown(SOP3_CONTENT, 'SOP-003')),
+  publishedAtUtc: daysFromNow(-7) + 'T12:00:00.000Z',
+  decidedAtUtc: daysFromNow(-7) + 'T11:00:00.000Z',
+  decidedByUserId: 'USR002',
+  decidedByName: 'Sarah Wilson',
+  // D64 — fleetScoped on the `sop` class, so this reaches the G650ER tail pages.
+  fleetTypes: ['G650ER'],
+};
+
 // ── GOM-3: published rev 12, initials-level, ack window OVERDUE, review OVERDUE ──
 const gom3r1: DocRevision = {
   id: 'GOM-3-r1',
@@ -335,6 +378,9 @@ interface CasSeed {
   id: string;
   title: string;
   fleetTypes: AircraftType[];
+  /** D64 — audience decides which section EXPANDS first for this reader; it never hides a section.
+   *  Defaults to everyone, which is right for shared knowledge like a CAS meaning. */
+  roles?: string[];
   casMeta?: { casMessage: string; casColor: CasColor; cmcCodes?: string[] };
   category: string;
   body: string;
@@ -364,7 +410,8 @@ const CAS_SEEDS: CasSeed[] = [
     title: 'GEAR UNSAFE — the intermittent squat-switch case (DEMO)',
     fleetTypes: ['G650ER'],
     casMeta: { casMessage: 'GEAR UNSAFE', casColor: 'AMBER', cmcCodes: ['32-31-14'] },
-    category: 'Aircraft Quirks',
+    category: 'Messages & faults',
+    roles: ['pilot', 'chief-pilot', 'maintenance', 'dom', 'lead'],
     ageDays: 60,
     body: `# GEAR UNSAFE — the intermittent squat-switch case (DEMO)
 
@@ -385,7 +432,8 @@ aircraft until maintenance defers or rectifies it.`,
     title: 'R ENG CHIP — treat as an engine event until proven otherwise (DEMO)',
     fleetTypes: ['G650ER'],
     casMeta: { casMessage: 'R ENG CHIP', casColor: 'RED', cmcCodes: ['79-3100-02'] },
-    category: 'Aircraft Quirks',
+    category: 'Messages & faults',
+    roles: ['pilot', 'chief-pilot', 'maintenance', 'dom', 'lead'],
     ageDays: 45,
     body: `# R ENG CHIP — treat as an engine event until proven otherwise (DEMO)
 
@@ -402,7 +450,7 @@ The safety report and the tech-log entry are still the records; this is context.
     title: 'CABIN TEMP — zone controller drift on both fleets (DEMO)',
     fleetTypes: ['G650ER', 'G500'],
     casMeta: { casMessage: 'CABIN TEMP', casColor: 'CYAN' },
-    category: 'Cabin',
+    category: 'Cabin & connectivity',
     ageDays: 30,
     body: `# CABIN TEMP — zone controller drift on both fleets (DEMO)
 
@@ -419,7 +467,8 @@ temperature — that is what gets the sensor recalibrated instead of re-reported
     title: 'GPS 1 ADVISORY — known nuisance window (DEMO)',
     fleetTypes: ['G500'],
     casMeta: { casMessage: 'GPS 1 ADVISORY', casColor: 'WHITE' },
-    category: 'Aircraft Quirks',
+    category: 'Messages & faults',
+    roles: ['pilot', 'chief-pilot', 'maintenance', 'dom', 'lead'],
     ageDays: 20,
     body: `# GPS 1 ADVISORY — known nuisance window (DEMO)
 
@@ -437,7 +486,8 @@ facts to be worth anything.`,
     title: 'BRK TEMP HIGH — G800 onboarding note (DEMO)',
     fleetTypes: ['G800'],
     casMeta: { casMessage: 'BRK TEMP HIGH', casColor: 'AMBER' },
-    category: 'Aircraft Quirks',
+    category: 'Messages & faults',
+    roles: ['pilot', 'chief-pilot', 'maintenance', 'dom', 'lead'],
     ageDays: 10,
     body: `# BRK TEMP HIGH — G800 onboarding note (DEMO)
 
@@ -455,7 +505,8 @@ in a group chat instead.`,
     id: 'TK-906',
     title: 'Normal startup CAS stack — G650ER (DEMO)',
     fleetTypes: ['G650ER'],
-    category: 'Operations',
+    category: 'Messages & faults',
+    roles: ['pilot', 'chief-pilot', 'maintenance', 'dom', 'lead'],
     ageDays: 50,
     body: `# Normal startup CAS stack — G650ER (DEMO)
 
@@ -473,7 +524,7 @@ ${CONFIG_POINTER}`,
     id: 'TK-907',
     title: 'Normal startup CAS stack — G500 (DEMO)',
     fleetTypes: ['G500'],
-    category: 'Operations',
+    category: 'Messages & faults',
     ageDays: 40,
     body: `# Normal startup CAS stack — G500 (DEMO)
 
@@ -488,7 +539,7 @@ ${CONFIG_POINTER}`,
     id: 'TK-908',
     title: 'Normal startup CAS stack — G800 (DEMO)',
     fleetTypes: ['G800'],
-    category: 'Operations',
+    category: 'Messages & faults',
     ageDays: 8,
     body: `# Normal startup CAS stack — G800 (DEMO)
 
@@ -498,6 +549,57 @@ is provisional) and nobody has flown it enough to know its normal stack.
 Fill this in as the type comes online, rather than starting a new note somewhere else.
 ${CONFIG_POINTER}`,
   },
+  {
+    // D64 — Bryan's own example of the step-card shape: "how to reset the wifi. Would be many
+    // steps with pictures of each step."
+    id: 'TK-909',
+    title: 'Reset the cabin wifi (DEMO)',
+    fleetTypes: ['G650ER', 'G500'],
+    roles: ['inflight', 'inflight-manager', 'commissary'],
+    category: 'Cabin & connectivity',
+    ageDays: 5,
+    body: `## Reset the cabin wifi (DEMO)
+
+[!STEP] Open the aft left cabinet and locate the CMS router panel.
+![CMS router panel](https://placehold.co/480x200?text=CMS+router+panel)
+
+[!STEP] Note the current SSID on the label before you change anything.
+
+[!STEP] Hold the reset pin for 10 seconds, until the amber light blinks twice.
+![reset pin location](https://placehold.co/480x200?text=reset+pin)
+
+> [!CAUTION]
+> A shorter press reboots the router without clearing the stored password. It looks like it worked
+> and it did not.
+
+[!STEP] Wait for the amber light to go steady green — about ninety seconds.
+
+[!STEP] Rejoin from a phone to confirm, then write the new password on the galley card.`,
+  },
+  {
+    // D64 — Bryan's second example: "Or how to set up a bed. Same thing."
+    id: 'TK-910',
+    title: 'Set up the divan bed (DEMO)',
+    fleetTypes: ['G650ER'],
+    roles: ['inflight', 'inflight-manager'],
+    category: 'Cabin & connectivity',
+    ageDays: 5,
+    body: `## Set up the divan bed (DEMO)
+
+[!STEP] Clear the divan and stow the cushions in the aft closet.
+![divan, cleared](https://placehold.co/480x200?text=divan+cleared)
+
+[!STEP] Release the two seat-back catches — they are behind the piping, not under it.
+
+[!STEP] Lower the seat back until it sits flush with the base.
+
+> [!NOTE]
+> If it will not sit flush, a belt buckle is usually trapped underneath. Do not force it.
+
+[!STEP] Fit the mattress pad, seam to the window side.
+
+[!STEP] Make up the bed and set the reading lights to the dim preset.`,
+  },
 ];
 
 function casSeedDoc(s: CasSeed): Doc {
@@ -506,7 +608,7 @@ function casSeedDoc(s: CasSeed): Doc {
     classId: 'tribal-knowledge',
     title: s.title,
     category: s.category,
-    roles: ['all'],
+    roles: s.roles ?? ['all'],
     ownerUserId: 'USR002',
     ownerName: 'Sarah Wilson',
     tags: ['cas', 'demo', ...s.fleetTypes.map((t) => t.toLowerCase())],
@@ -547,8 +649,87 @@ function casSeedRevision(s: CasSeed): DocRevision {
  * `loadInitialState` spreads the persisted state over the seeds. Same mechanism as
  * {@link safetyReadSeed}.
  */
+/**
+ * D64 — a DEMO subset of maintenance's known-nuisance CMC list.
+ *
+ * **Deliberately not the real list.** The scanned source points at the GVII family (G500/G600) via
+ * `C_GAC_GVII_PAR_3391` and a note reading "G600 fix to be applied to G500 in Block 1", but that
+ * applicability is UNCONFIRMED (`ref-gvii-known-nuisance-messages`), and D64 forbids seeding
+ * against a fleet type until the maintenance team rules. So: twelve representative rows spanning
+ * the real ATA chapters, marked DEMO, including one `superseded` and one `being-worked` so both
+ * states render.
+ *
+ * These are CMC MAINTENANCE messages, not CAS annunciations — see `DocCmcRow`.
+ */
+const NUISANCE_ROWS_G500: DocCmcRow[] = [
+  { messageName: 'COM1-NIM MAC BUS WIRING FAULT', maintCode: '2302031COM1', ataChapter: '23', vendorRefs: ['PR015033'], vendorStatus: 'accepted' },
+  { messageName: 'SATC-TSC2 TO SDU BUS FAULT', maintCode: '2315011SATC', ataChapter: '23', vendorRefs: ['PR015034'], vendorStatus: 'accepted' },
+  { messageName: 'SATC-ETHERNET 1 TO SDU BUS FAULT', maintCode: '2315023SATC', ataChapter: '23', vendorRefs: ['PR015034'], vendorStatus: 'accepted' },
+  { messageName: 'SPR1-PWS VALVE 5 FAULT', maintCode: '2480117SPR1', ataChapter: '38', vendorRefs: ['PR014109'], vendorStatus: 'superseded', supersededNote: 'PR015035 is closed, see PR014109' },
+  { messageName: 'DG1-XM WX ANTENNA FAILED', maintCode: '31619521DG1', ataChapter: '31', vendorRefs: ['PR015036'], vendorStatus: 'accepted' },
+  { messageName: 'DG2-XM WX DATA CORRUPTION', maintCode: '31619522DG2', ataChapter: '31', vendorRefs: ['PR015036'], vendorStatus: 'accepted' },
+  { messageName: 'BCSI-INBD ABS WOW DISAGREE FAULT', maintCode: '3244335BCSI', ataChapter: '32', vendorRefs: [], vendorStatus: 'accepted' },
+  { messageName: 'SFD1-NO OR INVALID NAVC DATA', maintCode: '3427012SFD1', ataChapter: '34', vendorRefs: ['PR011020', 'PR012999'], vendorStatus: 'accepted' },
+  { messageName: 'EGP1-FLT HISTORY WRITE FAULT/DBM', maintCode: '3446024EGP1', ataChapter: '34', vendorRefs: ['Jira 3243'], vendorStatus: 'being-worked' },
+  { messageName: 'FMS1-AGM2[GGF2]/FMS1/WRG FAULT', maintCode: '3461052FMS1', ataChapter: '34', vendorRefs: ['Jira 3242', 'C_GAC_GVII_PAR_3391'], vendorStatus: 'being-worked' },
+  { messageName: 'SW2-ESC 2A WIRING FAULT', maintCode: '42330013SW2', ataChapter: '42', vendorRefs: ['PR010595'], vendorStatus: 'accepted' },
+  { messageName: 'CMC-ARCHIVE TRANSFER FAULT', maintCode: '45451003CMC', ataChapter: '45', vendorRefs: ['PR015038'], vendorStatus: 'accepted' },
+];
+
+const NUISANCE_DOC_ID = 'TK-911';
+
+function nuisanceListSeed(): { doc: Doc; rev: DocRevision } {
+  const body = `## Known nuisance messages — G500 (DEMO)
+
+Messages maintenance already knows about and is tracking with the vendor. **Information, not a
+decision:** a message appearing here does not mean it should go unreported. Raise a defect exactly
+as you normally would, and say that you saw it.
+
+Applicability is still being confirmed with maintenance — treat the fleet tag as provisional.`;
+  const sections = sectionsFromMarkdown(body, NUISANCE_DOC_ID);
+  return {
+    doc: {
+      id: NUISANCE_DOC_ID,
+      classId: 'tribal-knowledge',
+      title: 'Known nuisance messages — G500 (DEMO)',
+      category: 'Messages & faults',
+      // Crew read these off the TOD report and maintenance curates them, so both — but not cabin.
+      roles: ['maintenance', 'pilot', 'chief-pilot', 'dom'],
+      ownerUserId: 'USR002',
+      ownerName: 'Sarah Wilson',
+      tags: ['cmc', 'nuisance', 'demo', 'g500'],
+      isPinned: false,
+      isArchived: false,
+      reviewCycleDays: 180,
+      nextReviewDate: daysFromNow(174),
+      createdDate: daysFromNow(-6),
+    },
+    rev: {
+      id: `${NUISANCE_DOC_ID}-r1`,
+      docId: NUISANCE_DOC_ID,
+      revision: '1.0',
+      status: 'published',
+      sections,
+      changeSummary: '',
+      effectiveDate: daysFromNow(-6),
+      authorUserId: 'USR002',
+      authorName: 'Sarah Wilson',
+      requireAcknowledgment: false,
+      ackLevel: 'none',
+      mockChecksum: checksumForSections(sections),
+      publishedAtUtc: daysFromNow(-6) + 'T12:00:00.000Z',
+      fleetTypes: ['G500'],
+      cmcRows: NUISANCE_ROWS_G500,
+    },
+  };
+}
+
 export function casKnowledgeSeed(): { docs: Doc[]; revisions: DocRevision[] } {
-  return { docs: CAS_SEEDS.map(casSeedDoc), revisions: CAS_SEEDS.map(casSeedRevision) };
+  const nuisance = nuisanceListSeed();
+  return {
+    docs: [...CAS_SEEDS.map(casSeedDoc), nuisance.doc],
+    revisions: [...CAS_SEEDS.map(casSeedRevision), nuisance.rev],
+  };
 }
 
 
@@ -581,6 +762,24 @@ const SEED_DOCS: Doc[] = [
     isArchived: false,
     reviewCycleDays: 365,
     createdDate: daysFromNow(-6),
+  },
+  {
+    // D64 — the CONTROLLED half of the Ship Notes split. Loading charts and the navigation database
+    // is a procedure performed ON the aircraft, so it is an `sop` behind four-eyes and the shelf
+    // links out to it rather than restating it in a direct-publish note.
+    id: 'SOP-003',
+    classId: 'sop',
+    title: 'Charts and navigation database load — G650ER',
+    category: 'Maintenance Procedures',
+    roles: ['maintenance', 'lead', 'admin'],
+    ownerUserId: 'role:procedural-specialist',
+    ownerName: 'Procedural Specialist Alvarez',
+    tags: ['charts', 'navdb', 'loading'],
+    isPinned: false,
+    isArchived: false,
+    reviewCycleDays: 365,
+    nextReviewDate: daysFromNow(358),
+    createdDate: daysFromNow(-7),
   },
   {
     id: 'GOM-3',
@@ -617,7 +816,7 @@ const SEED_DOCS: Doc[] = [
     id: 'TK-002',
     classId: 'tribal-knowledge',
     title: 'G650 APU cold-soak starts — field notes',
-    category: 'Aircraft Quirks',
+    category: 'Quirks & field notes',
     roles: ['all'],
     ownerUserId: 'USR002',
     ownerName: 'Sarah Wilson',
@@ -633,7 +832,7 @@ const SEED_DOCS: Doc[] = [
 ];
 
 const SEED_REVISIONS: DocRevision[] = [
-  sop1r1, sop1r2, sop2r1, gom3r1, gomSmsR1, tk1r1, tk2r1,
+  sop1r1, sop1r2, sop2r1, sop3r1, gom3r1, gomSmsR1, tk1r1, tk2r1,
   // D60 CAS knowledge — a fresh install gets these here; an existing store gets them
   // from the version-keyed migration step (engine/migrations.ts).
   ...casKnowledgeSeed().revisions,

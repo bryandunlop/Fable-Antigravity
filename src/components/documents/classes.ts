@@ -23,6 +23,22 @@ export interface DocumentClassConfig {
   categories: string[];
   /** Default ack window (days after publish) used to prefill ackDueDate. */
   defaultAckDueDays?: number;
+  /**
+   * D64 — may this class's revisions carry `fleetTypes`, i.e. appear on a tail page?
+   *
+   * Config rather than a hard-coded class id, because two classes now need it for opposite
+   * reasons: tribal knowledge because it IS the shelf, and `sop` because D64 rules that a
+   * procedure performed on the aircraft (a chart or navigation-database load) stays controlled
+   * and the shelf links out to it. Before this flag `fleetTypes` was written only when
+   * `cfg.id === 'tribal-knowledge'`, so a fleet-scoped SOP had no authoring path at all and
+   * D64's split existed on paper only.
+   *
+   * This is the widening D65's hinge assumption anticipated. It is safe because `fleetTypes` is
+   * read off the revision and never copied onto the `Doc` (it is not part of `proposedMeta`), so
+   * it rides the controlled draft→approve→publish path as ordinary revision content and touches
+   * no approval logic.
+   */
+  fleetScoped?: boolean;
 }
 
 /**
@@ -37,6 +53,26 @@ export interface DocumentClassConfig {
 export function docReaderPath(docId: string): string {
   return `/documents/${docId}`;
 }
+
+/**
+ * D64 — the Ship Notes shelf's section headings, in display order.
+ *
+ * These are `Doc.category` values, not a new axis: the editor's category picker IS the section
+ * picker, so no schema and no migration of the block tree. The order here is the order on the tail
+ * page — a reader's own section is expanded first (see `shipNoteSections`), but the list itself is
+ * stable so the shelf does not reshuffle between tails.
+ *
+ * D64 ruled these are what you are DOING, not who you are. That is why 'Maintenance' is absent:
+ * it is a department, which is the audience axis this decision deliberately moved away from.
+ */
+export const SHIP_NOTE_SECTIONS = [
+  'Messages & faults',
+  'Loading & updates',
+  'Cabin & connectivity',
+  'Quirks & field notes',
+] as const;
+
+export type ShipNoteSection = (typeof SHIP_NOTE_SECTIONS)[number];
 
 const APPROVERS = ['document-manager', 'lead', 'admin'];
 const BULLETIN_AUTHORS = ['admin', 'safety', 'lead', 'document-manager', 'procedural-specialist'];
@@ -97,6 +133,7 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     defaultReviewCycleDays: 365,
     categories: ['Flight Operations', 'Maintenance Procedures', 'Safety Procedures', 'Inflight Service', 'Ground Operations'],
     defaultAckDueDays: 7,
+    fleetScoped: true,
   },
   manual: {
     id: 'manual',
@@ -125,7 +162,14 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     approverRoles: [],
     commentsEnabled: true,
     defaultReviewCycleDays: 180,
-    categories: ['Airports & FBOs', 'Aircraft Quirks', 'Operations', 'Maintenance', 'Cabin'],
+    // Two general-library categories (an airport note carries no fleetTypes and so never reaches a
+    // tail page), then the aircraft shelf's own vocabulary. 'Maintenance', 'Cabin' and
+    // 'Aircraft Quirks' are RETIRED — the first two are departments rather than topics, and the
+    // third is simply the old name for 'Quirks & field notes'. All three migrate forward
+    // (engine/migrations); keeping them alongside the new names would be two categories for one
+    // idea, which is how a picker starts lying about where things go.
+    categories: ['Airports & FBOs', 'Operations', ...SHIP_NOTE_SECTIONS],
+    fleetScoped: true,
   },
 };
 

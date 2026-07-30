@@ -71,6 +71,35 @@ export interface DocCasMeta {
   cmcCodes?: string[];
 }
 
+/**
+ * D64 — one row of maintenance's known-nuisance CMC list, the messages crew read off the TOD
+ * (top-of-descent) report.
+ *
+ * **These are CMC maintenance messages, not CAS annunciations.** Different vocabulary, different
+ * source: CAS is what the flight deck shows, this is what the Central Maintenance Computer logs.
+ * That is why the row is its own shape rather than a `DocCasMeta` — `casMessage`/`casColor` do not
+ * describe it, and the picker must never offer one of these as a CAS value at defect intake.
+ *
+ * **Informational, never suppressive.** A row says a message is known and who is tracking it. It
+ * does not say "do not write it up", and nothing reads it to gate, filter or discourage the defect
+ * path. Whether myGFO may go further is [[Q19]], routed to the DOM and deliberately NOT built.
+ */
+export interface DocCmcRow {
+  /** As printed on the report, e.g. 'SATC-TSC2 TO SDU BUS FAULT'. */
+  messageName: string;
+  /** e.g. '2315011SATC'. Two rows in the source list have none — the source is incomplete, so
+   *  this may be empty rather than the list being silently trimmed. */
+  maintCode: string;
+  ataChapter: string;
+  /** Vendor tickets: 'PR015034', 'Jira 3242', 'C_GAC_GVII_PAR_3391'. */
+  vendorRefs: string[];
+  /** The source list distinguishes these, so we keep the distinction rather than flattening it:
+   *  a fix in progress is not the same claim as an accepted nuisance. */
+  vendorStatus: 'being-worked' | 'accepted' | 'superseded';
+  /** e.g. 'PR015035 is closed, see PR014109'. */
+  supersededNote?: string;
+}
+
 export interface Doc {
   id: string; // 'SOP-001' — generated from the class idPrefix
   classId: string; // key into DOC_CLASSES
@@ -156,6 +185,15 @@ export interface DocRevision {
   /** D60/D65 — set only on a structured CAS entry; absent on freeform articles.
    *  Lives on the revision for the reason given on `fleetTypes` above. */
   casMeta?: DocCasMeta;
+  /**
+   * D64 — the known-nuisance CMC list, when this entry IS that list.
+   *
+   * The whole list on ONE doc, not one doc per message: maintenance revises it as a unit when the
+   * vendor issues a new version, so a new list version is a new revision and the review badge
+   * covers it at the right granularity. On the revision for the same reason as `fleetTypes` — a
+   * draft's rows are unreachable rather than filtered.
+   */
+  cmcRows?: DocCmcRow[];
   /** Legacy bulletins 'lastUpdated' display date — preserved for lossless round-trips. */
   lastUpdatedDate?: string;
   images?: BulletinImage[];

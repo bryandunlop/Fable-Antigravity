@@ -32,7 +32,7 @@ export const VERSION_KEY = 'documents-data-version';
  *  a broken-render risk; the bump exists so a RETURNING user's curated CAS content is
  *  carried onto its revisions by the matching step in engine/migrations.ts rather than
  *  being stranded on a field nothing reads any more. */
-export const DATA_VERSION = '2026-07-30-cas-on-revision-v1';
+export const DATA_VERSION = '2026-07-30-ship-note-sections-v1';
 /** Set once the legacy 'bulletins-state' store has been imported — a later
  * re-seed must never resurrect stale pre-migration bulletins (C5). */
 export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';

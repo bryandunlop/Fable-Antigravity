@@ -142,6 +142,33 @@ export const STORED_STATE_MIGRATIONS: StoredStateMigration[] = [
       };
     },
   },
+  {
+    // D64 — the Ship Notes shelf's section vocabulary. 'Maintenance' and 'Cabin' are retired from
+    // the tribal-knowledge class (a department is not a topic, per D64's ruling that headings are
+    // what you're DOING), so stores written before this bump carry categories that now match no
+    // section and would silently vanish from the tail page.
+    //
+    // Applies to every tribal-knowledge doc, not just fleet-scoped ones: the three names are
+    // retired from the class outright, and a doc left on a category the picker no longer offers
+    // cannot be edited back onto a valid one. 'Airports & FBOs' and 'Operations' survive, so
+    // general-library content is untouched.
+    to: '2026-07-30-ship-note-sections-v1',
+    migrate: (s) => {
+      const REMAP: Record<string, string> = {
+        Maintenance: 'Messages & faults',
+        Cabin: 'Cabin & connectivity',
+        'Aircraft Quirks': 'Quirks & field notes',
+      };
+      return {
+        ...s,
+        docs: s.docs.map((d) => {
+          if (d.classId !== 'tribal-knowledge') return d;
+          const next = REMAP[d.category];
+          return next ? { ...d, category: next } : d;
+        }),
+      };
+    },
+  },
 ];
 
 /** Apply every step newer than the stored version. `fromVersion === null`
