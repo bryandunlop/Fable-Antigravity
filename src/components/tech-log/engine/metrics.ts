@@ -23,40 +23,39 @@ function average(xs: number[]): number | null {
   return xs.length ? round1(xs.reduce((a, b) => a + b, 0) / xs.length) : null;
 }
 
-/** Gap hours the enterer excluded that fall inside [from, to). Used to keep a derived window
- * honest: an overnight nobody counts should not inflate "how long did this take". */
-function excludedGapHoursWithin(card: WorkCard, fromUtc: string, toUtc: string): number {
-  const tags = [...(card.statusTags ?? [])].sort((a, b) => a.atUtc.localeCompare(b.atUtc));
-  let total = 0;
-  for (let i = 0; i < tags.length; i++) {
-    if (tags[i].tag !== 'GAP' || tags[i].includeInTotals !== false) continue;
-    const spanFrom = tags[i].atUtc;
-    const spanTo = i + 1 < tags.length ? tags[i + 1].atUtc : (card.completedAtUtc ?? toUtc);
-    const lo = spanFrom > fromUtc ? spanFrom : fromUtc;
-    const hi = spanTo < toUtc ? spanTo : toUtc;
-    if (hi > lo) total += hoursBetween(lo, hi);
-  }
-  return total;
-}
-
 /**
- * How long it took to work out what was wrong: the card being raised → the first transition **out
- * of** `DIAGNOSING`. Null when the card was never diagnosed, or is still in diagnosis — an
- * unfinished diagnosis is not a duration, and reporting the elapsed-so-far here would quietly
- * depress the fleet median every time somebody is mid-troubleshoot.
+ * **Hands-on** diagnosis hours: the sum of the card's `DIAGNOSING` spans.
  *
- * The window deliberately starts at `createdAtUtc`, not at the first `DIAGNOSING` tag: the question
- * is asked from when the job landed, so the wait before anyone picked it up is part of the answer.
- * Gaps the enterer excluded are subtracted (D61 §4).
+ * D61 amendment (Bryan, 2026-07-30). Slice 6 shipped this as raised → first transition out of
+ * `DIAGNOSING`, which meant a card raised Friday afternoon and picked up Monday morning reported a
+ * three-day diagnosis for two hours of work. Bryan chose hands-on: the figure that answers "how
+ * long does diagnosis take us" and is comparable between jobs.
+ *
+ * **The accepted cost, recorded on the decision so it is not rediscovered as a bug: this hides the
+ * queue.** A card nobody opened for three days now reads identically to one picked up immediately.
+ * That waiting is not lost — it is still in the timeline as spans, and elapsed remains derivable —
+ * but it is not what this number reports, and this function must not try to compensate for it.
+ *
+ * Null when the card was never diagnosed, or when the diagnosis is still running (the last span is
+ * `DIAGNOSING` on an open card): an unfinished diagnosis is not a duration, and reporting
+ * elapsed-so-far would quietly depress the fleet median every time somebody is mid-troubleshoot.
+ *
+ * A gap needs no special handling here, which is the quiet benefit of the change: a `GAP` is its own
+ * span, so an overnight in the middle of a diagnosis contributes nothing whether the enterer counted
+ * it or not, and the include/exclude choice cannot move this figure at all.
  */
 export function timeToDiagnose(card: WorkCard): number | null {
   const tags = [...(card.statusTags ?? [])].sort((a, b) => a.atUtc.localeCompare(b.atUtc));
-  const first = tags.findIndex(t => t.tag === 'DIAGNOSING');
-  if (first < 0) return null;
-  const exit = tags.slice(first + 1).find(t => t.tag !== 'DIAGNOSING' && t.tag !== 'GAP');
-  if (!exit) return null;
-  const gross = hoursBetween(card.createdAtUtc, exit.atUtc);
-  return round1(Math.max(0, gross - excludedGapHoursWithin(card, card.createdAtUtc, exit.atUtc)));
+  if (!tags.some(t => t.tag === 'DIAGNOSING')) return null;
+  let total = 0;
+  for (let i = 0; i < tags.length; i++) {
+    if (tags[i].tag !== 'DIAGNOSING') continue;
+    // The final span closes at sign-off; on an open card it has no end yet.
+    const to = i + 1 < tags.length ? tags[i + 1].atUtc : card.completedAtUtc;
+    if (!to) return null;
+    total += hoursBetween(tags[i].atUtc, to);
+  }
+  return round1(total);
 }
 
 export interface PartsLead {
@@ -130,6 +129,20 @@ export interface FleetMetrics {
   excludedGapHours: number;
   byAircraft: AircraftMetrics[];
   byVendor: VendorMetrics[];
+  /**
+   * The fleet parts-lead figures, computed over the **delivered orders themselves** — never as a
+   * median of the per-vendor medians.
+   *
+   * The page used to derive its headline from `byVendor.map(v => v.medianLeadHours)`, which weights
+   * every vendor equally regardless of volume: one vendor with a single fast order moved the fleet
+   * number as much as a vendor with fifty slow ones. Bryan's question is "how long does Gulfstream
+   * take to send parts", and a median of medians does not answer it. Exposed here so the page cannot
+   * reinvent the wrong aggregation.
+   */
+  medianLeadHours: number | null;
+  avgLeadHours: number | null;
+  deliveredOrders: number;
+  openOrders: number;
 }
 
 const zeroStateHours = (): Record<WorkCardStatusTag, number> =>
@@ -203,6 +216,9 @@ export function fleetMetrics(cards: WorkCard[], w: MetricsWindow): FleetMetrics 
     };
   });
 
+  // Over the ORDERS, not over the per-vendor medians — see the FleetMetrics docstring.
+  const deliveredLeads = allLeads.filter(l => !l.open).map(l => l.hours);
+
   const fleet = summarize(inWindow);
   return {
     fromUtc: w.fromUtc,
@@ -215,5 +231,9 @@ export function fleetMetrics(cards: WorkCard[], w: MetricsWindow): FleetMetrics 
     excludedGapHours: fleet.excludedGapHours,
     byAircraft,
     byVendor,
+    medianLeadHours: median(deliveredLeads),
+    avgLeadHours: average(deliveredLeads),
+    deliveredOrders: deliveredLeads.length,
+    openOrders: allLeads.filter(l => l.open).length,
   };
 }

@@ -18,15 +18,35 @@ const order = (over: Partial<PartsOrder> = {}): PartsOrder => ({
   orderedAtUtc: '2026-07-07T12:00:00.000Z', ...over,
 });
 
-describe('timeToDiagnose — card raised → the moment diagnosis ended', () => {
-  it('measures from the card being raised to the first transition OUT of diagnosing', () => {
+/**
+ * D61 amendment, ratified by Bryan 2026-07-30: `timeToDiagnose` is the SUM of the `DIAGNOSING`
+ * spans — hands-on time — not raised-to-first-transition wall clock. The accepted cost, recorded on
+ * the decision so it is not rediscovered later as a bug, is that this measurement **hides the
+ * queue**: a card nobody opened for three days now looks identical to one picked up immediately.
+ * The waiting is still in the timeline as spans; it is simply not what this number reports.
+ */
+describe('timeToDiagnose — the hands-on diagnosis hours (D61 amendment)', () => {
+  it('is the DIAGNOSING span itself, not wall clock from the card being raised', () => {
     const c = card({
       statusTags: [ev('DIAGNOSING', '2026-07-07T09:00:00.000Z'), ev('IN_WORK', '2026-07-07T14:00:00.000Z')],
     });
-    // Deliberately includes the hour between the card being raised and anyone starting: "how long
-    // did it take to work out what was wrong" is asked from when the job landed, not from the
-    // moment somebody happened to tag it.
-    expect(timeToDiagnose(c)).toBe(6);
+    // Hand-computed: the card was raised at 08:00, the technician started at 09:00 and stopped
+    // diagnosing at 14:00. Hands-on = 09:00 → 14:00 = 5 h. The idle hour before anyone picked it up
+    // is deliberately NOT in here — that is the queue, and the queue is not what this reports.
+    expect(timeToDiagnose(c)).toBe(5);
+  });
+
+  it('the case that forced the amendment: raised Friday, picked up Monday, two hours on it', () => {
+    const c = card({
+      createdAtUtc: '2026-07-03T16:00:00.000Z',                  // Friday afternoon
+      statusTags: [
+        ev('DIAGNOSING', '2026-07-06T09:00:00.000Z'),            // Monday morning
+        ev('IN_WORK', '2026-07-06T11:00:00.000Z'),
+      ],
+    });
+    // Hand-computed: Fri 16:00 → Mon 11:00 is 67 h of wall clock, which the pre-amendment
+    // measurement reported as a three-day diagnosis. Hands-on is Mon 09:00 → 11:00 = 2 h.
+    expect(timeToDiagnose(c)).toBe(2);
   });
 
   it('is null when the card was never diagnosed', () => {
@@ -38,7 +58,7 @@ describe('timeToDiagnose — card raised → the moment diagnosis ended', () => 
     expect(timeToDiagnose(card({ statusTags: [ev('DIAGNOSING', '2026-07-07T09:00:00.000Z')] }))).toBeNull();
   });
 
-  it('closes at the FIRST exit, so a later relapse into diagnosing does not extend it', () => {
+  it('a relapse into diagnosing ADDS to the total — both stretches were hands on the aircraft', () => {
     const c = card({
       statusTags: [
         ev('DIAGNOSING', '2026-07-07T09:00:00.000Z'),
@@ -47,20 +67,34 @@ describe('timeToDiagnose — card raised → the moment diagnosis ended', () => 
         ev('IN_WORK', '2026-07-07T20:00:00.000Z'),
       ],
     });
-    expect(timeToDiagnose(c)).toBe(4);
+    // Hand-computed: 09:00→12:00 = 3 h, plus 18:00→20:00 = 2 h, total 5 h. The six IN_WORK hours in
+    // between are not diagnosis. (The pre-amendment rule closed at the first exit and said 4 h.)
+    expect(timeToDiagnose(c)).toBe(5);
   });
 
-  it('subtracts an excluded gap that fell inside the diagnosis window', () => {
-    const c = card({
+  it('a gap inside the diagnosis contributes nothing — counted or not, a gap is not diagnosis', () => {
+    const overnight = (include: boolean) => card({
       statusTags: [
         ev('DIAGNOSING', '2026-07-07T09:00:00.000Z'),
-        ev('GAP', '2026-07-07T18:00:00.000Z', { gapReason: 'END_OF_SHIFT', includeInTotals: false }),
+        ev('GAP', '2026-07-07T18:00:00.000Z', { gapReason: 'END_OF_SHIFT', includeInTotals: include }),
         ev('DIAGNOSING', '2026-07-08T08:00:00.000Z'),
         ev('IN_WORK', '2026-07-08T10:00:00.000Z'),
       ],
     });
-    // 08:00 raised → 10:00 next day = 26 h, less the 14 h overnight the tech chose not to count.
-    expect(timeToDiagnose(c)).toBe(12);
+    // Hand-computed: 09:00→18:00 = 9 h, plus 08:00→10:00 = 2 h, total 11 h either way. The gap is
+    // its own span, so hands-on time needs no gap subtraction at all — the include/exclude choice
+    // cannot move this number.
+    expect(timeToDiagnose(overnight(false))).toBe(11);
+    expect(timeToDiagnose(overnight(true))).toBe(11);
+  });
+
+  it('a diagnosis that ran right up to sign-off closes at completedAtUtc', () => {
+    const c = card({
+      status: 'COMPLETED', completedAtUtc: '2026-07-07T15:00:00.000Z',
+      statusTags: [ev('DIAGNOSING', '2026-07-07T09:00:00.000Z')],
+    });
+    // Hand-computed: 09:00 → 15:00 = 6 h.
+    expect(timeToDiagnose(c)).toBe(6);
   });
 });
 
@@ -137,9 +171,12 @@ describe('fleetMetrics — per tail and fleet rollups', () => {
   it('reports median and average time-to-diagnose per tail', () => {
     const m = fleetMetrics(cards, window);
     const ac1 = m.byAircraft[0];
-    expect(ac1.diagnoseHours).toEqual([4, 8]);     // wc-a: 08:00→12:00, wc-b: 08:00→16:00
-    expect(ac1.medianDiagnoseHours).toBe(6);
-    expect(ac1.avgDiagnoseHours).toBe(6);
+    // Hand-computed hands-on diagnosis (D61 amendment): wc-a DIAGNOSING 09:00→12:00 = 3 h;
+    // wc-b DIAGNOSING 08:00→16:00 = 8 h. wc-a was raised at 08:00, and that idle hour is the queue,
+    // which this metric deliberately does not report.
+    expect(ac1.diagnoseHours).toEqual([3, 8]);
+    expect(ac1.medianDiagnoseHours).toBe(5.5);
+    expect(ac1.avgDiagnoseHours).toBe(5.5);
   });
 
   it('a tail that never diagnosed reports null rather than zero', () => {

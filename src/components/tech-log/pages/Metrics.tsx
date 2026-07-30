@@ -85,11 +85,17 @@ export default function Metrics() {
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi icon={<Stethoscope className="h-3.5 w-3.5" />} label="Time to diagnose (median)"
-          value={hrs(m.medianDiagnoseHours)} sub={`avg ${hrs(m.avgDiagnoseHours)}`} />
+        {/* D61 amendment — hands-on, not raised-to-diagnosed wall clock. The label says so because
+            the two differ by days on a card raised Friday and picked up Monday, and a reader who
+            assumes the wrong one draws the wrong conclusion. */}
+        <Kpi icon={<Stethoscope className="h-3.5 w-3.5" />} label="Diagnosis time (median)"
+          value={hrs(m.medianDiagnoseHours)} sub={`hands on the aircraft · avg ${hrs(m.avgDiagnoseHours)}`} />
+        {/* Straight off the engine, over the ORDERS. This was a median of the per-vendor medians,
+            which weighted a vendor with one fast order the same as a vendor with fifty slow ones —
+            not the question being asked. The engine owns the aggregation so this cannot drift back. */}
         <Kpi icon={<PackageSearch className="h-3.5 w-3.5" />} label="Parts lead (median)"
-          value={hrs(m.byVendor.length ? median(m.byVendor.map(v => v.medianLeadHours)) : null)}
-          sub={`${m.byVendor.reduce((n, v) => n + v.orders, 0)} order(s), ${m.byVendor.reduce((n, v) => n + v.openOrders, 0)} open`} />
+          value={hrs(m.medianLeadHours)}
+          sub={`${m.deliveredOrders + m.openOrders} order(s), ${m.openOrders} open`} />
         <Kpi icon={<Wrench className="h-3.5 w-3.5" />} label="Install / wrench time"
           value={hrs(m.totalInstallHours)} sub="hands on the aircraft" />
         <Kpi icon={<MoonStar className="h-3.5 w-3.5" />} label="Excluded gap time"
@@ -122,7 +128,7 @@ export default function Metrics() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Median time to diagnose, by tail</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Median hands-on diagnosis time, by tail</CardTitle></CardHeader>
           <CardContent>
             {diagnoseChart.length === 0 ? (
               <p className="text-sm text-muted-foreground">No card in this period recorded a completed diagnosis.</p>

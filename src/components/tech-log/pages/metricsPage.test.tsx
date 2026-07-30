@@ -56,14 +56,39 @@ describe('Maintenance time rollup (LG-100 / D61 §5)', () => {
   it('renders for a PILOT — D61 §5 makes this everyone\'s page, not maintenance-only', () => {
     renderMetrics('pilot');
     expect(screen.getByText('Maintenance time')).toBeInTheDocument();
-    expect(screen.getByText(/Time to diagnose \(median\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Diagnosis time \(median\)/i)).toBeInTheDocument();
   });
 
-  it('answers the three questions Bryan named from one screen', () => {
+  /**
+   * REWRITTEN after review. This test was named "answers the three questions Bryan named" and
+   * asserted only that three LABELS rendered — so the page could have shown a dash or a zero for
+   * every figure and stayed green. A test whose name claims more than its assertions is worse than
+   * no test, because it occupies the space where the real one would go.
+   *
+   * Hand-computed from CARD, the only card inside the default window:
+   *   diagnosis   DIAGNOSING 10d@08:00 → WAITING_PARTS 10d@12:00                  =  4 h
+   *               (hands-on per the D61 amendment — NOT from createdAtUtc 10d@06:00, which is 6 h)
+   *   parts lead  ordered 10d@12:00 → received 8d@12:00                           = 48 h
+   *   install     IN_WORK 8d@10:00 → completedAtUtc 8d@18:00                      =  8 h
+   */
+  it('answers the three questions Bryan named, with the right numbers', () => {
     renderMetrics('maintenance');
-    expect(screen.getByText(/Time to diagnose \(median\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Parts lead \(median\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Install \/ wrench time/i)).toBeInTheDocument();
+    const kpi = (label: RegExp) => screen.getByText(label).closest('div')!.parentElement!;
+    expect(kpi(/Diagnosis time \(median\)/i)).toHaveTextContent('4 h');
+    expect(kpi(/Parts lead \(median\)/i)).toHaveTextContent('48 h');
+    expect(kpi(/Install \/ wrench time/i)).toHaveTextContent('8 h');
+  });
+
+  /**
+   * The diagnosis figure is hands-on, so the two hours between the card being RAISED and anyone
+   * opening it must not appear in it. Pinned because it is the whole point of the D61 amendment and
+   * because reverting to elapsed would still produce a plausible-looking number.
+   */
+  it('reports hands-on diagnosis, not time since the card was raised', () => {
+    renderMetrics('maintenance');
+    const kpi = screen.getByText(/Diagnosis time \(median\)/i).closest('div')!.parentElement!;
+    expect(kpi).toHaveTextContent('4 h');
+    expect(kpi).not.toHaveTextContent('6 h');
   });
 
   it('links every rolled-up tail back to the cards behind it', () => {
