@@ -215,6 +215,46 @@ describe('AircraftDetail — Reference tab (D60)', () => {
     });
   });
 
+  /**
+   * D65 — the write half of the boundary, through the real editor rather than a fixture.
+   *
+   * `casDraftBoundary.test.tsx` pins that the catalog cannot READ an unpublished revision. This pins
+   * that the editor WRITES to the revision in the first place: if `buildRecords` put the CAS facts
+   * back on the doc they would still reach the picker (the doc is live the moment it is written) and
+   * every read-side test would stay green while the invariant was gone.
+   */
+  it('a CAS entry authored here lands its facts on the published revision, and is offered at once', async () => {
+    const user = userEvent.setup();
+    renderTail('N1PG', 'document-manager', []);
+
+    await user.click(screen.getByRole('button', { name: /new cas entry/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Title'), 'WSHLD HEAT — 650 note');
+    await user.click(within(dialog).getByLabelText('Everyone'));
+    await user.type(within(dialog).getByLabelText('Block 1 content'), 'What the fleet has seen.');
+    await user.type(within(dialog).getByLabelText('CAS message'), 'WSHLD HEAT');
+    await user.selectOptions(within(dialog).getByLabelText('CAS colour'), 'RED');
+    await user.click(within(dialog).getByRole('button', { name: /^Publish$/ }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem(DOCS_KEY) ?? '{}') as DocumentsState;
+      const created = stored.docs?.find((d) => d.title === 'WSHLD HEAT — 650 note');
+      expect(created).toBeDefined();
+      const rev = stored.revisions?.find((r) => r.docId === created!.id);
+      expect(rev?.status).toBe('published');
+      // The facts are on the revision…
+      expect(rev?.casMeta).toEqual({ casMessage: 'WSHLD HEAT', casColor: 'RED', cmcCodes: undefined });
+      expect(rev?.fleetTypes).toEqual(['G650ER']); // prefilled from the tail the curator stood on
+      // …and NOT on the doc row, which is what would make them live before publication.
+      const asLegacy = created as unknown as { casMeta?: unknown; fleetTypes?: unknown };
+      expect(asLegacy.casMeta).toBeUndefined();
+      expect(asLegacy.fleetTypes).toBeUndefined();
+    });
+
+    // Published directly, so the tab it was authored from offers it with no sync step.
+    expect(await screen.findByText('WSHLD HEAT — 650 note')).toBeInTheDocument();
+  });
+
   it('the tab is not filed under Records — reference content is not a record', async () => {
     const user = userEvent.setup();
     renderTail('N1PG');
