@@ -45,6 +45,10 @@ export function formatDateOnly(
   if (!m) return iso;
   const [, y, mo, d] = m.map(Number);
   const date = new Date(y, mo - 1, d); // local midnight — no zone shift
+  // `new Date(99, 0, 1)` is 1999, not year 99 — the legacy two-digit-year mapping. The
+  // guard below would catch it and fall back to the raw string, but then a well-formed
+  // date simply never renders. setFullYear has no such special case.
+  date.setFullYear(y);
   // Round-trip guard: JS rolls 2024-13-45 over into 2025. A silently shifted date is
   // exactly the failure this function exists to prevent, so reject rather than display.
   if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return iso;
