@@ -14,7 +14,7 @@ import type { Doc, DocRevision, DocumentsState } from '../../documents/types';
 import AircraftDetail from './AircraftDetail';
 
 /**
- * D60 — the tail page's Reference tab.
+ * D60/D64 — the tail page's Ship Notes tab.
  *
  * The property that matters most here is the FILTER: a pilot on a G650ER must not be shown a G500
  * CAS message. This is content that feeds an intake form for a signed record, so offering the wrong
@@ -45,7 +45,7 @@ const entry = (over: {
     id: over.id,
     classId: 'tribal-knowledge',
     title: over.title,
-    category: 'Aircraft Quirks',
+    category: 'Messages & faults',
     roles: ['all'],
     ownerUserId: 'USR002',
     ownerName: 'Sarah Wilson',
@@ -98,7 +98,7 @@ function renderTail(tail: string, loginRole = 'maintenance', additionalRoles: st
   localStorage.setItem(DOCS_VERSION_KEY, DOCS_DATA_VERSION);
   localStorage.setItem(DOCS_KEY, JSON.stringify(seed));
   return render(
-    <MemoryRouter initialEntries={[`/tech-log/aircraft/${tail}?tab=reference`]}>
+    <MemoryRouter initialEntries={[`/tech-log/aircraft/${tail}?tab=shipnotes`]}>
       <DocumentsProvider>
         {/* Both props, exactly as `App` passes them — `additionalRoles` is what makes the gate read
             the SESSION's roles instead of the resolved persona's. */}
@@ -110,7 +110,7 @@ function renderTail(tail: string, loginRole = 'maintenance', additionalRoles: st
   );
 }
 
-describe('AircraftDetail — Reference tab (D60)', () => {
+describe('AircraftDetail — Ship Notes tab (D60/D64)', () => {
   it('shows only the tail fleet type’s CAS entries — N1PG is a G650ER', () => {
     renderTail('N1PG');
     expect(screen.getByText('R ENG CHIP on the 650 — what it means')).toBeInTheDocument();
@@ -149,7 +149,7 @@ describe('AircraftDetail — Reference tab (D60)', () => {
   it('offers the create affordance to a curator (the maintenance login is also DOM)', () => {
     renderTail('N1PG', 'maintenance');
     expect(screen.getByRole('button', { name: /new cas entry/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /new article/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /new note/i })).toBeInTheDocument();
   });
 
   it('withholds it from a non-curator login (standards → FO Chen: pilot + standards)', () => {
@@ -170,11 +170,11 @@ describe('AircraftDetail — Reference tab (D60)', () => {
   // `resolveFromLogin` seats them on `personnel[0]` — Captain John Smith, a `chief-pilot`. Reading
   // that persona's roles handed them the curator gate. The tab must be READ-ONLY for both.
   it.each([['scheduling'], ['hr']])(
-    'a %s login gets the Reference tab READ-ONLY — no persona fallback grants curator authority',
+    'a %s login gets the Ship Notes tab READ-ONLY — no persona fallback grants curator authority',
     (role) => {
       renderTail('N1PG', role, []);
       expect(screen.queryByRole('button', { name: /new cas entry/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /new article/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /new note/i })).not.toBeInTheDocument();
       // Reading is still unrestricted — this is a gate on authoring, not on knowledge.
       expect(screen.getByText('R ENG CHIP on the 650 — what it means')).toBeInTheDocument();
     },
@@ -255,14 +255,14 @@ describe('AircraftDetail — Reference tab (D60)', () => {
     expect(await screen.findByText('WSHLD HEAT — 650 note')).toBeInTheDocument();
   });
 
-  it('the tab is not filed under Records — reference content is not a record', async () => {
+  it('the tab is not filed under Records — Ship Notes is reference, not a record', async () => {
     const user = userEvent.setup();
     renderTail('N1PG');
     // PLACEMENT, asserted rather than asserted-about. The tab row is one flex container: the
     // "Records" caption divides it, everything before the caption is a non-record tab, and the
     // record lists follow. Reference must be on the left of that caption — filing it under Records
     // would blur the line D60 rests on (tribal knowledge sits ADJACENT to the airworthiness record).
-    const reference = screen.getByRole('button', { name: 'Reference' });
+    const reference = screen.getByRole('button', { name: 'Ship Notes' });
     const row = reference.parentElement!;
     // Scoped to the tab row — "Records" also appears in the shell's own navigation.
     const caption = within(row).getByText('Records');
@@ -270,7 +270,7 @@ describe('AircraftDetail — Reference tab (D60)', () => {
     expect(order.indexOf(reference)).toBeLessThan(order.indexOf(caption));
     // Everything AFTER the caption is a record list, and Reference is not among them.
     const afterCaption = order.slice(order.indexOf(caption) + 1).map((el) => el.textContent);
-    expect(afterCaption.some((t) => /Reference/.test(t ?? ''))).toBe(false);
+    expect(afterCaption.some((t) => /Ship Notes/.test(t ?? ''))).toBe(false);
     expect(afterCaption.some((t) => /^Defects/.test(t ?? ''))).toBe(true);
 
     // …and it really is a different panel, not a section of the records view.

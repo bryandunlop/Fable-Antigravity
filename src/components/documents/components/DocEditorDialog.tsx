@@ -29,7 +29,7 @@ export type EditorMode =
       kind: 'create';
       classId?: string;
       /** D60: `fleetTypes` / `casMeta` seed a CAS reference entry created from a tail page. */
-      prefill?: { content?: string; title?: string; fleetTypes?: AircraftType[]; casMeta?: DocCasMeta };
+      prefill?: { content?: string; title?: string; category?: string; fleetTypes?: AircraftType[]; casMeta?: DocCasMeta };
     }
   // 'content' is the interim textarea's markdown prefill — independent of DocRevision.sections.
   | { kind: 'revise'; doc: Doc; baseRev: DocRevision; prefill?: Partial<DocRevision> & { content?: string } }
@@ -95,7 +95,10 @@ export function DocEditorDialog({
       const cfg = initial ? classFor(initial) : undefined;
       setClassId(initial);
       setTitle(mode.prefill?.title ?? '');
-      setCategory(cfg?.categories[0] ?? '');
+      // A prefilled category matters, not cosmetics: creating from a tail page must land the note
+      // in a Ship Notes section. The class's first category is now a general-LIBRARY one, so
+      // without this a note authored on a tail vanishes from the shelf it was created on.
+      setCategory(mode.prefill?.category ?? cfg?.categories[0] ?? '');
       setRoles([]);
       // A .docx-import prefill (Slice 4a) seeds sections once; otherwise start blank.
       setSections(mode.prefill?.content ? sectionsFromMarkdown(mode.prefill.content, 'new') : [emptySection()]);
@@ -196,6 +199,7 @@ export function DocEditorDialog({
       return null;
     }
     const casEnabled = cfg.id === CAS_KNOWLEDGE_CLASS_ID;
+    const fleetScoped = !!cfg.fleetScoped;
     // A CAS entry with no message would be a catalog row the picker cannot offer.
     if (casEnabled && isCas && !casMessage.trim()) {
       toast.error('A CAS entry needs the message as the flight deck shows it.');
@@ -212,8 +216,11 @@ export function DocEditorDialog({
     // D65 — these ride the REVISION, not the doc: they reach the catalog only when
     // this revision publishes. Applied only on the class that owns them, so an edit
     // on any other class cannot blank them by omission.
-    const casFields = casEnabled
-      ? { fleetTypes: fleetTypes.length ? fleetTypes : undefined, casMeta }
+    // D64 — fleet applicability is a CLASS CAPABILITY, not "is this tribal knowledge". An `sop`
+    // is fleet-scoped too, because D64 keeps a procedure performed on the aircraft controlled and
+    // has the shelf link out to it. The CAS message/colour half stays tribal-knowledge only.
+    const casFields = fleetScoped
+      ? { fleetTypes: fleetTypes.length ? fleetTypes : undefined, ...(casEnabled ? { casMeta } : {}) }
       : {};
     const { userId, userName } = identityFor(userRole);
     const effAckLevel: AckLevel = cfg.ackLevelLocked ? cfg.defaultAckLevel : requireAck ? ackLevel : 'none';
@@ -453,13 +460,13 @@ export function DocEditorDialog({
             <Input id="docTags" value={tags} onChange={(e) => setTags(e.target.value)} className="mt-1" />
           </div>
 
-          {/* D60 — CAS reference metadata. Tribal knowledge only: it is the class whose entries a
-              tail page and the defect form draw on. Fleet applicability applies to BOTH kinds of
-              entry (article or structured CAS message); the message + colour + codes below are the
-              structured half, and leaving the toggle off makes this a freeform article. */}
-          {cfg?.id === CAS_KNOWLEDGE_CLASS_ID && (
+          {/* D60/D64 — fleet applicability is shown for any FLEET-SCOPED class (tribal knowledge and
+              `sop`), because both can appear on a tail page. The CAS message/colour/codes below are
+              a separate, narrower concern: only tribal knowledge feeds the defect form's picker, so
+              that half stays gated on the class id. */}
+          {cfg?.fleetScoped && (
             <div className="rounded-md border border-border p-3">
-              <Label className="text-xs">Fleet applicability (D60)</Label>
+              <Label className="text-xs">Fleet applicability</Label>
               <div className="mt-1 flex flex-wrap gap-3">
                 {FLEET_TYPES.map((t) => (
                   <label key={t} className="flex cursor-pointer items-center gap-1.5 text-sm">
@@ -473,12 +480,14 @@ export function DocEditorDialog({
                 library content (airport notes and the like).
               </p>
 
+              {cfg?.id === CAS_KNOWLEDGE_CLASS_ID && (
               <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
                 <Checkbox checked={isCas} onCheckedChange={() => setIsCas((v) => !v)} />
                 This entry explains one CAS message
               </label>
+              )}
 
-              {isCas && (
+              {cfg?.id === CAS_KNOWLEDGE_CLASS_ID && isCas && (
                 <div className="mt-2 space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <Input
