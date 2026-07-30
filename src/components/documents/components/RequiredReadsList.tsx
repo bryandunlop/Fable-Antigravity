@@ -5,7 +5,7 @@ import { GFO_STATUS_CLASS } from '../../gfo/status';
 import { GfoEmptyState } from '../../gfo';
 import { useDocuments, identityFor } from '../DocumentsContext';
 import { unacknowledgedRequiredReads, isOverdue } from '../engine/acknowledgments';
-import { classFor } from '../classes';
+import { classFor, docReaderPath } from '../classes';
 import { DocIdentityLine } from './DocIdentity';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
@@ -36,7 +36,7 @@ export function RequiredReadsList({ userRole }: { userRole: string }) {
     <ul className="divide-y divide-border rounded-lg border border-border bg-card">
       {outstanding.map(({ doc, rev }) => {
         const cfg = classFor(doc.classId);
-        const to = cfg.readerRoute === '/documents' ? `/documents/${doc.id}` : cfg.readerRoute;
+        const to = docReaderPath(doc.id);
         const overdue = isOverdue(rev, todayIso);
         return (
           <li key={rev.id}>

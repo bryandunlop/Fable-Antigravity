@@ -21,10 +21,21 @@ export interface DocumentClassConfig {
   commentsEnabled: boolean;
   defaultReviewCycleDays?: number;
   categories: string[];
-  /** Canonical reader surface for links/notifications. */
-  readerRoute: string;
   /** Default ack window (days after publish) used to prefill ackDueDate. */
   defaultAckDueDays?: number;
+}
+
+/**
+ * Where a document is read. D66: the Document Center is the ONLY reader, for every
+ * class — so this is a function of the doc id alone, not of its class.
+ *
+ * This used to be a per-class `readerRoute`, which existed solely so the two bulletin
+ * classes could point at their own bespoke pages. Every call site then carried the
+ * same `route === '/documents' ? \`/documents/${id}\` : route` ternary, and a link to
+ * a bulletin landed on a LIST rather than on the document the notification named.
+ */
+export function docReaderPath(docId: string): string {
+  return `/documents/${docId}`;
 }
 
 const APPROVERS = ['document-manager', 'lead', 'admin'];
@@ -45,7 +56,6 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     approverRoles: APPROVERS,
     commentsEnabled: false,
     categories: ['Flight Operations', 'Maintenance Procedures', 'Safety Procedures', 'Inflight Service', 'Administrative'],
-    readerRoute: '/procedural-bulletins',
     defaultAckDueDays: 7,
   },
   'flight-ops-bulletin': {
@@ -60,7 +70,6 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     approverRoles: APPROVERS,
     commentsEnabled: false,
     categories: ['Flight Operations', 'Safety Procedures', 'Administrative'],
-    readerRoute: '/flight-operations-bulletins',
     defaultAckDueDays: 7,
   },
   sop: {
@@ -76,7 +85,6 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     commentsEnabled: false,
     defaultReviewCycleDays: 365,
     categories: ['Flight Operations', 'Maintenance Procedures', 'Safety Procedures', 'Inflight Service', 'Ground Operations'],
-    readerRoute: '/documents',
     defaultAckDueDays: 7,
   },
   manual: {
@@ -92,7 +100,6 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     commentsEnabled: false,
     defaultReviewCycleDays: 365,
     categories: ['General Operations', 'Flight Operations', 'Maintenance', 'Emergency Procedures'],
-    readerRoute: '/documents',
     defaultAckDueDays: 14,
   },
   'tribal-knowledge': {
@@ -108,7 +115,6 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     commentsEnabled: true,
     defaultReviewCycleDays: 180,
     categories: ['Airports & FBOs', 'Aircraft Quirks', 'Operations', 'Maintenance', 'Cabin'],
-    readerRoute: '/documents',
   },
 };
 

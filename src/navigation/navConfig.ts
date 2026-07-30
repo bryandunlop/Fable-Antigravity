@@ -10,7 +10,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity, AlertOctagon, AlertTriangle, Archive, ArrowRightLeft, BarChart3,
-  BookOpen, Boxes, Building2, Calendar, CalendarCheck, ClipboardCheck,
+  Boxes, Building2, Calendar, CalendarCheck, ClipboardCheck,
   ClipboardList, Database, FileText, Flag, Fuel, HardHat, Home, Layers,
   MapPin, Monitor, Package, PackagePlus, Plane, Send, Settings, Shield,
   Sliders, Sparkles, Target, Upload, UserCheck, Users, Utensils, Warehouse,
@@ -87,7 +87,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/tasks-action-items', label: 'Tasks & Action Items', domain: 'home', icon: Target, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   // Per-approver inbox (D39): requests awaiting your role's sign-off, plus what you filed.
   { path: '/approvals', label: 'Approvals', domain: 'home', icon: ClipboardCheck, primary: true, keywords: ['approve', 'waiver', 'sign-off', 'request'], roles: ['pilot', 'chief-pilot', 'inflight', 'fa-manager', 'maintenance', 'chief-inspector', 'shift-lead', 'safety', 'lead', 'scheduling', 'document-manager', 'admin', 'dom'] },
-  { path: '/procedural-bulletins', label: 'Procedural Bulletins', domain: 'home', icon: BookOpen, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
+  // D66: Procedural Bulletins and Flight Ops Bulletins used to sit here and under
+  // flight-ops as their own doors. They read in the Document Center now — one place,
+  // all documents — so their keywords moved onto that entry rather than being lost.
   { path: '/currency-dashboard', label: 'Currency Dashboard', domain: 'home', icon: UserCheck, primary: true, keywords: ['currency', 'compliance', 'landings', '61.58'], roles: ['pilot', 'admin', 'lead', 'scheduling'] },
   { path: '/aog-management', label: 'AOG Management', domain: 'home', icon: AlertOctagon, primary: true, keywords: ['aog', 'aircraft on ground', 'emergency'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   // Cross-role experimental tools live in the everyone-domain's More (spec deviation note).
@@ -109,7 +111,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/fuel-load-request', label: 'Fuel Load Request', domain: 'flight-ops', icon: Fuel, primary: false, roles: ['pilot', 'admin'] },
   { path: '/frat/review', label: 'FRAT Review', domain: 'flight-ops', icon: FileText, sidebar: false, roles: ['safety', 'admin'] },
   { path: '/flight-operations-center', label: 'Flight Operations Center', domain: 'flight-ops', icon: Monitor, sidebar: false, keywords: ['foc', 'ops center'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-  { path: '/flight-operations-bulletins', label: 'Flight Ops Bulletins', domain: 'flight-ops', icon: BookOpen, primary: false, keywords: ['fob', 'bulletin', 'interim', 'nonofficial', 'read and initial'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/aircraft', label: 'Aircraft Status', domain: 'flight-ops', icon: Plane, sidebar: false, keywords: ['fleet', 'tail number', 'status'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   // FIR — retrospective ops explainability (docs/FIR_MODULE_DESIGN.md). Any role can open one (§7 bottom-up capture).
   { path: '/fir', label: 'Irregularity Reports', domain: 'flight-ops', icon: Flag, primary: false, detailLabel: 'FIR', keywords: ['fir', 'irregularity', 'aog report', 'delay', 'debrief', 'downtime', 'why'], roles: ['pilot', 'chief-pilot', 'inflight', 'maintenance', 'maintenance-coordinator', 'dom', 'lead', 'safety', 'scheduling', 'admin'] },
@@ -177,7 +178,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/safety/form-fields', label: 'Form Field Manager', domain: 'safety', icon: Sliders, sidebar: false, keywords: ['frat', 'grat', 'customize', 'scoring'], roles: ['safety', 'admin'] },
 
   // ── Documents ─────────────────────────────────────────────────────────────
-  { path: '/documents', label: 'Document Center', domain: 'documents', icon: Archive, primary: true, detailLabel: 'Document', keywords: ['manual', 'gom', 'library', 'sop', 'compliance', 'read and initial', 'tribal knowledge', 'bulletin'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'procedural-specialist'] },
+  { path: '/documents', label: 'Document Center', domain: 'documents', icon: Archive, primary: true, detailLabel: 'Document', keywords: ['manual', 'gom', 'library', 'sop', 'compliance', 'read and initial', 'tribal knowledge', 'bulletin', 'bulletins', 'procedural bulletin', 'flight ops bulletin', 'pb', 'fob', 'interim', 'nonofficial'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'procedural-specialist'] },
   { path: '/documents', label: 'Document Library', domain: 'documents', icon: Archive, primary: true, roles: ['dms-manager'] },
 
   // ── Admin ─────────────────────────────────────────────────────────────────

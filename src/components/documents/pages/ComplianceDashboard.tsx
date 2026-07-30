@@ -8,7 +8,7 @@ import { GFO_STATUS_CLASS } from '../../gfo/status';
 import { downloadCSV } from '../../inventory-v2/shared/exportUtils';
 import { getRoleLabelByValue } from '../../../lib/mockUsers';
 import { useDocuments, identityFor } from '../DocumentsContext';
-import { DOC_CLASSES, classFor } from '../classes';
+import { DOC_CLASSES, classFor, docReaderPath } from '../classes';
 import { currentRevision } from '../engine/revisions';
 import {
   readersFor,
@@ -81,7 +81,7 @@ export function ComplianceDashboard({ standalone = false }: { standalone?: boole
                 <span className="min-w-0 flex-1 truncate">
                   <span className="font-medium">{identityFor(reader.role).userName}</span>
                   <span className="text-muted-foreground"> ({getRoleLabelByValue(reader.role)}) owes </span>
-                  <Link to={classFor(doc.classId).readerRoute === '/documents' ? `/documents/${doc.id}` : classFor(doc.classId).readerRoute} className="underline underline-offset-2">
+                  <Link to={docReaderPath(doc.id)} className="underline underline-offset-2">
                     {doc.id} rev {rev.revision}
                   </Link>
                 </span>

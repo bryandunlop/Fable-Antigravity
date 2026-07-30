@@ -4,7 +4,9 @@ import { buildAuditFeed } from './contributors/audits';
 import { buildHazardFeed } from './contributors/hazards';
 import { buildInventoryFeed } from './contributors/inventory';
 import { buildTripReminderFeed } from './contributors/tripReminders';
-// buildBulletinFeed superseded by the unified documents contributor (bulletins.ts kept in-tree, unregistered)
+// D66: the legacy bulletins contributor is gone. It read the no-longer-written
+// 'bulletins-state' key and deep-linked to the retired bulletin pages; the unified
+// documents contributor below covers bulletin classes and links to the document.
 import { buildDocumentsFeed } from './contributors/documents';
 import { buildHazardMessageFeed } from './contributors/hazardMessages';
 
