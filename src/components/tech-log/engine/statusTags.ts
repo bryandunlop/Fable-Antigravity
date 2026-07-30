@@ -205,6 +205,55 @@ export interface StatusDurations {
   openTag?: WorkCardStatusTag;  // state the card is sitting in right now (undefined once completed)
 }
 
+/** A half-open wall-clock interval, `[fromUtc, toUtc)`. */
+export interface Interval { fromUtc: string; toUtc: string }
+
+/**
+ * The wall-clock intervals of this card's EXCLUDED gaps — the stretches whoever entered the time
+ * chose not to count (D61 §4).
+ *
+ * Why intervals rather than just hours: a defect can carry several work cards, and when a job spans
+ * two of them the normal way to record "everybody was away over the weekend" is to log that same
+ * calendar gap on both. Summing each card's hours then subtracts it TWICE from one wall clock —
+ * measured at 120 h excluded against 63 h elapsed, which drove `countedDowntimeHours` to zero.
+ * Anything rolling up across cards must union these instead (`unionHours`).
+ */
+export function excludedGapIntervals(card: WorkCard, asOfUtc: string): Interval[] {
+  const tags = sorted(card.statusTags ?? []);
+  if (tags.length === 0) return [];
+  const end = card.completedAtUtc ?? asOfUtc;
+  const out: Interval[] = [];
+  for (let i = 0; i < tags.length; i++) {
+    if (tags[i].tag !== 'GAP' || tags[i].includeInTotals !== false) continue;
+    const toUtc = i + 1 < tags.length ? tags[i + 1].atUtc : end;
+    if (toUtc > tags[i].atUtc) out.push({ fromUtc: tags[i].atUtc, toUtc });
+  }
+  return out;
+}
+
+/**
+ * Hours covered by the UNION of `intervals`, clamped to `[clampFromUtc, clampToUtc)` when given.
+ * Overlapping or touching intervals merge, so the same calendar period logged on two cards is
+ * counted once.
+ */
+export function unionHours(intervals: Interval[], clampFromUtc?: string, clampToUtc?: string): number {
+  const lo = clampFromUtc ? new Date(clampFromUtc).getTime() : -Infinity;
+  const hi = clampToUtc ? new Date(clampToUtc).getTime() : Infinity;
+  const spans = intervals
+    .map(iv => ({ from: Math.max(new Date(iv.fromUtc).getTime(), lo), to: Math.min(new Date(iv.toUtc).getTime(), hi) }))
+    .filter(s => s.to > s.from)
+    .sort((a, b) => a.from - b.from);
+  let total = 0;
+  let cur: { from: number; to: number } | null = null;
+  for (const s of spans) {
+    if (!cur) { cur = { ...s }; continue; }
+    if (s.from <= cur.to) cur.to = Math.max(cur.to, s.to);   // overlapping or touching — merge
+    else { total += cur.to - cur.from; cur = { ...s }; }
+  }
+  if (cur) total += cur.to - cur.from;
+  return round1(total / 3600000);
+}
+
 /** Per-state elapsed hours from the tag history. The final segment closes at completion time, or
  * runs to asOf while the card is open — "how long has it been waiting" is always answerable live.
  *

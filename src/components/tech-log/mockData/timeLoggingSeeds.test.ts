@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getDefaultState } from './scenarios';
 import { fleetMetrics, timeToDiagnose, partsLeadTimes } from '../engine/metrics';
-import { statusDurations } from '../engine/statusTags';
+import { statusDurations, writeStatusTimeline } from '../engine/statusTags';
 import { crewActionPending } from '../engine/crewAction';
 
 /**
@@ -122,5 +122,53 @@ describe('LG-110 — the D59 crew-action gate is visible on a fresh load', () =>
   it('the crew has instructions to comply with — a required action with no (O) text is unusable', () => {
     const df = state.deferrals.find(d => d.id === 'df-n7pg')!;
     expect((df.melOProcedure ?? '').trim().length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * THE GUARD THAT WOULD HAVE CAUGHT IT.
+ *
+ * The first cut of the wc-4 seed put `completedAtUtc` five hours INSIDE the overnight gap, with the
+ * final `IN_WORK` span starting eight hours after the card was signed off. Every symptom was
+ * silent: the install span computed to −8 h and clamped to 0, the excluded gap ran past the return
+ * to service, and the totals stopped reconciling with elapsed. Five review lenses found it; this
+ * file did not, because it asserted tag containment and derived numbers rather than the one thing
+ * that actually mattered — **that the seeded history is a history the sanctioned writer would
+ * accept.**
+ *
+ * `writeStatusTimeline` is the only path a technician can write time through, and it validates. If
+ * a seed cannot survive it, the demo is showing a state the product forbids.
+ */
+describe('every seeded time history is one writeStatusTimeline would accept', () => {
+  const state = getDefaultState(Date.parse('2026-07-30T12:00:00.000Z'));
+
+  it('accepts every seeded card that carries a timeline', () => {
+    const carded = state.workCards.filter(c => (c.statusTags ?? []).length > 0);
+    expect(carded.length).toBeGreaterThan(0);
+    for (const c of carded) {
+      const res = writeStatusTimeline(c, c.statusTags!, { oid: 'USR001', name: 'Seed check' }, '2026-07-30T12:00:00.000Z');
+      expect(res.ok, `${c.cardNumber}: ${res.ok ? '' : res.error}`).toBe(true);
+    }
+  });
+
+  it('never lets a span begin after the card was complied with', () => {
+    for (const c of state.workCards) {
+      if (!c.completedAtUtc) continue;
+      for (const t of c.statusTags ?? []) {
+        expect(t.atUtc <= c.completedAtUtc!, `${c.cardNumber}: ${t.tag} at ${t.atUtc} is after RTS ${c.completedAtUtc}`).toBe(true);
+      }
+    }
+  });
+
+  it("attributed + excluded hours reconcile with the card's own elapsed time", () => {
+    for (const c of state.workCards) {
+      if (!c.completedAtUtc || !(c.statusTags ?? []).length) continue;
+      const d = statusDurations(c, '2026-07-30T12:00:00.000Z');
+      const attributed = Object.values(d.hours).reduce((a, b) => a + b, 0);
+      const firstTag = [...c.statusTags!].sort((a, b) => a.atUtc.localeCompare(b.atUtc))[0].atUtc;
+      const elapsed = (Date.parse(c.completedAtUtc) - Date.parse(firstTag)) / 3600000;
+      // Spans run edge to edge from the first tag to sign-off, so these must agree to rounding.
+      expect(Math.abs(attributed + d.excludedGapHours - elapsed), `${c.cardNumber}`).toBeLessThan(0.2);
+    }
   });
 });

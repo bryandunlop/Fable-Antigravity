@@ -1,5 +1,5 @@
 import type { Defect, LaborEntry, WorkCard, WorkCardStatusTag } from '../types';
-import { statusDurations, STATUS_TAG_LABELS, STATUS_TAG_ORDER } from './statusTags';
+import { statusDurations, excludedGapIntervals, unionHours, STATUS_TAG_LABELS, STATUS_TAG_ORDER } from './statusTags';
 import { laborRollup, type LaborRollup } from './labor';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -68,15 +68,28 @@ export function buildDowntimeDebrief(defectId: string, state: Slice, asOfUtc: st
   const labor = laborRollup(state.laborEntries.filter(l => cardIds.has(l.workCardId)));
 
   const stateHours = zeroStateHours();
-  let excludedGapHours = 0;
   for (const c of cards) {
     // Attribution stops at event end — an open tag never accrues past a cleared defect.
     const d = statusDurations(c, endUtc);
     (Object.keys(stateHours) as WorkCardStatusTag[]).forEach(k => { stateHours[k] += d.hours[k]; });
-    excludedGapHours += d.excludedGapHours;
   }
   (Object.keys(stateHours) as WorkCardStatusTag[]).forEach(k => { stateHours[k] = round1(stateHours[k]); });
-  excludedGapHours = round1(excludedGapHours);
+
+  /**
+   * Excluded-gap hours are the UNION of the intervals, never the sum of each card's total.
+   *
+   * A defect can carry several work cards, and when a job spans two of them the normal way to
+   * record "everybody was away over the weekend" is to log that same calendar gap on both. Summing
+   * subtracted it TWICE from a single wall clock: a 63 h event with the same 60 h weekend logged on
+   * two cards produced 120 h excluded, and `countedDowntimeHours` — the headline downtime figure,
+   * which reaches a published FIR — collapsed to zero. Clamped to the event window so a gap logged
+   * either side of it cannot subtract time the event never contained.
+   */
+  const excludedGapHours = unionHours(
+    cards.flatMap(c => excludedGapIntervals(c, endUtc)),
+    startUtc,
+    endUtc,
+  );
 
   const elapsedHours = round1(Math.max(0, (new Date(endUtc).getTime() - new Date(startUtc).getTime()) / 3600000));
   const attributed = (Object.values(stateHours) as number[]).reduce((a, b) => a + b, 0);

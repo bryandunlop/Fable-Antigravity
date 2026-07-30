@@ -381,10 +381,38 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
    * On N6PG so the metrics rollup has a second tail and is not a one-line table.
    */
   {
+    /**
+     * `iso(x)` is "x ago", so a SMALLER offset is a LATER instant. The first cut of this seed read
+     * naturally and was wrong for exactly that reason: `completedAt` was `6D+11H` while the last
+     * `IN_WORK` was `6D+3H`, i.e. the install began eight hours AFTER the card was signed off. The
+     * consequences were all silent — the final install span computed to −8 h and clamped to 0, the
+     * excluded gap ran five hours past the return to service, and `writeStatusTimeline`'s own
+     * validator would have refused the history the seed was handing the demo. Five review lenses
+     * caught it independently.
+     *
+     * Every offset below therefore descends, and the last one is `completedAt`.
+     */
     const raisedAt = iso(9 * D + 6 * H);
-    const completedAt = iso(6 * D + 11 * H);
+    const completedAt = iso(5 * D + 19 * H);
     const wc4Rel = makeSignature({ id: 'sig-wc-rel-4', signedEntity: 'WORK_CARD', signedEntityId: 'rel-wc-4', signer: tech, intentStatement: 'seed', signedAtUtc: completedAt, certNumber: tech.apCertificateNumber });
     signatures.push(wc4Rel);
+
+    // The squawk this card was raised against. RECTIFIED and cleared at the release, so it is
+    // history rather than anything that touches N6PG's current serviceability — the same shape the
+    // histDefect helper above uses. It exists so the downtime debrief and the FIR WORK_CARD anchor
+    // have a chain to resolve; without it the card is an orphan.
+    const wc4DefSig = makeSignature({ id: 'sig-d-wc4', signedEntity: 'DEFECT', signedEntityId: 'd-wc4', signer: pilot, intentStatement: 'seed', signedAtUtc: iso(9 * D + 7 * H) });
+    signatures.push(wc4DefSig);
+    defects.push({
+      id: 'd-wc4', aircraftId: 'ac-n6pg', source: 'PIREP', ataChapter: '34',
+      description: 'ADM 1 disagree — intermittent on climb-out.',
+      symptom: 'Came and went above 10,000 ft; airspeed split maybe 4 knots, cleared in the descent.',
+      cmcFaultCode: '34-11-07',
+      airworthinessAffecting: true, status: 'RECTIFIED', reportedByOid: pilot.oid,
+      occurredAtUtc: iso(9 * D + 8 * H), reportedAtUtc: iso(9 * D + 7 * H),
+      rectificationText: 'Replaced No. 1 air data module; pitot-static leak and correspondence check normal.',
+      clearedByOid: tech.oid, clearedTsUtc: completedAt, signatureId: wc4DefSig.id,
+    });
     releases.push({
       id: 'rel-wc-4', aircraftId: 'ac-n6pg', signoffType: 'WORKCARD', linkedWorkCardId: 'wc-4',
       isGatingDischarge: false, workDescription: 'WO-34-0512 — replaced No. 1 air data module; ops check normal.',
@@ -399,6 +427,10 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       ataChapter: '34', description: 'Corrective — intermittent ADM 1 disagree on climb-out.',
       source: 'CAMP', headerStatusCode: 0, scheduled: false, riiRequired: false,
       createdAtUtc: raisedAt, completedAtUtc: completedAt, completedReleaseId: 'rel-wc-4',
+      // Without this the card holding the gap, the delivered parts order and the whole arc is
+      // invisible to buildDowntimeDebrief AND to the FIR WORK_CARD anchor — i.e. the flagship demo
+      // card was unreachable by both features it exists to demonstrate.
+      linkedDefectId: 'd-wc4',
       status: 'COMPLETED', ammReference: 'AMM 34-11-00', cmcFaultCodes: ['34-11-07'],
       steps: [
         { id: 'wc4-s1', seq: 1, text: 'Interrogate MAU; compare ADM 1/2 pressure outputs', done: true },
@@ -411,7 +443,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
         { tag: 'WAITING_PARTS', atUtc: iso(9 * D), byOid: tech.oid, note: 'POO — No. 1 air data module from Gulfstream Savannah', partsOrderId: 'po-wc4-1' },
         { tag: 'IN_WORK', atUtc: iso(6 * D + 21 * H), byOid: tech.oid },
         { tag: 'GAP', atUtc: iso(6 * D + 16 * H), byOid: tech.oid, gapReason: 'END_OF_SHIFT', note: 'Went home; hangar closed overnight', includeInTotals: false },
-        { tag: 'IN_WORK', atUtc: iso(6 * D + 3 * H), byOid: tech.oid },
+        { tag: 'IN_WORK', atUtc: iso(5 * D + 22 * H), byOid: tech.oid },
       ],
       partsOrders: [{
         id: 'po-wc4-1', description: 'Air data module No. 1', partNumber: '1159SCT204-1',
