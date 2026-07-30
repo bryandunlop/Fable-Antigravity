@@ -1,10 +1,12 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router-dom';
 import { Paperclip, Camera, MapPin, X, Clock, MonitorDot, BookOpen } from 'lucide-react';
 // D60 — the CAS catalog is derived in the documents module (that is where the knowledge and its
 // forward-migrating store live). Pure functions and a type only: no context, no store, no provider
 // requirement — see `useCasCatalog` for the read side.
-import { matchCasCatalog, catalogEntryForMessage, type CasCatalogEntry } from '../../../documents/engine/casKnowledge';
+import {
+  matchCasCatalog, catalogEntryForMessage, CAS_PICKER_LIMIT, type CasCatalogEntry,
+} from '../../../documents/engine/casKnowledge';
 import { CasChip } from '../CasChip';
 import { mockSha256 } from '../../engine/signing';
 import { newId } from '../../util/id';
@@ -204,10 +206,60 @@ export function DefectCasField({
   fleetType?: string;
 }) {
   const [query, setQuery] = useState('');
-  const matches = matchCasCatalog(catalog, query);
+  // Filter over the WHOLE catalog, then cap what is drawn. Search therefore reaches an entry past
+  // the cap; the cap is a rendering limit, not a search limit, and the list says so below.
+  const filtered = matchCasCatalog(catalog, query, Number.MAX_SAFE_INTEGER);
+  const matches = filtered.slice(0, CAS_PICKER_LIMIT);
   // When the typed message IS a curated one, offer the entry that explains it. Read-only for the
   // pilot: "what maintenance knows about this message", not a second place to record the defect.
   const known = catalogEntryForMessage(catalog, message);
+
+  /**
+   * D60 fix pass — the colour follows the message, in BOTH directions.
+   *
+   * `casColor` is not decoration: `fir/engine/suggestions.ts` reads it on the safety fast path, and
+   * `casValueFor` writes it straight onto a signed defect. Before this, `pick()` wrote a curated
+   * colour and nothing took it back when the message was then hand-edited to a *different*
+   * annunciation — so one entry's tier rode onto another entry's message. The converse was also
+   * true: a message TYPED to exactly match a curated entry got the "what maintenance knows" deep
+   * link but not the curated colour, so the form knew the right answer and declined to use it.
+   *
+   * The rule: **while the message matches a catalog entry the colour is that entry's; otherwise it
+   * is whatever the reporter last chose in the select.** `manualColor` remembers that choice, so
+   * editing a curated message away hands the reporter their own colour back instead of inventing
+   * one — silently resetting an explicitly chosen RED to the AMBER default would be the same class
+   * of bug pointing the other way. Adoption fires only when the message moves to a DIFFERENT entry,
+   * so a reporter who deliberately overrides the tier on a curated message keeps their override.
+   *
+   * Free entry is untouched: a message no entry curates changes no colour by itself, which is
+   * D60's stated position that the catalog is an aid to intake and never a constraint on it. So is
+   * D57's mutual exclusion — this only ever moves `color`, and `casValueFor` remains the one place
+   * `casMessage`/`casColor` and `casObserved` are made alternatives.
+   */
+  const manualColor = useRef(color);
+  useEffect(() => {
+    // Outside MESSAGE mode there is no curated colour in play, so whatever is held IS the
+    // reporter's. This also re-baselines the ref when a parent resets the form without remounting.
+    if (mode !== 'MESSAGE') manualColor.current = color;
+  }, [mode, color]);
+
+  const chooseColor = (c: CasColor) => {
+    manualColor.current = c;
+    onColorChange(c);
+  };
+
+  const changeMessage = (next: string) => {
+    onMessageChange(next);
+    const before = catalogEntryForMessage(catalog, message);
+    const after = catalogEntryForMessage(catalog, next);
+    if (after) {
+      if (before?.docId !== after.docId && after.casColor !== color) onColorChange(after.casColor);
+      return;
+    }
+    // The message just stopped being the curated one whose colour is on screen — give the
+    // reporter's own colour back rather than leave another annunciation's tier behind.
+    if (before && color !== manualColor.current) onColorChange(manualColor.current);
+  };
 
   const pick = (entry: CasCatalogEntry) => {
     onMessageChange(entry.casMessage);
@@ -240,13 +292,13 @@ export function DefectCasField({
               aria-label="CAS message"
               placeholder="CAS message, e.g. R ENG CHIP"
               value={message}
-              onChange={e => onMessageChange(e.target.value)}
+              onChange={e => changeMessage(e.target.value)}
             />
             <select
               aria-label="CAS color"
               className="rounded-md border bg-background px-2 py-1 text-sm"
               value={color}
-              onChange={e => onColorChange(e.target.value as CasColor)}
+              onChange={e => chooseColor(e.target.value as CasColor)}
             >
               {CAS_COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
@@ -254,8 +306,15 @@ export function DefectCasField({
 
           {catalog.length > 0 && (
             <div className="mt-2 rounded-md border bg-muted/20 p-2">
+              {/* The header used to print `catalog.length` beside a list capped at
+                  CAS_PICKER_LIMIT, so a 26th curated message was invisible AND uncounted — the
+                  number claimed the list was complete. Shown/total is stated instead, and the cap
+                  is called out under the list when it bites. */}
               <Label htmlFor="cas-catalog-search" className="text-xs">
-                Or pick from {fleetType ? `${fleetType} ` : ''}curated messages ({catalog.length})
+                Or pick from {fleetType ? `${fleetType} ` : ''}curated messages
+                {filtered.length === catalog.length
+                  ? ` (${matches.length} of ${catalog.length})`
+                  : ` (${matches.length} of ${filtered.length} matching · ${catalog.length} curated)`}
               </Label>
               <Input
                 id="cas-catalog-search"
@@ -285,6 +344,12 @@ export function DefectCasField({
                   </p>
                 )}
               </div>
+              {filtered.length > matches.length && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Showing the first {matches.length} of {filtered.length} matches — narrow the filter to
+                  reach the rest. Filtering searches every curated entry, not just these.
+                </p>
+              )}
             </div>
           )}
 
@@ -293,7 +358,10 @@ export function DefectCasField({
               <Link to={`/documents/${known.docId}`} className="inline-flex items-center gap-1 underline">
                 <BookOpen className="h-3.5 w-3.5" /> What maintenance knows about {known.casMessage}
               </Link>
-              <span className="text-muted-foreground"> — reference only; it does not change what you report.</span>
+              <span className="text-muted-foreground">
+                {' '}— reference only; it does not change what you report. The colour above is the
+                curated one for this message; change it if the flight deck showed something else.
+              </span>
             </p>
           )}
         </>

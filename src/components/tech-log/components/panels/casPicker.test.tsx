@@ -71,20 +71,28 @@ const DOCS: Doc[] = [
     fleetTypes: ['G500'],
     casMeta: { casMessage: 'GPS 1 ADVISORY', casColor: 'WHITE' },
   }),
+  // A SECOND G650ER entry, at a different tier — without one, "the colour follows the message"
+  // cannot be told apart from "the colour never changes after the first pick".
+  tkDoc({
+    id: 'TK-912',
+    title: 'CABIN TEMP on the 650 — nuisance in the descent',
+    fleetTypes: ['G650ER'],
+    casMeta: { casMessage: 'CABIN TEMP', casColor: 'CYAN' },
+  }),
 ];
 
-function seedDocs() {
-  const seed: Partial<DocumentsState> = { docs: DOCS, revisions: DOCS.map((d) => published(d.id)), comments: [] };
+function seedDocs(docs: Doc[] = DOCS) {
+  const seed: Partial<DocumentsState> = { docs, revisions: docs.map((d) => published(d.id)), comments: [] };
   localStorage.setItem(DOCS_VERSION_KEY, DOCS_DATA_VERSION);
   localStorage.setItem(DOCS_KEY, JSON.stringify(seed));
 }
 
 /** N1PG is a G650ER in the seeded fleet. `lockTail: null` leaves the Aircraft select enabled —
  *  note a plain `undefined` cannot express that, since it would take the default below. */
-function renderForm(opts: { withDocuments?: boolean; lockTail?: string | null } = {}) {
-  const { withDocuments = true } = opts;
+function renderForm(opts: { withDocuments?: boolean; lockTail?: string | null; docs?: Doc[] } = {}) {
+  const { withDocuments = true, docs } = opts;
   const lockTail = 'lockTail' in opts ? opts.lockTail ?? undefined : 'N1PG';
-  if (withDocuments) seedDocs();
+  if (withDocuments) seedDocs(docs);
   const form = (
     <TechLogProvider userRole="pilot">
       <ReportDefectDialog open onOpenChange={() => {}} lockTail={lockTail} />
@@ -243,5 +251,134 @@ describe('defect form CAS picker (D60)', () => {
     const input = screen.getByLabelText('CAS message');
     await user.type(input, 'R ENG CHIP');
     expect(input).toHaveValue('R ENG CHIP');
+  });
+});
+
+/**
+ * D60 fix pass — `casColor` is what the FIR safety fast path reads (`fir/engine/suggestions.ts`) and
+ * what `casValueFor` writes onto a signed defect, so a colour that does not belong to the message
+ * beside it is a wrong tier on the record, not a cosmetic slip. The rule under test: while the
+ * message matches a catalog entry the colour is that entry's; otherwise it is the reporter's own.
+ */
+describe('defect form CAS colour follows the message (D60)', () => {
+  const messageInput = () => screen.getByLabelText('CAS message');
+  const colorSelect = () => screen.getByLabelText('CAS color');
+
+  it('adopts the curated colour for a message TYPED to match an entry', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await chooseMessageMode(user);
+    expect(colorSelect()).toHaveValue('AMBER');
+
+    await user.type(messageInput(), 'CABIN TEMP');
+
+    // The form already knew enough to render the deep link; it now uses the same knowledge for the
+    // tier instead of leaving the AMBER default on a cyan advisory.
+    expect(colorSelect()).toHaveValue('CYAN');
+    expect(screen.getByRole('link', { name: /what maintenance knows about CABIN TEMP/i })).toBeInTheDocument();
+  });
+
+  it('gives the colour back when the message is hand-edited away from the picked entry', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await chooseMessageMode(user);
+    await user.click(screen.getByText('GEAR UNSAFE on the 650 — the squat-switch case'));
+    expect(colorSelect()).toHaveValue('RED');
+
+    await user.type(messageInput(), '{backspace}'); // "GEAR UNSAF" — no longer that annunciation
+
+    expect(messageInput()).toHaveValue('GEAR UNSAF');
+    expect(colorSelect()).toHaveValue('AMBER'); // the reporter's own colour, not RED borrowed
+    expect(screen.queryByText(/what maintenance knows/i)).not.toBeInTheDocument();
+  });
+
+  it('re-derives when the message is edited onto a DIFFERENT curated entry', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await chooseMessageMode(user);
+    await user.click(screen.getByText('GEAR UNSAFE on the 650 — the squat-switch case'));
+    expect(colorSelect()).toHaveValue('RED');
+
+    await user.clear(messageInput());
+    await user.type(messageInput(), 'CABIN TEMP');
+
+    expect(colorSelect()).toHaveValue('CYAN');
+  });
+
+  it('restores the colour the REPORTER chose, not the module default', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await chooseMessageMode(user);
+    await user.selectOptions(colorSelect(), 'WHITE'); // an explicit choice, before any picking
+    await user.click(screen.getByText('GEAR UNSAFE on the 650 — the squat-switch case'));
+    expect(colorSelect()).toHaveValue('RED');
+
+    await user.type(messageInput(), '{backspace}');
+
+    // Resetting to the AMBER default here would silently overwrite a colour the reporter set.
+    expect(colorSelect()).toHaveValue('WHITE');
+  });
+
+  it('leaves a deliberate override alone while the message still names the same entry', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await chooseMessageMode(user);
+    await user.click(screen.getByText('GEAR UNSAFE on the 650 — the squat-switch case'));
+    await user.selectOptions(colorSelect(), 'AMBER'); // "the deck showed amber, whatever the entry says"
+
+    await user.type(messageInput(), ' '); // trailing space — still the same message once trimmed
+
+    expect(colorSelect()).toHaveValue('AMBER');
+  });
+
+  it('does not touch the colour for a message nobody has curated', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await chooseMessageMode(user);
+    await user.selectOptions(colorSelect(), 'RED');
+
+    await user.type(messageInput(), 'WINDSHIELD HEAT FAIL');
+
+    expect(colorSelect()).toHaveValue('RED');
+  });
+});
+
+/**
+ * The list is capped at `CAS_PICKER_LIMIT`. The header used to print the full catalog size beside
+ * it, so a curated message past the 25th was both invisible and uncounted — the number claimed the
+ * list was complete when it was not.
+ */
+describe('defect form CAS picker cap (D60)', () => {
+  /** 30 G650ER entries. Zero-padded messages so `casCatalog`'s localeCompare order matches the
+   *  index — entry 29 is genuinely the one past the cap. */
+  const MANY: Doc[] = Array.from({ length: 30 }, (_, i) =>
+    tkDoc({
+      id: `TK-9${String(i + 20).padStart(2, '0')}`,
+      title: `Entry number ${i}`,
+      fleetTypes: ['G650ER'],
+      casMeta: { casMessage: `MSG ${String(i).padStart(2, '0')}`, casColor: 'AMBER' },
+    }),
+  );
+  const lastMessage = 'MSG 29';
+
+  it('says how many of how many it is showing, and flags the truncation', async () => {
+    const user = userEvent.setup();
+    renderForm({ docs: MANY });
+    await chooseMessageMode(user);
+
+    expect(screen.getByText(/curated messages \(25 of 30\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Showing the first 25 of 30 matches/)).toBeInTheDocument();
+    expect(screen.queryByText('Entry number 29')).not.toBeInTheDocument();
+  });
+
+  it('search reaches an entry past the cap', async () => {
+    const user = userEvent.setup();
+    renderForm({ docs: MANY });
+    await chooseMessageMode(user);
+
+    await user.type(screen.getByLabelText(/curated messages/i), lastMessage);
+
+    expect(screen.getByText('Entry number 29')).toBeInTheDocument();
+    expect(screen.queryByText(/Showing the first/)).not.toBeInTheDocument();
   });
 });
