@@ -20,6 +20,18 @@ import { installMemoryStorage } from './memoryStorage';
 if (typeof document !== 'undefined') {
   installMemoryStorage();
 
+  // jsdom implements no ResizeObserver, and recharts' <ResponsiveContainer> constructs one on
+  // mount — so any test that renders a chart page throws before it can assert anything. A no-op
+  // stub is the right shape: jsdom reports zero-size layout regardless, so a real observer would
+  // never fire. Charts render empty and the surrounding page is what such tests assert on.
+  if (!('ResizeObserver' in globalThis)) {
+    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  }
+
   // Fresh storage per test case, so persistence tests in the same file cannot
   // see each other's keys.
   beforeEach(() => {
