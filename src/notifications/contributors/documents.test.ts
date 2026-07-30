@@ -72,7 +72,9 @@ describe('buildDocumentsFeed', () => {
     const feed = buildDocumentsFeed('pilot', NOW, s);
     expect(feed).toHaveLength(1);
     expect(feed[0].id).toBe('bulletin-ack:PB-001:1.1'); // legacy format, NOT doc-ack:…
-    expect(feed[0].link).toBe('/procedural-bulletins');
+    // D66: this used to land on the bulletin LIST. Every class now deep-links to the
+    // document the notification actually names.
+    expect(feed[0].link).toBe('/documents/PB-001');
     expect(feed[0].severity).toBe('warn');
   });
 

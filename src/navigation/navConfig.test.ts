@@ -68,6 +68,11 @@ const KNOWN_UNREGISTERED = [
   '/maintenance-workflow/handover',
   '/maintenance-workflow/analytics',
   '/experimental/scheduling-command', // redirect stub
+  // D66 redirect stubs — the two bulletin readers folded into the Document Center.
+  // Kept routed (not deleted) so bookmarks and pre-D66 notification links resolve;
+  // deliberately unregistered, because a manifest entry would put the second door back.
+  '/procedural-bulletins',
+  '/flight-operations-bulletins',
 ];
 
 describe('route audit — every App.tsx route is manifest-covered or enumerated debt', () => {

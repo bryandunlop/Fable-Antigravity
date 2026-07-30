@@ -85,9 +85,6 @@ import GRATReview from './components/GRATReview';
 import FormFieldManager from './components/FormFieldManager';
 import FRATFormBuilder from './components/FRATFormBuilder';
 import GRATFormBuilder from './components/GRATFormBuilder';
-import ProceduralBulletins from './components/ProceduralBulletins';
-import FlightOperationsBulletins from './components/bulletins/FlightOperationsBulletins';
-import { BulletinProvider } from './components/bulletins/BulletinContext';
 import { DocumentsProvider } from './components/documents/DocumentsContext';
 import { PassengerProvider } from './components/passengers/PassengerContext';
 import FlightAttendantFlights from './components/inflight/FlightAttendantFlights';
@@ -190,7 +187,6 @@ export default function App() {
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
                 <DocumentsProvider>
-                <BulletinProvider>
                 <PassengerProvider>
                 {/* TL-26 — ONE TechLogProvider, hoisted here with the other cross-cutting stores.
                     It used to be mounted four times on sibling route subtrees (/tech-log/*, /fir/*,
@@ -412,8 +408,11 @@ export default function App() {
                                 <Route path="/safety/hazards/:id" element={<HazardDetailView userRole={userRole} />} />
                                 <Route path="/safety/audits" element={<InternalAuditManagement />} />
                                 <Route path="/safety/compliance" element={<ComplianceDashboard standalone />} />
-                                <Route path="/procedural-bulletins" element={<ProceduralBulletins userRole={userRole} />} />
-                                <Route path="/flight-operations-bulletins" element={<FlightOperationsBulletins userRole={userRole} />} />
+                                {/* D66 — one place, all documents. Bulletins read in the Document
+                                    Center like every other class; these two paths survive only so
+                                    bookmarks and pre-D66 notification links land somewhere real. */}
+                                <Route path="/procedural-bulletins" element={<Navigate to="/documents" replace />} />
+                                <Route path="/flight-operations-bulletins" element={<Navigate to="/documents" replace />} />
                                 <Route
                                   path="/safety/form-fields"
                                   element={
@@ -655,7 +654,6 @@ export default function App() {
                 </TechLogProvider>
                 </CompanyAirportProvider>
                 </PassengerProvider>
-                </BulletinProvider>
                 </DocumentsProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
