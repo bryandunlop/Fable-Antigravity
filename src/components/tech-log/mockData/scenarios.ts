@@ -42,6 +42,9 @@ function withAuthoredCrewActions(items: MelItem[]): MelItem[] {
  * Builds the seeded demo world. Dates are RELATIVE to "now" so the AMBER aircraft
  * stays mid-clock and the RED aircraft stays grounded whenever the demo is run or reset.
  *   N5PG -> GREEN   N6PG -> AMBER (active deferral mid-clock)   N1PG, N2PG -> RED (open defects)
+ *   N7PG -> PENDING_PLACARD on an outstanding crew action (LG-110/D59; PENDING_PLACARD already
+ *           contributes RED — this tail exists so demonstrating the gate does not require flipping
+ *           the colour of a tail whose fixtures are calibrated against it)
  *   N3PG -> provisional G800 (no MEL approved)
  * N2PG's AOG is deliberately un-reported (no FIR) so the FIR §8 "Open an FIR?" nudge fires. That
  * nudge's immediate-escalation path reads `casColor === 'RED'`, so N2PG's RED CAS below is what
@@ -127,6 +130,55 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     placardLocation: melAmber.placardLocation, extensionUsed: false, riiRequired: false,
     melReviewAcknowledged: true, signedByOid: dom.oid, signatureId: sigDefrN6.id, status: 'ACTIVE',
   });
+
+  /**
+   * --- N7PG: LG-110 — a dedicated demo tail carrying a PENDING crew action (D59) ---
+   *
+   * D59 shipped the crew-action gate and nothing on a fresh load exercised it: the deferral that
+   * demonstrates it has to sit in PENDING_PLACARD with the (O) action outstanding, and putting that
+   * on an existing tail would have flipped its serviceability colour and re-pinned the fixtures
+   * calibrated against it (N6PG's clock in particular — see the note above). Hence its own tail.
+   *
+   * The MEL item is picked by PROPERTY, not by id: an only-(O) G500 item the DOM has authored as a
+   * real crew action. `AUTHORED_CREW_ACTIONS` at the top of this file is where that authorship
+   * lives, so if the overlay changes this seed follows it rather than going quietly stale.
+   */
+  {
+    const melCrew =
+      SEED_MEL.find(m => m.aircraftType === 'G500' && AUTHORED_CREW_ACTIONS[m.id] === true && m.oProcedure && !m.mProcedure) ??
+      SEED_MEL.find(m => m.id === 'mel-g500-35-02-02')!;
+    const occN7 = iso(1 * D + 5 * H);
+    const filedN7 = iso(1 * D + 4 * H);
+    const clockStartN7 = computeClockStart(occN7);
+    const dueN7 = computeRepairDue(melCrew.category, clockStartN7, melCrew, { hours: 640.3, cycles: 410 });
+    const sigDefN7 = makeSignature({ id: 'sig-seed-d-n7pg', signedEntity: 'DEFECT', signedEntityId: 'd-n7pg', signer: pilot, intentStatement: 'seed', signedAtUtc: filedN7 });
+    const sigDefrN7 = makeSignature({ id: 'sig-seed-df-n7pg', signedEntity: 'DEFERRAL', signedEntityId: 'df-n7pg', signer: dom, intentStatement: 'seed', signedAtUtc: iso(1 * D + 3 * H) });
+    signatures.push(sigDefN7, sigDefrN7);
+    defects.push({
+      id: 'd-n7pg', aircraftId: 'ac-n7pg', source: 'PIREP', ataChapter: melCrew.ataReference,
+      description: `${melCrew.title} — deferred under MEL ${melCrew.subItemNumber}; crew action outstanding.`,
+      casObserved: true, airworthinessAffecting: true, status: 'DEFERRED',
+      reportedByOid: pilot.oid, occurredAtUtc: occN7, reportedAtUtc: filedN7, signatureId: sigDefN7.id,
+    });
+    deferrals.push({
+      id: 'df-n7pg', defectId: 'd-n7pg', aircraftId: 'ac-n7pg', melItemId: melCrew.id,
+      governingMmelRevision: melCrew.mmelRevision, governingEffectiveDate: melCrew.effectiveDate,
+      melSubItemNumber: melCrew.subItemNumber, melTitle: melCrew.title,
+      melOProcedure: melCrew.oProcedure,
+      category: melCrew.category, dayOfDiscoveryUtc: occN7, clockStartDateUtc: clockStartN7,
+      governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
+      repairDueDateUtc: dueN7.repairDueDateUtc, usageDueThreshold: dueN7.usageDueThreshold,
+      repairIntervalUnit: dueN7.repairIntervalUnit, repairIntervalValue: dueN7.repairIntervalValue,
+      restrictionText: melCrew.provisos ?? 'Operate per MEL provisos.',
+      // The ONLY outstanding limb is the crew action. That is the modal D59 case (182 of 984 seeded
+      // items) and the one the gate was written for: before D59 this deferral went straight to
+      // ACTIVE and the aircraft was dispatchable with a mandatory crew action nobody had performed.
+      placardRequired: false, mProcedureRequired: false, placardInstalled: false,
+      crewActionRequired: true,
+      placardLocation: melCrew.placardLocation, extensionUsed: false, riiRequired: false,
+      melReviewAcknowledged: true, signedByOid: dom.oid, signatureId: sigDefrN7.id, status: 'PENDING_PLACARD',
+    });
+  }
 
   // --- N2PG: RED (fresh, un-reported AOG — no FIR yet, so the FIR §8 "Open an FIR?" nudge fires) ---
   const discN2 = iso(6 * H);

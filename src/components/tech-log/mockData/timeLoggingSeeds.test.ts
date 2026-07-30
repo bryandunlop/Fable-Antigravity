@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { getDefaultState } from './scenarios';
 import { fleetMetrics, timeToDiagnose, partsLeadTimes } from '../engine/metrics';
 import { statusDurations } from '../engine/statusTags';
+import { crewActionPending } from '../engine/crewAction';
 
 /**
  * D61 / LG-100 seed guard.
@@ -92,5 +93,34 @@ describe('time-logging seeds (D61 / LG-100)', () => {
     const poo = (wc3.statusTags ?? []).find(t => t.tag === 'WAITING_PARTS')!;
     expect(poo.note).toBeTruthy();
     expect(wc3.partsOrders?.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * LG-110 seed guard (D59). Separate concern from the time-logging seeds above, same discipline: the
+ * property that matters is that the crew-action gate is REACHABLE and DEMONSTRABLE on a fresh load,
+ * not that a field exists somewhere. A deferral could carry `crewActionRequired: true` and be ACTIVE
+ * with a compliance already recorded — containment satisfied, gate invisible.
+ */
+describe('LG-110 — the D59 crew-action gate is visible on a fresh load', () => {
+  it('seeds a dedicated tail so no existing tail had to change colour to show this', () => {
+    expect(state.aircraft.some(a => a.tailNumber === 'N7PG')).toBe(true);
+    // The tails the other fixtures are calibrated against keep their story.
+    expect(state.deferrals.find(d => d.id === 'df-n6pg')?.status).toBe('ACTIVE');
+    expect(state.defects.find(d => d.id === 'd-n1pg')?.status).toBe('OPEN');
+  });
+
+  it('the deferral sits in PENDING_PLACARD with the crew action OUTSTANDING — the gate is live', () => {
+    const df = state.deferrals.find(d => d.id === 'df-n7pg')!;
+    expect(df.status).toBe('PENDING_PLACARD');
+    expect(crewActionPending(df)).toBe(true);
+    // The crew action is the ONLY outstanding limb, which is the modal D59 case.
+    expect(df.placardRequired).toBeFalsy();
+    expect(df.mProcedureRequired).toBeFalsy();
+  });
+
+  it('the crew has instructions to comply with — a required action with no (O) text is unusable', () => {
+    const df = state.deferrals.find(d => d.id === 'df-n7pg')!;
+    expect((df.melOProcedure ?? '').trim().length).toBeGreaterThan(0);
   });
 });
