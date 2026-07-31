@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { TechLogProvider } from '../TechLogContext';
 import AircraftDetail from './AircraftDetail';
@@ -37,14 +37,22 @@ describe('aircraft workspace banner (D71)', () => {
   it('carries the serviceability state and the governing sentence in the banner', () => {
     renderTail('N2PG');
 
-    const banner = screen.getByRole('heading', { level: 1 }).closest('div')?.parentElement?.parentElement;
-    expect(banner).toBeTruthy();
-    // One of the three RAG labels is present beside the tail.
-    expect(screen.getAllByText(/serviceable|MEL \/ restricted|grounded/i).length).toBeGreaterThan(0);
+    /*
+     * Scoped to the banner on purpose. The governing sentence names the governing ITEM, and that
+     * item's text also appears on the blocker board below — an unscoped query would pass on the
+     * board alone, i.e. it would pass in exactly the state this change exists to fix.
+     */
+    const banner = within(screen.getByTestId('aircraft-banner'));
+    expect(banner.getByRole('heading', { level: 1 })).toHaveTextContent('N2PG');
+    // The chip, whose whole text is the RAG label — anchored so the governing sentence's own
+    // "grounded" cannot satisfy it.
+    expect(banner.getByText(/^(Serviceable|MEL \/ restricted|Grounded)$/)).toBeInTheDocument();
+    // The sentence itself, not just a status word: "<tail> is grounded because of ATA 79 — ...".
+    expect(banner.getByText(/N2PG is (grounded|serviceable|dispatchable)/i)).toBeInTheDocument();
     // The vitals strip replaces the old subtitle string.
-    expect(screen.getByText('Hours')).toBeInTheDocument();
-    expect(screen.getByText('Cycles')).toBeInTheDocument();
-    expect(screen.getByText('Blockers')).toBeInTheDocument();
+    expect(banner.getByText('Hours')).toBeInTheDocument();
+    expect(banner.getByText('Cycles')).toBeInTheDocument();
+    expect(banner.getByText('Blockers')).toBeInTheDocument();
   });
 
   it('states the aircraft status exactly once — no second status card', () => {
