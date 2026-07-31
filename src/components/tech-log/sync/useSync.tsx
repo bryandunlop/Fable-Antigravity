@@ -49,7 +49,7 @@ const saveOutbox = (o: Outbox) => {
   }
 };
 
-interface SyncCtx {
+export interface SyncCtx {
   summary: OutboxSummary;
   online: boolean;
   transportName: string;
@@ -67,7 +67,8 @@ interface SyncCtx {
   refresh: () => void;
 }
 
-const Ctx = createContext<SyncCtx | undefined>(undefined);
+export const SyncContext = createContext<SyncCtx | undefined>(undefined);
+const Ctx = SyncContext;
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { state, dispatch } = useTechLog();

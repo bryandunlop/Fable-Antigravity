@@ -75,6 +75,21 @@ export function SyncStatusChip() {
   );
 }
 
+/**
+ * BAD NEWS IS NEVER HIDDEN; good news is allowed to be.
+ *
+ * This chip used to be `hidden sm:inline-flex` in every state, so below 640px it disappeared
+ * entirely. That was survivable while the iPad was assumed to be the maintenance device. It is not
+ * survivable under D72 (2026-07-31): technicians are typically on their own **phone** and their own
+ * laptop — so the single indicator answering "did my morning's work leave this device" was invisible
+ * on the device most likely to be holding that work, and being invisible it could not report a
+ * conflict, a queue, or an offline outbox. That is precisely the defect this component was written
+ * to remove, wearing a media query instead of a hardcoded string.
+ *
+ * The quiet state (`ok` — "Synced") therefore still yields header room on a narrow screen; nobody
+ * needs telling hourly that nothing is wrong. Every other state is an unconditional `inline-flex`:
+ * a conflict, unsent changes, or an offline queue read the same at 390px as at 1280px.
+ */
 function Chip({
   tone,
   icon,
@@ -90,7 +105,8 @@ function Chip({
     <span
       title={title}
       className={cn(
-        'hidden items-center gap-1 rounded-full border px-2 py-1 text-xs sm:inline-flex',
+        'items-center gap-1 rounded-full border px-2 py-1 text-xs',
+        tone === 'ok' ? 'hidden sm:inline-flex' : 'inline-flex',
         tone === 'ok' && 'border-[var(--gfo-success,#00B140)]/40 bg-[var(--gfo-success,#00B140)]/10 text-[var(--gfo-success,#00B140)]',
         tone === 'busy' && 'border-border bg-muted/60 text-muted-foreground',
         tone === 'warn' && 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400',
