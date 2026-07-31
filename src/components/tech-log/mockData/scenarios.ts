@@ -186,6 +186,50 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     });
   }
 
+  /**
+   * D69 — an NEF deferral, on the same tail so it changes no aircraft's colour: N7PG is already RED
+   * on the crew action above, and RED wins the serviceability precedence regardless of what this
+   * adds. Deliberate, because every other fleet tail is load-bearing for another scenario.
+   *
+   * What it demonstrates is the whole ruling in one row: an item picked from the operator's NEF
+   * Deferral List, carrying the program's placard rule and NO repair category, so the deferral has
+   * no due date and will never expire — and is instead surfaced by AGE, which is the only thing that
+   * turns "repaired at the earliest opportunity" into something a planner can act on. Aged 46 days
+   * on purpose: a clock-bearing deferral could not be that old without having grounded the aircraft.
+   */
+  {
+    const nefItem = SEED_MEL_SECTIONS.find(m => m.melSection === 'NEF' && m.aircraftType === 'G500' && m.mProcedure);
+    if (nefItem) {
+      const occNef = iso(46 * D);
+      const sigDefNef = makeSignature({ id: 'sig-seed-d-nef', signedEntity: 'DEFECT', signedEntityId: 'd-nef', signer: pilot, intentStatement: 'seed', signedAtUtc: occNef });
+      const sigDefrNef = makeSignature({ id: 'sig-seed-df-nef', signedEntity: 'DEFERRAL', signedEntityId: 'df-nef', signer: dom, intentStatement: 'seed', signedAtUtc: iso(46 * D - 2 * H) });
+      signatures.push(sigDefNef, sigDefrNef);
+      defects.push({
+        id: 'd-nef', aircraftId: 'ac-n7pg', source: 'NEF', ataChapter: nefItem.ataReference,
+        description: `${nefItem.title} inoperative — deferred under the NEF program (${nefItem.itemNumber}).`,
+        symptom: 'Noticed on a cabin walk-through; no effect on operation.',
+        airworthinessAffecting: false, status: 'DEFERRED',
+        reportedByOid: pilot.oid, occurredAtUtc: occNef, reportedAtUtc: occNef, signatureId: sigDefNef.id,
+      });
+      deferrals.push({
+        id: 'df-nef', defectId: 'd-nef', aircraftId: 'ac-n7pg', melItemId: nefItem.id,
+        governingMmelRevision: nefItem.mmelRevision, governingEffectiveDate: nefItem.effectiveDate,
+        melSubItemNumber: nefItem.itemNumber, melTitle: nefItem.title,
+        melOProcedure: nefItem.oProcedure,
+        category: null, nefProgram: true,
+        dayOfDiscoveryUtc: occNef, clockStartDateUtc: computeClockStart(occNef),
+        governingTimezone: DEFAULT_GOVERNING_TIMEZONE,
+        // No due date, no usage threshold, no expiry — the point of the ruling.
+        repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 0,
+        restrictionText: nefItem.provisos,
+        placardRequired: true, mProcedureRequired: !!nefItem.mProcedure, placardInstalled: true,
+        placardLocation: nefItem.placardLocation ?? 'Near the affected NEF item',
+        extensionUsed: false, riiRequired: false, melReviewAcknowledged: true,
+        signedByOid: dom.oid, signatureId: sigDefrNef.id, status: 'PENDING_PLACARD',
+      });
+    }
+  }
+
   // --- N2PG: RED (fresh, un-reported AOG — no FIR yet, so the FIR §8 "Open an FIR?" nudge fires) ---
   const discN2 = iso(6 * H);
   const sigN2 = makeSignature({ id: 'sig-seed-d-n2pg', signedEntity: 'DEFECT', signedEntityId: 'd-n2pg', signer: pilot, intentStatement: 'seed', signedAtUtc: discN2 });
@@ -305,13 +349,8 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       // LG-98/99 on a COMPLETED card: exercises the read-only path AND puts both references on the
       // printed CRS (this card has a real release, rel-wc-1). Hand-typed (D22) — nothing sources
       // these from CAMP. Matches the AMM ref already named in step 3 below.
-      ammReference: 'AMM 21-50-00',
+      references: [{ id: 'wc1-r1', ref: 'AMM 21-50-00', note: 'Flow control valve R&R and pack operational test' }],
       cmcFaultCodes: ['21-51-03'],
-      steps: [
-        { id: 'wc1-s1', seq: 1, text: 'Remove pack 1 flow control valve', done: true },
-        { id: 'wc1-s2', seq: 2, text: 'Install replacement valve', done: true },
-        { id: 'wc1-s3', seq: 3, text: 'Operational test pack 1 per AMM 21-50-00', done: true },
-      ],
     });
     partUsages.push({
       id: 'pu-1', workCardId: 'wc-1', aircraftId: 'ac-n5pg', ataChapter: '21', partNumber: '1159SCB300-1', description: 'Flow control valve',
@@ -330,11 +369,9 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     id: 'wc-2', cardNumber: 'WC-1012', woNumber: 'WO-32-0455', aircraftId: 'ac-n2pg', title: 'Main Landing Gear — 600-hr functional check',
     ataChapter: '32', description: 'Scheduled MLG retraction test, inspection, and lubrication.', source: 'CAMP', headerStatusCode: 1,
     forecastRef: 'FC-32-MLG', scheduled: true, riiRequired: true, createdAtUtc: iso(1 * D), status: 'OPEN',
-    steps: [
-      { id: 'wc2-s1', seq: 1, text: 'Perform MLG retraction test per AMM 32-30-00', done: false },
-      { id: 'wc2-s2', seq: 2, text: 'Inspect MLG actuator and downlock for leakage/wear', done: false },
-      { id: 'wc2-s3', seq: 3, text: 'Lubricate landing gear per CMM; record grease P/N', done: false, riiRequired: true },
-    ],
+    // D68 — an OPEN RII card with no reference yet, so the demo shows a tech adding one. The RII
+    // gate is card-level now: this card cannot be signed off until an independent inspector signs.
+    references: [],
   });
 
   // Corrective card on the RED N1PG gear defect — live status tags + categorized labor so the AOG
@@ -350,13 +387,13 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     // own interrogation finding different codes than the crew read off the CMC page is also the
     // realistic case. TWO codes because one squawk interrogates into several — which is why the card
     // holds a list and the defect holds one. Illustrative demo codes; not real CMC output.
-    ammReference: 'AMM 32-30-00',
-    cmcFaultCodes: ['32-31-22', '32-31-40'],
-    steps: [
-      { id: 'wc3-s1', seq: 1, text: 'Interrogate MAU fault history; isolate sensor vs harness', done: true },
-      { id: 'wc3-s2', seq: 2, text: 'Replace LMLG uplock proximity sensor', done: false },
-      { id: 'wc3-s3', seq: 3, text: 'Gear swing / retraction check per AMM 32-30-00', done: false },
+    // TWO references because troubleshooting a gear-unsafe indication crosses two documents — which
+    // is exactly why D68 made this a list rather than the single string it replaced.
+    references: [
+      { id: 'wc3-r1', ref: 'AMM 32-30-00', note: 'Gear swing / retraction check' },
+      { id: 'wc3-r2', ref: 'CMM 32-31-14', note: 'Uplock proximity sensor' },
     ],
+    cmcFaultCodes: ['32-31-22', '32-31-40'],
     // D61 — the live AOG card opens with a diagnosis span, so the first thing a demo viewer sees is
     // that "how long to work out what was wrong" is a real, separately answerable number.
     statusTags: [
@@ -437,11 +474,11 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       // invisible to buildDowntimeDebrief AND to the FIR WORK_CARD anchor — i.e. the flagship demo
       // card was unreachable by both features it exists to demonstrate.
       linkedDefectId: 'd-wc4',
-      status: 'COMPLETED', ammReference: 'AMM 34-11-00', cmcFaultCodes: ['34-11-07'],
-      steps: [
-        { id: 'wc4-s1', seq: 1, text: 'Interrogate MAU; compare ADM 1/2 pressure outputs', done: true },
-        { id: 'wc4-s2', seq: 2, text: 'Replace No. 1 air data module', done: true },
-        { id: 'wc4-s3', seq: 3, text: 'Pitot-static leak and correspondence check per AMM 34-11-00', done: true },
+      status: 'COMPLETED', cmcFaultCodes: ['34-11-07'],
+      // A COMPLETED card, so this also exercises the read-only rendering and puts the references on
+      // the printed CRS (this card has a real release, rel-wc-4).
+      references: [
+        { id: 'wc4-r1', ref: 'AMM 34-11-00', note: 'Air data module R&R; pitot-static leak and correspondence check' },
       ],
       statusTags: [
         { tag: 'DIAGNOSING', atUtc: iso(9 * D + 5 * H), byOid: tech.oid, note: 'ADM 1/2 output comparison on the aircraft' },

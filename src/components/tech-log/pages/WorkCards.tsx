@@ -6,6 +6,7 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
 import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { newId } from '../util/id';
+import { formatReferences } from '../engine/workCardReferences';
 import type { WorkCard } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
@@ -72,10 +73,6 @@ export default function WorkCards() {
       description: wo.lines.filter(l => l.lineType === 'S').map(l => l.description).join('; ') || wo.title,
       source: 'CAMP', headerStatusCode: wo.headerStatusCode, scheduled: wo.scheduled, riiRequired: wo.riiRequired,
       createdAtUtc: now, status: 'OPEN',
-      steps: wo.lines.filter(l => l.lineType === 'T').map((l, i) => ({
-        id: newId('st'), seq: i + 1, text: l.description, done: false,
-        riiRequired: wo.riiRequired && /independent inspection|\bRII\b/i.test(l.description),
-      })),
     };
     dispatch({ type: 'ADD_WORK_CARD', payload: card });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'WORKCARD_PULLED', entityType: 'WorkCard', entityId: id, atUtc: now, summary: `Pulled ${wo.woNumber} from CAMP → ${card.cardNumber} (${ac.tailNumber})` } });
@@ -104,7 +101,6 @@ export default function WorkCards() {
               <Badge variant="outline">{cards.filter(w => w.status !== 'COMPLETED').length} open · {cards.length} total</Badge>
             </div>
             {cards.map(w => {
-              const done = w.steps.filter(s => s.done).length;
               const labor = laborOf(w.id);
               const due = dueOf(w);
               const dueDays = due?.dueDateUtc ? Math.floor((new Date(due.dueDateUtc).getTime() - Date.now()) / 86400000) : null;
@@ -129,11 +125,11 @@ export default function WorkCards() {
                       </div>
                       <p className="mt-1 text-sm">{w.title}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO status: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}
+                        {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO status: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode}
                         {labor > 0 ? ` · ${labor} h logged` : ''}
-                        {/* LG-98: the AMM reference on the row itself, so "which procedure is this
-                            card working to" is answerable without opening every card. */}
-                        {w.ammReference ? ` · ${w.ammReference}` : ''}
+                        {/* D68: the references on the row itself, so "which procedure is this card
+                            working to" is answerable without opening every card. */}
+                        {formatReferences(w) ? ` · ${formatReferences(w)}` : ''}
                       </p>
                     </div>
                     <div className="shrink-0 text-xs text-muted-foreground">

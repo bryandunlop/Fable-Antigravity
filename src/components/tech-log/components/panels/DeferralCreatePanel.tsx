@@ -8,7 +8,7 @@ import { formatRegulatoryCompact, formatRegulatoryInstant, formatRegulatoryLabel
 import { utcFromWallTime, wallTimeFromUtc } from '../../util/entryZone';
 import { canDeferDefect } from '../../engine/disposition';
 import { crewActionRequiredForMelItem, resolveDeferralCrewAction, entersPendingPlacard } from '../../engine/crewAction';
-import { isDeferrableToday } from '../../engine/melSection';
+import { isNefItem } from '../../engine/nef';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
 import { newId } from '../../util/id';
@@ -35,10 +35,10 @@ function dueFromCategory(mel: MelItem & { category: MelCategory }, clockStart: s
 }
 
 /**
- * A catalog item this panel can actually raise a deferral against — Section One or Section Two, both
- * of which carry a repair category. NEF items carry none by design (D69/D70) and are filtered out of
- * the picker by `isDeferrableToday`; narrowing here means the compiler, not a comment, is what stops
- * a clockless item reaching the PL-25 math.
+ * A catalog item that carries a repair category — Section One and Section Two. NEF items carry none
+ * by design (D69/D70), and this narrowing is what stops a clockless item reaching the PL-25 math:
+ * every call into `dueFromCategory` has to prove the category exists first, so the compiler enforces
+ * it rather than a comment.
  */
 type DeferrableMelItem = MelItem & { category: MelCategory };
 
@@ -88,18 +88,26 @@ export function DeferralCreatePanel({
     const q = query.trim().toLowerCase();
     return state.melItems
       .filter(m => m.aircraftType === aircraft.type && m.approvalState === 'APPROVED')
-      // Section One and Section Two both defer here; NEF does not yet — see `isDeferrableToday`.
-      .filter(isDeferrableToday)
+      // TL-37 — the HARD BLOCK (Bryan, 2026-07-31). `canDeferDefect` already refused a crew signing
+      // a maintenance-only item at the button, but the list still OFFERED it, so a pilot down-route
+      // picked an item, filled the form and only then learned they could not sign it. Both MELs mark
+      // every item `Flight Crew Deferral Item` YES/NO; ~41 across the fleet are NO. Filtering here
+      // means a crew member is never shown an item the MEL reserves to maintenance.
+      .filter(m => canDeferDefect(user, m))
       .filter(m => !q || m.subItemNumber.toLowerCase().includes(q) || m.title.toLowerCase().includes(q) || m.ataReference === q)
       .slice(0, 25);
-  }, [state.melItems, aircraft, query]);
+    // `user` IS a dependency: the list is now filtered by who is standing here (TL-37), and the
+    // current user resolves from the login AFTER the first render. Omitting it cached the list
+    // computed against whoever was resolved first — a maintenance user could be left looking at the
+    // crew-filtered list, which is the same class of bug as reading authority off the fallback
+    // persona. Caught by `deferralClockDefault.test.tsx`, which went looking for an item the stale
+    // list had dropped.
+  }, [state.melItems, aircraft, query, user]);
 
-  const selectedMelRaw = state.melItems.find(m => m.id === selectedMelId);
-  // Re-assert deferrability on the SELECTED item, not just on the list: the id can arrive from a
-  // deep link, and the list filter alone would let an NEF item through that door.
-  const selectedMel = selectedMelRaw && isDeferrableToday(selectedMelRaw)
-    ? (selectedMelRaw as DeferrableMelItem)
-    : undefined;
+  const selectedMel = state.melItems.find(m => m.id === selectedMelId);
+  // D69 — an NEF item carries no repair category, so there is no PL-25 interval to start. It is
+  // still a real, placarded, tracked deferral; it is the CLOCK that is absent, not the deferral.
+  const isNef = selectedMel ? isNefItem(selectedMel) : false;
   // D59: the flag is AUTHORED on the MEL item by the DOM / Chief Inspector at MEL entry; the
   // deferral inherits it. Legacy/auto-extracted items with no authored flag fall back to
   // Boolean(oProcedure) — conservative in the gating direction.
@@ -125,9 +133,11 @@ export function DeferralCreatePanel({
   // D24: live preview of the PL-25 clock under the chosen governing zone, so the signer sees the
   // effect of an override before signing. Advisory only (the real clock is re-stamped at signing).
   const clockPreview = useMemo(() => {
-    if (!selectedMel) return null;
+    // A clockless NEF item (D69) has no interval to preview — return null rather than a start date
+    // implying a clock that will never run.
+    if (!selectedMel?.category) return null;
     const cs = computeClockStart(dayOfDiscoveryUtc, governingZone);
-    const due = dueFromCategory(selectedMel, cs, { hours: 0, cycles: 0 }, governingZone);
+    const due = dueFromCategory(selectedMel as DeferrableMelItem, cs, { hours: 0, cycles: 0 }, governingZone);
     return {
       start: formatRegulatoryCompact(cs, 'GOVERNING', governingZone),
       due: due.repairDueDateUtc ? formatRegulatoryCompact(due.repairDueDateUtc, 'GOVERNING', governingZone) : null,
@@ -177,8 +187,15 @@ export function DeferralCreatePanel({
     const zone = governingZone;
     const clockStart = computeClockStart(dayOfDiscoveryUtc, zone);
     const airframe = { hours: aircraft.airframeTotalHours, cycles: aircraft.airframeTotalCycles };
-    const due = dueFromCategory(selectedMel, clockStart, airframe, zone);
+    // D69 — a clockless deferral: no due date, no usage threshold, and therefore no expiry.
+    // `isDeferralExpired` already returns false for a deferral carrying neither, so nothing had to
+    // be special-cased downstream to stop this grounding an aircraft.
+    const due = selectedMel.category
+      ? dueFromCategory(selectedMel as DeferrableMelItem, clockStart, airframe, zone)
+      : { repairDueDateUtc: undefined, repairIntervalUnit: 'CALENDAR_DAY' as const, repairIntervalValue: 0 };
     const mProcedureRequired = !!selectedMel.mProcedure?.trim();
+    // Every NEF item carries the program's placard rule in `placardText`, so this is already true
+    // for them — stated rather than special-cased.
     const placardRequired = !!selectedMel.placardText?.trim();
 
     const supDefect: Defect = { ...defect, id: newId('def'), status: 'DEFERRED', supersedesId: defect.id, signatureId: sig.id };
@@ -195,7 +212,11 @@ export function DeferralCreatePanel({
       // able to make a mandatory crew action vanish from an already-signed deferral.
       crewActionRequired,
       crewActionInstructions: crewActionRequired ? (crewActionInstructions.trim() || undefined) : undefined,
-      category: selectedMel.category, dayOfDiscoveryUtc, clockStartDateUtc: clockStart,
+      category: selectedMel.category,
+      // Snapshotted, not derived at read time: this deferral must still read as an NEF deferral
+      // after the MEL item is revised (the same rule as `melOProcedure` and the governing revision).
+      nefProgram: isNefItem(selectedMel) || undefined,
+      dayOfDiscoveryUtc, clockStartDateUtc: clockStart,
       governingTimezone: zone,
       governingTimezoneOverrideReason: isOverride(zone) ? overrideReason.trim() : undefined,
       repairDueDateUtc: due.repairDueDateUtc, repairIntervalUnit: due.repairIntervalUnit, repairIntervalValue: due.repairIntervalValue,
@@ -210,13 +231,17 @@ export function DeferralCreatePanel({
     dispatch({ type: 'ADD_SIGNATURE', payload: sig as any });
     dispatch({ type: 'SUPERSEDE_DEFECT', payload: supDefect });
     dispatch({ type: 'ADD_DEFERRAL', payload: deferral });
-    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFERRAL_SIGNED', entityType: 'Deferral', entityId: deferral.id, atUtc: now, summary: `${aircraft.tailNumber} deferred under MEL ${selectedMel.subItemNumber} (Cat ${selectedMel.category})` } });
+    dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFERRAL_SIGNED', entityType: 'Deferral', entityId: deferral.id, atUtc: now, summary: `${aircraft.tailNumber} deferred under MEL ${selectedMel.subItemNumber} (${selectedMel.category ? `Cat ${selectedMel.category}` : 'NEF — no repair interval'})` } });
 
     integration.pushDiscrepancy({
       entityType: 'DEFERRAL', entityId: deferral.id, aircraftId: aircraft.id,
       ata: selectedMel.ataReference, description: `MEL ${selectedMel.subItemNumber} — ${selectedMel.title}`,
       restriction: deferral.restrictionText, nextDue: deferral.repairDueDateUtc,
-      category: selectedMel.category, technician: user.displayName, intent: 'CREATE',
+      // CAMP's `MelFlag` is documented as "A, B, C, D **or null**", so a clockless NEF deferral has a
+      // legal representation on the vendor side already, and `NEFFlag` is a writable Y/N — see
+      // `ref-camp-discrepancy-writable-fields`. Nothing here is invented.
+      category: selectedMel.category ?? undefined, nefProgram: isNef || undefined,
+      technician: user.displayName, intent: 'CREATE',
     });
 
     onDone(deferral);

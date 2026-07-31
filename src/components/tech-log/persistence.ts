@@ -82,8 +82,16 @@ export const VERSION_KEY = 'tech-log-data-version';
  * NEF. This one is closer to v17 than to v19: `melItems` is seeded reference data, so a returning
  * user's stored blob would pin them to the old Section-One-only catalog indefinitely and two thirds
  * of their own MEL would simply not exist for them. Reseeding is the fix.
+ *
+ * v22 (D68/D69): `WorkCard.steps` is GONE, replaced by `references`; `Deferral.category` is nullable
+ * and `Deferral.nefProgram` added. This one is a genuine BROKEN-RENDER risk, unlike v19/v20 — a
+ * stored card still carries `steps` and no `references`, and every screen that used to count steps
+ * now reads a field that is not there. `cardReferences()` deliberately still reads the old
+ * `ammReference` (a signed release points at its card and the CRS print reads through to it), but a
+ * step checklist has nowhere left to render. Reseeding is what makes a returning user's demo
+ * coherent, and it is also what puts the seeded NEF deferral in front of them.
  */
-export const DATA_VERSION = '2026-07-31-v21';
+export const DATA_VERSION = '2026-07-31-v22';
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a

@@ -27,7 +27,6 @@ const OPEN_CARD: WorkCard = {
   ataChapter: '32', description: 'Corrective.', source: 'MANUAL', headerStatusCode: 1,
   scheduled: false, riiRequired: false, linkedDefectId: 'd-t1',
   createdAtUtc: '2026-07-28T10:00:00.000Z', status: 'IN_WORK',
-  steps: [{ id: 'wc-t1-s1', seq: 1, text: 'Interrogate MAU fault history', done: false }],
 };
 
 const COMPLETED_CARD: WorkCard = {
@@ -36,7 +35,6 @@ const COMPLETED_CARD: WorkCard = {
   linkedDefectId: undefined,
   completedAtUtc: '2026-07-28T18:00:00.000Z',
   ammReference: 'AMM 32-30-00', cmcFaultCodes: ['32-3120-04', '32-3120-11'],
-  steps: [{ id: 'wc-t2-s1', seq: 1, text: 'Interrogate MAU fault history', done: true }],
 };
 
 const LINKED_DEFECT: Defect = {
@@ -63,24 +61,62 @@ function renderCard(cardId: string, defects: Defect[] = [LINKED_DEFECT], cards: 
 
 const refBox = () => screen.getByTestId('work-card-references');
 
-describe('Work card AMM reference (LG-98)', () => {
+describe('Work card references — the documents worked to (D68, was LG-98)', () => {
   beforeEach(() => localStorage.clear());
 
-  it('is editable on a card that is not complied with, and the typed value sticks', async () => {
+  it('adds a reference as a chip on a card that is not complied with', async () => {
     const user = userEvent.setup();
     renderCard('wc-t1');
 
-    const input = screen.getByLabelText(/AMM reference/i);
-    await user.type(input, 'AMM 32-30-00');
+    await user.type(within(refBox()).getByPlaceholderText(/AMM 32-30-00/i), 'AMM 32-30-00');
+    await user.click(within(refBox()).getByRole('button', { name: /^Add$/i }));
 
-    expect(screen.getByLabelText(/AMM reference/i)).toHaveValue('AMM 32-30-00');
+    expect(within(refBox()).getByText('AMM 32-30-00')).toBeInTheDocument();
   });
 
-  it('is read-only text — not a disabled input — once the card is complied with', () => {
+  it('holds SEVERAL references, because one card routinely spans several procedures', async () => {
+    const user = userEvent.setup();
+    renderCard('wc-t1');
+    const box = refBox();
+
+    for (const ref of ['AMM 32-30-00', 'CMM 32-31-14']) {
+      await user.type(within(box).getByPlaceholderText(/AMM 32-30-00/i), ref);
+      await user.click(within(box).getByRole('button', { name: /^Add$/i }));
+    }
+
+    expect(within(refBox()).getByText('AMM 32-30-00')).toBeInTheDocument();
+    expect(within(refBox()).getByText('CMM 32-31-14')).toBeInTheDocument();
+  });
+
+  it('refuses a duplicate rather than listing the same document twice', async () => {
+    const user = userEvent.setup();
+    renderCard('wc-t1');
+    const box = refBox();
+
+    for (let i = 0; i < 2; i++) {
+      await user.type(within(box).getByPlaceholderText(/AMM 32-30-00/i), 'AMM 32-30-00');
+      await user.click(within(box).getByRole('button', { name: /^Add$/i }));
+    }
+
+    expect(within(refBox()).getAllByText('AMM 32-30-00')).toHaveLength(1);
+  });
+
+  it('is read-only text — no input at all — once the card is complied with', () => {
     renderCard('wc-t2');
 
-    expect(screen.queryByLabelText(/AMM reference/i)).not.toBeInTheDocument();
+    expect(within(refBox()).queryByPlaceholderText(/AMM 32-30-00/i)).not.toBeInTheDocument();
     expect(within(refBox()).getByText('AMM 32-30-00')).toBeInTheDocument();
+  });
+
+  /**
+   * wc-t2 carries the pre-D68 single `ammReference` string, which is exactly why the assertion above
+   * passes. A signed release points at its card and the CRS print reads through to it, so reading
+   * only the new `references` list would blank the reference on a release that already printed one.
+   */
+  it('still renders a pre-D68 card’s single ammReference, and offers no way to delete it', () => {
+    renderCard('wc-t2');
+    expect(within(refBox()).getByText('AMM 32-30-00')).toBeInTheDocument();
+    expect(within(refBox()).queryByRole('button', { name: /Remove AMM 32-30-00/i })).not.toBeInTheDocument();
   });
 });
 

@@ -39,7 +39,7 @@ function card(p: Partial<WorkCard> = {}): WorkCard {
   return {
     id: 'wc1', cardNumber: 'WC-1015', aircraftId: 'ac1', title: 'LMLG troubleshoot', ataChapter: '32',
     description: 'x', headerStatusCode: 1, scheduled: false, riiRequired: false, source: 'MANUAL',
-    createdAtUtc: NOW, status: 'OPEN', steps: [], ...p,
+    createdAtUtc: NOW, status: 'OPEN', ...p,
   };
 }
 

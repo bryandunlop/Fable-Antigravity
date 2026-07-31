@@ -28,30 +28,17 @@ export function casPaletteFor(type: AircraftType): CasColor[] {
 }
 
 /**
- * May a deferral be raised against this item **today**?
+ * Does this item carry a repair interval at all?
  *
- * Section One and Section Two both carry a repair category and defer identically — Section Two is
- * relief keyed by the message the crew saw rather than by the box that failed, and nothing about
- * the PL-25 clock changes.
+ * Section One and Section Two both do and defer identically — Section Two is relief keyed by the
+ * message the crew saw rather than by the box that failed, and nothing about the PL-25 clock
+ * changes. NEF items carry none by design (D69): the program repairs them "at the earliest
+ * opportunity", so there is no interval to start. They are still fully deferrable — placarded,
+ * tracked, and clockless — which is `engine/nef.ts`.
  *
- * NEF is excluded, and the exclusion is the honest state of the build rather than a policy claim.
- * D69 rules that an NEF item is a **placarded deferral with no repair clock** — the program
- * requires an MEL placard visible to the flight crew and tracking "in the same manner as any other
- * MEL deferral", but gives no repair category, so there is no interval to start. That flow does not
- * exist yet. Letting an NEF item through the ordinary panel would either invent a category it does
- * not have or produce a deferral with no placard gate, and both are worse than not offering it: the
- * item can still be written up and tracked exactly as it is today. Remove this guard in the slice
- * that builds the NEF deferral, not before.
+ * This is the predicate that decides whether the PL-25 math may run, nothing more. WHO may defer a
+ * given item is `canDeferDefect` (the MEL's own `Flight Crew Deferral Item` column, TL-37).
  */
-export function isDeferrableToday(item: Pick<MelItem, 'melSection' | 'category'>): boolean {
-  return sectionOf(item) !== 'NEF' && item.category !== null;
-}
-
-/** Why the picker is refusing an item, for the message shown beside it. */
-export function undeferrableReason(item: Pick<MelItem, 'melSection' | 'category'>): string | null {
-  if (isDeferrableToday(item)) return null;
-  if (sectionOf(item) === 'NEF') {
-    return 'NEF items are deferred under the operator’s NEF program, which myGFO does not yet run (D69). Track it as a defect for now.';
-  }
-  return 'This item carries no repair category, so no repair interval can be started.';
+export function hasRepairInterval(item: Pick<MelItem, 'melSection' | 'category'>): boolean {
+  return item.category !== null && item.category !== undefined;
 }

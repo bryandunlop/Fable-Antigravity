@@ -35,7 +35,7 @@ export function rectificationClosePush(
  */
 export function createRectificationCard(
   defect: Defect,
-  ids: { cardId: string; stepId: string },
+  ids: { cardId: string },
   nowUtc: string,
   deferralId?: string,
 ): WorkCard {
@@ -46,7 +46,6 @@ export function createRectificationCard(
     title: `Rectify — ATA ${defect.ataChapter}: ${defect.description}`,
     ataChapter: defect.ataChapter,
     description: defect.description,
-    steps: [{ id: ids.stepId, seq: 1, text: `Rectify: ${defect.description}`, done: false }],
     status: 'OPEN',
     source: 'MANUAL',
     headerStatusCode: 1, // Open (CAMP WO header ladder)

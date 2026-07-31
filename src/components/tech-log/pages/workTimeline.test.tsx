@@ -22,7 +22,6 @@ const IN_WORK_CARD: WorkCard = {
   ataChapter: '32', description: 'Corrective.', source: 'MANUAL', headerStatusCode: 1,
   scheduled: false, riiRequired: false, status: 'IN_WORK',
   createdAtUtc: '2026-07-28T10:00:00.000Z',
-  steps: [{ id: 'wc-t1-s1', seq: 1, text: 'Interrogate MAU fault history', done: false }],
   statusTags: [
     { tag: 'DIAGNOSING', atUtc: '2026-07-28T10:00:00.000Z', byOid: 'USR010' },
     { tag: 'GAP', atUtc: '2026-07-28T18:00:00.000Z', byOid: 'USR010', gapReason: 'END_OF_SHIFT', includeInTotals: false },

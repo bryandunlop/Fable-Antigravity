@@ -52,12 +52,15 @@ export function DeferralClock({
   clockStartUtc: string;
   repairDueUtc?: string;
   /** Selects the urgency threshold — a Cat B and a Cat D do not go amber at the same remaining time. */
-  category: MelCategory;
+  /** Absent for a clockless deferral (NEF, D69) — there is no interval to render. */
+  category?: MelCategory;
   className?: string;
   showLabel?: boolean;
 }) {
   const now = useNow();
-  const reading = readDeferralClock(clockStartUtc, repairDueUtc, now, category);
+  // No category means a clockless deferral (NEF, D69) — there is no interval to drain, so render
+  // nothing at all rather than a ring implying one.
+  const reading = category ? readDeferralClock(clockStartUtc, repairDueUtc, now, category) : null;
 
   // Usage-based or unparseable: nothing calendar-based to drain. Render nothing rather
   // than an empty ring implying a calendar interval that does not exist.

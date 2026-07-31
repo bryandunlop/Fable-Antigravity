@@ -151,7 +151,7 @@ export default function FleetStatus() {
                     className="ml-auto"
                     clockStartUtc={nearestDeferral.clockStartDateUtc}
                     repairDueUtc={nearestDeferral.repairDueDateUtc}
-                    category={nearestDeferral.category}
+                    category={nearestDeferral.category ?? undefined}
                   />
                 )}
                 <ChevronRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />

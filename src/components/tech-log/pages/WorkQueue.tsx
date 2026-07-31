@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatReferences } from '../engine/workCardReferences';
 import { Inbox, AlertTriangle, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck, Eye } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
 import { formatRegulatoryCompact } from '../util/displayZone';
@@ -26,7 +27,9 @@ export default function WorkQueue() {
   const isMaint = user.role === 'MAINTENANCE';
   const now = new Date().toISOString();
   const [riiOnly, setRiiOnly] = useState(false);
-  const isRii = (w: { riiRequired: boolean; steps: { riiRequired?: boolean }[] }) => w.riiRequired || w.steps.some(s => s.riiRequired);
+  // D68 — RII is a card-level flag now. It used to be `card.riiRequired || any step flagged RII`;
+  // with steps gone the card flag is the whole answer.
+  const isRii = (w: { riiRequired: boolean }) => w.riiRequired;
 
   const wq = useMemo(() => buildWorkQueue(state, now), [state, now]);
   // Glanceable fleet strip: the landing page answers "what's the state of the world"
@@ -226,7 +229,7 @@ export default function WorkQueue() {
               return cards.length === 0 ? empty : cards.map(w => (
                 <Row key={w.id} next="Open card" onClick={() => navigate(`/tech-log/work-cards/${w.id}`)}>
                   <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{w.cardNumber}</span><span className="font-semibold">{tailOf(w.aircraftId)}</span><Badge variant="outline">ATA {w.ataChapter}</Badge><Badge variant={w.status === 'IN_WORK' ? 'secondary' : 'destructive'}>{w.status}</Badge>{isRii(w) && <Badge variant="outline"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}</div>
-                  <p className="mt-0.5 truncate text-muted-foreground">{w.title} · steps {w.steps.filter(s => s.done).length}/{w.steps.length}</p>
+                  <p className="mt-0.5 truncate text-muted-foreground">{w.title}{formatReferences(w) ? ` · ${formatReferences(w)}` : ''}</p>
                 </Row>
               ));
             })()}
