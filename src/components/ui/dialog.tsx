@@ -60,7 +60,23 @@ const DialogContent = React.forwardRef<
       ref={ref}
       data-slot="dialog-content"
       className={cn(
-        "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-xl duration-200 sm:max-w-lg",
+        // TL-39 — max-h + overflow-y-auto are load-bearing, not polish. Without them a
+        // dialog taller than the viewport is CENTRED on it, so it overhangs top and bottom
+        // equally; Radix scroll-locks the body, and this element has no scroll container of
+        // its own, so neither end is reachable. Measured on /tech-log/aircraft/N5PG at
+        // 1280x800: 1059px tall, top:-130 bottom:930, submit button off-screen.
+        // dvh not vh: mobile Safari's 100vh includes the collapsible toolbar, so a vh cap
+        // still hides the footer — and per D74 maintenance is phone-primary.
+        //
+        // grid-cols-[minmax(0,1fr)] + [&>*]:min-w-0 is the horizontal half, and it is NOT
+        // cosmetic. A grid item defaults to min-width:auto, so it refuses to shrink below
+        // its min-content: the report-defect form's widest control forced every child to
+        // 412px inside a 333px box at 375px wide. That overflow predates this commit — it
+        // simply painted OUTSIDE the card while overflow-x was visible, and setting
+        // overflow-y turns the other axis to auto, which would have traded invisible
+        // spill for a horizontal scrollbar. Measured before: scrollWidth 460 / client 333.
+        // After: 333 / 333.
+        "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto overscroll-contain rounded-lg border p-6 shadow-xl duration-200 sm:max-w-lg [&>*]:min-w-0",
         className,
       )}
       {...props}
