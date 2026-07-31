@@ -22,6 +22,8 @@ import { CasChip } from '../components/CasChip';
 import { SymptomNote } from '../components/SymptomNote';
 import { WorkTimelinePanel } from '../components/WorkTimelinePanel';
 import { PartsOrdersPanel } from '../components/PartsOrdersPanel';
+import { WorkCardSyncBar } from '../components/WorkCardSyncBar';
+import { useSync } from '../sync/useSync';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -42,6 +44,7 @@ export default function WorkCardDetail() {
   const user = useCurrentUser();
   const isMaint = user.role === 'MAINTENANCE';
   const integration = useIntegration();
+  const sync = useSync(); // TL-38 — null outside SyncProvider; every call site is optional-chained.
 
   const card = state.workCards.find(w => w.id === id);
   const ac = card ? state.aircraft.find(a => a.id === card.aircraftId) : undefined;
@@ -131,8 +134,18 @@ export default function WorkCardDetail() {
   // rather than a disabled input — a complied-with card must not look like something you could
   // still type into. Both fields are hand-entered (D22); nothing here touches CAMP.
   const cmcCodes = card.cmcFaultCodes ?? [];
-  const setAmmReference = (v: string) =>
-    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, ammReference: v.trim() ? v : undefined } });
+  /**
+   * TL-38 — edit locally at once, then queue the same change for the server. The local dispatch keeps
+   * typing instant; the queued op is what makes the edit exist anywhere other than this browser. If
+   * the card moved underneath the edit the server refuses it and `WorkCardSyncBar` says so — the
+   * local optimistic value is then replaced by the server's copy, so what is on screen is what is
+   * real, not what this device wished were real.
+   */
+  const patch = (next: Partial<WorkCard>) => {
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, ...next } });
+    sync?.submit('workcard.patch', card.id, next);
+  };
+  const setAmmReference = (v: string) => patch({ ammReference: v.trim() ? v : undefined });
   const addCmcCode = (raw: string) => {
     const code = raw.trim();
     if (!code) return;
@@ -140,12 +153,12 @@ export default function WorkCardDetail() {
       setCmcDraft('');
       return toast.error(`${code} is already on this card.`);
     }
-    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, cmcFaultCodes: [...cmcCodes, code] } });
+    patch({ cmcFaultCodes: [...cmcCodes, code] });
     setCmcDraft('');
   };
   const removeCmcCode = (code: string) => {
     const next = cmcCodes.filter(c => c !== code);
-    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, cmcFaultCodes: next.length ? next : undefined } });
+    patch({ cmcFaultCodes: next.length ? next : undefined });
   };
   // The pilot's single reported code (LG-99) is a starting hint, never an automatic entry: what the
   // crew read off the CMC page is their observation, and putting it on the card is a maintenance act.
@@ -186,8 +199,53 @@ export default function WorkCardDetail() {
       dateUtc: new Date().toISOString(), description: ldesc.trim(),
       category: lcat, note: lnote.trim() || undefined,
     };
+    // TL-38 — the hours land in local state immediately AND are queued for the server. Labor is an
+    // append, so the server never rejects it for a concurrent edit (see `sync/applyOp.ts`): a
+    // technician's logged time is the one thing this workflow must not be able to lose.
     dispatch({ type: 'ADD_LABOR_ENTRY', payload: entry });
+    sync?.submit('workcard.labor.add', card.id, entry);
     setLhours(''); setLdesc(''); setLnote(''); setLcat('WRENCH');
+  };
+
+  /**
+   * TL-38 — a removed labor line must reach the server too. Deleting locally only would leave the
+   * entry on the server's copy, and the next thing that pulled that copy down would resurrect it —
+   * into `totalLabor`, and from there into the "Labor N h" sentence on the signed release.
+   */
+  const removeLabor = (laborEntryId: string) => {
+    dispatch({ type: 'DELETE_LABOR_ENTRY', payload: laborEntryId });
+    sync?.submit('workcard.labor.delete', card.id, { laborEntryId });
+  };
+
+  /**
+   * TL-38 — D61's retrospective timeline is the surface the numbers actually come from, so it is the
+   * one that most needs to survive being read on another device. It edits the history as a unit
+   * (reasons, notes, the per-gap include/exclude flag), and `timeAudit` travels with it because D62
+   * makes that the append-only record of every edit to `statusTags`.
+   */
+  const saveTimeline = (next: WorkCard) => {
+    dispatch({ type: 'EDIT_WORK_CARD', payload: next });
+    sync?.submit('workcard.timeline.set', card.id, {
+      statusTags: next.statusTags ?? [],
+      timeAudit: next.timeAudit ?? [],
+    });
+  };
+
+  /**
+   * TL-38 — the parts panel hands back a whole card, so diff out what actually changed and send the
+   * narrow op. Sending the whole card as a patch would make every parts edit conflict with any
+   * concurrent change to any other field, which is how a sync becomes something people work around.
+   */
+  const savePartsOrders = (next: WorkCard) => {
+    dispatch({ type: 'EDIT_WORK_CARD', payload: next });
+    const before = card.partsOrders ?? [];
+    const after = next.partsOrders ?? [];
+    const added = after.find(o => !before.some(b => b.id === o.id));
+    if (added) return sync?.submit('workcard.parts.add', card.id, added);
+    const received = after.find(o => o.receivedAtUtc && !before.find(b => b.id === o.id)?.receivedAtUtc);
+    if (received?.receivedAtUtc) {
+      sync?.submit('workcard.parts.receive', card.id, { partsOrderId: received.id, receivedAtUtc: received.receivedAtUtc });
+    }
   };
 
   // ── work/wait status tags (QM4/D27) ──
@@ -197,6 +255,11 @@ export default function WorkCardDetail() {
     const r = appendStatusTag(card, tag, user.oid, new Date().toISOString(), { note, byName: user.displayName, partsOrderId });
     if (!r.ok) return toast.error(r.error);
     dispatch({ type: 'EDIT_WORK_CARD', payload: r.card });
+    // TL-38 — send the newly appended tag + its audit row, not the whole card. `appendStatusTag` is
+    // the only sanctioned writer of the time history (D62), so the op carries exactly what it wrote.
+    const newTag = r.card.statusTags?.[r.card.statusTags.length - 1];
+    const newAudit = r.card.timeAudit?.[r.card.timeAudit.length - 1];
+    if (newTag && newAudit) sync?.submit('workcard.statustag.add', card.id, { tag: newTag, audit: newAudit });
     setPooPromptOpen(false); setPooNote('');
     toast.success(tag === 'WAITING_PARTS' ? 'Tagged waiting on parts (POO) — wait time now accruing to parts.' : tag === 'WAITING_INSPECTION' ? 'Tagged waiting on inspection.' : 'Card tagged in work.');
   };
@@ -332,6 +395,10 @@ export default function WorkCardDetail() {
         </>
       }
     >
+      {/* TL-38 — who last touched this card and when, who else is in it, and anything this device
+          typed that the server refused. Above the card body on purpose: a technician picking up
+          someone else's job needs it before they read the work, not after. */}
+      <WorkCardSyncBar workCardId={card.id} nowIso={new Date().toISOString()} />
       <Card className="mb-4">
         <CardContent className="flex flex-wrap items-center gap-3 p-4 text-sm">
           <Badge variant={completed ? 'outline' : card.status === 'IN_WORK' ? 'secondary' : 'destructive'}>{card.status}</Badge>
@@ -453,7 +520,7 @@ export default function WorkCardDetail() {
         canEdit={isMaint}
         user={{ oid: user.oid, displayName: user.displayName }}
         nameOf={nameOf}
-        onSave={next => dispatch({ type: 'EDIT_WORK_CARD', payload: next })}
+        onSave={saveTimeline}
       />
 
       {/* One-tap chips (QM4/D27) — the CONVENIENCE path per D61, never the source of truth. */}
@@ -519,7 +586,7 @@ export default function WorkCardDetail() {
         <PartsOrdersPanel
           card={card}
           canEdit={isMaint}
-          onSave={next => dispatch({ type: 'EDIT_WORK_CARD', payload: next })}
+          onSave={savePartsOrders}
           waitingPartsAlready={tagNow === 'WAITING_PARTS'}
           onOfferWaitingParts={setOfferedOrder}
         />
@@ -568,7 +635,7 @@ export default function WorkCardDetail() {
                   <div className="text-xs text-muted-foreground">{l.description}</div>
                   {l.note && <div className="mt-0.5 border-l-2 pl-2 text-xs italic text-muted-foreground">why: {l.note}</div>}
                 </div>
-                {!completed && isMaint && <Button size="icon" variant="ghost" onClick={() => dispatch({ type: 'DELETE_LABOR_ENTRY', payload: l.id })}><Trash2 className="h-4 w-4" /></Button>}
+                {!completed && isMaint && <Button size="icon" variant="ghost" onClick={() => removeLabor(l.id)}><Trash2 className="h-4 w-4" /></Button>}
               </div>
             ))}
             {labor.length === 0 && <p className="text-sm text-muted-foreground">No labor recorded.</p>}

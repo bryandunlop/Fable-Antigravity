@@ -120,6 +120,7 @@ import ElectronicLogbook from './components/ElectronicLogbook';
 import { MaintenanceWorkflowProvider } from './components/maintenance-workflow/context/MaintenanceWorkflowContext';
 import { SchedulingWorkspaceProvider } from './components/scheduling-workspace/SchedulingWorkspaceContext';
 import { TechLogProvider } from './components/tech-log/TechLogContext';
+import { SyncProvider } from './components/tech-log/sync/useSync';
 import PilotWorkspace from './components/pilot-workspace/PilotWorkspace';
 import AviaSyncDashboard from './components/maintenance-workflow/AviaSyncDashboard';
 import MWElectronicTechLog from './components/maintenance-workflow/ElectronicTechLog';
@@ -206,6 +207,11 @@ export default function App() {
                     `useLoginRoles`; deriving roles from the resolved persona instead handed every
                     login with no `SYSTEM_USERS` entry the fallback persona's `chief-pilot`. */}
                 <TechLogProvider userRole={userRole} additionalRoles={additionalRoles}>
+                {/* TL-38 — the sync runtime (outbox, send loop, presence heartbeat). INSIDE
+                    TechLogProvider because it reads and dispatches tech-log state, and hoisted to the
+                    same level for the same TL-26 reason: a provider that unmounts on navigation would
+                    drop the outbox, which is the one structure whose entire job is to survive. */}
+                <SyncProvider>
                 <Router>
                   <Routes>
                     {/* Public Routes - No Authentication Required */}
@@ -655,6 +661,7 @@ export default function App() {
                     } />
                   </Routes>
                 </Router>
+                </SyncProvider>
                 </TechLogProvider>
                 </CompanyAirportProvider>
                 </PassengerProvider>
