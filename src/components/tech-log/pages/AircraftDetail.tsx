@@ -33,6 +33,7 @@ import { SymptomNote } from '../components/SymptomNote';
 import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
+import { DeferralDueLine } from '../components/DeferralDueLine';
 import { AircraftBanner } from '../components/AircraftBanner';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
 import { BriefingPanel } from '../components/BriefingPanel';
@@ -671,7 +672,6 @@ export default function AircraftDetail() {
           {deferrals.map(d => {
             const expired = isDeferralExpired(d, now, airframe);
             const effective = expired ? 'EXPIRED' : d.status;
-            const ms = d.repairDueDateUtc ? new Date(d.repairDueDateUtc).getTime() - Date.now() : null;
             return (
               <Card key={d.id}>
                 <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
@@ -690,9 +690,13 @@ export default function AircraftDetail() {
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'}</p>
                     {d.repairDueDateUtc && (
-                      <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" /> due {formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)} · {ms != null && ms > 0 ? `${Math.floor(ms / 86400000)}d left` : 'overdue'}{d.extensionUsed && ' · extended'}
-                      </div>
+                      <DeferralDueLine
+                        clockStartUtc={d.clockStartDateUtc}
+                        repairDueUtc={d.repairDueDateUtc}
+                        category={d.category}
+                        dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                        extended={d.extensionUsed}
+                      />
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">

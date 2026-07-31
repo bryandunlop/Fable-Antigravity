@@ -3,7 +3,18 @@ import { deriveServiceability } from '../../tech-log/engine/serviceability';
 import { deriveCustody, type CustodyState } from '../../tech-log/engine/custody';
 import type { TripRecord } from '../../../scheduling/store/types';
 
-const SV_DOT: Record<string, string> = { GREEN: 'bg-emerald-500', AMBER: 'bg-amber-500', RED: 'bg-red-500' };
+/**
+ * LG-158 — these were Tailwind defaults (emerald-500 / amber-500 / red-500), which put a
+ * DIFFERENT green on the pilot's own board from every other serviceability surface in the
+ * app. The brand tokens are P&G PMS 354 / 143 / 032 and are the same values behind
+ * ServiceabilityChip's `status-*` classes. D33: brand tokens are imported, never copied —
+ * and never approximated by whatever the utility framework ships.
+ */
+const SV_DOT: Record<string, string> = {
+  GREEN: 'bg-[var(--gfo-success,#00B140)]',
+  AMBER: 'bg-[var(--gfo-warning,#F1B434)]',
+  RED: 'bg-[var(--gfo-error,#EF3340)]',
+};
 
 // Pilot-framed custody (first person) on the P&G-blue axis — distinct from the third-person CustodyChip.
 const CUSTODY: Record<CustodyState, { dot: string; label: string; strong: boolean }> = {

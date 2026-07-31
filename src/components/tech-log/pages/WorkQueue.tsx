@@ -8,6 +8,7 @@ import { currentRows } from '../engine/supersede';
 import { buildWorkQueue } from '../engine/workqueue';
 import { deriveServiceability } from '../engine/serviceability';
 import { TechLogShell } from '../components/TechLogShell';
+import { DeferralDueLine } from '../components/DeferralDueLine';
 import { CasChip } from '../components/CasChip';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -173,7 +174,17 @@ export default function WorkQueue() {
             {overdueDeferrals.length === 0 ? empty : overdueDeferrals.map(({ deferral: d }) => (
               <Row key={d.id} next="Rectify to clear" onClick={() => open(tailOf(d.aircraftId), '?tab=deferrals')}>
                 <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge><Badge variant="destructive">OVERDUE</Badge></div>
-                <p className="mt-0.5 truncate text-muted-foreground">{d.repairDueDateUtc ? `due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}` : ''} · {d.melTitle ?? 'MEL item not recorded'}</p>
+                <p className="mt-0.5 truncate text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'}</p>
+                {d.repairDueDateUtc && (
+                  <DeferralDueLine
+                    className="mt-0.5"
+                    clockStartUtc={d.clockStartDateUtc}
+                    repairDueUtc={d.repairDueDateUtc}
+                    category={d.category}
+                    dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                    extended={d.extensionUsed}
+                  />
+                )}
               </Row>
             ))}
           </Section>
@@ -196,7 +207,17 @@ export default function WorkQueue() {
             {soonDeferrals.length === 0 ? empty : soonDeferrals.map(({ deferral: d }) => (
               <Row key={d.id} next="Rectify or extend" onClick={() => open(tailOf(d.aircraftId), '?tab=deferrals')}>
                 <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{tailOf(d.aircraftId)}</span><Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge><Badge variant="secondary">DUE SOON</Badge></div>
-                <p className="mt-0.5 truncate text-muted-foreground">{d.repairDueDateUtc ? `due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}` : ''} · {d.melTitle ?? 'MEL item not recorded'}</p>
+                <p className="mt-0.5 truncate text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'}</p>
+                {d.repairDueDateUtc && (
+                  <DeferralDueLine
+                    className="mt-0.5"
+                    clockStartUtc={d.clockStartDateUtc}
+                    repairDueUtc={d.repairDueDateUtc}
+                    category={d.category}
+                    dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                    extended={d.extensionUsed}
+                  />
+                )}
               </Row>
             ))}
           </Section>
