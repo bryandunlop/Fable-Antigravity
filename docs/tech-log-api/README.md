@@ -49,14 +49,15 @@ seam was for. Read that file's header before you flip it; it lists the three thi
 
 **Op kinds** (`SyncOpKind` in `src/components/tech-log/sync/contract.ts`): `workcard.patch`,
 `workcard.labor.add`, `workcard.labor.delete`, `workcard.parts.add`, `workcard.parts.receive`,
-`workcard.statustag.add`.
+`workcard.statustag.add`, `workcard.timeline.set`.
 
 ---
 
-## Four rules the front end already depends on
+## Five rules the front end already depends on
 
-**1. Appends never conflict.** Only `workcard.patch` is revision-gated. `labor.add`, `parts.add` and
-`statustag.add` are additions to a list and are accepted at any base revision. If you make logged
+**1. Appends never conflict.** `labor.add`, `parts.add` and `statustag.add` are additions to a list
+and are accepted at any base revision. `workcard.patch`, `parts.receive` and `timeline.set` are
+revision-gated, because each overwrites something that already exists. If you make logged
 hours conflict because a colleague renamed the card, you will have rejected the one thing TL-38 exists
 to protect. The rule is implemented in `src/components/tech-log/sync/applyOp.ts` — **reuse that
 function rather than re-deriving it**, so the two halves cannot drift.
@@ -73,6 +74,14 @@ Personnel — same rule as `LaborEntry.techName` (TL-16). A rename must not repa
 identical response on replay. A conflict is deliberately **not** recorded against the key: the same
 key may legitimately be retried after the client rebases, and burning it would replay the failure
 forever. `localTransport.submit` shows both halves.
+
+**5. Always return the full aggregate, even on 409.** The client REBASES on every response: it takes
+your card and replays its own still-unsent ops on top (`useSync.applyServerCard`). A partial response
+— the card without `laborEntries`, or a 409 with no body — makes the client rebase onto an incomplete
+picture and briefly show a technician that their hours have disappeared. That flicker is not cosmetic:
+a tech who sees logged hours vanish re-enters them, and now there are two labor lines. Four separate
+bugs in the first cut of this front end traced to exactly this class of full-replace-without-rebase,
+so the contract is stricter than it looks.
 
 ---
 
