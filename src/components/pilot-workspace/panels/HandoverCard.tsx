@@ -30,15 +30,20 @@ export function HandoverCard({ trip, onOpenHandover }: { trip: TripRecord; onOpe
   const custody = deriveCustody(ac.id, state, now).state;
   const c = CUSTODY[custody];
   const deferrals = state.deferrals.filter((d) => d.aircraftId === ac.id && d.status === 'ACTIVE');
+  /* LG-143 — deriveServiceability knows nothing of isProvisional, so a clean tail in onboarding
+     reads GREEN and this card told the PIC "Serviceable · no deferrals" under a green dot for an
+     aircraft whose D195 MEL the FSDO has not approved (and which they are now blocked from
+     accepting at all). */
   const svText =
-    sv === 'RED' ? 'Unserviceable — grounded'
+    ac.isProvisional ? 'In onboarding — D195 MEL pending FSDO approval'
+    : sv === 'RED' ? 'Unserviceable — grounded'
     : sv === 'AMBER' ? `Serviceable · ${deferrals.length} deferral${deferrals.length === 1 ? '' : 's'}`
     : 'Serviceable · no deferrals';
 
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${SV_DOT[sv]}`} aria-hidden />
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${ac.isProvisional ? 'bg-muted-foreground' : SV_DOT[sv]}`} aria-hidden />
         <span>{svText}</span>
       </div>
       <div className={`inline-flex items-center gap-1.5 ${c.strong ? 'font-medium text-[var(--gfo-custody-crew)]' : 'text-muted-foreground'}`}>

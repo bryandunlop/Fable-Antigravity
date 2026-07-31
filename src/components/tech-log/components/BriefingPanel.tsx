@@ -168,6 +168,13 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   });
 
   const createDraft = () => {
+    /* LG-143 — the gate lives HERE, not only on the button that calls this. reRelease() (the
+       "Prepare updated briefing" affordance on a stale RELEASED briefing) calls straight through,
+       so a render-site-only check let a DRAFT briefing be created for a provisional tail: flip a
+       tail to PROVISIONAL in Admin > Fleet while it holds a released briefing, let the disclosure
+       drift, and the stale path builds one. The reducer pushes briefings without defending itself
+       (unlike ADD_POSTFLIGHT), so this function is the last honest place to stop it. */
+    if (!prepareGate.ok) return toast.error(prepareGate.reason!);
     if (!template) return toast.error(`No published preflight checklist for ${aircraft.type} yet — ask a maintenance admin to publish one in Admin > Checklists.`);
     const instanceId = newId('cli');
     const b: FlightBriefing = {

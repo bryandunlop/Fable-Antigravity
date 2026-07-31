@@ -58,6 +58,12 @@ export function handoverModule(
   // Handover is aircraft-keyed (by tail), not trip-keyed: it reflects the aircraft's real
   // serviceability + custody even before the trip is released to preflight (cold-open demo).
   if (!aircraft) return { ...base, tone: 'muted', summary: 'no aircraft', outstanding: 0 };
+  /* LG-143 — onboarding beats custody for the same reason RED does, and is checked first because
+     deriveServiceability cannot see it: a clean provisional tail reads GREEN, so this module fell
+     through to "ready to accept" for an aircraft the PIC is blocked from accepting. */
+  if (aircraft.isProvisional) {
+    return { ...base, tone: 'blocked', summary: 'in onboarding', outstanding: 1 };
+  }
   // RED grounding beats custody — a grounded aircraft is a hard stop regardless of who holds it.
   if (deriveServiceability(aircraft.id, state, nowUtc).status === 'RED') {
     return { ...base, tone: 'blocked', summary: 'grounded', outstanding: 1 };
