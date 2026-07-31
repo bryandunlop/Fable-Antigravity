@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Inbox, AlertTriangle, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck, Eye } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
@@ -14,6 +14,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { cn } from '../../ui/utils';
+
+/**
+ * "Lost in the slop" (Bryan, 2026-07-31) — the queue was a box inside a box inside a box, and the
+ * ONLY thing carrying consequence was the band heading three levels up. A squawk that grounds the
+ * fleet and a routine 600-hr check rendered as the same white bordered rectangle.
+ *
+ * The fix is structural, not decorative: the band's tone travels down to the row itself, so an item
+ * states its own consequence wherever the eye lands. `Section` also stops being a `Card` — the band
+ * is already the container, and a second one added chrome without adding meaning.
+ */
+type BandTone = 'stop' | 'soon' | 'track';
+const BandToneContext = createContext<BandTone>('track');
+
+/** Left edge per consequence. `track` gets no hue on purpose: "in hand" is not an alarm. */
+const ROW_EDGE: Record<BandTone, string> = {
+  stop: 'border-l-[3px] border-l-[var(--gfo-error,#EF3340)]',
+  soon: 'border-l-[3px] border-l-[var(--gfo-warning,#F1B434)]',
+  track: 'border-l-[3px] border-l-border',
+};
 
 const STATUS_VARIANT: Record<string, 'destructive' | 'secondary' | 'outline'> = {
   OPEN: 'destructive', DEFERRED: 'secondary', RECTIFIED: 'outline', CLOSED: 'outline', WATCHLISTED: 'secondary',
@@ -83,22 +102,37 @@ export default function WorkQueue() {
   const Section = ({ icon, title, count, keep, children }: { icon: React.ReactNode; title: string; count: number; keep?: boolean; children: React.ReactNode }) => {
     if (!count && !keep) return null;
     return (
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2 text-base">{icon} {title} <Badge variant={count ? 'secondary' : 'outline'}>{count}</Badge></CardTitle></CardHeader>
-        <CardContent className="space-y-2">{children}</CardContent>
-      </Card>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {icon} <span className="font-medium text-foreground">{title}</span>
+          <Badge variant={count ? 'secondary' : 'outline'}>{count}</Badge>
+        </div>
+        <div className="space-y-2">{children}</div>
+      </div>
     );
   };
   // D42: every row says what it will take you to do, so the queue reads as a list of next actions
   // rather than a list of records that happen to be clickable.
-  const Row = ({ onClick, next, children }: { onClick: () => void; next?: string; children: React.ReactNode }) => (
-    <button onClick={onClick} className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left text-sm hover:bg-accent/40">
-      <div className="min-w-0">{children}</div>
-      <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-        {next}<ChevronRight className="h-4 w-4" />
-      </span>
-    </button>
-  );
+  const Row = ({ onClick, next, children }: { onClick: () => void; next?: string; children: React.ReactNode }) => {
+    const tone = useContext(BandToneContext);
+    return (
+      <button
+        onClick={onClick}
+        className={cn(
+          // No rounded corners: a single-sided edge with rounded corners reads as a mistake.
+          'flex w-full items-center justify-between gap-3 border border-l-0 p-3 text-left text-sm transition-colors hover:bg-accent/40',
+          ROW_EDGE[tone],
+        )}
+      >
+        <div className="min-w-0">{children}</div>
+        {/* D42 made every row say what it will take you to do; it then said it in 12px grey, which is
+            how the actionable half of the queue became the quietest thing in it. */}
+        <span className="flex shrink-0 items-center gap-1 text-sm font-medium text-foreground">
+          {next}<ChevronRight className="h-4 w-4" />
+        </span>
+      </button>
+    );
+  };
   const empty = <p className="text-sm text-muted-foreground">Nothing here.</p>;
 
   // D42: three priority bands. Previously six equal-weight sections gave no reading order, so
@@ -106,17 +140,19 @@ export default function WorkQueue() {
   const Band = ({ title, hint, count, tone, children }: {
     title: string; hint: string; count: number; tone: 'stop' | 'soon' | 'track'; children: React.ReactNode;
   }) => (
-    <div className="space-y-2">
-      <div className="flex items-baseline gap-2 border-b pb-1">
-        <span className={cn('text-sm font-semibold',
-          tone === 'stop' ? 'text-[var(--gfo-error,#EF3340)]'
-          : tone === 'soon' ? 'text-[var(--gfo-warning,#F1B434)]'
-          : 'text-muted-foreground')}>{title}</span>
-        <Badge variant={count ? 'secondary' : 'outline'}>{count}</Badge>
-        <span className="text-xs text-muted-foreground">{hint}</span>
+    <BandToneContext.Provider value={tone}>
+      <div className="space-y-3">
+        <div className="flex items-baseline gap-2 border-b pb-1">
+          <span className={cn('text-sm font-semibold',
+            tone === 'stop' ? 'text-[var(--gfo-error,#EF3340)]'
+            : tone === 'soon' ? 'text-[var(--gfo-warning,#F1B434)]'
+            : 'text-muted-foreground')}>{title}</span>
+          <Badge variant={count ? 'secondary' : 'outline'}>{count}</Badge>
+          <span className="text-xs text-muted-foreground">{hint}</span>
+        </div>
+        <div className="space-y-4">{children}</div>
       </div>
-      {children}
-    </div>
+    </BandToneContext.Provider>
   );
 
   // An open airworthiness-affecting defect grounds by default; a non-affecting one does not.
