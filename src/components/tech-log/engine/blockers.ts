@@ -70,6 +70,11 @@ export interface BlockerBoard {
   restrictions: BlockerRow[];
   /** Work already under way. Never a grounding cause on its own. */
   inProgress: BlockerRow[];
+  /**
+   * The tail is in onboarding (its D195 MEL is not yet FSDO-approved). Carried on the board rather
+   * than looked up by callers so the sentence and the actions read it from one place. (LG-143)
+   */
+  provisional: boolean;
 }
 
 type Slice = Pick<TechLogState, 'aircraft' | 'defects' | 'deferrals'> &
@@ -221,13 +226,25 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
   blockers.sort(byGoverning);
   restrictions.sort(byGoverning);
 
-  return { status: sv.status, governingRule: sv.governingRule, blockers, restrictions, inProgress };
+  return {
+    status: sv.status, governingRule: sv.governingRule, blockers, restrictions, inProgress,
+    provisional: ac?.isProvisional === true,
+  };
 }
 
 /** One sentence naming the condition that governs the tail right now. */
 export function governingSentence(board: BlockerBoard, tailNumber: string): string {
   const g = [...board.blockers, ...board.restrictions].find(r => r.governing);
-  if (board.status === 'GREEN') return `${tailNumber} is serviceable — no open defects and no active deferrals.`;
+  if (board.status === 'GREEN') {
+    /* LG-143 — "no open defects" is true of a provisional tail, but "serviceable" is not something
+       myGFO may say about it: its D195 MEL is PENDING_FSDO, nothing can be deferred against it, and
+       it is not yet in service. Saying so beside the Provisional badge asserted a dispatch answer
+       the MEL cannot yet give. Only the CLEAN sentence changes — a provisional tail with an open
+       defect is grounded for the ordinary reason, and naming the defect is still the useful thing. */
+    return board.provisional
+      ? `${tailNumber} is in onboarding — no open defects, but no dispatch state is assessed until its D195 MEL is approved.`
+      : `${tailNumber} is serviceable — no open defects and no active deferrals.`;
+  }
   if (!g) {
     return board.status === 'RED'
       ? `${tailNumber} is grounded.`

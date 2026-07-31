@@ -65,6 +65,9 @@ const RULE_TEXT: Record<number, string> = {
   5: 'No open defects and no active deferrals',
 };
 
+/** LG-143 — what actually constrains a tail still in onboarding. */
+const PROVISIONAL_RULE_TEXT = 'Deferrals cannot be raised while the D195 MEL is pending FSDO approval';
+
 const CHECK_BADGE: Record<string, 'secondary' | 'destructive' | 'outline'> = { CURRENT: 'secondary', DUE_SOON: 'outline', EXPIRED: 'destructive', NEVER_DONE: 'destructive' };
 
 // D42: the label says which of the two "fix it" paths you are taking. "Rectify" and "Quick CRS"
@@ -398,7 +401,10 @@ export default function AircraftDetail() {
           status={ac.isProvisional ? null : sv.status}
           custody={custody.state}
           governing={governingSentence(board, ac.tailNumber)}
-          rule={RULE_TEXT[sv.governingRule]}
+          /* LG-143 — rule 5's text ("no open defects and no active deferrals") reads as the
+             green-light rule. On a provisional tail the operative constraint is the MEL, not the
+             absence of defects, so name that instead. */
+          rule={ac.isProvisional && sv.governingRule === 5 ? PROVISIONAL_RULE_TEXT : RULE_TEXT[sv.governingRule]}
           blockerCount={board.blockers.length}
           asOf={new Date(now).toLocaleString()}
           note={acceptedBriefing?.acknowledgedByOid ? (
@@ -477,6 +483,8 @@ export default function AircraftDetail() {
                 <Wrench className="h-4 w-4" />
                 {board.blockers.length > 0
                   ? `Stands between ${ac.tailNumber} and dispatch (${board.blockers.length})`
+                  : ac.isProvisional
+                  ? `Nothing recorded against ${ac.tailNumber}`
                   : `Nothing is holding ${ac.tailNumber} on the ground`}
               </CardTitle>
               <Button size="sm" variant="outline" onClick={() => setReportOpen(true)}>
@@ -485,9 +493,19 @@ export default function AircraftDetail() {
             </CardHeader>
             <CardContent className="space-y-3">
               {board.blockers.length === 0 && (
-                <div className={cn('flex items-center gap-1.5 text-sm', sv.status === 'GREEN' ? 'text-[var(--gfo-success,#00B140)]' : 'text-[var(--gfo-warning,#F1B434)]')}>
+                <div className={cn(
+                  'flex items-center gap-1.5 text-sm',
+                  ac.isProvisional ? 'text-muted-foreground'
+                  : sv.status === 'GREEN' ? 'text-[var(--gfo-success,#00B140)]'
+                  : 'text-[var(--gfo-warning,#F1B434)]',
+                )}>
                   <CheckCircle2 className="h-4 w-4" />
-                  {sv.status === 'GREEN'
+                  {/* LG-143 — the empty board asserted dispatchability, which is the same claim the
+                      banner used to make. A provisional tail's empty board means only that nothing
+                      is recorded against it; it still cannot dispatch. */}
+                  {ac.isProvisional
+                    ? `No open maintenance recorded against ${ac.tailNumber}. It cannot dispatch until its D195 MEL is approved.`
+                    : sv.status === 'GREEN'
                     ? `No open maintenance — ${ac.tailNumber} is dispatchable.`
                     : 'Dispatchable under restriction — see the deferrals in force below.'}
                 </div>

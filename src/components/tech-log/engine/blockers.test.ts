@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBlockers } from './blockers';
+import { buildBlockers, governingSentence } from './blockers';
 import type { Aircraft, Defect, Deferral, WorkCard, RecurringCheck } from '../types';
 
 const ac: Aircraft = {
@@ -159,6 +159,49 @@ describe('buildBlockers — every grounding cause is a listed, actionable row', 
     const b = r.blockers.find(x => x.kind === 'DEFECT_OPEN');
     expect(b).toBeDefined();
     expect(b!.actions).not.toContain('DEFER');
+  });
+
+  /**
+   * LG-143 — a clean provisional tail must not be called serviceable.
+   *
+   * "No open defects" is true of the G800 in onboarding, so the projection reads GREEN. But its
+   * D195 MEL is PENDING_FSDO: nothing can be deferred against it and it is not yet in service, so
+   * myGFO cannot answer the dispatch question for it at all. Rendering the ordinary GREEN sentence
+   * beside the Provisional badge and the pending-approval warning put a dispatch answer on screen
+   * that the MEL cannot yet give.
+   */
+  it('a clean provisional tail is described as in onboarding, never as serviceable (LG-143)', () => {
+    const prov: Aircraft = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
+    const r = buildBlockers('ac2', { ...empty, aircraft: [ac, prov] }, NOW);
+
+    expect(r.status).toBe('GREEN');
+    const s = governingSentence(r, 'N3PG');
+    expect(s).not.toMatch(/serviceable/i);
+    expect(s).toMatch(/onboarding/i);
+    expect(s).toMatch(/MEL/);
+  });
+
+  it('a non-provisional clean tail keeps the serviceable sentence', () => {
+    const r = buildBlockers('ac1', { ...empty }, NOW);
+
+    expect(r.status).toBe('GREEN');
+    expect(governingSentence(r, 'N1PG')).toMatch(/is serviceable/i);
+  });
+
+  /**
+   * Provisional changes only the CLEAN sentence. A provisional tail with an open defect is grounded
+   * for the ordinary reason, and naming that defect is still the most useful thing to say.
+   */
+  it('a provisional tail with an open defect still names the defect', () => {
+    const prov: Aircraft = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
+    const r = buildBlockers(
+      'ac2',
+      { ...empty, aircraft: [ac, prov], defects: [defect({ id: 'd2', aircraftId: 'ac2' })] },
+      NOW,
+    );
+
+    expect(r.status).toBe('RED');
+    expect(governingSentence(r, 'N3PG')).toMatch(/is grounded because of/i);
   });
 
   it('a repair-due instant is handed over raw, never pre-formatted into the display text (D24)', () => {
