@@ -303,8 +303,20 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
   }
 
   const svAtRelease = disclosure?.serviceability ?? briefing.serviceabilityAtRelease ?? sv.status;
-  const svColor = svAtRelease === 'GREEN' ? 'var(--gfo-success,#00B140)' : svAtRelease === 'AMBER' ? 'var(--gfo-warning,#F1B434)' : 'var(--gfo-error,#EF3340)';
-  const svText = svAtRelease === 'GREEN' ? 'Serviceable — no open items' : svAtRelease === 'AMBER' ? 'Serviceable with limitations' : 'Unserviceable — grounded';
+  /* LG-143 — a provisional tail has no serviceability answer to disclose. The projection reads
+     GREEN on a clean one (it knows nothing of isProvisional), so this line told the PIC
+     "Serviceable — no open items" about an aircraft whose D195 MEL the FSDO has not approved.
+     Acceptance is now blocked outright in canAcceptDispatch; this stops the panel asserting the
+     green state while that block is explained beneath it. */
+  const provisional = aircraft.isProvisional === true;
+  const svColor = provisional ? 'var(--muted-foreground)'
+    : svAtRelease === 'GREEN' ? 'var(--gfo-success,#00B140)'
+    : svAtRelease === 'AMBER' ? 'var(--gfo-warning,#F1B434)'
+    : 'var(--gfo-error,#EF3340)';
+  const svText = provisional ? 'In onboarding — D195 MEL pending FSDO approval'
+    : svAtRelease === 'GREEN' ? 'Serviceable — no open items'
+    : svAtRelease === 'AMBER' ? 'Serviceable with limitations'
+    : 'Unserviceable — grounded';
   // Frozen MEL identity for the acknowledge checkboxes: the PIC must tick against the same text the
   // briefing discloses and the signature covers, not against a MelItem a later revision can rewrite.
   const disclosedById = new Map((disclosure?.deferrals ?? []).map(r => [r.deferralId, r]));

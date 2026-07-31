@@ -30,12 +30,25 @@ export function deferralsRequiringAck(
     .filter(d => Boolean(d.restrictionText || d.placardRequired || d.melOProcedure));
 }
 
-/** Dispatch acceptance gate (design §A): a RED aircraft cannot be accepted. */
+/**
+ * Dispatch acceptance gate (design §A): a RED aircraft cannot be accepted.
+ *
+ * LG-143 — nor can a PROVISIONAL one, and that limb is not a refinement of the RED test: it sits
+ * outside the serviceability projection entirely. `deriveServiceability` has no notion of
+ * `isProvisional`, so the G800 in onboarding — no defects, D195 MEL still PENDING_FSDO — read GREEN
+ * and passed this gate. The PIC was shown "Serviceable — no open items" and could sign acceptance,
+ * freezing `serviceability: 'GREEN'` into the signed FlightBriefing disclosure for an aircraft
+ * whose MEL the FSDO has not approved. Bryan ruled block-outright on 2026-07-31: myGFO has no
+ * dispatch answer for a tail in onboarding, and absence of an answer is never a green light.
+ */
 export function canAcceptDispatch(
   aircraftId: string,
   state: Parameters<typeof deriveServiceability>[1],
   asOfUtc: string,
 ): { ok: boolean; reason?: string } {
+  if (state.aircraft.find(a => a.id === aircraftId)?.isProvisional) {
+    return { ok: false, reason: 'Aircraft is in onboarding — its D195 MEL is pending FSDO approval, so dispatch cannot be accepted against it.' };
+  }
   if (deriveServiceability(aircraftId, state, asOfUtc).status === 'RED') {
     return { ok: false, reason: 'Aircraft is RED — resolve or defer the grounding item before acceptance (a special flight permit is out of scope).' };
   }
