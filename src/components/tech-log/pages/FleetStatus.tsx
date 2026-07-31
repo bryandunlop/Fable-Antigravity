@@ -154,20 +154,25 @@ export default function FleetStatus() {
               <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"><AlertTriangle className="h-3.5 w-3.5" />{openDefects.length} open</span>
                 <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"><Wrench className="h-3.5 w-3.5" />{activeDeferrals.length} MEL</span>
-                {/* LG-155 — the tile's clock is deliberately NOT the inline size used on list rows.
-                    This is the one number on the card that decides whether the aircraft flies
-                    tomorrow, and it was previously the smallest thing on it. */}
-                {nearestDeferral && (
+                <ChevronRight className="ml-auto h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
+              </div>
+
+              {/* LG-155 — the tile's clock is deliberately NOT the inline size used on list rows: it
+                  is the one number on the card that decides whether the aircraft flies tomorrow, and
+                  it was previously the smallest thing on it.
+                  It gets its OWN row rather than `ml-auto` on the counts line — at the xl:3-up tile
+                  width the large label ran past the card edge and clipped, which the first cut of
+                  this change shipped and a browser pass caught. */}
+              {nearestDeferral && (
+                <div className="mt-3 border-t pt-3">
                   <DeferralClock
-                    className="ml-auto"
                     size="lg"
                     clockStartUtc={nearestDeferral.clockStartDateUtc}
                     repairDueUtc={nearestDeferral.repairDueDateUtc}
                     category={nearestDeferral.category}
                   />
-                )}
-                <ChevronRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
-              </div>
+                </div>
+              )}
 
               {ac.isProvisional && (
                 <div className="mt-3 rounded bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
