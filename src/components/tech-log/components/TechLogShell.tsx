@@ -18,12 +18,19 @@ export function TechLogShell({
   subtitle,
   actions,
   status,
+  banner,
   children,
 }: {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   status?: ReactNode;
+  /**
+   * D71 — a page that owns its own headline (the aircraft workspace) passes it here. The chrome row
+   * then keeps only a quiet context line, and the banner spans the full width under the nav, so the
+   * page states what it is once instead of a title above the nav and a status card below it.
+   */
+  banner?: ReactNode;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -43,9 +50,15 @@ export function TechLogShell({
     <div className="mx-auto max-w-7xl p-6">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="gfo-eyebrow mb-1 text-muted-foreground">Global Flight Operations</p>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
+          {banner ? (
+            <p className="text-sm text-muted-foreground">{title}</p>
+          ) : (
+            <>
+              <p className="gfo-eyebrow mb-1 text-muted-foreground">Global Flight Operations</p>
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+              {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
+            </>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {status}
@@ -115,6 +128,7 @@ export function TechLogShell({
       )}
       {!activeGroup.sub && <div className="mb-6" />}
 
+      {banner}
       {children}
     </div>
   );
