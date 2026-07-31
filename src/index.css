@@ -717,6 +717,10 @@
   }
   .cas-white { color: #F2F5F7; }
   .cas-cyan  { color: #4FD8EE; }
+  /* The G650ER deck annunciates advisories in blue where the G500 uses cyan (D70). Kept visibly
+     bluer than .cas-cyan — they are different colours on different flight decks, not one colour
+     with two names, and a crew reading a G650ER message should see what they saw. */
+  .cas-blue  { color: #6AA9FF; }
   .cas-amber { color: #FFB021; }
   .cas-red   { color: #FF5147; }
 

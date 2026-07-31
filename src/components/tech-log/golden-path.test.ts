@@ -2,14 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { getDefaultState } from './mockData/scenarios';
 import { deriveServiceability } from './engine/serviceability';
 import { computeClockStart, computeRepairDue } from './engine/pl25';
-import type { Defect, Deferral } from './types';
+import type { Defect, Deferral, MelCategory, MelItem } from './types';
 
 // Proves the hero demo flow end-to-end through the engine + lifecycle transitions.
 describe('golden path: report -> defer (M-gated) -> gating release', () => {
   const base = getDefaultState();
   const ac = base.aircraft.find(a => a.tailNumber === 'N5PG')!; // seeded GREEN
   const now = '2026-06-21T12:00:00Z';
-  const mel = base.melItems.find(m => m.aircraftType === ac.type && m.approvalState === 'APPROVED' && m.mProcedure)!;
+  // `&& m.category` is not decoration: the seed now also holds NEF items, 60 of which carry an (M)
+  // procedure and none of which carry a repair category (D69/D70). Without it this picks an NEF
+  // item and the whole PL-25 path below runs against something that has no clock.
+  const mel = base.melItems.find(m => m.aircraftType === ac.type && m.approvalState === 'APPROVED' && m.mProcedure && m.category) as MelItem & { category: MelCategory };
   const cs = computeClockStart(now);
   const due = computeRepairDue(mel.category, cs, { repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: 10 }, { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles });
 

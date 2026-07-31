@@ -75,8 +75,15 @@ export const VERSION_KEY = 'tech-log-data-version';
  * a broken-render risk — the bump exists so a returning user's stored blob is replaced by seeds that
  * actually carry a logged overnight gap and a delivered parts order. Without it the include/exclude
  * control and the metrics page have nothing to act on and the slice is invisible on their machine.
+ *
+ * v21 (D70): the MEL catalog gained the two parts of the approved D195 MELs it never held — Section
+ * Two (CAS Message Relief, 208 items) and the NEF Deferral List (287 items) — plus `melSection`,
+ * `casMessage`/`casColor`/`casLevel` and `nefArea` on `MelItem`, and `category` became nullable for
+ * NEF. This one is closer to v17 than to v19: `melItems` is seeded reference data, so a returning
+ * user's stored blob would pin them to the old Section-One-only catalog indefinitely and two thirds
+ * of their own MEL would simply not exist for them. Reseeding is the fix.
  */
-export const DATA_VERSION = '2026-07-30-v20';
+export const DATA_VERSION = '2026-07-31-v21';
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a

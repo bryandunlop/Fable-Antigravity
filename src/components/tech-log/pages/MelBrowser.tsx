@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { BookOpen, Search, Info, CalendarClock } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
 import { CATEGORY_DAYS } from '../constants';
-import type { AircraftType, MelItem } from '../types';
+import { sectionOf } from '../engine/melSection';
+import type { AircraftType, MelItem, MelSection } from '../types';
+import { CasChip } from '../components/CasChip';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -15,6 +17,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
  * only APPROVED items whose effectiveDate is on/before the as-of date. Distinct from Admin (no edit)
  * and from the deferral picker (no sign action) — a pure reference view.
  */
+/** Section One is the unmarked default, so it is only labelled once an item is selected. */
+const SECTION_LABEL: Record<MelSection, string> = {
+  ONE: 'Section 1 — LRU',
+  TWO: 'Section 2 — CAS',
+  NEF: 'NEF list',
+};
+
+const SECTION_ORDER: Record<MelSection, number> = { ONE: 0, TWO: 1, NEF: 2 };
+
 export default function MelBrowser() {
   const { state } = useTechLog();
   const [type, setType] = useState<AircraftType>('G500');
@@ -29,7 +40,11 @@ export default function MelBrowser() {
       .filter(m => m.approvalState === 'APPROVED')
       .filter(m => m.effectiveDate <= asOf)
       .filter(m => !query || m.subItemNumber.toLowerCase().includes(query) || m.title.toLowerCase().includes(query) || m.ataReference === query)
-      .sort((a, b) => a.subItemNumber.localeCompare(b.subItemNumber));
+      // Group by section before item number: the three parts number themselves differently
+      // ('24-02-02', '2-14', 'N200-31'), so one flat string sort interleaves them into nonsense.
+      .sort((a, b) =>
+        SECTION_ORDER[sectionOf(a)] - SECTION_ORDER[sectionOf(b)]
+        || a.subItemNumber.localeCompare(b.subItemNumber, undefined, { numeric: true }));
   }, [state.melItems, type, asOf, q]);
 
   const totalApproved = state.melItems.filter(m => m.aircraftType === type && m.approvalState === 'APPROVED').length;
@@ -81,8 +96,14 @@ export default function MelBrowser() {
               <div className="flex flex-wrap items-center gap-2">
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">{m.subItemNumber}</span>
-                <Badge variant="outline">Cat {m.category}</Badge>
-                <Badge variant="outline">{CATEGORY_DAYS[m.category] ? `${CATEGORY_DAYS[m.category]}d` : 'proviso'}</Badge>
+                {sectionOf(m) !== 'ONE' && <Badge variant="outline">{SECTION_LABEL[sectionOf(m)]}</Badge>}
+                {m.category
+                  ? <>
+                      <Badge variant="outline">Cat {m.category}</Badge>
+                      <Badge variant="outline">{CATEGORY_DAYS[m.category] ? `${CATEGORY_DAYS[m.category]}d` : 'proviso'}</Badge>
+                    </>
+                  : <Badge variant="outline">no repair interval</Badge>}
+                {m.casColor && <CasChip message={m.casMessage} color={m.casColor} />}
                 {m.oProcedure && <Badge variant="outline">(O)</Badge>}
                 {m.mProcedure && <Badge variant="outline">(M)</Badge>}
                 {m.placardText || m.placardLocation ? <Badge variant="outline">placard</Badge> : null}
@@ -101,9 +122,17 @@ export default function MelBrowser() {
                 <div>
                   <div className="text-base font-semibold">{selected.subItemNumber} — {selected.title}</div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    <Badge variant="outline">ATA {selected.ataReference}</Badge>
-                    <Badge variant="outline">Cat {selected.category}</Badge>
-                    <Badge variant="outline">{CATEGORY_DAYS[selected.category] ? `${CATEGORY_DAYS[selected.category]}-day clock` : 'per proviso'}</Badge>
+                    <Badge variant="outline">{SECTION_LABEL[sectionOf(selected)]}</Badge>
+                    {selected.ataReference && <Badge variant="outline">ATA {selected.ataReference}</Badge>}
+                    {selected.nefArea && <Badge variant="outline">{selected.nefArea}</Badge>}
+                    {selected.category
+                      ? <>
+                          <Badge variant="outline">Cat {selected.category}</Badge>
+                          <Badge variant="outline">{CATEGORY_DAYS[selected.category] ? `${CATEGORY_DAYS[selected.category]}-day clock` : 'per proviso'}</Badge>
+                        </>
+                      /* NEF has no repair category by design — the program repairs "at the earliest
+                         opportunity", so there is no interval to show and none to start (D69). */
+                      : <Badge variant="outline">no repair interval — earliest opportunity</Badge>}
                     {selected.numberInstalled != null && <Badge variant="outline">{selected.numberRequired}/{selected.numberInstalled} req/inst</Badge>}
                     {selected.flightCrewDeferral ? <Badge variant="outline">FC-deferrable</Badge> : null}
                   </div>

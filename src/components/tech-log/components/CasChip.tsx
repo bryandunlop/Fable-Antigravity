@@ -29,20 +29,25 @@ import { cn } from '../../ui/utils';
 
 const COLOR_CLASS: Record<CasColor, string> = {
   WHITE: 'cas-white',
+  BLUE: 'cas-blue',
   CYAN: 'cas-cyan',
   AMBER: 'cas-amber',
   RED: 'cas-red',
 };
 
+/** What assistive tech announces. BLUE and CYAN name the same **Advisory** tier on two different
+ *  flight decks (D70), so both say the tier outright — the colour word alone would imply a
+ *  difference in urgency between the two fleets that does not exist. */
 const COLOR_TITLE: Record<CasColor, string> = {
-  WHITE: 'White CAS message',
-  CYAN: 'Cyan CAS message',
-  AMBER: 'Amber CAS message',
-  RED: 'Red CAS message',
+  WHITE: 'White CAS message — status',
+  BLUE: 'Blue CAS message — advisory',
+  CYAN: 'Cyan CAS message — advisory',
+  AMBER: 'Amber CAS message — caution',
+  RED: 'Red CAS message — warning',
 };
 
 /** A shape for the two tiers that mean "act now" — warning triangle, caution dot. Deliberately none
- *  for WHITE/CYAN: a mark on every tile marks nothing, and advisory tiers carry no urgency to
+ *  for WHITE/BLUE/CYAN: a mark on every tile marks nothing, and advisory tiers carry no urgency to
  *  encode. Decorative to assistive tech; `COLOR_TITLE` is what gets announced. */
 const TIER_GLYPH: Partial<Record<CasColor, string>> = {
   RED: '▲',

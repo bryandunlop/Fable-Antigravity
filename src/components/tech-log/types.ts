@@ -20,8 +20,39 @@ export interface Aircraft {
 export type DefectSource = 'PIREP' | 'MAREP' | 'CABIN' | 'STRUCTURAL' | 'NEF';
 export type DefectStatus = 'OPEN' | 'DEFERRED' | 'RECTIFIED' | 'CLOSED' | 'WATCHLISTED';
 
-/** Annunciator color of a CAS message, as displayed on the flight deck (D57). */
-export type CasColor = 'WHITE' | 'CYAN' | 'AMBER' | 'RED';
+/**
+ * Annunciator color of a CAS message, as displayed on the flight deck (D57).
+ *
+ * **The palette is fleet-specific, and D57's original four were the G500's.** Reading the two
+ * approved D195 MELs (D70): the G500's deck annunciates advisories in **Cyan**, the G650ER's in
+ * **Blue**. The G650ER Section Two carries 29 `(Blue – Advisory)` items and not one Cyan; the G500
+ * carries 128 Cyan. Neither is a synonym for the other — the crew sees the colour the MEL names for
+ * their aircraft — so both are values here, and `casPaletteFor` says which belong to a given type.
+ *
+ * RED appears in neither MEL, which is expected rather than missing: Section Two lists only
+ * *dispatchable* relief. A defect report can still carry a red CAS, so the value stays.
+ */
+export type CasColor = 'WHITE' | 'BLUE' | 'CYAN' | 'AMBER' | 'RED';
+
+/**
+ * The tier word the MEL prints beside the colour — "(Amber – Caution)", "(Cyan – Advisory)".
+ * Carried separately because it, not the hue, is the meaningful half: Blue and Cyan are different
+ * colours naming the same **Advisory** tier across the two fleets. Anything reasoning about urgency
+ * should read this, never `CasColor`.
+ */
+export type CasLevel = 'STATUS' | 'ADVISORY' | 'CAUTION' | 'WARNING';
+
+/**
+ * Which of the MEL's three parts an item comes from (D70).
+ *
+ * - `ONE` — Section One, LRU component relief, keyed by ATA. Absent means `ONE`, so every row that
+ *   predates this field reads correctly and nothing had to be migrated.
+ * - `TWO` — Section Two, CAS Message Relief, keyed by the **CAS message** rather than by ATA.
+ *   Carries a repair category and defers exactly like Section One.
+ * - `NEF` — the operator's NEF Deferral List. Carries **no repair category** and therefore no PL-25
+ *   clock: the program says NEF items are repaired "at the earliest opportunity". See D69.
+ */
+export type MelSection = 'ONE' | 'TWO' | 'NEF';
 
 /** An attachment is part of the signed payload — its SHA-256 is folded into the content hash (AC 120-78B). */
 export interface Attachment {
@@ -81,15 +112,32 @@ export interface MelItem {
   mmelRevision: string;
   effectiveDate: string;
   approvalState: ApprovalState;
+  /** Empty string for Section Two, which the MEL keys by CAS message and never by ATA. */
   ataReference: string;
-  itemNumber: string;        // '24-02'
+  itemNumber: string;        // '24-02' · Section Two: '2-14' · NEF: 'N200-31'
   subItemNumber: string;     // '24-02-02'
   title: string;
-  category: MelCategory;
+  /**
+   * `null` only for NEF items, which the program deliberately gives no repair category — they are
+   * repaired "at the earliest opportunity", so there is no PL-25 interval to start (D69/D70).
+   * Every Section One and Section Two item has one.
+   */
+  category: MelCategory | null;
   numberInstalled: number | null;
   numberRequired: number | null;
   oProcedure?: string;
   mProcedure?: string;
+  /** Absent = `ONE`. See `MelSection`. */
+  melSection?: MelSection;
+  /**
+   * Section Two only — the CAS message this relief is keyed to, and the colour/tier the MEL prints
+   * beside it. `title` carries the same text so that generic MEL rendering needs no special case.
+   */
+  casMessage?: string;
+  casColor?: CasColor;
+  casLevel?: CasLevel;
+  /** NEF only — the cabin area group the item is listed under, e.g. 'Galley Items (300)'. */
+  nefArea?: string;
   /**
    * D59 — does a deferral against this item carry a CREW ACTION the crew (or maintenance) must
    * accomplish and mark before the aircraft is first released to fly on it?
