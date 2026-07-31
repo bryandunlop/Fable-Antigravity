@@ -1,8 +1,9 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Check, UserCircle, Bell, X } from 'lucide-react';
+import { UserCircle, Bell, X } from 'lucide-react';
 import { DemoBanner } from './DemoBanner';
 import { ResetDemoButton } from './ResetDemoButton';
+import { SyncStatusChip } from './SyncStatusChip';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
 import type { DisplayZoneMode } from '../util/displayZone';
 import { deriveServiceability } from '../engine/serviceability';
@@ -55,12 +56,7 @@ export function TechLogShell({
             onOpen={(link) => navigate(link)}
             onDismiss={(id) => dispatch({ type: 'DISMISS_NOTIFICATION', payload: id })}
           />
-          <span
-            className="hidden items-center gap-1 rounded-full border border-[var(--gfo-success,#00B140)]/40 bg-[var(--gfo-success,#00B140)]/10 px-2 py-1 text-xs text-[var(--gfo-success,#00B140)] sm:inline-flex"
-            title="All signed records confirmed by the server. In offline use this shows 'N entries not yet synced' until the server ACKs."
-          >
-            <Check className="h-3 w-3" /> Synced
-          </span>
+          <SyncStatusChip />
           <DisplayZoneToggle />
           <span
             className="hidden items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground sm:inline-flex"

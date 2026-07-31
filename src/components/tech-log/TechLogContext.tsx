@@ -9,6 +9,7 @@ import { isSelfApproval, applyApproval } from './engine/approvals';
 import { newId } from './util/id';
 import type { DisplayZoneMode } from './util/displayZone';
 import { STORAGE_KEY, isDurableAction, loadPersistedState, persistState, type StorageLike } from './persistence';
+import { resetLocalServer } from './sync/localTransport';
 
 // Persistence lives in ./persistence so the durability rules are testable in node (TL-26).
 export { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './persistence';
@@ -73,6 +74,11 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       return { ...state, laborEntries: [...state.laborEntries, action.payload] };
     case 'DELETE_LABOR_ENTRY':
       return { ...state, laborEntries: state.laborEntries.filter(l => l.id !== action.payload) };
+    case 'REPLACE_CARD_LABOR': {
+      const { workCardId, entries } = action.payload;
+      const others = state.laborEntries.filter(l => l.workCardId !== workCardId);
+      return { ...state, laborEntries: [...others, ...entries] };
+    }
     case 'ADD_PROJECT':
       return { ...state, projects: [...state.projects, action.payload] };
     case 'EDIT_PROJECT':
@@ -365,6 +371,12 @@ export function useResetTechLog() {
   return useCallback(() => {
     try {
       localStorage.removeItem(STORAGE_KEY);
+      // TL-38 — the stand-in server and the outbox are separate stores by design (the whole point is
+      // that they can disagree with this browser's copy), so a reset that cleared only the local blob
+      // would reseed the client against a server still holding the old cards, and every subsequent
+      // edit would conflict on a revision the user never saw.
+      resetLocalServer();
+      localStorage.removeItem('tech-log-outbox');
     } catch {
       /* ignore */
     }

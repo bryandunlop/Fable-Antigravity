@@ -1129,6 +1129,14 @@ export type TechLogAction =
   | { type: 'DELETE_PART_USAGE'; payload: string }
   | { type: 'ADD_LABOR_ENTRY'; payload: LaborEntry }
   | { type: 'DELETE_LABOR_ENTRY'; payload: string }
+  /**
+   * TL-38 — replace ONE card's labor lines with the server's copy. Dispatched only by the sync
+   * runtime, when a card arrives from the server (initial fetch, or another device's commit). Scoped
+   * to a single card deliberately: a blanket replace would discard labor queued on THIS device
+   * against other cards the server has not seen yet, which is the failure the outbox exists to
+   * prevent.
+   */
+  | { type: 'REPLACE_CARD_LABOR'; payload: { workCardId: string; entries: LaborEntry[] } }
   | { type: 'ADD_PROJECT'; payload: MaintenanceProject }
   | { type: 'EDIT_PROJECT'; payload: MaintenanceProject }
   | { type: 'ADD_RECURRING_CHECK'; payload: RecurringCheck }
