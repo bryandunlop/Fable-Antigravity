@@ -12,6 +12,7 @@ import { Button } from '../../../ui/button';
 import { Textarea } from '../../../ui/textarea';
 import { Label } from '../../../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../ui/dialog';
+import { Checkbox } from '../../../ui/checkbox';
 
 /**
  * WATCH disposition (mirrors CAMP DEFERRED-WATCHLIST): maintenance attests a defect is
@@ -85,7 +86,7 @@ export function WatchlistDialog({
               <Textarea className="mt-1" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. monitor at next transit check; part on order" />
             </div>
             <label className="flex items-start gap-2">
-              <input type="checkbox" className="mt-1" checked={attested} onChange={e => setAttested(e.target.checked)} />
+              <Checkbox className="mt-0.5 size-5" checked={attested} onCheckedChange={(v: unknown) => setAttested(v === true)} />
               <span className="text-xs">I assess this defect as <strong>not airworthiness-affecting</strong> (cabin/NEF). It will be tracked on the watch list without an MEL deferral and does not restrict dispatch.</span>
             </label>
           </div>

@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
+import { Checkbox } from '../../../ui/checkbox';
 
 /**
  * Reusable CRS rectification body (work performed + optional RII dual sign-off). Renders WITHOUT a
@@ -99,7 +100,7 @@ export function RectifyPanel({
           <Textarea className="mt-1" value={work} onChange={e => setWork(e.target.value)} placeholder="Describe the corrective action…" />
         </div>
         <label className="flex items-start gap-2">
-          <input type="checkbox" className="mt-1" checked={riiRequired} onChange={e => setRiiRequired(e.target.checked)} />
+          <Checkbox className="mt-0.5 size-5" checked={riiRequired} onCheckedChange={(v: unknown) => setRiiRequired(v === true)} />
           <span className="text-xs">Required Inspection Item (RII) — needs an independent second inspector.</span>
         </label>
         {riiRequired && (
@@ -111,7 +112,7 @@ export function RectifyPanel({
                 {inspectors.map(p => <SelectItem key={p.oid} value={p.oid}>{p.displayName}</SelectItem>)}
               </SelectContent>
             </Select>
-            {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error,#EF3340)]">No RII-authorized inspector for ATA {ata} — sign-off cannot proceed.</p>}
+            {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">No RII-authorized inspector for ATA {ata} — sign-off cannot proceed.</p>}
           </div>
         )}
         <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">

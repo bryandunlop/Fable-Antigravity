@@ -64,7 +64,7 @@ export default function Aog() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Plane className="h-5 w-5 text-[var(--gfo-error,#EF3340)]" />
+                    <Plane className="h-5 w-5 text-[var(--gfo-error-ink,#C81E2B)]" />
                     <span className="text-lg font-semibold">{ac.tailNumber}</span>
                     <Badge variant="outline">{ac.type}</Badge>
                     <Badge variant="destructive">{esc}</Badge>

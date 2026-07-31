@@ -62,9 +62,12 @@ describe('report-defect entry points', () => {
   it('the correction dialog offers no Severity control (D55)', async () => {
     renderRoute('/tech-log/defects', '/tech-log/defects', <Defects />);
 
-    const correct = screen.getAllByRole('button', { name: /correct/i });
-    expect(correct.length).toBeGreaterThan(0);
-    await userEvent.click(correct[0]);
+    // LG-154 — Correct now lives in the row's overflow menu; superseding a signed defect is an
+    // exception path, not one of the two live dispositions.
+    const more = screen.getAllByRole('button', { name: /more actions/i });
+    expect(more.length).toBeGreaterThan(0);
+    await userEvent.click(more[0]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: /correct/i }));
 
     expect(screen.getByText(/correct defect/i)).toBeInTheDocument();
     expect(screen.queryByText(/severity/i)).not.toBeInTheDocument();

@@ -69,15 +69,23 @@ export default function FleetStatus() {
     return !r.ac.isProvisional && r.sv === filter;
   });
 
-  const stat = (label: string, value: number, cls: string, f: Filter) => (
+  /**
+   * LG-171 — the count tile used to pair the numeral with a 40px filled circle in the RAG hue.
+   * The circle was the largest, most saturated object on the page and encoded nothing the numeral
+   * and label beside it did not already carry; meanwhile `13h left` on a deferral clock — the fact
+   * that decides whether a jet flies — rendered at 12px. The hue moves onto the numeral itself, so
+   * the colour axis (D41: RAG is airworthiness only) is intact with strictly less ink.
+   *
+   * A zero count drops to muted: an empty grounded bucket is good news and should not shout in red.
+   */
+  const stat = (label: string, value: number, tone: string, f: Filter) => (
     <button onClick={() => setFilter(filter === f ? 'ALL' : f)} className="text-left">
       <Card className={cn('gfo-stat-rule transition-colors hover:bg-accent/40', filter === f && 'ring-2 ring-primary')}>
-        <CardContent className="flex items-center justify-between p-4">
-          <div>
-            <div className="gfo-eyebrow">{label}</div>
-            <div className="gfo-numeric mt-1 text-3xl text-primary">{value}</div>
+        <CardContent className="p-4">
+          <div className="gfo-eyebrow">{label}</div>
+          <div className={cn('gfo-numeric mt-1 text-4xl leading-none', value === 0 ? 'text-muted-foreground' : tone)}>
+            {value}
           </div>
-          <span className={cn('h-10 w-10 rounded-full', cls)} />
         </CardContent>
       </Card>
     </button>
@@ -89,10 +97,10 @@ export default function FleetStatus() {
       subtitle={`Airworthiness picture as of ${now.toLocaleString()} · refreshes on sync`}
     >
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-        {stat('Grounded', counts.RED, 'bg-[var(--gfo-error,#EF3340)]', 'RED')}
-        {stat('MEL / restricted', counts.AMBER, 'bg-[var(--gfo-warning,#F1B434)]', 'AMBER')}
-        {stat('Serviceable', counts.GREEN, 'bg-[var(--gfo-success,#00B140)]', 'GREEN')}
-        {stat('Provisional', counts.prov, 'bg-muted-foreground/40', 'PROV')}
+        {stat('Grounded', counts.RED, 'text-[var(--gfo-error-ink,#C81E2B)]', 'RED')}
+        {stat('MEL / restricted', counts.AMBER, 'text-[var(--gfo-warning-ink,#8A6200)]', 'AMBER')}
+        {stat('Serviceable', counts.GREEN, 'text-[var(--gfo-success-ink,#00803A)]', 'GREEN')}
+        {stat('Provisional', counts.prov, 'text-muted-foreground', 'PROV')}
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -137,7 +145,7 @@ export default function FleetStatus() {
               </div>
 
               {showAog && (
-                <div className="mt-3 flex items-center gap-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error,#EF3340)]">
+                <div className="mt-3 flex items-center gap-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">
                   <Badge variant="destructive">{esc}</Badge>
                   down {downHours}h{since ? ` · since ${new Date(since).toLocaleString()}` : ''}
                 </div>
@@ -146,16 +154,25 @@ export default function FleetStatus() {
               <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"><AlertTriangle className="h-3.5 w-3.5" />{openDefects.length} open</span>
                 <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"><Wrench className="h-3.5 w-3.5" />{activeDeferrals.length} MEL</span>
-                {nearestDeferral && (
+                <ChevronRight className="ml-auto h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
+              </div>
+
+              {/* LG-155 — the tile's clock is deliberately NOT the inline size used on list rows: it
+                  is the one number on the card that decides whether the aircraft flies tomorrow, and
+                  it was previously the smallest thing on it.
+                  It gets its OWN row rather than `ml-auto` on the counts line — at the xl:3-up tile
+                  width the large label ran past the card edge and clipped, which the first cut of
+                  this change shipped and a browser pass caught. */}
+              {nearestDeferral && (
+                <div className="mt-3 border-t pt-3">
                   <DeferralClock
-                    className="ml-auto"
+                    size="lg"
                     clockStartUtc={nearestDeferral.clockStartDateUtc}
                     repairDueUtc={nearestDeferral.repairDueDateUtc}
                     category={nearestDeferral.category}
                   />
-                )}
-                <ChevronRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
-              </div>
+                </div>
+              )}
 
               {ac.isProvisional && (
                 <div className="mt-3 rounded bg-muted/60 px-2 py-1 text-xs text-muted-foreground">

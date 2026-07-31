@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Wrench, Clock, TimerReset, Hammer } from 'lucide-react';
+import { Wrench, TimerReset, Hammer } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
 import { formatRegulatoryCompact } from '../util/displayZone';
 import { currentRows } from '../engine/supersede';
@@ -11,6 +11,8 @@ import type { Deferral } from '../types';
 import { TechLogShell } from '../components/TechLogShell';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
 import { ExtendDeferralDialog } from '../components/panels/ExtendDeferralDialog';
+import { DeferralDueLine } from '../components/DeferralDueLine';
+import { PendingPlacardNote } from '../components/PendingPlacardNote';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -68,7 +70,6 @@ export default function Deferrals() {
           const ac = state.aircraft.find(a => a.id === d.aircraftId)!;
           const expired = isDeferralExpired(d, new Date().toISOString(), { hours: ac.airframeTotalHours, cycles: ac.airframeTotalCycles });
           const effective = expired ? 'EXPIRED' : d.status;
-          const ms = d.repairDueDateUtc ? new Date(d.repairDueDateUtc).getTime() - Date.now() : null;
           const corr = state.campCorrelation.find(c => c.mygfoEntityId === d.id);
           return (
             <Card key={d.id}>
@@ -87,11 +88,17 @@ export default function Deferrals() {
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{d.melTitle ?? 'MEL item not recorded'}</p>
                   {d.repairDueDateUtc && (
-                    <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" /> due {formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)} · {ms != null && ms > 0 ? `${Math.floor(ms / 86400000)}d left` : 'overdue'}
-                      {d.extensionUsed && ' · extended'}
-                    </div>
+                    <DeferralDueLine
+                      clockStartUtc={d.clockStartDateUtc}
+                      repairDueUtc={d.repairDueDateUtc}
+                      category={d.category}
+                      dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                      extended={d.extensionUsed}
+                    />
                   )}
+                  {/* LG-170 — the badge above says PENDING_PLACARD; this says what that means and
+                      what to do. Both read the same frozen row. */}
+                  <PendingPlacardNote deferral={{ ...d, status: effective }} />
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {isMaint && (

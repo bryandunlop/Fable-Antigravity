@@ -107,7 +107,7 @@ function Chip({
       className={cn(
         'items-center gap-1 rounded-full border px-2 py-1 text-xs',
         tone === 'ok' ? 'hidden sm:inline-flex' : 'inline-flex',
-        tone === 'ok' && 'border-[var(--gfo-success,#00B140)]/40 bg-[var(--gfo-success,#00B140)]/10 text-[var(--gfo-success,#00B140)]',
+        tone === 'ok' && 'border-[var(--gfo-success,#00B140)]/40 bg-[var(--gfo-success,#00B140)]/10 text-[var(--gfo-success-ink,#00803A)]',
         tone === 'busy' && 'border-border bg-muted/60 text-muted-foreground',
         tone === 'warn' && 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400',
       )}

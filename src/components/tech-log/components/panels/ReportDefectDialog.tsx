@@ -192,7 +192,7 @@ export function ReportDefectDialog({
             <DialogDescription>Capture the observation. Maintenance determines dispatch impact.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Aircraft</Label>
                 <Select value={tail} onValueChange={(v: string) => setTail(v)} disabled={!!lockTail}>

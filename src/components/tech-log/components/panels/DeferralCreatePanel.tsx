@@ -19,6 +19,7 @@ import { Badge } from '../../../ui/badge';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
 import { Textarea } from '../../../ui/textarea';
+import { Checkbox } from '../../../ui/checkbox';
 
 /**
  * D56 — whole minutes, because that is all the day-of-discovery control can express. A defect's
@@ -141,7 +142,7 @@ export function DeferralCreatePanel({
     return (
       <Card className="border-[var(--gfo-error,#EF3340)]/40">
         <CardContent className="flex items-start gap-2 p-4 text-sm">
-          <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--gfo-error,#EF3340)]" />
+          <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--gfo-error-ink,#C81E2B)]" />
           <span><strong>Deferral blocked.</strong> {aircraft.tailNumber}'s {aircraft.type} D195 MEL is pending FSDO approval (provisional). No deferrals may be created against an unapproved MEL.</span>
         </CardContent>
       </Card>
@@ -290,7 +291,7 @@ export function DeferralCreatePanel({
                   </>
                 ) : (
                   <label className="flex items-start gap-2">
-                    <input id="deferral-add-crew-action" type="checkbox" className="mt-1" checked={addCrewAction} onChange={e => setAddCrewAction(e.target.checked)} />
+                    <Checkbox id="deferral-add-crew-action" className="mt-0.5 size-5" checked={addCrewAction} onCheckedChange={(v: unknown) => setAddCrewAction(v === true)} />
                     <span className="text-xs">
                       <span className="font-medium">Crew action required</span> — this MEL item carries none; add one for this deferral.
                     </span>
@@ -306,7 +307,7 @@ export function DeferralCreatePanel({
                         ? 'What the crew must accomplish, and how it is verified — there is no (O) text to fall back on.'
                         : 'Anything beyond the (O) procedure text the crew needs — the (O) text itself is carried automatically.'} />
                     {addendumRequired && (
-                      <p className="mt-1 text-xs text-[var(--gfo-error,#EF3340)]">
+                      <p className="mt-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">
                         This item carries no (O) procedure text, so these instructions are the only thing the crew will be shown.
                       </p>
                     )}
@@ -380,7 +381,7 @@ export function DeferralCreatePanel({
               </div>
 
               <label className="flex items-start gap-2">
-                <input type="checkbox" className="mt-1" checked={ack} onChange={e => setAck(e.target.checked)} />
+                <Checkbox className="mt-0.5 size-5" checked={ack} onCheckedChange={(v: unknown) => setAck(v === true)} />
                 <span className="text-xs">I have reviewed the governing MEL item (revision {selectedMel.mmelRevision}, eff. {selectedMel.effectiveDate}), its category, provisos, (O)/(M) procedures, and placard, and I authorize this deferral.</span>
               </label>
 
@@ -388,7 +389,7 @@ export function DeferralCreatePanel({
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>
                 <Button onClick={beginSign} disabled={!canDeferDefect(user, selectedMel) || !ack || !validateGoverningOverride(governingZone, overrideReason).ok}>Sign deferral</Button>
               </div>
-              {!canDeferDefect(user, selectedMel) && <p className="text-xs text-[var(--gfo-error,#EF3340)]">{user.role === 'MAINTENANCE' ? '' : 'Crew may only defer flight-crew-deferrable (FC-deferrable) MEL items.'}</p>}
+              {!canDeferDefect(user, selectedMel) && <p className="text-xs text-[var(--gfo-error-ink,#C81E2B)]">{user.role === 'MAINTENANCE' ? '' : 'Crew may only defer flight-crew-deferrable (FC-deferrable) MEL items.'}</p>}
             </>
           )}
         </CardContent>

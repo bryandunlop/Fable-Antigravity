@@ -120,7 +120,7 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
         {current.crewActionRequired && (
           mark ? (
             <p className="flex items-start gap-1.5 rounded-md border p-2 text-xs">
-              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--gfo-success,#00B140)]" />
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--gfo-success-ink,#00803A)]" />
               <span>Crew action marked complied by <strong>{mark.byName}</strong>{mark.note ? ` — ${mark.note}` : ''}. That mark is evidence; your signature below is what releases the aircraft.</span>
             </p>
           ) : (
@@ -136,10 +136,10 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
           <Button variant="outline" onClick={onCancel}>Later</Button>
           <Button onClick={begin} disabled={!canSign}><ShieldCheck className="mr-1.5 h-4 w-4" /> {crewAttestation ? 'Attest placard installed' : 'Sign discharge release'}</Button>
         </div>
-        {!gate.ok && gate.code === 'EXPIRED' && <p className="text-xs text-[var(--gfo-error,#EF3340)]">This deferral already passed its repair-due condition and reads EXPIRED — discharging it now would silently un-ground an overdue item. Use an extension or correction instead.</p>}
+        {!gate.ok && gate.code === 'EXPIRED' && <p className="text-xs text-[var(--gfo-error-ink,#C81E2B)]">This deferral already passed its repair-due condition and reads EXPIRED — discharging it now would silently un-ground an overdue item. Use an extension or correction instead.</p>}
         {/* CREW_ACTION_PENDING has its own block above, with the (O) context — repeating the reason
             here would say the same sentence twice on one card. */}
-        {!gate.ok && gate.code !== 'EXPIRED' && gate.code !== 'CREW_ACTION_PENDING' && <p className="text-xs text-[var(--gfo-error,#EF3340)]">{gate.reason}</p>}
+        {!gate.ok && gate.code !== 'EXPIRED' && gate.code !== 'CREW_ACTION_PENDING' && <p className="text-xs text-[var(--gfo-error-ink,#C81E2B)]">{gate.reason}</p>}
         <p className="text-xs text-muted-foreground">On signing, the deferral flips PENDING_PLACARD → ACTIVE and the aircraft moves RED → AMBER.</p>
       </CardContent>
       <SignCeremonyDialog open={signOpen} onOpenChange={setSignOpen} signer={user}

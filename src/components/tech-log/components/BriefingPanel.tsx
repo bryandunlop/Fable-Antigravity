@@ -20,6 +20,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
+import { Checkbox } from '../../ui/checkbox';
 
 /** Latest briefing for an aircraft (most recent by createdAtUtc). */
 export function latestBriefing(briefings: FlightBriefing[], aircraftId: string): FlightBriefing | undefined {
@@ -352,7 +353,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
               const text = row ? melText(row) : (d.restrictionText ?? d.melTitle ?? 'restriction/placard');
               return (
                 <label key={d.id} className="flex items-start gap-2 rounded-md border p-2">
-                  <input type="checkbox" className="mt-1" checked={!!ackChecks[d.id]} onChange={() => setAckChecks(prev => ({ ...prev, [d.id]: !prev[d.id] }))} />
+                  <Checkbox className="mt-0.5 size-5" checked={!!ackChecks[d.id]} onCheckedChange={() => setAckChecks(prev => ({ ...prev, [d.id]: !prev[d.id] }))} />
                   <span>MEL {num} (Cat {d.category}) — {text}</span>
                 </label>
               );
@@ -475,7 +476,7 @@ function BriefingReadout({ b, disclosure, acknowledgedByName, unsnapshotted, onP
         </div>
 
         {b.status === 'ACKNOWLEDGED' && (
-          <div className="flex items-center gap-2 rounded bg-[var(--gfo-success,#00B140)]/10 p-2 text-[var(--gfo-success,#00B140)]">
+          <div className="flex items-center gap-2 rounded bg-[var(--gfo-success,#00B140)]/10 p-2 text-[var(--gfo-success-ink,#00803A)]">
             <CheckCircle2 className="h-4 w-4" /> Acknowledged by {acknowledgedByName ?? 'not recorded'} · {b.acknowledgedAtUtc ? new Date(b.acknowledgedAtUtc).toLocaleString() : ''}
             {onPrint && <Button size="sm" variant="ghost" className="ml-auto" onClick={onPrint}><Printer className="mr-1.5 h-4 w-4" /> Print</Button>}
           </div>

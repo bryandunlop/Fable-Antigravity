@@ -24,7 +24,7 @@ const STATUS_LABEL: Record<ProjectStatus, string> = { PLANNING: 'Planning', IN_W
 const STATUS_CLASS: Record<ProjectStatus, string> = {
   PLANNING: 'border-[var(--gfo-daylight)] text-[var(--gfo-daylight)]',
   IN_WORK: 'bg-[var(--gfo-midnight)] text-white border-transparent',
-  PAUSED: 'border-[var(--gfo-warning)] text-[var(--gfo-warning)]',
+  PAUSED: 'border-[var(--gfo-warning)] text-[var(--gfo-warning-ink,#8A6200)]',
   CLOSED: 'text-muted-foreground',
 };
 const PAUSE_LABEL: Record<ProjectPauseReason, string> = {
@@ -218,7 +218,7 @@ export default function Planners() {
                               </p>
                               {p.pauseNote && <p className="mt-1 border-l-2 pl-2 text-xs italic text-muted-foreground">{p.pauseNote}</p>}
                               {away.length > 0 && p.status !== 'CLOSED' && (
-                                <p className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--gfo-warning)]">
+                                <p className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--gfo-warning-ink,#8A6200)]">
                                   <AlertTriangle className="h-3.5 w-3.5" /> Aircraft scheduled away in this window: {away.map(l => l.label).join(', ')}
                                 </p>
                               )}

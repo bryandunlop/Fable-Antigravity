@@ -24,9 +24,9 @@ const HEADLINE: Record<TripReadiness, string> = { READY: 'Ready', NOT_READY: 'Al
 const zulu = (utc?: string) => (utc ? `${utc.slice(11, 16)}Z` : '—');
 
 function fratText(l: TripLeg): { label: string; cls: string } {
-  if (l.fratScore != null && l.fratScore >= 25) return { label: `FRAT no-go (${l.fratScore})`, cls: 'text-[var(--gfo-error,#EF3340)]' };
+  if (l.fratScore != null && l.fratScore >= 25) return { label: `FRAT no-go (${l.fratScore})`, cls: 'text-[var(--gfo-error-ink,#C81E2B)]' };
   if (l.fratStatus === 'COMPLETED') return { label: `FRAT ${l.fratScore ?? '✓'}`, cls: 'text-muted-foreground' };
-  return { label: 'FRAT due', cls: 'text-[var(--gfo-warning,#F1B434)]' };
+  return { label: 'FRAT due', cls: 'text-[var(--gfo-warning-ink,#8A6200)]' };
 }
 
 export default function TripWorkspace() {
@@ -150,9 +150,9 @@ export default function TripWorkspace() {
                 </div>
                 <div className="flex shrink-0 items-center gap-3 text-xs">
                   <span className={frat.cls}>{frat.label}</span>
-                  <span className={l.airportReviewed ? 'text-muted-foreground' : 'text-[var(--gfo-warning,#F1B434)]'}>{l.airportReviewed ? 'Airport reviewed' : 'Airport pending'}</span>
+                  <span className={l.airportReviewed ? 'text-muted-foreground' : 'text-[var(--gfo-warning-ink,#8A6200)]'}>{l.airportReviewed ? 'Airport reviewed' : 'Airport pending'}</span>
                   {ac && requiresFuelFarmSubmission(l, ac) && (
-                    <span className={cn(fuelDue ? 'text-[var(--gfo-warning,#F1B434)]' : 'text-muted-foreground')}>{l.fuelRequestId ? 'Fuel submitted' : `Fuel due (${l.departureIcao})`}</span>
+                    <span className={cn(fuelDue ? 'text-[var(--gfo-warning-ink,#8A6200)]' : 'text-muted-foreground')}>{l.fuelRequestId ? 'Fuel submitted' : `Fuel due (${l.departureIcao})`}</span>
                   )}
                 </div>
               </div>

@@ -30,6 +30,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { Checkbox } from '../../ui/checkbox';
 
 const LABOR_CATEGORY_LABELS: Record<LaborCategory, string> = {
   WRENCH: 'Wrench time', TROUBLESHOOTING: 'Troubleshooting', TECH_OPS_CALL: 'Tech-ops call',
@@ -60,6 +61,15 @@ export default function WorkCardDetail() {
   const [rsn, setRsn] = useState('');
   const [rreason, setRreason] = useState('');
   // labor add form
+  /**
+   * LG-159 — both add-forms used to sit permanently expanded inside their list cards behind a dashed
+   * border: two 4-column input grids for parts, a select + 3-col grid + category + why-note for labor.
+   * A technician opening a work card is READING it. Per D74 this is a phone-primary surface, where two
+   * 4-column grids are the worst case in the module. Closed by default; the Add button opens them.
+   */
+  const [partFormOpen, setPartFormOpen] = useState(false);
+  const [laborFormOpen, setLaborFormOpen] = useState(false);
+
   const [ltech, setLtech] = useState(user.oid);
   const [lhours, setLhours] = useState('');
   const [ldesc, setLdesc] = useState('');
@@ -407,7 +417,7 @@ export default function WorkCardDetail() {
           {card.riiRequired && <Badge variant="outline"><UserCheck className="mr-1 h-3 w-3" />RII required</Badge>}
           {card.linkedDefectId && <Badge variant="outline">linked defect</Badge>}
           {forecastItem && (
-            <Badge variant="outline" className={!completed && forecastDays != null && forecastDays <= 7 ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]' : ''}>
+            <Badge variant="outline" className={!completed && forecastDays != null && forecastDays <= 7 ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning-ink,#8A6200)]' : ''}>
               <CalendarClock className="mr-1 h-3 w-3" />
               CAMP due list{forecastItem.dueDateUtc ? ` · ${new Date(forecastItem.dueDateUtc).toLocaleDateString()} · ${forecastDays != null && forecastDays < 0 ? `overdue ${Math.abs(forecastDays)}d` : `${forecastDays}d`}` : ''}
             </Badge>
@@ -596,7 +606,7 @@ export default function WorkCardDetail() {
           <CardContent className="space-y-2">
             {card.steps.map(s => (
               <div key={s.id} className={`flex items-start gap-2 rounded-md border p-2 text-sm ${s.done ? 'bg-[var(--gfo-success,#00B140)]/5' : ''}`}>
-                <input type="checkbox" className="mt-0.5" checked={s.done} disabled={completed || !isMaint} onChange={() => toggleStep(s.id)} />
+                <Checkbox className="mt-0.5 size-5" checked={s.done} disabled={completed || !isMaint} onCheckedChange={() => toggleStep(s.id)} />
                 <span className="flex-1">
                   <span className="text-xs text-muted-foreground">#{s.seq}</span> {s.text}
                   {s.riiRequired && <Badge variant="outline" className="ml-2"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}
@@ -639,7 +649,12 @@ export default function WorkCardDetail() {
               </div>
             ))}
             {labor.length === 0 && <p className="text-sm text-muted-foreground">No labor recorded.</p>}
-            {!completed && isMaint && (
+            {!completed && isMaint && !laborFormOpen && (
+              <Button size="sm" variant="outline" onClick={() => setLaborFormOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" /> Add labor
+              </Button>
+            )}
+            {!completed && isMaint && laborFormOpen && (
               <div className="space-y-2 rounded-md border border-dashed p-2">
                 <Select value={ltech} onValueChange={(v: string) => setLtech(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -662,7 +677,12 @@ export default function WorkCardDetail() {
                   </div>
                 )}
                 {!needsWhyNote && <Input placeholder="Why-note (optional — what drove the time)" value={lnote} onChange={e => setLnote(e.target.value)} />}
-                <Button size="sm" variant="outline" onClick={addLabor}><Plus className="mr-1.5 h-4 w-4" /> Add labor (end of shift)</Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { addLabor(); setLaborFormOpen(false); }}>
+                    <Plus className="mr-1.5 h-4 w-4" /> Add labor (end of shift)
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setLaborFormOpen(false)}>Cancel</Button>
+                </div>
               </div>
             )}
           </CardContent>
@@ -711,17 +731,22 @@ export default function WorkCardDetail() {
               </div>
             ))}
             {parts.length === 0 && <p className="text-sm text-muted-foreground">No parts recorded.</p>}
-            {!completed && isMaint && (
+            {!completed && isMaint && !partFormOpen && (
+              <Button size="sm" variant="outline" onClick={() => setPartFormOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" /> Add part
+              </Button>
+            )}
+            {!completed && isMaint && partFormOpen && (
               <div className="space-y-2 rounded-md border border-dashed p-2">
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
                   <Input placeholder="Part number" value={pn} onChange={e => setPn(e.target.value)} />
                   <Input className="md:col-span-2" placeholder="Description" value={pdesc} onChange={e => setPdesc(e.target.value)} />
                   <Input type="number" placeholder="Qty" value={pqty} onChange={e => setPqty(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
                   <Input className="md:col-span-2" placeholder="Serial number (if serialized)" value={psn} onChange={e => setPsn(e.target.value)} />
-                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={rotable} onChange={e => setRotable(e.target.checked)} /> Rotable</label>
-                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showRemoved} onChange={e => setShowRemoved(e.target.checked)} /> Records a removal</label>
+                  <label className="flex items-center gap-2 text-xs"><Checkbox checked={rotable} onCheckedChange={(v: unknown) => setRotable(v === true)} /> Rotable</label>
+                  <label className="flex items-center gap-2 text-xs"><Checkbox checked={showRemoved} onCheckedChange={(v: unknown) => setShowRemoved(v === true)} /> Records a removal</label>
                 </div>
                 {showRemoved && (
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
@@ -730,7 +755,12 @@ export default function WorkCardDetail() {
                     <Input placeholder="Reason (e.g. unscheduled)" value={rreason} onChange={e => setRreason(e.target.value)} />
                   </div>
                 )}
-                <Button size="sm" variant="outline" onClick={addPart}><Plus className="mr-1.5 h-4 w-4" /> Add part</Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { addPart(); setPartFormOpen(false); }}>
+                    <Plus className="mr-1.5 h-4 w-4" /> Add part
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setPartFormOpen(false)}>Cancel</Button>
+                </div>
               </div>
             )}
           </CardContent>
@@ -742,7 +772,7 @@ export default function WorkCardDetail() {
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4" /> Completion &amp; return to service</CardTitle></CardHeader>
         <CardContent className="space-y-3 text-sm">
           {completed ? (
-            <div className="flex items-center gap-2 rounded bg-[var(--gfo-success,#00B140)]/10 p-2 text-[var(--gfo-success,#00B140)]">
+            <div className="flex items-center gap-2 rounded bg-[var(--gfo-success,#00B140)]/10 p-2 text-[var(--gfo-success-ink,#00803A)]">
               <CheckCircle2 className="h-4 w-4" /> Complied with {card.completedAtUtc ? new Date(card.completedAtUtc).toLocaleString() : ''}. Release {card.completedReleaseId}.
             </div>
           ) : (
@@ -754,8 +784,8 @@ export default function WorkCardDetail() {
                     <SelectTrigger className="mt-1"><SelectValue placeholder={inspectors.length ? 'Select inspector' : 'No authorized inspector for this ATA'} /></SelectTrigger>
                     <SelectContent>{inspectors.map(p => <SelectItem key={p.oid} value={p.oid}>{p.displayName}</SelectItem>)}</SelectContent>
                   </Select>
-                  {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error,#EF3340)]">No RII-authorized inspector for ATA {card.ataChapter} — completion cannot proceed.</p>}
-                  {hasRiiSteps && !riiStepsDone && <p className="mt-1 text-xs text-[var(--gfo-warning,#F1B434)]">{pendingRiiSteps(card.steps).length} RII step(s) still need an independent inspector signature.</p>}
+                  {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">No RII-authorized inspector for ATA {card.ataChapter} — completion cannot proceed.</p>}
+                  {hasRiiSteps && !riiStepsDone && <p className="mt-1 text-xs text-[var(--gfo-warning-ink,#8A6200)]">{pendingRiiSteps(card.steps).length} RII step(s) still need an independent inspector signature.</p>}
                 </div>
               )}
               <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">

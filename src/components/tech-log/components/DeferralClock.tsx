@@ -35,8 +35,8 @@ function useNow(intervalMs = 60_000): number {
  */
 const TONE: Record<ClockTone, { stroke: string; text: string }> = {
   NORMAL: { stroke: 'var(--muted-foreground)', text: 'text-muted-foreground' },
-  URGENT: { stroke: 'var(--gfo-warning, #F1B434)', text: 'text-[var(--gfo-warning,#F1B434)]' },
-  EXPIRED: { stroke: 'var(--gfo-error, #EF3340)', text: 'text-[var(--gfo-error,#EF3340)]' },
+  URGENT: { stroke: 'var(--gfo-warning, #F1B434)', text: 'text-[var(--gfo-warning-ink,#8A6200)]' },
+  EXPIRED: { stroke: 'var(--gfo-error, #EF3340)', text: 'text-[var(--gfo-error-ink,#C81E2B)]' },
 };
 
 const R = 7;
@@ -48,6 +48,7 @@ export function DeferralClock({
   category,
   className,
   showLabel = true,
+  size = 'sm',
 }: {
   clockStartUtc: string;
   repairDueUtc?: string;
@@ -55,6 +56,12 @@ export function DeferralClock({
   category: MelCategory;
   className?: string;
   showLabel?: boolean;
+  /**
+   * LG-155 — `lg` is for the ONE place per screen where remaining time is the headline rather than a
+   * detail (today: the fleet tile). Do not reach for it on list rows: if every clock is prominent then
+   * none of them is, which is precisely the failure this size exists to correct.
+   */
+  size?: 'sm' | 'lg';
 }) {
   const now = useNow();
   const reading = readDeferralClock(clockStartUtc, repairDueUtc, now, category);
@@ -71,7 +78,11 @@ export function DeferralClock({
       className={cn('inline-flex items-center gap-1.5', className)}
       title={tone === 'EXPIRED' ? 'Repair interval elapsed' : `${label} of the repair interval`}
     >
-      <svg viewBox="0 0 18 18" className="h-4 w-4 shrink-0 -rotate-90" aria-hidden="true">
+      <svg
+        viewBox="0 0 18 18"
+        className={cn('shrink-0 -rotate-90', size === 'lg' ? 'h-8 w-8' : 'h-4 w-4')}
+        aria-hidden="true"
+      >
         <circle cx="9" cy="9" r={R} fill="none" stroke="currentColor" strokeWidth="2" className="opacity-15" />
         <circle
           cx="9"
@@ -86,7 +97,17 @@ export function DeferralClock({
           className="transition-[stroke-dashoffset] duration-500 motion-reduce:transition-none"
         />
       </svg>
-      {showLabel && <span className={cn('whitespace-nowrap text-xs tabular-nums', tokens.text)}>{label}</span>}
+      {showLabel && (
+        <span
+          className={cn(
+            'whitespace-nowrap tabular-nums',
+            size === 'lg' ? 'text-lg font-medium leading-none' : 'text-xs',
+            tokens.text,
+          )}
+        >
+          {label}
+        </span>
+      )}
     </span>
   );
 }

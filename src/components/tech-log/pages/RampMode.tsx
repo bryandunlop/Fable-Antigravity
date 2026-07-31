@@ -126,7 +126,7 @@ export default function RampMode() {
     <div className="min-h-screen bg-background">
       <div className={cn(
         'flex items-center justify-between gap-3 px-4 py-2.5 text-sm',
-        view.serviceability === 'RED' ? 'bg-[var(--gfo-error,#EF3340)]/10 text-[var(--gfo-error,#EF3340)]' : 'bg-muted',
+        view.serviceability === 'RED' ? 'bg-[var(--gfo-error,#EF3340)]/10 text-[var(--gfo-error-ink,#C81E2B)]' : 'bg-muted',
       )}>
         <span className="flex items-center gap-2 font-medium">
           <ShieldCheck className="h-4 w-4" />
@@ -151,7 +151,7 @@ export default function RampMode() {
               What stays off is the defect narrative behind it.
             */}
             {view.melProvisional
-              ? <Badge variant="outline" className="border-[var(--gfo-error,#EF3340)]/50 text-[var(--gfo-error,#EF3340)]">MEL provisional</Badge>
+              ? <Badge variant="outline" className="border-[var(--gfo-error,#EF3340)]/50 text-[var(--gfo-error-ink,#C81E2B)]">MEL provisional</Badge>
               : <ServiceabilityChip status={view.serviceability} />}
           </div>
 
@@ -162,7 +162,7 @@ export default function RampMode() {
                   is literally the inspector's LOA check, so an unqualified "D195 · G800" here is
                   the worst possible place to overstate. */}
               {view.melProvisional ? (
-                <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--gfo-error,#EF3340)]">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--gfo-error-ink,#C81E2B)]">
                   <FileWarning className="h-3.5 w-3.5" /> D195 · {view.type} — pending FSDO approval
                 </p>
               ) : (
@@ -174,7 +174,7 @@ export default function RampMode() {
               {view.loaHeld ? (
                 <p className="text-sm font-medium">On file</p>
               ) : (
-                <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--gfo-error,#EF3340)]">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--gfo-error-ink,#C81E2B)]">
                   <FileWarning className="h-3.5 w-3.5" /> Not held in myGFO
                 </p>
               )}
@@ -196,7 +196,7 @@ export default function RampMode() {
               chip's job now; this says only what it actually knows.
             */}
             {view.hasMelFinding && (
-              <span className="flex items-center gap-1 text-xs font-medium text-[var(--gfo-error,#EF3340)]">
+              <span className="flex items-center gap-1 text-xs font-medium text-[var(--gfo-error-ink,#C81E2B)]">
                 <AlertTriangle className="h-3.5 w-3.5" /> Finding on a deferred item
               </span>
             )}
@@ -264,7 +264,7 @@ function RampRow({
 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           {row.placardRequired ? (
-            <span className={cn('flex items-center gap-1', row.placardInstalled ? 'text-muted-foreground' : 'text-[var(--gfo-error,#EF3340)]')}>
+            <span className={cn('flex items-center gap-1', row.placardInstalled ? 'text-muted-foreground' : 'text-[var(--gfo-error-ink,#C81E2B)]')}>
               <MapPin className="h-3 w-3" />
               {row.placardInstalled ? 'Placard' : 'Placard NOT installed'}
               {row.placardLocation ? ` — ${row.placardLocation}` : ''}
@@ -272,7 +272,7 @@ function RampRow({
           ) : (
             <span className="text-muted-foreground">No placard required</span>
           )}
-          <span className={cn('text-muted-foreground', row.isExpired && 'font-medium text-[var(--gfo-error,#EF3340)]')}>
+          <span className={cn('text-muted-foreground', row.isExpired && 'font-medium text-[var(--gfo-error-ink,#C81E2B)]')}>
             Deferred {formatRegulatoryCompact(row.clockStartDateUtc, 'GOVERNING', row.governingTimezone)} · due {due}
             {row.isExpired ? ' — EXPIRED' : ''}
           </span>
@@ -305,7 +305,7 @@ function RampRow({
                 <p className="font-mono text-muted-foreground">{signature.mockContentHash}</p>
               </>
             ) : (
-              <p className="text-[var(--gfo-error,#EF3340)]">Signature record not found.</p>
+              <p className="text-[var(--gfo-error-ink,#C81E2B)]">Signature record not found.</p>
             )}
           </div>
 
