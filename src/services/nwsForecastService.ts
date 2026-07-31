@@ -20,7 +20,11 @@ import {
   type WeatherCondition,
 } from './weatherConditions';
 
-const PROXY_URL = '/api/weather/forecast';
+// Single-segment on purpose. Nested /api/** paths never reached the Vercel
+// function in production — the platform router 404'd them before any handler
+// existed (TL-18 fault 2), so this outlook shipped inert. See the route in
+// src/server/routes/weather.ts.
+const PROXY_URL = '/api/forecast';
 
 /** NWS reports °F and mph; the rest of the weather UI is °C and knots. */
 const MPH_TO_KNOTS = 0.868976;
