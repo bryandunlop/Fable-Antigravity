@@ -56,6 +56,7 @@ export function AircraftBanner({
 }) {
   return (
     <div
+      data-testid="aircraft-banner"
       className="mb-4 border border-l-[3px] bg-card p-4"
       style={{ borderLeftColor: status ? RAIL[status] : 'var(--border)' }}
     >
