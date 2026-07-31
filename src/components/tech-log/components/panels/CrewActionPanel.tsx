@@ -150,7 +150,7 @@ export function CrewActionPanel({
 
         {mark && (
           <div className="rounded-md border p-3">
-            <div className="flex items-center gap-1.5 text-[var(--gfo-success,#00B140)]">
+            <div className="flex items-center gap-1.5 text-[var(--gfo-success-ink,#00803A)]">
               <CheckCircle2 className="h-4 w-4" /> Marked complied by {mark.byName}
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">

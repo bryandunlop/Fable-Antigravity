@@ -404,7 +404,7 @@ export default function AircraftDetail() {
           blockerCount={board.blockers.length}
           asOf={new Date(now).toLocaleString()}
           note={acceptedBriefing?.acknowledgedByOid ? (
-            <p className="mt-1 text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {sigById(acceptedBriefing.ackSignatureId)?.signerName ?? 'not recorded'} · {acceptedBriefing.acknowledgedAtUtc ? new Date(acceptedBriefing.acknowledgedAtUtc).toLocaleString() : ''}</p>
+            <p className="mt-1 text-xs text-[var(--gfo-success-ink,#00803A)]">PIC accepted by {sigById(acceptedBriefing.ackSignatureId)?.signerName ?? 'not recorded'} · {acceptedBriefing.acknowledgedAtUtc ? new Date(acceptedBriefing.acknowledgedAtUtc).toLocaleString() : ''}</p>
           ) : undefined}
           actions={
             <>
@@ -487,7 +487,7 @@ export default function AircraftDetail() {
             </CardHeader>
             <CardContent className="space-y-3">
               {board.blockers.length === 0 && (
-                <div className={cn('flex items-center gap-1.5 text-sm', sv.status === 'GREEN' ? 'text-[var(--gfo-success,#00B140)]' : 'text-[var(--gfo-warning,#F1B434)]')}>
+                <div className={cn('flex items-center gap-1.5 text-sm', sv.status === 'GREEN' ? 'text-[var(--gfo-success-ink,#00803A)]' : 'text-[var(--gfo-warning-ink,#8A6200)]')}>
                   <CheckCircle2 className="h-4 w-4" />
                   {sv.status === 'GREEN'
                     ? `No open maintenance — ${ac.tailNumber} is dispatchable.`
@@ -555,7 +555,7 @@ export default function AircraftDetail() {
                     <div className="mt-1 text-xs text-muted-foreground">
                       {p.latest ? `Last done ${new Date(p.latest.accomplishedAtUtc).toLocaleDateString()} · due ${due}${remain ? ` · ${remain}` : ''}` : 'Never accomplished — due now (grounds the aircraft until signed).'}
                     </div>
-                    {grounding && <div className="mt-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error,#EF3340)]">Expired — aircraft is RED (rule 3) until this check is re-accomplished and signed.</div>}
+                    {grounding && <div className="mt-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">Expired — aircraft is RED (rule 3) until this check is re-accomplished and signed.</div>}
                   </div>
                 );
               })}

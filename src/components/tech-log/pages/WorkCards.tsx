@@ -121,7 +121,7 @@ export default function WorkCards() {
                         {w.scheduled ? <Badge variant="outline">scheduled</Badge> : <Badge variant="outline">corrective</Badge>}
                         {w.riiRequired && <Badge variant="outline"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}
                         {due && w.status !== 'COMPLETED' && (
-                          <Badge variant="outline" className={dueSoon ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]' : ''}>
+                          <Badge variant="outline" className={dueSoon ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning-ink,#8A6200)]' : ''}>
                             <CalendarClock className="mr-1 h-3 w-3" />
                             {due.dueDateUtc ? `due ${new Date(due.dueDateUtc).toLocaleDateString()}${dueDays != null ? ` · ${dueDays < 0 ? `overdue ${Math.abs(dueDays)}d` : `${dueDays}d`}` : ''}` : 'CAMP due list'}
                           </Badge>
@@ -138,7 +138,7 @@ export default function WorkCards() {
                     </div>
                     <div className="shrink-0 text-xs text-muted-foreground">
                       {w.status === 'COMPLETED'
-                        ? <span className="inline-flex items-center gap-1 text-[var(--gfo-success,#00B140)]"><CheckCircle2 className="h-3.5 w-3.5" /> Complied with</span>
+                        ? <span className="inline-flex items-center gap-1 text-[var(--gfo-success-ink,#00803A)]"><CheckCircle2 className="h-3.5 w-3.5" /> Complied with</span>
                         : <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> opened {new Date(w.createdAtUtc).toLocaleDateString()}</span>}
                     </div>
                   </CardContent>

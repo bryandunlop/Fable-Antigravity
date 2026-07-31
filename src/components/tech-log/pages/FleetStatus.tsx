@@ -97,9 +97,9 @@ export default function FleetStatus() {
       subtitle={`Airworthiness picture as of ${now.toLocaleString()} · refreshes on sync`}
     >
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-        {stat('Grounded', counts.RED, 'text-[var(--gfo-error,#EF3340)]', 'RED')}
-        {stat('MEL / restricted', counts.AMBER, 'text-[var(--gfo-warning,#F1B434)]', 'AMBER')}
-        {stat('Serviceable', counts.GREEN, 'text-[var(--gfo-success,#00B140)]', 'GREEN')}
+        {stat('Grounded', counts.RED, 'text-[var(--gfo-error-ink,#C81E2B)]', 'RED')}
+        {stat('MEL / restricted', counts.AMBER, 'text-[var(--gfo-warning-ink,#8A6200)]', 'AMBER')}
+        {stat('Serviceable', counts.GREEN, 'text-[var(--gfo-success-ink,#00803A)]', 'GREEN')}
         {stat('Provisional', counts.prov, 'text-muted-foreground', 'PROV')}
       </div>
 
@@ -145,7 +145,7 @@ export default function FleetStatus() {
               </div>
 
               {showAog && (
-                <div className="mt-3 flex items-center gap-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error,#EF3340)]">
+                <div className="mt-3 flex items-center gap-2 rounded bg-[var(--gfo-error,#EF3340)]/10 px-2 py-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">
                   <Badge variant="destructive">{esc}</Badge>
                   down {downHours}h{since ? ` · since ${new Date(since).toLocaleString()}` : ''}
                 </div>

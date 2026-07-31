@@ -88,7 +88,7 @@ export default function Airworthiness({ view }: { view: View }) {
             <CardContent className="flex items-start gap-2 p-3 text-xs text-muted-foreground">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
               <div className="space-y-1">
-                {adsb.unconfirmed && <Badge variant="outline" className="border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]">OQ: CAMP read function unconfirmed</Badge>}
+                {adsb.unconfirmed && <Badge variant="outline" className="border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning-ink,#8A6200)]">OQ: CAMP read function unconfirmed</Badge>}
                 <div>The CAMP read function for AD/SB status is not in the GEN/STA/WRK integration docs — treat as an <strong>Open Question</strong> to confirm before wiring the real read. Data below is mock.</div>
               </div>
             </CardContent>

@@ -476,7 +476,7 @@ function BriefingReadout({ b, disclosure, acknowledgedByName, unsnapshotted, onP
         </div>
 
         {b.status === 'ACKNOWLEDGED' && (
-          <div className="flex items-center gap-2 rounded bg-[var(--gfo-success,#00B140)]/10 p-2 text-[var(--gfo-success,#00B140)]">
+          <div className="flex items-center gap-2 rounded bg-[var(--gfo-success,#00B140)]/10 p-2 text-[var(--gfo-success-ink,#00803A)]">
             <CheckCircle2 className="h-4 w-4" /> Acknowledged by {acknowledgedByName ?? 'not recorded'} · {b.acknowledgedAtUtc ? new Date(b.acknowledgedAtUtc).toLocaleString() : ''}
             {onPrint && <Button size="sm" variant="ghost" className="ml-auto" onClick={onPrint}><Printer className="mr-1.5 h-4 w-4" /> Print</Button>}
           </div>

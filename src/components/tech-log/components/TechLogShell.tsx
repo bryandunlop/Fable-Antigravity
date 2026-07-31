@@ -97,7 +97,7 @@ export function TechLogShell({
             >
               {g.label}
               {badge > 0 && (
-                <span className={cn('rounded-full px-1.5 text-xs', g.badge === 'red' ? 'bg-[var(--gfo-error,#EF3340)]/15 text-[var(--gfo-error,#EF3340)]' : 'bg-[var(--gfo-warning,#F1B434)]/20 text-[var(--gfo-warning,#F1B434)]')}>
+                <span className={cn('rounded-full px-1.5 text-xs', g.badge === 'red' ? 'bg-[var(--gfo-error,#EF3340)]/15 text-[var(--gfo-error-ink,#C81E2B)]' : 'bg-[var(--gfo-warning,#F1B434)]/20 text-[var(--gfo-warning-ink,#8A6200)]')}>
                   {badge}
                 </span>
               )}

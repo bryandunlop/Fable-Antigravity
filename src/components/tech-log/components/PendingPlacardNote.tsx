@@ -21,9 +21,9 @@ export function PendingPlacardNote({ deferral, className }: { deferral: Deferral
         className,
       )}
     >
-      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--gfo-error,#EF3340)]" aria-hidden />
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--gfo-error-ink,#C81E2B)]" aria-hidden />
       <span>
-        <span className="font-medium text-[var(--gfo-error,#EF3340)]">Still grounded.</span>{' '}
+        <span className="font-medium text-[var(--gfo-error-ink,#C81E2B)]">Still grounded.</span>{' '}
         <span className="text-muted-foreground">
           Next: {step.action}
           {step.where ? ` — ${step.where}` : ''}.

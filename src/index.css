@@ -99,6 +99,7 @@
   }
 
   .dark {
+
     /* A PMS 293 shadow is invisible on a Midnight card — the tint and the
        surface are the same colour. Dark mode falls back to black, deeper,
        because there is no ambient light to model. Overriding the P&G tier
@@ -176,7 +177,38 @@
     --gfo-error:   var(--pg-red);          /* PMS 032 C */
     --gfo-info:    var(--gfo-daylight);
 
+    /* TL-41 — TEXT-SAFE variants of the RAG axis.
+       The PMS values above were drawn for print and for fills; as glyphs on a white ground they
+       fail WCAG badly. Measured: amber 1.86:1, green 2.85:1, red 4.02:1, against a 4.5:1 bar for
+       body text and 3:1 for large. LG-171 put those hues onto the fleet count numerals, which is
+       what made a long-standing weakness into a legible-number problem.
+
+       So: FILLS AND STROKES KEEP THE BRAND VALUE, GLYPHS USE THE INK. The hue family reads the
+       same; only the lightness moves, and only where a human has to read a shape as a letter.
+       The three are tuned to a similar ratio (5.06–5.71) rather than each being pushed as dark as
+       it will go, so they carry equal weight beside one another instead of green looking like a
+       different, heavier idea than amber.
+
+       These are NOT a fourth colour axis — they are the same axis, legible. Do not use them for
+       anything the RAG axis does not already own (see the custody/CAS separation below). */
+    --gfo-success-ink: #00803A;   /* 5.06:1 on white */
+    --gfo-warning-ink: #8A6200;   /* 5.49:1 on white */
+    --gfo-error-ink:   #C81E2B;   /* 5.71:1 on white */
+
     --gfo-sphere: radial-gradient(circle at 30% 30%, #4FAEE5 0%, #1F66C2 38%, var(--pg-blue) 70%, var(--pg-navy) 100%);
+  }
+
+  /* TL-41 — must come AFTER the `:root, .dark` block above: these blocks are settled by SOURCE
+     ORDER, not specificity (see this file's header note), so declaring the dark inks earlier would
+     let the light values win in dark mode — which is the exact bug this ordering avoids.
+
+     On the navy ground the ink direction INVERTS: darkening would erase these. Measured on
+     #0D1F5C — amber 8.28:1 and green 7.73:1 pass as-is or lightened; red at 3.82:1 clears only the
+     large-text bar, so it lifts to 5.57:1. */
+  .dark {
+    --gfo-success-ink: #46D07C;
+    --gfo-warning-ink: #F1B434;
+    --gfo-error-ink:   #FF6B76;
   }
 }
 

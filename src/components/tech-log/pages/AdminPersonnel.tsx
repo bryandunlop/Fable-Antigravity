@@ -56,7 +56,7 @@ export default function AdminPersonnel() {
                 <div>
                   <div className="flex items-center gap-2 font-semibold">{p.displayName}<Badge variant="outline">{p.role}</Badge></div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {p.apCertificateNumber ? <span>A&P {p.apCertificateNumber}</span> : <span className="text-[var(--gfo-error,#EF3340)]">no A&P cert (cannot sign CRS)</span>}
+                    {p.apCertificateNumber ? <span>A&P {p.apCertificateNumber}</span> : <span className="text-[var(--gfo-error-ink,#C81E2B)]">no A&P cert (cannot sign CRS)</span>}
                     {p.riiAuthorized && <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> RII: {p.riiAuthorizedAta.join(', ')}</span>}
                     {p.crewDeferralAuthorized && <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> crew-defer</span>}
                     {p.placardAuthorized && <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> placard</span>}

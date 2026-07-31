@@ -112,7 +112,7 @@ export function RectifyPanel({
                 {inspectors.map(p => <SelectItem key={p.oid} value={p.oid}>{p.displayName}</SelectItem>)}
               </SelectContent>
             </Select>
-            {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error,#EF3340)]">No RII-authorized inspector for ATA {ata} — sign-off cannot proceed.</p>}
+            {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">No RII-authorized inspector for ATA {ata} — sign-off cannot proceed.</p>}
           </div>
         )}
         <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">

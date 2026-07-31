@@ -88,7 +88,7 @@ export function ExtendDeferralDialog({
           </DialogHeader>
 
           {!hardBlock.ok ? (
-            <p className="rounded-md border border-[var(--gfo-error,#EF3340)]/40 bg-[var(--gfo-error,#EF3340)]/5 p-3 text-sm text-[var(--gfo-error,#EF3340)]">{hardBlock.error}</p>
+            <p className="rounded-md border border-[var(--gfo-error,#EF3340)]/40 bg-[var(--gfo-error,#EF3340)]/5 p-3 text-sm text-[var(--gfo-error-ink,#C81E2B)]">{hardBlock.error}</p>
           ) : (
             <div className="space-y-3 text-sm">
               {hardBlock.auth?.thirdParty && (

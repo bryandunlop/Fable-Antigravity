@@ -22,8 +22,8 @@ const catVariant = (category?: string) =>
   category?.startsWith('MEL') ? 'secondary' : CAT_VARIANT[category ?? ''] ?? 'outline';
 
 const SECTION: Record<DueBucket, { title: string; icon: React.ReactNode; accent?: string }> = {
-  OVERDUE: { title: 'Overdue', icon: <AlertTriangle className="h-4 w-4 text-[var(--gfo-error,#EF3340)]" />, accent: 'border-[var(--gfo-error,#EF3340)]/50' },
-  DUE_7D: { title: 'Due within 7 days', icon: <Clock className="h-4 w-4 text-[var(--gfo-warning,#F1B434)]" />, accent: 'border-[var(--gfo-warning,#F1B434)]/50' },
+  OVERDUE: { title: 'Overdue', icon: <AlertTriangle className="h-4 w-4 text-[var(--gfo-error-ink,#C81E2B)]" />, accent: 'border-[var(--gfo-error,#EF3340)]/50' },
+  DUE_7D: { title: 'Due within 7 days', icon: <Clock className="h-4 w-4 text-[var(--gfo-warning-ink,#8A6200)]" />, accent: 'border-[var(--gfo-warning,#F1B434)]/50' },
   DUE_30D: { title: 'Due within 30 days', icon: <CalendarClock className="h-4 w-4" /> },
   HORIZON: { title: 'On the horizon (≤90 days)', icon: <CalendarDays className="h-4 w-4" /> },
 };
@@ -171,8 +171,8 @@ export default function ComingDue() {
                 <span className="text-[11px] text-muted-foreground">{a.total} due</span>
               </div>
               <div className="mt-1 flex gap-3 text-sm font-semibold tabular-nums">
-                <span className={a.counts.OVERDUE ? 'text-[var(--gfo-error,#EF3340)]' : 'text-muted-foreground/50'}>{a.counts.OVERDUE} over</span>
-                <span className={a.counts.DUE_7D ? 'text-[var(--gfo-warning,#F1B434)]' : 'text-muted-foreground/50'}>{a.counts.DUE_7D} ·7d</span>
+                <span className={a.counts.OVERDUE ? 'text-[var(--gfo-error-ink,#C81E2B)]' : 'text-muted-foreground/50'}>{a.counts.OVERDUE} over</span>
+                <span className={a.counts.DUE_7D ? 'text-[var(--gfo-warning-ink,#8A6200)]' : 'text-muted-foreground/50'}>{a.counts.DUE_7D} ·7d</span>
                 <span className={a.counts.DUE_30D ? '' : 'text-muted-foreground/50'}>{a.counts.DUE_30D} ·30d</span>
               </div>
             </button>
@@ -199,7 +199,7 @@ export default function ComingDue() {
 
         {total === 0 && (
           <Card className="border-[var(--gfo-success,#00B140)]/40">
-            <CardContent className="flex items-center gap-2 p-4 text-sm text-[var(--gfo-success,#00B140)]">
+            <CardContent className="flex items-center gap-2 p-4 text-sm text-[var(--gfo-success-ink,#00803A)]">
               <CheckCircle2 className="h-4 w-4" /> Nothing coming due in the next 90 days.
             </CardContent>
           </Card>

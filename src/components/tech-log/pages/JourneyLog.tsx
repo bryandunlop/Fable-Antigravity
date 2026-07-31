@@ -202,7 +202,7 @@ export default function JourneyLog() {
   };
 
   const Gate = ({ ok, label }: { ok: boolean; label: string }) => (
-    <div className={`flex items-center gap-1.5 text-xs ${ok ? 'text-[var(--gfo-success,#00B140)]' : 'text-[var(--gfo-error,#EF3340)]'}`}>
+    <div className={`flex items-center gap-1.5 text-xs ${ok ? 'text-[var(--gfo-success-ink,#00803A)]' : 'text-[var(--gfo-error-ink,#C81E2B)]'}`}>
       {ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />} {label}
     </div>
   );

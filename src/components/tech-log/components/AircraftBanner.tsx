@@ -27,7 +27,7 @@ function Vital({ label, value, tone }: { label: string; value: string; tone?: 'e
   return (
     <div className="rounded-md bg-muted/50 px-3 py-2 text-right">
       <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className={cn('text-base font-medium', tone === 'error' && 'text-[var(--gfo-error,#EF3340)]')}>{value}</div>
+      <div className={cn('text-base font-medium', tone === 'error' && 'text-[var(--gfo-error-ink,#C81E2B)]')}>{value}</div>
     </div>
   );
 }

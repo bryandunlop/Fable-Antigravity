@@ -417,7 +417,7 @@ export default function WorkCardDetail() {
           {card.riiRequired && <Badge variant="outline"><UserCheck className="mr-1 h-3 w-3" />RII required</Badge>}
           {card.linkedDefectId && <Badge variant="outline">linked defect</Badge>}
           {forecastItem && (
-            <Badge variant="outline" className={!completed && forecastDays != null && forecastDays <= 7 ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning,#F1B434)]' : ''}>
+            <Badge variant="outline" className={!completed && forecastDays != null && forecastDays <= 7 ? 'border-[var(--gfo-warning,#F1B434)] text-[var(--gfo-warning-ink,#8A6200)]' : ''}>
               <CalendarClock className="mr-1 h-3 w-3" />
               CAMP due list{forecastItem.dueDateUtc ? ` · ${new Date(forecastItem.dueDateUtc).toLocaleDateString()} · ${forecastDays != null && forecastDays < 0 ? `overdue ${Math.abs(forecastDays)}d` : `${forecastDays}d`}` : ''}
             </Badge>
@@ -772,7 +772,7 @@ export default function WorkCardDetail() {
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4" /> Completion &amp; return to service</CardTitle></CardHeader>
         <CardContent className="space-y-3 text-sm">
           {completed ? (
-            <div className="flex items-center gap-2 rounded bg-[var(--gfo-success,#00B140)]/10 p-2 text-[var(--gfo-success,#00B140)]">
+            <div className="flex items-center gap-2 rounded bg-[var(--gfo-success,#00B140)]/10 p-2 text-[var(--gfo-success-ink,#00803A)]">
               <CheckCircle2 className="h-4 w-4" /> Complied with {card.completedAtUtc ? new Date(card.completedAtUtc).toLocaleString() : ''}. Release {card.completedReleaseId}.
             </div>
           ) : (
@@ -784,8 +784,8 @@ export default function WorkCardDetail() {
                     <SelectTrigger className="mt-1"><SelectValue placeholder={inspectors.length ? 'Select inspector' : 'No authorized inspector for this ATA'} /></SelectTrigger>
                     <SelectContent>{inspectors.map(p => <SelectItem key={p.oid} value={p.oid}>{p.displayName}</SelectItem>)}</SelectContent>
                   </Select>
-                  {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error,#EF3340)]">No RII-authorized inspector for ATA {card.ataChapter} — completion cannot proceed.</p>}
-                  {hasRiiSteps && !riiStepsDone && <p className="mt-1 text-xs text-[var(--gfo-warning,#F1B434)]">{pendingRiiSteps(card.steps).length} RII step(s) still need an independent inspector signature.</p>}
+                  {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">No RII-authorized inspector for ATA {card.ataChapter} — completion cannot proceed.</p>}
+                  {hasRiiSteps && !riiStepsDone && <p className="mt-1 text-xs text-[var(--gfo-warning-ink,#8A6200)]">{pendingRiiSteps(card.steps).length} RII step(s) still need an independent inspector signature.</p>}
                 </div>
               )}
               <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">

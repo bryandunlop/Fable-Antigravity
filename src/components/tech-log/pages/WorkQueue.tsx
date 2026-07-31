@@ -144,8 +144,8 @@ export default function WorkQueue() {
       <div className="space-y-3">
         <div className="flex items-baseline gap-2 border-b pb-1">
           <span className={cn('text-sm font-semibold',
-            tone === 'stop' ? 'text-[var(--gfo-error,#EF3340)]'
-            : tone === 'soon' ? 'text-[var(--gfo-warning,#F1B434)]'
+            tone === 'stop' ? 'text-[var(--gfo-error-ink,#C81E2B)]'
+            : tone === 'soon' ? 'text-[var(--gfo-warning-ink,#8A6200)]'
             : 'text-muted-foreground')}>{title}</span>
           <Badge variant={count ? 'secondary' : 'outline'}>{count}</Badge>
           <span className="text-xs text-muted-foreground">{hint}</span>
@@ -171,9 +171,9 @@ export default function WorkQueue() {
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {([
-            ['Grounded', fleetCounts.RED, 'RED', 'text-[var(--gfo-error,#EF3340)]'],
-            ['MEL / restricted', fleetCounts.AMBER, 'AMBER', 'text-[var(--gfo-warning,#F1B434)]'],
-            ['Serviceable', fleetCounts.GREEN, 'GREEN', 'text-[var(--gfo-success,#00B140)]'],
+            ['Grounded', fleetCounts.RED, 'RED', 'text-[var(--gfo-error-ink,#C81E2B)]'],
+            ['MEL / restricted', fleetCounts.AMBER, 'AMBER', 'text-[var(--gfo-warning-ink,#8A6200)]'],
+            ['Serviceable', fleetCounts.GREEN, 'GREEN', 'text-[var(--gfo-success-ink,#00803A)]'],
             ['Provisional', fleetCounts.PROV, 'PROV', 'text-muted-foreground'],
           ] as const).map(([label, n, f, cls]) => (
             <button key={f} onClick={() => navigate(`/tech-log/fleet?filter=${f}`)}
@@ -301,7 +301,7 @@ export default function WorkQueue() {
 
         {wq.counts.urgent === 0 && (
           <Card className="border-[var(--gfo-success,#00B140)]/40">
-            <CardContent className="flex items-center gap-2 p-4 text-sm text-[var(--gfo-success,#00B140)]"><CheckCircle2 className="h-4 w-4" /> Nothing urgent — the fleet is caught up.</CardContent>
+            <CardContent className="flex items-center gap-2 p-4 text-sm text-[var(--gfo-success-ink,#00803A)]"><CheckCircle2 className="h-4 w-4" /> Nothing urgent — the fleet is caught up.</CardContent>
           </Card>
         )}
       </div>

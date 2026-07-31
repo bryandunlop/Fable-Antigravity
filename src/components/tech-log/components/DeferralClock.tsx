@@ -35,8 +35,8 @@ function useNow(intervalMs = 60_000): number {
  */
 const TONE: Record<ClockTone, { stroke: string; text: string }> = {
   NORMAL: { stroke: 'var(--muted-foreground)', text: 'text-muted-foreground' },
-  URGENT: { stroke: 'var(--gfo-warning, #F1B434)', text: 'text-[var(--gfo-warning,#F1B434)]' },
-  EXPIRED: { stroke: 'var(--gfo-error, #EF3340)', text: 'text-[var(--gfo-error,#EF3340)]' },
+  URGENT: { stroke: 'var(--gfo-warning, #F1B434)', text: 'text-[var(--gfo-warning-ink,#8A6200)]' },
+  EXPIRED: { stroke: 'var(--gfo-error, #EF3340)', text: 'text-[var(--gfo-error-ink,#C81E2B)]' },
 };
 
 const R = 7;
