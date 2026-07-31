@@ -387,7 +387,7 @@ export default function AircraftDetail() {
 
   return (
     <TechLogShell
-      title="Fleet · aircraft workspace"
+      title="Aircraft workspace"
       /* D71 — the tail, its RAG state and WHY it holds that state are one band, not a title above the
          nav plus a status card below it. The governing sentence names the governing *item*, so "why
          is this tail red" is answered without navigating (D42) and without scrolling past two nav
