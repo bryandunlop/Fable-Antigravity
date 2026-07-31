@@ -503,8 +503,12 @@ export default function AircraftDetail() {
                   {/* LG-143 — the empty board asserted dispatchability, which is the same claim the
                       banner used to make. A provisional tail's empty board means only that nothing
                       is recorded against it; it still cannot dispatch. */}
+                  {/* Deliberately "not assessed", not "cannot dispatch". That an aircraft in
+                      onboarding may not fly at all is a regulatory claim nobody here has confirmed
+                      — what IS confirmed is that its MEL is not approved, so nothing can be
+                      deferred and myGFO has no dispatch answer to give. */}
                   {ac.isProvisional
-                    ? `No open maintenance recorded against ${ac.tailNumber}. It cannot dispatch until its D195 MEL is approved.`
+                    ? `No open maintenance recorded against ${ac.tailNumber} — but no dispatch state is assessed until its D195 MEL is approved.`
                     : sv.status === 'GREEN'
                     ? `No open maintenance — ${ac.tailNumber} is dispatchable.`
                     : 'Dispatchable under restriction — see the deferrals in force below.'}

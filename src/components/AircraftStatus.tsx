@@ -72,8 +72,13 @@ export default function AircraftStatus() {
                     <CardDescription>{ac.model}</CardDescription>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <ServiceabilityChip status={aw.status} />
-                    {aw.isProvisional && <Badge variant="outline">Provisional</Badge>}
+                    {/* LG-143 — a provisional tail gets the badge INSTEAD of a RAG chip, never
+                        alongside it. deriveServiceability has no notion of isProvisional, so a
+                        clean tail in onboarding reads GREEN and rendered a green "Serviceable" chip
+                        next to the badge saying its MEL is not approved yet. */}
+                    {aw.isProvisional
+                      ? <Badge variant="outline">Provisional</Badge>
+                      : <ServiceabilityChip status={aw.status} />}
                   </div>
                 </div>
               </CardHeader>

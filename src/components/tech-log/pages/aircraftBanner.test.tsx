@@ -104,6 +104,8 @@ describe('aircraft workspace banner (D71)', () => {
 
     expect(screen.queryByText(/N3PG is dispatchable/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/N3PG is serviceable/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/cannot dispatch until its D195 MEL is approved/i)).toBeInTheDocument();
+    // Both surfaces decline to assess rather than asserting the aircraft may not fly — that second
+    // claim is regulatory and unconfirmed (see the comment at the blocker-board copy).
+    expect(screen.getAllByText(/no dispatch state is assessed until its D195 MEL is approved/i).length).toBe(2);
   });
 });

@@ -83,8 +83,11 @@ export function useUnifiedFleetStatus() {
     });
   }, [airworthiness, aircraftPositions, aircraftStatuses]);
 
+  /* LG-143 — a tail still in onboarding does not count as dispatchable, whatever its RAG state
+     says. deriveServiceability has no notion of isProvisional, so a clean provisional tail reads
+     GREEN and was being counted in this numerator. */
   const dispatchable = useMemo(
-    () => fleet.filter(a => a.airworthiness.status !== 'RED').length,
+    () => fleet.filter(a => !a.airworthiness.isProvisional && a.airworthiness.status !== 'RED').length,
     [fleet]
   );
   const inFlight = useMemo(

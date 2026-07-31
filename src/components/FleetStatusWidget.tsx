@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { Link } from 'react-router-dom';
 import { useUnifiedFleetStatus } from './hooks/useUnifiedFleetStatus';
 import { ServiceabilityChip } from './tech-log/components/ServiceabilityChip';
@@ -89,8 +90,12 @@ export default function FleetStatusWidget({
           {fleet.map(ac => {
             const fuel = overrides[ac.tailNumber] !== undefined ? overrides[ac.tailNumber] : ac.fuelRemaining;
             const aw = ac.airworthiness;
-            const reason =
-              aw.status === 'RED'
+            /* LG-143 — a provisional tail's RAG state is not an answer this widget may show. Its
+               D195 MEL is still pending FSDO approval, so deriveServiceability reading GREEN on a
+               clean tail means only "nothing recorded", not "good to go". */
+            const reason = aw.isProvisional
+              ? 'MEL pending FSDO approval'
+              : aw.status === 'RED'
                 ? `${aw.openAffectingDefects} open defect${aw.openAffectingDefects === 1 ? '' : 's'}`
                 : aw.status === 'AMBER'
                   ? `${aw.activeDeferrals} active deferral${aw.activeDeferrals === 1 ? '' : 's'}`
@@ -98,7 +103,7 @@ export default function FleetStatusWidget({
             return (
               <div key={ac.tailNumber} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50 group/item">
                 <Link to={`/tech-log/fleet?filter=${aw.status}`} className="flex items-center gap-3 min-w-0">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: RAG_DOT[aw.status] }} />
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: aw.isProvisional ? 'var(--muted-foreground)' : RAG_DOT[aw.status] }} />
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-foreground block leading-none mb-1">{ac.tailNumber}</span>
                     <span className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
@@ -144,7 +149,9 @@ export default function FleetStatusWidget({
                     </PopoverContent>
                   </Popover>
 
-                  <ServiceabilityChip status={aw.status} pulse={false} />
+                  {aw.isProvisional
+                    ? <Badge variant="outline" className="text-xs">Provisional</Badge>
+                    : <ServiceabilityChip status={aw.status} pulse={false} />}
                 </div>
               </div>
             );
