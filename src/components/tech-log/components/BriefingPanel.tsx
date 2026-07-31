@@ -20,6 +20,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
+import { Checkbox } from '../../ui/checkbox';
 
 /** Latest briefing for an aircraft (most recent by createdAtUtc). */
 export function latestBriefing(briefings: FlightBriefing[], aircraftId: string): FlightBriefing | undefined {
@@ -352,7 +353,7 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
               const text = row ? melText(row) : (d.restrictionText ?? d.melTitle ?? 'restriction/placard');
               return (
                 <label key={d.id} className="flex items-start gap-2 rounded-md border p-2">
-                  <input type="checkbox" className="mt-1" checked={!!ackChecks[d.id]} onChange={() => setAckChecks(prev => ({ ...prev, [d.id]: !prev[d.id] }))} />
+                  <Checkbox className="mt-0.5 size-5" checked={!!ackChecks[d.id]} onCheckedChange={() => setAckChecks(prev => ({ ...prev, [d.id]: !prev[d.id] }))} />
                   <span>MEL {num} (Cat {d.category}) — {text}</span>
                 </label>
               );

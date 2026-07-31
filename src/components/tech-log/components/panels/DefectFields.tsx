@@ -414,7 +414,10 @@ export function OccurredAtField({ valueUtc, onChange }: {
       <Label htmlFor="defect-occurred-at" className="flex items-center gap-1.5">
         <Clock className="h-3.5 w-3.5" /> When was it noticed?
       </Label>
-      <div className="mt-1 flex gap-2">
+      {/* LG-169 — a datetime-local input and the zone select cannot share a 375px row: the input
+          truncates to "07/31/2026, 07:5" and the reader cannot see the instant they are back-dating
+          to. That instant starts the MEL repair clock, so a half-visible value is not cosmetic. */}
+      <div className="mt-1 flex flex-col gap-2 sm:flex-row">
         <Input
           id="defect-occurred-at"
           type="datetime-local"
@@ -476,7 +479,7 @@ export function DefectLocationSection({
   return (
     <div className="rounded-md border p-3">
       <Label className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Location</Label>
-      <div className="mt-2 grid grid-cols-2 gap-3">
+      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Select value={locKind} onValueChange={(v: string) => onLocKindChange(v as DefectLocationKind)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>

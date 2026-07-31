@@ -30,6 +30,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { Checkbox } from '../../ui/checkbox';
 
 const LABOR_CATEGORY_LABELS: Record<LaborCategory, string> = {
   WRENCH: 'Wrench time', TROUBLESHOOTING: 'Troubleshooting', TECH_OPS_CALL: 'Tech-ops call',
@@ -596,7 +597,7 @@ export default function WorkCardDetail() {
           <CardContent className="space-y-2">
             {card.steps.map(s => (
               <div key={s.id} className={`flex items-start gap-2 rounded-md border p-2 text-sm ${s.done ? 'bg-[var(--gfo-success,#00B140)]/5' : ''}`}>
-                <input type="checkbox" className="mt-0.5" checked={s.done} disabled={completed || !isMaint} onChange={() => toggleStep(s.id)} />
+                <Checkbox className="mt-0.5 size-5" checked={s.done} disabled={completed || !isMaint} onCheckedChange={() => toggleStep(s.id)} />
                 <span className="flex-1">
                   <span className="text-xs text-muted-foreground">#{s.seq}</span> {s.text}
                   {s.riiRequired && <Badge variant="outline" className="ml-2"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}
@@ -720,8 +721,8 @@ export default function WorkCardDetail() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                   <Input className="md:col-span-2" placeholder="Serial number (if serialized)" value={psn} onChange={e => setPsn(e.target.value)} />
-                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={rotable} onChange={e => setRotable(e.target.checked)} /> Rotable</label>
-                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showRemoved} onChange={e => setShowRemoved(e.target.checked)} /> Records a removal</label>
+                  <label className="flex items-center gap-2 text-xs"><Checkbox checked={rotable} onCheckedChange={(v: unknown) => setRotable(v === true)} /> Rotable</label>
+                  <label className="flex items-center gap-2 text-xs"><Checkbox checked={showRemoved} onCheckedChange={(v: unknown) => setShowRemoved(v === true)} /> Records a removal</label>
                 </div>
                 {showRemoved && (
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3">

@@ -19,6 +19,7 @@ import { Badge } from '../../../ui/badge';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
 import { Textarea } from '../../../ui/textarea';
+import { Checkbox } from '../../../ui/checkbox';
 
 /**
  * D56 — whole minutes, because that is all the day-of-discovery control can express. A defect's
@@ -290,7 +291,7 @@ export function DeferralCreatePanel({
                   </>
                 ) : (
                   <label className="flex items-start gap-2">
-                    <input id="deferral-add-crew-action" type="checkbox" className="mt-1" checked={addCrewAction} onChange={e => setAddCrewAction(e.target.checked)} />
+                    <Checkbox id="deferral-add-crew-action" className="mt-0.5 size-5" checked={addCrewAction} onCheckedChange={(v: unknown) => setAddCrewAction(v === true)} />
                     <span className="text-xs">
                       <span className="font-medium">Crew action required</span> — this MEL item carries none; add one for this deferral.
                     </span>
@@ -380,7 +381,7 @@ export function DeferralCreatePanel({
               </div>
 
               <label className="flex items-start gap-2">
-                <input type="checkbox" className="mt-1" checked={ack} onChange={e => setAck(e.target.checked)} />
+                <Checkbox className="mt-0.5 size-5" checked={ack} onCheckedChange={(v: unknown) => setAck(v === true)} />
                 <span className="text-xs">I have reviewed the governing MEL item (revision {selectedMel.mmelRevision}, eff. {selectedMel.effectiveDate}), its category, provisos, (O)/(M) procedures, and placard, and I authorize this deferral.</span>
               </label>
 
