@@ -41,6 +41,28 @@ export function deferralsRequiringAck(
  * whose MEL the FSDO has not approved. Bryan ruled block-outright on 2026-07-31: myGFO has no
  * dispatch answer for a tail in onboarding, and absence of an answer is never a green light.
  */
+/**
+ * Briefing-preparation gate (LG-143). A tail in onboarding gets no briefing at all.
+ *
+ * Blocking only acceptance was not enough. `buildBriefingDisclosure` freezes
+ * `serviceability: deriveServiceability(...).status` — GREEN for a clean provisional tail — and the
+ * maintenance release signature covers that frozen disclosure. So a briefing that could never be
+ * accepted still produced a signed record, an on-screen readout and a PRINTED flight briefing all
+ * asserting "Serviceability: GREEN" for an aircraft whose D195 MEL the FSDO has not approved.
+ * Blocking the release end removes the record rather than re-labelling it.
+ *
+ * Bryan ruled block-release on 2026-07-31, after the acceptance-only ruling earlier that day.
+ */
+export function canPrepareBriefing(
+  aircraftId: string,
+  state: Pick<TechLogState, 'aircraft'>,
+): { ok: boolean; reason?: string } {
+  if (state.aircraft.find(a => a.id === aircraftId)?.isProvisional) {
+    return { ok: false, reason: 'Aircraft is in onboarding — its D195 MEL is pending FSDO approval, so no flight briefing can be prepared or released for it.' };
+  }
+  return { ok: true };
+}
+
 export function canAcceptDispatch(
   aircraftId: string,
   state: Parameters<typeof deriveServiceability>[1],

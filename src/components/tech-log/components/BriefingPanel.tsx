@@ -6,7 +6,7 @@ import { deriveServiceability } from '../engine/serviceability';
 import { projectCheck } from '../engine/recurringChecks';
 import { campForecast } from '../integration/campClient';
 import { buildBriefingDisclosure, disclosureDigest } from '../engine/briefingDisclosure';
-import { deferralsRequiringAck, canAcceptDispatch } from '../engine/handover';
+import { deferralsRequiringAck, canAcceptDispatch, canPrepareBriefing } from '../engine/handover';
 import { INTENT } from '../constants';
 import { latestPublishedTemplate, isReleaseGated, buildInitialEntries } from '../engine/checklist';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
@@ -134,6 +134,9 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
     disclosureDigest(frozen) !== disclosureDigest(liveDisclosure),
   );
 
+  /* LG-143 — the release end of the same block. Held here rather than at the button so the DRAFT
+     branch's release control reads the same gate the prepare card does. */
+  const prepareGate = canPrepareBriefing(aircraft.id, state);
   const baseGate = canAcceptDispatch(aircraft.id, state, now);
   const acceptGate = !baseGate.ok
     ? baseGate
@@ -237,8 +240,16 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
         {isMaint ? (
           <Card>
             <CardContent className="flex flex-col items-start gap-2 p-6 text-sm">
-              <p className="text-muted-foreground">{briefing ? 'The last briefing was acknowledged. Prepare a new one for the next flight.' : 'No active briefing. Prepare one for the crew.'}</p>
-              <Button onClick={createDraft}><ClipboardCheck className="mr-1.5 h-4 w-4" /> Prepare flight briefing</Button>
+              {/* LG-143 — a tail in onboarding gets no briefing at all. The disclosure freezes the
+                  projection's GREEN into a record the release signature covers, so blocking only
+                  acceptance would have left a signed (and printable) "Serviceability: GREEN" for an
+                  aircraft whose MEL is not approved. */}
+              <p className="text-muted-foreground">
+                {!prepareGate.ok ? prepareGate.reason
+                  : briefing ? 'The last briefing was acknowledged. Prepare a new one for the next flight.'
+                  : 'No active briefing. Prepare one for the crew.'}
+              </p>
+              {prepareGate.ok && <Button onClick={createDraft}><ClipboardCheck className="mr-1.5 h-4 w-4" /> Prepare flight briefing</Button>}
             </CardContent>
           </Card>
         ) : (
@@ -271,12 +282,18 @@ export function BriefingPanel({ aircraft }: { aircraft: Aircraft }) {
             </div>
             <div><Label>Notes to crew</Label><Textarea className="mt-1" value={briefing.notes ?? ''} onChange={e => patch({ ...briefing, notes: e.target.value || undefined })} placeholder="Anything the crew should know before the flight…" /></div>
             <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">On release, the briefing takes a permanent snapshot of the airworthiness content as it stands now — serviceability ({sv.status}), active MELs, open defects, watch items, recurring checks and coming-due maintenance. That snapshot is what the crew signs and what prints, and it never changes afterwards.</div>
-            <Button onClick={() => beginRelease(briefing)}><Send className="mr-1.5 h-4 w-4" /> Release for flight</Button>
+            {/* LG-143 — a DRAFT that predates the block (or one reached by any other route) must
+                not be releasable either: the release is what signs the frozen disclosure. */}
+            {!prepareGate.ok && <p className="text-xs" style={{ color: 'var(--gfo-error,#EF3340)' }}>{prepareGate.reason}</p>}
+            <Button disabled={!prepareGate.ok} onClick={() => beginRelease(briefing)}><Send className="mr-1.5 h-4 w-4" /> Release for flight</Button>
           </CardContent>
         </Card>
         <SignCeremonyDialog open={relOpen} onOpenChange={setRelOpen} signer={user} signedEntity="BRIEFING" signedEntityId={pendingSigId}
           intentStatement={INTENT.BRIEFING_RELEASE} payloadSummary={`${aircraft.tailNumber} preflight checklist complete; serviceability ${sv.status}.`}
           payloadExtra={liveDisclosure ? disclosureDigest(liveDisclosure) : undefined}
+          /* LG-143 — the gate holds at the signing door too, not only on the button. The signature
+             is what makes the frozen GREEN a record; a disabled button is a UI state, not a gate. */
+          validate={() => ({ ok: prepareGate.ok, error: prepareGate.reason })}
           onSigned={onReleased(briefing)} title="Release briefing for flight" />
       </div>
     );
