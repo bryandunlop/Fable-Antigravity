@@ -23,6 +23,16 @@ export function deriveTripReadiness(
   const verdict = (s: TripReadiness, extra: Partial<TripReadinessResult> = {}): TripReadinessResult =>
     ({ state: s, computedAtUtc: asOfUtc, ...extra });
 
+  /* Ahead of serviceability: the aircraft is still in onboarding. LG-143 — checked ABOVE the RED
+     test rather than inside it, because deriveServiceability has no notion of isProvisional. A
+     clean provisional tail reads GREEN, so trip readiness showed a green "Ready" chip on every
+     pilot surface — Trips, LegDetail, MyFlights, FlightHub — right up until the PIC opened the
+     briefing and hit the canAcceptDispatch block. Trip prep has to agree with that gate rather
+     than contradict it for the whole of trip planning. */
+  if (state.aircraft.find(a => a.id === trip.aircraftId)?.isProvisional) {
+    return verdict('RED', { blocker: 'Aircraft in onboarding — D195 MEL pending FSDO approval' });
+  }
+
   // Highest precedence: aircraft serviceability.
   if (deriveServiceability(trip.aircraftId, state, asOfUtc).status === 'RED') {
     return verdict('RED', { blocker: 'Aircraft grounded (RED)' });
