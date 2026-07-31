@@ -53,7 +53,7 @@ seam was for. Read that file's header before you flip it; it lists the three thi
 
 ---
 
-## Five rules the front end already depends on
+## Six rules the front end already depends on
 
 **1. Appends never conflict.** `labor.add`, `parts.add` and `statustag.add` are additions to a list
 and are accepted at any base revision. `workcard.patch`, `parts.receive` and `timeline.set` are
@@ -83,15 +83,22 @@ a tech who sees logged hours vanish re-enters them, and now there are two labor 
 bugs in the first cut of this front end traced to exactly this class of full-replace-without-rebase,
 so the contract is stricter than it looks.
 
+**6. Live push is Phase 1, and it must survive scale-out.** Bryan ruled on 2026-07-31 that a
+colleague's edit has to appear instantly rather than on next focus — a technician's usual two devices
+are their own phone and their own laptop, so the person looking at the stale card is most often the
+same person who just changed it. `GET /stream` (WebSocket) carries `{ type: 'card.changed', card }`;
+the client is already written (`httpTransport.ts#subscribe`). **On more than one App Service instance
+you need Azure SignalR Service or a Redis backplane**, because a publish on one instance cannot reach
+a socket held by another — without it the feature is live for whoever happens to share your instance
+and silently stale for everyone else, raising no error anywhere. That is the single likeliest way to
+ship this broken. You do *not* need delivery guarantees: the client refetches on every connect and
+reconnect, so a dropped frame self-heals. Note this contradicts `PHASE1_BUILD_SPEC.md` §2, which
+parks real-time push in Phase 2 — the spec is what needs updating, not this.
+
 ---
 
 ## What the front end does NOT need from you yet
 
-- **Push.** `subscribe` is a stub in `httpTransport`. With it wired, the app converges on fetch —
-  mount, reconnect, tab focus. A tech sees a colleague's edit on their next focus rather than
-  instantly. `PHASE1_BUILD_SPEC.md` §2 puts real-time push (SignalR) in Phase 2 explicitly, so this
-  is consistent — but it is a product decision and **Bryan should rule on whether next-focus is good
-  enough for Phase 1**, rather than discovering it in UAT.
 - **Presence storage.** A table with a TTL sweep. Nothing gates on it; if you ship it late, the
   "someone else is viewing this" line simply does not appear.
 
@@ -117,10 +124,13 @@ without its labor line is the TL-38 bug with extra steps.
 
 ## Open questions this raises for Bryan, not for you
 
-1. **Is next-focus convergence enough for Phase 1**, or does the shift-change workflow need push?
-2. **Q7 (device model)** is load-bearing here. If iPads are shared and aircraft-resident, single-device
-   persistence already covered more of the real workflow than anyone thought; if they are personal,
-   it covered almost none. That answer changes how urgent this whole slice is.
+1. ~~Is next-focus convergence enough?~~ **Answered 2026-07-31: no — push.** See rule 6.
+2. ~~Q7, the device model.~~ **Answered 2026-07-31: personal devices, but a tech is typically on
+   their phone or their laptop rather than an iPad.** Two consequences for you. The common
+   multi-device case is *one person* on two of their own devices, so a conflict banner usually means
+   "you did this to yourself" — which is exactly why push, not next-focus. And the phone is a
+   first-class client, not a fallback: the UI is already responsive to 390px, so do not assume a
+   desk-bound consumer of this API.
 3. **Conflict resolution is "re-enter it".** The UI holds the losing edit and asks the technician to
    redo it against the current card. A merge UI is possible and was not built, because guessing at
    merge semantics for maintenance records without a ruling seemed worse than an honest re-entry.

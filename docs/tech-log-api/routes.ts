@@ -40,6 +40,12 @@ interface Deps {
   /** Tail-level authorization. The stand-in server has none of this. */
   mayTouchCard(actorOid: string, cardId: string): Promise<boolean>;
   now(): Date;
+  /**
+   * Fan the committed card out to every OTHER open connection watching it. See `/stream` below.
+   * Must filter per subscriber by what that user may see — this is the one call here that can leak
+   * a card across a permission boundary.
+   */
+  publish(cardId: string, card: unknown): void;
 }
 
 interface Tx {
@@ -170,10 +176,36 @@ export function mountTechLogApi(router: Router, deps: Deps): void {
     if (result.outcome === 'REJECTED') return res.status(422).json({ reason: result.reason });
     res.json({ card: result.card, replayed: result.replayed });
 
-    // AFTER the response, fan out to whoever else has this card open. Phase 2 (SignalR) — see the
-    // README. Until it exists the client converges on fetch at mount / reconnect / tab focus.
-    // notifyWatchers(cardId, result.card);
+    // AFTER the response, fan out to everyone else watching this card. Ordering matters: the writer
+    // is answered first, so a client can never be pushed its own change before it knows the change
+    // landed. Bryan ruled 2026-07-31 that this is Phase 1, not Phase 2 — see `/stream` below.
+    deps.publish(cardId, result.card);
   });
+
+  /**
+   * GET /stream — WebSocket upgrade. The live half of TL-38.
+   *
+   * The client is `src/components/tech-log/sync/httpTransport.ts#subscribe`. It sends nothing; this
+   * is one-way, server to client. Frames are `{ type: 'card.changed', card: StampedWorkCard }` — the
+   * WHOLE card, not a "something changed" ping, because the client applies it directly and a ping
+   * would only cost a round trip to learn what you already knew.
+   *
+   *   - **Auth rides `Sec-WebSocket-Protocol`.** A browser WebSocket cannot set an Authorization
+   *     header. The client sends `['bearer', <token>]`; validate that token exactly as you would the
+   *     header, and echo `bearer` back as the accepted subprotocol or the handshake fails. Do NOT
+   *     take the token from the query string — it lands in access logs.
+   *   - **Scope every frame to what that subscriber may see.** Filter at publish time, per
+   *     connection. A fan-out bug here shows one person a card they have no business seeing.
+   *   - **You do NOT need delivery guarantees.** The client refetches everything on every connect
+   *     and every reconnect, so a dropped frame self-heals. Do not build an at-least-once queue for
+   *     this — it is real complexity buying nothing.
+   *   - **On Azure this is where SignalR goes, and skipping it is the likeliest way to ship this
+   *     broken.** App Service's own WebSocket support does not survive scale-out: a `publish` on
+   *     instance A cannot reach a socket held by instance B. With more than one instance you need
+   *     Azure SignalR Service (or a Redis backplane), or the feature half-works — live for whoever
+   *     happens to share your instance, silently stale for everyone else, with no error anywhere.
+   */
+  // router.ws('/stream', …) — depends on your framework's WebSocket integration.
 
   /** POST /presence/heartbeat — advisory. Never a lock; see `contract.ts#PresenceRecord`. */
   router.post('/presence/heartbeat', async (req: Request, res: Response) => {

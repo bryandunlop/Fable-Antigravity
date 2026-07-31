@@ -15,12 +15,10 @@
  *
  *   1. **A token.** `getToken` should return the Entra access token MSAL already holds for the API's
  *      scope. Do not pass the id token.
- *   2. **`subscribe` is a stub here.** It returns a no-op unsubscribe, so with this transport wired
- *      the app is poll-and-refresh, not live. The real thing is SignalR (`PHASE1_BUILD_SPEC.md` §2
- *      puts real-time push in Phase 2 explicitly). Until then the app converges on `fetchCards`,
- *      which `useSync` already calls on mount, on reconnect and on tab focus. That is a real
- *      product decision — a tech does see a colleague's edit, on their next focus rather than
- *      instantly — and it should be Bryan's call whether that is good enough for Phase 1.
+ *   2. **A WebSocket endpoint.** `subscribe` is a real live-push client (see its own note). Bryan
+ *      ruled on 2026-07-31 that convergence must be instant rather than on next focus, which moves
+ *      real-time push into Phase 1 — `PHASE1_BUILD_SPEC.md` §2 had parked it in Phase 2, so the spec
+ *      is what needs updating, not this file. The server side is `docs/tech-log-api/routes.ts`.
  *   3. **Presence needs a server-side TTL sweep.** The `PRESENCE_TTL_MS` filter is applied by the
  *      client here, which is fine for display but means the presence table grows without bound.
  *
@@ -53,6 +51,8 @@ const ROUTES = {
   op: (workCardId: string) => `/work-cards/${encodeURIComponent(workCardId)}/ops`,
   heartbeat: '/presence/heartbeat',
   presence: (workCardId: string) => `/presence?workCardId=${encodeURIComponent(workCardId)}`,
+  /** WebSocket upgrade. See `subscribe` and `docs/tech-log-api/routes.ts`. */
+  stream: '/stream',
 } as const;
 
 export function createHttpTransport(opts: HttpTransportOptions): SyncTransport {
@@ -65,7 +65,9 @@ export function createHttpTransport(opts: HttpTransportOptions): SyncTransport {
     ...extra,
   });
 
-  return {
+  // Named rather than returned inline so `subscribe` can call `api.fetchCards()` for its
+  // reconnect resync — see the note on that method.
+  const api: SyncTransport = {
     name: 'http',
 
     async submit(op: SyncOp): Promise<SyncResult> {
@@ -120,8 +122,86 @@ export function createHttpTransport(opts: HttpTransportOptions): SyncTransport {
     },
 
     /** See note 2 in the header — this is a stub until SignalR exists. */
-    subscribe(): () => void {
-      return () => {};
+    /**
+     * Live push. Bryan chose "truly instant" over next-focus convergence (2026-07-31), because a
+     * technician's usual pair of devices is their own phone and their own laptop — so the person
+     * being surprised by a stale card is most often the same person who changed it, and "tap away
+     * and back to see your own edit" is not a thing anyone will forgive.
+     *
+     * **A push channel that can silently drop a message is worse than polling**, because it looks
+     * live. Two rules keep that from happening:
+     *
+     *   1. **Every successful connect — including every reconnect — refetches everything** and
+     *      replays it through `onCard`. Anything that changed while the socket was down is caught by
+     *      that sweep, so a missed frame costs a round trip, never a wrong screen. This is the whole
+     *      reason `open` does work instead of just logging.
+     *   2. **Reconnect backs off but never gives up**, because the failure this exists to prevent is
+     *      long and quiet: a laptop that slept through a shift change. Capped at 30s so a hangar
+     *      wifi blip recovers quickly.
+     *
+     * `useSync` still refreshes on focus and on `online`, and those stay — belt and braces. The
+     * socket makes the common case instant; the fetches make the uncommon case correct.
+     *
+     * Deliberately the browser's own `WebSocket`, not `@microsoft/signalr`. The spec names SignalR
+     * and Azure SignalR Service is the natural fit — but adding a dependency for a file nothing
+     * imports is how dead code starts costing bundle size. Swapping this for a SignalR hub
+     * connection is a body transplant on one function; the contract above it does not move.
+     */
+    subscribe(onCard: (card: StampedWorkCard) => void): () => void {
+      let socket: WebSocket | null = null;
+      let retry = 0;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let stopped = false;
+
+      const connect = async () => {
+        if (stopped) return;
+        let token: string;
+        try {
+          token = await opts.getToken();
+        } catch {
+          return schedule();
+        }
+        const url = new URL(`${opts.baseUrl}${ROUTES.stream}`, window.location.origin);
+        url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+        // A browser WebSocket cannot set an Authorization header, so the token rides the subprotocol
+        // slot — the standard workaround, and it keeps the token out of the query string where it
+        // would land in server access logs. The server reads it from `Sec-WebSocket-Protocol`.
+        socket = new WebSocket(url.toString(), ['bearer', token]);
+
+        socket.onopen = () => {
+          retry = 0;
+          // Rule 1 — resync on every connect, so a gap in the stream cannot become a stale screen.
+          void api.fetchCards().then(cards => { if (!stopped) cards.forEach(onCard); }).catch(() => {});
+        };
+        socket.onmessage = ev => {
+          try {
+            const msg = JSON.parse(String(ev.data)) as { type?: string; card?: StampedWorkCard };
+            if (msg.type === 'card.changed' && msg.card) onCard(msg.card);
+          } catch {
+            // A frame we cannot parse is a server-side bug, not a client state to model. The next
+            // reconnect sweep will resync us regardless, so drop it rather than tearing down.
+          }
+        };
+        socket.onclose = () => { socket = null; schedule(); };
+        socket.onerror = () => socket?.close();
+      };
+
+      const schedule = () => {
+        if (stopped) return;
+        const wait = Math.min(30_000, 500 * 2 ** retry++);
+        timer = setTimeout(() => void connect(), wait);
+      };
+
+      void connect();
+
+      return () => {
+        stopped = true;
+        if (timer) clearTimeout(timer);
+        socket?.close();
+        socket = null;
+      };
     },
   };
+
+  return api;
 }
