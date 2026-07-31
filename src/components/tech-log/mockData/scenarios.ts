@@ -2,10 +2,11 @@ import type {
   TechLogState, Defect, Deferral, Signature, AuditEntry, FlightLog, MaintenanceRelease,
   WorkCard, PartUsage, LaborEntry, RecurringCheck, RecurringCheckAccomplishment,
   IntermittentFault, IntermittentFaultOccurrence, Trip, FlightBriefing,
-  MaintenanceProject, TechVacation, MelItem,
+  MaintenanceProject, TechVacation, MelItem, MelCategory,
 } from '../types';
 import { SEED_AIRCRAFT, SEED_PERSONNEL, SEED_MEL_G800 } from './fleet';
 import { SEED_MEL } from './mel';
+import { SEED_MEL_SECTIONS } from './melSections';
 import { SEED_CHECKLIST_TEMPLATES } from './checklistTemplates';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { makeSignature } from '../engine/signing';
@@ -88,9 +89,13 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   });
 
   // --- N6PG: AMBER (active deferral mid-clock; Cat C, no (M)/placard -> straight to ACTIVE) ---
-  const melAmber =
+  // `SEED_MEL` is Section One only, so every item in it carries a repair category — the narrowing
+  // is the type system catching up with that, not an assumption. NEF items (no category) live in
+  // `SEED_MEL_SECTIONS` and are never picked for a deferral seed.
+  const melAmber = (
     SEED_MEL.find(m => m.aircraftType === 'G500' && m.category === 'C' && !m.mProcedure) ??
-    SEED_MEL.find(m => m.id === 'mel-g500-21-01-01')!;
+    SEED_MEL.find(m => m.id === 'mel-g500-21-01-01')!
+  ) as MelItem & { category: MelCategory };
   // D56: the deferral's day of discovery is the instant the defect was NOTICED, not the instant it
   // was filed — which is what `DeferralCreatePanel` now defaults from, so the seed has to agree.
   //
@@ -144,9 +149,10 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
    * lives, so if the overlay changes this seed follows it rather than going quietly stale.
    */
   {
-    const melCrew =
+    const melCrew = (
       SEED_MEL.find(m => m.aircraftType === 'G500' && AUTHORED_CREW_ACTIONS[m.id] === true && m.oProcedure && !m.mProcedure) ??
-      SEED_MEL.find(m => m.id === 'mel-g500-35-02-02')!;
+      SEED_MEL.find(m => m.id === 'mel-g500-35-02-02')!
+    ) as MelItem & { category: MelCategory };
     const occN7 = iso(1 * D + 5 * H);
     const filedN7 = iso(1 * D + 4 * H);
     const clockStartN7 = computeClockStart(occN7);
@@ -687,7 +693,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
 
   return {
     aircraft: SEED_AIRCRAFT,
-    melItems: withAuthoredCrewActions([...SEED_MEL, ...SEED_MEL_G800]),
+    melItems: withAuthoredCrewActions([...SEED_MEL, ...SEED_MEL_SECTIONS, ...SEED_MEL_G800]),
     personnel,
     flightLogs,
     defects,

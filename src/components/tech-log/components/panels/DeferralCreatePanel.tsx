@@ -8,10 +8,11 @@ import { formatRegulatoryCompact, formatRegulatoryInstant, formatRegulatoryLabel
 import { utcFromWallTime, wallTimeFromUtc } from '../../util/entryZone';
 import { canDeferDefect } from '../../engine/disposition';
 import { crewActionRequiredForMelItem, resolveDeferralCrewAction, entersPendingPlacard } from '../../engine/crewAction';
+import { isDeferrableToday } from '../../engine/melSection';
 import { CATEGORY_DAYS, INTENT } from '../../constants';
 import { useIntegration } from '../../integration/useIntegration';
 import { newId } from '../../util/id';
-import type { Defect, Deferral, MelItem } from '../../types';
+import type { Defect, Deferral, MelCategory, MelItem } from '../../types';
 import { SignCeremonyDialog } from '../SignCeremonyDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Badge } from '../../../ui/badge';
@@ -27,11 +28,19 @@ import { Textarea } from '../../../ui/textarea';
  */
 const minuteOf = (iso: string) => Math.floor(new Date(iso).getTime() / 60_000);
 
-function dueFromCategory(mel: MelItem, clockStart: string, airframe: { hours: number; cycles: number }, zone: string) {
+function dueFromCategory(mel: MelItem & { category: MelCategory }, clockStart: string, airframe: { hours: number; cycles: number }, zone: string) {
   if (mel.category === 'A') return { repairDueDateUtc: undefined, repairIntervalUnit: 'CALENDAR_DAY' as const, repairIntervalValue: 0 };
   const value = CATEGORY_DAYS[mel.category] ?? 0;
   return computeRepairDue(mel.category, clockStart, { repairIntervalUnit: 'CALENDAR_DAY', repairIntervalValue: value }, airframe, zone);
 }
+
+/**
+ * A catalog item this panel can actually raise a deferral against — Section One or Section Two, both
+ * of which carry a repair category. NEF items carry none by design (D69/D70) and are filtered out of
+ * the picker by `isDeferrableToday`; narrowing here means the compiler, not a comment, is what stops
+ * a clockless item reaching the PL-25 math.
+ */
+type DeferrableMelItem = MelItem & { category: MelCategory };
 
 /**
  * Reusable MEL-deferral create body (MEL picker + review & sign). Renders WITHOUT a TechLogShell so it
@@ -79,11 +88,18 @@ export function DeferralCreatePanel({
     const q = query.trim().toLowerCase();
     return state.melItems
       .filter(m => m.aircraftType === aircraft.type && m.approvalState === 'APPROVED')
+      // Section One and Section Two both defer here; NEF does not yet — see `isDeferrableToday`.
+      .filter(isDeferrableToday)
       .filter(m => !q || m.subItemNumber.toLowerCase().includes(q) || m.title.toLowerCase().includes(q) || m.ataReference === q)
       .slice(0, 25);
   }, [state.melItems, aircraft, query]);
 
-  const selectedMel = state.melItems.find(m => m.id === selectedMelId);
+  const selectedMelRaw = state.melItems.find(m => m.id === selectedMelId);
+  // Re-assert deferrability on the SELECTED item, not just on the list: the id can arrive from a
+  // deep link, and the list filter alone would let an NEF item through that door.
+  const selectedMel = selectedMelRaw && isDeferrableToday(selectedMelRaw)
+    ? (selectedMelRaw as DeferrableMelItem)
+    : undefined;
   // D59: the flag is AUTHORED on the MEL item by the DOM / Chief Inspector at MEL entry; the
   // deferral inherits it. Legacy/auto-extracted items with no authored flag fall back to
   // Boolean(oProcedure) — conservative in the gating direction.
