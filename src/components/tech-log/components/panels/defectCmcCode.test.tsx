@@ -9,6 +9,17 @@ import Defects from '../../pages/Defects';
 import type { Defect, Signature } from '../../types';
 
 /**
+ * LG-154 — "Correct" moved from a top-level button into the row's overflow menu: superseding a signed
+ * defect is an exception path, not one of the two live dispositions. Tests reach it the way a person
+ * now does. Kept as one helper so the next change to the action bar breaks in one place.
+ */
+async function openCorrectionDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getAllByRole('button', { name: /more actions/i })[0]);
+  await user.click(await screen.findByRole('menuitem', { name: /correct/i }));
+}
+
+
+/**
  * LG-99 — `Defect.cmcFaultCode` gets the input it never had.
  *
  * The field was added to the type by an earlier slice of this batch and shipped with **zero writers
@@ -96,14 +107,14 @@ describe('CMC fault code on the correction (supersede) dialog', () => {
 
   it('shows the stored code so a correction can fix a mistyped one', async () => {
     const user = renderDefectsPage({ ...DEFECT, cmcFaultCode: '32-3120-99' });
-    await user.click(screen.getByRole('button', { name: /correct/i }));
+    await openCorrectionDialog(user);
 
     expect(screen.getByLabelText(/CMC fault code/i)).toHaveValue('32-3120-99');
   });
 
   it('carries an edited code onto the superseding row', async () => {
     const user = renderDefectsPage({ ...DEFECT, cmcFaultCode: '32-3120-99' });
-    await user.click(screen.getByRole('button', { name: /correct/i }));
+    await openCorrectionDialog(user);
     const input = screen.getByLabelText(/CMC fault code/i);
     await user.clear(input);
     await user.type(input, '32-3120-04');
@@ -134,7 +145,7 @@ describe('CMC code normalization happens at signing, not per keystroke', () => {
 
   it('lets a space be typed into the correction dialog', async () => {
     const user = renderDefectsPage({ ...DEFECT, cmcFaultCode: undefined });
-    await user.click(screen.getByRole('button', { name: /correct/i }));
+    await openCorrectionDialog(user);
     const input = screen.getByLabelText(/CMC fault code/i);
     await user.type(input, '32-3120-04 CH A');
 
@@ -144,7 +155,7 @@ describe('CMC code normalization happens at signing, not per keystroke', () => {
 
   it('still trims the stored value, so the signed row carries no stray whitespace', async () => {
     const user = renderDefectsPage({ ...DEFECT, cmcFaultCode: undefined });
-    await user.click(screen.getByRole('button', { name: /correct/i }));
+    await openCorrectionDialog(user);
     await user.type(screen.getByLabelText(/CMC fault code/i), '  32-3120-04  ');
     await user.click(screen.getByRole('button', { name: /continue to sign/i }));
     await user.click(await screen.findByRole('button', { name: 'Sign' }));

@@ -34,6 +34,7 @@ import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
 import { DeferralDueLine } from '../components/DeferralDueLine';
+import { PendingPlacardNote } from '../components/PendingPlacardNote';
 import { AircraftBanner } from '../components/AircraftBanner';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
 import { BriefingPanel } from '../components/BriefingPanel';
@@ -698,6 +699,8 @@ export default function AircraftDetail() {
                         extended={d.extensionUsed}
                       />
                     )}
+                    {/* LG-170 — see Deferrals.tsx; same frozen row, same words. */}
+                    <PendingPlacardNote deferral={{ ...d, status: effective }} />
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     {/* D59 — open to BOTH personas by design: on the road the pilots perform and

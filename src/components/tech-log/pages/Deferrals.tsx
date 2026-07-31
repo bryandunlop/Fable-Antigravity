@@ -12,6 +12,7 @@ import { TechLogShell } from '../components/TechLogShell';
 import { DeferralCreatePanel } from '../components/panels/DeferralCreatePanel';
 import { ExtendDeferralDialog } from '../components/panels/ExtendDeferralDialog';
 import { DeferralDueLine } from '../components/DeferralDueLine';
+import { PendingPlacardNote } from '../components/PendingPlacardNote';
 import { Card, CardContent } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -95,6 +96,9 @@ export default function Deferrals() {
                       extended={d.extensionUsed}
                     />
                   )}
+                  {/* LG-170 — the badge above says PENDING_PLACARD; this says what that means and
+                      what to do. Both read the same frozen row. */}
+                  <PendingPlacardNote deferral={{ ...d, status: effective }} />
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {isMaint && (

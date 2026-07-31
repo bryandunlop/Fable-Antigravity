@@ -11,6 +11,8 @@ import { currentRows } from '../engine/supersede';
 import { canSupersede } from '../engine/authz';
 import { detectRepetitiveGroups } from '../engine/repetitive';
 import { TechLogShell } from '../components/TechLogShell';
+import { DefectActionBar } from '../components/DefectActionBar';
+import { defectActionLayout } from '../engine/defectActions';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
 import { useCasCatalog } from '../../documents/hooks/useCasCatalog';
@@ -221,41 +223,25 @@ export default function Defects() {
                   </div>
                 ) : null}
               </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                {d.status === 'OPEN' && canSupersede(signerOfDefect(d), user).ok && (
-                  <Button size="sm" variant="outline" onClick={() => openCorrectDefect(d)}>
-                    <Pencil className="mr-1.5 h-4 w-4" /> Correct
-                  </Button>
-                )}
-                {isMaint && d.status === 'OPEN' && (
-                  <>
-                    <Button size="sm" variant="secondary" onClick={() => navigate(`/tech-log/deferrals?defect=${d.id}`)}>
-                      <Wrench className="mr-1.5 h-4 w-4" /> Defer (MEL)
-                    </Button>
-                    <Button size="sm" onClick={() => rectifyToWorkCard(d)}>
-                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/tech-log/releases?defect=${d.id}`)}>Quick CRS</Button>
-                    <Button size="sm" variant="outline" onClick={() => setWatchTarget(d)}>
-                      <Eye className="mr-1.5 h-4 w-4" /> Watch
-                    </Button>
-                  </>
-                )}
-                {isMaint && d.status === 'WATCHLISTED' && (
-                  <>
-                    <Button size="sm" onClick={() => rectifyToWorkCard(d)}>
-                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Rectify
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => setEscalateTarget(d)}>
-                      <TriangleAlert className="mr-1.5 h-4 w-4" /> Escalate
-                    </Button>
-                  </>
-                )}
-                {/* FIR is retrospective — any role, any defect status (even rectified) can seed one. */}
-                <Button size="sm" variant="outline" onClick={() => navigate(`/fir/new?defect=${d.id}`)}>
-                  <Flag className="mr-1.5 h-4 w-4" /> Open FIR
-                </Button>
-              </div>
+              {/* LG-154 — was six equal buttons on every card. The two genuine paths out of the
+                  defect stay visible; exception handling, watching and the retrospective FIR move
+                  behind More. See engine/defectActions.ts for why this is two and not one. */}
+              <DefectActionBar
+                layout={defectActionLayout({
+                  status: d.status,
+                  isMaint,
+                  canCorrect: canSupersede(signerOfDefect(d), user).ok,
+                })}
+                on={{
+                  correct: () => openCorrectDefect(d),
+                  defer: () => navigate(`/tech-log/deferrals?defect=${d.id}`),
+                  rectify: () => rectifyToWorkCard(d),
+                  quickCrs: () => navigate(`/tech-log/releases?defect=${d.id}`),
+                  watch: () => setWatchTarget(d),
+                  escalate: () => setEscalateTarget(d),
+                  fir: () => navigate(`/fir/new?defect=${d.id}`),
+                }}
+              />
             </CardContent>
           </Card>
           );
