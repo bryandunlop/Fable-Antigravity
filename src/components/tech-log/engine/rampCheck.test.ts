@@ -207,6 +207,12 @@ describe('buildRampView — a provisional MEL may never read as an approved one'
   it('never reports GREEN for a provisional aircraft, even with nothing else wrong', () => {
     const v = buildRampView('ac-g800', { aircraft: [PROV], deferrals: [], defects: [], recurringChecks: [], recurringAccomplishments: [] }, NOW)!;
     expect(v.serviceability).not.toBe('GREEN');
+    /* LG-143 — and specifically NOT_ASSESSED now, not the conservative RED this screen used to
+       force locally. The projection answers it (§14.2 rule 6), so ramp mode no longer carries its
+       own copy of the rule. Worth pinning, because the comment above this describe block records an
+       adversarial verifier catching this same class in July 2026 on a different surface — which is
+       what eventually argued for putting the state in the type rather than in each consumer. */
+    expect(v.serviceability).toBe('NOT_ASSESSED');
   });
 
   it('leaves a normal aircraft unflagged', () => {

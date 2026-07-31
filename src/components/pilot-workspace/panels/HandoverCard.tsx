@@ -1,9 +1,15 @@
 import { useTechLog } from '../../tech-log/TechLogContext';
 import { deriveServiceability } from '../../tech-log/engine/serviceability';
 import { deriveCustody, type CustodyState } from '../../tech-log/engine/custody';
+import type { Serviceability } from '../../tech-log/types';
 import type { TripRecord } from '../../../scheduling/store/types';
 
-const SV_DOT: Record<string, string> = { GREEN: 'bg-emerald-500', AMBER: 'bg-amber-500', RED: 'bg-red-500' };
+// Typed to the union, not Record<string, …> (LG-143) — a loose key type is how a status this map
+// has never heard of renders as no dot at all instead of failing to compile.
+const SV_DOT: Record<Serviceability, string> = {
+  GREEN: 'bg-emerald-500', AMBER: 'bg-amber-500', RED: 'bg-red-500',
+  NOT_ASSESSED: 'bg-muted-foreground',
+};
 
 // Pilot-framed custody (first person) on the P&G-blue axis — distinct from the third-person CustodyChip.
 const CUSTODY: Record<CustodyState, { dot: string; label: string; strong: boolean }> = {
@@ -30,12 +36,11 @@ export function HandoverCard({ trip, onOpenHandover }: { trip: TripRecord; onOpe
   const custody = deriveCustody(ac.id, state, now).state;
   const c = CUSTODY[custody];
   const deferrals = state.deferrals.filter((d) => d.aircraftId === ac.id && d.status === 'ACTIVE');
-  /* LG-143 — deriveServiceability knows nothing of isProvisional, so a clean tail in onboarding
-     reads GREEN and this card told the PIC "Serviceable · no deferrals" under a green dot for an
-     aircraft whose D195 MEL the FSDO has not approved (and which they are now blocked from
-     accepting at all). */
+  /* LG-143 — this card told the PIC "Serviceable · no deferrals" under a green dot for the tail in
+     onboarding, because the projection handed it GREEN. It now returns NOT_ASSESSED, so this reads
+     the answer rather than re-deriving it from isProvisional. */
   const svText =
-    ac.isProvisional ? 'In onboarding — D195 MEL pending FSDO approval'
+    sv === 'NOT_ASSESSED' ? 'In onboarding — D195 MEL pending FSDO approval'
     : sv === 'RED' ? 'Unserviceable — grounded'
     : sv === 'AMBER' ? `Serviceable · ${deferrals.length} deferral${deferrals.length === 1 ? '' : 's'}`
     : 'Serviceable · no deferrals';
@@ -43,7 +48,7 @@ export function HandoverCard({ trip, onOpenHandover }: { trip: TripRecord; onOpe
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${ac.isProvisional ? 'bg-muted-foreground' : SV_DOT[sv]}`} aria-hidden />
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${SV_DOT[sv]}`} aria-hidden />
         <span>{svText}</span>
       </div>
       <div className={`inline-flex items-center gap-1.5 ${c.strong ? 'font-medium text-[var(--gfo-custody-crew)]' : 'text-muted-foreground'}`}>

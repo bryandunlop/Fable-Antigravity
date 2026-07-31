@@ -6,6 +6,11 @@ const LABEL: Record<Serviceability, string> = {
   GREEN: 'Serviceable',
   AMBER: 'MEL / restricted',
   RED: 'Grounded',
+  /* LG-143 — the tail is in onboarding, so there is no dispatch answer to render. The chip says
+     what IS true rather than borrowing a RAG word, and this is now the ONE place that decision
+     lives: every surface that renders this chip inherits it instead of each remembering to check
+     isProvisional (which is how four review passes each found new surfaces that had not). */
+  NOT_ASSESSED: 'Provisional',
 };
 
 export function ServiceabilityChip({

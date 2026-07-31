@@ -58,15 +58,14 @@ export function handoverModule(
   // Handover is aircraft-keyed (by tail), not trip-keyed: it reflects the aircraft's real
   // serviceability + custody even before the trip is released to preflight (cold-open demo).
   if (!aircraft) return { ...base, tone: 'muted', summary: 'no aircraft', outstanding: 0 };
-  /* LG-143 — onboarding beats custody for the same reason RED does, and is checked first because
-     deriveServiceability cannot see it: a clean provisional tail reads GREEN, so this module fell
-     through to "ready to accept" for an aircraft the PIC is blocked from accepting. */
-  if (aircraft.isProvisional) {
+  /* RED grounding beats custody — a grounded aircraft is a hard stop regardless of who holds it —
+     and so does having no dispatch answer at all (LG-143: this fell through to "ready to accept"
+     for the tail in onboarding, because the projection used to hand it GREEN). Written as an
+     allow-list so a future member of the union blocks by default rather than sailing past. */
+  const sv = deriveServiceability(aircraft.id, state, nowUtc).status;
+  if (sv === 'RED') return { ...base, tone: 'blocked', summary: 'grounded', outstanding: 1 };
+  if (sv !== 'GREEN' && sv !== 'AMBER') {
     return { ...base, tone: 'blocked', summary: 'in onboarding', outstanding: 1 };
-  }
-  // RED grounding beats custody — a grounded aircraft is a hard stop regardless of who holds it.
-  if (deriveServiceability(aircraft.id, state, nowUtc).status === 'RED') {
-    return { ...base, tone: 'blocked', summary: 'grounded', outstanding: 1 };
   }
   switch (deriveCustody(aircraft.id, state, nowUtc).state) {
     // Both crew-custody states sit on the P&G-blue axis — "ready to accept" is a custody prompt,

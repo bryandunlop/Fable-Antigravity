@@ -10,6 +10,9 @@ export const SERVICEABILITY_CLASS: Record<Serviceability, string> = {
   GREEN: 'status-success',
   AMBER: 'status-warning',
   RED: 'status-error',
+  // LG-143 — deliberately not a RAG colour. "Not assessed" is the absence of an answer, so it must
+  // not borrow the look of the axis that gives one.
+  NOT_ASSESSED: 'status-neutral',
 };
 
 export const INTENT = {

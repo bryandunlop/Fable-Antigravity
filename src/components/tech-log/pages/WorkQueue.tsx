@@ -34,8 +34,12 @@ export default function WorkQueue() {
   const fleetCounts = useMemo(() => {
     const c = { RED: 0, AMBER: 0, GREEN: 0, PROV: 0 };
     for (const ac of state.aircraft) {
-      if (ac.isProvisional) { c.PROV++; continue; }
-      c[deriveServiceability(ac.id, state, now).status]++;
+      /* LG-143 — reads the projection's answer instead of re-deriving it from isProvisional. Note
+         a provisional tail with an open defect still counts RED: rule 1 outranks rule 6, because a
+         defect is a defect whatever the MEL's approval state. */
+      const status = deriveServiceability(ac.id, state, now).status;
+      if (status === 'NOT_ASSESSED') { c.PROV++; continue; }
+      c[status]++;
     }
     return c;
   }, [state, now]);

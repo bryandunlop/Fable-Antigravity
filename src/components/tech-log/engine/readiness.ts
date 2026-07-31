@@ -23,19 +23,15 @@ export function deriveTripReadiness(
   const verdict = (s: TripReadiness, extra: Partial<TripReadinessResult> = {}): TripReadinessResult =>
     ({ state: s, computedAtUtc: asOfUtc, ...extra });
 
-  /* Ahead of serviceability: the aircraft is still in onboarding. LG-143 — checked ABOVE the RED
-     test rather than inside it, because deriveServiceability has no notion of isProvisional. A
-     clean provisional tail reads GREEN, so trip readiness showed a green "Ready" chip on every
-     pilot surface — Trips, LegDetail, MyFlights, FlightHub — right up until the PIC opened the
-     briefing and hit the canAcceptDispatch block. Trip prep has to agree with that gate rather
-     than contradict it for the whole of trip planning. */
-  if (state.aircraft.find(a => a.id === trip.aircraftId)?.isProvisional) {
+  /* Highest precedence: aircraft serviceability — as an ALLOW-list. `=== 'RED'` let a tail with no
+     dispatch answer at all sail through as READY (LG-143): a clean provisional tail read GREEN, so
+     every pilot surface showed a green "Ready" chip until the PIC hit the acceptance block at the
+     briefing. Naming the states that may proceed means the next state added to the union blocks by
+     default instead of being silently waved past. */
+  const sv = deriveServiceability(trip.aircraftId, state, asOfUtc).status;
+  if (sv === 'RED') return verdict('RED', { blocker: 'Aircraft grounded (RED)' });
+  if (sv !== 'GREEN' && sv !== 'AMBER') {
     return verdict('RED', { blocker: 'Aircraft in onboarding — D195 MEL pending FSDO approval' });
-  }
-
-  // Highest precedence: aircraft serviceability.
-  if (deriveServiceability(trip.aircraftId, state, asOfUtc).status === 'RED') {
-    return verdict('RED', { blocker: 'Aircraft grounded (RED)' });
   }
 
   const aircraft = state.aircraft.find(a => a.id === trip.aircraftId);

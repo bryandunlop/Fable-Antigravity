@@ -2,7 +2,23 @@
 
 export type AircraftType = 'G650ER' | 'G500' | 'G800';
 export type AircraftStatus = 'ACTIVE' | 'PROVISIONAL' | 'STORED' | 'SOLD';
-export type Serviceability = 'GREEN' | 'AMBER' | 'RED';
+/**
+ * The dispatch answer for a tail.
+ *
+ * `NOT_ASSESSED` is not a fourth colour — it is the ABSENCE of an answer, and it exists because
+ * pretending otherwise cost four review passes (LG-143). A tail in onboarding, whose D195 MEL is
+ * still PENDING_FSDO, has no dispatch state: nothing can be deferred against it and the projection
+ * has nothing to say. Before this, `isProvisional` lived only on the Aircraft row, invisible to
+ * this type, so a clean provisional tail read GREEN and each of ~15 consumers had to remember to
+ * special-case it. They kept not remembering, and "forgot to check the flag" compiles cleanly.
+ *
+ * Making it a member of the union puts the obligation where the compiler can see it: every
+ * exhaustive `Record<Serviceability, …>` and every switch has to answer for it.
+ *
+ * Corollary for anyone writing a gate: test for the states you ALLOW (`GREEN`/`AMBER`), never for
+ * the one you deny. `!== 'RED'` silently admits `NOT_ASSESSED` — the same bug in a new costume.
+ */
+export type Serviceability = 'GREEN' | 'AMBER' | 'RED' | 'NOT_ASSESSED';
 
 export interface Aircraft {
   id: string;

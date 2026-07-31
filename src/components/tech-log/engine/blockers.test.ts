@@ -174,7 +174,9 @@ describe('buildBlockers — every grounding cause is a listed, actionable row', 
     const prov: Aircraft = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
     const r = buildBlockers('ac2', { ...empty, aircraft: [ac, prov] }, NOW);
 
-    expect(r.status).toBe('GREEN');
+    // The projection itself now declines to answer (§14.2 rule 6) — this used to read GREEN, which
+    // is what every downstream surface was faithfully repeating.
+    expect(r.status).toBe('NOT_ASSESSED');
     const s = governingSentence(r, 'N3PG');
     expect(s).not.toMatch(/serviceable/i);
     expect(s).toMatch(/onboarding/i);

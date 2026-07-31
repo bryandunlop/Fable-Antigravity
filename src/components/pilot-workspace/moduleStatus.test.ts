@@ -110,9 +110,13 @@ describe('handoverModule (aircraft-keyed, independent of trip release)', () => {
     const prov = { ...AC, isProvisional: true } as Aircraft;
     const briefings = [{ id: 'b1', aircraftId: AC_ID, status: 'RELEASED', releasedAtUtc: PAST } as FlightBriefing];
 
-    // Same state that reads "ready to accept" for the non-provisional tail two tests above.
+    // Same briefing state that reads "ready to accept" for the non-provisional tail two tests
+    // above. The provisional case puts the tail in `state` too, because the module reads the
+    // serviceability PROJECTION rather than the passed row — one source of truth, so a caller
+    // cannot hand it an aircraft object that disagrees with the ledger.
     expect(handoverModule(AC, state({ briefings }), NOW)).toMatchObject({ summary: 'ready to accept' });
-    expect(handoverModule(prov, state({ briefings }), NOW)).toMatchObject({ tone: 'blocked', summary: 'in onboarding' });
+    expect(handoverModule(prov, state({ briefings, aircraft: [prov] }), NOW))
+      .toMatchObject({ tone: 'blocked', summary: 'in onboarding' });
   });
 });
 

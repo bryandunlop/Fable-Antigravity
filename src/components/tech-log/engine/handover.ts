@@ -68,11 +68,14 @@ export function canAcceptDispatch(
   state: Parameters<typeof deriveServiceability>[1],
   asOfUtc: string,
 ): { ok: boolean; reason?: string } {
-  if (state.aircraft.find(a => a.id === aircraftId)?.isProvisional) {
+  /* An ALLOW-list, not a deny-list. `!== 'RED'` was the original shape and it is what let a
+     provisional tail through: any state that is not RED read as acceptable, so a status the
+     projection had never heard of at the time (NOT_ASSESSED) would have been admitted silently.
+     Naming the states that pass means a future member of the union is refused by default. */
+  const status = deriveServiceability(aircraftId, state, asOfUtc).status;
+  if (status === 'GREEN' || status === 'AMBER') return { ok: true };
+  if (status === 'NOT_ASSESSED') {
     return { ok: false, reason: 'Aircraft is in onboarding — its D195 MEL is pending FSDO approval, so dispatch cannot be accepted against it.' };
   }
-  if (deriveServiceability(aircraftId, state, asOfUtc).status === 'RED') {
-    return { ok: false, reason: 'Aircraft is RED — resolve or defer the grounding item before acceptance (a special flight permit is out of scope).' };
-  }
-  return { ok: true };
+  return { ok: false, reason: 'Aircraft is RED — resolve or defer the grounding item before acceptance (a special flight permit is out of scope).' };
 }

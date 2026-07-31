@@ -186,14 +186,15 @@ export function buildRampView(
     type: ac.type,
     loaHeld: false,
     deferrals: rows,
-    // `deriveServiceability` has no concept of isProvisional — legitimately, since it answers
-    // "what do the records say about this airframe", and a pending FSDO approval is not a defect.
-    // But it therefore returns GREEN for a provisional aircraft, and this screen must never print
-    // "Serviceable" beside a D195 the FSDO has not approved. Every other consumer already refuses
-    // that combination (AircraftDetail.tsx:276 shows a Provisional badge INSTEAD of the chip); ramp
-    // mode was the sole exception, on the sole regulator-facing screen. Resolved conservatively —
-    // consistent with "absence of an explicit status is RED, never GREEN".
-    serviceability: ac.isProvisional ? 'RED' : deriveServiceability(aircraftId, state, asOfUtc).status,
+    /* This read `ac.isProvisional ? 'RED' : derive(...)`, because the projection had no concept of
+       isProvisional and returned GREEN — and this regulator-facing screen must never print
+       "Serviceable" beside a D195 the FSDO has not approved. That local patch was right at the time
+       and is now unnecessary: the projection answers NOT_ASSESSED itself (LG-143, §14.2 rule 6),
+       which renders as "Provisional". More accurate than the conservative RED, too — the aircraft
+       is not grounded, it is simply not yet in service — and `melProvisional` below still flags it
+       explicitly for the inspector. Ramp mode was one of ~15 surfaces each carrying its own version
+       of this patch; the union member replaces all of them. */
+    serviceability: deriveServiceability(aircraftId, state, asOfUtc).status,
     melProvisional: ac.isProvisional,
     // MEL-scoped only. A presented row that is not ACTIVE is a finding — EXPIRED is out of time,
     // PENDING_PLACARD means the (M)/placard release is unsigned so the deferral never became

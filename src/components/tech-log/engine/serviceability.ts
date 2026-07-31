@@ -74,6 +74,12 @@ export function deriveServiceability(
   // Rule 3: an expired (or never-accomplished) recurring dispatch-gating check -> RED (§17.4)
   const expiredCheck = expiredChecksFor(aircraftId, state, asOfUtc)[0];
   if (expiredCheck) return result('RED', 3, { check: expiredCheck.id });
+  /* Rule 6 (LG-143): the tail is in onboarding — its D195 MEL is still PENDING_FSDO, so there is
+     no dispatch answer to give. Placed AFTER the RED rules deliberately: a defect on a provisional
+     tail is still a defect, and naming it is more useful than declining to answer. It comes before
+     AMBER/GREEN because "nothing recorded against it" is not a green light. (Rule 4 is unreachable
+     for such a tail anyway — a deferral cannot be raised against an unapproved MEL.) */
+  if (ac?.isProvisional) return result('NOT_ASSESSED', 6);
   // Rule 4: any ACTIVE deferral -> AMBER
   const active = deferrals.find(df => effectiveStatus(df) === 'ACTIVE');
   if (active) return result('AMBER', 4, { deferral: active.id });

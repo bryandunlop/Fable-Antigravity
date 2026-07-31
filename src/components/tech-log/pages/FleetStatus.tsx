@@ -18,6 +18,8 @@ const RING: Record<Serviceability, string> = {
   RED: 'border-l-4 border-l-[var(--gfo-error,#EF3340)]',
   AMBER: 'border-l-4 border-l-[var(--gfo-warning,#F1B434)]',
   GREEN: 'border-l-4 border-l-[var(--gfo-success,#00B140)]',
+  // LG-143 — a neutral rail, not a RAG one: the tail has no dispatch answer to colour.
+  NOT_ASSESSED: 'border-l-4 border-l-muted-foreground',
 };
 
 export default function FleetStatus() {
