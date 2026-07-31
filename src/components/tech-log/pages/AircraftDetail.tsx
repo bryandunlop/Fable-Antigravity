@@ -33,6 +33,7 @@ import { SymptomNote } from '../components/SymptomNote';
 import { CustodyChip } from '../components/CustodyChip';
 import { SignCeremonyDialog } from '../components/SignCeremonyDialog';
 import { TechLogShell } from '../components/TechLogShell';
+import { AircraftBanner } from '../components/AircraftBanner';
 import { ReportDefectDialog } from '../components/panels/ReportDefectDialog';
 import { BriefingPanel } from '../components/BriefingPanel';
 import { PostflightPanel } from '../components/PostflightPanel';
@@ -386,42 +387,40 @@ export default function AircraftDetail() {
 
   return (
     <TechLogShell
-      title={`${ac.tailNumber} — ${ac.type}`}
-      subtitle={`S/N ${ac.serialNumber} · ${ac.airframeTotalHours.toFixed(1)} hrs · ${ac.airframeTotalCycles} cyc · ${ac.homeBase}`}
-      actions={
-        <>
-          <Button variant="outline" size="sm" onClick={() => navigate('/tech-log')}><ArrowLeft className="mr-1.5 h-4 w-4" /> Fleet</Button>
-          {/* D36 — one tap from the aircraft the inspector is standing next to. Stays
-              unconditional: showing a regulator what you're flying under is not a
-              role-specific job, and either crew may be the one standing at the wing. */}
-          <Button variant="outline" size="sm" onClick={() => navigate(`/tech-log/aircraft/${ac.tailNumber}/ramp`)}>
-            <ShieldCheck className="mr-1.5 h-4 w-4" /> Ramp check
-          </Button>
-          {/* D42: for maintenance this action lives on the blocker board, where the work is.
-              Pilots have no blocker board, so they keep it here. */}
-          {!isMaint && <Button size="sm" onClick={() => setReportOpen(true)}><FilePlus className="mr-1.5 h-4 w-4" /> Report defect</Button>}
-        </>
+      title="Fleet · aircraft workspace"
+      /* D71 — the tail, its RAG state and WHY it holds that state are one band, not a title above the
+         nav plus a status card below it. The governing sentence names the governing *item*, so "why
+         is this tail red" is answered without navigating (D42) and without scrolling past two nav
+         rows to reach it. */
+      banner={
+        <AircraftBanner
+          aircraft={ac}
+          status={ac.isProvisional ? null : sv.status}
+          custody={custody.state}
+          governing={governingSentence(board, ac.tailNumber)}
+          rule={RULE_TEXT[sv.governingRule]}
+          blockerCount={board.blockers.length}
+          asOf={new Date(now).toLocaleString()}
+          note={acceptedBriefing?.acknowledgedByOid ? (
+            <p className="mt-1 text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {sigById(acceptedBriefing.ackSignatureId)?.signerName ?? 'not recorded'} · {acceptedBriefing.acknowledgedAtUtc ? new Date(acceptedBriefing.acknowledgedAtUtc).toLocaleString() : ''}</p>
+          ) : undefined}
+          actions={
+            <>
+              <Button variant="outline" size="sm" onClick={() => navigate('/tech-log')}><ArrowLeft className="mr-1.5 h-4 w-4" /> Fleet</Button>
+              {/* D36 — one tap from the aircraft the inspector is standing next to. Stays
+                  unconditional: showing a regulator what you're flying under is not a
+                  role-specific job, and either crew may be the one standing at the wing. */}
+              <Button variant="outline" size="sm" onClick={() => navigate(`/tech-log/aircraft/${ac.tailNumber}/ramp`)}>
+                <ShieldCheck className="mr-1.5 h-4 w-4" /> Ramp check
+              </Button>
+              {/* D42: for maintenance this action lives on the blocker board, where the work is.
+                  Pilots have no blocker board, so they keep it here. */}
+              {!isMaint && <Button size="sm" onClick={() => setReportOpen(true)}><FilePlus className="mr-1.5 h-4 w-4" /> Report defect</Button>}
+            </>
+          }
+        />
       }
     >
-      {/* Status / why — always visible above the workspace tabs so the chip is in view as it changes.
-          The headline names the governing *item*, not just the rule, so "why is this tail red" is
-          answered without navigating (D42). */}
-      <Card className="mb-4">
-        <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-3">
-              {ac.isProvisional ? <Badge variant="outline">Provisional</Badge> : <ServiceabilityChip status={sv.status} />}
-              <CustodyChip state={custody.state} />
-              <span className="text-sm">{governingSentence(board, ac.tailNumber)}</span>
-            </div>
-            <span className="text-xs text-muted-foreground">{RULE_TEXT[sv.governingRule]}</span>
-            {acceptedBriefing?.acknowledgedByOid && (
-              <span className="text-xs text-[var(--gfo-success,#00B140)]">PIC accepted by {sigById(acceptedBriefing.ackSignatureId)?.signerName ?? 'not recorded'} · {acceptedBriefing.acknowledgedAtUtc ? new Date(acceptedBriefing.acknowledgedAtUtc).toLocaleString() : ''}</span>
-            )}
-          </div>
-          <div className="text-xs text-muted-foreground">as of {new Date(now).toLocaleString()}</div>
-        </CardContent>
-      </Card>
 
       {ac.isProvisional && (
         <Card className="mb-4 border-muted-foreground/30">
