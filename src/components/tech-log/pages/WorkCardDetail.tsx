@@ -61,6 +61,15 @@ export default function WorkCardDetail() {
   const [rsn, setRsn] = useState('');
   const [rreason, setRreason] = useState('');
   // labor add form
+  /**
+   * LG-159 — both add-forms used to sit permanently expanded inside their list cards behind a dashed
+   * border: two 4-column input grids for parts, a select + 3-col grid + category + why-note for labor.
+   * A technician opening a work card is READING it. Per D74 this is a phone-primary surface, where two
+   * 4-column grids are the worst case in the module. Closed by default; the Add button opens them.
+   */
+  const [partFormOpen, setPartFormOpen] = useState(false);
+  const [laborFormOpen, setLaborFormOpen] = useState(false);
+
   const [ltech, setLtech] = useState(user.oid);
   const [lhours, setLhours] = useState('');
   const [ldesc, setLdesc] = useState('');
@@ -640,7 +649,12 @@ export default function WorkCardDetail() {
               </div>
             ))}
             {labor.length === 0 && <p className="text-sm text-muted-foreground">No labor recorded.</p>}
-            {!completed && isMaint && (
+            {!completed && isMaint && !laborFormOpen && (
+              <Button size="sm" variant="outline" onClick={() => setLaborFormOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" /> Add labor
+              </Button>
+            )}
+            {!completed && isMaint && laborFormOpen && (
               <div className="space-y-2 rounded-md border border-dashed p-2">
                 <Select value={ltech} onValueChange={(v: string) => setLtech(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -663,7 +677,12 @@ export default function WorkCardDetail() {
                   </div>
                 )}
                 {!needsWhyNote && <Input placeholder="Why-note (optional — what drove the time)" value={lnote} onChange={e => setLnote(e.target.value)} />}
-                <Button size="sm" variant="outline" onClick={addLabor}><Plus className="mr-1.5 h-4 w-4" /> Add labor (end of shift)</Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { addLabor(); setLaborFormOpen(false); }}>
+                    <Plus className="mr-1.5 h-4 w-4" /> Add labor (end of shift)
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setLaborFormOpen(false)}>Cancel</Button>
+                </div>
               </div>
             )}
           </CardContent>
@@ -712,14 +731,19 @@ export default function WorkCardDetail() {
               </div>
             ))}
             {parts.length === 0 && <p className="text-sm text-muted-foreground">No parts recorded.</p>}
-            {!completed && isMaint && (
+            {!completed && isMaint && !partFormOpen && (
+              <Button size="sm" variant="outline" onClick={() => setPartFormOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" /> Add part
+              </Button>
+            )}
+            {!completed && isMaint && partFormOpen && (
               <div className="space-y-2 rounded-md border border-dashed p-2">
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
                   <Input placeholder="Part number" value={pn} onChange={e => setPn(e.target.value)} />
                   <Input className="md:col-span-2" placeholder="Description" value={pdesc} onChange={e => setPdesc(e.target.value)} />
                   <Input type="number" placeholder="Qty" value={pqty} onChange={e => setPqty(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
                   <Input className="md:col-span-2" placeholder="Serial number (if serialized)" value={psn} onChange={e => setPsn(e.target.value)} />
                   <label className="flex items-center gap-2 text-xs"><Checkbox checked={rotable} onCheckedChange={(v: unknown) => setRotable(v === true)} /> Rotable</label>
                   <label className="flex items-center gap-2 text-xs"><Checkbox checked={showRemoved} onCheckedChange={(v: unknown) => setShowRemoved(v === true)} /> Records a removal</label>
@@ -731,7 +755,12 @@ export default function WorkCardDetail() {
                     <Input placeholder="Reason (e.g. unscheduled)" value={rreason} onChange={e => setRreason(e.target.value)} />
                   </div>
                 )}
-                <Button size="sm" variant="outline" onClick={addPart}><Plus className="mr-1.5 h-4 w-4" /> Add part</Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { addPart(); setPartFormOpen(false); }}>
+                    <Plus className="mr-1.5 h-4 w-4" /> Add part
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setPartFormOpen(false)}>Cancel</Button>
+                </div>
               </div>
             )}
           </CardContent>
