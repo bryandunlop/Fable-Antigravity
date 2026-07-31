@@ -1,7 +1,7 @@
 # Group Drives + Document Control — SharePoint / OneDrive under the controlled-list process — Design Spec
 
 - **Date:** 2026-07-30
-- **Status:** **Draft for review — NOT approved for implementation.** Written from the 2026-07-30 whiteboard photo + Bryan's steer. §12 lists what has to be answered before a plan is cut.
+- **Status:** **Draft for review — NOT approved for implementation.** Written from the 2026-07-30 whiteboard photo + Bryan's steer. §12 lists what is still open; five questions have been answered since the first draft and are recorded there.
 - **Author:** Bryan Dunlop (whiteboard) + Claude
 - **Branch:** `claude/sharepoint-onedrive-drive-management-e9d5n2`
 - **Surface:** extends the existing Document Compliance module (`src/components/documents/`)
@@ -128,6 +128,10 @@ The documents module already implements the left column — `DocumentClassConfig
 
 **Mostly already modelled.** `Doc.reviewCycleDays`, `nextReviewDate` and `DocReviewRecord` (`outcome: 'reaffirmed' | 'revision-started'`) are this mechanism, with 365 days already the default on `sop`/`manual`. What is new: the queue is **owned per group** rather than per document, the cull adds `'kept' | 'deleted'` to `DocReviewRecord.outcome`, and the cadence becomes a function of classification rather than of class.
 
+**Who does the work: each group's own owner** (answered 2026-07-30). Eight queues, eight accountable people — matching the whiteboard's per-group split, and keeping the judgment with the only people who can actually tell whether an Mx form is still correct. A single central reviewer would be simpler to build and to chase, and would degrade into a rubber stamp for exactly that reason.
+
+The cost of that choice, recorded rather than argued: **there is no backstop.** If an owner leaves, changes role, or simply stops working the queue, nothing in the system notices on anyone else's behalf. So the group roll-up below has to be visible to *somebody* outside the group — an escalation surface is a consequence of this decision, not a separate feature. Who sees it is [[Q11]].
+
 **The group roll-up is the auditable artifact.** Per (group, register, period): every entry attested, nothing overdue, every drive item on a list, no unclassified backlog. **A period cannot be closed while that group's intake queue is non-empty** — that is what makes §6 a process rather than a dashboard, and it is what you hand an auditor.
 
 ## 9. Distribution — the ForeFlight content pack is a mirrored folder
@@ -151,30 +155,52 @@ The mirror changes the engineering on both sides of the ledger.
 
 ## 10. Access — how users actually get to the documents
 
-> Bryan flagged this as the open problem: *"we need to figure out a way for the users to be able to access this, and that's what I'm trying to understand — the best way to do that."* This section is a recommendation, not a transcription. [[Q9]] and [[Q10]] are the two facts that would change it.
+> Bryan flagged this as the open problem: *"we need to figure out a way for the users to be able to access this, and that's what I'm trying to understand — the best way to do that."* This section is a recommendation, not a transcription.
+
+### 10.0 [[Q9]] answered — and it falsifies the first draft's recommendation
+
+**Answered 2026-07-30 (Bryan):** *"OneDrive. Technically SharePoint, but people don't know that, and they use a shortcut on OneDrive to the SharePoint."*
+
+Two things follow, one good and one that invalidates a design decision.
+
+**The good one: §4 is already true in the field.** The backing store is a SharePoint library, not personal OneDrive. That is not a migration to argue for — it is what GFO already runs, and people simply experience it through *Add shortcut to OneDrive*. [[Q3]]'s SharePoint-vs-personal-OneDrive half is closed by observation.
+
+**The one that hurts: the reading surface is File Explorer, and Explorer shows almost nothing.** The first draft's recommendation was to write the register onto drive items as **SharePoint metadata columns**. Those columns render in the browser and in Teams. They do **not** render in File Explorer, which is where a synced OneDrive shortcut is actually read — Explorer shows name, date modified, type, size and a sync badge, and nothing more. A design that puts the register in columns puts it precisely where this population will never look.
+
+So the recommendation below replaces it. **The truth has to ride the only two things Explorer displays: the folder path and the filename.**
 
 ### 10.1 There is no single reader, because there is no single user
 
-| Who | Where they are | What they need |
+| Who | Where they are | What they can actually see |
 |---|---|---|
-| **Pilot**, airborne or on the road | iPad, often offline, no appetite for a login | the current pilot-facing set, always, with no thought required |
-| **Anyone at a desk** doing their job | already in Teams / Explorer / Office | to open the file and get on with it |
-| **Anyone who must *rely* on a document** | anywhere | to know it is current and controlled, and whether they owe an acknowledgment |
+| **Pilot**, airborne or on the road | iPad, often offline, no appetite for a login | whatever ForeFlight Documents mirrored — filenames and folders |
+| **Anyone at a desk** doing their job | **File Explorer, via a OneDrive shortcut to the SharePoint library** | **filename, folder, date modified, size. No columns, no metadata, no badges.** |
+| **Anyone who must *rely* on a document** | anywhere | needs to know it is current and controlled, and whether they owe an acknowledgment |
 
-Funnelling all three through one door fails in a predictable direction. The desk population will keep using SharePoint because it is already open, and **a reader nobody uses is worse than no reader** — it becomes the place where the register is true while the drive is what people actually read. That gap is the failure mode this whole design exists to prevent, so the access model must not reintroduce it.
+Funnelling all three through one door fails in a predictable direction. The desk population will keep using the shortcut because it is already in Explorer, and **a reader nobody uses is worse than no reader** — it becomes the place where the register is true while the drive is what people actually read. That gap is the failure mode this whole design exists to prevent, so the access model must not reintroduce it.
 
-### 10.2 Recommendation — one truth, rendered in three places
+### 10.2 Recommendation — the register rides the folder and the filename
 
-**myGFO owns the register. It does not own the reading experience.**
+**myGFO owns the register. It does not own the reading experience.** That much survives. What changes is the carrier.
 
-The move that makes this coherent: **myGFO writes the register onto the drive items as SharePoint metadata columns** — `Classification`, `Revision`, `EffectiveDate`, `NextReview`, `Owner`, `Status`. The native library view then *is* a register view: sortable, filterable, searchable columns instead of a folder of filenames. Someone who never opens myGFO still sees, **at the moment they open the file**, whether what they are holding is controlled and whether it is current.
+**1. Folder = classification.** The CTL / Un-CTL split the whiteboard already draws is not decoration — for an Explorer reader it is the *only* permanently-visible classification signal. §3 still holds exactly as written (classification lives on the register entry; the folder is a *rendering* of it, and moving a file between folders is drift, not reclassification) — but that rendering is now **load-bearing** rather than a convenience. Bryan's original instinct on the board was right for a reason the board did not state.
 
-This is the read-side twin of §6. We cannot stop people reading natively, so instead of fighting it, push the truth to where they already are. The alternative — myGFO proxying file bytes so everyone is forced through our UI — buys nothing the metadata does not, and costs a download path, a second permission model, an offline story, and a viewer for every file type Office already renders.
+**2. Filename = revision and currency.** myGFO owns the filename and stamps it — `GOM — Rev 4.2 — eff 2026-01-15.pdf`. It is ugly, and it is correct in every place a file can end up: Explorer, OneDrive web, a phone, a printout on someone's desk, an attachment a person forwarded out of the system entirely. Nothing else has that reach. A hand-renamed file is drift (§6) like any other unsanctioned change.
+
+**3. Metadata columns = enhancement, never mechanism.** Still worth writing for the browser/Teams view and for SharePoint search, because they make the register genuinely queryable there. But **nothing may depend on them**, and no user-facing guarantee may rest on a reader seeing one. That also neatly de-risks [[Q10]]: IT has not been asked yet, and now the answer changes how good the web view is rather than whether the design works.
 
 So:
 - **Pilots →** ForeFlight Documents via the mirrored folder (§9). Offline by construction, no login.
-- **Desk users →** native SharePoint / OneDrive, every item carrying myGFO's metadata. Offline via OneDrive sync.
+- **Desk users →** the OneDrive shortcut they already use, where folder and filename carry the register.
 - **Anyone asking a question *about* a document →** the myGFO Document Center.
+
+### 10.2a What the shortcut mechanism costs
+
+Three consequences of the *Add shortcut to OneDrive* pattern that the design has to absorb:
+
+- **The shortcut is per-user and removable.** "Everyone has permission" is not "everyone has the shortcut," and myGFO cannot see whether a given person added it. Onboarding needs that step, and myGFO should offer a link that opens the right library location rather than assuming the shortcut exists.
+- **Deletions propagate to everyone's Explorer.** Good — the 24-month cull and controlled supersede actually *reach* people. Also sharp: a delete is the distribution of an absence, and it is as irreversible in the reader's view as a publish. Same hazard class as the ForeFlight mirror (§9).
+- **Offline copies go stale silently, and this is the strongest argument for the filename stamp.** A synced file held offline is a copy of whatever it was at sync time, and Explorer will never tell that reader a newer revision published. With the revision in the filename, an offline copy at least *names itself* — a reader who checks can tell what they are holding. Without it, a superseded manual and the current one are indistinguishable on a laptop in a hotel. For a Part 91 flight department that is the difference that matters.
 
 ### 10.3 What the myGFO reader is actually for
 
@@ -221,7 +247,13 @@ They have to agree, and the clean way to make them agree is **one Entra group pe
 
 ## 12. Open questions — answer before a plan is cut
 
-> **Resolved since the first draft.** *[[Q5]] ForeFlight path* — **answered 2026-07-30 (Bryan):** ForeFlight **Documents**, connected to a OneDrive folder by path, mirroring it. Not an API push, and not the Files integration this repo already has. §9 is rewritten accordingly; the questions below keep their original numbers so earlier references still resolve.
+> **Resolved since the first draft** (numbering held throughout, so earlier references still resolve):
+>
+> - **[[Q5]] ForeFlight path** — ForeFlight **Documents**, pointed at a OneDrive folder by path and mirroring it. Not an API push, and not the Files integration this repo already has. §9 rewritten.
+> - **[[Q9]] Where people work** — a **OneDrive shortcut to a SharePoint library**; users think of it as OneDrive. Confirms §4's backing store by observation, and **falsifies** the first draft's metadata-column recommendation, because Explorer renders no columns. §10 rewritten around folder + filename.
+> - **[[Q3]] (half)** — SharePoint-backed, not personal OneDrive. Confirmed by what GFO already runs. The *topology* half (site/library layout) stays open below.
+> - **Review ownership** — each group's own owner, no central reviewer (§8). Consequence: no backstop, hence [[Q11]].
+> - **[[Q10]] Metadata columns** — pending IT. Deliberately demoted to an enhancement in §10.2 so the answer no longer gates anything.
 
 1. **[[Q1]] Working vs Shared Folder.** Is my §5 reading right — Working = pre-process drafting (on no register), Shared = cross-group published surface? Or is Shared also a staging area?
 2. **[[Q2]] `Master`.** A ninth peer group (corporate/all-hands), or the union/index of the other eight?
@@ -231,14 +263,16 @@ They have to agree, and the clean way to make them agree is **one Entra group pe
 6. **[[Q6]] Scope of Phase 1 here.** Full reconcile against a mocked Graph, or registers + intake UI over the existing mock store with the drive layer stubbed? My recommendation: the latter first — the pure `DriveSyncEngine` and both registers are the valuable, testable half, and they are what makes the Graph work mechanical when it comes.
 7. **[[Q7]] Retention.** Does the group review roll-up have a retention requirement of its own (Part 91 record-keeping), or is it an internal quality artifact?
 8. **[[Q8]] Uncontrolled cull cadence.** 24 months is Bryan's working figure ("I'm not sure of the timeline — let's just say 24 months"). Confirm, or set it per group. It is one config value either way, so this gates nothing — but the number should be someone's decision rather than a placeholder that hardened by default.
-9. **[[Q9]] Where do people actually work today?** The §10.2 recommendation rests on this. If GFO already lives in Teams / SharePoint day-to-day, pushing metadata to the native view is clearly right. If most people's day starts in myGFO and SharePoint is only where files happen to sit, the balance shifts toward the myGFO reader and native access becomes the exception rather than the main road. **This is the single most useful thing to tell me**, and it is an observation about how the departments work, not a technical choice.
-10. **[[Q10]] Metadata columns — acceptable?** §10.2 assumes myGFO may write columns onto drive items and that an admin will provision them per library. Needs write scope on the item and a small amount of SharePoint administration. If that is unwelcome, the fallback is a per-folder index file written by myGFO — visible, but not sortable, searchable or filterable, so it is a materially weaker version of the same idea. Also: is one Entra group per GFO group (§10.5) workable with how GFO manages groups today?
+9. **[[Q10]] Metadata columns — with IT.** No longer gates the design (§10.2 point 3), but the answer decides how good the browser/Teams view gets. Bundle it with the other IT asks: item write scope, column provisioning per library, and whether one Entra group per GFO group (§10.5) fits how GFO manages groups today.
+10. **[[Q11]] Who sees the roll-up?** Per-group ownership has no backstop (§8). Somebody outside the group has to see a group going quiet — Chief Pilot, DOM, a lead-tier role, or a standing report. This is the direct consequence of the ownership decision, not a new idea.
+11. **[[Q12]] How many documents per group, roughly?** Answered "varies wildly," which is the answer that makes this worth counting. A group with tens is absorbed by the ordinary intake queue; a group with thousands needs **bulk backfill as its own feature** — batch classify, sane defaults, and a way to work it down over weeks, because handing an owner 2,000 unclassified items is not an intake queue, it is a wall. **Eight rough counts would size this in an afternoon** and decide whether Slice 2 carries a bulk path.
+12. **[[Q13]] Filename stamping — acceptable in practice?** §10.2 point 2 has myGFO own and stamp filenames (`GOM — Rev 4.2 — eff 2026-01-15.pdf`). It is the only carrier that survives Explorer, offline copies, print and forwarding — but it means filenames change on every revision, which breaks anyone's saved links and desktop shortcuts to a specific file. Worth checking against how people actually refer to these documents before committing.
 
 ## 13. Suggested slicing (once §12 is answered)
 
 - **Slice 1 — registers over the mock store.** `DocGroup` config, `DocDriveBinding`, both register views, per-document classification. No Graph.
-- **Slice 2 — reconcile + intake.** Pure `DriveSyncEngine` + tests (unclassified / drifted / orphaned / CTL-drift-is-an-incident), intake queue UI, mock drive fixtures.
+- **Slice 2 — reconcile + intake.** Pure `DriveSyncEngine` + tests (unclassified / drifted / orphaned / CTL-drift-is-an-incident), intake queue UI, mock drive fixtures. **Carries a bulk-backfill path if [[Q12]] says any group is in the thousands** — same engine, different UI affordance (batch classify with defaults, worked down over weeks rather than a single sitting).
 - **Slice 3 — the review cycles.** Owner queues per group: 12-month controlled attestation and 24-month uncontrolled cull, the delete tombstone, overdue-flags-but-never-hides, and the group roll-up with the "cannot close with a non-empty queue" rule.
-- **Slice 3b — access.** The register surfaced where people read: metadata columns on drive items, deep links both directions, cross-group register search, the "what do I owe" queue. Sequenced right after the review cycles because an overdue flag is worth little if it is only visible to someone who already opened myGFO.
+- **Slice 3b — access.** The register surfaced where people actually read it (§10): folder placement and filename stamping as the primary carriers, deep links both directions, cross-group register search, the "what do I owe" queue. Metadata columns only if [[Q10]] comes back yes, and as an enhancement. Sequenced right after the review cycles, because an overdue flag is worth little if it is only visible to someone who already opened myGFO.
 - **Slice 4 — content pack folder.** `distributeToForeFlight`, authored pack tree, and a pure `packReconcile(desired, actual) → { add, replace, delete }` with the delete arm tested hardest — a superseded revision left behind in the folder is a wrong document on a flight deck (§9, consequence 1). Plus the manifest, and the pack folder folded into reconcile scope.
 - **Slice 5 — real Graph.** Delta + subscriptions + renewal behind the seam Slice 2 defined. Separate call, separate review.
