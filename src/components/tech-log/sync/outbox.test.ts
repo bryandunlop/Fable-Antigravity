@@ -12,12 +12,17 @@ import {
 } from './outbox';
 import type { SyncOp } from './contract';
 
-const op = (key: string, kind: SyncOp['kind'] = 'workcard.patch', cardId = 'wc-1'): SyncOp =>
+/**
+ * Default kind is an APPEND, not a patch, so these queue/send-loop cases test what they say they
+ * test. Consecutive patches on one card coalesce by design (see the coalescing block below), which
+ * would otherwise silently turn a three-op ordering assertion into a one-op one.
+ */
+const op = (key: string, kind: SyncOp['kind'] = 'workcard.labor.add', cardId = 'wc-1'): SyncOp =>
   ({
     idempotencyKey: key,
     kind,
     workCardId: cardId,
-    payload: { description: 'x' },
+    payload: { id: key, hours: 1 },
     baseRevision: 1,
     clientAtUtc: '2026-07-31T10:00:00.000Z',
     actorOid: 'USR001',
@@ -40,6 +45,58 @@ describe('outbox — queueing', () => {
 
   it('preserves submission order', () => {
     const o = enqueue(enqueue(enqueue(empty, op('k1')), op('k2')), op('k3'));
+    expect(o.entries.map(e => e.op.idempotencyKey)).toEqual(['k1', 'k2', 'k3']);
+  });
+});
+
+describe('outbox — coalescing chatty edits', () => {
+  const patch = (key: string, payload: object, cardId = 'wc-1'): SyncOp =>
+    ({ idempotencyKey: key, kind: 'workcard.patch', workCardId: cardId, payload, baseRevision: 1, clientAtUtc: '2026-07-31T10:00:00.000Z', actorOid: 'USR001' }) as SyncOp;
+
+  // A text input fires onChange per keystroke. Without coalescing, typing "AMM 32-30-00" queues 12
+  // ops; the first ACKs and bumps the revision, and the other 11 conflict against a base that only
+  // this device's own edit invalidated. That is a self-inflicted conflict storm, not concurrency.
+  it('merges consecutive pending patches on one card into a single op', () => {
+    let o = enqueue(empty, patch('k1', { ammReference: 'A' }));
+    o = enqueue(o, patch('k2', { ammReference: 'AM' }));
+    o = enqueue(o, patch('k3', { ammReference: 'AMM' }));
+    expect(o.entries).toHaveLength(1);
+    expect(o.entries[0].op.payload).toEqual({ ammReference: 'AMM' });
+  });
+
+  it('keeps the FIRST key, so a retry of an already-sent key is never re-used', () => {
+    const o = enqueue(enqueue(empty, patch('k1', { ammReference: 'A' })), patch('k2', { ammReference: 'AM' }));
+    expect(o.entries[0].op.idempotencyKey).toBe('k1');
+  });
+
+  it('merges across different fields rather than dropping one', () => {
+    const o = enqueue(enqueue(empty, patch('k1', { ammReference: 'A' })), patch('k2', { cmcFaultCodes: ['X'] }));
+    expect(o.entries[0].op.payload).toEqual({ ammReference: 'A', cmcFaultCodes: ['X'] });
+  });
+
+  it('does not merge into an op already in flight — its payload is on the wire', () => {
+    const sent = markSent(enqueue(empty, patch('k1', { ammReference: 'A' })), 'k1');
+    const o = enqueue(sent, patch('k2', { ammReference: 'AM' }));
+    expect(o.entries).toHaveLength(2);
+  });
+
+  it('does not merge patches for different cards', () => {
+    const o = enqueue(enqueue(empty, patch('k1', { ammReference: 'A' })), patch('k2', { ammReference: 'B' }, 'wc-9'));
+    expect(o.entries).toHaveLength(2);
+  });
+
+  it('never merges an append — two labor entries are two separate facts', () => {
+    const labor = (key: string): SyncOp =>
+      ({ idempotencyKey: key, kind: 'workcard.labor.add', workCardId: 'wc-1', payload: { id: key, hours: 1 }, baseRevision: 1, clientAtUtc: 'x', actorOid: 'U' }) as SyncOp;
+    const o = enqueue(enqueue(empty, labor('k1')), labor('k2'));
+    expect(o.entries).toHaveLength(2);
+  });
+
+  it('does not merge a patch across an intervening append — order is meaning', () => {
+    const labor = { idempotencyKey: 'k2', kind: 'workcard.labor.add', workCardId: 'wc-1', payload: { id: 'l1' }, baseRevision: 1, clientAtUtc: 'x', actorOid: 'U' } as SyncOp;
+    let o = enqueue(empty, patch('k1', { ammReference: 'A' }));
+    o = enqueue(o, labor);
+    o = enqueue(o, patch('k3', { ammReference: 'AM' }));
     expect(o.entries.map(e => e.op.idempotencyKey)).toEqual(['k1', 'k2', 'k3']);
   });
 });

@@ -23,6 +23,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { PresenceRecord, StampedWorkCard, SyncOp, SyncOpKind, SyncOpPayloads, SyncTransport } from './contract';
 import { PRESENCE_HEARTBEAT_MS } from './contract';
 import { createLocalTransport, resetLocalServer } from './localTransport';
+import { applyOp } from './applyOp';
 import { EMPTY_OUTBOX, discardConflict, enqueue, markAcked, markConflict, markFailed, markSent, nextSendable, outboxSummary, type Outbox, type OutboxEntry, type OutboxSummary } from './outbox';
 import { useTechLog } from '../TechLogContext';
 import { newId } from '../util/id';
@@ -84,6 +85,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // arrives, which would re-arm every effect that depends on it.
   const serverCardsRef = useRef(serverCards);
   serverCardsRef.current = serverCards;
+  // `applyServerCard` replays unsent ops onto the server's card; reading the outbox through a ref
+  // keeps it out of that callback's dependencies, which would otherwise re-arm the subscribe effect
+  // on every queue change.
+  const outboxRef = useRef(outbox);
+  outboxRef.current = outbox;
 
   const transport: SyncTransport = useMemo(
     () =>
@@ -106,10 +112,36 @@ export function SyncProvider({ children }: { children: ReactNode }) {
    * Fold a card the server sent us into local state. Both halves of the aggregate are applied — the
    * card body and its labor lines — which is what makes another technician's logged hours actually
    * appear here rather than only a "this changed" badge.
+   *
+   * REBASE, DO NOT CLOBBER. The server's card is authoritative for everything that has been
+   * *committed*, but it necessarily knows nothing about this device's edits that are still queued.
+   * Replacing local state with it outright would erase them from the screen — and since
+   * `EDIT_WORK_CARD` and `REPLACE_CARD_LABOR` are both full replaces for that card, "from the
+   * screen" means the technician watches their own work disappear while the bar says "Last saved
+   * just now". The one thing that must never happen here is the user re-entering hours they already
+   * entered, because that is how one shift becomes two labor lines.
+   *
+   * So: take the server's card, then replay every still-unsent op on top of it. The ops are replayed
+   * with `baseRevision: null` — they are being applied to the very revision they are about to be
+   * rebased onto, so the concurrency gate has nothing left to decide. `applyOp` is the same pure
+   * function the server runs, which is what makes the optimistic picture and the eventual committed
+   * picture agree by construction rather than by hand.
    */
   const applyServerCard = useCallback(
-    (card: StampedWorkCard) => {
-      setServerCards(prev => ({ ...prev, [card.id]: card }));
+    (serverCard: StampedWorkCard) => {
+      setServerCards(prev => ({ ...prev, [serverCard.id]: serverCard }));
+
+      const unsent = outboxRef.current.entries.filter(
+        e => e.op.workCardId === serverCard.id && (e.state === 'PENDING' || e.state === 'IN_FLIGHT'),
+      );
+      const card = unsent.reduce<StampedWorkCard>((acc, e) => {
+        const r = applyOp(acc, { ...e.op, baseRevision: null }, {
+          serverAtUtc: acc.stamp.serverAtUtc,
+          updatedByName: acc.stamp.updatedByName,
+        });
+        return r.outcome === 'APPLIED' ? r.card : acc;
+      }, serverCard);
+
       const { stamp: _stamp, laborEntries, ...body } = card;
       dispatch({ type: 'EDIT_WORK_CARD', payload: body });
       dispatch({ type: 'REPLACE_CARD_LABOR', payload: { workCardId: card.id, entries: laborEntries ?? [] } });
@@ -156,8 +188,20 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       const key = entry.op.idempotencyKey;
       setOutbox(o => markSent(o, key));
 
+      /**
+       * Re-base at SEND time, not at enqueue time. An op composed while an earlier op from THIS
+       * device was still in flight carries the pre-ACK revision, so it would be rejected for a change
+       * this device itself made — a conflict the user cannot act on and did not cause.
+       *
+       * This does not weaken the cross-device guard. The claim being made is "nobody else has changed
+       * this since the last revision I saw", and `serverCards` is exactly that: it only advances on
+       * an ACK, a push, or a fetch. Resolving it later simply makes the claim as current as the
+       * client's knowledge, instead of as stale as the moment the user pressed a key.
+       */
+      const op = { ...entry.op, baseRevision: serverCardsRef.current[entry.op.workCardId]?.stamp.revision ?? entry.op.baseRevision };
+
       transport
-        .submit(entry.op)
+        .submit(op)
         .then(res => {
           if (res.outcome === 'ACCEPTED') {
             applyServerCard(res.card);
@@ -201,8 +245,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         idempotencyKey: newId('op'),
         kind,
         workCardId,
-        // The revision this edit was composed against. Null when the server has never shown us this
-        // card, which the server reads as "makes no concurrency claim" rather than as revision zero.
+        // Provisional — the send loop re-reads this immediately before submitting, so an op queued
+        // behind one of this device's own in-flight ops is not rejected for a change we made
+        // ourselves. Null when the server has never shown us this card, which it reads as "makes no
+        // concurrency claim" rather than as revision zero.
         baseRevision: serverCardsRef.current[workCardId]?.stamp.revision ?? null,
         payload,
         clientAtUtc: new Date().toISOString(),

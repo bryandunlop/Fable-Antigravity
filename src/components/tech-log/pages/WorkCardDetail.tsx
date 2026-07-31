@@ -208,6 +208,30 @@ export default function WorkCardDetail() {
   };
 
   /**
+   * TL-38 — a removed labor line must reach the server too. Deleting locally only would leave the
+   * entry on the server's copy, and the next thing that pulled that copy down would resurrect it —
+   * into `totalLabor`, and from there into the "Labor N h" sentence on the signed release.
+   */
+  const removeLabor = (laborEntryId: string) => {
+    dispatch({ type: 'DELETE_LABOR_ENTRY', payload: laborEntryId });
+    sync?.submit('workcard.labor.delete', card.id, { laborEntryId });
+  };
+
+  /**
+   * TL-38 — D61's retrospective timeline is the surface the numbers actually come from, so it is the
+   * one that most needs to survive being read on another device. It edits the history as a unit
+   * (reasons, notes, the per-gap include/exclude flag), and `timeAudit` travels with it because D62
+   * makes that the append-only record of every edit to `statusTags`.
+   */
+  const saveTimeline = (next: WorkCard) => {
+    dispatch({ type: 'EDIT_WORK_CARD', payload: next });
+    sync?.submit('workcard.timeline.set', card.id, {
+      statusTags: next.statusTags ?? [],
+      timeAudit: next.timeAudit ?? [],
+    });
+  };
+
+  /**
    * TL-38 — the parts panel hands back a whole card, so diff out what actually changed and send the
    * narrow op. Sending the whole card as a patch would make every parts edit conflict with any
    * concurrent change to any other field, which is how a sync becomes something people work around.
@@ -496,7 +520,7 @@ export default function WorkCardDetail() {
         canEdit={isMaint}
         user={{ oid: user.oid, displayName: user.displayName }}
         nameOf={nameOf}
-        onSave={next => dispatch({ type: 'EDIT_WORK_CARD', payload: next })}
+        onSave={saveTimeline}
       />
 
       {/* One-tap chips (QM4/D27) — the CONVENIENCE path per D61, never the source of truth. */}
@@ -611,7 +635,7 @@ export default function WorkCardDetail() {
                   <div className="text-xs text-muted-foreground">{l.description}</div>
                   {l.note && <div className="mt-0.5 border-l-2 pl-2 text-xs italic text-muted-foreground">why: {l.note}</div>}
                 </div>
-                {!completed && isMaint && <Button size="icon" variant="ghost" onClick={() => dispatch({ type: 'DELETE_LABOR_ENTRY', payload: l.id })}><Trash2 className="h-4 w-4" /></Button>}
+                {!completed && isMaint && <Button size="icon" variant="ghost" onClick={() => removeLabor(l.id)}><Trash2 className="h-4 w-4" /></Button>}
               </div>
             ))}
             {labor.length === 0 && <p className="text-sm text-muted-foreground">No labor recorded.</p>}

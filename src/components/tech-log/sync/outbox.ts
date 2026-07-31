@@ -44,9 +44,42 @@ const replace = (o: Outbox, key: string, f: (e: OutboxEntry) => OutboxEntry): Ou
 /**
  * Queue a mutation. Re-enqueuing a key already present is a no-op — the idempotency key is immutable
  * across retries, so a second appearance is the same mutation, not a new one.
+ *
+ * COALESCING. A consecutive `workcard.patch` for the same card is MERGED into the trailing pending
+ * patch rather than appended. A text input fires `onChange` per keystroke, so typing "AMM 32-30-00"
+ * would otherwise queue twelve ops; the first ACKs and bumps the card's revision, and the remaining
+ * eleven then conflict against a base that only *this device's own* edit invalidated. That is a
+ * self-inflicted conflict storm being reported to the user as concurrency, which is worse than the
+ * problem it was meant to solve — it teaches people the conflict banner is noise.
+ *
+ * Three limits on the merge, each load-bearing:
+ *   - only into a **PENDING** entry, never one IN_FLIGHT — that payload is already on the wire;
+ *   - only the **trailing** entry for that card, so a patch never jumps an intervening append
+ *     (`labor.add` between two patches means the person did those things in that order);
+ *   - appends are **never** merged — two labor entries are two separate facts, and merging them
+ *     would delete a technician's hours.
+ *
+ * The merged op keeps the FIRST key. Neither op has been sent, so no key is being reused against the
+ * server, and keeping the earliest preserves queue order.
  */
 export function enqueue(o: Outbox, op: SyncOp): Outbox {
   if (o.entries.some(e => e.op.idempotencyKey === op.idempotencyKey)) return o;
+
+  const last = o.entries[o.entries.length - 1];
+  if (
+    op.kind === 'workcard.patch' &&
+    last?.state === 'PENDING' &&
+    last.op.kind === 'workcard.patch' &&
+    last.op.workCardId === op.workCardId
+  ) {
+    const merged: SyncOp = {
+      ...last.op,
+      payload: { ...(last.op.payload as object), ...(op.payload as object) } as SyncOp['payload'],
+      clientAtUtc: op.clientAtUtc,
+    };
+    return { entries: [...o.entries.slice(0, -1), { ...last, op: merged }] };
+  }
+
   return { entries: [...o.entries, { op, state: 'PENDING', attempts: 0 }] };
 }
 
@@ -124,6 +157,7 @@ export function describeOp(op: SyncOp): string {
     'workcard.parts.add': 'Part ordered',
     'workcard.parts.receive': 'Part received',
     'workcard.statustag.add': 'Status changed',
+    'workcard.timeline.set': 'Work timeline edited',
   };
   return k[op.kind];
 }

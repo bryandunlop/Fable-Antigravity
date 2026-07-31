@@ -99,6 +99,11 @@ export function applyOp(
       return { outcome: 'APPLIED', card: { ...card, laborEntries: [...existing, entry], stamp } };
     }
 
+    case 'workcard.timeline.set': {
+      const { statusTags, timeAudit } = op.payload as { statusTags: StampedWorkCard['statusTags']; timeAudit: StampedWorkCard['timeAudit'] };
+      return { outcome: 'APPLIED', card: { ...card, statusTags, timeAudit, stamp } };
+    }
+
     case 'workcard.labor.delete': {
       const { laborEntryId } = op.payload as { laborEntryId: string };
       return {

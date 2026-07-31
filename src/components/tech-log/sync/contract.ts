@@ -86,7 +86,8 @@ export type SyncOpKind =
   | 'workcard.labor.delete'
   | 'workcard.parts.add'
   | 'workcard.parts.receive'
-  | 'workcard.statustag.add';
+  | 'workcard.statustag.add'
+  | 'workcard.timeline.set';  // wholesale edit of the time history — see below
 
 export interface SyncOpPayloads {
   'workcard.patch': Partial<Pick<WorkCard, 'title' | 'description' | 'ammReference' | 'cmcFaultCodes' | 'status' | 'riiRequired'>>;
@@ -95,6 +96,17 @@ export interface SyncOpPayloads {
   'workcard.parts.add': PartsOrder;
   'workcard.parts.receive': { partsOrderId: string; receivedAtUtc: string };
   'workcard.statustag.add': { tag: StatusTagEvent; audit: WorkCardTimeAuditEvent };
+  /**
+   * The retrospective time-entry surface (D61's `WorkTimelinePanel`) edits the whole history as a
+   * unit — reasons, notes, and the per-gap include/exclude flag — rather than appending one event,
+   * so it needs a wholesale op. It carries `timeAudit` with it because D62 makes that the append-only
+   * record of every edit to `statusTags`, and shipping the two apart would let the history and its
+   * audit trail arrive at the server out of step.
+   *
+   * Revision-gated (it does NOT commute): this replaces the time history rather than adding to it,
+   * so a concurrent edit really is a conflict and really does need a person.
+   */
+  'workcard.timeline.set': { statusTags: StatusTagEvent[]; timeAudit: WorkCardTimeAuditEvent[] };
 }
 
 export interface SyncOp<K extends SyncOpKind = SyncOpKind> {

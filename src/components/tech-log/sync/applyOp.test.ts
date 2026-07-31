@@ -101,6 +101,46 @@ describe('applyOp — receiving a part', () => {
   });
 });
 
+describe('applyOp — replaying unsent work onto the server’s card (the rebase in useSync)', () => {
+  // This is the shape `applyServerCard` relies on: an op replayed with baseRevision null is applied
+  // unconditionally, so a queued edit is never erased by the arrival of the server's copy.
+  const rebase = (c: StampedWorkCard, o: SyncOp) => applyOp(c, { ...o, baseRevision: null }, srv);
+
+  it('re-applies a queued labor entry the server has not seen, so hours never vanish from screen', () => {
+    const queued = op('workcard.labor.add', { id: 'lab-9', workCardId: 'wc-1', hours: 2, dateUtc: 'x', description: 'y', techOid: 'U' }, 1);
+    const r = rebase(card(7), queued); // server is ahead and knows nothing of our unsent hours
+    expect(r.outcome === 'APPLIED' && r.card.laborEntries.map(l => l.id)).toEqual(['lab-9']);
+  });
+
+  it('re-applies a queued deletion, so a removed line is not resurrected by the server’s copy', () => {
+    const serverCard = { ...card(7), laborEntries: [{ id: 'lab-1', hours: 4 }] } as StampedWorkCard;
+    const r = rebase(serverCard, op('workcard.labor.delete', { laborEntryId: 'lab-1' }, 1));
+    expect(r.outcome === 'APPLIED' && r.card.laborEntries).toEqual([]);
+  });
+
+  it('re-applies a queued patch, so a half-typed field is not stomped back', () => {
+    const r = rebase(card(7), op('workcard.patch', { ammReference: 'AMM 32-30-00' }, 1));
+    expect(r.outcome === 'APPLIED' && r.card.ammReference).toBe('AMM 32-30-00');
+  });
+});
+
+describe('applyOp — the timeline is a wholesale replace', () => {
+  const tag = (atUtc: string) => ({ tag: 'IN_WORK' as const, atUtc, byOid: 'USR003' });
+  const audit = (after: string) => ({ atUtc: '2026-07-31T10:00:00.000Z', byOid: 'USR003', after, afterCompletion: false });
+  const payload = { statusTags: [tag('2026-07-31T08:00:00.000Z')], timeAudit: [audit('a1'), audit('a2')] };
+
+  it('replaces the history rather than appending to it', () => {
+    const base = { ...card(4), statusTags: [tag('2026-07-30T08:00:00.000Z')], timeAudit: [audit('old')] } as StampedWorkCard;
+    const r = applyOp(base, op('workcard.timeline.set', payload, 4), srv);
+    expect(r.outcome === 'APPLIED' && r.card.statusTags!.map(t => t.atUtc)).toEqual(['2026-07-31T08:00:00.000Z']);
+    expect(r.outcome === 'APPLIED' && r.card.timeAudit!.map(a => a.after)).toEqual(['a1', 'a2']);
+  });
+
+  it('DOES conflict on a stale revision — unlike an append, a wholesale replace needs a person', () => {
+    expect(applyOp(card(9), op('workcard.timeline.set', payload, 4), srv).outcome).toBe('CONFLICT');
+  });
+});
+
 describe('applyOp — labor rides on the aggregate', () => {
   const entry = { id: 'lab-1', workCardId: 'wc-1', techOid: 'USR003', hours: 3.5, dateUtc: '2026-07-31', description: 'troubleshoot' };
 
