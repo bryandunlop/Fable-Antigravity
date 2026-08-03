@@ -29,6 +29,24 @@ import {
   Target,
   Mail
 } from 'lucide-react';
+import { ActionItem, NewItemForm } from './ActionItems/types';
+import { CHECK_IN_CADENCE_OPTIONS } from './ActionItems/constants';
+import { getCheckInCompliance } from './ActionItems/checkIn';
+import NewItemDialog from './ActionItems/NewItemDialog';
+import { useActionItems } from '../contexts/ActionItemContext';
+
+const EMPTY_NEW_ITEM_FORM: NewItemForm = {
+  title: '',
+  description: '',
+  module: 'Flight Operations',
+  priority: 'Medium',
+  dueDate: '',
+  sections: [''],
+  checkInCadence: 'weekly',
+};
+
+/** The shared store uses title-case labels; the local colour helpers key off slugs. */
+const toSlug = (value: string) => value.toLowerCase().replace(/\s+/g, '-');
 
 interface CriticalFunction {
   id: string;
@@ -53,34 +71,6 @@ interface CriticalFunction {
   lastUpdated: string;
 }
 
-interface ActionItem {
-  id: string;
-  title: string;
-  description: string;
-  assignedTo: string;
-  priority: 'critical' | 'high' | 'medium' | 'low';
-  status: 'not-started' | 'in-progress' | 'on-hold' | 'completed' | 'overdue';
-  progress: number;
-  createdDate: string;
-  dueDate: string;
-  estimatedCompletion: string;
-  reminders: {
-    enabled: boolean;
-    frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
-    lastSent?: string;
-  };
-  updates: ActionItemUpdate[];
-  category: string;
-}
-
-interface ActionItemUpdate {
-  id: string;
-  date: string;
-  author: string;
-  message: string;
-  progressChange?: number;
-}
-
 interface SuggestionBoxItem {
   id: string;
   title: string;
@@ -100,8 +90,28 @@ export default function CriticalFunctionsPlan() {
   const [activeTab, setActiveTab] = useState('functions');
   const [showAddFunction, setShowAddFunction] = useState(false);
   const [showAddActionItem, setShowAddActionItem] = useState(false);
-  const [selectedActionItem, setSelectedActionItem] = useState<ActionItem | null>(null);
+  const [selectedActionItemId, setSelectedActionItemId] = useState<string | null>(null);
   const [selectedFunction, setSelectedFunction] = useState<CriticalFunction | null>(null);
+
+  // Rolling Action Items read the same store as Tasks & Action Items — one list of
+  // projects, two views. Raising an item in either surface puts it on both.
+  const { actionItems, addActionItem, setCheckInCadence } = useActionItems();
+  const [newItemForm, setNewItemForm] = useState<NewItemForm>(EMPTY_NEW_ITEM_FORM);
+  const [isCreatingActionItem, setIsCreatingActionItem] = useState(false);
+
+  const today = new Date().toISOString().split('T')[0];
+  const selectedActionItem = actionItems.find(item => item.id === selectedActionItemId) ?? null;
+
+  const isOverdue = (item: ActionItem) => item.status !== 'Completed' && item.dueDate < today;
+
+  const handleCreateActionItem = () => {
+    if (!newItemForm.title.trim() || !newItemForm.description.trim()) return;
+    setIsCreatingActionItem(true);
+    addActionItem(newItemForm, 'Lead Team');
+    setIsCreatingActionItem(false);
+    setShowAddActionItem(false);
+    setNewItemForm(EMPTY_NEW_ITEM_FORM);
+  };
 
   // Mock list of available personnel for assignment/tagging
   const availablePersonnel = [
@@ -178,82 +188,6 @@ export default function CriticalFunctionsPlan() {
       },
       createdDate: '2024-01-03',
       lastUpdated: '2024-01-10'
-    }
-  ];
-
-  // Mock data for Rolling Action Items
-  const actionItems: ActionItem[] = [
-    {
-      id: 'AI001',
-      title: 'Update Emergency Procedures Manual',
-      description: 'Revise emergency procedures manual to align with new FAA regulations',
-      assignedTo: 'Sarah Johnson',
-      priority: 'high',
-      status: 'in-progress',
-      progress: 65,
-      createdDate: '2024-01-10',
-      dueDate: '2024-02-15',
-      estimatedCompletion: '2024-02-10',
-      reminders: {
-        enabled: true,
-        frequency: 'weekly',
-        lastSent: '2024-01-15'
-      },
-      updates: [
-        {
-          id: 'U001',
-          date: '2024-01-15',
-          author: 'Sarah Johnson',
-          message: 'Completed review of sections 1-3. Working on section 4.',
-          progressChange: 25
-        }
-      ],
-      category: 'Safety'
-    },
-    {
-      id: 'AI002',
-      title: 'Implement New Fuel Tracking System',
-      description: 'Deploy new automated fuel tracking system across all aircraft',
-      assignedTo: 'Mike Peterson',
-      priority: 'medium',
-      status: 'in-progress',
-      progress: 40,
-      createdDate: '2024-01-05',
-      dueDate: '2024-03-01',
-      estimatedCompletion: '2024-02-25',
-      reminders: {
-        enabled: true,
-        frequency: 'biweekly'
-      },
-      updates: [
-        {
-          id: 'U002',
-          date: '2024-01-12',
-          author: 'Mike Peterson',
-          message: 'Hardware installation complete on 3 of 8 aircraft.',
-          progressChange: 15
-        }
-      ],
-      category: 'Operations'
-    },
-    {
-      id: 'AI003',
-      title: 'Training Program Development',
-      description: 'Develop comprehensive training program for new inflight crew',
-      assignedTo: 'Lisa Chen',
-      priority: 'critical',
-      status: 'overdue',
-      progress: 20,
-      createdDate: '2024-01-01',
-      dueDate: '2024-01-30',
-      estimatedCompletion: '2024-02-05',
-      reminders: {
-        enabled: true,
-        frequency: 'daily',
-        lastSent: '2024-01-20'
-      },
-      updates: [],
-      category: 'Training'
     }
   ];
 
@@ -562,7 +496,7 @@ export default function CriticalFunctionsPlan() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  {actionItems.filter(item => item.status === 'in-progress').length}
+                  {actionItems.filter(item => item.status === 'In Progress').length}
                 </div>
                 <p className="text-xs text-muted-foreground">Currently active</p>
               </CardContent>
@@ -575,7 +509,7 @@ export default function CriticalFunctionsPlan() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">
-                  {actionItems.filter(item => item.status === 'overdue').length}
+                  {actionItems.filter(isOverdue).length}
                 </div>
                 <p className="text-xs text-muted-foreground">Need attention</p>
               </CardContent>
@@ -583,56 +517,81 @@ export default function CriticalFunctionsPlan() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CardTitle className="text-sm font-medium">Awaiting Check-In</CardTitle>
+                <Bell className="h-4 w-4 text-indigo-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {actionItems.filter(item => item.status === 'completed').length}
+                <div className="text-2xl font-bold text-indigo-600">
+                  {actionItems.reduce((count, item) => {
+                    const compliance = getCheckInCompliance(item, today);
+                    return count + (compliance ? compliance.total - compliance.reported : 0);
+                  }, 0)}
                 </div>
-                <p className="text-xs text-muted-foreground">This month</p>
+                <p className="text-xs text-muted-foreground">Status reports outstanding</p>
               </CardContent>
             </Card>
           </div>
 
           <div className="flex justify-between items-center">
-            <h2>Rolling Action Items</h2>
+            <div>
+              <h2>Rolling Action Items</h2>
+              <p className="text-sm text-muted-foreground">
+                The lead team's project tracker. Every item here is the same record the owner sees on
+                their Tasks &amp; Action Items list.
+              </p>
+            </div>
             <Button onClick={() => setShowAddActionItem(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add Action Item
             </Button>
           </div>
 
+          {actionItems.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Target className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="font-medium mb-2">No Projects Tracked</h3>
+                <p className="text-muted-foreground">
+                  Add an action item to start tracking a project and collecting status updates.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-4">
-            {actionItems.map((item) => (
-              <Card key={item.id} className={item.status === 'overdue' ? 'border-red-200' : ''}>
+            {actionItems.map((item) => {
+              const compliance = getCheckInCompliance(item, today);
+              const overdue = isOverdue(item);
+              const latestActivity = item.recentActivity[0];
+
+              return (
+              <Card key={item.id} className={overdue ? 'border-red-200' : ''}>
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2 flex-wrap">
                         {item.title}
                         <Badge variant="outline" className="text-xs">
-                          <div className={`w-2 h-2 rounded-full ${getPriorityColor(item.priority)} mr-1`}></div>
+                          <div className={`w-2 h-2 rounded-full ${getPriorityColor(toSlug(item.priority))} mr-1`}></div>
                           {item.priority}
                         </Badge>
                         <Badge variant="outline" className="text-xs">
-                          <div className={`w-2 h-2 rounded-full ${getStatusColor(item.status)} mr-1`}></div>
-                          {item.status}
+                          <div className={`w-2 h-2 rounded-full ${getStatusColor(overdue ? 'overdue' : toSlug(item.status))} mr-1`}></div>
+                          {overdue ? 'Overdue' : item.status}
                         </Badge>
-                        {item.reminders.enabled && (
+                        {item.checkIn && item.checkIn.cadence !== 'none' && (
                           <Badge variant="outline" className="text-xs">
                             <Bell className="w-3 h-3 mr-1" />
-                            {item.reminders.frequency}
+                            {item.checkIn.cadence}
                           </Badge>
                         )}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
-                        onClick={() => setSelectedActionItem(item)}
+                        onClick={() => setSelectedActionItemId(item.id)}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -643,23 +602,23 @@ export default function CriticalFunctionsPlan() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Assigned To</Label>
-                        <p>{item.assignedTo}</p>
+                        <Label className="text-xs font-medium text-muted-foreground">Responsible</Label>
+                        <p>{item.assignedBy}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Working On It</Label>
+                        <p>{item.contributors.map(c => c.name).join(', ') || '—'}</p>
                       </div>
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground">Due Date</Label>
                         <p>{formatDate(item.dueDate)}</p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Estimated Completion</Label>
-                        <p>{formatDate(item.estimatedCompletion)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Category</Label>
-                        <p>{item.category}</p>
+                        <Label className="text-xs font-medium text-muted-foreground">Module</Label>
+                        <p>{item.module}</p>
                       </div>
                     </div>
-                    
+
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <Label className="text-sm font-medium">Progress</Label>
@@ -668,23 +627,40 @@ export default function CriticalFunctionsPlan() {
                       <Progress value={item.progress} className="h-2" />
                     </div>
 
-                    {item.updates.length > 0 && (
+                    {/* Automatic status collection — who has reported this cycle. */}
+                    {compliance && (
+                      <div className="flex items-center gap-2 text-sm">
+                        {compliance.reported === compliance.total ? (
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Clock className="w-4 h-4 text-amber-500" />
+                        )}
+                        <span>
+                          Check-in due {formatDate(compliance.dueOn)} —{' '}
+                          <span className="font-medium">{compliance.reported}/{compliance.total}</span> reported
+                        </span>
+                      </div>
+                    )}
+
+                    {latestActivity && (
                       <div>
                         <Label className="text-sm font-medium">Latest Update</Label>
                         <div className="mt-2 p-3 bg-muted rounded-lg">
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-medium">{item.updates[0].author}</span>
-                            <span className="text-xs text-muted-foreground">{formatDate(item.updates[0].date)}</span>
+                            <span className="text-sm font-medium">{latestActivity.user.name}</span>
+                            <span className="text-xs text-muted-foreground">{latestActivity.time}</span>
                           </div>
-                          <p className="text-sm">{item.updates[0].message}</p>
+                          <p className="text-sm">{latestActivity.action}</p>
                         </div>
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
+          )}
         </TabsContent>
 
         {/* Suggestion Box Tab */}
@@ -861,31 +837,45 @@ export default function CriticalFunctionsPlan() {
                     <p className="text-sm">{selectedActionItem.description}</p>
                   </div>
                   <div>
-                    <Label>Assigned To</Label>
-                    <p>{selectedActionItem.assignedTo}</p>
+                    <Label>Responsible</Label>
+                    <p>{selectedActionItem.assignedBy}</p>
+                  </div>
+                  <div>
+                    <Label>Working On It</Label>
+                    <div className="space-y-1">
+                      {selectedActionItem.contributors.length > 0 ? (
+                        selectedActionItem.contributors.map((contributor) => (
+                          <p key={contributor.id} className="text-sm">
+                            {contributor.name} <span className="text-muted-foreground">— {contributor.role}</span>
+                          </p>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Nobody assigned yet</p>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <Label>Priority</Label>
-                    <Badge className={getPriorityColor(selectedActionItem.priority)}>
+                    <Badge className={getPriorityColor(toSlug(selectedActionItem.priority))}>
                       {selectedActionItem.priority}
                     </Badge>
                   </div>
                   <div>
                     <Label>Status</Label>
-                    <Badge className={getStatusColor(selectedActionItem.status)}>
+                    <Badge className={getStatusColor(toSlug(selectedActionItem.status))}>
                       {selectedActionItem.status}
                     </Badge>
                   </div>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div>
                     <Label>Due Date</Label>
                     <p>{formatDate(selectedActionItem.dueDate)}</p>
                   </div>
                   <div>
-                    <Label>Estimated Completion</Label>
-                    <p>{formatDate(selectedActionItem.estimatedCompletion)}</p>
+                    <Label>Module</Label>
+                    <p>{selectedActionItem.module}</p>
                   </div>
                   <div>
                     <Label>Progress</Label>
@@ -894,50 +884,80 @@ export default function CriticalFunctionsPlan() {
                       <span className="text-sm font-medium">{selectedActionItem.progress}%</span>
                     </div>
                   </div>
+                  {/* The automatic-collection control: set the rhythm once and every
+                      contributor is asked on schedule from their own task list. */}
                   <div>
-                    <Label>Reminders</Label>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={selectedActionItem.reminders.enabled} />
-                      <span className="text-sm">
-                        {selectedActionItem.reminders.enabled ? selectedActionItem.reminders.frequency : 'Disabled'}
-                      </span>
-                    </div>
+                    <Label htmlFor="rolling-cadence">Status Check-In Cadence</Label>
+                    <Select
+                      value={selectedActionItem.checkIn?.cadence ?? 'none'}
+                      onValueChange={(value: string) => setCheckInCadence(selectedActionItem.id, value as NewItemForm['checkInCadence'])}
+                    >
+                      <SelectTrigger id="rolling-cadence">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CHECK_IN_CADENCE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(() => {
+                      const compliance = getCheckInCompliance(selectedActionItem, today);
+                      return compliance ? (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Cycle due {formatDate(compliance.dueOn)} — {compliance.reported} of {compliance.total} reported.
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               </div>
 
               <div>
-                <Label>Updates History</Label>
+                <Label>Check-In History</Label>
                 <div className="space-y-3 mt-2">
-                  {selectedActionItem.updates.length > 0 ? (
-                    selectedActionItem.updates.map((update) => (
-                      <div key={update.id} className="p-4 border rounded-lg">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium">{update.author}</span>
-                          <span className="text-sm text-muted-foreground">{formatDate(update.date)}</span>
-                        </div>
-                        <p className="text-sm">{update.message}</p>
-                        {update.progressChange && (
-                          <p className="text-sm text-green-600 mt-1">
-                            Progress increased by {update.progressChange}%
-                          </p>
-                        )}
-                      </div>
-                    ))
+                  {selectedActionItem.checkIn && selectedActionItem.checkIn.reports.length > 0 ? (
+                    [...selectedActionItem.checkIn.reports]
+                      .sort((a, b) => b.reportedOn.localeCompare(a.reportedOn))
+                      .map((report) => {
+                        const contributor = selectedActionItem.contributors.find(c => c.id === report.contributorId);
+                        return (
+                          <div key={`${report.contributorId}-${report.dueOn}`} className="p-4 border rounded-lg">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-medium">{contributor?.name ?? report.contributorId}</span>
+                              <span className="text-sm text-muted-foreground">{formatDate(report.reportedOn)}</span>
+                            </div>
+                            <p className="text-sm">{report.note}</p>
+                            <p className="text-sm text-green-600 mt-1">Reported progress: {report.progress}%</p>
+                          </div>
+                        );
+                      })
                   ) : (
-                    <p className="text-sm text-muted-foreground">No updates yet</p>
+                    <p className="text-sm text-muted-foreground">No status updates filed yet</p>
                   )}
                 </div>
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setSelectedActionItem(null)}>Close</Button>
-                <Button>Update Progress</Button>
+                <Button variant="outline" onClick={() => setSelectedActionItemId(null)}>Close</Button>
               </div>
             </CardContent>
           </Card>
         </div>
       )}
+
+      {/* Create a project on the Rolling list — the same dialog Tasks & Action Items uses. */}
+      <NewItemDialog
+        isOpen={showAddActionItem}
+        onClose={() => {
+          setShowAddActionItem(false);
+          setNewItemForm(EMPTY_NEW_ITEM_FORM);
+        }}
+        newItemForm={newItemForm}
+        setNewItemForm={setNewItemForm}
+        onSubmit={handleCreateActionItem}
+        isSubmitting={isCreatingActionItem}
+      />
 
       {/* Critical Function Detail/Edit Modal */}
       {selectedFunction && (

@@ -131,6 +131,7 @@ import MWShiftHandover from './components/maintenance-workflow/ShiftHandover';
 import MWPredictiveAnalytics from './components/maintenance-workflow/PredictiveAnalytics';
 import MaintenanceTurnoverForm from './components/MaintenanceTurnoverForm';
 import { AuditProvider } from './contexts/AuditContext';
+import { ActionItemProvider } from './contexts/ActionItemContext';
 
 // Inventory V2
 import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Context';
@@ -185,6 +186,11 @@ export default function App() {
       <MaintenanceProvider>
           <HazardProvider>
             <AuditProvider>
+              {/* One store behind Tasks & Action Items and the lead team's Rolling
+                  Action Items list — they are two views of the same projects, and
+                  a provider mounted per-subtree would make an item raised in one
+                  invisible in the other. */}
+              <ActionItemProvider>
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
                 <DocumentsProvider>
@@ -668,6 +674,7 @@ export default function App() {
                 </DocumentsProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
+              </ActionItemProvider>
             </AuditProvider>
           </HazardProvider>
         </MaintenanceProvider>

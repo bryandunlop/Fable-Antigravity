@@ -1,4 +1,4 @@
-import { ActionItem } from './types';
+import { ActionItem, CheckInCadence } from './types';
 
 export const MOCK_ACTION_ITEMS: ActionItem[] = [
   {
@@ -130,3 +130,10 @@ export const MODULE_OPTIONS = [
 export const PRIORITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
 export const STATUS_OPTIONS = ['pending', 'in-progress', 'completed'];
 export const ROLE_OPTIONS = ['Contributor', 'Reviewer', 'Observer'];
+
+export const CHECK_IN_CADENCE_OPTIONS: Array<{ value: CheckInCadence; label: string }> = [
+  { value: 'none', label: 'No scheduled check-ins' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every two weeks' },
+  { value: 'monthly', label: 'Monthly' },
+];

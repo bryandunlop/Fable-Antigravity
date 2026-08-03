@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Progress } from './ui/progress';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -48,12 +48,27 @@ import AuditDetailDrawer from './audit/AuditDetailDrawer';
 
 // Import existing types and utilities from ActionItems
 import { ActionItemsProps, ActionItem, NewItemForm } from './ActionItems/types';
-import { MOCK_ACTION_ITEMS } from './ActionItems/constants';
 import { getBorderColor, formatDate, getUserActionItems, getStats } from './ActionItems/utils';
+import { getOutstandingCheckIns } from './ActionItems/checkIn';
+import { useActionItems } from '../contexts/ActionItemContext';
 
 // Import Action Item dialogs
 import DetailsDialog from './ActionItems/DetailsDialog';
 import UpdateProgressDialog from './ActionItems/UpdateProgressDialog';
+import NewItemDialog from './ActionItems/NewItemDialog';
+
+/** A derived check-in task carries the project + window it answers. */
+type CheckInTask = ActionItem & { checkInFor: { itemId: string; dueOn: string; contributorId: string } };
+
+const EMPTY_NEW_ITEM_FORM: NewItemForm = {
+  title: '',
+  description: '',
+  module: 'Flight Operations',
+  priority: 'Medium',
+  dueDate: '',
+  sections: [''],
+  checkInCadence: 'none',
+};
 
 interface PersonalTask {
   id: string;
@@ -93,7 +108,20 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
 
+  // Shared action-item store — the same projects the lead team's Rolling Action
+  // Items list reads, so an item raised here shows up there and vice versa.
+  const { actionItems: projectActionItems, addActionItem, recordCheckIn } = useActionItems();
+
   // Action Items states
+  const [isNewActionItemDialogOpen, setIsNewActionItemDialogOpen] = useState(false);
+  const [newItemForm, setNewItemForm] = useState<NewItemForm>(EMPTY_NEW_ITEM_FORM);
+  const [isCreatingActionItem, setIsCreatingActionItem] = useState(false);
+
+  // Scheduled check-in states
+  const [checkInTask, setCheckInTask] = useState<CheckInTask | null>(null);
+  const [checkInProgress, setCheckInProgress] = useState('0');
+  const [checkInNote, setCheckInNote] = useState('');
+
   const [selectedActionItem, setSelectedActionItem] = useState<ActionItem | null>(null);
   const [isActionItemDialogOpen, setIsActionItemDialogOpen] = useState(false);
   const [isUpdateProgressDialogOpen, setIsUpdateProgressDialogOpen] = useState(false);
@@ -529,7 +557,44 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
     });
   };
 
-  const userActionItems = applyWaiverDecisions([...getUserActionItems(MOCK_ACTION_ITEMS, userRole), ...getHazardTasks(), ...getWaiverApprovalTasks(), ...getAuditTasks()]);
+  /**
+   * Derive a task for every contributor who owes a status report on a lead-team
+   * project this cycle. This is the automatic half of the Rolling Action Items
+   * loop: the lead sets a cadence once, and the ask lands in each contributor's
+   * own list on schedule instead of the lead chasing people.
+   *
+   * Same convention as getAuditTasks — in a real app these would be filtered to
+   * the logged-in person; for the demo every outstanding report is shown.
+   */
+  const getCheckInTasks = (): CheckInTask[] => {
+    const today = new Date().toISOString().split('T')[0];
+
+    return projectActionItems.flatMap(item => {
+      const outstanding = getOutstandingCheckIns(item, today);
+      if (!outstanding) return [];
+
+      return outstanding.contributors.map(contributor => ({
+        id: `CheckIn-${item.id}-${outstanding.dueOn}-${contributor.id}`,
+        title: `Status update due: ${item.title}`,
+        description: `${contributor.name} owes a ${item.checkIn?.cadence} status report on this project. Report progress and what changed since the last check-in.`,
+        module: 'Status Check-In',
+        assignedBy: item.assignedBy,
+        assignedDate: outstanding.dueOn,
+        dueDate: outstanding.dueOn,
+        priority: item.priority,
+        status: 'Pending',
+        progress: item.progress,
+        contributors: [contributor],
+        recentActivity: [],
+        sections: item.sections,
+        sectionsComplete: item.sectionsComplete,
+        totalSections: item.totalSections,
+        checkInFor: { itemId: item.id, dueOn: outstanding.dueOn, contributorId: contributor.id },
+      }));
+    });
+  };
+
+  const userActionItems = applyWaiverDecisions([...getUserActionItems(projectActionItems, userRole), ...getHazardTasks(), ...getWaiverApprovalTasks(), ...getAuditTasks(), ...getCheckInTasks()]);
   const actionItemsStats = getStats(userActionItems);
 
   // Surface pending waiver decisions as events (publish is idempotent by id)
@@ -698,6 +763,53 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
     setUpdatingPersonalTask(null);
     toast.success('Progress Updated', {
       description: 'Personal task progress has been updated successfully.'
+    });
+  };
+
+  const handleCreateActionItem = () => {
+    if (!newItemForm.title.trim() || !newItemForm.description.trim()) return;
+
+    setIsCreatingActionItem(true);
+    const created = addActionItem(newItemForm, userRole === 'lead' ? 'Lead Team' : 'Administrator');
+    setIsCreatingActionItem(false);
+    setIsNewActionItemDialogOpen(false);
+    setNewItemForm(EMPTY_NEW_ITEM_FORM);
+
+    toast.success('Action Item Created', {
+      description:
+        created.checkIn?.cadence && created.checkIn.cadence !== 'none'
+          ? `"${created.title}" is on the Rolling Action Items list. Contributors will be asked for a ${created.checkIn.cadence} status update.`
+          : `"${created.title}" is now on the Rolling Action Items list.`,
+    });
+  };
+
+  const handleOpenCheckInDialog = (task: CheckInTask) => {
+    setCheckInTask(task);
+    setCheckInProgress(String(task.progress));
+    setCheckInNote('');
+  };
+
+  const handleSubmitCheckIn = () => {
+    if (!checkInTask) return;
+    if (!checkInNote.trim()) {
+      toast.error('Please describe what changed since the last check-in');
+      return;
+    }
+
+    const parsed = Number(checkInProgress);
+    const progress = Number.isFinite(parsed) ? Math.min(100, Math.max(0, Math.round(parsed))) : 0;
+
+    recordCheckIn(checkInTask.checkInFor.itemId, {
+      contributorId: checkInTask.checkInFor.contributorId,
+      dueOn: checkInTask.checkInFor.dueOn,
+      progress,
+      note: checkInNote.trim(),
+    });
+
+    setCheckInTask(null);
+    setCheckInNote('');
+    toast.success('Status Update Filed', {
+      description: 'The lead team sees this on the Rolling Action Items list.',
     });
   };
 
@@ -977,6 +1089,15 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
                     Make Decision
                   </Button>
                 )
+              ) : isActionItem && (task as ActionItem).module === 'Status Check-In' ? (
+                <Button
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                  onClick={() => handleOpenCheckInDialog(task as CheckInTask)}
+                >
+                  <Bell className="w-4 h-4 mr-2" />
+                  File Status Update
+                </Button>
               ) : (
                 <Button
                   size="sm"
@@ -1125,7 +1246,7 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
             <div className="flex items-center justify-between">
               <h2>Assigned Action Items</h2>
               {(userRole === 'lead' || userRole === 'admin') && (
-                <Button>
+                <Button onClick={() => setIsNewActionItemDialogOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create Action Item
                 </Button>
@@ -1407,6 +1528,68 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
       </Dialog>
 
       {/* Action Item Dialogs */}
+      <NewItemDialog
+        isOpen={isNewActionItemDialogOpen}
+        onClose={() => {
+          setIsNewActionItemDialogOpen(false);
+          setNewItemForm(EMPTY_NEW_ITEM_FORM);
+        }}
+        newItemForm={newItemForm}
+        setNewItemForm={setNewItemForm}
+        onSubmit={handleCreateActionItem}
+        isSubmitting={isCreatingActionItem}
+      />
+
+      {/* Scheduled check-in — one contributor's status report for this cycle */}
+      {checkInTask && (
+        <Dialog open onOpenChange={open => { if (!open) setCheckInTask(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>File Status Update</DialogTitle>
+              <DialogDescription>
+                {checkInTask.contributors[0]?.name}'s check-in for the cycle due {formatDate(checkInTask.checkInFor.dueOn)}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="check-in-progress" className="text-sm font-medium mb-2 block">
+                  Project progress (%)
+                </Label>
+                <Input
+                  id="check-in-progress"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={checkInProgress}
+                  onChange={e => setCheckInProgress(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="check-in-note" className="text-sm font-medium mb-2 block">
+                  What changed since the last check-in? <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="check-in-note"
+                  rows={4}
+                  placeholder="Progress, blockers, what's next..."
+                  value={checkInNote}
+                  onChange={e => setCheckInNote(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setCheckInTask(null)}>Cancel</Button>
+              <Button onClick={handleSubmitCheckIn} disabled={!checkInNote.trim()}>
+                <Bell className="w-4 h-4 mr-2" />
+                Submit Update
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {selectedActionItem && (
         <DetailsDialog
           item={selectedActionItem}

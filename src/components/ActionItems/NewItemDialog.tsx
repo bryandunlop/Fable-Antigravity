@@ -7,7 +7,7 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Plus, X, Loader2, Target, Wrench, Shield, Users, Building } from 'lucide-react';
 import { NewItemForm } from './types';
-import { MODULE_OPTIONS, PRIORITY_OPTIONS } from './constants';
+import { MODULE_OPTIONS, PRIORITY_OPTIONS, CHECK_IN_CADENCE_OPTIONS } from './constants';
 
 interface NewItemDialogProps {
   isOpen: boolean;
@@ -150,6 +150,31 @@ export default function NewItemDialog({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Automatic status collection — the lead team sets the rhythm once and
+              each contributor is asked on schedule, instead of being chased. */}
+          <div>
+            <Label htmlFor="check-in-cadence" className="text-sm font-medium mb-2 block">
+              Status check-in cadence
+            </Label>
+            <Select
+              value={newItemForm.checkInCadence}
+              onValueChange={(value: string) => setNewItemForm({ ...newItemForm, checkInCadence: value as NewItemForm['checkInCadence'] })}
+            >
+              <SelectTrigger id="check-in-cadence">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CHECK_IN_CADENCE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-2">
+              Each contributor gets a status-update task on this rhythm. Their answers roll up to the
+              Rolling Action Items list.
+            </p>
           </div>
 
           {/* Sections */}
