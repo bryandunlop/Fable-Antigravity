@@ -111,6 +111,48 @@ describe('ActionItemContext', () => {
     expect(result.current.getActionItemById(id)!.status).toBe('Completed');
   });
 
+  it('stamps a nudge so the contributor sees the lead reached past the cadence', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => {
+      result.current.addActionItem(form(), 'Lead Team');
+    });
+    const id = result.current.actionItems[0].id;
+
+    act(() => {
+      result.current.nudge(id, '2026-08-04');
+    });
+
+    expect(result.current.getActionItemById(id)!.checkIn?.lastNudgedOn).toBe('2026-08-04');
+  });
+
+  it('clears the nudge once the silence is broken', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => {
+      result.current.addActionItem(form(), 'Lead Team');
+    });
+    const id = result.current.actionItems[0].id;
+
+    act(() => {
+      result.current.nudge(id, '2026-08-04');
+    });
+    act(() => {
+      result.current.recordCheckIn(id, { contributorId: 'creator', dueOn: '2026-08-08', progress: 40, note: 'moving again' });
+    });
+
+    expect(result.current.getActionItemById(id)!.checkIn?.lastNudgedOn).toBeUndefined();
+  });
+
+  it('seeds reporting history so the board opens on a real stalled project', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    const withHistory = result.current.actionItems.filter(item => (item.checkIn?.reports.length ?? 0) > 0);
+    expect(withHistory.length).toBeGreaterThan(0);
+    // At least one seeded project reports the same figure twice — the flat
+    // trend the board exists to expose.
+    expect(
+      result.current.actionItems.some(item => (item.checkIn?.reports.length ?? 0) >= 2),
+    ).toBe(true);
+  });
+
   it('changes the cadence without losing filed reports', () => {
     const { result } = renderHook(() => useActionItems(), { wrapper });
     act(() => {

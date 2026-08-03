@@ -32,8 +32,17 @@ import {
 import { ActionItem, NewItemForm } from './ActionItems/types';
 import { CHECK_IN_CADENCE_OPTIONS } from './ActionItems/constants';
 import { getCheckInCompliance } from './ActionItems/checkIn';
+import {
+  getDaysSinceLastReport,
+  getProgressTrend,
+  getStallState,
+  getStallSummary,
+  isTrendFlat,
+  bySilenceDesc,
+} from './ActionItems/stall';
 import NewItemDialog from './ActionItems/NewItemDialog';
 import { useActionItems } from '../contexts/ActionItemContext';
+import { toast } from 'sonner';
 
 const EMPTY_NEW_ITEM_FORM: NewItemForm = {
   title: '',
@@ -47,6 +56,55 @@ const EMPTY_NEW_ITEM_FORM: NewItemForm = {
 
 /** The shared store uses title-case labels; the local colour helpers key off slugs. */
 const toSlug = (value: string) => value.toLowerCase().replace(/\s+/g, '-');
+
+/**
+ * How long a project has been silent, drawn to the same scale across the board
+ * so two bars can be compared by eye. Length is the message; the number beside
+ * it is the confirmation.
+ */
+function SilenceBar({ days, max }: { days: number; max: number }) {
+  const pct = max <= 0 ? 0 : Math.min(100, Math.round((days / max) * 100));
+  return (
+    <div className="h-3 w-full rounded bg-muted overflow-hidden" role="presentation">
+      <div className="h-full bg-red-500/70" style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+/**
+ * Reported progress over successive check-ins. A flat line at 75% reads as
+ * stuck, which a 75%-full progress bar never does — that is the entire reason
+ * this replaced the progress bar on the board.
+ */
+function Sparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return <div className="w-14" />;
+
+  const width = 56;
+  const height = 18;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const flat = max === min;
+
+  const points = values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * width;
+      const y = height - 2 - ((value - min) / span) * (height - 4);
+      return `${x.toFixed(1)},${flat ? height / 2 : y.toFixed(1)}`;
+    })
+    .join(' ');
+
+  return (
+    <svg width={width} height={height} className="shrink-0" aria-hidden="true">
+      <polyline
+        points={points}
+        fill="none"
+        strokeWidth="1.5"
+        className={flat ? 'stroke-muted-foreground' : 'stroke-green-500'}
+      />
+    </svg>
+  );
+}
 
 interface CriticalFunction {
   id: string;
@@ -95,14 +153,33 @@ export default function CriticalFunctionsPlan() {
 
   // Rolling Action Items read the same store as Tasks & Action Items — one list of
   // projects, two views. Raising an item in either surface puts it on both.
-  const { actionItems, addActionItem, setCheckInCadence } = useActionItems();
+  const { actionItems, addActionItem, setCheckInCadence, nudge } = useActionItems();
   const [newItemForm, setNewItemForm] = useState<NewItemForm>(EMPTY_NEW_ITEM_FORM);
   const [isCreatingActionItem, setIsCreatingActionItem] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
   const selectedActionItem = actionItems.find(item => item.id === selectedActionItemId) ?? null;
 
-  const isOverdue = (item: ActionItem) => item.status !== 'Completed' && item.dueDate < today;
+  // The board is ranked by silence, not by creation order or percent complete:
+  // a project stuck at 75% for a month is the one that needs a lead, and a
+  // three-quarters-full progress bar is the last thing that would say so.
+  const stallSummary = getStallSummary(actionItems, today);
+  const ranked = [...actionItems].sort(bySilenceDesc(today));
+  const zones = {
+    quiet: ranked.filter(item => getStallState(item, today) === 'quiet'),
+    moving: ranked.filter(item => getStallState(item, today) === 'moving'),
+    fresh: ranked.filter(item => getStallState(item, today) === 'new'),
+    landed: ranked.filter(item => getStallState(item, today) === 'landed'),
+  };
+  // One scale for every bar, so their lengths are comparable at a glance.
+  const silenceScale = Math.max(1, stallSummary.longestSilence);
+
+  const handleNudge = (item: ActionItem) => {
+    nudge(item.id);
+    toast.success('Nudge Sent', {
+      description: `${item.contributors.map(c => c.name).join(', ') || 'The owner'} will see a status request on their task list.`,
+    });
+  };
 
   const handleCreateActionItem = () => {
     if (!newItemForm.title.trim() || !newItemForm.description.trim()) return;
@@ -476,58 +553,42 @@ export default function CriticalFunctionsPlan() {
 
         {/* Rolling Action Items Tab */}
         <TabsContent value="actions" className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* The stall radar: is the reporting habit landing, and what has gone dark. */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Actions</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{actionItems.length}</div>
-                <p className="text-xs text-muted-foreground">Active items</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-                <TrendingUp className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {actionItems.filter(item => item.status === 'In Progress').length}
-                </div>
-                <p className="text-xs text-muted-foreground">Currently active</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Overdue</CardTitle>
+                <CardTitle className="text-sm font-medium">Went Quiet</CardTitle>
                 <AlertTriangle className="h-4 w-4 text-red-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  {actionItems.filter(isOverdue).length}
-                </div>
-                <p className="text-xs text-muted-foreground">Need attention</p>
+                <div className="text-2xl font-bold text-red-600">{stallSummary.quietCount}</div>
+                <p className="text-xs text-muted-foreground">Missed a whole check-in cycle</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Awaiting Check-In</CardTitle>
-                <Bell className="h-4 w-4 text-indigo-500" />
+                <CardTitle className="text-sm font-medium">Longest Silence</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-indigo-600">
-                  {actionItems.reduce((count, item) => {
-                    const compliance = getCheckInCompliance(item, today);
-                    return count + (compliance ? compliance.total - compliance.reported : 0);
-                  }, 0)}
+                <div className="text-2xl font-bold">
+                  {stallSummary.longestSilence > 0 ? `${stallSummary.longestSilence}d` : '—'}
                 </div>
-                <p className="text-xs text-muted-foreground">Status reports outstanding</p>
+                <p className="text-xs text-muted-foreground">Since anyone last reported</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Reporting Rate</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stallSummary.rate}%</div>
+                <p className="text-xs text-muted-foreground">
+                  {stallSummary.reported} of {stallSummary.owed} filed this cycle
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -536,8 +597,8 @@ export default function CriticalFunctionsPlan() {
             <div>
               <h2>Rolling Action Items</h2>
               <p className="text-sm text-muted-foreground">
-                The lead team's project tracker. Every item here is the same record the owner sees on
-                their Tasks &amp; Action Items list.
+                Ranked by silence, not by percent complete. Every item here is the same record its
+                owner sees on their Tasks &amp; Action Items list.
               </p>
             </div>
             <Button onClick={() => setShowAddActionItem(true)}>
@@ -557,109 +618,153 @@ export default function CriticalFunctionsPlan() {
               </CardContent>
             </Card>
           ) : (
-          <div className="grid gap-4">
-            {actionItems.map((item) => {
-              const compliance = getCheckInCompliance(item, today);
-              const overdue = isOverdue(item);
-              const latestActivity = item.recentActivity[0];
+            <div className="space-y-8">
+              {/* Needs you — the reason the board exists. */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <h3 className="font-medium text-red-600">Needs You</h3>
+                  <span className="text-sm text-muted-foreground">
+                    {zones.quiet.length === 0
+                      ? 'Nothing has gone quiet'
+                      : `${zones.quiet.length} ${zones.quiet.length === 1 ? 'project has' : 'projects have'} gone quiet`}
+                  </span>
+                </div>
 
-              return (
-              <Card key={item.id} className={overdue ? 'border-red-200' : ''}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2 flex-wrap">
-                        {item.title}
-                        <Badge variant="outline" className="text-xs">
-                          <div className={`w-2 h-2 rounded-full ${getPriorityColor(toSlug(item.priority))} mr-1`}></div>
-                          {item.priority}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          <div className={`w-2 h-2 rounded-full ${getStatusColor(overdue ? 'overdue' : toSlug(item.status))} mr-1`}></div>
-                          {overdue ? 'Overdue' : item.status}
-                        </Badge>
-                        {item.checkIn && item.checkIn.cadence !== 'none' && (
-                          <Badge variant="outline" className="text-xs">
-                            <Bell className="w-3 h-3 mr-1" />
-                            {item.checkIn.cadence}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedActionItemId(item.id)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
+                {zones.quiet.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-6 flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <p className="text-sm text-muted-foreground">
+                        Every tracked project has reported inside its cycle.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-3">
+                    {zones.quiet.map(item => {
+                      const silence = getDaysSinceLastReport(item, today) ?? 0;
+                      const nudged = item.checkIn?.lastNudgedOn;
+                      return (
+                        <Card key={item.id} className="border-red-200">
+                          <CardContent className="p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="min-w-0">
+                                <button
+                                  className="font-medium text-left hover:underline"
+                                  onClick={() => setSelectedActionItemId(item.id)}
+                                >
+                                  {item.title}
+                                </button>
+                                <p className="text-sm text-muted-foreground">
+                                  {item.contributors.map(c => c.name).join(', ') || 'Nobody assigned'}
+                                  {' · '}
+                                  {isTrendFlat(item) ? 'stuck at' : 'last reported'} {item.progress}%
+                                </p>
+                              </div>
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {item.priority}
+                              </Badge>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <SilenceBar days={silence} max={silenceScale} />
+                              </div>
+                              <span className="text-sm text-red-600 whitespace-nowrap">
+                                silent {silence}d
+                              </span>
+                              {nudged ? (
+                                <Badge variant="outline" className="text-xs whitespace-nowrap">
+                                  <Bell className="w-3 h-3 mr-1" />
+                                  Nudged {formatDate(nudged)}
+                                </Badge>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => handleNudge(item)}>
+                                  <Bell className="w-4 h-4 mr-2" />
+                                  Nudge
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Responsible</Label>
-                        <p>{item.assignedBy}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Working On It</Label>
-                        <p>{item.contributors.map(c => c.name).join(', ') || '—'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Due Date</Label>
-                        <p>{formatDate(item.dueDate)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Module</Label>
-                        <p>{item.module}</p>
-                      </div>
-                    </div>
+                )}
+              </div>
 
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <Label className="text-sm font-medium">Progress</Label>
-                        <span className="text-sm font-medium">{item.progress}%</span>
-                      </div>
-                      <Progress value={item.progress} className="h-2" />
-                    </div>
-
-                    {/* Automatic status collection — who has reported this cycle. */}
-                    {compliance && (
-                      <div className="flex items-center gap-2 text-sm">
-                        {compliance.reported === compliance.total ? (
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <Clock className="w-4 h-4 text-amber-500" />
-                        )}
-                        <span>
-                          Check-in due {formatDate(compliance.dueOn)} —{' '}
-                          <span className="font-medium">{compliance.reported}/{compliance.total}</span> reported
-                        </span>
-                      </div>
-                    )}
-
-                    {latestActivity && (
-                      <div>
-                        <Label className="text-sm font-medium">Latest Update</Label>
-                        <div className="mt-2 p-3 bg-muted rounded-lg">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-medium">{latestActivity.user.name}</span>
-                            <span className="text-xs text-muted-foreground">{latestActivity.time}</span>
+              {/* Moving — compact, because it needs no decision. */}
+              {zones.moving.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp className="w-4 h-4 text-green-500" />
+                    <h3 className="font-medium text-green-600">Moving</h3>
+                  </div>
+                  <Card>
+                    <CardContent className="p-0 divide-y">
+                      {zones.moving.map(item => {
+                        const silence = getDaysSinceLastReport(item, today);
+                        const trend = getProgressTrend(item);
+                        return (
+                          <div key={item.id} className="flex items-center gap-4 px-4 py-3">
+                            <button
+                              className="flex-1 min-w-0 text-left text-sm hover:underline truncate"
+                              onClick={() => setSelectedActionItemId(item.id)}
+                            >
+                              {item.title}
+                            </button>
+                            <Sparkline values={trend} />
+                            <span className="text-sm text-muted-foreground w-24 text-right whitespace-nowrap">
+                              {trend.length > 1 && trend[0] !== trend[trend.length - 1]
+                                ? `${trend[0]} → ${item.progress}%`
+                                : `${item.progress}%`}
+                            </span>
+                            <span className="text-sm text-muted-foreground w-24 text-right whitespace-nowrap">
+                              {silence === null ? '—' : silence === 0 ? 'today' : `silent ${silence}d`}
+                            </span>
                           </div>
-                          <p className="text-sm">{latestActivity.action}</p>
-                        </div>
-                      </div>
-                    )}
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* New — tracked, but not yet due for a first report. */}
+              {zones.fresh.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Plus className="w-4 h-4 text-muted-foreground" />
+                    <h3 className="font-medium text-muted-foreground">Just Started</h3>
                   </div>
-                </CardContent>
-              </Card>
-              );
-            })}
-          </div>
+                  <Card>
+                    <CardContent className="p-0 divide-y">
+                      {zones.fresh.map(item => (
+                        <div key={item.id} className="flex items-center gap-4 px-4 py-3">
+                          <button
+                            className="flex-1 min-w-0 text-left text-sm hover:underline truncate"
+                            onClick={() => setSelectedActionItemId(item.id)}
+                          >
+                            {item.title}
+                          </button>
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">
+                            {item.checkIn && item.checkIn.cadence !== 'none'
+                              ? `first ${item.checkIn.cadence} check-in pending`
+                              : 'no check-ins scheduled'}
+                          </span>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle className="w-4 h-4" />
+                Landed · {zones.landed.length} complete
+              </div>
+            </div>
           )}
         </TabsContent>
 

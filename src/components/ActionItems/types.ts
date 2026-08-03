@@ -22,6 +22,12 @@ export interface ProjectCheckIn {
    */
   startedOn?: string;
   reports: CheckInReport[];
+  /**
+   * ISO date a lead last poked this project outside its cadence. Silence is the
+   * signal the board ranks on, so the ability to break it on demand — rather
+   * than wait for the next window — is part of the model, not a UI nicety.
+   */
+  lastNudgedOn?: string;
 }
 
 /**

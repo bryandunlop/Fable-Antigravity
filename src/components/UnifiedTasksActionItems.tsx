@@ -573,15 +573,22 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
       const outstanding = getOutstandingCheckIns(item, today);
       if (!outstanding) return [];
 
+      const nudgedOn = item.checkIn?.lastNudgedOn;
+
       return outstanding.contributors.map(contributor => ({
         id: `CheckIn-${item.id}-${outstanding.dueOn}-${contributor.id}`,
-        title: `Status update due: ${item.title}`,
-        description: `${contributor.name} owes a ${item.checkIn?.cadence} status report on this project. Report progress and what changed since the last check-in.`,
+        title: nudgedOn
+          ? `Status update requested: ${item.title}`
+          : `Status update due: ${item.title}`,
+        description: nudgedOn
+          ? `The lead team asked for an update on ${formatDate(nudgedOn)} — this project has gone quiet. Report progress and what changed.`
+          : `${contributor.name} owes a ${item.checkIn?.cadence} status report on this project. Report progress and what changed since the last check-in.`,
         module: 'Status Check-In',
         assignedBy: item.assignedBy,
         assignedDate: outstanding.dueOn,
         dueDate: outstanding.dueOn,
-        priority: item.priority,
+        // A lead reaching past the cadence is the strongest signal there is.
+        priority: nudgedOn ? 'Critical' : item.priority,
         status: 'Pending',
         progress: item.progress,
         contributors: [contributor],
