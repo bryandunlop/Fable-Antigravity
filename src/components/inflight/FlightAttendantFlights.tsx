@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import {
   Plane, Users, ShieldAlert, Cake, Utensils, ThumbsDown, ChevronRight, Clock,
   ArrowRight, Phone, Truck, AlertTriangle, CheckCircle2, Image as ImageIcon,
@@ -136,19 +136,19 @@ function CateringBlock({ order, now }: { order: FaCateringOrder; now: Date }) {
       </div>
 
       <dl className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs m-0">
-        <div className="flex justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5 sm:gap-2">
           <dt className="text-muted-foreground flex items-center gap-1"><Truck className="w-3 h-3" />Delivery</dt>
-          <dd className="text-right m-0 text-foreground">{fmtTime(order.deliveryUtc)} · {order.deliveryLocation}</dd>
+          <dd className="text-left sm:text-right m-0 text-foreground">{fmtTime(order.deliveryUtc)} · {order.deliveryLocation}</dd>
         </div>
-        <div className="flex justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5 sm:gap-2">
           <dt className="text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" />Order cut-off</dt>
-          <dd className={`text-right m-0 ${deadlinePassed ? 'text-red-700 dark:text-red-300 font-medium' : ''}`}>
+          <dd className={`text-left sm:text-right m-0 ${deadlinePassed ? 'text-red-700 dark:text-red-300 font-medium' : ''}`}>
             {fmtDateTime(order.orderDeadlineUtc)}{deadlinePassed ? ' · passed' : ''}
           </dd>
         </div>
-        <div className="flex justify-between gap-2 sm:col-span-2">
+        <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5 sm:gap-2 sm:col-span-2">
           <dt className="text-muted-foreground flex items-center gap-1 shrink-0"><Phone className="w-3 h-3" />Contact</dt>
-          <dd className="text-right m-0">
+          <dd className="text-left sm:text-right m-0">
             {order.contactPerson} ·{' '}
             <a className="text-blue-700 dark:text-blue-300 hover:underline" href={`tel:${order.phone.replace(/[^+\d]/g, '')}`}>{order.phone}</a>
             {order.email && <> · <a className="text-blue-700 dark:text-blue-300 hover:underline" href={`mailto:${order.email}`}>{order.email}</a></>}
@@ -196,7 +196,7 @@ function PassengerTable({ pax, departureUtc, onOpen }: {
         <button
           key={p.id}
           onClick={() => onOpen(p)}
-          className="w-full text-left px-3 py-2.5 hover:bg-muted flex items-center gap-3"
+          className="w-full text-left px-3 py-3 min-h-[52px] hover:bg-muted active:bg-muted flex items-center gap-3"
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -296,7 +296,7 @@ export default function FlightAttendantFlights() {
   ).length;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5 sm:space-y-6">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <Plane className="w-6 h-6 text-blue-600" />
@@ -378,24 +378,25 @@ export default function FlightAttendantFlights() {
         })}
       </div>
 
-      <Sheet open={!!openPax} onOpenChange={(o: boolean) => { if (!o) setOpenPax(null); }}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+      {/* A centred modal, not a side sheet: this is used one-handed on an iPhone and
+          two-handed on an iPad, where a right-edge panel is the far corner of the
+          screen. DialogContent is already height-capped and scrolls internally. */}
+      <Dialog open={!!openPax} onOpenChange={(o: boolean) => { if (!o) setOpenPax(null); }}>
+        <DialogContent className="sm:max-w-xl">
           {openPax && (
             <>
-              {/* The panel already leads with the name and role, so the sheet's own
-                  header is for assistive tech only — no visible duplicate. */}
-              <SheetHeader className="sr-only">
-                <SheetTitle>Passenger profile</SheetTitle>
-                <SheetDescription>{openPax.name} · {openPax.role}</SheetDescription>
-              </SheetHeader>
+              {/* The panel leads with the name and role, so this header is for
+                  assistive tech only — no visible duplicate. */}
+              <DialogHeader className="sr-only">
+                <DialogTitle>Passenger profile</DialogTitle>
+                <DialogDescription>{openPax.name} · {openPax.role}</DialogDescription>
+              </DialogHeader>
               <PassengerProfilePanel passenger={openPax} />
-              <div className="mt-6">
-                <Button variant="outline" className="w-full" onClick={() => setOpenPax(null)}>Close</Button>
-              </div>
+              <Button variant="outline" className="w-full h-12" onClick={() => setOpenPax(null)}>Close</Button>
             </>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
