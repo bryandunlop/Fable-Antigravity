@@ -13,6 +13,8 @@ import PassengerProfilePanel from '../passengers/PassengerProfilePanel';
 import { getFlightPassengers } from '../passengers/engine/flights';
 import { legMenuPlan, tripWindow, groundMinutes, formatGround } from './engine/menuPlan';
 import type { LegAllergen, LegMenuPlan } from './engine/menuPlan';
+import SummaryBar from '../shared/SummaryBar';
+import RecordList, { RecordRow } from '../shared/RecordList';
 import { buildFaTrips } from './faTrips';
 import type { CateringStatus, FaCateringOrder, FaLeg, FaTrip } from './faTrips';
 
@@ -203,40 +205,35 @@ function PassengerTable({ pax, departureUtc, onOpen }: {
 }) {
   if (pax.length === 0) return <p className="text-sm text-muted-foreground">No passengers listed for this leg.</p>;
   return (
-    <div className="border rounded-lg divide-y overflow-hidden bg-card">
+    <RecordList>
       {pax.map((p) => (
-        <button
+        <RecordRow
           key={p.id}
-          onClick={() => onOpen(p)}
-          className="w-full text-left px-3 py-3 min-h-[52px] hover:bg-muted active:bg-muted flex items-center gap-3"
-        >
-          {/* The name stays on one line and truncates. Left to wrap it broke into two
-              lines on a phone and pushed the role out from under the allergy badge. */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-medium text-sm truncate">{p.name}</span>
+          title={p.name}
+          meta={[p.role, p.food.join(', '), p.beverage.join(', ')].filter(Boolean).join(' \u00b7 ')}
+          badges={
+            <>
               {isBirthdaySoon(p.birthday, departureUtc) && (
-                <Badge className="bg-pink-100 text-pink-800 border-pink-200 text-xs shrink-0"><Cake className="w-3 h-3 mr-1" />Birthday</Badge>
+                <Badge className="bg-pink-100 text-pink-800 border-pink-200 text-xs shrink-0">
+                  <Cake className="w-3 h-3 mr-1" />Birthday
+                </Badge>
               )}
               {(p.photos?.length ?? 0) > 0 && (
-                <Badge variant="outline" className="text-xs shrink-0"><ImageIcon className="w-3 h-3 mr-1" />{p.photos!.length}</Badge>
+                <Badge variant="outline" className="text-xs shrink-0">
+                  <ImageIcon className="w-3 h-3 mr-1" />{p.photos!.length}
+                </Badge>
               )}
-            </div>
-            {/* Two lines on a phone, one on desktop: truncated to a single narrow line
-                the preview read "Board Chairman · W…", which tells the FA nothing. */}
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">
-              {[p.role, p.food.join(', '), p.beverage.join(', ')].filter(Boolean).join(' · ')}
-            </p>
-          </div>
-          {p.allergies.length > 0 && (
+            </>
+          }
+          trailing={p.allergies.length > 0 && (
             <Badge className={`text-xs shrink-0 ${ALLERGY_BADGE}`}>
               <ShieldAlert className="w-3 h-3 mr-1" />{p.allergies.length}
             </Badge>
           )}
-          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-        </button>
+          onOpen={() => onOpen(p)}
+        />
       ))}
-    </div>
+    </RecordList>
   );
 }
 
@@ -325,21 +322,14 @@ export default function FlightAttendantFlights() {
         </p>
       </div>
 
-      {/* One compact line, not four dashboard tiles. On a phone those tiles were a
-          whole screen of chrome standing between the FA and the first trip. */}
-      <div className="rounded-lg border bg-card px-3 py-2 text-sm flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span><span className="font-semibold">{trips.length}</span> trip{trips.length === 1 ? '' : 's'}</span>
-        <span><span className="font-semibold">{allLegs.length}</span> legs</span>
-        <span className="flex items-center gap-1">
-          <Users className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="font-semibold">{uniquePaxIds.size}</span> pax
-        </span>
-        {cateringToChase > 0 && (
-          <span className="flex items-center gap-1 text-red-700 dark:text-red-300 font-medium">
-            <Utensils className="w-3.5 h-3.5" />{cateringToChase} catering to chase
-          </span>
-        )}
-      </div>
+      <SummaryBar
+        items={[
+          { label: trips.length === 1 ? 'trip' : 'trips', value: trips.length },
+          { label: 'legs', value: allLegs.length },
+          { label: 'pax', value: uniquePaxIds.size, icon: Users },
+          { label: 'catering to chase', value: cateringToChase, icon: Utensils, tone: 'alert', hideWhenZero: true },
+        ]}
+      />
 
       {criticalAllergens > 0 && (
         <p className="text-sm rounded-lg border border-red-200 bg-red-50 text-red-900 px-3 py-2 flex items-center gap-2">

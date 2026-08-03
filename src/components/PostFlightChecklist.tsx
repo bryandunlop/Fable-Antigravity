@@ -6,11 +6,11 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
+import RecordList, { RecordRow } from './shared/RecordList';
 import {
   ClipboardCheck,
   Plus,
@@ -237,7 +237,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
         <div>
           <h1 className="flex items-center gap-2">
@@ -398,56 +398,30 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
             <CardTitle>Recent Flights</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Flight ID</TableHead>
-                  <TableHead>Aircraft</TableHead>
-                  <TableHead>Route</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {flights.map((flight) => (
-                  <TableRow key={flight.id}>
-                    <TableCell className="font-medium">{flight.id}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{flight.aircraft}</Badge>
-                    </TableCell>
-                    <TableCell>{flight.route}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        {new Date(flight.date).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getFlightStatusColor(flight)}>
-                        {getFlightStatus(flight)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 min-w-32">
-                        <Progress value={flight.completionRate} className="flex-1" />
-                        <span className="text-sm">{flight.completionRate}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedFlight(flight.id)}
-                      >
-                        View Checklist
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {/* Was a seven-column table — Flight ID / Aircraft / Route / Date /
+                Status / Progress / Actions. There is no CSS that makes seven columns
+                work at 390pt, and this checklist is run in the cabin on a phone after
+                every leg. One tappable row per flight instead; the row IS the "View
+                checklist" action, so that column disappears too. */}
+            <RecordList>
+              {flights.map((flight) => (
+                <RecordRow
+                  key={flight.id}
+                  title={`${flight.id} \u00b7 ${flight.route}`}
+                  meta={`${flight.aircraft} \u00b7 ${new Date(flight.date).toLocaleDateString()} \u00b7 ${flight.completionRate}% complete`}
+                  trailing={
+                    /* Trailing content has to stay narrow — a progress bar here
+                       squeezed the title to "FO001 ·…". The meta line already states
+                       the percentage, so the bar is desktop-only. */
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Progress value={flight.completionRate} className="hidden sm:block w-24" />
+                      <Badge className={`text-xs ${getFlightStatusColor(flight)}`}>{getFlightStatus(flight)}</Badge>
+                    </div>
+                  }
+                  onOpen={() => setSelectedFlight(flight.id)}
+                />
+              ))}
+            </RecordList>
           </CardContent>
         </Card>
       )}
@@ -642,7 +616,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
         <div className="text-center py-12">
           <ClipboardCheck className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium mb-2">Select a Flight</h3>
-          <p className="text-muted-foreground">Choose a flight from the table above to view and manage its post-flight checklist.</p>
+          <p className="text-muted-foreground">Choose a flight above to view and manage its post-flight checklist.</p>
         </div>
       )}
     </div>

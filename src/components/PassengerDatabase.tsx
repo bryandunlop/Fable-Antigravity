@@ -36,6 +36,8 @@ import { usePassengers } from './passengers/PassengerContext';
 import type { Passenger } from './passengers/passengerData';
 import { fileToDataUrl, makePhoto } from './passengers/photoUtil';
 import PassengerProfilePanel from './passengers/PassengerProfilePanel';
+import SummaryBar from './shared/SummaryBar';
+import RecordList, { RecordRow } from './shared/RecordList';
 
 interface PassengerDatabaseProps {
   userRole?: string;
@@ -617,26 +619,13 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
           </Dialog>
         </div>
 
-        {/* One compact line, not five stacked cards. On a phone those were a screen
-            and a half of coloured chrome before the first passenger, and the four hues
-            encoded nothing. */}
-        <div className="rounded-lg border bg-card px-3 py-2 text-sm flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span className="flex items-center gap-1">
-            <Users className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="font-semibold">{passengers.length}</span> passengers
-          </span>
-          {allergyCount > 0 && (
-            <span className="flex items-center gap-1 text-red-700 dark:text-red-300 font-medium">
-              <ShieldAlert className="w-3.5 h-3.5" />{allergyCount} with allergies
-            </span>
-          )}
-          {birthdaysThisMonth > 0 && (
-            <span className="flex items-center gap-1">
-              <Cake className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-semibold">{birthdaysThisMonth}</span> birthday{birthdaysThisMonth === 1 ? '' : 's'} this month
-            </span>
-          )}
-        </div>
+        <SummaryBar
+          items={[
+            { label: 'passengers', value: passengers.length, icon: Users },
+            { label: 'with allergies', value: allergyCount, icon: ShieldAlert, tone: 'alert', hideWhenZero: true },
+            { label: birthdaysThisMonth === 1 ? 'birthday this month' : 'birthdays this month', value: birthdaysThisMonth, icon: Cake, hideWhenZero: true },
+          ]}
+        />
 
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row gap-4">
@@ -682,46 +671,27 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
               </CardContent>
             </Card>
           ) : (
-            /* A list, not six open detail panes. Every field used to render inline for
-               every passenger — on a phone that was an unscrollable wall, and it was a
-               second copy of the profile markup that now lives in
-               PassengerProfilePanel. Tap a row for the full record. */
-            <div className="border rounded-lg divide-y overflow-hidden bg-card">
+            <RecordList>
               {filteredPassengers.map((passenger) => (
-                <div key={passenger.id} className="flex items-stretch">
-                  <button
-                    onClick={() => { setSelectedPassenger(passenger); setIsPassengerDetailOpen(true); }}
-                    className="flex-1 min-w-0 text-left px-3 py-3 min-h-[52px] hover:bg-muted active:bg-muted flex items-center gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-medium text-sm truncate">{passenger.name}</span>
-                        {(passenger.photos?.length ?? 0) > 0 && (
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            <ImageIcon className="w-3 h-3 mr-1" />{passenger.photos!.length}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">
-                        {[passenger.role, passenger.food.join(', '), passenger.beverage.join(', ')].filter(Boolean).join(' · ')}
-                      </p>
-                    </div>
-                    {hasAllergies(passenger) && (
-                      <Badge className="text-xs shrink-0 bg-red-500 text-white border-red-600">
-                        <ShieldAlert className="w-3 h-3 mr-1" />{passenger.allergies.length}
-                      </Badge>
-                    )}
-                  </button>
-                  <button
-                    aria-label={`Edit ${passenger.name}`}
-                    onClick={() => { setSelectedPassenger(passenger); setIsEditingPassenger(true); }}
-                    className="px-3 shrink-0 border-l hover:bg-muted active:bg-muted text-muted-foreground"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                </div>
+                <RecordRow
+                  key={passenger.id}
+                  title={passenger.name}
+                  meta={[passenger.role, passenger.food.join(', '), passenger.beverage.join(', ')].filter(Boolean).join(' \u00b7 ')}
+                  badges={(passenger.photos?.length ?? 0) > 0 && (
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      <ImageIcon className="w-3 h-3 mr-1" />{passenger.photos!.length}
+                    </Badge>
+                  )}
+                  trailing={hasAllergies(passenger) && (
+                    <Badge className="text-xs shrink-0 bg-red-500 text-white border-red-600">
+                      <ShieldAlert className="w-3 h-3 mr-1" />{passenger.allergies.length}
+                    </Badge>
+                  )}
+                  onOpen={() => { setSelectedPassenger(passenger); setIsPassengerDetailOpen(true); }}
+                  action={{ icon: Edit, label: `Edit ${passenger.name}`, onClick: () => { setSelectedPassenger(passenger); setIsEditingPassenger(true); } }}
+                />
               ))}
-            </div>
+            </RecordList>
           )}
         </div>
       </div>
