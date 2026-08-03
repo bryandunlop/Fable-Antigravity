@@ -47,7 +47,18 @@ function fmtBirthday(iso: string): string {
 /** The whole passenger record, read-only. Shared by the flight-attendant trip view's
  * slide-over so an FA sees the same profile the Passenger Database owns, without
  * leaving the trip they are planning. */
-export default function PassengerProfilePanel({ passenger }: { passenger: Passenger }) {
+export default function PassengerProfilePanel({
+  passenger,
+  showFlightAttendantNotes = true,
+  showPhotos = true,
+}: {
+  passenger: Passenger;
+  /** Cabin-crew notes are written for the cabin crew. The Passenger Database has always
+   *  gated them to the inflight role — keep that gate rather than widening it here. */
+  showFlightAttendantNotes?: boolean;
+  /** Off where the host renders its own photo section with add/remove controls. */
+  showPhotos?: boolean;
+}) {
   const { info, passengerComfort: comfort } = passenger;
   const photos = passenger.photos ?? [];
   const dislikes = passenger.dislikes ?? [];
@@ -134,10 +145,10 @@ export default function PassengerProfilePanel({ passenger }: { passenger: Passen
         </Section>
       )}
 
-      {(passenger.additionalNotes || passenger.flightAttendantNotes) && (
+      {(passenger.additionalNotes || (showFlightAttendantNotes && passenger.flightAttendantNotes)) && (
         <Section title="Notes" icon={FileText}>
           {passenger.additionalNotes && <p className="text-sm">{passenger.additionalNotes}</p>}
-          {passenger.flightAttendantNotes && (
+          {showFlightAttendantNotes && passenger.flightAttendantNotes && (
             <p className="text-sm mt-1.5 text-blue-900 bg-blue-50 border border-blue-100 rounded px-2 py-1.5">
               FA note: {passenger.flightAttendantNotes}
             </p>
@@ -145,7 +156,7 @@ export default function PassengerProfilePanel({ passenger }: { passenger: Passen
         </Section>
       )}
 
-      {photos.length > 0 && (
+      {showPhotos && photos.length > 0 && (
         <Section title={`Photos (${photos.length})`}>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {photos.map((ph) => (
