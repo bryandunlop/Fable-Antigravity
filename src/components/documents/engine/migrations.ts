@@ -8,7 +8,7 @@
 // is also a migration step's job (a fresh install gets it from the seeds).
 import type { AircraftType } from '../../tech-log/types';
 import type { Doc, DocCasMeta, DocumentsState } from '../types';
-import { safetyReadSeed, casKnowledgeSeed, TK_002_FLEET_TYPES } from '../mockData';
+import { safetyReadSeed, casKnowledgeSeed, cabinKnowledgeSeed, TK_002_FLEET_TYPES } from '../mockData';
 
 /**
  * The PRE-D65 doc shape: D60 hung the CAS facts off the mutable `Doc` identity row.
@@ -166,6 +166,27 @@ export const STORED_STATE_MIGRATIONS: StoredStateMigration[] = [
           const next = REMAP[d.category];
           return next ? { ...d, category: next } : d;
         }),
+      };
+    },
+  },
+  {
+    // D75 — the cabin knowledge seeds. Same shape and same reason as the CAS step below: new seed
+    // content reaches only a fresh install, because `loadInitialState` spreads persisted state OVER
+    // the seeds. Without this step anyone whose browser already holds a documents store opens the
+    // new Cabin knowledge tab to an empty shelf and concludes the feature does not work.
+    //
+    // Per-doc rather than all-or-nothing, so an entry a curator has since revised or archived is
+    // left alone and only genuinely absent ones are added.
+    to: '2026-08-03-cabin-knowledge-v1',
+    migrate: (s) => {
+      const { docs, revisions } = cabinKnowledgeSeed();
+      const missing = docs.filter((d) => !s.docs.some((x) => x.id === d.id));
+      if (missing.length === 0) return s;
+      const missingIds = new Set(missing.map((d) => d.id));
+      return {
+        ...s,
+        docs: [...s.docs, ...missing],
+        revisions: [...s.revisions, ...revisions.filter((r) => missingIds.has(r.docId))],
       };
     },
   },

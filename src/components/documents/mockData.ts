@@ -848,6 +848,13 @@ const cabinSeedRevision = (seed: CabinSeed): DocRevision => {
   };
 };
 
+/** D75 — exported so the stored-state migration brings an EXISTING demo store forward to the
+ *  cabin shelf. Without this the three entries reach only a fresh install, and anyone whose
+ *  browser already holds a documents store opens Cabin knowledge to an empty shelf. */
+export function cabinKnowledgeSeed(): { docs: Doc[]; revisions: DocRevision[] } {
+  return { docs: CABIN_SEEDS.map(cabinSeedDoc), revisions: CABIN_SEEDS.map(cabinSeedRevision) };
+}
+
 const SEED_DOCS: Doc[] = [
   {
     id: 'SOP-001',

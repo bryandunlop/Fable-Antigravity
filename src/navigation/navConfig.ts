@@ -91,9 +91,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // flight-ops as their own doors. They read in the Document Center now — one place,
   // all documents — so their keywords moved onto that entry rather than being lost.
   { path: '/currency-dashboard', label: 'Currency Dashboard', domain: 'home', icon: UserCheck, primary: true, keywords: ['currency', 'compliance', 'landings', '61.58'], roles: ['pilot', 'admin', 'lead', 'scheduling'] },
-  { path: '/aog-management', label: 'AOG Management', domain: 'home', icon: AlertOctagon, primary: true, keywords: ['aog', 'aircraft on ground', 'emergency'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
-  // Cross-role experimental tools live in the everyone-domain's More (spec deviation note).
-  { path: '/experimental/unified-trip', label: 'Trip Sandbox (Beta)', domain: 'home', icon: Sparkles, primary: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  // '/aog-management' and '/experimental/unified-trip' (Trip Sandbox) were REMOVED 2026-08-03:
+  // the tech log owns AOG (`/tech-log/aog`), and the sandbox was a beta that never graduated.
+  // The tech-log AOG page is maintenance-scoped, so this narrows who sees an AOG surface at all —
+  // if inflight/safety/scheduling need one, widen '/tech-log' below rather than reviving the
+  // standalone page.
 
   // ── Flight Ops — the Pilot Workspace is the front item; absorbed pages behind More ──
   { path: '/pilot-workspace', label: 'Pilot Workspace', domain: 'flight-ops', icon: CalendarCheck, primary: true, keywords: ['flight hub', 'my flights', 'preflight'], roles: ['pilot', 'chief-pilot', 'admin'] },
@@ -148,7 +150,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/inventory-v2/inspection', label: 'Inspection', domain: 'inventory', icon: ClipboardCheck, sidebar: false, searchable: false, detailLabel: 'Review', roles: ['inflight', 'admin'] },
 
   // ── Maintenance — trim-hard (2026-07-02): Tech Log + Parts primary; hub/dash/mel-cdl out of nav ──
-  { path: '/tech-log', label: 'Tech Log', domain: 'maintenance', icon: FileText, primary: true, keywords: ['squawk', 'defect', 'deferral', 'mel', 'release', 'work card'], roles: ['pilot', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+  { path: '/tech-log', label: 'Tech Log', domain: 'maintenance', icon: FileText, primary: true, keywords: ['squawk', 'defect', 'deferral', 'mel', 'release', 'work card', 'aog', 'aircraft on ground'], roles: ['pilot', 'maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/parts-inventory', label: 'Parts Inventory', domain: 'maintenance', icon: Boxes, primary: true, keywords: ['mycmp', 'procurement', 'stock'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/tech-work-analytics', label: 'Work Analytics', domain: 'maintenance', icon: BarChart3, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/mttr-dashboard', label: 'MTTR Dashboard', domain: 'maintenance', icon: Activity, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },

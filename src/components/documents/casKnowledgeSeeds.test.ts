@@ -405,8 +405,12 @@ describe('D65 — CAS meta moves onto the revision without losing curated conten
   it('loses nothing — every doc, revision and comment survives, with its own content intact', () => {
     const before = storedBeforeD65();
     const after = migrated();
-    expect(after.docs.map((d) => d.id).sort()).toEqual(before.docs.map((d) => d.id).sort());
-    expect(after.revisions.map((r) => r.id).sort()).toEqual(before.revisions.map((r) => r.id).sort());
+    // SUPERSET, not equality. The test's claim is "loses nothing", and a later seed-injecting step
+    // (D75's cabin knowledge) legitimately ADDS docs when the chain runs from this old version.
+    // Asserting equality made this test fail on a step that lost nothing at all — it was checking
+    // "the chain adds nothing ever", which is not a property this codebase has or wants.
+    for (const id of before.docs.map((d) => d.id)) expect(after.docs.map((d) => d.id)).toContain(id);
+    for (const id of before.revisions.map((r) => r.id)) expect(after.revisions.map((r) => r.id)).toContain(id);
     expect(after.comments).toEqual(before.comments);
     // The two collections the docstring claims and nothing previously checked.
     expect(after.acknowledgments).toEqual(before.acknowledgments);
@@ -416,9 +420,11 @@ describe('D65 — CAS meta moves onto the revision without losing curated conten
     expect(kept.isPinned).toBe(true);
     expect(kept.ownerName).toBe('Tom Parker');
     expect(after.docs.find((d) => d.id === retitledSeed().doc.id)?.title).toBe('Curator retitled this seed');
-    // The body of every revision is untouched — this step only ever adds two keys.
-    for (const r of after.revisions) {
-      expect(r.sections).toEqual(before.revisions.find((b) => b.id === r.id)!.sections);
+    // The body of every PRE-EXISTING revision is untouched — this step only ever adds two keys.
+    // Iterate `before`, not `after`: a later seed-injecting step adds revisions that by definition
+    // have no counterpart in `before`, and looking those up threw rather than proving anything.
+    for (const b of before.revisions) {
+      expect(after.revisions.find((r) => r.id === b.id)!.sections).toEqual(b.sections);
     }
   });
 
