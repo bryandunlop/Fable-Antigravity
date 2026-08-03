@@ -16,6 +16,8 @@ import type { AircraftType, CasColor } from '../../tech-log/types';
 import { CAS_KNOWLEDGE_CLASS_ID } from '../engine/casKnowledge';
 import { DOC_CLASS_LIST, classFor, type DocumentClassConfig } from '../classes';
 import { useDocuments, identityFor, publishApprovalRequestedEvent, publishRequiredReadEvent } from '../DocumentsContext';
+import { useFleetTypes } from '../../tech-log/TechLogContext';
+import { cabinSections } from '../engine/cabinSections';
 import { canAuthor, validateSubmit, validateDirectPublish } from '../engine/lifecycle';
 import { nextDocId, nextRevisionId, nextRevisionLabel, currentRevision } from '../engine/revisions';
 import { computeNextReviewDate } from '../engine/review';
@@ -41,8 +43,9 @@ export type EditorMode =
 
 const ALL_ROLES = Object.values(ROLE_CATEGORIES).flat();
 
-/** D60 — canonical type strings ("500/650/800" is display shorthand only). */
-const FLEET_TYPES: AircraftType[] = ['G650ER', 'G500', 'G800'];
+// LG-183 — the fleet-applicability picker no longer restates the type union. `useFleetTypes`
+// derives it from the tails actually on file, so adding an aircraft in Admin → Fleet is the only
+// place a type is ever "added" and this picker cannot drift from the fleet.
 const CAS_COLORS: CasColor[] = ['WHITE', 'CYAN', 'AMBER', 'RED'];
 
 function todayIso(): string {
@@ -71,6 +74,7 @@ export function DocEditorDialog({
   const { state, createDoc, updateDocMeta, createDraft, updateDraft, submitForApproval, publishDirect } = useDocuments();
   const userRoles = [userRole, ...additionalRoles];
   const authorable = DOC_CLASS_LIST.filter((c) => canAuthor(c, userRoles));
+  const FLEET_TYPES = useFleetTypes();
 
   const [classId, setClassId] = useState('');
   const [title, setTitle] = useState('');
@@ -108,7 +112,10 @@ export function DocEditorDialog({
       // A prefilled category matters, not cosmetics: creating from a tail page must land the note
       // in a Ship Notes section. The class's first category is now a general-LIBRARY one, so
       // without this a note authored on a tail vanishes from the shelf it was created on.
-      setCategory(mode.prefill?.category ?? cfg?.categories[0] ?? '');
+      // LG-183 — the default category must come from the LIVE list for a step-form class, or a
+      // renamed section leaves every new entry born on a name the picker no longer offers.
+      const initialCats = cfg?.stepForm ? cabinSections(state) : (cfg?.categories ?? []);
+      setCategory(mode.prefill?.category ?? initialCats[0] ?? '');
       setRoles([]);
       // A .docx-import prefill (Slice 4a) seeds sections once; otherwise start blank.
       setSections(mode.prefill?.content ? sectionsFromMarkdown(mode.prefill.content, 'new') : [emptySection()]);
@@ -189,6 +196,9 @@ export function DocEditorDialog({
   }, [open]);
 
   const cfg: DocumentClassConfig | undefined = classId ? classFor(classId) : undefined;
+  // LG-183 — cabin knowledge takes its sections from editable state; every other class still
+  // reads the constant on its class config.
+  const categoryOptions = cfg?.stepForm ? cabinSections(state) : (cfg?.categories ?? []);
   const hasPriorPublished = useMemo(() => {
     if (mode.kind === 'create') return false;
     return state.revisions.some(
@@ -410,7 +420,7 @@ export function DocEditorDialog({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Document class</Label>
-                <Select value={classId} onValueChange={(v: string) => { setClassId(v); const c = classFor(v); setCategory(c.categories[0]); setAckLevel(c.defaultAckLevel); setRequireAck(c.defaultAckLevel !== 'none'); }}>
+                <Select value={classId} onValueChange={(v: string) => { setClassId(v); const c = classFor(v); setCategory((c.stepForm ? cabinSections(state) : c.categories)[0]); setAckLevel(c.defaultAckLevel); setRequireAck(c.defaultAckLevel !== 'none'); }}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select class" /></SelectTrigger>
                   <SelectContent>
                     {authorable.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
@@ -422,7 +432,7 @@ export function DocEditorDialog({
                 <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(cfg?.categories ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

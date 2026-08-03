@@ -220,7 +220,11 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     ackLevelLocked: false,
     // The whole cabin crew may draft. Approval is the narrower list below — an `inflight` FA
     // cannot publish their own entry, which is the point of choosing four-eyes here.
-    authorRoles: ['inflight', 'lead-fa', 'fa-manager', 'commissary-manager', 'document-manager', 'admin'],
+    // LG-183 — Bryan's editor list is lead FA, FA manager, scheduling manager and admin; the wider
+    // cabin crew authors too. There is no owner gate anywhere in the engine, so an authoring role
+    // may revise ANY cabin entry, not only its own — which is what "as editable as possible" asks
+    // for. Approval stays the narrower list below.
+    authorRoles: ['inflight', 'lead-fa', 'fa-manager', 'commissary-manager', 'scheduling-manager', 'document-manager', 'admin'],
     approverRoles: ['fa-manager', 'lead-fa', 'lead', 'document-manager', 'admin'],
     commentsEnabled: true,
     defaultReviewCycleDays: 365,

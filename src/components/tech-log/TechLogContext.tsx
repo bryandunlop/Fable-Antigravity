@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState, useCallback, ReactNode } from 'react';
 import { toast } from 'sonner';
-import type { TechLogState, TechLogAction, Personnel, AuditEntry, PendingApproval, SupersedeEntityType } from './types';
+import type { TechLogState, TechLogAction, Personnel, AuditEntry, PendingApproval, SupersedeEntityType, AircraftType } from './types';
 import { getDefaultState } from './mockData/scenarios';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { wouldFork, buildSupersedeConflict } from './engine/supersede';
@@ -350,6 +350,29 @@ export function useTechLog(): Ctx {
   const c = useContext(TechLogContext);
   if (!c) throw new Error('useTechLog must be used within TechLogProvider');
   return c;
+}
+
+/**
+ * D75 — the fleet's aircraft types, DERIVED from the actual tails on file, in canonical order.
+ *
+ * Any picker that offers "which aircraft type" should read this rather than restate the union:
+ * add a tail in Admin → Fleet and it appears everywhere, and a hardcoded list can never quietly
+ * disagree with the fleet. The union still bounds what a type CAN be — that is load-bearing for
+ * MEL items, serviceability and checklists — so this widens *who maintains the list*, not what
+ * the system accepts.
+ *
+ * Deliberately does NOT throw outside a provider: this is a picker's option list, not an
+ * authority decision, and a surface rendered without the tech-log store should degrade to the
+ * full set rather than crash.
+ */
+export function useFleetTypes(): AircraftType[] {
+  const c = useContext(TechLogContext);
+  const order: AircraftType[] = ['G650ER', 'G500', 'G800'];
+  if (!c) return order;
+  const present = new Set(c.state.aircraft.map((a) => a.type));
+  const derived = order.filter((t) => present.has(t));
+  // An empty or not-yet-loaded fleet must not render an empty picker.
+  return derived.length ? derived : order;
 }
 
 /**

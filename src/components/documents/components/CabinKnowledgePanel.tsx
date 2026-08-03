@@ -1,23 +1,24 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BedDouble, Film, MessageSquare, Plus } from 'lucide-react';
+import { BedDouble, Film, MessageSquare, Plus, Settings2 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { GfoEmptyState } from '../../gfo';
 import { useDocuments } from '../DocumentsContext';
 import { isLiveComment } from '../types';
 import type { AircraftType } from '../../tech-log/types';
-import { classFor, CABIN_SECTIONS } from '../classes';
+import { classFor } from '../classes';
 import { canAuthor } from '../engine/lifecycle';
 import { currentRevision } from '../engine/revisions';
 import { stepNumbers } from '../engine/blocks';
+import { cabinSections, canManageCabinSections } from '../engine/cabinSections';
+import { useFleetTypes } from '../../tech-log/TechLogContext';
 import { DocEditorDialog } from './DocEditorDialog';
+import { CabinSectionsDialog } from './CabinSectionsDialog';
 import { ReviewFlagBadge } from './ReviewFlagBadge';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
 export const CABIN_KNOWLEDGE_CLASS_ID = 'cabin-knowledge';
-
-const FLEET_TYPES: AircraftType[] = ['G650ER', 'G500', 'G800'];
 
 /**
  * D75 — the flight attendants' shelf. Cabin know-how, grouped by what you are doing and filtered
@@ -30,10 +31,16 @@ const FLEET_TYPES: AircraftType[] = ['G650ER', 'G500', 'G800'];
 export function CabinKnowledgePanel({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { state } = useDocuments();
   const [creating, setCreating] = useState(false);
+  const [editingSections, setEditingSections] = useState(false);
   const [fleet, setFleet] = useState<AircraftType | 'all'>('all');
+  // LG-183 — both lists are now live: the fleet filter derives from the tails on file, the
+  // sections from editable state. Neither is restated here.
+  const FLEET_TYPES = useFleetTypes();
   const todayIso = operatorTodayIso();
   const cfg = classFor(CABIN_KNOWLEDGE_CLASS_ID);
-  const author = canAuthor(cfg, [userRole, ...additionalRoles]);
+  const userRoles = [userRole, ...additionalRoles];
+  const author = canAuthor(cfg, userRoles);
+  const sectionManager = canManageCabinSections(userRoles);
 
   const entries = state.docs
     .filter((d) => d.classId === CABIN_KNOWLEDGE_CLASS_ID && !d.isArchived)
@@ -43,7 +50,7 @@ export function CabinKnowledgePanel({ userRole, additionalRoles = [] }: { userRo
     .filter((e): e is { doc: typeof e.doc; rev: NonNullable<typeof e.rev> } => !!e.rev)
     .filter((e) => fleet === 'all' || (e.rev.fleetTypes ?? []).includes(fleet));
 
-  const sections = CABIN_SECTIONS.map((section) => ({
+  const sections = cabinSections(state).map((section) => ({
     section,
     items: entries.filter((e) => e.doc.category === section),
   })).filter((g) => g.items.length > 0);
@@ -56,11 +63,18 @@ export function CabinKnowledgePanel({ userRole, additionalRoles = [] }: { userRo
           and the quirks nobody writes down. Flight attendants write it; the cabin services manager
           publishes it.
         </p>
-        {author && (
-          <Button size="sm" onClick={() => setCreating(true)} className="shrink-0">
-            <Plus className="mr-1.5 h-4 w-4" /> New entry
-          </Button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {sectionManager && (
+            <Button size="sm" variant="outline" onClick={() => setEditingSections(true)}>
+              <Settings2 className="mr-1.5 h-4 w-4" /> Sections
+            </Button>
+          )}
+          {author && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> New entry
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -118,6 +132,8 @@ export function CabinKnowledgePanel({ userRole, additionalRoles = [] }: { userRo
           </div>
         ))
       )}
+
+      <CabinSectionsDialog open={editingSections} onOpenChange={setEditingSections} actorRoles={userRoles} />
 
       <DocEditorDialog
         open={creating}
