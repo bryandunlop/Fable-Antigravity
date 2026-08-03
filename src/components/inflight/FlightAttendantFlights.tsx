@@ -105,15 +105,20 @@ function AllergyRollup({ plan }: { plan: LegMenuPlan }) {
       {plan.dislikes.length > 0 && (
         <div className="mt-3 pt-3 border-t">
           <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-1.5">
-            <ThumbsDown className="w-3.5 h-3.5" /> Avoid (preference, not medical)
+            <ThumbsDown className="w-3.5 h-3.5 shrink-0" /> Avoid — preference, not medical
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          {/* One wrapping line each, chip + names, rather than a single pill carrying
+              both: "Overly sweet desserts · Patricia Alvarez" is wider than a phone. */}
+          <ul className="space-y-1 list-none p-0 m-0">
             {plan.dislikes.map((d) => (
-              <Badge key={d.item} className={`text-xs ${DISLIKE_BADGE}`}>
-                {d.item} <span className="ml-1 font-normal opacity-80">{d.passengers.join(', ')}</span>
-              </Badge>
+              <li key={d.item} className="text-xs flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <Badge className={`text-xs max-w-full whitespace-normal text-left ${DISLIKE_BADGE}`}>
+                  {d.item}
+                </Badge>
+                <span className="text-muted-foreground min-w-0 break-words">{d.passengers.join(', ')}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
     </div>
@@ -127,13 +132,18 @@ function CateringBlock({ order, now }: { order: FaCateringOrder; now: Date }) {
   // body text, and a light fill would strand the muted ones in the dark theme.
   return (
     <div className={`rounded-lg border bg-card p-3 ${needsAction ? 'border-2 border-red-400' : ''}`}>
-      <div className="flex items-start justify-between gap-2 flex-wrap">
-        <p className="text-sm font-semibold flex items-center gap-2">
-          <Utensils className="w-4 h-4 text-muted-foreground" />
-          {order.service} · {order.caterer}
+      {/* Service is the heading, caterer the second line. Run together they made a
+          three-line title on a phone with the icon orphaned beside it. */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold flex items-center gap-2 min-w-0">
+          <Utensils className="w-4 h-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">{order.service}</span>
         </p>
-        <Badge className={`text-xs ${CATERING_BADGE[order.status]}`}>{order.status}</Badge>
+        <Badge className={`text-xs shrink-0 ${CATERING_BADGE[order.status]}`}>{order.status}</Badge>
       </div>
+      {/* Caterer gets the full width on its own line — sharing the title row squeezed
+          "Air Culinaire Worldwide — Teterboro" into three words-per-line on a phone. */}
+      <p className="text-xs text-muted-foreground mt-0.5">{order.caterer}</p>
 
       <dl className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs m-0">
         <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5 sm:gap-2">
@@ -164,7 +174,9 @@ function CateringBlock({ order, now }: { order: FaCateringOrder; now: Date }) {
                 <span className="text-muted-foreground mr-1.5">{it.quantity}×</span>{it.name}
                 {it.note && <span className="text-muted-foreground"> — {it.note}</span>}
               </span>
-              <span className="text-muted-foreground shrink-0">{it.category}</span>
+              {/* Category is a desktop nicety; on a phone it fought the item note for
+                  the same line and left both ragged. */}
+              <span className="hidden sm:inline text-muted-foreground shrink-0">{it.category}</span>
             </li>
           ))}
         </ul>
@@ -198,19 +210,22 @@ function PassengerTable({ pax, departureUtc, onOpen }: {
           onClick={() => onOpen(p)}
           className="w-full text-left px-3 py-3 min-h-[52px] hover:bg-muted active:bg-muted flex items-center gap-3"
         >
+          {/* The name stays on one line and truncates. Left to wrap it broke into two
+              lines on a phone and pushed the role out from under the allergy badge. */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-sm">{p.name}</span>
-              <span className="text-xs text-muted-foreground">{p.role}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-medium text-sm truncate">{p.name}</span>
               {isBirthdaySoon(p.birthday, departureUtc) && (
-                <Badge className="bg-pink-100 text-pink-800 border-pink-200 text-xs"><Cake className="w-3 h-3 mr-1" />Birthday</Badge>
+                <Badge className="bg-pink-100 text-pink-800 border-pink-200 text-xs shrink-0"><Cake className="w-3 h-3 mr-1" />Birthday</Badge>
               )}
               {(p.photos?.length ?? 0) > 0 && (
-                <Badge variant="outline" className="text-xs"><ImageIcon className="w-3 h-3 mr-1" />{p.photos!.length}</Badge>
+                <Badge variant="outline" className="text-xs shrink-0"><ImageIcon className="w-3 h-3 mr-1" />{p.photos!.length}</Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-              {[p.food.join(', '), p.beverage.join(', ')].filter(Boolean).join(' · ') || 'No preferences on file'}
+            {/* Two lines on a phone, one on desktop: truncated to a single narrow line
+                the preview read "Board Chairman · W…", which tells the FA nothing. */}
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">
+              {[p.role, p.food.join(', '), p.beverage.join(', ')].filter(Boolean).join(' · ')}
             </p>
           </div>
           {p.allergies.length > 0 && (
@@ -295,8 +310,11 @@ export default function FlightAttendantFlights() {
     (l) => l.catering && (l.catering.status === 'Not ordered' || l.catering.status === 'Issue'),
   ).length;
 
+  // No padding of our own: the layout shell already pads (Navigation's <main> is
+  // p-6 pb-20 md:pb-6). Doubling it cost 32px of a 390pt phone and was what made every
+  // heading wrap.
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5 sm:space-y-6">
+    <div className="max-w-5xl mx-auto space-y-5 sm:space-y-6">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <Plane className="w-6 h-6 text-blue-600" />
@@ -307,23 +325,20 @@ export default function FlightAttendantFlights() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card><CardContent className="p-3">
-          <p className="text-xs text-muted-foreground">Trips</p>
-          <p className="text-2xl font-bold">{trips.length}</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-3">
-          <p className="text-xs text-muted-foreground">Legs</p>
-          <p className="text-2xl font-bold">{allLegs.length}</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-3">
-          <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> Passengers</p>
-          <p className="text-2xl font-bold">{uniquePaxIds.size}</p>
-        </CardContent></Card>
-        <Card className={cateringToChase > 0 ? 'border-2 border-red-400' : ''}><CardContent className="p-3">
-          <p className="text-xs text-muted-foreground flex items-center gap-1"><Utensils className="w-3 h-3" /> Catering to chase</p>
-          <p className={`text-2xl font-bold ${cateringToChase > 0 ? 'text-red-700 dark:text-red-300' : ''}`}>{cateringToChase}</p>
-        </CardContent></Card>
+      {/* One compact line, not four dashboard tiles. On a phone those tiles were a
+          whole screen of chrome standing between the FA and the first trip. */}
+      <div className="rounded-lg border bg-card px-3 py-2 text-sm flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span><span className="font-semibold">{trips.length}</span> trip{trips.length === 1 ? '' : 's'}</span>
+        <span><span className="font-semibold">{allLegs.length}</span> legs</span>
+        <span className="flex items-center gap-1">
+          <Users className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="font-semibold">{uniquePaxIds.size}</span> pax
+        </span>
+        {cateringToChase > 0 && (
+          <span className="flex items-center gap-1 text-red-700 dark:text-red-300 font-medium">
+            <Utensils className="w-3.5 h-3.5" />{cateringToChase} catering to chase
+          </span>
+        )}
       </div>
 
       {criticalAllergens > 0 && (
@@ -339,26 +354,30 @@ export default function FlightAttendantFlights() {
           return (
             <Card key={trip.id}>
               <CardHeader className="pb-3">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
-                      <span>{trip.tripNumber}</span>
-                      <span className="text-muted-foreground font-normal text-base">{trip.tripName}</span>
-                    </CardTitle>
-                    <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
-                      <span><Badge variant="outline" className="mr-1.5">{trip.tail}</Badge>{trip.aircraftType}</span>
-                      {window && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />{fmtDate(window.startUtc)} – {fmtDate(window.endUtc)}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1"><Users className="w-3 h-3" />{trip.cabinCrew.join(', ')}</span>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="w-fit">
-                    {trip.legs.length} leg{trip.legs.length === 1 ? '' : 's'} · {untilDeparture(trip.legs[0]?.departureUtc ?? '', now)}
+                {/* Title and countdown share the top line; everything else is one
+                    wrapping meta run. Five stacked rows on a phone was mostly labels. */}
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-base sm:text-lg min-w-0">
+                    {trip.tripNumber}{' '}
+                    <span className="text-muted-foreground font-normal">{trip.tripName}</span>
+                  </CardTitle>
+                  <Badge variant="secondary" className="shrink-0">
+                    {untilDeparture(trip.legs[0]?.departureUtc ?? '', now)}
                   </Badge>
                 </div>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-x-4 gap-y-1 flex-wrap">
+                  <span className="flex items-center gap-1.5">
+                    <Badge variant="outline" className="text-xs">{trip.tail}</Badge>{trip.aircraftType}
+                  </span>
+                  {window && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 shrink-0" />{fmtDate(window.startUtc)} – {fmtDate(window.endUtc)}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1 min-w-0">
+                    <Users className="w-3 h-3 shrink-0" /><span className="truncate">{trip.cabinCrew.join(', ')}</span>
+                  </span>
+                </p>
                 <RouteStrip trip={trip} />
               </CardHeader>
               <CardContent className="space-y-1">
