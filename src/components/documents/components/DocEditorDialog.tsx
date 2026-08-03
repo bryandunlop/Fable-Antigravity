@@ -21,6 +21,10 @@ import { nextDocId, nextRevisionId, nextRevisionLabel, currentRevision } from '.
 import { computeNextReviewDate } from '../engine/review';
 import { sectionsFromMarkdown, checksumForSections } from '../engine/blocks';
 import { SectionedEditor } from './SectionedEditor';
+import { StepFormEditor } from './StepFormEditor';
+import {
+  stepFormFromSections, stepFormToSections, stepFormToMarkdown, emptyStepFormModel, type StepFormModel,
+} from '../engine/stepForm';
 import { emptySection } from '../engine/blockEditor';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
@@ -87,6 +91,12 @@ export function DocEditorDialog({
   const [casColor, setCasColor] = useState<CasColor>('AMBER');
   const [cmcCodes, setCmcCodes] = useState<string[]>([]);
   const [cmcDraft, setCmcDraft] = useState('');
+  // D75 — the semi-rigid form. `useStepForm` is state, not a derived `cfg.stepForm`, because an
+  // entry can outgrow the form: `stepFormFromSections` reports lossy and we fall back to the full
+  // editor rather than silently dropping the table someone added.
+  const [stepModel, setStepModel] = useState<StepFormModel>(emptyStepFormModel());
+  const [useStepForm, setUseStepForm] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -115,6 +125,11 @@ export function DocEditorDialog({
       setCasColor(mode.prefill?.casMeta?.casColor ?? 'AMBER');
       setCmcCodes(mode.prefill?.casMeta?.cmcCodes ?? []);
       setCmcDraft('');
+      // A new entry on a step-form class starts in the form; a .docx prefill starts in the full
+      // editor, because imported content is exactly the arbitrary shape the form cannot hold.
+      setStepModel(emptyStepFormModel());
+      setUseStepForm(!!cfg?.stepForm && !mode.prefill?.content);
+      setVideoUrl('');
     } else {
       const doc = mode.doc;
       const rev = mode.kind === 'revise' ? mode.baseRev : mode.rev;
@@ -158,6 +173,17 @@ export function DocEditorDialog({
       setCasColor(rev.casMeta?.casColor ?? 'AMBER');
       setCmcCodes(rev.casMeta?.cmcCodes ?? []);
       setCmcDraft('');
+      // Reading the existing tree decides the editor: the form opens only if it can hold what is
+      // already there. `revise` with a suggestion prefill is markdown, so read the parsed prefill,
+      // not the base revision — otherwise the form would show the OLD steps and save them back.
+      const bodySections =
+        mode.kind === 'revise' && mode.prefill?.content
+          ? sectionsFromMarkdown(mode.prefill.content, doc.id)
+          : rev.sections;
+      const { model, lossy } = stepFormFromSections(bodySections);
+      setStepModel(model);
+      setUseStepForm(!!cfg.stepForm && !lossy);
+      setVideoUrl(rev.videos?.[0]?.url ?? '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -193,9 +219,17 @@ export function DocEditorDialog({
 
   const buildRecords = (): { doc: Doc; rev: DocRevision; liveControlled: boolean } | null => {
     if (!cfg) return null;
-    const hasContent = sections.some((s) => s.title.trim() || s.blocks.some((b) => b.md.trim()));
+    // D75 — the form is a projection. Validate it here, but serialize it below against the real
+    // doc id, so form-authored blocks get the same `<docId>::<section>::bN` ids as any other.
+    const hasContent = useStepForm
+      ? stepFormToMarkdown(stepModel).trim().length > 0
+      : sections.some((s) => s.title.trim() || s.blocks.some((b) => b.md.trim()));
     if (!title.trim() || !hasContent || roles.length === 0) {
-      toast.error('Title, content, and at least one audience role are required.');
+      toast.error(
+        useStepForm
+          ? 'Title, at least one step, and at least one audience role are required.'
+          : 'Title, content, and at least one audience role are required.',
+      );
       return null;
     }
     const casEnabled = cfg.id === CAS_KNOWLEDGE_CLASS_ID;
@@ -258,6 +292,16 @@ export function DocEditorDialog({
         doc.roles.some((r, i) => r !== mode.doc.roles[i]) ||
         doc.tags.length !== mode.doc.tags.length ||
         doc.tags.some((t, i) => t !== mode.doc.tags[i]));
+    const bodySections = useStepForm ? stepFormToSections(stepModel, doc.id) : sections;
+    // Sidecar media. The video field is the step form's (D75, fork 3 — link only, no upload); the
+    // images/links beside it belong to migrated legacy bulletins and are carried forward so a
+    // revision is not the thing that deletes them.
+    const priorRev = mode.kind === 'create' ? undefined : mode.kind === 'revise' ? mode.baseRev : mode.rev;
+    const videos = cfg.stepForm
+      ? videoUrl.trim()
+        ? [{ url: videoUrl.trim(), title: title.trim() }]
+        : undefined
+      : priorRev?.videos;
     const rev: DocRevision = {
       id:
         mode.kind === 'edit-draft'
@@ -266,8 +310,11 @@ export function DocEditorDialog({
       docId: doc.id,
       revision: revisionLabel.trim() || '1.0',
       status: 'draft',
-      sections,
-      mockChecksum: checksumForSections(sections),
+      sections: bodySections,
+      mockChecksum: checksumForSections(bodySections),
+      images: priorRev?.images,
+      videos,
+      links: priorRev?.links,
       changeSummary: changeSummary.trim(),
       effectiveDate,
       authorUserId: userId,
@@ -404,11 +451,59 @@ export function DocEditorDialog({
           </div>
 
           <div>
-            <Label className="text-xs">Content</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label className="text-xs">{useStepForm ? 'Steps' : 'Content'}</Label>
+              {/* Escape hatch, both ways. Form → full editor is always safe. Full editor → form is
+                  offered only when the current tree fits, and takes the parsed tree with it. */}
+              {cfg?.stepForm && (useStepForm ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => { setSections(stepFormToSections(stepModel, mode.kind === 'create' ? 'new' : mode.doc.id)); setUseStepForm(false); }}
+                >
+                  Switch to the full editor
+                </Button>
+              ) : stepFormFromSections(sections).lossy ? (
+                <span className="text-xs text-muted-foreground">
+                  This entry has content the step form can’t hold.
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => { setStepModel(stepFormFromSections(sections).model); setUseStepForm(true); }}
+                >
+                  Switch to the step form
+                </Button>
+              ))}
+            </div>
             <div className="mt-1">
-              <SectionedEditor sections={sections} onChange={setSections} />
+              {useStepForm ? (
+                <StepFormEditor model={stepModel} onChange={setStepModel} />
+              ) : (
+                <SectionedEditor sections={sections} onChange={setSections} />
+              )}
             </div>
           </div>
+
+          {cfg?.stepForm && (
+            <div>
+              <Label htmlFor="docVideo" className="text-xs">Video (optional)</Label>
+              <Input
+                id="docVideo"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="Link to the walkthrough — YouTube, Vimeo, or any URL"
+                className="mt-1"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                A link, not an upload. Record it wherever your crew already shares video and paste
+                the link here.
+              </p>
+            </div>
+          )}
 
           {hasPriorPublished && (
             <div>

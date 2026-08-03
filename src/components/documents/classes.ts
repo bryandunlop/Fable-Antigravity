@@ -39,6 +39,15 @@ export interface DocumentClassConfig {
    * no approval logic.
    */
   fleetScoped?: boolean;
+  /**
+   * D75 — author this class through the semi-rigid step form instead of the general block editor.
+   *
+   * This is a property of the AUTHORING SURFACE only. The form emits ordinary `step` / `figure` /
+   * `callout` blocks (`engine/stepForm`), so nothing downstream — reader, search, diff, print,
+   * checksum — knows or cares which editor produced a revision. A `stepForm` entry that has since
+   * grown a table falls back to the full editor: the flag is a default, not a cage.
+   */
+  stepForm?: boolean;
 }
 
 /**
@@ -73,6 +82,24 @@ export const SHIP_NOTE_SECTIONS = [
 ] as const;
 
 export type ShipNoteSection = (typeof SHIP_NOTE_SECTIONS)[number];
+
+/**
+ * D75 — the cabin knowledge shelf's sections, in display order.
+ *
+ * Same construction as `SHIP_NOTE_SECTIONS`: these are `Doc.category` values, so the editor's
+ * category picker IS the section picker and no schema moves. And the same rule — what you are
+ * DOING, not who you are — which is why there is no 'Flight attendant' section on a shelf that
+ * only flight attendants write.
+ */
+export const CABIN_SECTIONS = [
+  'Bedding & crew rest',
+  'Cabin systems & lighting',
+  'Connectivity & entertainment',
+  'Galley & service',
+  'Quirks & field notes',
+] as const;
+
+export type CabinSection = (typeof CABIN_SECTIONS)[number];
 
 const APPROVERS = ['document-manager', 'lead', 'admin'];
 const BULLETIN_AUTHORS = ['admin', 'safety', 'lead', 'document-manager', 'procedural-specialist'];
@@ -170,6 +197,36 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     // idea, which is how a picker starts lying about where things go.
     categories: ['Airports & FBOs', 'Operations', ...SHIP_NOTE_SECTIONS],
     fleetScoped: true,
+  },
+  /**
+   * D75 — cabin know-how, written by flight attendants, for flight attendants.
+   *
+   * Deliberately NOT folded into `tribal-knowledge`, which is maintenance's shelf: one class
+   * would put "setting up the aft divan" and "SATC bus fault is a known nuisance" in the same
+   * picker and the same section list, and the categories would have to serve both.
+   *
+   * `controlled: true` is Bryan's call (D75, fork 2) — an FA drafts, the FA manager publishes, so
+   * the cabin standard stays consistent across crews. It is the `sop` posture minus the signature:
+   * `defaultAckLevel: 'none'` because know-how is not a required read, but `ackLevelLocked: false`
+   * so a manager can demand a read-and-initial on the one entry where a standard actually changed.
+   */
+  'cabin-knowledge': {
+    id: 'cabin-knowledge',
+    label: 'Cabin Knowledge',
+    labelPlural: 'Cabin Knowledge',
+    idPrefix: 'CK',
+    controlled: true,
+    defaultAckLevel: 'none',
+    ackLevelLocked: false,
+    // The whole cabin crew may draft. Approval is the narrower list below — an `inflight` FA
+    // cannot publish their own entry, which is the point of choosing four-eyes here.
+    authorRoles: ['inflight', 'lead-fa', 'fa-manager', 'commissary-manager', 'document-manager', 'admin'],
+    approverRoles: ['fa-manager', 'lead-fa', 'lead', 'document-manager', 'admin'],
+    commentsEnabled: true,
+    defaultReviewCycleDays: 365,
+    categories: [...CABIN_SECTIONS],
+    fleetScoped: true,
+    stepForm: true,
   },
 };
 

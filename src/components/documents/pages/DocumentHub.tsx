@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BarChart3, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
+import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -27,6 +27,7 @@ import { ReviewFlagBadge } from '../components/ReviewFlagBadge';
 import { ApprovalQueuePanel } from '../components/ApprovalQueuePanel';
 import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
 import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
+import { CabinKnowledgePanel } from '../components/CabinKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
 import { ComplianceMatrix } from '../components/ComplianceMatrix';
 import { DocEditorDialog } from '../components/DocEditorDialog';
@@ -51,6 +52,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
   const userRoles = [userRole, ...additionalRoles];
   const manager = canManageDocuments(userRole, additionalRoles);
   const authorCapable = DOC_CLASS_LIST.some((c) => canAuthor(c, userRoles));
+  const cabinCrew = userRoles.some((r) => ['inflight', 'lead-fa', 'fa-manager', 'commissary-manager'].includes(r));
 
   // Seed-import a .docx into a new draft: parse to markdown, open the create editor
   // prefilled, then the author fills class/audience/ack and saves via four-eyes.
@@ -164,7 +166,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
         {manager && <GfoStatCard label="Open suggestions" value={openSugs} />}
       </div>
 
-      <Tabs defaultValue={myOutstanding.length > 0 ? 'my-reads' : 'library'}>
+      {/* D75 — cabin crew land on their own shelf. A flight attendant opening the Document Center
+          wants "how does the bedding go together on this tail", not the SOP library; required
+          reads still win, because those are the ones with a due date. */}
+      <Tabs defaultValue={myOutstanding.length > 0 ? 'my-reads' : cabinCrew ? 'cabin-knowledge' : 'library'}>
         <TabsList>
           <TabsTrigger value="my-reads" className="gap-1.5">
             <BookOpenCheck className="h-4 w-4" /> My required reads
@@ -177,6 +182,9 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           </TabsTrigger>
           <TabsTrigger value="tribal-knowledge" className="gap-1.5">
             <Lightbulb className="h-4 w-4" /> Tribal knowledge
+          </TabsTrigger>
+          <TabsTrigger value="cabin-knowledge" className="gap-1.5">
+            <BedDouble className="h-4 w-4" /> Cabin knowledge
           </TabsTrigger>
           {manager && (
             <TabsTrigger value="compliance" className="gap-1.5">
@@ -303,6 +311,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
         <TabsContent value="tribal-knowledge" className="mt-4">
           <TribalKnowledgePanel userRole={userRole} additionalRoles={additionalRoles} />
+        </TabsContent>
+
+        <TabsContent value="cabin-knowledge" className="mt-4">
+          <CabinKnowledgePanel userRole={userRole} additionalRoles={additionalRoles} />
         </TabsContent>
 
         <TabsContent value="compliance" className="mt-4">

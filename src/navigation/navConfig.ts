@@ -178,7 +178,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/safety/form-fields', label: 'Form Field Manager', domain: 'safety', icon: Sliders, sidebar: false, keywords: ['frat', 'grat', 'customize', 'scoring'], roles: ['safety', 'admin'] },
 
   // ── Documents ─────────────────────────────────────────────────────────────
-  { path: '/documents', label: 'Document Center', domain: 'documents', icon: Archive, primary: true, detailLabel: 'Document', keywords: ['manual', 'gom', 'library', 'sop', 'compliance', 'read and initial', 'tribal knowledge', 'bulletin', 'bulletins', 'procedural bulletin', 'flight ops bulletin', 'pb', 'fob', 'interim', 'nonofficial'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'procedural-specialist'] },
+  { path: '/documents', label: 'Document Center', domain: 'documents', icon: Archive, primary: true, detailLabel: 'Document', keywords: ['manual', 'gom', 'library', 'sop', 'compliance', 'read and initial', 'tribal knowledge', 'bulletin', 'bulletins', 'procedural bulletin', 'flight ops bulletin', 'pb', 'fob', 'interim', 'nonofficial', 'cabin knowledge', 'bedding', 'cabin lighting', 'wifi'], roles: ['pilot', 'inflight', 'lead-fa', 'fa-manager', 'commissary-manager', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'procedural-specialist'] },
   { path: '/documents', label: 'Document Library', domain: 'documents', icon: Archive, primary: true, roles: ['dms-manager'] },
 
   // ── Admin ─────────────────────────────────────────────────────────────────

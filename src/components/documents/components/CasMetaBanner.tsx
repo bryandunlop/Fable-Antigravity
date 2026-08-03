@@ -35,9 +35,14 @@ export function CasMetaBanner({ rev }: { rev: DocRevision | undefined }) {
       </div>
       <p className="mt-2 flex items-start gap-2 text-xs text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        {/* The CMC half is CONDITIONAL. The banner fires on `fleetTypes` alone, so it also renders
+            on a fleet-scoped `sop` and on D75 cabin knowledge — neither of which has, or could
+            have, a CMC code. Stating "any CMC codes listed…" on an entry about bedding is the
+            banner describing a field the class does not own. */}
         <span>
-          Reference only — curated field knowledge, not an airworthiness record. Any CMC codes listed
-          are hand-curated relations, not a diagnosis of a specific defect.
+          Reference only — curated field knowledge, not an airworthiness record.
+          {codes.length > 0 &&
+            ' Any CMC codes listed are hand-curated relations, not a diagnosis of a specific defect.'}
         </span>
       </p>
     </div>
