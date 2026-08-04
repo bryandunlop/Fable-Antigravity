@@ -216,6 +216,34 @@ const secondRequest: TripRequest = {
   messages: [],
 };
 
+// Deliberately tier 3 and submitted last, but departing this week — the case the
+// banding exists for. A flat tier-then-time list buries it under two requests
+// that do not fly for a fortnight.
+const departingSoonRequest: TripRequest = {
+  id: 'R-2051',
+  status: 'pending',
+  tier: 3,
+  principalId: 'P-TANAKA',
+  requestedBy: 'P. Marsh',
+  createdAt: isoAt(-1, '11:20'),
+  extras: ['Ground at destination'],
+  note: 'Plant visit — needs to be back same day.',
+  legs: [
+    {
+      id: 'L-5',
+      from: 'KCVG',
+      to: 'KTEB',
+      date: isoDate(4),
+      departLocal: '06:30',
+      flexHours: 1,
+      estMinutes: 105,
+      estNm: 570,
+      passengers: [{ passengerId: 'P-TANAKA', lead: true, purpose: 'business' }],
+    },
+  ],
+  messages: [],
+};
+
 const declinedRequest: TripRequest = {
   id: 'R-2044',
   status: 'declined',
@@ -268,7 +296,7 @@ const watches: Watch[] = [
 export function initialPortalState(): PortalState {
   return {
     persona: 'ea',
-    requests: [seedRequest, secondRequest, declinedRequest],
+    requests: [seedRequest, secondRequest, departingSoonRequest, declinedRequest],
     flights,
     seatAsks: [],
     watches,

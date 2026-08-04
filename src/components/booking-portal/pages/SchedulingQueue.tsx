@@ -1,155 +1,239 @@
-// Frame D — scheduling's queue, ranked by org tier then request time
-// (provisional default), cleared at a published time. Overrides and declines
-// both demand a reason; requesters never see their position.
+// The scheduling side, in the Command Center's language: a funnel summary over
+// the horizon, urgency bands as cards, request clusters you can act on in
+// place, and a drawer so reading one request never costs you your place in the
+// ranked list.
+//
+// Banding is presentation. The policy underneath is unchanged — org tier, then
+// request time — and "Departing soon" only lifts a band, it does not reorder
+// within one.
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import {
+  AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Inbox, ListChecks, Plane, Users,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
 import { PortalShell } from '../components/PortalShell';
-import { AsOf, Card, Chip, SectionLabel } from '../components/portalUi';
+import { RequestDrawer } from '../components/RequestDrawer';
+import { RequestIdentityLine } from '../components/RequestIdentity';
+import { AsOf } from '../components/portalUi';
 import { usePortal } from '../BookingPortalContext';
-import { rankQueue, routeLabel } from '../engine/lifecycle';
+import { buildQueue, overallRank, type QueueBand } from '../engine/queueBands';
+import type { TripRequest } from '../types';
+import { cn } from '../../ui/utils';
+
+const BAND_META: Record<Exclude<QueueBand, 'seat-asks'>, { label: string; hint: string; icon: React.ElementType; accent: string }> = {
+  'departing-soon': { label: 'Departing soon', hint: 'inside 7 days — decide these first', icon: AlertTriangle, accent: 'status-error' },
+  pending: { label: "Today's clear", hint: 'ranked by tier, then request time', icon: ListChecks, accent: 'status-warning' },
+  'awaiting-placement': { label: 'Approved — awaiting placement', hint: 'approved is a decision; confirmed is a schedule', icon: CalendarClock, accent: 'status-info' },
+};
+const BAND_ORDER: Exclude<QueueBand, 'seat-asks'>[] = ['departing-soon', 'pending', 'awaiting-placement'];
+
+type Filter = 't1' | 't2' | 't3';
 
 export default function SchedulingQueue() {
   const { state, dispatch } = usePortal();
+  const [filters, setFilters] = useState<Set<Filter>>(new Set());
+  const [drawerId, setDrawerId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
-  const queue = rankQueue(state.requests);
-  const approved = state.requests.filter((r) => r.status === 'approved');
-  const seatAsks = state.seatAsks.filter((s) => s.status === 'requested');
+  const model = buildQueue(state.requests, state.seatAsks, Date.now());
 
   if (state.persona !== 'scheduling') {
     return (
       <PortalShell title="Booking queue">
-        <p className="text-sm text-muted-foreground">The queue is scheduling's side of the portal — switch persona (top right) to work it.</p>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 p-12 text-muted-foreground">
+            <Users className="h-10 w-10 opacity-40" />
+            <p className="font-medium">The queue is scheduling's side of the portal.</p>
+            <p className="text-sm">Switch persona at the top right to work it.</p>
+          </CardContent>
+        </Card>
       </PortalShell>
     );
   }
 
+  const toggle = (f: Filter) =>
+    setFilters((prev) => { const s = new Set(prev); s.has(f) ? s.delete(f) : s.add(f); return s; });
+  const matches = (r: TripRequest) => filters.size === 0 || filters.has(`t${r.tier}` as Filter);
+
+  const chips: { key: Filter; label: string; count: number; dot: string }[] = [
+    { key: 't1', label: 'Tier 1', count: model.tiers.t1, dot: 'bg-[var(--gfo-error,#EF3340)]' },
+    { key: 't2', label: 'Tier 2', count: model.tiers.t2, dot: 'bg-[var(--gfo-warning,#F1B434)]' },
+    { key: 't3', label: 'Tier 3', count: model.tiers.t3, dot: 'bg-muted-foreground/40' },
+  ];
+
+  const shown = BAND_ORDER.map((b) => ({ band: b, rows: model.bands[b].filter(matches) }));
+  const totalShown = shown.reduce((n, s) => n + s.rows.length, 0) + model.seatAsks.length;
+
   return (
-    <PortalShell title="Booking queue · daily clear 14:00 ET" meta={<AsOf>{queue.length + seatAsks.length} pending</AsOf>}>
-      <SectionLabel>Trip requests — default order: tier, then request time</SectionLabel>
-      <Card className="mb-6">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <th className="px-4 py-2.5 w-12">Rank</th>
-              <th className="px-4 py-2.5">Request</th>
-              <th className="px-4 py-2.5">Requester</th>
-              <th className="px-4 py-2.5 w-16">Tier</th>
-              <th className="px-4 py-2.5">Requested</th>
-              <th className="px-4 py-2.5 w-56"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.map((r, i) => {
-              const principal = state.passengers.find((p) => p.id === r.principalId);
-              return (
-                <tr key={r.id} className="border-b border-border align-top last:border-0">
-                  <td className="px-4 py-2.5 tabular-nums">{i + 1}</td>
-                  <td className="px-4 py-2.5">
-                    <Link to={`/booking-portal/requests/${r.id}`} className="font-semibold text-[#0077CC] dark:text-[#4FB6FD]">{r.id}</Link>
-                    {' '}· {routeLabel(r)} · {r.legs[0]?.date ?? '—'}
-                  </td>
-                  <td className="px-4 py-2.5">{principal?.name ?? '—'} <span className="text-xs text-muted-foreground">({r.requestedBy})</span></td>
-                  <td className="px-4 py-2.5">
-                    <span className="inline-block w-8 bg-[#142D7E] py-0.5 text-center text-[10.5px] font-semibold text-white">T{r.tier}</span>
-                  </td>
-                  <td className="px-4 py-2.5 tabular-nums text-muted-foreground">{new Date(r.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                  <td className="px-4 py-2.5">
-                    {decliningId === r.id ? (
-                      <div className="flex gap-1.5">
-                        <input
-                          autoFocus
-                          aria-label="Decline reason"
-                          className="w-44 border border-border bg-background px-2 py-1 text-xs"
-                          placeholder="Reason (required)"
-                          value={reason}
-                          onChange={(e) => setReason(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          disabled={!reason.trim()}
-                          onClick={() => { dispatch({ type: 'DECLINE_REQUEST', id: r.id, reason: reason.trim() }); setDecliningId(null); setReason(''); }}
-                          className="border border-destructive px-2 py-1 text-xs font-semibold text-destructive disabled:opacity-40"
-                        >
-                          Decline
-                        </button>
-                        <button type="button" onClick={() => { setDecliningId(null); setReason(''); }} className="px-1 text-xs text-muted-foreground">✕</button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => dispatch({ type: 'APPROVE_REQUEST', id: r.id })}
-                          className="bg-[#0096FC] px-3 py-1 text-xs font-semibold text-white hover:bg-[#0077CC]"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDecliningId(r.id)}
-                          className="border border-destructive px-3 py-1 text-xs font-semibold text-destructive"
-                        >
-                          Decline…
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-            {queue.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Queue is clear.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
-      <p className="-mt-4 mb-6 text-[11px] text-muted-foreground">
-        Declining requires a reason — it travels to the requester with the decision. Reordering (a logged override) is in the design; not wired in the demo.
-      </p>
-
-      {approved.length > 0 && (
-        <>
-          <SectionLabel>Approved — awaiting placement on the schedule</SectionLabel>
-          <Card className="mb-6">
-            {approved.map((r) => (
-              <div key={r.id} className="flex items-center justify-between border-b border-border px-4 py-2.5 text-sm last:border-0">
-                <span><span className="font-semibold">{r.id}</span> · {routeLabel(r)} · {r.legs[0]?.date}</span>
-                <button
-                  type="button"
-                  onClick={() => dispatch({ type: 'CONFIRM_REQUEST', id: r.id })}
-                  className="border border-[#0096FC] px-3 py-1 text-xs font-semibold text-[#0077CC] dark:text-[#4FB6FD]"
-                >
-                  Place on schedule → Confirmed
-                </button>
-              </div>
+    <PortalShell
+      title="Booking queue"
+      meta={<AsOf>{model.counts.total} decision{model.counts.total === 1 ? '' : 's'} waiting · daily clear 14:00 ET</AsOf>}
+    >
+      <div className="flex flex-col gap-4">
+        {/* Funnel over the queue — chips filter the bands below */}
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-2.5 p-4">
+            <span className="mr-1 text-xs font-medium text-muted-foreground">
+              {model.counts.pending} pending · {model.counts.approved} approved · {model.counts.seatAsks} seat ask{model.counts.seatAsks === 1 ? '' : 's'}
+            </span>
+            {chips.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => toggle(c.key)}
+                className={cn(
+                  'flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                  filters.has(c.key) ? 'border-foreground bg-foreground text-background' : 'bg-background text-foreground hover:bg-accent',
+                )}
+              >
+                <span className={cn('h-2 w-2 rounded-full', c.dot)} />
+                {c.label}
+                <span className={filters.has(c.key) ? 'opacity-80' : 'text-muted-foreground'}>{c.count}</span>
+              </button>
             ))}
-          </Card>
-        </>
-      )}
+          </CardContent>
+        </Card>
 
-      <SectionLabel>Seat asks — clear with the same review</SectionLabel>
-      <Card>
-        {seatAsks.map((s) => {
-          const flight = state.flights.find((f) => f.id === s.flightId);
-          const passenger = state.passengers.find((p) => p.id === s.passengerId);
+        {shown.map(({ band, rows }) => {
+          const meta = BAND_META[band];
+          const Icon = meta.icon;
+          const awaiting = band === 'awaiting-placement';
           return (
-            <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 text-sm last:border-0">
-              <span>
-                {passenger?.name ?? '—'} · {flight ? `${flight.from} → ${flight.to} · ${flight.date}` : '—'}
-                {' '}<Chip tone={s.purpose === 'business' ? 'info' : 'flag'}>{s.purpose}</Chip>
-                {s.firstFlight && <Chip tone="neutral" className="ml-1.5">first flight — form auto-sends</Chip>}
-              </span>
-              <div className="flex gap-1.5">
-                <button type="button" onClick={() => dispatch({ type: 'DECIDE_SEAT', id: s.id, approve: true })} className="bg-[#0096FC] px-3 py-1 text-xs font-semibold text-white">Confirm seat</button>
-                <button type="button" onClick={() => dispatch({ type: 'DECIDE_SEAT', id: s.id, approve: false })} className="border border-destructive px-3 py-1 text-xs font-semibold text-destructive">Don't clear</button>
-              </div>
-            </div>
+            <Card key={band}>
+              <CardHeader className="py-4">
+                <CardTitle className="flex flex-wrap items-center gap-2.5 text-base">
+                  <span className={cn('status-badge p-1.5', meta.accent)}><Icon className="h-4 w-4" /></span>
+                  {meta.label}
+                  <Badge variant={rows.length ? 'secondary' : 'outline'}>{rows.length}</Badge>
+                  <span className="text-xs font-normal text-muted-foreground">{meta.hint}</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0">
+                {rows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nothing here.</p>
+                ) : (
+                  rows.map((r) => (
+                    <div key={r.id} className="overflow-hidden rounded-lg border">
+                      <button
+                        onClick={() => setDrawerId(r.id)}
+                        className="group flex w-full items-center justify-between gap-3 border-b bg-muted/50 px-4 py-2.5 text-left transition-colors hover:bg-accent"
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          {!awaiting && (
+                            <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-muted-foreground">
+                              {overallRank(model, r)}
+                            </span>
+                          )}
+                          <RequestIdentityLine request={r} passengers={state.passengers} />
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground">
+                          Open <ChevronRight className="h-3.5 w-3.5" />
+                        </span>
+                      </button>
+                      <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
+                        {awaiting ? (
+                          <Button size="sm" onClick={() => dispatch({ type: 'CONFIRM_REQUEST', id: r.id })}>
+                            Place on schedule → Confirmed
+                          </Button>
+                        ) : decliningId === r.id ? (
+                          <>
+                            <input
+                              autoFocus
+                              aria-label="Decline reason"
+                              className="min-w-[220px] flex-1 rounded-md border bg-background px-2.5 py-1.5 text-sm"
+                              placeholder="Reason (required — it travels to the requester)"
+                              value={reason}
+                              onChange={(e) => setReason(e.target.value)}
+                            />
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={!reason.trim()}
+                              onClick={() => { dispatch({ type: 'DECLINE_REQUEST', id: r.id, reason: reason.trim() }); setDecliningId(null); setReason(''); }}
+                            >
+                              Decline
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setDecliningId(null); setReason(''); }}>Cancel</Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button size="sm" onClick={() => dispatch({ type: 'APPROVE_REQUEST', id: r.id })}>Approve</Button>
+                            <Button size="sm" variant="outline" onClick={() => setDecliningId(r.id)}>Decline…</Button>
+                            {r.note && <span className="text-xs italic text-muted-foreground">"{r.note}"</span>}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           );
         })}
-        {seatAsks.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">No seat asks pending.</p>}
-      </Card>
+
+        {/* Seat asks clear with the same review, but never bump a trip request */}
+        <Card>
+          <CardHeader className="py-4">
+            <CardTitle className="flex flex-wrap items-center gap-2.5 text-base">
+              <span className="status-badge status-info p-1.5"><Plane className="h-4 w-4" /></span>
+              Seat asks
+              <Badge variant={model.seatAsks.length ? 'secondary' : 'outline'}>{model.seatAsks.length}</Badge>
+              <span className="text-xs font-normal text-muted-foreground">clear with the same review — never bump a trip request</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 pt-0">
+            {model.seatAsks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nothing here.</p>
+            ) : (
+              model.seatAsks.map((s) => {
+                const flight = state.flights.find((f) => f.id === s.flightId);
+                const passenger = state.passengers.find((p) => p.id === s.passengerId);
+                const personal = s.purpose === 'personal' || s.purpose === 'entertainment';
+                return (
+                  <div key={s.id} className="flex flex-wrap items-center gap-2 rounded-lg border px-4 py-2.5 text-sm">
+                    <span className="font-medium">{passenger?.name ?? '—'}</span>
+                    <span className="text-muted-foreground">
+                      {flight ? `${flight.from} → ${flight.to} · ${flight.date}` : '—'}
+                    </span>
+                    <Badge variant="outline" className={cn('text-[10px]', personal && 'status-warning')}>{s.purpose}</Badge>
+                    {personal && <span className="text-[11px] text-muted-foreground">SIFL logged</span>}
+                    {s.firstFlight && <Badge variant="outline" className="text-[10px]">first flight — form auto-sends</Badge>}
+                    <span className="ml-auto flex gap-2">
+                      <Button size="sm" onClick={() => dispatch({ type: 'DECIDE_SEAT', id: s.id, approve: true })}>Confirm seat</Button>
+                      <Button size="sm" variant="outline" onClick={() => dispatch({ type: 'DECIDE_SEAT', id: s.id, approve: false })}>Don't clear</Button>
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        {totalShown === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-3 p-12 text-muted-foreground">
+              {model.counts.total === 0 ? (
+                <Inbox className="h-10 w-10 opacity-40" />
+              ) : (
+                <CheckCircle2 className="h-10 w-10 text-[var(--gfo-success,#00B140)] opacity-60" />
+              )}
+              <p className="font-medium">
+                {model.counts.total === 0 ? 'Queue is clear — nothing waiting.' : 'Nothing matches those tier filters.'}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        <p className="text-[11px] text-muted-foreground">
+          Reordering within a band is a logged override — in the design, not wired in the demo.
+          Requesters see "decision by 14:00", never their rank or who else is in line.
+        </p>
+      </div>
+
+      <RequestDrawer requestId={drawerId} open={!!drawerId} onOpenChange={(o) => { if (!o) setDrawerId(null); }} />
     </PortalShell>
   );
 }
