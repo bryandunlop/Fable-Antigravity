@@ -197,6 +197,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // It sits OUTSIDE the authenticated shell (public outer route) so the door
   // works pre-login; exposure is bounded by Vercel SSO, the demo's real gate.
   { path: '/ops', label: 'Ops Ledger', domain: 'admin', icon: Activity, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
+  // Personal effort tracker, not product — hours worked on myGFO, by fiscal year.
+  // Listed ONLY so the reverse route audit can see that /worklog is a real path;
+  // hidden + sidebar:false + searchable:false means it renders no link anywhere,
+  // in any role. Nothing in flight ops reads it and it reads nothing from them.
+  { path: '/worklog', label: 'Work Log', domain: 'admin', icon: Activity, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
 ];
 
 /** Entries visible to a user, by role. Same semantics as Navigation.tsx filtering. */
