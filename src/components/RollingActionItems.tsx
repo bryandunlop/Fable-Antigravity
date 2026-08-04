@@ -8,8 +8,8 @@ import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import {
-  Target, AlertTriangle, Bell, ChevronDown, ChevronRight, Plus, Search,
-  LayoutList, Table as TableIcon, CheckCircle, Clock, TrendingUp,
+  Target, Bell, ChevronDown, ChevronRight, Plus, Search,
+  LayoutList, Table as TableIcon, PlayCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ActionItem, NewItemForm } from './ActionItems/types';
@@ -20,6 +20,9 @@ import {
   isTrendFlat, bySilenceDesc, groupForChase, getOwner, ChaseAxis, StallState,
 } from './ActionItems/stall';
 import NewItemDialog from './ActionItems/NewItemDialog';
+import ChaseRunPanel from './ActionItems/ChaseRunPanel';
+import { buildRunQueue } from './ActionItems/chaseRun';
+import { CheckInCadence } from './ActionItems/types';
 import { useActionItems } from '../contexts/ActionItemContext';
 
 const EMPTY_NEW_ITEM_FORM: NewItemForm = {
@@ -68,7 +71,7 @@ function Sparkline({ values, width = 44 }: { values: number[]; width?: number })
  * scanning and bulk edits.
  */
 export default function RollingActionItems() {
-  const { actionItems, addActionItem, nudge, nudgeMany } = useActionItems();
+  const { actionItems, addActionItem, updateActionItem, setCheckInCadence, nudge, nudgeMany } = useActionItems();
 
   const [view, setView] = useState<'chase' | 'table'>('chase');
   const [axis, setAxis] = useState<ChaseAxis>('owner');
@@ -79,6 +82,8 @@ export default function RollingActionItems() {
   const [showAdd, setShowAdd] = useState(false);
   const [newItemForm, setNewItemForm] = useState<NewItemForm>(EMPTY_NEW_ITEM_FORM);
   const [isCreating, setIsCreating] = useState(false);
+  /** Non-null while a chase run is in progress — the snapshot it walks. */
+  const [runQueue, setRunQueue] = useState<string[] | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
   const summary = getStallSummary(actionItems, today);
@@ -126,6 +131,39 @@ export default function RollingActionItems() {
     });
   };
 
+  /** Move a person to the head of the contributor list — they become the owner. */
+  const reassign = (id: string, personName: string) => {
+    const item = actionItems.find(candidate => candidate.id === id);
+    if (!item) return;
+
+    const existing = item.contributors.find(c => c.name === personName);
+    const incoming = existing ?? {
+      id: `${id}-owner-${personName.replace(/\s+/g, '-').toLowerCase()}`,
+      name: personName,
+      role: 'Owner',
+      avatar: personName.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase(),
+    };
+
+    updateActionItem(id, {
+      contributors: [
+        { ...incoming, role: 'Owner' },
+        ...item.contributors.filter(c => c.name !== personName),
+      ],
+    });
+    toast.success('Reassigned', { description: `${personName} now owns "${item.title}".` });
+  };
+
+  const closeProject = (id: string) => {
+    const item = actionItems.find(candidate => candidate.id === id);
+    updateActionItem(id, { status: 'Completed' });
+    toast.success('Closed', { description: `"${item?.title ?? 'Project'}" moved to Landed.` });
+  };
+
+  const slowCadence = (id: string, cadence: CheckInCadence) => {
+    setCheckInCadence(id, cadence);
+    toast.success('Cadence Slowed', { description: `Status reports now ${cadence}.` });
+  };
+
   const handleCreate = () => {
     if (!newItemForm.title.trim() || !newItemForm.description.trim()) return;
     setIsCreating(true);
@@ -163,11 +201,36 @@ export default function RollingActionItems() {
             owner sees on their Tasks &amp; Action Items list.
           </p>
         </div>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Action Item
-        </Button>
+        <div className="flex gap-2">
+          {/* A list is a standing obligation; a run is a task you can finish. */}
+          <Button
+            variant="outline"
+            disabled={quietIds.length === 0}
+            onClick={() => setRunQueue(buildRunQueue(actionItems, today))}
+          >
+            <PlayCircle className="w-4 h-4 mr-2" />
+            Start chase run ({quietIds.length})
+          </Button>
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Action Item
+          </Button>
+        </div>
       </div>
+
+      {runQueue ? (
+        <ChaseRunPanel
+          queue={runQueue}
+          allItems={actionItems}
+          today={today}
+          onNudge={id => nudge(id)}
+          onReassign={reassign}
+          onSlowCadence={slowCadence}
+          onClose={closeProject}
+          onExit={() => setRunQueue(null)}
+        />
+      ) : (
+      <>
 
       {/* Controls — one row, because at this density a header of metric tiles
           would push the first project below the fold. */}
@@ -403,6 +466,8 @@ export default function RollingActionItems() {
             </table>
           </CardContent>
         </Card>
+      )}
+      </>
       )}
 
       <NewItemDialog
