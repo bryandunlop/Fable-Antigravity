@@ -19,21 +19,58 @@ Every date in the system is a plain `YYYY-MM-DD` calendar day, and the FY is com
 
 ---
 
+## The repositories
+
+myGFO has lived in more than one repository, and a single afternoon often touches several. They are all read into **one pooled timeline**:
+
+| Repository | What it is | Range |
+|---|---|---|
+| `Fable-Antigravity` | The current app | 22 Jun – 4 Aug 2026 |
+| `Antigravity-Aviation-Management-System` | Its predecessor — tech log work starts here | 15 Feb – 24 Jun 2026 |
+| `myGFO-vault` | Strategy, meetings, stakeholders, platform notes | 14 Jul – 4 Aug 2026 |
+| `myGFO-iOS` | The iOS/Capacitor wrapper | 16 Mar – 27 Jul 2026 |
+| `mygfo-ios-app` | The earlier Swift app | 15 Mar – 8 Jun 2026 |
+| `antigravity-vault` | Predecessor vault | 3–7 Jun 2026 |
+| `Aviationmanagementsystem` | The original spike | 7 Dec 2025 |
+
+Pass them all in one run:
+
+```bash
+npx tsx scripts/derive-work-sessions.ts \
+  --repos ".,../Antigravity-Aviation-Management-System,../myGFO-vault,../myGFO-iOS,../mygfo-ios-app,../antigravity-vault,../Aviationmanagementsystem"
+```
+
+**Pooling before clustering is the point.** An afternoon spent moving between the app, the iOS wrapper and the vault is *one sitting*. Deriving each repo separately and adding the totals would bill it two or three times over. Pooled, those commits interleave into a single session.
+
+**Duplicates are dropped.** `Fable-Antigravity` was forked out of `Antigravity-AMS` in June 2026, so four handover commits exist verbatim in both — same author instant, same subject. They are matched on those two fields rather than on SHA, because a fork rewrites SHAs when history is squashed or grafted but changes neither when the work happened nor what it was called.
+
 ## What the git history says
 
 Run the derivation at any time — it reads git and writes nothing unless you pass `--seed`:
 
 ```bash
-npx tsx scripts/derive-work-sessions.ts
+npx tsx scripts/derive-work-sessions.ts        # this repo only
 ```
 
-As of 4 Aug 2026, from 343 non-merge commits:
+As of 4 Aug 2026, from **946 non-merge commits across all seven repositories** (4 duplicates dropped):
 
 | Fiscal year | Hours | Sessions | Days worked | Range |
 |---|---|---|---|---|
-| FY26 | 1.5 | 3 | 3 | 22–24 Jun 2026 |
-| **FY27** | **81.4** | **47** | **24** | 2 Jul – 4 Aug 2026 |
-| | **82.9** | **50** | **27** | |
+| FY26 | 74.6 | 62 | 41 | 7 Dec 2025 – 24 Jun 2026 |
+| **FY27** | **93.8** | **51** | **25** | 2 Jul – 4 Aug 2026 |
+| **Total** | **168.4** | **113** | **66** | |
+
+By repository — note that a session spanning repos counts once against *each*, so these deliberately sum to more than the total. They answer "how much did this repo appear in", not "how do the hours divide":
+
+| Repository | Hours | Sessions |
+|---|---|---|
+| Fable-Antigravity | 92.3 | 49 |
+| Antigravity-AMS | 56.9 | 45 |
+| myGFO-vault | 53.6 | 28 |
+| myGFO-iOS | 34.0 | 20 |
+| mygfo-ios-app | 20.0 | 10 |
+| antigravity-vault | 7.0 | 4 |
+| Aviationmanagementsystem | 0.5 | 1 |
 
 ### How a session is derived
 
@@ -48,14 +85,14 @@ The inter-commit gap distribution in this repo is sharply bimodal — median **8
 
 The *scoring* is more sensitive than the *cutting*, which is why the parameters are flags:
 
-| | Total |
-|---|---|
-| `--gap 60 --ramp 15 --min 30` (tight) | 69.5 h |
-| **default** (`90 / 25 / 30`) | **82.9 h** |
-| `--gap 120 --ramp 30 --min 45` | 90.8 h |
-| `--gap 120 --ramp 45 --min 60` (generous) | 102.8 h |
+| | FY26 | FY27 | Total |
+|---|---|---|---|
+| `--gap 60 --ramp 15 --min 30` (tight) | 62.6 h | 78.7 h | 141.3 h |
+| **default** (`90 / 25 / 30`) | **74.6 h** | **93.8 h** | **168.4 h** |
+| `--gap 120 --ramp 30 --min 45` | 88.8 h | 103.7 h | 192.5 h |
+| `--gap 120 --ramp 45 --min 60` (generous) | 103.0 h | 115.5 h | 218.5 h |
 
-The default is deliberately conservative.
+The default is deliberately conservative. Note that the *days worked* figure — 41 in FY26, 25 in FY27 — does not move across any of these settings. The calendar is solid; only what a day is worth is a judgement call.
 
 ### What this number is not
 
@@ -65,7 +102,7 @@ The default is deliberately conservative.
 - Review, reading, and regulatory research
 - Testing on the iPad
 - Debugging that never landed
-- **All work before 22 June 2026** — this repository's history begins there, while `docs/superpowers/` carries plans dated back to 15 May 2026. That work is real and is not in the 82.9 h.
+- Any repository not in the list above
 
 Correct any of it by hand in the app, or log the missing time as manual entries. A derived row you have edited is never overwritten by a re-run (see below).
 
@@ -87,7 +124,13 @@ Reads `DATABASE_URL` from `.env.local` and writes straight to Postgres — no ru
 
 The distinction is made by comparing `createdAt` with `updatedAt` — an untouched row still has them equal — so no extra column is needed to carry it.
 
-Run it again whenever you want the log brought up to date; a weekly habit keeps FY totals honest without any bookkeeping.
+Run it again whenever you want the log brought up to date; a weekly habit keeps FY totals honest without any bookkeeping. **Pass the same `--repos` list every time.**
+
+### If you change the repository list
+
+Use `--seed --replace`.
+
+Session ids are keyed on the instant of a session's first commit, so adding a repository can merge two sessions into one or shift a boundary. The rows under the old ids then become orphans that no future run will ever touch again, quietly inflating the total. `--replace` clears every `source='git'` row first and rebuilds them. Hand-logged entries are never touched by it.
 
 ---
 

@@ -1,19 +1,57 @@
 import { describe, it, expect } from 'vitest';
 import {
   clusterSessions,
+  dedupeCommits,
   DEFAULT_CLUSTER_OPTIONS,
   type CommitPoint,
 } from './sessionClustering';
 
 /** Builds a commit `minutesFromStart` after 2026-07-06T09:00 local (-0400). */
-function at(minutesFromStart: number, subject = 'feat: something'): CommitPoint {
+function at(minutesFromStart: number, subject = 'feat: something', repo?: string): CommitPoint {
   const base = Date.UTC(2026, 6, 6, 13, 0, 0); // 09:00 -0400
   const ms = base + minutesFromStart * 60_000;
   const iso = new Date(ms).toISOString();
-  return { iso, epochMs: ms, localDate: iso.slice(0, 10), subject };
+  return { iso, epochMs: ms, localDate: iso.slice(0, 10), subject, repo };
 }
 
 const opts = DEFAULT_CLUSTER_OPTIONS;
+
+describe('dedupe across forked repositories', () => {
+  it('drops a commit that exists verbatim in two repos', () => {
+    // Fable-Antigravity was forked out of Antigravity-AMS, so the June 2026
+    // handover commits exist in both with identical author time and subject.
+    // Counting them twice would bill the fork window twice.
+    const shared = 'feat(tech-log): apply quiet GFO language';
+    const out = dedupeCommits([at(0, shared, 'fork'), at(0, shared, 'origin')]);
+    expect(out).toHaveLength(1);
+  });
+
+  it('keeps the FIRST repo seen, so ordering of the repo list decides attribution', () => {
+    const shared = 'feat: same work';
+    expect(dedupeCommits([at(0, shared, 'origin'), at(0, shared, 'fork')])[0].repo).toBe('origin');
+  });
+
+  it('keeps two different commits made in the same second', () => {
+    expect(dedupeCommits([at(0, 'one', 'a'), at(0, 'two', 'a')])).toHaveLength(2);
+  });
+
+  it('keeps the same subject committed at different times', () => {
+    // A repeated subject is normal — "fix: typo" twice in a day is two commits.
+    expect(dedupeCommits([at(0, 'fix: typo', 'a'), at(30, 'fix: typo', 'a')])).toHaveLength(2);
+  });
+
+  it('leaves a single-repo list untouched', () => {
+    const commits = [at(0, 'a', 'r'), at(10, 'b', 'r'), at(20, 'c', 'r')];
+    expect(dedupeCommits(commits)).toHaveLength(3);
+  });
+
+  it('clustering dedupes even when the caller has not', () => {
+    const shared = 'feat: shared';
+    const sessions = clusterSessions([at(0, shared, 'fork'), at(0, shared, 'origin')]);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].commits).toBe(1);
+  });
+});
 
 describe('session clustering', () => {
   it('returns nothing for no commits', () => {
@@ -115,6 +153,24 @@ describe('session clustering', () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0].fy).toBe('FY26');
     expect(sessions[0].localDate).toBe('2026-06-30');
+  });
+
+  it('pools repos into one session rather than billing the afternoon twice', () => {
+    // An afternoon moving between the app and the strategy vault is one
+    // sitting. Clustering each repo separately would score it once per repo.
+    const sessions = clusterSessions([
+      at(0, 'feat: work card', 'app'),
+      at(20, 'docs: decision note', 'vault'),
+      at(40, 'feat: more', 'app'),
+    ]);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].minutes).toBe(40 + DEFAULT_CLUSTER_OPTIONS.ramp);
+    expect(sessions[0].repos).toEqual(['app', 'vault']);
+  });
+
+  it('records a single repo when the session never left it', () => {
+    const [s] = clusterSessions([at(0, 'a', 'app'), at(15, 'b', 'app')]);
+    expect(s.repos).toEqual(['app']);
   });
 
   it('uses the commit’s own local date, so a trip abroad does not shift a day', () => {

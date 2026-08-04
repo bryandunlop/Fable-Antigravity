@@ -36,6 +36,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 
 // The clustering itself lives in src/ so the test suite reaches it — it is what
@@ -43,6 +44,7 @@ import { eq } from 'drizzle-orm';
 // looks exactly like a right one. This file is the IO around it.
 import {
   clusterSessions,
+  dedupeCommits,
   type CommitPoint,
   type DerivedSession,
 } from '../src/components/worklog/sessionClustering';
@@ -64,25 +66,81 @@ function num(flag: string, fallback: number): number {
   return Number.isFinite(v) ? v : fallback;
 }
 
-function readCommits(): CommitPoint[] {
+/**
+ * Repository paths to read. Defaults to the current directory; pass --repo any
+ * number of times, or --repos with a comma-separated list, to pool several.
+ *
+ * The project has lived in more than one repository — the app, its predecessor,
+ * the iOS wrapper, the strategy vault — and a single afternoon often touches
+ * more than one. They are pooled into ONE timeline before clustering so that
+ * afternoon counts as one session rather than three.
+ */
+function repoPaths(): string[] {
+  const paths: string[] = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === '--repo' && process.argv[i + 1]) paths.push(process.argv[i + 1]);
+  }
+  const list = process.argv.indexOf('--repos');
+  if (list !== -1 && process.argv[list + 1]) {
+    paths.push(
+      ...process.argv[list + 1]
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }
+  return paths.length ? paths : ['.'];
+}
+
+function shortName(path: string): string {
+  // Resolve first, so the default '.' reports as the repository's actual
+  // directory name rather than a dot in the middle of the summary table.
+  const parts = resolve(path).replace(/\/+$/, '').split('/');
+  return parts[parts.length - 1] || path;
+}
+
+function readCommitsFrom(path: string): CommitPoint[] {
   // %aI = author date, strict ISO 8601 with the original UTC offset.
   // %ad with --date=format:%Y-%m-%d = the same instant as a LOCAL calendar day,
-  // which is what the hours are bucketed by: commits here span -0400 to +0200
-  // and a UTC-derived day would move a late-evening session onto the next date.
+  // which is what the hours are bucketed by: commits span -0400 to +0200 and a
+  // UTC-derived day would move a late-evening session onto the next date.
+  //
+  // %x1f is git's escape for a literal unit-separator byte. Spelled as an
+  // escape rather than embedded raw so the format survives being edited.
+  const SEP = '\x1f';
   const out = execFileSync(
     'git',
-    ['log', '--no-merges', '--pretty=format:%aI%ad%s', '--date=format:%Y-%m-%d'],
+    [
+      '-C',
+      path,
+      'log',
+      '--no-merges',
+      '--pretty=format:%aI%x1f%ad%x1f%s',
+      '--date=format:%Y-%m-%d',
+    ],
     { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
   );
 
+  const repo = shortName(path);
   return out
     .split('\n')
     .filter(Boolean)
     .map((line) => {
-      const [iso, localDate, ...rest] = line.split('');
-      return { iso, epochMs: new Date(iso).getTime(), localDate, subject: rest.join('') };
+      const [iso, localDate, ...rest] = line.split(SEP);
+      return {
+        iso,
+        epochMs: new Date(iso).getTime(),
+        localDate,
+        subject: rest.join(SEP),
+        repo,
+      };
     })
-    .filter((c) => Number.isFinite(c.epochMs))
+    .filter((c) => Number.isFinite(c.epochMs));
+}
+
+function readCommits(): CommitPoint[] {
+  return repoPaths()
+    .flatMap(readCommitsFrom)
     .sort((a, b) => a.epochMs - b.epochMs);
 }
 
@@ -97,8 +155,15 @@ function report(commits: CommitPoint[], sessions: DerivedSession[]) {
     byFy.get(s.fy)!.push(s);
   }
 
+  // Report the deduped figure, not the raw one: the same commit exists verbatim
+  // in a repo and the repo it was forked from, and saying "950 commits" when 4
+  // of them are one commit seen twice overstates the input.
+  const unique = dedupeCommits(commits).length;
+  const dropped = commits.length - unique;
   console.log(
-    `\nDerived from ${commits.length} non-merge commits ` +
+    `\nDerived from ${unique} non-merge commits across ${repoPaths().length} ` +
+      `${repoPaths().length === 1 ? 'repository' : 'repositories'}` +
+      `${dropped > 0 ? ` (${dropped} duplicate${dropped === 1 ? '' : 's'} dropped)` : ''} ` +
       `(gap ${IDLE_GAP_MIN}m, ramp-up ${RAMP_UP_MIN}m, floor ${MIN_SESSION_MIN}m)\n`,
   );
 
@@ -113,6 +178,28 @@ function report(commits: CommitPoint[], sessions: DerivedSession[]) {
 
   const totalMin = sessions.reduce((a, s) => a + s.minutes, 0);
   console.log(`\nTOTAL ${hours(totalMin)} h across ${sessions.length} sessions\n`);
+
+  // Per repository. A session that touched several is counted once against
+  // EACH of them, so these deliberately sum to more than the total — they
+  // answer "how much did this repo appear in", not "how do the hours divide".
+  const repos = new Map<string, { min: number; sessions: number }>();
+  for (const s of sessions) {
+    for (const r of s.repos.length ? s.repos : ['(unknown)']) {
+      const e = repos.get(r) ?? { min: 0, sessions: 0 };
+      e.min += s.minutes;
+      e.sessions += 1;
+      repos.set(r, e);
+    }
+  }
+  if (repos.size > 1) {
+    console.log('BY REPOSITORY (sessions spanning repos count in each)');
+    for (const [repo, e] of [...repos.entries()].sort((a, b) => b[1].min - a[1].min)) {
+      console.log(
+        `  ${hours(e.min).padStart(7)} h  ${String(e.sessions).padStart(3)} sessions  ${repo}`,
+      );
+    }
+    console.log();
+  }
 
   const byDay = new Map<string, { min: number; sessions: number; commits: number }>();
   for (const s of sessions) {
@@ -147,11 +234,27 @@ async function seed(sessions: DerivedSession[]) {
     return;
   }
 
+  const { eq: eqOp } = await import('drizzle-orm');
   const { createDb } = await import('../src/server/db/index');
   const { workLogEntries } = await import('../src/server/db/schema');
 
   const db = createDb();
   const stamp = new Date().toISOString();
+
+  // --replace: clear every derived row first.
+  //
+  // Needed when the SET OF REPOSITORIES changes. Session ids are keyed on the
+  // instant of a session's first commit, so adding a repo can merge two
+  // sessions into one or shift a boundary — and the rows under the old ids are
+  // then orphans that no future run will ever touch again, quietly inflating
+  // the total. Hand-logged rows are never touched by this; only source='git'.
+  if (process.argv.includes('--replace')) {
+    const gone = await db
+      .delete(workLogEntries)
+      .where(eqOp(workLogEntries.source, 'git'))
+      .returning({ id: workLogEntries.id });
+    console.log(`\n--replace: cleared ${gone.length} derived row(s).`);
+  }
 
   // UPSERT rule: a derived row you have since edited by hand is never
   // overwritten. An untouched row still has updatedAt === createdAt, which
