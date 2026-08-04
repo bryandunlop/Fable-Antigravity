@@ -36,8 +36,15 @@ myGFO has lived in more than one repository, and a single afternoon often touche
 Pass them all in one run:
 
 ```bash
-npx tsx scripts/derive-work-sessions.ts \
-  --repos ".,../Antigravity-Aviation-Management-System,../myGFO-vault,../myGFO-iOS,../mygfo-ios-app,../antigravity-vault,../Aviationmanagementsystem"
+npm run worklog:derive     # report only
+npm run worklog:seed       # report, then write to the database
+```
+
+Those scripts assume the other repositories are **siblings of this one** (`../myGFO-vault`, and so on). If yours live elsewhere, edit the `--repos` list in `package.json` once, or pass your own:
+
+```bash
+npx tsx scripts/derive-work-sessions.ts --repos "/path/one,/path/two"
+npx tsx scripts/derive-work-sessions.ts --repo /path/one --repo /path/two
 ```
 
 **Pooling before clustering is the point.** An afternoon spent moving between the app, the iOS wrapper and the vault is *one sitting*. Deriving each repo separately and adding the totals would bill it two or three times over. Pooled, those commits interleave into a single session.
@@ -52,7 +59,7 @@ Run the derivation at any time — it reads git and writes nothing unless you pa
 npx tsx scripts/derive-work-sessions.ts        # this repo only
 ```
 
-As of 4 Aug 2026, from **946 non-merge commits across all seven repositories** (4 duplicates dropped):
+As of 4 Aug 2026, from **946 non-merge commits across all seven repositories** (4 duplicates dropped). This table is a snapshot — every commit after it moves the figures, so re-run rather than quoting these:
 
 | Fiscal year | Hours | Sessions | Days worked | Range |
 |---|---|---|---|---|

@@ -139,9 +139,33 @@ function readCommitsFrom(path: string): CommitPoint[] {
 }
 
 function readCommits(): CommitPoint[] {
-  return repoPaths()
-    .flatMap(readCommitsFrom)
-    .sort((a, b) => a.epochMs - b.epochMs);
+  const paths = repoPaths();
+
+  // Check every path up front and fail on ANY that is unreadable, rather than
+  // skipping it with a warning. These hours stand in for a timesheet: a repo
+  // silently dropped because a sibling directory moved produces a total that is
+  // quietly too low, and a quietly-too-low number is worse than an error.
+  const missing = paths.filter((p) => {
+    try {
+      execFileSync('git', ['-C', p, 'rev-parse', '--git-dir'], { stdio: 'ignore' });
+      return false;
+    } catch {
+      return true;
+    }
+  });
+
+  if (missing.length) {
+    console.error(
+      `\nNot a readable git repository:\n${missing.map((p) => `  ${p}  ->  ${resolve(p)}`).join('\n')}\n\n` +
+        'The --repos list in package.json assumes the other myGFO repositories are\n' +
+        'siblings of this one. Edit it to match where yours actually live, or pass\n' +
+        '--repos / --repo explicitly. Refusing to continue: dropping a repository\n' +
+        'would silently understate the hours.\n',
+    );
+    process.exit(1);
+  }
+
+  return paths.flatMap(readCommitsFrom).sort((a, b) => a.epochMs - b.epochMs);
 }
 
 const hours = (min: number) => (min / 60).toFixed(1);
