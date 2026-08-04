@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Users, Utensils, Edit } from 'lucide-react';
 import SummaryBar from './SummaryBar';
-import RecordList, { RecordRow } from './RecordList';
+import RecordList, { RecordFold, RecordRow } from './RecordList';
 
 describe('SummaryBar', () => {
   it('renders each item as value + label on one line', () => {
@@ -72,5 +72,37 @@ describe('RecordRow', () => {
     render(<RecordList><RecordRow title="Read only" /></RecordList>);
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.getByText('Read only')).toBeTruthy();
+  });
+});
+
+describe('RecordFold', () => {
+  it('keeps the finished records out of the DOM until asked — not merely hidden', () => {
+    render(
+      <RecordList>
+        <RecordRow title="FO001 · LAX → JFK" meta="N123AB · 3 items left" />
+        <RecordFold label="12 completed">
+          <RecordRow title="FO002 · JFK → MIA" />
+        </RecordFold>
+      </RecordList>,
+    );
+    expect(screen.queryByText('FO002 · JFK → MIA')).toBeNull();
+    expect(screen.getByText('12 completed')).toBeTruthy();
+  });
+
+  it('reveals them on tap and reports its state to assistive tech', () => {
+    render(
+      <RecordFold label="12 completed">
+        <RecordRow title="FO002 · JFK → MIA" />
+      </RecordFold>,
+    );
+    const toggle = screen.getByRole('button', { name: /12 completed/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(toggle);
+    expect(screen.getByText('FO002 · JFK → MIA')).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText('FO002 · JFK → MIA')).toBeNull();
   });
 });

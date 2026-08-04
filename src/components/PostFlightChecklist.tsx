@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
-import RecordList, { RecordRow } from './shared/RecordList';
+import RecordList, { RecordFold, RecordRow } from './shared/RecordList';
 import {
   ClipboardCheck,
   Plus,
@@ -224,16 +224,25 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
     setShowAddItemDialog(false);
   };
 
-  const getFlightStatus = (flight: any) => {
-    if (flight.completionRate === 100) return 'Complete';
-    if (flight.status === 'landed') return 'In Progress';
-    return 'Pending';
+  /**
+   * How many checklist items this flight still owes, or null when we hold no
+   * item list for it and only know a percentage. Counting beats the percentage
+   * because "3 items left" is the size of the job; "75% complete" is a score.
+   */
+  const itemsLeft = (flight: any): number | null => {
+    const items = checklistItems[flight.id as keyof typeof checklistItems];
+    if (items) return items.filter(item => !item.completed).length;
+    return flight.completionRate === 100 ? 0 : null;
   };
 
-  const getFlightStatusColor = (flight: any) => {
-    if (flight.completionRate === 100) return 'bg-green-100 text-green-800';
-    if (flight.status === 'landed') return 'bg-yellow-100 text-yellow-800';
-    return 'bg-gray-100 text-gray-800';
+  const flightsOutstanding = flights.filter(f => itemsLeft(f) !== 0);
+  const flightsDone = flights.filter(f => itemsLeft(f) === 0);
+
+  const flightMeta = (flight: any) => {
+    const left = itemsLeft(flight);
+    if (left === null) return `${flight.aircraft} · ${flight.completionRate}% complete`;
+    if (left === 0) return `${flight.aircraft} · ${new Date(flight.date).toLocaleDateString()}`;
+    return `${flight.aircraft} · ${left} item${left === 1 ? '' : 's'} left`;
   };
 
   return (
@@ -404,23 +413,30 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
                 every leg. One tappable row per flight instead; the row IS the "View
                 checklist" action, so that column disappears too. */}
             <RecordList>
-              {flights.map((flight) => (
+              {flightsOutstanding.map((flight) => (
                 <RecordRow
                   key={flight.id}
                   title={`${flight.id} \u00b7 ${flight.route}`}
-                  meta={`${flight.aircraft} \u00b7 ${new Date(flight.date).toLocaleDateString()} \u00b7 ${flight.completionRate}% complete`}
-                  trailing={
-                    /* Trailing content has to stay narrow — a progress bar here
-                       squeezed the title to "FO001 ·…". The meta line already states
-                       the percentage, so the bar is desktop-only. */
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Progress value={flight.completionRate} className="hidden sm:block w-24" />
-                      <Badge className={`text-xs ${getFlightStatusColor(flight)}`}>{getFlightStatus(flight)}</Badge>
-                    </div>
-                  }
+                  meta={flightMeta(flight)}
                   onOpen={() => setSelectedFlight(flight.id)}
                 />
               ))}
+              {flightsOutstanding.length === 0 && (
+                <p className="px-3 py-4 text-sm text-muted-foreground">Every recent flight is closed out.</p>
+              )}
+              {flightsDone.length > 0 && (
+                <RecordFold label={`${flightsDone.length} completed`}>
+                  {flightsDone.map((flight) => (
+                    <RecordRow
+                      key={flight.id}
+                      title={`${flight.id} · ${flight.route}`}
+                      meta={flightMeta(flight)}
+                      trailing={<CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />}
+                      onOpen={() => setSelectedFlight(flight.id)}
+                    />
+                  ))}
+                </RecordFold>
+              )}
             </RecordList>
           </CardContent>
         </Card>

@@ -1,5 +1,5 @@
-import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 // The phone-first replacement for two desktop idioms that both fail at 390pt:
 //
@@ -79,6 +79,46 @@ export function RecordRow({
           <action.icon className="w-4 h-4" />
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * A closed drawer at the foot of a list, holding the records that need nothing.
+ *
+ * The list should answer "what is left to do", not "how did every record score".
+ * A finished flight, a stocked part, a delivered catering order all still cost a
+ * row, a scan and a line of screen — on a 390pt phone that is most of the screen
+ * spent on work nobody has to do. They stay reachable, one tap away, and the
+ * count is the reassurance that they were not lost.
+ *
+ * Deliberately not `<details>`: it renders its children into the DOM while
+ * closed, and the rows inside are focusable buttons.
+ */
+export function RecordFold({
+  label,
+  children,
+  defaultOpen = false,
+}: {
+  /** States what is inside AND how much of it — "12 completed", not "Show more". */
+  label: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const Chevron = open ? ChevronDown : ChevronRight;
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="w-full text-left px-3 py-3 min-h-[44px] flex items-center gap-2 bg-muted/40 hover:bg-muted active:bg-muted text-xs text-muted-foreground"
+      >
+        <Chevron className="w-4 h-4 shrink-0" />
+        {label}
+      </button>
+      {open && <div className="divide-y border-t">{children}</div>}
     </div>
   );
 }
