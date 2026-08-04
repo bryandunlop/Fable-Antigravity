@@ -6,10 +6,10 @@
 import { Routes, Route } from 'react-router-dom';
 import { BookingPortalProvider } from './BookingPortalContext';
 import PortalHome from './pages/PortalHome';
+import Trips from './pages/Trips';
 import EmptySeats from './pages/EmptySeats';
 import Requests from './pages/Requests';
 import NewRequest from './pages/NewRequest';
-import RequestDetail from './pages/RequestDetail';
 import SchedulingQueue from './pages/SchedulingQueue';
 import Passengers from './pages/Passengers';
 import Watches from './pages/Watches';
@@ -20,10 +20,11 @@ export default function BookingPortalRoutes() {
     <BookingPortalProvider>
       <Routes>
         <Route path="/" element={<PortalHome />} />
+        <Route path="trips" element={<Trips />} />
         <Route path="seats" element={<EmptySeats />} />
         <Route path="requests" element={<Requests />} />
         <Route path="requests/new" element={<NewRequest />} />
-        <Route path="requests/:id" element={<RequestDetail />} />
+        <Route path="requests/:id" element={<Requests />} />
         <Route path="queue" element={<SchedulingQueue />} />
         <Route path="passengers" element={<Passengers />} />
         <Route path="watches" element={<Watches />} />

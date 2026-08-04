@@ -1,12 +1,16 @@
 // Frame F — watches: fleet-date holds and route-seat watches on one
-// mechanism. A watch reserves nothing; when it frees, one click opens a
-// pre-filled request. "Simulate: aircraft frees up" stands in for the mirror
-// noticing a cancellation.
+// mechanism. A watch reserves nothing; when the thing you are watching frees,
+// one click opens a pre-filled request. "Simulate: frees up" stands in for the
+// mirror noticing a cancellation.
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bell } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
 import { PortalShell } from '../components/PortalShell';
-import { AsOf, Card, Chip, SectionLabel } from '../components/portalUi';
+import { AsOf, Chip, SectionLabel } from '../components/portalUi';
 import { usePortal } from '../BookingPortalContext';
 import { cn } from '../../ui/utils';
 
@@ -18,6 +22,9 @@ export default function Watches() {
   const [detailField, setDetailField] = useState('');
 
   const asOf = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const active = state.watches.filter((w) => w.status !== 'expired');
+  const field = 'w-full rounded-md border bg-background px-2.5 py-1.5 text-sm';
+
   const create = () => {
     const label = kind === 'fleet'
       ? `Fleet hold · ${dates || 'dates TBD'}${detailField ? ` · ${detailField} pax` : ''}`
@@ -26,78 +33,107 @@ export default function Watches() {
       type: 'CREATE_WATCH',
       kind,
       label,
-      detail: kind === 'fleet' ? 'Watching for any aircraft free across the window.' : 'Alerts you if a seat opens on any eligible flight matching route + window.',
+      detail: kind === 'fleet'
+        ? 'Watching for any aircraft free across the window.'
+        : 'Alerts you if a seat opens on any eligible flight matching route + window.',
     });
     setDates(''); setDetailField('');
   };
 
   return (
-    <PortalShell title="Watches" meta={<AsOf>Fleet state as of {asOf}</AsOf>}>
-      <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
-        <div className="flex flex-col gap-3">
-          {state.watches.map((w) => (
-            <Card
-              key={w.id}
-              className={cn(
-                'grid grid-cols-[auto_1fr_auto] items-center gap-4 p-4',
-                w.status === 'freed' && 'border-l-[3px] border-l-[#D1AC6B]',
-                w.status === 'expired' && 'opacity-55',
-              )}
-            >
-              {w.status === 'watching' && <Chip tone="info">Watching</Chip>}
-              {w.status === 'freed' && <Chip tone="gold">Freed</Chip>}
-              {w.status === 'expired' && <Chip tone="neutral">Expired</Chip>}
-              <div>
-                <p className="text-sm font-semibold">{w.label}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{w.status === 'freed' ? w.freedNote : w.detail}</p>
+    <PortalShell title="Watches" meta={<AsOf>{active.length} active · fleet state as of {asOf}</AsOf>}>
+      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+        <Card>
+          <CardHeader className="py-4">
+            <CardTitle className="flex flex-wrap items-center gap-2.5 text-base">
+              <span className="status-badge status-info p-1.5"><Bell className="h-4 w-4" /></span>
+              Availability watches
+              <Badge variant={active.length ? 'secondary' : 'outline'}>{active.length}</Badge>
+              <span className="text-xs font-normal text-muted-foreground">a watch never holds an aircraft or a seat</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5 pt-0">
+            {state.watches.map((w) => (
+              <div
+                key={w.id}
+                className={cn(
+                  'flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3',
+                  w.status === 'freed' && 'border-l-[3px] border-l-[var(--gfo-sunrise,#D1AC6B)]',
+                  w.status === 'expired' && 'opacity-60',
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  {w.status === 'watching' && <Chip tone="info">Watching</Chip>}
+                  {w.status === 'freed' && <Chip tone="gold">Freed</Chip>}
+                  {w.status === 'expired' && <Chip tone="neutral">Expired</Chip>}
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{w.label}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {w.status === 'freed' ? w.freedNote : w.detail}
+                    </span>
+                  </span>
+                </span>
+                <span className="flex shrink-0 gap-2">
+                  {w.status === 'watching' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => dispatch({ type: 'SIMULATE_FREE', id: w.id })}
+                        title="Demo control — stands in for the mirror noticing a cancellation"
+                      >
+                        Simulate: frees up
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => dispatch({ type: 'CANCEL_WATCH', id: w.id })}>
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                  {w.status === 'freed' && !w.prefillRequestId && (
+                    <Button size="sm" onClick={() => navigate('/booking-portal/requests/new', { state: { fromWatchId: w.id } })}>
+                      Open pre-filled request
+                    </Button>
+                  )}
+                  {w.status === 'freed' && w.prefillRequestId && <Chip tone="info">Requested — {w.prefillRequestId}</Chip>}
+                </span>
               </div>
-              <div className="flex gap-1.5">
-                {w.status === 'watching' && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => dispatch({ type: 'SIMULATE_FREE', id: w.id })}
-                      className="border border-[#D1AC6B] px-2.5 py-1 text-[11px] font-semibold text-[#8A6A24] dark:text-[#D1AC6B]"
-                      title="Demo control — stands in for the mirror noticing a cancellation"
-                    >
-                      Simulate: frees up
-                    </button>
-                    <button type="button" onClick={() => dispatch({ type: 'CANCEL_WATCH', id: w.id })} className="border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                      Cancel
-                    </button>
-                  </>
-                )}
-                {w.status === 'freed' && !w.prefillRequestId && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/booking-portal/requests/new', { state: { fromWatchId: w.id } })}
-                    className="bg-[#0096FC] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0077CC]"
-                  >
-                    Open pre-filled request
-                  </button>
-                )}
-                {w.status === 'freed' && w.prefillRequestId && (
-                  <Chip tone="info">Requested — {w.prefillRequestId}</Chip>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
+            ))}
+            {state.watches.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">No watches yet.</p>
+            )}
+          </CardContent>
+        </Card>
 
-        <Card className="h-fit p-4">
-          <SectionLabel>New watch</SectionLabel>
-          <div className="mb-2 flex gap-1.5">
-            <button type="button" onClick={() => setKind('fleet')} className={cn('px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wide', kind === 'fleet' ? 'bg-[#0096FC]/10 text-[#0077CC] dark:text-[#4FB6FD]' : 'border border-border text-muted-foreground')}>Fleet dates</button>
-            <button type="button" onClick={() => setKind('route')} className={cn('px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wide', kind === 'route' ? 'bg-[#0096FC]/10 text-[#0077CC] dark:text-[#4FB6FD]' : 'border border-border text-muted-foreground')}>Route seat</button>
-          </div>
-          <label className="mb-1 block text-xs text-muted-foreground">{kind === 'fleet' ? 'Dates' : 'Window'}</label>
-          <input aria-label="Watch dates" className="mb-2 w-full border border-border bg-background px-2 py-1.5 text-sm" placeholder="Sep 2 – Sep 4" value={dates} onChange={(e) => setDates(e.target.value)} />
-          <label className="mb-1 block text-xs text-muted-foreground">{kind === 'fleet' ? 'Passengers' : 'Route'}</label>
-          <input aria-label="Watch detail" className="mb-3 w-full border border-border bg-background px-2 py-1.5 text-sm" placeholder={kind === 'fleet' ? '3' : 'KCVG → KTEB'} value={detailField} onChange={(e) => setDetailField(e.target.value)} />
-          <button type="button" onClick={create} className="w-full bg-[#0096FC] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0077CC]">
-            Start watching
-          </button>
-          <p className="mt-2 text-[11px] text-muted-foreground">A watch is advisory — it never holds an aircraft or a seat, and it expires with its window.</p>
+        <Card className="h-fit">
+          <CardHeader className="py-4"><CardTitle className="text-base">New watch</CardTitle></CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <div className="flex gap-1.5">
+              <Button variant={kind === 'fleet' ? 'secondary' : 'outline'} size="sm" onClick={() => setKind('fleet')}>
+                Fleet dates
+              </Button>
+              <Button variant={kind === 'route' ? 'secondary' : 'outline'} size="sm" onClick={() => setKind('route')}>
+                Route seat
+              </Button>
+            </div>
+            <div>
+              <SectionLabel>{kind === 'fleet' ? 'Dates' : 'Window'}</SectionLabel>
+              <input aria-label="Watch dates" className={field} placeholder="Sep 2 – Sep 4" value={dates} onChange={(e) => setDates(e.target.value)} />
+            </div>
+            <div>
+              <SectionLabel>{kind === 'fleet' ? 'Passengers' : 'Route'}</SectionLabel>
+              <input
+                aria-label="Watch detail"
+                className={field}
+                placeholder={kind === 'fleet' ? '3' : 'KCVG → KTEB'}
+                value={detailField}
+                onChange={(e) => setDetailField(e.target.value)}
+              />
+            </div>
+            <Button className="w-full" onClick={create}>Start watching</Button>
+            <p className="text-xs text-muted-foreground">
+              Advisory only, and it expires with its window — no zombie alerts.
+            </p>
+          </CardContent>
         </Card>
       </div>
     </PortalShell>

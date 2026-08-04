@@ -269,6 +269,47 @@ const declinedRequest: TripRequest = {
   messages: [],
 };
 
+// Already through the whole ladder, so Trips has an itinerary to open on the
+// first click rather than an empty state.
+const confirmedRequest: TripRequest = {
+  id: 'R-2039',
+  status: 'confirmed',
+  tier: 1,
+  principalId: 'P-OSEI',
+  requestedBy: `${EA_NAME} (EA)`,
+  createdAt: isoAt(-16, '10:12'),
+  extras: ['Catering — full', 'Ground at both ends'],
+  note: 'Site visit; back the same evening.',
+  legs: [
+    {
+      id: 'L-6',
+      from: 'KLUK',
+      to: 'KAUS',
+      date: isoDate(4),
+      departLocal: '09:15',
+      flexHours: 0,
+      estMinutes: 145,
+      estNm: 920,
+      passengers: [
+        { passengerId: 'P-OSEI', lead: true, purpose: 'business' },
+        { passengerId: 'P-TANAKA', purpose: 'business' },
+      ],
+    },
+    {
+      id: 'L-7',
+      from: 'KAUS',
+      to: 'KLUK',
+      date: isoDate(4),
+      departLocal: '18:40',
+      flexHours: 0,
+      estMinutes: 150,
+      estNm: 920,
+      passengers: [{ passengerId: 'P-OSEI', lead: true, purpose: 'business' }],
+    },
+  ],
+  messages: [],
+};
+
 const watches: Watch[] = [
   {
     id: 'W-1',
@@ -296,7 +337,7 @@ const watches: Watch[] = [
 export function initialPortalState(): PortalState {
   return {
     persona: 'ea',
-    requests: [seedRequest, secondRequest, departingSoonRequest, declinedRequest],
+    requests: [seedRequest, secondRequest, departingSoonRequest, confirmedRequest, declinedRequest],
     flights,
     seatAsks: [],
     watches,

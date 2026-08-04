@@ -1,43 +1,35 @@
-// Small shared presentation pieces for the portal shell. Chip colors follow
-// the design frames: Daylight for informational, Sunrise gold for "your own
-// things", semantic green/amber/red for valid/flag/block.
+// Shared presentation for the portal, on the house kit — Badge/Card from the
+// UI library and the status-* accent classes, so the portal reads as the same
+// product as the Command Center rather than a bolt-on with its own palette.
 
 import type { ReactNode } from 'react';
+import { Badge } from '../../ui/badge';
 import { cn } from '../../ui/utils';
+
+export { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 
 export type ChipTone = 'info' | 'gold' | 'ok' | 'flag' | 'block' | 'neutral';
 
-const TONE_CLASSES: Record<ChipTone, string> = {
-  info: 'bg-[#0096FC]/10 text-[#0077CC] dark:text-[#4FB6FD]',
-  gold: 'bg-[#D1AC6B]/15 text-[#8A6A24] dark:text-[#D1AC6B]',
-  ok: 'bg-[#00B140]/10 text-[#008130] dark:text-[#34C46A]',
-  flag: 'bg-[#F1B434]/15 text-[#8A5B00] dark:text-[#F1B434]',
-  block: 'bg-destructive/10 text-destructive',
-  neutral: 'bg-muted text-muted-foreground border border-border',
+const TONE_CLASS: Record<ChipTone, string> = {
+  info: 'status-info',
+  ok: 'status-success',
+  flag: 'status-warning',
+  block: 'status-error',
+  gold: 'border-[var(--gfo-sunrise,#D1AC6B)] bg-[color-mix(in_srgb,var(--gfo-sunrise,#D1AC6B)_16%,transparent)] text-[var(--gfo-sunrise-deep,#8A6A24)] dark:text-[var(--gfo-sunrise,#D1AC6B)]',
+  neutral: '',
 };
 
+/** A status pill. Tone maps onto the app's semantic accents, never raw hex. */
 export function Chip({ tone = 'neutral', children, className }: { tone?: ChipTone; children: ReactNode; className?: string }) {
   return (
-    <span
-      className={cn(
-        'inline-block whitespace-nowrap px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide',
-        TONE_CLASSES[tone],
-        className,
-      )}
-    >
+    <Badge variant="outline" className={cn('text-[10px] font-semibold', TONE_CLASS[tone], className)}>
       {children}
-    </span>
+    </Badge>
   );
 }
 
 export function SectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{children}</p>
-  );
-}
-
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('border border-border bg-card shadow-sm', className)}>{children}</div>;
+  return <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{children}</p>;
 }
 
 const STATUS_TONE: Record<string, ChipTone> = {
@@ -70,7 +62,7 @@ export function StatusLadder({ status }: { status: string }) {
     <div className="flex flex-wrap items-center gap-2">
       {LADDER.map((step, i) => (
         <div key={step} className="flex items-center gap-2">
-          {i > 0 && <span className={cn('h-0.5 w-8', i <= activeIndex ? 'bg-[#0096FC]' : 'bg-border')} />}
+          {i > 0 && <span className={cn('h-0.5 w-8', i <= activeIndex ? 'bg-[var(--gfo-daylight,#0096FC)]' : 'bg-border')} />}
           <span
             className={cn(
               'flex items-center gap-1.5 text-xs',
@@ -82,8 +74,8 @@ export function StatusLadder({ status }: { status: string }) {
             <span
               className={cn(
                 'inline-block h-2.5 w-2.5 rounded-full border-2',
-                i < activeIndex && 'border-[#0096FC] bg-[#0096FC]',
-                i === activeIndex && 'border-[#0096FC] bg-background',
+                i < activeIndex && 'border-[var(--gfo-daylight,#0096FC)] bg-[var(--gfo-daylight,#0096FC)]',
+                i === activeIndex && 'border-[var(--gfo-daylight,#0096FC)] bg-background',
                 i > activeIndex && 'border-border bg-background',
               )}
             />
@@ -97,7 +89,7 @@ export function StatusLadder({ status }: { status: string }) {
 }
 
 export function AsOf({ children }: { children: ReactNode }) {
-  return <span className="text-[11.5px] text-muted-foreground/80">{children}</span>;
+  return <span className="text-xs text-muted-foreground">{children}</span>;
 }
 
 export function purposeLabel(p: string): string {

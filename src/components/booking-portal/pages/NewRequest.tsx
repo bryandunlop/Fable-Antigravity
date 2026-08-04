@@ -4,8 +4,12 @@
 
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Plane, Plus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
 import { PortalShell } from '../components/PortalShell';
-import { Card, Chip, SectionLabel, purposeLabel } from '../components/portalUi';
+import { Chip, SectionLabel, purposeLabel } from '../components/portalUi';
 import { usePortal } from '../BookingPortalContext';
 import type { Purpose, RequestLeg } from '../types';
 import { cn } from '../../ui/utils';
@@ -19,6 +23,7 @@ const EST: Record<string, { minutes: number; nm: number }> = {
   'KTEB-KCVG': { minutes: 125, nm: 570 },
   'KCVG-KATL': { minutes: 80, nm: 373 },
   'KLUK-KORD': { minutes: 75, nm: 250 },
+  'KLUK-KAUS': { minutes: 145, nm: 920 },
   'KCVG-EGGW': { minutes: 460, nm: 3400 },
 };
 
@@ -104,142 +109,174 @@ export default function NewRequest() {
     navigate('/booking-portal/requests');
   };
 
-  const inputCls = 'border border-border bg-background px-2 py-1.5 text-sm';
+  const field = 'rounded-md border bg-background px-2.5 py-1.5 text-sm';
 
   return (
     <PortalShell title="New trip request">
       {prefill?.fromWatchId && (
-        <div className="mb-4 border border-[#D1AC6B] bg-[#D1AC6B]/10 px-4 py-2.5 text-sm">
-          <Chip tone="gold">Freed</Chip> <span className="text-muted-foreground">Pre-filled from your fleet-date hold — adjust and submit.</span>
-        </div>
+        <Card className="mb-4 border-l-[3px] border-l-[var(--gfo-sunrise,#D1AC6B)]">
+          <CardContent className="flex flex-wrap items-center gap-2 p-4 text-sm">
+            <Chip tone="gold">Freed</Chip>
+            <span className="text-muted-foreground">Pre-filled from your fleet-date hold — adjust and submit.</span>
+          </CardContent>
+        </Card>
       )}
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-4">
-          {legs.map((leg, i) => (
-            <Card key={i} className="p-4">
-              <div className="flex items-center justify-between">
-                <SectionLabel>Leg {i + 1}</SectionLabel>
-                {legs.length > 1 && (
-                  <button type="button" className="text-xs text-destructive" onClick={() => setLegs((p) => p.filter((_, j) => j !== i))}>
-                    Remove leg
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <input aria-label={`Leg ${i + 1} from`} className={cn(inputCls, 'w-24 uppercase')} value={leg.from} onChange={(e) => updateLeg(i, { from: e.target.value.toUpperCase() })} />
-                <span className="text-muted-foreground">→</span>
-                <input aria-label={`Leg ${i + 1} to`} className={cn(inputCls, 'w-24 uppercase')} value={leg.to} onChange={(e) => updateLeg(i, { to: e.target.value.toUpperCase() })} />
-                <input aria-label={`Leg ${i + 1} date`} type="date" className={inputCls} value={leg.date} onChange={(e) => updateLeg(i, { date: e.target.value })} />
-                <input aria-label={`Leg ${i + 1} departure`} type="time" className={inputCls} value={leg.departLocal} onChange={(e) => updateLeg(i, { departLocal: e.target.value })} />
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  flex ±
-                  <input
-                    aria-label={`Leg ${i + 1} flexibility hours`}
-                    type="number" min={0} max={12}
-                    className={cn(inputCls, 'w-14')}
-                    value={leg.flexHours}
-                    onChange={(e) => updateLeg(i, { flexHours: Number(e.target.value) })}
-                  /> h
-                </label>
-                <Chip tone="info">est. {Math.floor(estimate(leg.from, leg.to).minutes / 60)} h {estimate(leg.from, leg.to).minutes % 60} m · {estimate(leg.from, leg.to).nm} nm</Chip>
-              </div>
 
-              <div className="mt-3 border-t border-border pt-3">
-                <SectionLabel>Manifest — leg {i + 1}</SectionLabel>
-                <div className="flex flex-col gap-1.5">
-                  {bookable.map((p) => {
-                    const on = leg.passengerIds.includes(p.id);
-                    return (
-                      <div key={p.id} className="flex flex-wrap items-center gap-2 text-sm">
-                        <label className="flex w-44 items-center gap-2">
-                          <input type="checkbox" checked={on} onChange={() => togglePassenger(i, p.id)} />
-                          {p.name}
-                          <span className="text-xs text-muted-foreground">{p.kind}</span>
-                        </label>
-                        {on && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => updateLeg(i, { leadId: p.id })}
-                              className={cn('px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide', leg.leadId === p.id ? 'bg-[#D1AC6B]/20 text-[#8A6A24] dark:text-[#D1AC6B]' : 'border border-border text-muted-foreground')}
-                            >
-                              {leg.leadId === p.id ? 'Lead' : 'Set lead'}
-                            </button>
-                            <select
-                              aria-label={`${p.name} purpose leg ${i + 1}`}
-                              className={cn(inputCls, 'py-1 text-xs')}
-                              value={leg.purposes[p.id] ?? 'business'}
-                              onChange={(e) => updateLeg(i, { purposes: { ...leg.purposes, [p.id]: e.target.value as Purpose } })}
-                            >
-                              {PURPOSES.map((pu) => <option key={pu} value={pu}>{purposeLabel(pu)}</option>)}
-                            </select>
-                            {(leg.purposes[p.id] === 'personal' || leg.purposes[p.id] === 'entertainment') && (
-                              <span className="text-[11px] text-[#8A5B00] dark:text-[#F1B434]">SIFL — imputed income, logged</span>
+      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="flex flex-col gap-4">
+          {legs.map((leg, i) => {
+            const est = estimate(leg.from, leg.to);
+            return (
+              <Card key={i}>
+                <CardHeader className="py-4">
+                  <CardTitle className="flex flex-wrap items-center gap-2.5 text-base">
+                    <span className="status-badge status-info p-1.5"><Plane className="h-4 w-4" /></span>
+                    Leg {i + 1}
+                    <Badge variant="outline" className="text-[10px]">
+                      est. {Math.floor(est.minutes / 60)} h {est.minutes % 60} m · {est.nm} nm
+                    </Badge>
+                    {legs.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto text-destructive"
+                        onClick={() => setLegs((p) => p.filter((_, j) => j !== i))}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <input aria-label={`Leg ${i + 1} from`} className={cn(field, 'w-24 uppercase')} value={leg.from} onChange={(e) => updateLeg(i, { from: e.target.value.toUpperCase() })} />
+                    <span className="text-muted-foreground">→</span>
+                    <input aria-label={`Leg ${i + 1} to`} className={cn(field, 'w-24 uppercase')} value={leg.to} onChange={(e) => updateLeg(i, { to: e.target.value.toUpperCase() })} />
+                    <input aria-label={`Leg ${i + 1} date`} type="date" className={field} value={leg.date} onChange={(e) => updateLeg(i, { date: e.target.value })} />
+                    <input aria-label={`Leg ${i + 1} departure`} type="time" className={field} value={leg.departLocal} onChange={(e) => updateLeg(i, { departLocal: e.target.value })} />
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      flex ±
+                      <input
+                        aria-label={`Leg ${i + 1} flexibility hours`}
+                        type="number" min={0} max={12}
+                        className={cn(field, 'w-16')}
+                        value={leg.flexHours}
+                        onChange={(e) => updateLeg(i, { flexHours: Number(e.target.value) })}
+                      /> h
+                    </label>
+                  </div>
+
+                  <div className="rounded-lg border">
+                    <p className="border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                      Manifest — leg {i + 1}
+                    </p>
+                    <div className="divide-y">
+                      {bookable.map((p) => {
+                        const on = leg.passengerIds.includes(p.id);
+                        return (
+                          <div key={p.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                            <label className="flex w-44 items-center gap-2">
+                              <input type="checkbox" checked={on} onChange={() => togglePassenger(i, p.id)} />
+                              {p.name}
+                              <span className="text-xs text-muted-foreground">{p.kind}</span>
+                            </label>
+                            {on && (
+                              <>
+                                <Button
+                                  variant={leg.leadId === p.id ? 'secondary' : 'outline'}
+                                  size="sm"
+                                  className="h-7 text-[10px]"
+                                  onClick={() => updateLeg(i, { leadId: p.id })}
+                                >
+                                  {leg.leadId === p.id ? 'Lead' : 'Set lead'}
+                                </Button>
+                                <select
+                                  aria-label={`${p.name} purpose leg ${i + 1}`}
+                                  className={cn(field, 'py-1 text-xs')}
+                                  value={leg.purposes[p.id] ?? 'business'}
+                                  onChange={(e) => updateLeg(i, { purposes: { ...leg.purposes, [p.id]: e.target.value as Purpose } })}
+                                >
+                                  {PURPOSES.map((pu) => <option key={pu} value={pu}>{purposeLabel(pu)}</option>)}
+                                </select>
+                                {(leg.purposes[p.id] === 'personal' || leg.purposes[p.id] === 'entertainment') && (
+                                  <Chip tone="flag">SIFL — imputed income, logged</Chip>
+                                )}
+                              </>
                             )}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </Card>
-          ))}
-          <button
-            type="button"
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+          <Button
+            variant="outline"
+            className="self-start"
             onClick={() => setLegs((p) => [...p, { ...emptyLeg(p[p.length - 1]?.date ?? defaultDate), from: p[p.length - 1]?.to ?? 'KTEB', to: p[0]?.from ?? 'KCVG' }])}
-            className="self-start border border-[#0096FC] px-3 py-1.5 text-xs font-semibold text-[#0077CC] dark:text-[#4FB6FD]"
           >
-            + Add leg
-          </button>
+            <Plus className="mr-1.5 h-4 w-4" /> Add leg
+          </Button>
         </div>
 
         <div className="flex flex-col gap-4">
-          <Card className="p-4">
-            <SectionLabel>Principal</SectionLabel>
-            <select aria-label="Principal" className={cn(inputCls, 'w-full')} value={principalId} onChange={(e) => setPrincipalId(e.target.value)}>
-              {state.passengers.filter((p) => p.kind === 'principal' && p.eaLevel !== 'view').map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <p className="mt-1.5 text-[11px] text-muted-foreground">Your View-level principals can't be booked for — ask for Book access.</p>
+          <Card>
+            <CardHeader className="py-4"><CardTitle className="text-base">Principal</CardTitle></CardHeader>
+            <CardContent className="pt-0">
+              <select aria-label="Principal" className={cn(field, 'w-full')} value={principalId} onChange={(e) => setPrincipalId(e.target.value)}>
+                {state.passengers.filter((p) => p.kind === 'principal' && p.eaLevel !== 'view').map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Your View-level principals can't be booked for — ask for Book access.
+              </p>
+            </CardContent>
           </Card>
-          <Card className="p-4">
-            <SectionLabel>Extras</SectionLabel>
-            <div className="flex flex-col gap-1.5 text-sm">
-              {EXTRAS.map((x) => (
-                <label key={x} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={extras.includes(x)}
-                    onChange={() => setExtras((p) => (p.includes(x) ? p.filter((e) => e !== x) : [...p, x]))}
-                  />
-                  {x}
-                </label>
-              ))}
-            </div>
-            <SectionLabel><span className="mt-3 inline-block">Note to scheduling</span></SectionLabel>
-            <textarea
-              aria-label="Note to scheduling"
-              className={cn(inputCls, 'w-full')}
-              rows={2}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Anything the form can't say"
-            />
+
+          <Card>
+            <CardHeader className="py-4"><CardTitle className="text-base">Extras</CardTitle></CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              <div className="flex flex-col gap-1.5 text-sm">
+                {EXTRAS.map((x) => (
+                  <label key={x} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={extras.includes(x)}
+                      onChange={() => setExtras((p) => (p.includes(x) ? p.filter((e) => e !== x) : [...p, x]))}
+                    />
+                    {x}
+                  </label>
+                ))}
+              </div>
+              <div>
+                <SectionLabel>Note to scheduling</SectionLabel>
+                <textarea
+                  aria-label="Note to scheduling"
+                  className={cn(field, 'w-full')}
+                  rows={2}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Anything the form can't say"
+                />
+              </div>
+            </CardContent>
           </Card>
-          <Card className="p-4">
-            <SectionLabel>Planning estimate</SectionLabel>
-            <p className="text-sm"><span className="font-semibold">{Math.floor(totalMinutes / 60)} h {totalMinutes % 60} m</span> total flight time · {legs.length} leg{legs.length === 1 ? '' : 's'}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">Estimate only — scheduling assigns aircraft and final times.</p>
-            <button
-              type="button"
-              disabled={!canSubmit}
-              onClick={submit}
-              className="mt-3 w-full bg-[#0096FC] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0077CC] disabled:opacity-40"
-            >
-              Submit request
-            </button>
+
+          <Card>
+            <CardHeader className="py-4"><CardTitle className="text-base">Planning estimate</CardTitle></CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              <p className="text-sm">
+                <span className="font-semibold">{Math.floor(totalMinutes / 60)} h {totalMinutes % 60} m</span>
+                {' '}total flight time · {legs.length} leg{legs.length === 1 ? '' : 's'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Estimate only — scheduling assigns aircraft and final times.
+              </p>
+              <Button className="w-full" disabled={!canSubmit} onClick={submit}>Submit request</Button>
+            </CardContent>
           </Card>
         </div>
       </div>

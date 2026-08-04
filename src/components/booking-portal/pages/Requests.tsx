@@ -1,62 +1,100 @@
-// Requests list — the EA's view of everything in flight, with the declined
-// ones surfaced for resubmit rather than buried.
+// Requests — the EA's view of everything in flight. Declined requests are
+// surfaced with their reason rather than buried, because the reason is the
+// thing that tells the EA what to change.
 
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ClipboardList, Plus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
 import { PortalShell } from '../components/PortalShell';
-import { Card, StatusChip } from '../components/portalUi';
+import { RequestDrawer } from '../components/RequestDrawer';
+import { RequestIdentityLine } from '../components/RequestIdentity';
+import { AsOf, StatusChip } from '../components/portalUi';
 import { usePortal } from '../BookingPortalContext';
-import { routeLabel } from '../engine/lifecycle';
 
 export default function Requests() {
-  const { state } = usePortal();
+  const { state, dispatch } = usePortal();
+  const navigate = useNavigate();
+  // A deep link to one request opens it in the drawer over this list rather
+  // than on a page of its own — one implementation, and closing it leaves you
+  // somewhere useful instead of nowhere.
+  const { id: deepLinkId } = useParams();
+  const [drawerId, setDrawerId] = useState<string | null>(deepLinkId ?? null);
+
   const requests = state.requests.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const live = requests.filter((r) => r.status !== 'confirmed' && r.status !== 'declined');
+  const declined = requests.filter((r) => r.status === 'declined');
+  const done = requests.filter((r) => r.status === 'confirmed');
+
+  const Section = ({
+    title, rows, hint, accent,
+  }: { title: string; rows: typeof requests; hint: string; accent: string }) => (
+    <Card>
+      <CardHeader className="py-4">
+        <CardTitle className="flex flex-wrap items-center gap-2.5 text-base">
+          <span className={`status-badge p-1.5 ${accent}`}><ClipboardList className="h-4 w-4" /></span>
+          {title}
+          <Badge variant={rows.length ? 'secondary' : 'outline'}>{rows.length}</Badge>
+          <span className="text-xs font-normal text-muted-foreground">{hint}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2.5 pt-0">
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing here.</p>
+        ) : (
+          rows.map((r) => (
+            <div key={r.id} className="overflow-hidden rounded-lg border">
+              <button
+                onClick={() => setDrawerId(r.id)}
+                className="group flex w-full flex-wrap items-center justify-between gap-3 border-b bg-muted/50 px-4 py-2.5 text-left transition-colors hover:bg-accent"
+              >
+                <RequestIdentityLine request={r} passengers={state.passengers} />
+                <StatusChip status={r.status} />
+              </button>
+              {r.status === 'declined' && r.declineReason && (
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+                  <span className="text-sm text-muted-foreground">"{r.declineReason}"</span>
+                  <Button variant="outline" size="sm" onClick={() => dispatch({ type: 'RESUBMIT_REQUEST', id: r.id })}>
+                    Edit &amp; resubmit
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <PortalShell
       title="Trip requests"
+      meta={<AsOf>{live.length} in flight · {declined.length} needing a change</AsOf>}
       actions={
-        <Link to="/booking-portal/requests/new" className="bg-[#0096FC] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0077CC]">
-          New trip request
-        </Link>
+        <Button asChild size="sm">
+          <Link to="/booking-portal/requests/new"><Plus className="mr-1.5 h-4 w-4" /> New trip request</Link>
+        </Button>
       }
     >
-      <Card>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <th className="px-4 py-2.5">Request</th>
-              <th className="px-4 py-2.5">Route</th>
-              <th className="px-4 py-2.5">Dates</th>
-              <th className="px-4 py-2.5">Principal</th>
-              <th className="px-4 py-2.5">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requests.map((r) => {
-              const principal = state.passengers.find((p) => p.id === r.principalId);
-              const dates = r.legs.length
-                ? `${r.legs[0].date}${r.legs.length > 1 ? ` – ${r.legs[r.legs.length - 1].date}` : ''}`
-                : '—';
-              return (
-                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                  <td className="px-4 py-2.5">
-                    <Link to={`/booking-portal/requests/${r.id}`} className="font-semibold text-[#0077CC] dark:text-[#4FB6FD]">
-                      {r.id}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5">{routeLabel(r)}</td>
-                  <td className="px-4 py-2.5 tabular-nums">{dates}</td>
-                  <td className="px-4 py-2.5">{principal?.name ?? '—'}</td>
-                  <td className="px-4 py-2.5"><StatusChip status={r.status} /></td>
-                </tr>
-              );
-            })}
-            {requests.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No requests yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
+      <div className="flex flex-col gap-4">
+        <Section title="In flight" rows={live} hint="submitted, waiting on a decision" accent="status-info" />
+        {declined.length > 0 && (
+          <Section title="Declined — needs a change" rows={declined} hint="the reason travels with the decision" accent="status-error" />
+        )}
+        <Section title="Confirmed" rows={done} hint="on the schedule — see Trips for the itinerary" accent="status-success" />
+      </div>
+
+      <RequestDrawer
+        requestId={drawerId}
+        open={!!drawerId}
+        onOpenChange={(o) => {
+          if (o) return;
+          setDrawerId(null);
+          if (deepLinkId) navigate('/booking-portal/requests', { replace: true });
+        }}
+      />
     </PortalShell>
   );
 }
