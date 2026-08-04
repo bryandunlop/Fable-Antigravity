@@ -9,7 +9,7 @@ import { Progress } from './ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import {
   Target, Bell, ChevronDown, ChevronRight, Plus, Search,
-  LayoutList, Table as TableIcon, PlayCircle,
+  LayoutList, Table as TableIcon, PlayCircle, RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ActionItem, NewItemForm } from './ActionItems/types';
@@ -71,7 +71,10 @@ function Sparkline({ values, width = 44 }: { values: number[]; width?: number })
  * scanning and bulk edits.
  */
 export default function RollingActionItems() {
-  const { actionItems, addActionItem, updateActionItem, setCheckInCadence, nudge, nudgeMany } = useActionItems();
+  const {
+    actionItems, addActionItem, updateActionItem, setCheckInCadence,
+    nudge, nudgeMany, closeActionItem, reopenActionItem,
+  } = useActionItems();
 
   const [view, setView] = useState<'chase' | 'table'>('chase');
   const [axis, setAxis] = useState<ChaseAxis>('owner');
@@ -150,13 +153,27 @@ export default function RollingActionItems() {
         ...item.contributors.filter(c => c.name !== personName),
       ],
     });
-    toast.success('Reassigned', { description: `${personName} now owns "${item.title}".` });
+    // Otherwise the new owner inherits a quiet project in silence and hears
+    // nothing until the next check-in window — which is the failure the whole
+    // surface exists to prevent. Handing it over IS the ask.
+    nudge(id);
+    toast.success('Reassigned', {
+      description: `${personName} now owns "${item.title}" and has a status request on their task list.`,
+    });
   };
 
-  const closeProject = (id: string) => {
+  const closeProject = (id: string, reason: string) => {
     const item = actionItems.find(candidate => candidate.id === id);
-    updateActionItem(id, { status: 'Completed' });
-    toast.success('Closed', { description: `"${item?.title ?? 'Project'}" moved to Landed.` });
+    closeActionItem(id, reason, 'Lead Team');
+    toast.success('Closed', {
+      description: `"${item?.title ?? 'Project'}" closed at ${item?.progress ?? 0}% — ${reason}`,
+      action: { label: 'Undo', onClick: () => reopenActionItem(id) },
+    });
+  };
+
+  const reopen = (item: ActionItem) => {
+    reopenActionItem(item.id);
+    toast.success('Reopened', { description: `"${item.title}" is back on the board.` });
   };
 
   const slowCadence = (id: string, cadence: CheckInCadence) => {
@@ -355,7 +372,12 @@ export default function RollingActionItems() {
                       const nudged = item.checkIn?.lastNudgedOn;
                       return (
                         <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 pl-11">
-                          <span className="flex-1 min-w-0 truncate text-sm">{item.title}</span>
+                          <span className="flex-1 min-w-0 truncate text-sm">
+                            {item.title}
+                            {item.closure && (
+                              <span className="text-muted-foreground"> · closed at {item.closure.progressAtClose}%: {item.closure.reason}</span>
+                            )}
+                          </span>
                           {axis !== 'owner' && (
                             <span className="text-sm text-muted-foreground w-32 truncate text-right">
                               {getOwner(item)?.name ?? '—'}
@@ -368,7 +390,12 @@ export default function RollingActionItems() {
                           >
                             {state === 'landed' ? 'done' : silence === 0 ? 'today' : `${silence}d`}
                           </span>
-                          {nudged ? (
+                          {state === 'landed' ? (
+                            <Button size="sm" variant="ghost" onClick={() => reopen(item)}>
+                              <RotateCcw className="w-4 h-4 mr-1" />
+                              Reopen
+                            </Button>
+                          ) : nudged ? (
                             <Badge variant="outline" className="text-xs whitespace-nowrap">
                               <Bell className="w-3 h-3 mr-1" />
                               Nudged

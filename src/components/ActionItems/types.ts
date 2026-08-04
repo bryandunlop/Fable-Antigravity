@@ -30,6 +30,14 @@ export interface ProjectCheckIn {
   lastNudgedOn?: string;
 }
 
+export interface ProjectClosure {
+  reason: string;
+  closedOn: string;
+  closedBy: string;
+  /** Progress at the moment of closing — a project closed at 55% says so. */
+  progressAtClose: number;
+}
+
 /**
  * Phase 2 (declared, not yet editable): a named data point the lead team wants
  * tracked over the life of the project, e.g. "aircraft converted".
@@ -82,6 +90,12 @@ export interface ActionItem {
   totalSections: number;
   /** Lead-team project tracking. Absent on items derived from other modules. */
   checkIn?: ProjectCheckIn;
+  /**
+   * Why a project was closed. Closing one at 55% is a real decision someone
+   * will ask about later, so the reason is captured at the moment it is made
+   * rather than reconstructed from memory.
+   */
+  closure?: ProjectClosure;
   metrics?: ProjectMetric[];
   linkedRecords?: ProjectModuleLink[];
 }

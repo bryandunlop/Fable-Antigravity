@@ -24,6 +24,10 @@ interface ActionItemContextType {
   nudge: (id: string, on?: string) => void;
   /** Chase a whole group in one pass — one owner, or every quiet project. */
   nudgeMany: (ids: string[], on?: string) => void;
+  /** Close a project with the reason it was closed, so it can be answered for later. */
+  closeActionItem: (id: string, reason: string, closedBy: string, on?: string) => void;
+  /** Undo a close — the project returns to whatever state its silence says it is. */
+  reopenActionItem: (id: string) => void;
   /** File one contributor's report for a check-in window. */
   recordCheckIn: (
     id: string,
@@ -134,6 +138,53 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
+  const closeActionItem = (id: string, reason: string, closedBy: string, on?: string) => {
+    const closedOn = on ?? todayIso();
+    setActionItems(prev =>
+      prev.map(item =>
+        item.id === id
+          ? {
+              ...item,
+              status: 'Completed',
+              closure: { reason, closedOn, closedBy, progressAtClose: item.progress },
+              recentActivity: [
+                {
+                  id: Date.now(),
+                  user: { name: closedBy, avatar: initialsOf(closedBy) },
+                  action: `closed this project at ${item.progress}%: ${reason}`,
+                  time: 'just now',
+                },
+                ...item.recentActivity,
+              ].slice(0, 10),
+            }
+          : item,
+      ),
+    );
+  };
+
+  const reopenActionItem = (id: string) => {
+    setActionItems(prev =>
+      prev.map(item => {
+        if (item.id !== id) return item;
+        const { closure, ...rest } = item;
+        return {
+          ...rest,
+          // Back to In Progress — the stall helpers re-derive quiet from silence.
+          status: 'In Progress',
+          recentActivity: [
+            {
+              id: Date.now(),
+              user: { name: 'Lead Team', avatar: 'LT' },
+              action: 'reopened this project',
+              time: 'just now',
+            },
+            ...item.recentActivity,
+          ].slice(0, 10),
+        };
+      }),
+    );
+  };
+
   const recordCheckIn: ActionItemContextType['recordCheckIn'] = (id, report) => {
     setActionItems(prev =>
       prev.map(item => {
@@ -184,6 +235,8 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setCheckInCadence,
         nudge,
         nudgeMany,
+        closeActionItem,
+        reopenActionItem,
         recordCheckIn,
       }}
     >

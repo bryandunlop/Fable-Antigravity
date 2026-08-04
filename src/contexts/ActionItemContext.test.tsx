@@ -203,3 +203,51 @@ describe('ActionItemContext at scale', () => {
     expect(result.current.actionItems.every(item => !item.checkIn?.lastNudgedOn)).toBe(true);
   });
 });
+
+describe('closing and reopening', () => {
+  it('records why a project was closed, and at what progress', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => { result.current.addActionItem(form(), 'Lead Team'); });
+    const id = result.current.actionItems[0].id;
+    act(() => { result.current.recordCheckIn(id, { contributorId: 'creator', dueOn: '2026-08-08', progress: 55, note: 'halfway' }); });
+
+    act(() => { result.current.closeActionItem(id, 'Superseded by another project', 'Lead Team', '2026-08-04'); });
+
+    const item = result.current.getActionItemById(id)!;
+    expect(item.status).toBe('Completed');
+    expect(item.closure).toEqual({
+      reason: 'Superseded by another project',
+      closedOn: '2026-08-04',
+      closedBy: 'Lead Team',
+      progressAtClose: 55,
+    });
+    // The reason is also in the feed, so it reads in context later.
+    expect(item.recentActivity[0].action).toContain('closed this project at 55%');
+  });
+
+  it('reopens cleanly — the closure is gone, not just overwritten', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => { result.current.addActionItem(form(), 'Lead Team'); });
+    const id = result.current.actionItems[0].id;
+
+    act(() => { result.current.closeActionItem(id, 'No longer a priority', 'Lead Team'); });
+    act(() => { result.current.reopenActionItem(id); });
+
+    const item = result.current.getActionItemById(id)!;
+    expect(item.status).toBe('In Progress');
+    expect(item.closure).toBeUndefined();
+    expect(item.recentActivity[0].action).toContain('reopened');
+  });
+
+  it('leaves filed reports intact through a close and reopen', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => { result.current.addActionItem(form(), 'Lead Team'); });
+    const id = result.current.actionItems[0].id;
+    act(() => { result.current.recordCheckIn(id, { contributorId: 'creator', dueOn: '2026-08-08', progress: 40, note: 'progress' }); });
+
+    act(() => { result.current.closeActionItem(id, 'Cancelled', 'Lead Team'); });
+    act(() => { result.current.reopenActionItem(id); });
+
+    expect(result.current.getActionItemById(id)!.checkIn?.reports).toHaveLength(1);
+  });
+});

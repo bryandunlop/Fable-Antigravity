@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
 import { Progress } from '../ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Bell, UserCheck, Clock, CheckCircle, SkipForward, X, Flag } from 'lucide-react';
@@ -18,9 +20,22 @@ interface ChaseRunPanelProps {
   onNudge: (id: string) => void;
   onReassign: (id: string, personName: string) => void;
   onSlowCadence: (id: string, cadence: CheckInCadence) => void;
-  onClose: (id: string) => void;
+  onClose: (id: string, reason: string) => void;
   onExit: () => void;
 }
+
+/**
+ * The reasons a lead-team project actually stops. Free text is allowed, but
+ * offering the common answers means the reason gets captured rather than
+ * skipped — an unlabelled close is the one nobody can answer for later.
+ */
+const CLOSURE_REASONS = [
+  'Delivered — the work is done',
+  'Superseded by another project',
+  'No longer a priority',
+  'Absorbed into business as usual',
+  'Cancelled — will not proceed',
+];
 
 /**
  * One quiet project at a time, five verbs, a progress bar, an end.
@@ -36,6 +51,8 @@ export default function ChaseRunPanel({
   const [index, setIndex] = useState(0);
   const [handled, setHandled] = useState<Array<{ id: string; title: string; verb: ChaseVerb }>>([]);
   const [reassigning, setReassigning] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeReason, setCloseReason] = useState('');
 
   const byId = new Map(allItems.map(item => [item.id, item]));
   const current = index < queue.length ? byId.get(queue[index]) ?? null : null;
@@ -44,6 +61,8 @@ export default function ChaseRunPanel({
   const advance = (item: ActionItem, verb: ChaseVerb) => {
     setHandled(prev => [...prev, { id: item.id, title: item.title, verb }]);
     setReassigning(false);
+    setClosing(false);
+    setCloseReason('');
     setIndex(prev => prev + 1);
   };
 
@@ -151,6 +170,40 @@ export default function ChaseRunPanel({
               </Select>
               <Button variant="ghost" size="sm" onClick={() => setReassigning(false)}>Cancel</Button>
             </div>
+          ) : closing ? (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">
+                Why is this closing at {current.progress}%?
+              </Label>
+              <div className="flex gap-2 flex-wrap">
+                {CLOSURE_REASONS.map(reason => (
+                  <Button
+                    key={reason}
+                    variant={closeReason === reason ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setCloseReason(reason)}
+                  >
+                    {reason}
+                  </Button>
+                ))}
+              </div>
+              <Textarea
+                rows={2}
+                placeholder="Or write your own…"
+                value={CLOSURE_REASONS.includes(closeReason) ? '' : closeReason}
+                onChange={e => setCloseReason(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button
+                  disabled={!closeReason.trim()}
+                  onClick={() => { onClose(current.id, closeReason.trim()); advance(current, 'closed'); }}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Close it
+                </Button>
+                <Button variant="ghost" onClick={() => { setClosing(false); setCloseReason(''); }}>Cancel</Button>
+              </div>
+            </div>
           ) : (
             <div className="flex gap-2 flex-wrap">
               <Button onClick={() => { onNudge(current.id); advance(current, 'nudged'); }}>
@@ -170,7 +223,7 @@ export default function ChaseRunPanel({
                 <Clock className="w-4 h-4 mr-2" />
                 {slower ? `Slow to ${slower}` : 'Slowest cadence'}
               </Button>
-              <Button variant="outline" onClick={() => { onClose(current.id); advance(current, 'closed'); }}>
+              <Button variant="outline" onClick={() => setClosing(true)}>
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Close it
               </Button>
