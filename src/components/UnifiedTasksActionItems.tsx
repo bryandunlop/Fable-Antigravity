@@ -51,6 +51,7 @@ import { ActionItemsProps, ActionItem, NewItemForm } from './ActionItems/types';
 import { getBorderColor, formatDate, getUserActionItems, getStats } from './ActionItems/utils';
 import { getOutstandingCheckIns } from './ActionItems/checkIn';
 import { useActionItems } from '../contexts/ActionItemContext';
+import { getCurrentPerson, isSamePerson, seesEveryProject } from '../lib/currentUser';
 
 // Import Action Item dialogs
 import DetailsDialog from './ActionItems/DetailsDialog';
@@ -570,19 +571,26 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
    * loop: the lead sets a cadence once, and the ask lands in each contributor's
    * own list on schedule instead of the lead chasing people.
    *
-   * Same convention as getAuditTasks — in a real app these would be filtered to
-   * the logged-in person; for the demo every outstanding report is shown.
+   * Scoped to the signed-in person: a check-in is a personal obligation, and
+   * showing everyone's made the page a wall of other people's homework — 27
+   * status requests for one reader. Portfolio roles still see the lot, because
+   * chasing other people's reports is the job.
    */
   const getCheckInTasks = (): CheckInTask[] => {
     const today = new Date().toISOString().split('T')[0];
+    const person = getCurrentPerson(userRole);
+    const seesAll = seesEveryProject(userRole);
 
     return projectActionItems.flatMap(item => {
       const outstanding = getOutstandingCheckIns(item, today);
       if (!outstanding) return [];
 
       const nudgedOn = item.checkIn?.lastNudgedOn;
+      const mine = seesAll
+        ? outstanding.contributors
+        : outstanding.contributors.filter(c => person && isSamePerson(c.name, person.name));
 
-      return outstanding.contributors.map(contributor => ({
+      return mine.map(contributor => ({
         id: `CheckIn-${item.id}-${outstanding.dueOn}-${contributor.id}`,
         title: nudgedOn
           ? `Status update requested: ${item.title}`

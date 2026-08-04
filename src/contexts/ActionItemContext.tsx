@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { ActionItem, NewItemForm, CheckInCadence } from '../components/ActionItems/types';
 import { calculateProgress } from '../components/ActionItems/utils';
 import { buildSeedActionItems } from '../components/ActionItems/seedProjects';
@@ -37,13 +37,47 @@ interface ActionItemContextType {
 
 const ActionItemContext = createContext<ActionItemContextType | undefined>(undefined);
 
+const STORAGE_KEY = 'antigravity_action_items';
+const STORAGE_VERSION_KEY = 'antigravity_action_items_version';
+/** Bump to discard stored projects when the seed or the shape changes. */
+const STORAGE_VERSION = 'v1';
+
+/**
+ * Read synchronously in the state initialiser rather than in an effect, so the
+ * board never renders once with an empty list and then again with the real one.
+ * A corrupt or stale blob falls back to the seed instead of throwing — losing
+ * demo state is annoying; a white screen is worse.
+ */
+const loadActionItems = (): ActionItem[] => {
+  try {
+    if (localStorage.getItem(STORAGE_VERSION_KEY) !== STORAGE_VERSION) return buildSeedActionItems();
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return buildSeedActionItems();
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) && parsed.length ? (parsed as ActionItem[]) : buildSeedActionItems();
+  } catch {
+    return buildSeedActionItems();
+  }
+};
+
 const todayIso = () => new Date().toISOString().split('T')[0];
 
 const initialsOf = (name: string) =>
   name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
 
 export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [actionItems, setActionItems] = useState<ActionItem[]>(buildSeedActionItems);
+  const [actionItems, setActionItems] = useState<ActionItem[]>(loadActionItems);
+
+  // Persist unconditionally, including an empty list — "I closed everything"
+  // is a real state and must survive a reload like any other.
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(actionItems));
+      localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION);
+    } catch {
+      // Quota or a locked-down browser: the session still works in memory.
+    }
+  }, [actionItems]);
 
   const getActionItemById = (id: string) => actionItems.find(item => item.id === id);
 

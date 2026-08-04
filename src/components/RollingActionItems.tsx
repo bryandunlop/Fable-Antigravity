@@ -24,6 +24,8 @@ import ChaseRunPanel from './ActionItems/ChaseRunPanel';
 import { buildRunQueue } from './ActionItems/chaseRun';
 import { CheckInCadence } from './ActionItems/types';
 import { useActionItems } from '../contexts/ActionItemContext';
+import { getRolesForPeople } from '../lib/currentUser';
+import { eventStore } from '../notifications/events';
 
 const EMPTY_NEW_ITEM_FORM: NewItemForm = {
   title: '', description: '', department: 'Flight Operations',
@@ -126,9 +128,35 @@ export default function RollingActionItems() {
   const toggleAllRows = () =>
     setSelected(prev => (prev.size === rows.length ? new Set() : new Set(rows.map(r => r.id))));
 
+  /**
+   * A nudge that only retitles a task inside the app is a nudge nobody sees
+   * unless they were already looking. Publish it to the feed as well, so it
+   * reaches the bell — and through it, push.
+   */
+  const notifyNudge = (ids: string[]) => {
+    const stamp = today;
+    ids.forEach(id => {
+      const item = actionItems.find(candidate => candidate.id === id);
+      if (!item) return;
+      const audience = getRolesForPeople(item.contributors.map(c => c.name));
+      if (!audience.length) return;
+      eventStore.publish({
+        // Same project, same day — one nudge, however many times it is pressed.
+        id: `action-item-nudge:${item.id}:${stamp}`,
+        severity: 'warn',
+        title: `Status update requested: ${item.title}`,
+        detail: `The lead team asked for an update — this project has gone quiet.`,
+        module: 'Rolling Action Items',
+        link: '/tasks-action-items',
+        audienceRoles: audience,
+      });
+    });
+  };
+
   const chase = (ids: string[], who: string) => {
     if (!ids.length) return;
     nudgeMany(ids);
+    notifyNudge(ids);
     toast.success(ids.length === 1 ? 'Nudge Sent' : `${ids.length} Nudges Sent`, {
       description: `${who} will see a status request on their task list.`,
     });
@@ -157,6 +185,7 @@ export default function RollingActionItems() {
     // nothing until the next check-in window — which is the failure the whole
     // surface exists to prevent. Handing it over IS the ask.
     nudge(id);
+    notifyNudge([id]);
     toast.success('Reassigned', {
       description: `${personName} now owns "${item.title}" and has a status request on their task list.`,
     });
@@ -240,7 +269,7 @@ export default function RollingActionItems() {
           queue={runQueue}
           allItems={actionItems}
           today={today}
-          onNudge={id => nudge(id)}
+          onNudge={id => { nudge(id); notifyNudge([id]); }}
           onReassign={reassign}
           onSlowCadence={slowCadence}
           onClose={closeProject}
@@ -401,7 +430,7 @@ export default function RollingActionItems() {
                               Nudged
                             </Badge>
                           ) : state === 'quiet' ? (
-                            <Button size="sm" variant="ghost" onClick={() => { nudge(item.id); toast.success('Nudge Sent'); }}>
+                            <Button size="sm" variant="ghost" onClick={() => { nudge(item.id); notifyNudge([item.id]); toast.success('Nudge Sent'); }}>
                               <Bell className="w-4 h-4" />
                             </Button>
                           ) : (
