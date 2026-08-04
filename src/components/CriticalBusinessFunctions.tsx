@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import { Alert, AlertDescription } from './ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { toast } from 'sonner';
 import {
   Shield,
   Users,
@@ -48,6 +50,47 @@ interface CriticalFunction {
   lastUpdated: string;
 }
 
+interface NewFunctionForm {
+  name: string;
+  category: string;
+  priority: CriticalFunction['priority'];
+  primaryRole: string;
+  procedures: string;
+}
+
+const EMPTY_FUNCTION_FORM: NewFunctionForm = {
+  name: '', category: 'Operations', priority: 'high', primaryRole: '', procedures: '',
+};
+
+const CATEGORIES = ['Operations', 'Maintenance', 'Safety', 'Administration'];
+const PRIORITIES: CriticalFunction['priority'][] = ['critical', 'high', 'medium', 'low'];
+const BACKUP_ROLE_POOL = [
+  'Assistant Chief Pilot', 'Senior Captain', 'Senior Dispatcher', 'Operations Manager',
+  'Lead Technician', 'Avionics Specialist', 'Safety Officer', 'Chief Inspector',
+];
+
+const todayIso = () => new Date().toISOString().split('T')[0];
+
+/** Add-one-from-a-list, used by the three "add" affordances in the editor. */
+function AddFromList({ label, options, onPick }: { label: string; options: string[]; onPick: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  if (!options.length) return null;
+
+  return open ? (
+    <Select onValueChange={(value: string) => { onPick(value); setOpen(false); }}>
+      <SelectTrigger className="w-56 h-8"><SelectValue placeholder={label} /></SelectTrigger>
+      <SelectContent>
+        {options.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  ) : (
+    <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Plus className="w-3 h-3 mr-1" />
+      {label}
+    </Button>
+  );
+}
+
 /**
  * Critical Business Functions — who owns each function the department cannot
  * operate without, and who backs them up.
@@ -59,7 +102,54 @@ interface CriticalFunction {
  */
 export default function CriticalBusinessFunctions() {
   const [showAddFunction, setShowAddFunction] = useState(false);
-  const [selectedFunction, setSelectedFunction] = useState<CriticalFunction | null>(null);
+  /** The function being edited, as an editable COPY — Cancel must discard. */
+  const [draft, setDraft] = useState<CriticalFunction | null>(null);
+  const [newFunction, setNewFunction] = useState<NewFunctionForm>(EMPTY_FUNCTION_FORM);
+
+  const saveDraft = (edited: CriticalFunction) => {
+    setCriticalFunctions(prev =>
+      prev.map(func => (func.id === edited.id ? { ...edited, lastUpdated: todayIso() } : func)),
+    );
+    setDraft(null);
+    toast.success('Saved', { description: `"${edited.name}" updated.` });
+  };
+
+  const sendReminder = (func: CriticalFunction) => {
+    const sentOn = todayIso();
+    const withStamp = { ...func, reminders: { ...func.reminders, lastSent: sentOn } };
+    setCriticalFunctions(prev => prev.map(f => (f.id === func.id ? { ...f, reminders: withStamp.reminders } : f)));
+    setDraft(current => (current && current.id === func.id ? withStamp : current));
+    toast.success('Reminder sent', {
+      description: `${func.assignedTo.join(', ') || func.primaryRole} reminded about "${func.name}".`,
+    });
+  };
+
+  const addFunction = () => {
+    if (!newFunction.name.trim() || !newFunction.primaryRole) return;
+    const created: CriticalFunction = {
+      id: `CF-${Date.now()}`,
+      name: newFunction.name.trim(),
+      category: newFunction.category,
+      priority: newFunction.priority,
+      primaryRole: newFunction.primaryRole,
+      backupRoles: [],
+      procedures: newFunction.procedures.trim(),
+      // A function with no backup is exactly the gap this register exists to
+      // surface, so it starts there rather than being quietly marked active.
+      status: 'unavailable',
+      assignedTo: [],
+      taggedPersons: [],
+      reminders: { enabled: false, daysBefore: 7, frequency: 'once' },
+      createdDate: todayIso(),
+      lastUpdated: todayIso(),
+    };
+    setCriticalFunctions(prev => [created, ...prev]);
+    setShowAddFunction(false);
+    setNewFunction(EMPTY_FUNCTION_FORM);
+    toast.success('Function added', {
+      description: `"${created.name}" has no backup yet — open it to assign one.`,
+    });
+  };
 
   // Mock list of available personnel for assignment/tagging
   const availablePersonnel = [
@@ -71,7 +161,7 @@ export default function CriticalBusinessFunctions() {
   ];
 
   // Mock data for Critical Functions
-  const criticalFunctions: CriticalFunction[] = [
+  const [criticalFunctions, setCriticalFunctions] = useState<CriticalFunction[]>([
     {
       id: 'CF001',
       name: 'Flight Operations Management',
@@ -137,7 +227,7 @@ export default function CriticalBusinessFunctions() {
       createdDate: '2024-01-03',
       lastUpdated: '2024-01-10'
     }
-  ];
+  ]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -268,7 +358,7 @@ export default function CriticalBusinessFunctions() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => setSelectedFunction(func)}
+                        onClick={() => setDraft({ ...func })}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -359,22 +449,101 @@ export default function CriticalBusinessFunctions() {
       </div>
 
       {/* Critical Function Detail/Edit Modal */}
-      {selectedFunction && (
+      <Dialog open={showAddFunction} onOpenChange={open => { if (!open) { setShowAddFunction(false); setNewFunction(EMPTY_FUNCTION_FORM); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add a critical function</DialogTitle>
+            <DialogDescription>
+              Something the department cannot operate without. Name who owns it; backups come after.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="function-name" className="text-sm font-medium mb-2 block">
+                Function name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="function-name"
+                placeholder="Aircraft dispatch"
+                value={newFunction.name}
+                onChange={e => setNewFunction({ ...newFunction, name: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Category</Label>
+                <Select value={newFunction.category} onValueChange={(value: string) => setNewFunction({ ...newFunction, category: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(category => <SelectItem key={category} value={category}>{category}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Priority</Label>
+                <Select value={newFunction.priority} onValueChange={(value: string) => setNewFunction({ ...newFunction, priority: value as CriticalFunction['priority'] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PRIORITIES.map(priority => <SelectItem key={priority} value={priority}>{priority}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                Primary role <span className="text-red-500">*</span>
+              </Label>
+              <Select value={newFunction.primaryRole} onValueChange={(value: string) => setNewFunction({ ...newFunction, primaryRole: value })}>
+                <SelectTrigger><SelectValue placeholder="Who owns this function?" /></SelectTrigger>
+                <SelectContent>
+                  {availablePersonnel.map(person => <SelectItem key={person} value={person}>{person}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="function-procedures" className="text-sm font-medium mb-2 block">Procedures</Label>
+              <Textarea
+                id="function-procedures"
+                rows={3}
+                placeholder="What this function covers, and what the holder is expected to do."
+                value={newFunction.procedures}
+                onChange={e => setNewFunction({ ...newFunction, procedures: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setShowAddFunction(false); setNewFunction(EMPTY_FUNCTION_FORM); }}>
+              Cancel
+            </Button>
+            <Button disabled={!newFunction.name.trim() || !newFunction.primaryRole} onClick={addFunction}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add function
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {draft && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <Card className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <CardHeader>
-              <CardTitle>Edit Critical Function - {selectedFunction.name}</CardTitle>
+              <CardTitle>Edit Critical Function - {draft.name}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
                     <Label>Function Name</Label>
-                    <Input defaultValue={selectedFunction.name} />
+                    <Input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />
                   </div>
                   <div>
                     <Label>Category</Label>
-                    <Select defaultValue={selectedFunction.category}>
+                    <Select value={draft.category} onValueChange={(value: string) => setDraft({ ...draft, category: value })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -388,7 +557,7 @@ export default function CriticalBusinessFunctions() {
                   </div>
                   <div>
                     <Label>Priority</Label>
-                    <Select defaultValue={selectedFunction.priority}>
+                    <Select value={draft.priority} onValueChange={(value: string) => setDraft({ ...draft, priority: value as CriticalFunction['priority'] })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -402,7 +571,7 @@ export default function CriticalBusinessFunctions() {
                   </div>
                   <div>
                     <Label>Status</Label>
-                    <Select defaultValue={selectedFunction.status}>
+                    <Select value={draft.status} onValueChange={(value: string) => setDraft({ ...draft, status: value as CriticalFunction['status'] })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -418,21 +587,15 @@ export default function CriticalBusinessFunctions() {
                 <div className="space-y-4">
                   <div>
                     <Label>Due Date</Label>
-                    <Input 
-                      type="date" 
-                      defaultValue={selectedFunction.dueDate} 
-                    />
+                    <Input type="date" value={draft.dueDate ?? ''} onChange={e => setDraft({ ...draft, dueDate: e.target.value })} />
                   </div>
                   <div>
                     <Label>Review Date</Label>
-                    <Input 
-                      type="date" 
-                      defaultValue={selectedFunction.reviewDate} 
-                    />
+                    <Input type="date" value={draft.reviewDate ?? ''} onChange={e => setDraft({ ...draft, reviewDate: e.target.value })} />
                   </div>
                   <div>
                     <Label>Primary Role</Label>
-                    <Select defaultValue={selectedFunction.primaryRole}>
+                    <Select value={draft.primaryRole} onValueChange={(value: string) => setDraft({ ...draft, primaryRole: value })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -450,50 +613,68 @@ export default function CriticalBusinessFunctions() {
                 <div>
                   <Label>Assigned Personnel</Label>
                   <div className="flex gap-2 mt-2 flex-wrap">
-                    {selectedFunction.assignedTo.map((person, index) => (
-                      <Badge key={index} variant="default" className="text-xs">
+                    {draft.assignedTo.map((person) => (
+                      <Badge key={person} variant="default" className="text-xs">
                         <UserCheck className="w-3 h-3 mr-1" />
                         {person}
-                        <X className="w-3 h-3 ml-1 cursor-pointer" />
+                        <button
+                          aria-label={`Remove ${person}`}
+                          onClick={() => setDraft({ ...draft, assignedTo: draft.assignedTo.filter(p => p !== person) })}
+                        >
+                          <X className="w-3 h-3 ml-1 cursor-pointer" />
+                        </button>
                       </Badge>
                     ))}
-                    <Button variant="outline" size="sm">
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add Person
-                    </Button>
+                    <AddFromList
+                      label="Add Person"
+                      options={availablePersonnel.filter(p => !draft.assignedTo.includes(p))}
+                      onPick={person => setDraft({ ...draft, assignedTo: [...draft.assignedTo, person] })}
+                    />
                   </div>
                 </div>
 
                 <div>
                   <Label>Tagged Personnel</Label>
                   <div className="flex gap-2 mt-2 flex-wrap">
-                    {selectedFunction.taggedPersons.map((person, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
+                    {draft.taggedPersons.map((person) => (
+                      <Badge key={person} variant="outline" className="text-xs">
                         <Users className="w-3 h-3 mr-1" />
                         {person}
-                        <X className="w-3 h-3 ml-1 cursor-pointer" />
+                        <button
+                          aria-label={`Untag ${person}`}
+                          onClick={() => setDraft({ ...draft, taggedPersons: draft.taggedPersons.filter(p => p !== person) })}
+                        >
+                          <X className="w-3 h-3 ml-1 cursor-pointer" />
+                        </button>
                       </Badge>
                     ))}
-                    <Button variant="outline" size="sm">
-                      <Plus className="w-3 h-3 mr-1" />
-                      Tag Person
-                    </Button>
+                    <AddFromList
+                      label="Tag Person"
+                      options={availablePersonnel.filter(p => !draft.taggedPersons.includes(p))}
+                      onPick={person => setDraft({ ...draft, taggedPersons: [...draft.taggedPersons, person] })}
+                    />
                   </div>
                 </div>
 
                 <div>
                   <Label>Backup Roles</Label>
                   <div className="flex gap-2 mt-2 flex-wrap">
-                    {selectedFunction.backupRoles.map((role, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
+                    {draft.backupRoles.map((role) => (
+                      <Badge key={role} variant="secondary" className="text-xs">
                         {role}
-                        <X className="w-3 h-3 ml-1 cursor-pointer" />
+                        <button
+                          aria-label={`Remove ${role}`}
+                          onClick={() => setDraft({ ...draft, backupRoles: draft.backupRoles.filter(r => r !== role) })}
+                        >
+                          <X className="w-3 h-3 ml-1 cursor-pointer" />
+                        </button>
                       </Badge>
                     ))}
-                    <Button variant="outline" size="sm">
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add Role
-                    </Button>
+                    <AddFromList
+                      label="Add Role"
+                      options={BACKUP_ROLE_POOL.filter(r => !draft.backupRoles.includes(r))}
+                      onPick={role => setDraft({ ...draft, backupRoles: [...draft.backupRoles, role] })}
+                    />
                   </div>
                 </div>
               </div>
@@ -501,10 +682,7 @@ export default function CriticalBusinessFunctions() {
               <div className="space-y-4">
                 <div>
                   <Label>Procedures</Label>
-                  <Textarea 
-                    defaultValue={selectedFunction.procedures}
-                    rows={3}
-                  />
+                  <Textarea value={draft.procedures} onChange={e => setDraft({ ...draft, procedures: e.target.value })} rows={3} />
                 </div>
               </div>
 
@@ -518,27 +696,19 @@ export default function CriticalBusinessFunctions() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-2">
-                    <Switch 
-                      id="reminders-enabled" 
-                      defaultChecked={selectedFunction.reminders.enabled}
-                    />
+                    <Switch id="reminders-enabled" checked={draft.reminders.enabled} onCheckedChange={(on: boolean) => setDraft({ ...draft, reminders: { ...draft.reminders, enabled: on } })} />
                     <Label htmlFor="reminders-enabled">Enable Reminders</Label>
                   </div>
                   
-                  {selectedFunction.reminders.enabled && (
+                  {draft.reminders.enabled && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Days Before Due Date</Label>
-                        <Input 
-                          type="number" 
-                          defaultValue={selectedFunction.reminders.daysBefore}
-                          min="1"
-                          max="365"
-                        />
+                        <Input type="number" min="1" max="365" value={draft.reminders.daysBefore} onChange={e => setDraft({ ...draft, reminders: { ...draft.reminders, daysBefore: Number(e.target.value) || 1 } })} />
                       </div>
                       <div>
                         <Label>Reminder Frequency</Label>
-                        <Select defaultValue={selectedFunction.reminders.frequency}>
+                        <Select value={draft.reminders.frequency} onValueChange={(value: string) => setDraft({ ...draft, reminders: { ...draft.reminders, frequency: value as CriticalFunction['reminders']['frequency'] } })}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -552,11 +722,11 @@ export default function CriticalBusinessFunctions() {
                     </div>
                   )}
 
-                  {selectedFunction.reminders.lastSent && (
+                  {draft.reminders.lastSent && (
                     <Alert>
                       <Bell className="h-4 w-4" />
                       <AlertDescription>
-                        Last reminder sent: {formatDate(selectedFunction.reminders.lastSent)}
+                        Last reminder sent: {formatDate(draft.reminders.lastSent)}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -565,13 +735,18 @@ export default function CriticalBusinessFunctions() {
 
               <div className="flex justify-between">
                 <div className="text-sm text-muted-foreground">
-                  <p>Created: {formatDate(selectedFunction.createdDate)}</p>
-                  <p>Last Updated: {formatDate(selectedFunction.lastUpdated)}</p>
+                  <p>Created: {formatDate(draft.createdDate)}</p>
+                  <p>Last Updated: {formatDate(draft.lastUpdated)}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setSelectedFunction(null)}>Cancel</Button>
-                  <Button>Save Changes</Button>
-                  <Button variant="outline">
+                  <Button variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+                  <Button onClick={() => saveDraft(draft)}>Save Changes</Button>
+                  <Button
+                    variant="outline"
+                    disabled={!draft.reminders.enabled}
+                    title={draft.reminders.enabled ? undefined : 'Reminders are switched off for this function'}
+                    onClick={() => sendReminder(draft)}
+                  >
                     <Bell className="w-4 h-4 mr-2" />
                     Send Reminder Now
                   </Button>
