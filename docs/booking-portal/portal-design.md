@@ -2,7 +2,8 @@
 
 Status: design record, agreed with Bryan 2026-08-04. The rendered frames live at
 [`mockups/booking-portal-frames-v1.html`](./mockups/booking-portal-frames-v1.html) (self-contained,
-open in any browser). This note is the text of record for *what* the portal is; the
+open in any browser), and a clickable demo shell of the agreed design runs at `/booking-portal` —
+see [`demo-script.md`](./demo-script.md) for the run sheet. This note is the text of record for *what* the portal is; the
 [phase plan](./phase-plan.md) says *when and behind which gates* it gets built. Integration
 constraints (mirror, CRM read-through, write guard) come from `architecture.md` (lands with PR #23)
 and are not restated here.
@@ -68,9 +69,11 @@ Withdrawn / Released) — one language, two paths.
 
 ## Open design decisions (before or during build; owners in parentheses)
 
-1. **The trip page after Confirmed** — itinerary, FBO details, calendar invite, day-of changes.
-   Biggest known gap; every comparable product treats this as the heart of the app. Needs its own
-   frame before Stage 4 builds. (design + Bryan)
+1. **The trip page after Confirmed** — *first pass built* (`Trips`, in the demo shell): legs, times,
+   tail, FBO at both ends, per-leg manifest, and the lockout countdown (24 h domestic / 72 h
+   international). Still open: what else belongs there — ground transport, catering, crew, weather,
+   documents — plus whether "Add to calendar" and "Send itinerary" are real deliverables for v1.
+   (design + Bryan)
 2. **Host consent on empty seats** — does the host principal get a veto on who joins their
    flight, or is scheduling's clear the only gate? One arrow in the flow; changes who feels in
    control. (Bryan)
