@@ -6,30 +6,21 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ScrollArea } from './ui/scroll-area';
-import { Separator } from './ui/separator';
 import { toast } from 'sonner';
 import {
   Users,
   Plus,
   Search,
   Edit,
-  Eye,
-  Star,
   Calendar,
   Phone,
-  Mail,
-  MapPin,
-  Heart,
   Coffee,
   Utensils,
   AlertTriangle,
   ShieldAlert,
   AlertCircle,
-  Clock,
   User,
   Cake,
   Wine,
@@ -44,6 +35,9 @@ import {
 import { usePassengers } from './passengers/PassengerContext';
 import type { Passenger } from './passengers/passengerData';
 import { fileToDataUrl, makePhoto } from './passengers/photoUtil';
+import PassengerProfilePanel from './passengers/PassengerProfilePanel';
+import SummaryBar from './shared/SummaryBar';
+import RecordList, { RecordRow } from './shared/RecordList';
 
 interface PassengerDatabaseProps {
   userRole?: string;
@@ -71,8 +65,6 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
     return true;
   };
 
-  const matchesRole = true;
-
   const filteredPassengers = passengers.filter(passenger => {
     const matchesSearch =
       passenger.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -83,29 +75,13 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
     return matchesSearch && matchesAllergy(passenger);
   });
 
-  const getRoleColor = (role: string) => {
-    if (['CEO', 'CFO', 'President', 'Sector CEO', 'Board Chairman', 'Board Member', 'Board of Directors'].includes(role)) {
-      return 'bg-purple-100 text-purple-800 border-purple-200';
-    }
-    if (role === 'Standard') {
-      return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-    return 'bg-blue-100 text-blue-800 border-blue-200';
-  };
-
-  // Allergies are medical → always red. Dislikes (a preference) render yellow.
-  const getAllergySeverityColor = (_severity: string) => 'bg-red-500 text-white border-red-600';
-
-  const getAllergySeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'Critical': return <ShieldAlert className="w-3 h-3" />;
-      case 'Moderate': return <AlertTriangle className="w-3 h-3" />;
-      case 'Mild': return <AlertCircle className="w-3 h-3" />;
-      default: return <AlertCircle className="w-3 h-3" />;
-    }
-  };
-
   const hasAllergies = (passenger: Passenger) => passenger.allergies.length > 0;
+
+  const allergyCount = passengers.filter(hasAllergies).length;
+  const birthdaysThisMonth = passengers.filter((p) => {
+    if (!p.birthday) return false;
+    return new Date(p.birthday).getMonth() === new Date().getMonth();
+  }).length;
 
   const [newPassengerForm, setNewPassengerForm] = useState<Partial<Passenger>>({
     name: '',
@@ -643,81 +619,13 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
           </Dialog>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Passengers</p>
-                  <p className="text-2xl font-bold">{passengers.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Star className="w-4 h-4 text-red-600" />
-                <div>
-                  <p className="text-sm text-red-700 font-medium">Executives</p>
-                  <p className="text-2xl font-bold text-red-700">
-                    {passengers.filter(p => ['CEO', 'CFO', 'President', 'Sector CEO'].includes(p.role || '')).length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-purple-200 bg-purple-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Star className="w-4 h-4 text-purple-600" />
-                <div>
-                  <p className="text-sm text-purple-700 font-medium">Custom Roles</p>
-                  <p className="text-2xl font-bold text-purple-700">
-                    {passengers.filter(p => !['CEO', 'CFO', 'President', 'Sector CEO', 'Standard'].includes(p.role || '')).length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-orange-200 bg-orange-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-orange-600" />
-                <div>
-                  <p className="text-sm text-orange-700 font-medium">Has Allergies</p>
-                  <p className="text-2xl font-bold text-orange-700">
-                    {passengers.filter(p => hasAllergies(p)).length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-purple-200 bg-purple-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Cake className="w-4 h-4 text-purple-600" />
-                <div>
-                  <p className="text-sm text-purple-700 font-medium">This Month Birthdays</p>
-                  <p className="text-2xl font-bold text-purple-700">
-                    {passengers.filter(p => {
-                      if (!p.birthday) return false;
-                      const birthMonth = new Date(p.birthday).getMonth();
-                      const currentMonth = new Date().getMonth();
-                      return birthMonth === currentMonth;
-                    }).length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <SummaryBar
+          items={[
+            { label: 'passengers', value: passengers.length, icon: Users },
+            { label: 'with allergies', value: allergyCount, icon: ShieldAlert, tone: 'alert', hideWhenZero: true },
+            { label: birthdaysThisMonth === 1 ? 'birthday this month' : 'birthdays this month', value: birthdaysThisMonth, icon: Cake, hideWhenZero: true },
+          ]}
+        />
 
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row gap-4">
@@ -763,357 +671,101 @@ export default function PassengerDatabase({ userRole = 'pilot' }: PassengerDatab
               </CardContent>
             </Card>
           ) : (
-            filteredPassengers.map((passenger) => (
-              <Card
-                key={passenger.id}
-                className={`${hasAllergies(passenger)
-                  ? 'border-orange-300 border-2 bg-orange-50'
-                  : ''
-                  }`}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-medium text-lg">{passenger.name}</h3>
-
-                        <Badge className={getRoleColor(passenger.role)}>
-                          {passenger.role}
-                        </Badge>
-                        {hasAllergies(passenger) && (
-                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            ALLERGY
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        {/* Contact Info */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Mail className="w-3 h-3" />
-                            <span>{passenger.info.email || 'No email'}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Phone className="w-3 h-3" />
-                            <span>{passenger.info.phone || 'No phone'}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <span className="font-medium">Role:</span>
-                            <span>{passenger.role}</span>
-                          </div>
-                        </div>
-
-                        {/* Birthday */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Cake className="w-3 h-3 text-purple-600" />
-                            <span className="font-medium text-purple-700">Birthday</span>
-                          </div>
-                          {passenger.birthday ? (
-                            <div className="text-xs text-purple-600">
-                              {new Date(passenger.birthday).toLocaleDateString()}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Not provided</span>
-                          )}
-                        </div>
-
-                        {/* Allergies */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <AlertTriangle className="w-3 h-3 text-orange-600" />
-                            <span className="font-medium text-orange-700">Allergies</span>
-                          </div>
-                          {passenger.allergies.length > 0 ? (
-                            <div className="space-y-1">
-                              {passenger.allergies.slice(0, 2).map((allergy, index) => (
-                                <div key={index} className="flex items-center gap-1">
-                                  {getAllergySeverityIcon(allergy.severity)}
-                                  <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
-                                    {allergy.allergen} - {allergy.severity}
-                                  </Badge>
-                                </div>
-                              ))}
-                              {passenger.allergies.length > 2 && (
-                                <span className="text-xs text-muted-foreground">
-                                  +{passenger.allergies.length - 2} more
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-green-600">No known allergies</span>
-                          )}
-                        </div>
-
-                        {/* Beverages */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Wine className="w-3 h-3 text-blue-600" />
-                            <span className="font-medium">Beverages</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {passenger.beverage.slice(0, 3).join(', ')}
-                            {passenger.beverage.length > 3 && `... +${passenger.beverage.length - 3} more`}
-                          </div>
-                        </div>
-
-                        {/* Food */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Utensils className="w-3 h-3 text-green-600" />
-                            <span className="font-medium">Food</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {passenger.food.slice(0, 3).join(', ')}
-                            {passenger.food.length > 3 && `... +${passenger.food.length - 3} more`}
-                          </div>
-                        </div>
-
-                        {/* Comfort */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Heart className="w-3 h-3 text-purple-600" />
-                            <span className="font-medium">Comfort</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {passenger.passengerComfort.temperature}, {passenger.passengerComfort.seating}
-                          </div>
-                        </div>
-
-                        {/* Notes */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <User className="w-3 h-3 text-gray-600" />
-                            <span className="font-medium">Notes</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {passenger.additionalNotes ?
-                              (passenger.additionalNotes.length > 50 ?
-                                passenger.additionalNotes.substring(0, 50) + '...' :
-                                passenger.additionalNotes
-                              ) :
-                              'No additional notes'
-                            }
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 ml-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPassenger(passenger);
-                          setIsPassengerDetailOpen(true);
-                        }}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPassenger(passenger);
-                          setIsEditingPassenger(true);
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+            <RecordList>
+              {filteredPassengers.map((passenger) => (
+                <RecordRow
+                  key={passenger.id}
+                  title={passenger.name}
+                  meta={[passenger.role, passenger.food.join(', '), passenger.beverage.join(', ')].filter(Boolean).join(' \u00b7 ')}
+                  badges={(passenger.photos?.length ?? 0) > 0 && (
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      <ImageIcon className="w-3 h-3 mr-1" />{passenger.photos!.length}
+                    </Badge>
+                  )}
+                  trailing={hasAllergies(passenger) && (
+                    <Badge className="text-xs shrink-0 bg-red-500 text-white border-red-600">
+                      <ShieldAlert className="w-3 h-3 mr-1" />{passenger.allergies.length}
+                    </Badge>
+                  )}
+                  onOpen={() => { setSelectedPassenger(passenger); setIsPassengerDetailOpen(true); }}
+                  action={{ icon: Edit, label: `Edit ${passenger.name}`, onClick: () => { setSelectedPassenger(passenger); setIsEditingPassenger(true); } }}
+                />
+              ))}
+            </RecordList>
           )}
         </div>
       </div>
 
       {/* View Details Dialog */}
       <Dialog open={isPassengerDetailOpen} onOpenChange={setIsPassengerDetailOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Passenger Details - {selectedPassenger?.name}</DialogTitle>
-          </DialogHeader>
-          {selectedPassenger && (
-            <div className="space-y-4">
-              {/* Full passenger details display */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <DialogContent className="sm:max-w-xl">
+          {selectedPassenger && (() => {
+            // Read the live record so a photo added below appears immediately.
+            const live = passengers.find(p => p.id === selectedPassenger.id) ?? selectedPassenger;
+            const photos = live.photos ?? [];
+            return (
+              <>
+                <DialogHeader className="sr-only">
+                  <DialogTitle>Passenger profile</DialogTitle>
+                  <DialogDescription>{live.name} · {live.role}</DialogDescription>
+                </DialogHeader>
+
+                <PassengerProfilePanel
+                  passenger={live}
+                  showFlightAttendantNotes={userRole === 'inflight'}
+                  showPhotos={false}
+                />
+
+                {/* Photos live here rather than in the shared panel: this surface can
+                    add and remove them, the read-only trip view cannot. */}
                 <div>
-                  <h4 className="font-medium mb-2">Contact Information</h4>
-                  <div className="space-y-2 text-sm">
-                    <div>Email: {selectedPassenger.info.email || 'Not provided'}</div>
-                    <div>Phone: {selectedPassenger.info.phone || 'Not provided'}</div>
-                    <div>Address: {selectedPassenger.info.address || 'Not provided'}</div>
-
-                    <div>Role: {selectedPassenger.role}</div>
-                    <div>Birthday: {selectedPassenger.birthday ? new Date(selectedPassenger.birthday).toLocaleDateString() : 'Not provided'}</div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium mb-2">Allergies</h4>
-                  {selectedPassenger.allergies.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedPassenger.allergies.map((allergy, index) => (
-                        <Card key={index} className="p-3 border-orange-200 bg-orange-50">
-                          <div className="flex items-center gap-2 mb-1">
-                            <AlertTriangle className="w-3 h-3 text-orange-600" />
-                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
-                              {allergy.severity}
-                            </Badge>
-                            <span className="font-medium">{allergy.allergen}</span>
-                          </div>
-                          {allergy.reaction && <div className="text-sm">Reaction: {allergy.reaction}</div>}
-                          {allergy.medication && <div className="text-sm">Medication: {allergy.medication}</div>}
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-green-600">No known allergies</p>
-                  )}
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-medium mb-2">Beverage Preferences</h4>
-                  <div className="text-sm">
-                    {selectedPassenger.beverage.length > 0 ? (
-                      <ul className="list-disc list-inside space-y-1">
-                        {selectedPassenger.beverage.map((item, index) => (
-                          <li key={index}>{item}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">No preferences specified</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium mb-2">Food Preferences</h4>
-                  <div className="text-sm">
-                    {selectedPassenger.food.length > 0 ? (
-                      <ul className="list-disc list-inside space-y-1">
-                        {selectedPassenger.food.map((item, index) => (
-                          <li key={index}>{item}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">No preferences specified</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {(selectedPassenger.dislikes?.length ?? 0) > 0 && (
-                <>
-                  <Separator />
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <ThumbsDown className="w-4 h-4 text-yellow-600" /> Dislikes
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedPassenger.dislikes!.map((d, index) => (
-                        <Badge key={index} className="bg-yellow-400 text-yellow-950 border-yellow-500">{d}</Badge>
-                      ))}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                    <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5" /> Photos{photos.length > 0 ? ` (${photos.length})` : ''}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={pendingPhotoCaption}
+                        onChange={(e) => setPendingPhotoCaption(e.target.value)}
+                        placeholder="Caption (e.g. bed setup)"
+                        className="h-9 flex-1 sm:w-48"
+                      />
+                      <Button size="sm" variant="outline" className="h-9 shrink-0" onClick={() => photoInputRef.current?.click()}>
+                        <Camera className="w-4 h-4 mr-1" /> Add
+                      </Button>
                     </div>
                   </div>
-                </>
-              )}
-
-              <Separator />
-
-              <div>
-                <h4 className="font-medium mb-2">Passenger Comfort</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>Temperature: {selectedPassenger.passengerComfort.temperature || 'Not specified'}</div>
-                  <div>Seating: {selectedPassenger.passengerComfort.seating || 'Not specified'}</div>
-                  <div>TV Preference: {selectedPassenger.passengerComfort.tvPreference || 'Not specified'}</div>
-                  <div>Lighting: {selectedPassenger.passengerComfort.lighting || 'Not specified'}</div>
-                </div>
-                {selectedPassenger.passengerComfort.specialRequests && (
-                  <div className="mt-2">
-                    <div className="font-medium text-sm">Special Requests:</div>
-                    <div className="text-sm">{selectedPassenger.passengerComfort.specialRequests}</div>
-                  </div>
-                )}
-              </div>
-
-              {selectedPassenger.additionalNotes && (
-                <div>
-                  <h4 className="font-medium mb-2">Additional Notes</h4>
-                  <p className="text-sm">{selectedPassenger.additionalNotes}</p>
-                </div>
-              )}
-
-              <Separator />
-
-              {/* Photos — cabin setup references (plating, bed setup, etc.) */}
-              <div>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4" /> Photos
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={pendingPhotoCaption}
-                      onChange={(e) => setPendingPhotoCaption(e.target.value)}
-                      placeholder="Caption (e.g. bed setup)"
-                      className="h-8 w-48"
-                    />
-                    <Button size="sm" variant="outline" onClick={() => photoInputRef.current?.click()}>
-                      <Camera className="w-4 h-4 mr-1" /> Add Photo
-                    </Button>
-                  </div>
-                </div>
-                {(() => {
-                  const live = passengers.find(p => p.id === selectedPassenger.id);
-                  const photos = live?.photos ?? [];
-                  return photos.length === 0 ? (
+                  {photos.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       No photos yet. Add cabin setup references — how they like food plated, bed setup, etc.
                     </p>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {photos.map(ph => (
-                        <div key={ph.id} className="relative group border rounded-lg overflow-hidden bg-slate-50">
-                          <img src={ph.url} alt={ph.caption || 'Passenger photo'} className="w-full h-28 object-cover" />
-                          {ph.caption && <div className="px-2 py-1 text-xs truncate" title={ph.caption}>{ph.caption}</div>}
+                        <figure key={ph.id} className="relative border rounded-lg overflow-hidden bg-muted m-0">
+                          <img src={ph.url} alt={ph.caption || `Photo of ${live.name}'s cabin setup`} className="w-full h-24 object-cover" />
+                          {ph.caption && <figcaption className="px-2 py-1 text-xs truncate" title={ph.caption}>{ph.caption}</figcaption>}
                           <button
-                            className="absolute top-1 right-1 bg-white/90 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Remove photo"
-                            onClick={() => { removePhoto(selectedPassenger.id, ph.id); toast.success('Photo removed'); }}
+                            className="absolute top-1 right-1 bg-white/90 rounded-full p-1.5"
+                            aria-label={`Remove photo${ph.caption ? `: ${ph.caption}` : ''}`}
+                            onClick={() => { removePhoto(live.id, ph.id); toast.success('Photo removed'); }}
                           >
                             <Trash2 className="w-3 h-3 text-red-600" />
                           </button>
-                        </div>
+                        </figure>
                       ))}
                     </div>
-                  );
-                })()}
-                <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={handlePhotoFile} />
-              </div>
-            </div>
-          )}
+                  )}
+                  <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={handlePhotoFile} />
+                </div>
 
-          {userRole === 'inflight' && selectedPassenger && selectedPassenger.flightAttendantNotes && (
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
-              <h4 className="font-medium mb-2 text-blue-800 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Flight Attendant Notes
-                <Badge variant="outline" className="ml-auto border-blue-200 text-blue-700 bg-white">Private</Badge>
-              </h4>
-              <p className="text-sm text-blue-900 whitespace-pre-wrap">{selectedPassenger.flightAttendantNotes}</p>
-            </div>
-          )}
+                <Button variant="outline" className="w-full h-12" onClick={() => setIsPassengerDetailOpen(false)}>Close</Button>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
+
 
       {/* Edit Passenger Dialog */}
       <Dialog open={isEditingPassenger} onOpenChange={setIsEditingPassenger}>

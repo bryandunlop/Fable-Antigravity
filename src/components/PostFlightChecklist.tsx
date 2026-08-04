@@ -6,11 +6,11 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
+import RecordList, { RecordFold, RecordRow } from './shared/RecordList';
 import {
   ClipboardCheck,
   Plus,
@@ -224,20 +224,29 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
     setShowAddItemDialog(false);
   };
 
-  const getFlightStatus = (flight: any) => {
-    if (flight.completionRate === 100) return 'Complete';
-    if (flight.status === 'landed') return 'In Progress';
-    return 'Pending';
+  /**
+   * How many checklist items this flight still owes, or null when we hold no
+   * item list for it and only know a percentage. Counting beats the percentage
+   * because "3 items left" is the size of the job; "75% complete" is a score.
+   */
+  const itemsLeft = (flight: any): number | null => {
+    const items = checklistItems[flight.id as keyof typeof checklistItems];
+    if (items) return items.filter(item => !item.completed).length;
+    return flight.completionRate === 100 ? 0 : null;
   };
 
-  const getFlightStatusColor = (flight: any) => {
-    if (flight.completionRate === 100) return 'bg-green-100 text-green-800';
-    if (flight.status === 'landed') return 'bg-yellow-100 text-yellow-800';
-    return 'bg-gray-100 text-gray-800';
+  const flightsOutstanding = flights.filter(f => itemsLeft(f) !== 0);
+  const flightsDone = flights.filter(f => itemsLeft(f) === 0);
+
+  const flightMeta = (flight: any) => {
+    const left = itemsLeft(flight);
+    if (left === null) return `${flight.aircraft} · ${flight.completionRate}% complete`;
+    if (left === 0) return `${flight.aircraft} · ${new Date(flight.date).toLocaleDateString()}`;
+    return `${flight.aircraft} · ${left} item${left === 1 ? '' : 's'} left`;
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
         <div>
           <h1 className="flex items-center gap-2">
@@ -398,56 +407,37 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
             <CardTitle>Recent Flights</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Flight ID</TableHead>
-                  <TableHead>Aircraft</TableHead>
-                  <TableHead>Route</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {flights.map((flight) => (
-                  <TableRow key={flight.id}>
-                    <TableCell className="font-medium">{flight.id}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{flight.aircraft}</Badge>
-                    </TableCell>
-                    <TableCell>{flight.route}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        {new Date(flight.date).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getFlightStatusColor(flight)}>
-                        {getFlightStatus(flight)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 min-w-32">
-                        <Progress value={flight.completionRate} className="flex-1" />
-                        <span className="text-sm">{flight.completionRate}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedFlight(flight.id)}
-                      >
-                        View Checklist
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {/* Was a seven-column table — Flight ID / Aircraft / Route / Date /
+                Status / Progress / Actions. There is no CSS that makes seven columns
+                work at 390pt, and this checklist is run in the cabin on a phone after
+                every leg. One tappable row per flight instead; the row IS the "View
+                checklist" action, so that column disappears too. */}
+            <RecordList>
+              {flightsOutstanding.map((flight) => (
+                <RecordRow
+                  key={flight.id}
+                  title={`${flight.id} \u00b7 ${flight.route}`}
+                  meta={flightMeta(flight)}
+                  onOpen={() => setSelectedFlight(flight.id)}
+                />
+              ))}
+              {flightsOutstanding.length === 0 && (
+                <p className="px-3 py-4 text-sm text-muted-foreground">Every recent flight is closed out.</p>
+              )}
+              {flightsDone.length > 0 && (
+                <RecordFold label={`${flightsDone.length} completed`}>
+                  {flightsDone.map((flight) => (
+                    <RecordRow
+                      key={flight.id}
+                      title={`${flight.id} · ${flight.route}`}
+                      meta={flightMeta(flight)}
+                      trailing={<CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />}
+                      onOpen={() => setSelectedFlight(flight.id)}
+                    />
+                  ))}
+                </RecordFold>
+              )}
+            </RecordList>
           </CardContent>
         </Card>
       )}
@@ -642,7 +632,7 @@ export default function PostFlightChecklist({ userRole }: PostFlightChecklistPro
         <div className="text-center py-12">
           <ClipboardCheck className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium mb-2">Select a Flight</h3>
-          <p className="text-muted-foreground">Choose a flight from the table above to view and manage its post-flight checklist.</p>
+          <p className="text-muted-foreground">Choose a flight above to view and manage its post-flight checklist.</p>
         </div>
       )}
     </div>

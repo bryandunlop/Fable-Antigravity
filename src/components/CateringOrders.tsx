@@ -11,6 +11,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import SummaryBar from './shared/SummaryBar';
 import {
   Utensils,
   Plane,
@@ -110,6 +111,7 @@ export default function CateringOrders() {
   const [airportFilter, setAirportFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedFlight, setExpandedFlight] = useState<string | null>(null);
+  const [showDelivered, setShowDelivered] = useState(false);
   const [selectedPassenger, setSelectedPassenger] = useState<Passenger | null>(null);
 
   // Mock upcoming catering orders data
@@ -420,6 +422,23 @@ export default function CateringOrders() {
     return matchesSearch && matchesAirport && matchesStatus;
   });
 
+  const criticalAllergyCount = filteredOrders.reduce(
+    (count, order) => count + order.allergyAlerts.filter(alert => alert.severity === 'Critical').length, 0);
+  const specialDietCount = filteredOrders.reduce((count, order) => count + order.dietaryRequirements.length, 0);
+
+  // A delivered order needs nothing from anyone, so it folds out of the way — except
+  // while searching or filtering, where the query is the more specific instruction.
+  // Filtering to "Delivered" and being shown an empty list above a closed drawer is
+  // the sharpest version of that bug.
+  const isNarrowingOrders = searchTerm.trim() !== '' || airportFilter !== 'all' || statusFilter !== 'all';
+  const ordersOutstanding = isNarrowingOrders
+    ? filteredOrders
+    : filteredOrders.filter(o => o.cateringDetails.status !== 'Delivered');
+  const ordersDelivered = isNarrowingOrders
+    ? []
+    : filteredOrders.filter(o => o.cateringDetails.status === 'Delivered');
+
+
   // Get unique airports for filter
   const airports = Array.from(new Set([
     ...cateringOrders.map(order => order.departureAirport),
@@ -475,7 +494,7 @@ export default function CateringOrders() {
     order.allergyAlerts.some(alert => alert.severity === 'Critical');
 
   return (
-    <div className="p-4 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2">
@@ -505,7 +524,7 @@ export default function CateringOrders() {
             </div>
 
             <Select value={airportFilter} onValueChange={setAirportFilter}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Filter by airport" />
               </SelectTrigger>
               <SelectContent>
@@ -517,7 +536,7 @@ export default function CateringOrders() {
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -533,68 +552,25 @@ export default function CateringOrders() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Utensils className="w-4 h-4 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-bold">{filteredOrders.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Four stat Cards stacked into ~700px of chrome on a phone before the first
+          order. Critical allergies keeps its alert tone; the two exception counts
+          disappear at zero instead of reading as a score. */}
+      <SummaryBar
+        items={[
+          { label: 'orders', value: filteredOrders.length, icon: Utensils },
+          { label: 'not yet ordered', value: filteredOrders.filter(o => o.cateringDetails.status === 'Not Ordered').length, icon: AlertTriangle, hideWhenZero: true },
+          { label: 'critical allergies', value: criticalAllergyCount, icon: ShieldAlert, tone: 'alert', hideWhenZero: true },
+          { label: 'special diets', value: specialDietCount, icon: Users, hideWhenZero: true },
+        ]}
+      />
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-orange-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Pending Orders</p>
-                <p className="text-2xl font-bold">
-                  {filteredOrders.filter(order => order.cateringDetails.status === 'Not Ordered').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-red-600" />
-              <div>
-                <p className="text-sm text-red-700 font-medium">Critical Allergies</p>
-                <p className="text-2xl font-bold text-red-700">
-                  {filteredOrders.reduce((count, order) => {
-                    return count + order.allergyAlerts.filter(alert => alert.severity === 'Critical').length;
-                  }, 0)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-green-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Special Diets</p>
-                <p className="text-2xl font-bold">
-                  {filteredOrders.reduce((count, order) => count + order.dietaryRequirements.length, 0)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Catering Orders List */}
+      {/* Catering Orders List. A delivered order needs nothing from anyone, so it
+          stays out of the list until asked for — same idea as RecordFold, done with
+          a toggle here because the order card is 400 lines of JSX and rendering it
+          in two places would duplicate every one of them. */}
       <div className="space-y-4">
-        {filteredOrders.map((order) => {
+        {[...ordersOutstanding, ...(showDelivered ? ordersDelivered : [])].map((order) => {
           const flightPassengers = getFlightPassengers(order);
           const isExpanded = expandedFlight === order.id;
 
@@ -605,65 +581,63 @@ export default function CateringOrders() {
                 onOpenChange={() => setExpandedFlight(isExpanded ? null : order.id)}
               >
                 <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                          <Utensils className="w-5 h-5 text-blue-600" />
+                  {/* Was a two-column desktop header — an icon tile and four inline
+                      meta items on the left, a right-aligned passenger count and two
+                      flag chips on the right. At 390pt neither column survives. The
+                      route and the flags are what an FA scans for, so they lead; the
+                      rest wraps under them. */}
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors px-4 sm:px-6">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CardTitle className="text-base sm:text-lg">
+                            {order.flightNumber} · Leg {order.legNumber}
+                          </CardTitle>
+                          <Badge className={getOrderStatusColor(order.cateringDetails.status)}>
+                            {order.cateringDetails.status}
+                          </Badge>
                         </div>
-                        <div>
-                          <div className="flex items-center gap-3 mb-1">
-                            <CardTitle className="text-lg">
-                              {order.flightNumber} - Leg {order.legNumber}
-                            </CardTitle>
-                            <Badge className={getOrderStatusColor(order.cateringDetails.status)}>
-                              {order.cateringDetails.status}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {order.departureAirport} → {order.arrivalAirport}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(order.date).toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {order.departureTime} - {order.arrivalTime}
-                            </span>
-                            <span>{order.cateringDetails.caterer}</span>
-                          </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            {order.departureAirport} → {order.arrivalAirport}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 shrink-0" />
+                            {new Date(order.date).toLocaleDateString()}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            {order.departureTime} - {order.arrivalTime}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3 shrink-0" />
+                            {flightPassengers.length} pax
+                          </span>
+                          <span>{order.cateringDetails.caterer}</span>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Users className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-medium">{flightPassengers.length} passengers</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
+                        {(hasCriticalAllergies(order) || order.dietaryRequirements.length > 0) && (
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                             {hasCriticalAllergies(order) && (
-                              <div className="flex items-center gap-1 text-red-600">
-                                <ShieldAlert className="w-4 h-4" />
-                                <span>Critical Allergies</span>
-                              </div>
+                              <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-medium">
+                                <ShieldAlert className="w-4 h-4 shrink-0" />
+                                Critical allergies
+                              </span>
                             )}
                             {order.dietaryRequirements.length > 0 && (
-                              <div className="flex items-center gap-1 text-blue-600">
-                                <ChefHat className="w-4 h-4" />
-                                <span>Special Diets</span>
-                              </div>
+                              <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                                <ChefHat className="w-4 h-4 shrink-0" />
+                                Special diets
+                              </span>
                             )}
                           </div>
-                        </div>
-                        {isExpanded ? (
-                          <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
                         )}
                       </div>
+                      {isExpanded ? (
+                        <ChevronDown className="w-5 h-5 shrink-0 mt-1 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 shrink-0 mt-1 text-muted-foreground" />
+                      )}
                     </div>
                   </CardHeader>
                 </CollapsibleTrigger>
@@ -674,9 +648,9 @@ export default function CateringOrders() {
 
                     {/* Catering Details */}
                     <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-blue-700">Catering Information</h4>
-                        <div className="flex gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <h4 className="font-medium text-blue-700 dark:text-blue-300">Catering Information</h4>
+                        <div className="flex flex-wrap gap-2">
                           <Button variant="outline" size="sm">
                             <Edit className="w-4 h-4 mr-2" />
                             Edit Order
@@ -1039,6 +1013,17 @@ export default function CateringOrders() {
             </Card>
           );
         })}
+
+        {ordersDelivered.length > 0 && (
+          <button
+            onClick={() => setShowDelivered(!showDelivered)}
+            aria-expanded={showDelivered}
+            className="w-full text-left px-3 py-3 min-h-[44px] rounded-lg border bg-muted/40 hover:bg-muted active:bg-muted text-xs text-muted-foreground flex items-center gap-2"
+          >
+            {showDelivered ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
+            {ordersDelivered.length} delivered
+          </button>
+        )}
       </div>
 
       {filteredOrders.length === 0 && (

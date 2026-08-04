@@ -301,7 +301,10 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
 
   return (
     <>
-      <div className="p-6 max-w-4xl mx-auto space-y-6 pb-20">
+      {/* No page padding: Navigation's <main> is already p-6 pb-20 md:pb-6, and a
+          second p-6 here cost 48px of a 390pt phone. max-w-4xl is 896px, so iPad
+          portrait (834pt) still gets the full-width two-column layout. */}
+      <div className="max-w-4xl mx-auto space-y-6">
         {/* Header — standalone only; embedded, the surrounding module already titles it */}
         {!inContext && (
         <div className="flex items-center justify-between mb-6">
@@ -486,53 +489,79 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
 
             return (
               <Card key={sectionIndex} className={hasSelectedItems ? 'border-blue-500' : ''}>
-                <CardHeader className="cursor-pointer select-none" onClick={() => toggleSection(sectionIndex)}>
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2">
-                      {openSections.has(sectionIndex) ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                      <Icon className="w-5 h-5" />
-                      {section.title}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
+                {/* A real <button>, not a click handler on the header: a FRAT is
+                    tapped dozens of times per fill, standing at the aircraft, so the
+                    section toggle has to be keyboard- and screen-reader-reachable and
+                    at least 44pt tall. */}
+                <CardHeader className="px-4 sm:px-6">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(sectionIndex)}
+                    aria-expanded={openSections.has(sectionIndex)}
+                    className="w-full min-w-0 min-h-[44px] flex items-center justify-between gap-2 text-left select-none"
+                  >
+                    <span className="flex flex-1 items-center gap-2 min-w-0">
+                      {openSections.has(sectionIndex) ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
+                      <Icon className="w-5 h-5 shrink-0" />
+                      <span className="truncate">{section.title}</span>
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0">
                       {hasSelectedItems && (
                         <Badge variant="outline" className="text-xs">{section.items.filter(i => i.selected).length} selected</Badge>
                       )}
                       {sectionScore > 0 && (
                         <Badge variant="secondary" className="text-base px-2.5 py-0.5">+{sectionScore}</Badge>
                       )}
-                    </div>
-                  </div>
+                    </span>
+                  </button>
                 </CardHeader>
                 {openSections.has(sectionIndex) && (
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="px-4 sm:px-6 @container">
+                  {/* 61 factors in a single column is a scroll nobody finishes, so they
+                      pair up once there is room.
+
+                      CONTAINER query, not a viewport one: on an 834pt iPad an open
+                      sidebar leaves this column 570pt, so a viewport `md:` (768pt of
+                      VIEWPORT) would have crammed two 265pt columns in.
+
+                      720 separates the two real iPad cases — 570pt with the sidebar
+                      open stays one column, 776pt with it collapsed pairs up — and is
+                      set away from both so a padding change cannot flip the layout.
+
+                      The trade is measured, and it is not free. Across the real 56
+                      labels, pairing at 776pt wraps 45 of them to two lines (33 at
+                      894pt), against 0 in a single column. It buys roughly half the
+                      scroll: the factor stack is 1779px paired vs 3042px stacked at
+                      894pt. Per Bryan 2026-08-04, a FRAT is filled on an iPad and
+                      wants the side-by-side layout; to undo that, this is the only
+                      line to change. */}
+                  <div className="grid gap-2 @[720px]:grid-cols-2">
                     {section.items.map((item, itemIndex) => (
-                      <div
+                      /* The whole row is the tap target, not the checkbox glyph — 16px
+                         is far too small for a form tapped standing at the aircraft. A
+                         <label> drives the Radix checkbox because <button> is a
+                         labelable element, so this stays one tap and nests nothing
+                         interactive inside anything else interactive. */
+                      <Label
                         key={item.id}
-                        className={`flex items-start space-x-3 p-3 rounded-lg transition-colors ${item.selected ? 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800' : 'hover:bg-muted/50'
+                        htmlFor={item.id}
+                        className={`flex items-center gap-3 p-3 min-h-[44px] rounded-lg cursor-pointer font-normal transition-colors ${item.selected ? 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800' : 'hover:bg-muted/50'
                           }`}
                       >
                         <Checkbox
                           id={item.id}
                           checked={item.selected}
                           onCheckedChange={() => handleItemToggle(sectionIndex, itemIndex)}
-                          className="mt-1"
+                          className="size-5 shrink-0"
                         />
-                        <div className="flex-1 flex items-center justify-between gap-4 py-1">
-                          <Label
-                            htmlFor={item.id}
-                            className="cursor-pointer flex-1"
-                          >
-                            {item.label}
-                          </Label>
-                          <Badge
-                            variant={item.selected ? "default" : "outline"}
-                            className={item.score === 0 ? 'bg-gray-500' : ''}
-                          >
-                            {item.score === 0 ? '0' : `+${item.score}`}
-                          </Badge>
-                        </div>
-                      </div>
+                        <span className="flex-1">{item.label}</span>
+                        <Badge
+                          variant={item.selected ? "default" : "outline"}
+                          className={`shrink-0 ${item.score === 0 ? 'bg-gray-500' : ''}`}
+                        >
+                          {item.score === 0 ? '0' : `+${item.score}`}
+                        </Badge>
+                      </Label>
                     ))}
                   </div>
                 </CardContent>

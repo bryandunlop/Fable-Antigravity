@@ -359,17 +359,21 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               </div>
             </div>
 
-            {/* Right side with notifications and logout */}
-            <div className="flex items-center gap-3">
+            {/* Right side with notifications and logout. The cluster measured 404pt
+                against a 290pt budget on a 390pt phone — the search field alone was
+                256 of it — so every route in the app overflowed here regardless of
+                its own layout. Below sm the field collapses to its icon. */}
+            <div className="flex items-center gap-1 sm:gap-3 min-w-0">
               {/* Global Search Button */}
               <Button
                 variant="ghost"
                 onClick={() => setIsCommandPaletteOpen(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-full text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-all w-64 justify-between group"
+                aria-label="Search system"
+                className="flex items-center gap-2 h-10 w-10 justify-center px-0 sm:w-64 sm:px-3 sm:py-2 sm:justify-between bg-muted border border-border rounded-full text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-all group shrink-0"
               >
                 <div className="flex items-center gap-2">
                   <Search className="w-4 h-4 group-hover:text-primary transition-colors" />
-                  <span>Search system...</span>
+                  <span className="hidden sm:inline">Search system...</span>
                 </div>
                 <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border/50 bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
                   <span className="text-xs">⌘</span>K
