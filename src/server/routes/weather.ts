@@ -138,7 +138,17 @@ async function resolveForecastUrl(station: string): Promise<{ forecastUrl: strin
 // The gridpoint is fetched in parallel and is strictly optional: if it fails,
 // `gridpoint` is null and the client falls back to the legacy text/icon path. A
 // deprecated-but-working field beats no outlook.
-weatherRoute.get('/forecast', async (c) => {
+//
+// Mounted at the SINGLE-SEGMENT path /api/forecast (see app.ts), not at
+// /api/weather/forecast. Nested /api/** paths never reached the Vercel function
+// at all — the platform router 404'd them before any handler existed (TL-18
+// fault 2). The catch-all filename is fixed separately; this flat path is the
+// belt to that braces, so the outlook cannot be taken out again by a routing
+// quirk. weatherRoute re-mounts it at the old nested path below for clients
+// holding a cached bundle.
+export const forecastRoute = new Hono();
+
+forecastRoute.get('/', async (c) => {
   const station = (c.req.query('ids') || HOME_STATION).toUpperCase();
   if (!ICAO_RE.test(station)) {
     return c.json({ error: 'Invalid station identifier' }, 400);
@@ -189,3 +199,8 @@ weatherRoute.get('/forecast', async (c) => {
     );
   }
 });
+
+// Legacy nested path. Kept only so an already-installed PWA shell holding the
+// old bundle keeps working after this ships; /api/forecast is the real path.
+// Safe to delete once no client requests it.
+weatherRoute.route('/forecast', forecastRoute);
