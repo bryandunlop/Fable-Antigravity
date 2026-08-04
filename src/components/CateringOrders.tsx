@@ -426,9 +426,17 @@ export default function CateringOrders() {
     (count, order) => count + order.allergyAlerts.filter(alert => alert.severity === 'Critical').length, 0);
   const specialDietCount = filteredOrders.reduce((count, order) => count + order.dietaryRequirements.length, 0);
 
-  // A delivered order needs nothing from anyone, so it folds out of the way.
-  const ordersOutstanding = filteredOrders.filter(o => o.cateringDetails.status !== 'Delivered');
-  const ordersDelivered = filteredOrders.filter(o => o.cateringDetails.status === 'Delivered');
+  // A delivered order needs nothing from anyone, so it folds out of the way — except
+  // while searching or filtering, where the query is the more specific instruction.
+  // Filtering to "Delivered" and being shown an empty list above a closed drawer is
+  // the sharpest version of that bug.
+  const isNarrowingOrders = searchTerm.trim() !== '' || airportFilter !== 'all' || statusFilter !== 'all';
+  const ordersOutstanding = isNarrowingOrders
+    ? filteredOrders
+    : filteredOrders.filter(o => o.cateringDetails.status !== 'Delivered');
+  const ordersDelivered = isNarrowingOrders
+    ? []
+    : filteredOrders.filter(o => o.cateringDetails.status === 'Delivered');
 
 
   // Get unique airports for filter

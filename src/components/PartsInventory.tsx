@@ -365,8 +365,18 @@ export default function PartsInventory() {
 
   // A part above its minimum needs nothing from anyone, so it folds out of the way.
   // Ordering matches the page's own low-stock definition (see lowStockParts above).
-  const partsNeedingAttention = filteredParts.filter(part => part.status !== 'in-stock');
-  const partsInStock = filteredParts.filter(part => part.status === 'in-stock');
+  //
+  // EXCEPT while searching or filtering. Someone who types a part number is looking
+  // for THAT part, and a healthy part is the likeliest thing they are looking up;
+  // folding it would answer a direct question with an empty list and a drawer.
+  // A deliberate query beats the fold's default.
+  const isNarrowingParts = searchTerm.trim() !== '' || filterCategory !== 'all';
+  const partsNeedingAttention = isNarrowingParts
+    ? filteredParts
+    : filteredParts.filter(part => part.status !== 'in-stock');
+  const partsInStock = isNarrowingParts
+    ? []
+    : filteredParts.filter(part => part.status === 'in-stock');
 
   const ordersOutstanding = purchaseOrders.filter(o => o.status !== 'received' && o.status !== 'cancelled');
   const ordersClosed = purchaseOrders.filter(o => o.status === 'received' || o.status === 'cancelled');
@@ -452,8 +462,11 @@ export default function PartsInventory() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         {/* Five labels in a five-column grid overlap each other at 390pt. Scrolling
-            the strip is the phone idiom; the grid returns once there is room. */}
-        <TabsList className="w-full flex overflow-x-auto justify-start sm:grid sm:grid-cols-5">
+            the strip is the phone idiom, but a scroll container with no arrow and no
+            fade is invisible — two of the five tabs start off-screen. The mask fades
+            the right edge while there is more to reach, so the strip reads as cut off
+            rather than finished. Removed once the grid returns. */}
+        <TabsList className="w-full flex overflow-x-auto justify-start [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:mask-none sm:grid sm:grid-cols-5">
           <TabsTrigger value="inventory" className="shrink-0">Inventory</TabsTrigger>
           <TabsTrigger value="orders" className="shrink-0">Purchase Orders</TabsTrigger>
           <TabsTrigger value="vendors" className="shrink-0">Vendors</TabsTrigger>
@@ -531,7 +544,9 @@ export default function PartsInventory() {
                   />
                 ))}
                 {partsNeedingAttention.length === 0 && (
-                  <p className="px-3 py-4 text-sm text-muted-foreground">Every part is above its minimum.</p>
+                  <p className="px-3 py-4 text-sm text-muted-foreground">
+                    {isNarrowingParts ? 'No part matches that search.' : 'Every part is above its minimum.'}
+                  </p>
                 )}
                 {partsInStock.length > 0 && (
                   <RecordFold label={`${partsInStock.length} in stock`}>

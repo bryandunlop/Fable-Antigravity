@@ -518,12 +518,24 @@ export default function StandaloneFRATForm({ userRole = 'pilot', initialData, on
                 {openSections.has(sectionIndex) && (
                 <CardContent className="px-4 sm:px-6 @container">
                   {/* 61 factors in a single column is a scroll nobody finishes, so they
-                      pair up once there is room. The breakpoint is a CONTAINER query,
-                      not a viewport one: on an 834pt iPad the open sidebar leaves this
-                      column 570pt, and a viewport `md:` would have crammed two 265pt
-                      columns in. The second column now appears when the column itself
-                      is genuinely wide — sidebar collapsed, landscape, or desktop. */}
-                  <div className="grid gap-2 @[560px]:grid-cols-2">
+                      pair up once there is room.
+
+                      CONTAINER query, not a viewport one: on an 834pt iPad an open
+                      sidebar leaves this column 570pt, so a viewport `md:` (768pt of
+                      VIEWPORT) would have crammed two 265pt columns in.
+
+                      720 separates the two real iPad cases — 570pt with the sidebar
+                      open stays one column, 776pt with it collapsed pairs up — and is
+                      set away from both so a padding change cannot flip the layout.
+
+                      The trade is measured, and it is not free. Across the real 56
+                      labels, pairing at 776pt wraps 45 of them to two lines (33 at
+                      894pt), against 0 in a single column. It buys roughly half the
+                      scroll: the factor stack is 1779px paired vs 3042px stacked at
+                      894pt. Per Bryan 2026-08-04, a FRAT is filled on an iPad and
+                      wants the side-by-side layout; to undo that, this is the only
+                      line to change. */}
+                  <div className="grid gap-2 @[720px]:grid-cols-2">
                     {section.items.map((item, itemIndex) => (
                       /* The whole row is the tap target, not the checkbox glyph — 16px
                          is far too small for a form tapped standing at the aircraft. A

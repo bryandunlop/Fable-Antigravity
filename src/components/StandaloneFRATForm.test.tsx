@@ -50,4 +50,20 @@ describe('StandaloneFRATForm', () => {
     expect(page).toBeTruthy();
     expect(page!.className).not.toMatch(/(^|\s)p-6(\s|$)/);
   });
+
+  it('pairs the factors on the CONTAINER width, never the viewport', () => {
+    const { container } = renderFrat();
+    fireEvent.click(sectionToggle(/Pilot Qualifications/));
+
+    // by content, not by `.grid` — CardHeader is itself a grid
+    const grid = [...container.querySelectorAll('div.grid')].find((el) =>
+      el.querySelector('[role="checkbox"]'),
+    );
+    expect(grid).toBeTruthy();
+    // A viewport breakpoint here would put two 265pt columns into the 570pt this
+    // column actually has on an 834pt iPad with the sidebar open.
+    expect(grid!.className).not.toMatch(/(^|\s)(sm|md|lg|xl):grid-cols-2/);
+    expect(grid!.className).toMatch(/@\[\d+px\]:grid-cols-2/);
+    expect(grid!.closest('.\\@container')).toBeTruthy();
+  });
 });
