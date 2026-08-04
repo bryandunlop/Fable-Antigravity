@@ -6,7 +6,8 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { currentRows, latestFor } from '../engine/supersede';
 import { validateCrs, validateRii } from '../engine/signing';
-import { riiStepsComplete, pendingRiiSteps } from '../engine/rii';
+import { riiSatisfied } from '../engine/rii';
+import { cardReferences } from '../engine/workCardReferences';
 import { appendStatusTag, statusDurations, currentTag, STATUS_TAG_LABELS } from '../engine/statusTags';
 import { whyNoteRequired } from '../engine/labor';
 import { rectificationClosePush } from '../engine/rectification';
@@ -77,6 +78,7 @@ export default function WorkCardDetail() {
   const [lnote, setLnote] = useState('');
   // CMC fault-code entry (LG-99) — the code being typed, not yet on the card
   const [cmcDraft, setCmcDraft] = useState('');
+  const [refDraft, setRefDraft] = useState('');
   // status-tag control (QM4/D27) — POO demands a note (what part, from whom)
   const [pooNote, setPooNote] = useState('');
   const [pooPromptOpen, setPooPromptOpen] = useState(false);
@@ -88,8 +90,6 @@ export default function WorkCardDetail() {
   const [riiOpen, setRiiOpen] = useState(false);
   const [pendingReleaseId, setPendingReleaseId] = useState('');
   const [perfSig, setPerfSig] = useState<Signature | null>(null);
-  const [riiStepOpen, setRiiStepOpen] = useState(false);
-  const [riiStepId, setRiiStepId] = useState<string | null>(null);
   const [addWo, setAddWo] = useState('');
   const [woOpts, setWoOpts] = useState<{ woNumber: string; title: string; ata: string; scheduled: boolean; riiRequired: boolean }[]>([]);
 
@@ -113,16 +113,16 @@ export default function WorkCardDetail() {
   const inspector = state.personnel.find(p => p.oid === inspectorOid);
   const nameOf = (oid: string) => state.personnel.find(p => p.oid === oid)?.displayName ?? oid;
   const completed = card.status === 'COMPLETED';
-  const stepsDone = card.steps.filter(s => s.done).length;
-  const allStepsDone = card.steps.length > 0 && stepsDone === card.steps.length;
   const totalLabor = Math.round(labor.reduce((s, l) => s + l.hours, 0) * 10) / 10;
   const release = card.completedReleaseId ? state.releases.find(r => r.id === card.completedReleaseId) : undefined;
   // Due context from the CAMP due-list item this card complies with (read-view; CAMP is the system of record).
   const forecastItem = card.forecastRef ? integration.readForecast(card.aircraftId).find(f => f.ref === card.forecastRef) : undefined;
   const forecastDays = forecastItem?.dueDateUtc ? Math.floor((new Date(forecastItem.dueDateUtc).getTime() - Date.now()) / 86400000) : null;
-  const hasRiiSteps = card.steps.some(s => s.riiRequired);
-  const needsRii = card.riiRequired || hasRiiSteps;
-  const riiStepsDone = riiStepsComplete(card.steps);
+  // D68 — one gate, at card level. Steps are gone, so the per-step inspector signature they used to
+  // carry is gone with them; `engine/rii.ts` explains what that cost and why the ceremony signature
+  // is now the only thing that opens this.
+  const needsRii = card.riiRequired;
+  const refs = cardReferences(card);
 
   /**
    * LG-108 — the defect this card was raised against, resolved through the SUPERSEDING CHAIN.
@@ -155,7 +155,24 @@ export default function WorkCardDetail() {
     dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, ...next } });
     sync?.submit('workcard.patch', card.id, next);
   };
-  const setAmmReference = (v: string) => patch({ ammReference: v.trim() ? v : undefined });
+  /**
+   * D68 references go through `patch`, not a bare dispatch, for the TL-38 reason above: an AMM
+   * reference the next tech cannot see is the failure this card is meant to prevent. `refs` is
+   * normalised by `cardReferences`, so writing it back also migrates a legacy single `ammReference`
+   * into the array the first time anyone edits — the old scalar is read-only from here on and is
+   * deliberately not cleared, because a printed CRS still reads through to it.
+   */
+  const addReference = (raw: string) => {
+    const ref = raw.trim();
+    if (!ref) return;
+    if (refs.some(r => r.ref.toLowerCase() === ref.toLowerCase())) {
+      setRefDraft('');
+      return toast.error(`${ref} is already on this card.`);
+    }
+    patch({ references: [...refs, { id: newId('ref'), ref }] });
+    setRefDraft('');
+  };
+  const removeReference = (id: string) => patch({ references: refs.filter(r => r.id !== id) });
   const addCmcCode = (raw: string) => {
     const code = raw.trim();
     if (!code) return;
@@ -174,13 +191,6 @@ export default function WorkCardDetail() {
   // crew read off the CMC page is their observation, and putting it on the card is a maintenance act.
   const pilotCode = linkedDefect?.cmcFaultCode?.trim();
   const pilotHint = pilotCode && !cmcCodes.some(c => c.toLowerCase() === pilotCode.toLowerCase()) ? pilotCode : undefined;
-
-  const toggleStep = (stepId: string) => {
-    if (completed || !isMaint) return;
-    const steps = card.steps.map(s => (s.id === stepId ? { ...s, done: !s.done } : s));
-    const nextStatus = steps.some(s => s.done) ? 'IN_WORK' : 'OPEN';
-    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, steps, status: nextStatus, headerStatusCode: nextStatus === 'IN_WORK' ? 1 : card.headerStatusCode } });
-  };
 
   const addPart = () => {
     if (!pn.trim() || !pdesc.trim()) return toast.error('Part number and description are required.');
@@ -274,42 +284,31 @@ export default function WorkCardDetail() {
     toast.success(tag === 'WAITING_PARTS' ? 'Tagged waiting on parts (POO) — wait time now accruing to parts.' : tag === 'WAITING_INSPECTION' ? 'Tagged waiting on inspection.' : 'Card tagged in work.');
   };
 
-  const addStepsFromCamp = () => {
+  /**
+   * D68 — this used to import the WO's task lines as a step checklist. It no longer does: the
+   * procedure lives in the AMM, and a CAMP task line is a work-order line item, not a procedure.
+   * What it still pulls is the WO's expected parts/tools/consumables, which ARE vendor data.
+   */
+  const addExpectedFromCamp = () => {
     if (!addWo) return;
     const wo = integration.pullWorkOrder(card.aircraftId, addWo);
     if (!wo) return toast.error('CAMP returned no detail for that work order.');
-    const newSteps = wo.lines.filter(l => l.lineType === 'T').map((l, i) => ({
-      id: newId('st'), seq: card.steps.length + i + 1, text: l.description, done: false,
-      riiRequired: wo.riiRequired && /independent inspection|\bRII\b/i.test(l.description),
-    }));
     // Merge the WO's expected parts/tools/consumables (dedupe on kind+part number+name).
     const seen = new Set((card.campExpected ?? []).map(e => `${e.kind}|${e.partNumber ?? ''}|${e.name}`));
     const addedExpected = expectedFromWo(wo).filter(e => !seen.has(`${e.kind}|${e.partNumber ?? ''}|${e.name}`));
     const campExpected = [...(card.campExpected ?? []), ...addedExpected];
-    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, steps: [...card.steps, ...newSteps], woNumber: card.woNumber ?? wo.woNumber, campExpected: campExpected.length ? campExpected : undefined } });
+    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, woNumber: card.woNumber ?? wo.woNumber, campExpected: campExpected.length ? campExpected : undefined } });
     setAddWo('');
-    toast.success(`Added ${newSteps.length} step(s)${addedExpected.length ? ` + ${addedExpected.length} expected part/tool item(s)` : ''} from CAMP ${wo.woNumber}.`);
-  };
-
-  const beginStepRii = (stepId: string) => {
-    if (!inspector) return toast.error('Select an RII inspector authorized for this ATA.');
-    setRiiStepId(stepId);
-    setRiiStepOpen(true);
-  };
-  const onStepRiiSigned = (stepId: string, rSig: Signature) => {
-    dispatch({ type: 'ADD_SIGNATURE', payload: rSig });
-    const steps = card.steps.map(s => (s.id === stepId ? { ...s, riiSignatureId: rSig.id, riiInspectorOid: inspector?.oid } : s));
-    dispatch({ type: 'EDIT_WORK_CARD', payload: { ...card, steps } });
-    toast.success('RII step inspected and signed.');
+    toast.success(addedExpected.length
+      ? `Linked CAMP ${wo.woNumber} and added ${addedExpected.length} expected part/tool item(s).`
+      : `Linked CAMP ${wo.woNumber}.`);
   };
 
   const beginComplete = () => {
     if (!isMaint) return toast.error('Only maintenance can sign work-card completion.');
-    if (!allStepsDone) return toast.error('Mark all steps complete before signing.');
     const crs = validateCrs(user);
     if (!crs.ok) return toast.error(crs.error);
     if (needsRii && !inspector) return toast.error('Select an RII inspector authorized for this ATA.');
-    if (hasRiiSteps && !riiStepsDone) return toast.error(`Every RII step must be independently inspector-signed first (${pendingRiiSteps(card.steps).length} pending).`);
     setPendingReleaseId(newId('rel'));
     setCrsOpen(true);
   };
@@ -325,8 +324,8 @@ export default function WorkCardDetail() {
       returnToServiceStatement: 'Work card complied with; the aircraft is approved for return to service (14 CFR 91.417).',
       certifyingTechOid: user.oid, apCertificateNumber: user.apCertificateNumber ?? '',
       riiRequired: needsRii,
-      riiInspectorOid: rSig ? inspector?.oid : card.steps.find(s => s.riiRequired && s.riiSignatureId)?.riiInspectorOid,
-      riiSignatureId: rSig?.id ?? card.steps.find(s => s.riiRequired && s.riiSignatureId)?.riiSignatureId,
+      riiInspectorOid: rSig ? inspector?.oid : undefined,
+      riiSignatureId: rSig?.id,
       pdfBlobUri: mockPdfBlobUri('crs', pendingReleaseId), signatureId: pSig.id,
     };
     dispatch({ type: 'ADD_SIGNATURE', payload: pSig });
@@ -363,8 +362,10 @@ export default function WorkCardDetail() {
 
   const onCrsSigned = (sig: Signature) => {
     setPerfSig(sig);
-    // Per-step RII (if any) is already signed before completion; only the legacy card-level RII opens here.
-    if (card.riiRequired && !hasRiiSteps) { setRiiOpen(true); return; }
+    // D68 — the inspector ceremony is the ONLY place an RII signature is now collected. It used to
+    // be skipped when the steps had already been signed one by one; with steps gone there is no
+    // earlier signature to defer to, so a card needing RII always opens it.
+    if (card.riiRequired) { setRiiOpen(true); return; }
     finalize(sig);
   };
 
@@ -384,7 +385,6 @@ export default function WorkCardDetail() {
         ], body: card.title },
         // LG-98/99 — shared with the other two CRS call sites; see `util/workCardPrint.ts`.
         ...workCardReferenceSections(card),
-        { heading: 'Steps', body: card.steps.map(s => `${s.done ? '☑' : '☐'} ${s.text}`).join('\n') },
         { heading: 'Parts', body: parts.length ? parts.map(p => `${p.partNumber} (${p.description}) ×${p.qty}${p.serialNumber ? ` S/N ${p.serialNumber}` : ''}${p.removedPartNumber ? ` — removed ${p.removedPartNumber}${p.removedSerialNumber ? `/${p.removedSerialNumber}` : ''}` : ''}`).join('\n') : 'None' },
         // Frozen at entry (TL-16) — never a live Personnel join on a signed release.
         { heading: 'Labor', body: labor.length ? labor.map(l => `${l.techName ?? 'not recorded'} — ${l.hours} h — ${l.description}`).join('\n') + `\nTotal: ${totalLabor} h` : 'None' },
@@ -422,7 +422,7 @@ export default function WorkCardDetail() {
               CAMP due list{forecastItem.dueDateUtc ? ` · ${new Date(forecastItem.dueDateUtc).toLocaleDateString()} · ${forecastDays != null && forecastDays < 0 ? `overdue ${Math.abs(forecastDays)}d` : `${forecastDays}d`}` : ''}
             </Badge>
           )}
-          <span className="ml-auto text-xs text-muted-foreground">steps {stepsDone}/{card.steps.length} · labor {totalLabor} h · {parts.length} part(s)</span>
+          <span className="ml-auto text-xs text-muted-foreground">{refs.length} ref(s) · labor {totalLabor} h · {parts.length} part(s)</span>
         </CardContent>
         {/* LG-108 — what was actually reported, in the header a tech reads before troubleshooting.
             The `linked defect` badge above has never carried anything but the word: no description,
@@ -451,27 +451,37 @@ export default function WorkCardDetail() {
             <span className="text-xs text-muted-foreground">manual entry — not sourced from CAMP</span>
           </div>
 
-          {/* AMM reference — free text, because the reference is whatever document the tech actually
-              worked to (AMM / CMM / SB) and there is no manual index in the app to validate against. */}
-          {!completed && isMaint ? (
-            <div>
-              <Label htmlFor="wc-amm-ref" className="text-xs">AMM reference</Label>
-              <Input
-                id="wc-amm-ref"
-                className="mt-1"
-                placeholder="e.g. AMM 32-30-00"
-                value={card.ammReference ?? ''}
-                onChange={e => setAmmReference(e.target.value)}
-              />
+          {/* D68 — the documents worked to, replacing the step checklist. A LIST, because one card
+              routinely spans several procedures, and free text because the reference is whatever
+              document the tech actually opened (AMM / CMM / SB) with no manual index to validate
+              against. */}
+          <div>
+            <div className="text-xs text-muted-foreground">Worked to</div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {refs.map(r => (
+                <Badge key={r.id} variant="secondary" className="gap-1 font-mono text-[11px]">
+                  {r.ref}
+                  {!completed && isMaint && r.id !== 'legacy-amm' && (
+                    <button type="button" aria-label={`Remove ${r.ref}`} className="ml-0.5 opacity-60 hover:opacity-100" onClick={() => removeReference(r.id)}>×</button>
+                  )}
+                </Badge>
+              ))}
+              {refs.length === 0 && <span className="text-sm text-muted-foreground">Not recorded.</span>}
             </div>
-          ) : (
-            <div>
-              <div className="text-xs text-muted-foreground">AMM reference</div>
-              {card.ammReference
-                ? <span className="font-medium">{card.ammReference}</span>
-                : <span className="text-muted-foreground">Not recorded.</span>}
-            </div>
-          )}
+            {!completed && isMaint && (
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  id="wc-ref"
+                  className="h-8"
+                  placeholder="e.g. AMM 32-30-00"
+                  value={refDraft}
+                  onChange={e => setRefDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addReference(refDraft); } }}
+                />
+                <Button size="sm" variant="outline" className="h-8 shrink-0" disabled={!refDraft.trim()} onClick={() => addReference(refDraft)}>Add</Button>
+              </div>
+            )}
+          </div>
 
           {/* CMC fault codes — a real add/remove chip list. Deliberately NOT the comma-separated
               string in a single `<Input>` that `AdminPersonnel` uses for `riiAuthorizedAta`: one
@@ -600,38 +610,23 @@ export default function WorkCardDetail() {
           waitingPartsAlready={tagNow === 'WAITING_PARTS'}
           onOfferWaitingParts={setOfferedOrder}
         />
-        {/* Steps */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4" /> Task steps</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {card.steps.map(s => (
-              <div key={s.id} className={`flex items-start gap-2 rounded-md border p-2 text-sm ${s.done ? 'bg-[var(--gfo-success,#00B140)]/5' : ''}`}>
-                <Checkbox className="mt-0.5 size-5" checked={s.done} disabled={completed || !isMaint} onCheckedChange={() => toggleStep(s.id)} />
-                <span className="flex-1">
-                  <span className="text-xs text-muted-foreground">#{s.seq}</span> {s.text}
-                  {s.riiRequired && <Badge variant="outline" className="ml-2"><UserCheck className="mr-1 h-3 w-3" />RII</Badge>}
-                </span>
-                {s.riiRequired && (
-                  s.riiSignatureId
-                    ? <Badge variant="secondary" className="shrink-0 self-center text-[10px]"><CheckCircle2 className="mr-1 h-3 w-3" />RII {state.signatures.find(sig => sig.id === s.riiSignatureId)?.signerName ?? 'not recorded'}</Badge>
-                    : !completed && (s.done
-                        ? <Button size="sm" variant="outline" className="h-7 shrink-0" disabled={!isMaint || !inspector} onClick={() => beginStepRii(s.id)}>RII sign</Button>
-                        : <span className="shrink-0 self-center text-[10px] text-muted-foreground">complete step</span>)
-                )}
-              </div>
-            ))}
-            {card.steps.length === 0 && <p className="text-sm text-muted-foreground">No task steps on this card.</p>}
-            {isMaint && !completed && woOpts.length > 0 && (
-              <div className="mt-2 flex items-center gap-2 border-t pt-2">
+        {/* D68 — no step checklist. The procedure lives in the AMM; the card records which
+            reference the tech worked to (above) and the CAMP link stays for expected parts. */}
+        {isMaint && !completed && woOpts.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CloudDownload className="h-4 w-4" /> CAMP work order</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
                 <Select value={addWo} onValueChange={(v: string) => setAddWo(v)}>
-                  <SelectTrigger className="h-8 flex-1"><SelectValue placeholder="Add steps from a CAMP work order…" /></SelectTrigger>
+                  <SelectTrigger className="h-8 flex-1"><SelectValue placeholder="Link a CAMP work order…" /></SelectTrigger>
                   <SelectContent>{woOpts.map(w => <SelectItem key={w.woNumber} value={w.woNumber}>{w.woNumber} · {w.title}{w.riiRequired ? ' (RII)' : ''}</SelectItem>)}</SelectContent>
                 </Select>
-                <Button size="sm" variant="outline" className="h-8 shrink-0" disabled={!addWo} onClick={addStepsFromCamp}><CloudDownload className="mr-1.5 h-3.5 w-3.5" /> Add</Button>
+                <Button size="sm" variant="outline" className="h-8 shrink-0" disabled={!addWo} onClick={addExpectedFromCamp}><CloudDownload className="mr-1.5 h-3.5 w-3.5" /> Link</Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <p className="mt-2 text-xs text-muted-foreground">Pulls the work order's expected parts, tools and consumables. Task lines are not imported as steps — the procedure is in the AMM.</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Labor */}
         <Card>
@@ -779,22 +774,22 @@ export default function WorkCardDetail() {
             <>
               {needsRii && (
                 <div>
-                  <Label className="text-xs">RII inspector (authorized for ATA {card.ataChapter}, not the performer){hasRiiSteps ? ' — signs each RII step independently' : ''}</Label>
+                  <Label className="text-xs">RII inspector (authorized for ATA {card.ataChapter}, not the performer)</Label>
                   <Select value={inspectorOid} onValueChange={(v: string) => setInspectorOid(v)}>
                     <SelectTrigger className="mt-1"><SelectValue placeholder={inspectors.length ? 'Select inspector' : 'No authorized inspector for this ATA'} /></SelectTrigger>
                     <SelectContent>{inspectors.map(p => <SelectItem key={p.oid} value={p.oid}>{p.displayName}</SelectItem>)}</SelectContent>
                   </Select>
+                  {/* Keeps main's -ink token: the branch predates the contrast fix, and D68 removes
+                      the per-step RII line below it because there are no steps left to sign. */}
                   {inspectors.length === 0 && <p className="mt-1 text-xs text-[var(--gfo-error-ink,#C81E2B)]">No RII-authorized inspector for ATA {card.ataChapter} — completion cannot proceed.</p>}
-                  {hasRiiSteps && !riiStepsDone && <p className="mt-1 text-xs text-[var(--gfo-warning-ink,#8A6200)]">{pendingRiiSteps(card.steps).length} RII step(s) still need an independent inspector signature.</p>}
                 </div>
               )}
               <div className="rounded bg-muted/60 p-2 text-xs text-muted-foreground">
-                CRS requires an A&P certificate ({user.apCertificateNumber ? `you: ${user.apCertificateNumber}` : 'you have none — sign will be rejected'}). All steps must be complete{card.riiRequired ? ' and an RII inspector must independently sign' : ''}. Step-up re-auth required.
+                CRS requires an A&P certificate ({user.apCertificateNumber ? `you: ${user.apCertificateNumber}` : 'you have none — sign will be rejected'}){card.riiRequired ? ', and an RII inspector must independently sign' : ''}. Step-up re-auth required.
               </div>
-              <Button onClick={beginComplete} disabled={!isMaint || !allStepsDone || (needsRii && !inspector) || (hasRiiSteps && !riiStepsDone)}>
+              <Button onClick={beginComplete} disabled={!isMaint || (needsRii && !inspector)}>
                 <ShieldCheck className="mr-1.5 h-4 w-4" /> Sign completion (RTS)
               </Button>
-              {!allStepsDone && <p className="text-xs text-muted-foreground">Mark all {card.steps.length} steps complete to enable signing.</p>}
             </>
           )}
         </CardContent>
@@ -802,17 +797,12 @@ export default function WorkCardDetail() {
 
       <SignCeremonyDialog open={crsOpen} onOpenChange={setCrsOpen} signer={user} signedEntity="WORK_CARD" signedEntityId={pendingReleaseId}
         intentStatement={INTENT.CRS} requireStepUp validate={() => validateCrs(user)}
-        payloadSummary={`${card.cardNumber}: ${stepsDone}/${card.steps.length} steps, ${parts.length} part(s), ${totalLabor} h labor.`}
+        payloadSummary={`${card.cardNumber}: ${refs.length} reference(s), ${parts.length} part(s), ${totalLabor} h labor.`}
         onSigned={onCrsSigned} title="Sign work-card completion (performer)" />
       {inspector && (
         <SignCeremonyDialog open={riiOpen} onOpenChange={setRiiOpen} signer={inspector} signedEntity="WORK_CARD" signedEntityId={pendingReleaseId}
           intentStatement={INTENT.RII} requireStepUp validate={() => validateRii(user.oid, inspector, card.ataChapter)}
           onSigned={(rSig) => { if (perfSig) finalize(perfSig, rSig); }} title="RII independent inspection" />
-      )}
-      {inspector && riiStepId && (
-        <SignCeremonyDialog open={riiStepOpen} onOpenChange={setRiiStepOpen} signer={inspector} signedEntity="WORK_CARD" signedEntityId={riiStepId}
-          intentStatement={INTENT.RII} requireStepUp validate={() => validateRii(user.oid, inspector, card.ataChapter)}
-          onSigned={(rSig) => onStepRiiSigned(riiStepId, rSig)} title="RII step — independent inspection" />
       )}
     </TechLogShell>
   );

@@ -62,6 +62,12 @@ export interface DiscrepancyPush {
   nextDue?: string;
   melLogbookDate?: string;
   riiItem?: boolean;
+  /**
+   * D69 — CAMP's `NEFFlag`, documented as writable `Y/N` on `IntegrateDiscrepancies`
+   * (`ref-camp-discrepancy-writable-fields`). An NEF deferral also pushes `melFlag` absent, which
+   * the same vendor doc permits: "A, B, C, D **or null**". Neither is invented.
+   */
+  nefFlag?: boolean;
   technician?: string;
   inspector?: string;
   existingDiscrepancyId?: string; // EDIT/UPDATE of a previously-pushed discrepancy

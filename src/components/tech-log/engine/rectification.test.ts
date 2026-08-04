@@ -12,7 +12,7 @@ const defect = (over: Partial<Defect> = {}): Defect => ({
 
 describe('createRectificationCard', () => {
   it('links the card to the defect and carries its ATA + aircraft', () => {
-    const c = createRectificationCard(defect(), { cardId: 'wc-abcd', stepId: 'st-1' }, '2026-06-25T01:00:00.000Z');
+    const c = createRectificationCard(defect(), { cardId: 'wc-abcd' }, '2026-06-25T01:00:00.000Z');
     expect(c.linkedDefectId).toBe('def-1');
     expect(c.ataChapter).toBe('32');
     expect(c.aircraftId).toBe('ac-1');
@@ -20,28 +20,32 @@ describe('createRectificationCard', () => {
   });
 
   it('is an OPEN, in-house (MANUAL), corrective card', () => {
-    const c = createRectificationCard(defect(), { cardId: 'wc-abcd', stepId: 'st-1' }, 'now');
+    const c = createRectificationCard(defect(), { cardId: 'wc-abcd' }, 'now');
     expect(c.status).toBe('OPEN');
     expect(c.source).toBe('MANUAL');
     expect(c.scheduled).toBe(false);
     expect(c.riiRequired).toBe(false);
   });
 
-  it('seeds exactly one (incomplete) step so the card is completable', () => {
-    const c = createRectificationCard(defect({ description: 'Pack 1 fault' }), { cardId: 'wc-abcd', stepId: 'st-1' }, 'now');
-    expect(c.steps).toHaveLength(1);
-    expect(c.steps[0].text).toContain('Pack 1 fault');
-    expect(c.steps[0].done).toBe(false);
+  /**
+   * D68 — a raised card carries NO procedure of its own. It used to seed one step restating the
+   * defect, which read as a task list while being a copy of the title; the procedure lives in the
+   * AMM, and the tech records which reference they worked to.
+   */
+  it('carries the defect in its title and no procedure of its own', () => {
+    const c = createRectificationCard(defect({ description: 'Pack 1 fault' }), { cardId: 'wc-abcd' }, 'now');
+    expect(c.title).toContain('Pack 1 fault');
+    expect(c.references ?? []).toHaveLength(0);
   });
 
   it('links the card to the deferral when a deferralId is given (traceability)', () => {
-    const c = createRectificationCard(defect(), { cardId: 'wc-abcd', stepId: 'st-1' }, 'now', 'df-99');
+    const c = createRectificationCard(defect(), { cardId: 'wc-abcd' }, 'now', 'df-99');
     expect(c.linkedDeferralId).toBe('df-99');
     expect(c.linkedDefectId).toBe('def-1');
   });
 
   it('leaves linkedDeferralId undefined when raised straight from a defect (no deferral)', () => {
-    const c = createRectificationCard(defect(), { cardId: 'wc-abcd', stepId: 'st-1' }, 'now');
+    const c = createRectificationCard(defect(), { cardId: 'wc-abcd' }, 'now');
     expect(c.linkedDeferralId).toBeUndefined();
   });
 });

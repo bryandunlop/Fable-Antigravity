@@ -22,7 +22,6 @@ const OPEN_CARD: WorkCard = {
   ataChapter: '79', description: 'Corrective.', source: 'MANUAL', headerStatusCode: 1,
   scheduled: false, riiRequired: false,
   createdAtUtc: '2026-07-28T10:00:00.000Z', status: 'IN_WORK',
-  steps: [],
 };
 
 function renderCard() {

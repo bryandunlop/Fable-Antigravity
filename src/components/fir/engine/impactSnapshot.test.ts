@@ -23,7 +23,7 @@ const defect = (over: Partial<Defect> = {}): Defect => ({
 
 const card = (over: Partial<WorkCard> = {}): WorkCard => ({
   id: 'wc-1', cardNumber: 'WC-1001', aircraftId: 'ac-1', title: 'Replace main battery',
-  ataChapter: '24', description: '', steps: [], status: 'COMPLETED', source: 'MANUAL',
+  ataChapter: '24', description: '', status: 'COMPLETED', source: 'MANUAL',
   headerStatusCode: 0, scheduled: false, riiRequired: false, linkedDefectId: 'def-1',
   createdAtUtc: '2026-07-07T09:00:00.000Z', completedAtUtc: '2026-07-08T08:00:00.000Z',
   statusTags: [

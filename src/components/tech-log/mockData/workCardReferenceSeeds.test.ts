@@ -27,7 +27,7 @@ describe('work card AMM/CMC seeds (LG-98/99)', () => {
     expect(wc1!.completedReleaseId).toBeTruthy();
     // Assert the PROPERTY, not the literal — the values are labelled illustrative in the seed and an
     // ordinary edit to them must not fail a guard that exists to protect demo visibility.
-    expect(wc1!.ammReference?.trim()).toBeTruthy();
+    expect(wc1!.references?.length).toBeGreaterThan(0);
     expect(wc1!.cmcFaultCodes?.length).toBeGreaterThan(0);
   });
 
@@ -35,7 +35,9 @@ describe('work card AMM/CMC seeds (LG-98/99)', () => {
     const wc3 = state.workCards.find(c => c.id === 'wc-3');
     expect(wc3).toBeDefined();
     expect(wc3!.status).not.toBe('COMPLETED');
-    expect(wc3!.ammReference?.trim()).toBeTruthy();
+    // More than one on the live card: D68 made this a list precisely because troubleshooting
+    // routinely crosses two documents, and a one-element seed would not exercise that.
+    expect(wc3!.references!.length).toBeGreaterThan(1);
     // More than one, on purpose: one squawk interrogates into several codes.
     expect(wc3!.cmcFaultCodes!.length).toBeGreaterThan(1);
   });

@@ -21,7 +21,7 @@ const iso = (daysAgo: number, hour = 8) => {
 
 const CARD: WorkCard = {
   id: 'wc-m1', cardNumber: 'WC-7001', aircraftId: 'ac-n1pg', title: 'Battery will not hold charge',
-  ataChapter: '24', description: '', steps: [], source: 'MANUAL', headerStatusCode: 0,
+  ataChapter: '24', description: '', source: 'MANUAL', headerStatusCode: 0,
   scheduled: false, riiRequired: false, status: 'COMPLETED',
   createdAtUtc: iso(10, 6),
   completedAtUtc: iso(8, 18),

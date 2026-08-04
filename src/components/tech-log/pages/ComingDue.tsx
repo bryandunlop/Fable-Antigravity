@@ -72,7 +72,7 @@ export default function ComingDue() {
       return toast.error('That due-list item already has an open card.');
     }
     const nowUtc = new Date().toISOString();
-    const card = createForecastCard(item, it.aircraftId, { cardId: newId('wc'), stepIds: [newId('st'), newId('st')] }, nowUtc);
+    const card = createForecastCard(item, it.aircraftId, { cardId: newId('wc') }, nowUtc);
     dispatch({ type: 'ADD_WORK_CARD', payload: card });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'WORKCARD_PULLED', entityType: 'WorkCard', entityId: card.id, atUtc: nowUtc, summary: `Pulled from CAMP due list ${item.ref} → ${card.cardNumber} (${it.tailNumber})` } });
     toast.success(`${card.cardNumber} ready to execute — ${item.description}.`);

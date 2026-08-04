@@ -46,6 +46,7 @@ export function useIntegration() {
     intent?: PushIntent;          // CREATE (default) | CORRECT | CLOSE
     defectStatus?: DefectStatus;  // WATCHLISTED → DEFERRED-WATCHLIST discrepancyType
     supersedesEntityId?: string;  // parent entity whose CAMP ref is carried forward (CORRECT/CLOSE)
+    nefProgram?: boolean;         // D69 — NEFFlag=Y on the CAMP discrepancy (deferred under the NEF program)
     riiItem?: boolean;            // RIIitem=Y on the CAMP discrepancy
     inspector?: string;           // RII inspector name carried to CAMP
   }): camp.CampResult<{ discrepancyId: string }> | undefined {
@@ -74,6 +75,7 @@ export function useIntegration() {
           restriction: input.restriction,
           nextDue: input.nextDue,
           riiItem: input.riiItem ?? false,
+          nefFlag: input.nefProgram,
           inspector: input.inspector,
           technician: input.technician,
           existingDiscrepancyId: decision.existingDiscrepancyId,

@@ -4,6 +4,7 @@ import { isDeferralExpired } from './pl25';
 import { crewActionPending } from './crewAction';
 import { projectCheck } from './recurringChecks';
 import { deriveServiceability } from './serviceability';
+import { formatReferences } from './workCardReferences';
 
 /**
  * One list of "what stands between this tail and dispatch", each row carrying the dispositions that
@@ -205,12 +206,14 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
 
   // ── work already under way ──
   for (const w of workCards.filter(w => w.status !== 'COMPLETED')) {
-    const done = w.steps.filter(s => s.done).length;
+    // D68: the card no longer holds a step checklist, so progress is the state the tech tagged,
+    // not a done-count. The references say which manual procedure the work is being done to.
+    const refs = formatReferences(w);
     inProgress.push({
       id: w.id, kind: 'WORK_CARD_OPEN', workCard: w,
       title: `${w.cardNumber ?? w.woNumber ?? w.id} — ${w.title}`,
-      detail: `${w.status} · steps ${done}/${w.steps.length}`,
-      clearsWhen: 'All steps are completed and the card is signed off.',
+      detail: refs ? `${w.status} · ${refs}` : w.status,
+      clearsWhen: 'The work is complete and the card is signed off.',
       governing: false,
       actions: ['OPEN_CARD'],
     });

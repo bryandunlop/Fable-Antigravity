@@ -169,7 +169,7 @@ export default function FleetStatus() {
                     size="lg"
                     clockStartUtc={nearestDeferral.clockStartDateUtc}
                     repairDueUtc={nearestDeferral.repairDueDateUtc}
-                    category={nearestDeferral.category}
+                    category={nearestDeferral.category ?? undefined}
                   />
                 </div>
               )}

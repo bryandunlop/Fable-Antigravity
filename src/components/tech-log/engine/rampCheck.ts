@@ -58,7 +58,8 @@ export interface RampDeferralRow {
   melTitle: string | null;
   governingMmelRevision: string;
   governingEffectiveDate: string;
-  category: MelCategory;
+  /** `null` for an NEF deferral, which carries no repair category (D69). */
+  category: MelCategory | null;
   /** Effective status: the stored status, re-read against the due boundary (expiry is derived). */
   status: DeferralStatus;
   isExpired: boolean;

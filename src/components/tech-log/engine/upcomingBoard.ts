@@ -167,7 +167,7 @@ export function buildUpcomingBoard(
 export function createForecastCard(
   item: CampForecastItem,
   aircraftId: string,
-  ids: { cardId: string; stepIds: [string, string] },
+  ids: { cardId: string },
   nowUtc: string,
 ): WorkCard {
   return {
@@ -177,10 +177,6 @@ export function createForecastCard(
     title: item.description,
     ataChapter: item.ata,
     description: `${item.category} due-list item ${item.ref} pulled from CAMP.`,
-    steps: [
-      { id: ids.stepIds[0], seq: 1, text: `Perform: ${item.description} per applicable AMM/AD/SB reference`, done: false },
-      { id: ids.stepIds[1], seq: 2, text: 'Record compliance in CAMP (Phase 2: IntegrateDiscrepancies / WO update)', done: false },
-    ],
     status: 'OPEN',
     source: 'CAMP',
     headerStatusCode: 1, // Open (CAMP WO header ladder)

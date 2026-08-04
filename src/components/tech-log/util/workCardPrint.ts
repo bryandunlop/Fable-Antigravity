@@ -1,5 +1,6 @@
 import type { PrintField, PrintSection } from './printRecord';
 import type { WorkCard } from '../types';
+import { formatReferences } from '../engine/workCardReferences';
 
 /**
  * The work card's troubleshooting references (LG-98/99) as printed-CRS content.
@@ -23,11 +24,14 @@ import type { WorkCard } from '../types';
  * signed releases, and the fix belongs to all of them at once rather than to these two rows.
  */
 export function workCardReferenceFields(
-  card?: Pick<WorkCard, 'ammReference' | 'cmcFaultCodes'>,
+  card?: Pick<WorkCard, 'references' | 'ammReference' | 'cmcFaultCodes'>,
 ): PrintField[] {
   const fields: PrintField[] = [];
-  const amm = card?.ammReference?.trim();
-  if (amm) fields.push({ label: 'AMM reference', value: amm });
+  // D68 — reads BOTH shapes via `cardReferences`: a release signed before D68 points at a card
+  // carrying the single `ammReference` string, and blanking it here would change what an already
+  // printed CRS prints.
+  const refs = card ? formatReferences(card) : '';
+  if (refs) fields.push({ label: 'Worked to', value: refs });
   const codes = (card?.cmcFaultCodes ?? []).map(c => c.trim()).filter(Boolean);
   if (codes.length) fields.push({ label: 'CMC fault codes', value: codes.join(', ') });
   return fields;
@@ -40,7 +44,7 @@ export function workCardReferenceFields(
  * over two em-dashes.
  */
 export function workCardReferenceSections(
-  card?: Pick<WorkCard, 'ammReference' | 'cmcFaultCodes'>,
+  card?: Pick<WorkCard, 'references' | 'ammReference' | 'cmcFaultCodes'>,
 ): PrintSection[] {
   const fields = workCardReferenceFields(card);
   return fields.length ? [{ heading: 'Troubleshooting references', fields }] : [];

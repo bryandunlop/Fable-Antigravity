@@ -79,7 +79,7 @@ describe('buildUpcomingBoard — MEL repair clocks', () => {
   it('links a deferral row to the open corrective card via linkedDefectId', () => {
     const { s, forecast } = seededBoard();
     const df = s.deferrals.find(d => d.id === 'df-n6pg')!;
-    const card = createForecastCard(fc({ ref: 'X' }), 'ac-n6pg', { cardId: 'wc-t1', stepIds: ['s1', 's2'] }, NOW);
+    const card = createForecastCard(fc({ ref: 'X' }), 'ac-n6pg', { cardId: 'wc-t1' }, NOW);
     const linked = { ...card, forecastRef: undefined, linkedDefectId: df.defectId };
     const b = buildUpcomingBoard({ ...s, workCards: [...s.workCards, linked] }, forecast, NOW);
     const row = [...b.buckets.DUE_7D, ...b.buckets.DUE_30D].find(i => i.refId === 'df-n6pg');
@@ -151,7 +151,7 @@ describe('buildUpcomingBoard — work-card linkage & demo spread', () => {
 
 describe('createForecastCard', () => {
   const item = fc({ ref: 'FC-27-AD2024-12', category: 'AD', ata: '27', description: 'AD 2024-12-05 flight-control rigging (recurring)' });
-  const card = createForecastCard(item, 'ac-n1pg', { cardId: 'wc-abcd', stepIds: ['st-1', 'st-2'] }, NOW);
+  const card = createForecastCard(item, 'ac-n1pg', { cardId: 'wc-abcd' }, NOW);
 
   it('creates an OPEN scheduled CAMP card carrying the forecastRef', () => {
     expect(card.status).toBe('OPEN');
@@ -163,9 +163,10 @@ describe('createForecastCard', () => {
     expect(card.riiRequired).toBe(false);
   });
 
-  it('is completable: has steps, none pre-done, and a display card number', () => {
-    expect(card.steps.length).toBeGreaterThanOrEqual(1);
-    expect(card.steps.every(s => !s.done)).toBe(true);
+  // D68 — a pulled card carries no step checklist. The CAMP task lines it used to import are
+  // work-order line items, not a procedure; the procedure is in the AMM.
+  it('carries a display card number and no procedure of its own', () => {
     expect(card.cardNumber).toMatch(/^WC-/);
+    expect(card.references ?? []).toHaveLength(0);
   });
 });

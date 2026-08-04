@@ -52,7 +52,6 @@ const CARD: WorkCard = {
   status: 'COMPLETED', completedAtUtc: '2026-07-28T18:00:00.000Z', completedReleaseId: 'rel-p1',
   ammReference: 'AMM 32-30-00',
   cmcFaultCodes: ['32-3120-04', '32-3120-11'],
-  steps: [{ id: 'wc-p1-s1', seq: 1, text: 'Gear swing check', done: true }],
 };
 
 const SIG: Signature = {
@@ -114,13 +113,15 @@ const CALL_SITES: { name: string; open: () => void }[] = [
   },
 ];
 
-describe('Printed CRS carries the work card AMM reference and CMC fault codes (LG-98/99)', () => {
+describe('Printed CRS carries the work card references and CMC fault codes (D68, LG-99)', () => {
   beforeEach(() => { localStorage.clear(); printSpy.mockClear(); seed(); });
 
   for (const site of CALL_SITES) {
-    it(`${site.name} prints the AMM reference`, async () => {
+    // The fixture card carries the pre-D68 single `ammReference`, so this also pins that a release
+    // signed before D68 keeps printing the reference it printed at signing.
+    it(`${site.name} prints the references worked to`, async () => {
       site.open();
-      expect(fieldValue(await printed(), 'AMM reference')).toBe('AMM 32-30-00');
+      expect(fieldValue(await printed(), 'Worked to')).toBe('AMM 32-30-00');
     });
 
     it(`${site.name} prints every CMC fault code`, async () => {

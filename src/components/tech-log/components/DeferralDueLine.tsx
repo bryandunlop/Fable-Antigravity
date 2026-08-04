@@ -37,7 +37,12 @@ export function DeferralDueLine({
   clockStartUtc: string;
   /** Undefined for usage-based deferrals — there is no calendar span to drain. */
   repairDueUtc?: string;
-  category: MelCategory;
+  /**
+   * Null for a clockless deferral (D69's NEF items): no repair category, so no interval to
+   * drain and no ring to draw. `DeferralClock` one layer down already treats an absent
+   * category this way — this signature was the only thing that had not caught up.
+   */
+  category: MelCategory | null;
   /** Already zone-resolved by the caller, e.g. `due 04 Aug`. */
   dueLabel: string;
   extended?: boolean;
@@ -46,7 +51,7 @@ export function DeferralDueLine({
   // Ask the same engine the ring asks, so the fallback triggers exactly when the ring
   // would render nothing — rather than inferring it from `repairDueUtc` being absent and
   // silently dropping the line for an unparseable date.
-  const hasRing = readDeferralClock(clockStartUtc, repairDueUtc, Date.now(), category) !== null;
+  const hasRing = category !== null && readDeferralClock(clockStartUtc, repairDueUtc, Date.now(), category) !== null;
 
   return (
     <div className={cn('mt-1 inline-flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground', className)}>

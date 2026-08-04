@@ -67,7 +67,7 @@ export function ExtendDeferralDialog({
     integration.pushDiscrepancy({
       entityType: 'DEFERRAL', entityId: row.id, aircraftId: row.aircraftId,
       ata: ataChapter ?? '—', description: `MEL deferral extended once: ${justification.trim()}`,
-      category: row.category, nextDue: row.repairDueDateUtc, technician: user.displayName,
+      category: row.category ?? undefined, nextDue: row.repairDueDateUtc, technician: user.displayName,
       intent: 'CORRECT', supersedesEntityId: deferral.id,
     });
     dispatch({ type: 'ADD_AUDIT', payload: { id: newId('aud'), actorOid: user.oid, action: 'DEFERRAL_EXTENDED', entityType: 'Deferral', entityId: row.id, atUtc: now, summary: `${tail}: ${auditSummary}` } });

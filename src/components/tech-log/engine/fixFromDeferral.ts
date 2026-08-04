@@ -18,7 +18,7 @@ export function planFixFromDeferral(
   deferral: Deferral,
   defects: Defect[],
   workCards: WorkCard[],
-  ids: { cardId: string; stepId: string },
+  ids: { cardId: string },
   nowUtc: string,
 ): FixFromDeferralPlan {
   const defect = defects.find(d => d.id === deferral.defectId);

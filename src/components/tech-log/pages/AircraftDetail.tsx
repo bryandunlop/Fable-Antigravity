@@ -21,6 +21,8 @@ import { WO_HEADER_STATUS } from '../integration/campTaxonomy';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { workCardReferenceSections } from '../util/workCardPrint';
 import { newId } from '../util/id';
+import { formatReferences } from '../engine/workCardReferences';
+import { isNefDeferral, openDays, repairIntervalLabel } from '../engine/nef';
 import type {
   Signature, RecurringCheck, RecurringCheckAccomplishment, RecurringIntervalUnit, Deferral,
   MaintenanceRelease, WorkCard,
@@ -350,7 +352,6 @@ export default function AircraftDetail() {
       description: wo.lines.filter(l => l.lineType === 'S').map(l => l.description).join('; ') || wo.title,
       source: 'CAMP', headerStatusCode: wo.headerStatusCode, scheduled: wo.scheduled, riiRequired: wo.riiRequired,
       createdAtUtc: nowIso, status: 'OPEN',
-      steps: wo.lines.filter(l => l.lineType === 'T').map((l, i) => ({ id: newId('st'), seq: i + 1, text: l.description, done: false, riiRequired: wo.riiRequired && /independent inspection|\bRII\b/i.test(l.description) })),
       campExpected: expected.length ? expected : undefined,
     };
     dispatch({ type: 'ADD_WORK_CARD', payload: card });
@@ -679,7 +680,7 @@ export default function AircraftDetail() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">MEL {d.melSubItemNumber ?? 'not recorded'}</Badge>
-                      <Badge variant="outline">Cat {d.category}</Badge>
+                      <Badge variant="outline">{repairIntervalLabel(d)}</Badge>
                       <Badge variant={effective === 'ACTIVE' ? 'secondary' : 'destructive'}>{effective}</Badge>
                       {/* D59 — the crew action reads off the frozen deferral row, so a later MEL
                           revision cannot repaint it. */}
@@ -701,6 +702,14 @@ export default function AircraftDetail() {
                     )}
                     {/* LG-170 — see Deferrals.tsx; same frozen row, same words. */}
                     <PendingPlacardNote deferral={{ ...d, status: effective }} />
+                    {/* D69 — a clockless NEF deferral has no due date to show, and will never raise
+                        its own hand by expiring. Age is what stands in for "earliest opportunity":
+                        without it the oldest NEF item is the one nobody ever sees. */}
+                    {isNefDeferral(d) && (
+                      <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" /> open {openDays(d, now)}d · no repair interval — earliest opportunity
+                      </div>
+                    )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     {/* D59 — open to BOTH personas by design: on the road the pilots perform and
@@ -755,7 +764,6 @@ export default function AircraftDetail() {
           {isMaint && <Button size="sm" onClick={() => setPullOpen(true)}><CloudDownload className="mr-1.5 h-4 w-4" /> Pull from CAMP</Button>}
           {workCards.length === 0 && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No work cards for this aircraft.</CardContent></Card>}
           {workCards.map(w => {
-            const done = w.steps.filter(s => s.done).length;
             return (
               <Card key={w.id} className="cursor-pointer transition-colors hover:bg-accent/40" onClick={() => navigate(`/tech-log/work-cards/${w.id}`)}>
                 <CardContent className="flex items-center justify-between gap-3 p-4 text-sm">
@@ -768,11 +776,11 @@ export default function AircraftDetail() {
                     </div>
                     <p className="mt-1">{w.title}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode} · steps {done}/{w.steps.length}
-                      {/* LG-98 — the work-card list is FORKED (this tab and pages/WorkCards.tsx).
-                          The AMM ref landed on the other copy first; both need it, or "which
-                          procedure is this card working to" is answerable on only one screen. */}
-                      {w.ammReference ? ` · ${w.ammReference}` : ''}
+                      {w.woNumber ? `CAMP ${w.woNumber} · ` : ''}WO: {WO_HEADER_STATUS[w.headerStatusCode] ?? w.headerStatusCode}
+                      {/* D68 — the work-card list is FORKED (this tab and pages/WorkCards.tsx).
+                          Both need the references, or "which procedure is this card working to" is
+                          answerable on only one screen. */}
+                      {formatReferences(w) ? ` · ${formatReferences(w)}` : ''}
                     </p>
                   </div>
                   <Package className="h-4 w-4 text-muted-foreground" />

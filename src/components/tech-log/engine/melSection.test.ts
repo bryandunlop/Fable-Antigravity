@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SEED_MEL } from '../mockData/mel';
 import { SEED_MEL_SECTIONS } from '../mockData/melSections';
-import { casPaletteFor, isDeferrableToday, sectionOf, undeferrableReason } from './melSection';
+import { casPaletteFor, hasRepairInterval, sectionOf } from './melSection';
 import type { MelItem } from '../types';
 
 const two = SEED_MEL_SECTIONS.filter(m => m.melSection === 'TWO');
@@ -100,27 +100,25 @@ describe('NEF Deferral List', () => {
   });
 });
 
-describe('what may be deferred today', () => {
+describe('which items carry a repair interval', () => {
   const item = (p: Partial<MelItem>): MelItem => ({
     id: 'm1', aircraftType: 'G500', mmelRevision: 'Rev 1', effectiveDate: '2025-09-26',
     approvalState: 'APPROVED', ataReference: '24', itemNumber: '24-01', subItemNumber: '24-01-01',
     title: 'x', category: 'C', numberInstalled: null, numberRequired: null, ...p,
   });
 
-  it('allows Section One and Section Two alike', () => {
-    expect(isDeferrableToday(item({}))).toBe(true);
-    expect(isDeferrableToday(item({ melSection: 'TWO', ataReference: '', category: 'B' }))).toBe(true);
-    expect(two.every(m => isDeferrableToday(m))).toBe(true);
+  it('Section One and Section Two both do, and defer identically', () => {
+    expect(hasRepairInterval(item({}))).toBe(true);
+    expect(hasRepairInterval(item({ melSection: 'TWO', ataReference: '', category: 'B' }))).toBe(true);
+    expect(two.every(m => hasRepairInterval(m))).toBe(true);
   });
 
   /**
-   * NOT a policy claim that NEF is undeferrable — D69 says the opposite. It is that the placarded,
-   * clockless NEF deferral is not built, and offering NEF in the ordinary panel would produce a
-   * deferral with no placard gate. Delete this expectation in the slice that builds that flow.
+   * NEF is fully deferrable (D69) — placarded, tracked, and clockless. What it does NOT have is an
+   * interval, which is the only thing this predicate is about: it guards the PL-25 math, not the
+   * deferral.
    */
-  it('withholds NEF until the D69 placarded no-clock deferral exists, and says why', () => {
-    expect(nef.every(m => !isDeferrableToday(m))).toBe(true);
-    expect(undeferrableReason(nef[0])).toMatch(/NEF program/);
-    expect(undeferrableReason(item({}))).toBeNull();
+  it('NEF does not, because the program repairs at the earliest opportunity', () => {
+    expect(nef.every(m => !hasRepairInterval(m))).toBe(true);
   });
 });

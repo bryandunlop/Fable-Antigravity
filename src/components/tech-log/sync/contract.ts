@@ -90,7 +90,13 @@ export type SyncOpKind =
   | 'workcard.timeline.set';  // wholesale edit of the time history — see below
 
 export interface SyncOpPayloads {
-  'workcard.patch': Partial<Pick<WorkCard, 'title' | 'description' | 'ammReference' | 'cmcFaultCodes' | 'status' | 'riiRequired'>>;
+  /**
+   * `references`, not `ammReference` (D68). The old single-string field is read-only from here on
+   * — `cardReferences` is the only thing that still reads it — so naming it in a *write* payload
+   * would invite a caller to resurrect the superseded shape. `SyncOpKind` above already said
+   * "references" in its comment while this type still said `ammReference`; the type was wrong.
+   */
+  'workcard.patch': Partial<Pick<WorkCard, 'title' | 'description' | 'references' | 'cmcFaultCodes' | 'status' | 'riiRequired'>>;
   'workcard.labor.add': LaborEntry;
   'workcard.labor.delete': { laborEntryId: string };
   'workcard.parts.add': PartsOrder;

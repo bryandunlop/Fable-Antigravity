@@ -20,7 +20,7 @@ export function useRectifyToWorkCard() {
   return (defect: Defect) => {
     const cardId = newId('wc');
     const now = new Date().toISOString();
-    const card = createRectificationCard(defect, { cardId, stepId: newId('st') }, now);
+    const card = createRectificationCard(defect, { cardId }, now);
     dispatch({ type: 'ADD_WORK_CARD', payload: card });
     dispatch({
       type: 'ADD_AUDIT',
@@ -52,7 +52,7 @@ export function useRaiseFixFromDeferral() {
       deferral,
       currentRows(state.defects),
       state.workCards,
-      { cardId: newId('wc'), stepId: newId('st') },
+      { cardId: newId('wc') },
       now,
     );
     if (plan.kind === 'NO_DEFECT') {

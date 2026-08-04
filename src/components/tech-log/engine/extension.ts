@@ -59,7 +59,10 @@ export function buildExtension(
 
   let repairDueDateUtc = d.repairDueDateUtc;
   let usageDueThreshold = d.usageDueThreshold;
-  if (d.repairDueDateUtc) {
+  // A clockless deferral (NEF, D69) has neither a due date nor a usage threshold, so both branches
+  // fall through and there is nothing to extend — which is correct: you cannot extend an interval
+  // that was never running. The `canExtend` gate above already refuses it.
+  if (d.repairDueDateUtc && d.category) {
     repairDueDateUtc = computeRepairDue(
       d.category, d.clockStartDateUtc,
       { repairIntervalUnit: d.repairIntervalUnit, repairIntervalValue: doubled },

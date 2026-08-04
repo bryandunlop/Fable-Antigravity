@@ -86,7 +86,7 @@ export default function RampMode() {
           fields: [
             { label: 'MEL item', value: r.melSubItemNumber ?? 'not recorded' },
             { label: 'Description', value: r.melTitle ?? 'not recorded' },
-            { label: 'Category', value: `${r.category} — ${CATEGORY_DAYS_LABEL[r.category] ?? ''}` },
+            { label: 'Category', value: r.category ? `${r.category} — ${CATEGORY_DAYS_LABEL[r.category] ?? ''}` : 'NEF — no repair interval' },
             { label: 'Governing MMEL', value: `${r.governingMmelRevision} · eff ${r.governingEffectiveDate}` },
             { label: 'Status', value: r.status },
           ],
@@ -284,7 +284,7 @@ function RampRow({
           <div className="grid gap-2 sm:grid-cols-2">
             {/* mmelRevision already reads "Rev 1" — prefixing it renders "Rev Rev 1". */}
             <Field label="Governing MMEL" value={`${row.governingMmelRevision} · eff ${row.governingEffectiveDate}`} />
-            <Field label="Repair interval" value={CATEGORY_DAYS_LABEL[row.category] ?? '—'} />
+            <Field label="Repair interval" value={row.category ? (CATEGORY_DAYS_LABEL[row.category] ?? '—') : 'None — repaired at the earliest opportunity (NEF)'} />
             <Field label="Regulatory clock zone" value={row.governingTimezone} />
             <Field label="Extension" value={row.extensionUsed ? 'Used — once-only allowance spent' : 'Not used'} />
           </div>

@@ -227,7 +227,17 @@ export interface Deferral {
   crewActionInstructions?: string;
   /** D59 — the complied mark. Present ⇒ the release gate is satisfied; it changes nothing else. */
   crewActionCompliance?: CrewActionCompliance;
-  category: MelCategory;
+  /**
+   * `null` for an NEF deferral, which the program deliberately gives no repair category (D69). Every
+   * other deferral — Section One and Section Two alike — carries A/B/C/D.
+   */
+  category: MelCategory | null;
+  /**
+   * D69 — snapshotted at signing, not derived from the MEL item at read time. A deferral must still
+   * read as an NEF deferral after the item is revised or re-classified, which is the same
+   * freeze-into-the-signed-record rule that governs `melOProcedure` and `governingMmelRevision`.
+   */
+  nefProgram?: boolean;
   dayOfDiscoveryUtc: string;
   clockStartDateUtc: string;
   governingTimezone: string;                 // D24: IANA zone the PL-25 clock is anchored to (default America/New_York)
@@ -381,14 +391,22 @@ export interface PartsOrder {
   note?: string;
 }
 
-export interface WorkStep {
+/**
+ * A document the technician actually worked to — `AMM 32-30-00`, a CMM, a service bulletin (D68).
+ *
+ * This REPLACED `WorkStep`. myGFO does not hold the procedure; the manual does, and a copy in here
+ * is a copy that goes stale. Bryan, 2026-07-30: *"AMM is wrong a lot. Lets flip it to the techs can
+ * enter in which AMM Ref Number they are working with."*
+ *
+ * Free text on purpose: there is no manual index in the app to validate against, and the reference
+ * is whatever document the tech worked to. **Hand-typed (D22)** — nothing sources it from CAMP, and
+ * it must not be conflated with the fields on the card that ARE CAMP-derived (`woNumber`,
+ * `headerStatusCode`, `forecastRef`, `campExpected`).
+ */
+export interface WorkCardReference {
   id: string;
-  seq: number;
-  text: string;
-  done: boolean;
-  riiRequired?: boolean;
-  riiInspectorOid?: string;   // independent inspector who signed THIS step (per-step RII)
-  riiSignatureId?: string;    // the inspector's signature on this step
+  ref: string;      // 'AMM 32-30-00'
+  note?: string;    // what it covered, when the ref alone is not obvious
 }
 
 /** Expected part / tool / consumable mirrored from the CAMP WO detail (WRK 2_0_8: per-line part
@@ -413,7 +431,6 @@ export interface WorkCard {
   title: string;
   ataChapter: string;
   description: string;
-  steps: WorkStep[];
   status: WorkCardStatus;
   source: WorkCardSource;
   headerStatusCode: number;    // CAMP WO header status ladder (0=Complied With … 6=Planned)
@@ -446,8 +463,18 @@ export interface WorkCard {
    * The legacy `ammReference` in `src/types/maintenance.ts` is NOT prior art — that surface is
    * do-not-extend (`docs/CANONICAL_MAINTENANCE_SURFACE.md`) and nothing canonical imports it. The
    * name is reused; the implementation is not.
+   *
+   * **Superseded by `references` (D68) and read-only from here on.** Cards written before D68 carry
+   * the single string; `cardReferences()` reads both so a stored card — including one a signed
+   * release points at — still renders its reference. Nothing writes this field any more.
    */
   ammReference?: string;
+  /**
+   * D68 — every document the tech worked to, replacing the step checklist. A LIST for the same
+   * reason `cmcFaultCodes` is: one card routinely spans several procedures. See
+   * `WorkCardReference`.
+   */
+  references?: WorkCardReference[];
   /**
    * LG-99 — the CMC/MAU fault codes maintenance found while troubleshooting. A LIST, because one
    * squawk routinely interrogates into several codes — which is exactly why this cannot live on
@@ -696,7 +723,7 @@ export interface BriefingDeferralRow {
   /** Frozen at signing. null on a row predating the D36 snapshot — never backfilled by a join. */
   melSubItemNumber: string | null;
   melTitle: string | null;
-  category: MelCategory;
+  category: MelCategory | null;
   /** Effective status: the stored status, re-read against the due boundary (expiry is derived). */
   status: DeferralStatus;
   isExpired: boolean;
