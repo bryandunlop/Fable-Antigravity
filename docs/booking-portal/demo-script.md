@@ -67,7 +67,9 @@ tail, **FBO at both ends**, who is on which leg, and a plain statement of when t
 > detail as the largest open question in v1.
 
 ### 5. Empty seats (60s)
-**Empty seats** → **Ask for a seat** on any flight. Choose **S. Reyes** and purpose **Personal**:
+**Empty seats** → **Ask for a seat** on the **KTEB → KPBI** flight (two days out, so its manifest is
+still open — the first flight in the list departs tomorrow and shows as already locked, which is
+worth a second visit but muddles the first pass). Choose **S. Reyes** and purpose **Personal**:
 - the SIFL tax note fires,
 - and because S. Reyes has never flown with GFO, the travel form auto-sends on approval.
 
@@ -77,6 +79,10 @@ manifest isn't theirs to see.
 
 > A seat ask never bumps a trip request. And an offer is never a promise: every seat rides someone
 > else's trip and stays conditional until departure.
+
+**If you want the international beat:** claim the **KCVG → EGGW** seat instead. Its itinerary shows
+the 72-hour lockout rather than 24 — the longer window exists to protect the APIS filing, since a
+passenger change after filing means a refile.
 
 ### 6. Watches (45s)
 **Watches** → press **Simulate: frees up** on the fleet hold. That button stands in for the mirror
