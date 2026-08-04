@@ -138,7 +138,7 @@ export const bySilenceDesc = (today: string) => (a: ActionItem, b: ActionItem) =
  */
 export const getOwner = (item: ActionItem) => item.contributors[0] ?? null;
 
-export type ChaseAxis = 'owner' | 'module' | 'status';
+export type ChaseAxis = 'owner' | 'department' | 'status';
 
 export interface ChaseGroup {
   key: string;
@@ -149,7 +149,7 @@ export interface ChaseGroup {
 }
 
 const axisKey = (item: ActionItem, axis: ChaseAxis): string => {
-  if (axis === 'module') return item.module || 'Unassigned';
+  if (axis === 'department') return item.department || 'Unassigned';
   if (axis === 'status') return item.status || 'Unknown';
   return getOwner(item)?.name ?? 'Unassigned';
 };

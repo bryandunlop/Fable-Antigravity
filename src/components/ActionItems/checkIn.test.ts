@@ -6,7 +6,7 @@ const makeItem = (checkIn: ProjectCheckIn | undefined, contributorIds: string[] 
   id: 'ACTION-TEST',
   title: 'Fleet Wi-Fi rollout',
   description: 'Retrofit the fleet',
-  module: 'Flight Operations',
+  department: 'Flight Operations',
   assignedBy: 'Lead Team',
   assignedDate: '2026-01-01',
   dueDate: '2026-12-31',

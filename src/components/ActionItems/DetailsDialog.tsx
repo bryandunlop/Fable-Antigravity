@@ -42,7 +42,7 @@ export default function DetailsDialog({ isOpen, onClose, item }: DetailsDialogPr
             <p className="text-muted-foreground mb-3">{item.description}</p>
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className="text-xs">
-                {item.module}
+                {item.department}
               </Badge>
               <Badge className={`text-xs ${
                 item.priority === 'Critical' ? 'bg-red-100 text-red-800' :

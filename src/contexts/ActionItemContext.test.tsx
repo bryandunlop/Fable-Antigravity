@@ -11,7 +11,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 const form = (overrides: Partial<NewItemForm> = {}): NewItemForm => ({
   title: 'Fleet Wi-Fi rollout',
   description: 'Retrofit all four tails',
-  module: 'Flight Operations',
+  department: 'Flight Operations',
   priority: 'High',
   dueDate: '2026-12-31',
   sections: ['Survey', 'Install', ''],

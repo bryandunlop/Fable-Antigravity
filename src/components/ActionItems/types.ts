@@ -59,11 +59,22 @@ export interface ProjectModuleLink {
   recordId: string;
 }
 
+/**
+ * Where a derived task came from. Separate from `department` because the two
+ * are different questions: a check-in on a Ground Operations project belongs to
+ * Ground Operations AND is a check-in. One field answering both meant the UI
+ * read a department name to decide what a task was.
+ */
+export type ActionItemSource = 'waiver' | 'audit' | 'hazard' | 'check-in';
+
 export interface ActionItem {
   id: string;
   title: string;
   description: string;
-  module: string;
+  /** The department that owns this work. */
+  department: string;
+  /** Set only on tasks derived from another surface; absent on real projects. */
+  source?: ActionItemSource;
   assignedBy: string;
   assignedDate: string;
   dueDate: string;
@@ -103,7 +114,7 @@ export interface ActionItem {
 export interface NewItemForm {
   title: string;
   description: string;
-  module: string;
+  department: string;
   priority: string;
   dueDate: string;
   sections: string[];

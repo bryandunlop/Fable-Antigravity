@@ -27,7 +27,7 @@ const makeItem = (
   id: 'ACTION-TEST',
   title: 'Ground ops safety audit',
   description: 'Audit the ground handling procedures',
-  module: 'Safety',
+  department: 'Safety',
   assignedBy: 'Safety Manager',
   assignedDate: '2026-01-01',
   dueDate: '2026-12-31',
@@ -187,10 +187,10 @@ describe('getStallSummary', () => {
 });
 
 describe('groupForChase', () => {
-  const owned = (id: string, ownerName: string, module: string, reportOn: string | null, progress = 50) =>
+  const owned = (id: string, ownerName: string, department: string, reportOn: string | null, progress = 50) =>
     makeItem({
       id,
-      module,
+      department,
       progress,
       contributors: [
         { id: `${id}-c0`, name: ownerName, role: 'Owner', avatar: 'XX' },
@@ -245,7 +245,7 @@ describe('groupForChase', () => {
         owned('C', 'Sarah Wilson', 'Ground Operations', '2026-08-03'),
       ],
       '2026-08-04',
-      'module',
+      'department',
     );
 
     expect(groups.map(g => g.label)).toEqual(['Safety', 'Ground Operations']);

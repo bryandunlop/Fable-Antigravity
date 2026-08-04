@@ -14,7 +14,7 @@ const makeItem = (
   id,
   title: `Project ${id}`,
   description: 'A project',
-  module: 'Safety',
+  department: 'Safety',
   assignedBy: 'Safety Manager',
   assignedDate: '2026-01-01',
   dueDate: '2026-12-31',

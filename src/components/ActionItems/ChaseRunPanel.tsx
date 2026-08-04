@@ -145,7 +145,7 @@ export default function ChaseRunPanel({
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <h3 className="font-medium">{current.title}</h3>
               <Badge variant="outline" className="text-xs">{current.priority}</Badge>
-              <Badge variant="outline" className="text-xs">{current.module}</Badge>
+              <Badge variant="outline" className="text-xs">{current.department}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">
               {owner?.name ?? 'Nobody assigned'} · silent {silence} days ·{' '}

@@ -26,7 +26,7 @@ import { CheckInCadence } from './ActionItems/types';
 import { useActionItems } from '../contexts/ActionItemContext';
 
 const EMPTY_NEW_ITEM_FORM: NewItemForm = {
-  title: '', description: '', module: 'Flight Operations',
+  title: '', description: '', department: 'Flight Operations',
   priority: 'Medium', dueDate: '', sections: [''], checkInCadence: 'weekly',
 };
 
@@ -103,7 +103,7 @@ export default function RollingActionItems() {
     if (!term) return true;
     return (
       item.title.toLowerCase().includes(term) ||
-      item.module.toLowerCase().includes(term) ||
+      item.department.toLowerCase().includes(term) ||
       item.contributors.some(c => c.name.toLowerCase().includes(term))
     );
   });
@@ -256,7 +256,7 @@ export default function RollingActionItems() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder={`Search ${actionItems.length} projects, owners, modules…`}
+            placeholder={`Search ${actionItems.length} projects, owners, departments…`}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -286,7 +286,7 @@ export default function RollingActionItems() {
             <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="owner">Group by owner</SelectItem>
-              <SelectItem value="module">Group by module</SelectItem>
+              <SelectItem value="department">Group by department</SelectItem>
               <SelectItem value="status">Group by status</SelectItem>
             </SelectContent>
           </Select>
@@ -468,7 +468,7 @@ export default function RollingActionItems() {
                       </td>
                       <td className="p-3">
                         <div className="truncate max-w-[280px]">{item.title}</div>
-                        <div className="text-xs text-muted-foreground">{item.module}</div>
+                        <div className="text-xs text-muted-foreground">{item.department}</div>
                       </td>
                       <td className="p-3 text-muted-foreground truncate">{getOwner(item)?.name ?? '—'}</td>
                       <td className={`p-3 ${state === 'quiet' ? 'text-red-600' : 'text-muted-foreground'}`}>

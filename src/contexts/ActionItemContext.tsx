@@ -58,7 +58,7 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       id: `ACTION-${Date.now()}`,
       title: form.title.trim(),
       description: form.description.trim(),
-      module: form.module,
+      department: form.department,
       assignedBy: createdBy,
       assignedDate: created,
       dueDate: form.dueDate || created,
