@@ -131,3 +131,63 @@ export const getStallSummary = (items: ActionItem[], today: string) => {
 /** Most silent first — the ranking the whole board hangs off. */
 export const bySilenceDesc = (today: string) => (a: ActionItem, b: ActionItem) =>
   (getDaysSinceLastReport(b, today) ?? 0) - (getDaysSinceLastReport(a, today) ?? 0);
+
+/**
+ * The first contributor is the project's owner — the person a lead or a VP's
+ * admin actually chases. Everyone else on the project is a contributor.
+ */
+export const getOwner = (item: ActionItem) => item.contributors[0] ?? null;
+
+export type ChaseAxis = 'owner' | 'module' | 'status';
+
+export interface ChaseGroup {
+  key: string;
+  label: string;
+  items: ActionItem[];
+  quietCount: number;
+  worstSilence: number;
+}
+
+const axisKey = (item: ActionItem, axis: ChaseAxis): string => {
+  if (axis === 'module') return item.module || 'Unassigned';
+  if (axis === 'status') return item.status || 'Unknown';
+  return getOwner(item)?.name ?? 'Unassigned';
+};
+
+/**
+ * Group projects for the chase list.
+ *
+ * An admin holding twenty projects does not chase projects, they chase people:
+ * one owner with three stalled projects is ONE conversation, and a
+ * project-ranked list would make them start it three times. Groups sort by how
+ * many have gone quiet, then by the worst silence in the group, so the person
+ * to call first is at the top.
+ */
+export const groupForChase = (
+  items: ActionItem[],
+  today: string,
+  axis: ChaseAxis = 'owner',
+): ChaseGroup[] => {
+  const groups = new Map<string, ActionItem[]>();
+
+  items.forEach(item => {
+    const key = axisKey(item, axis);
+    const existing = groups.get(key);
+    if (existing) existing.push(item);
+    else groups.set(key, [item]);
+  });
+
+  return [...groups.entries()]
+    .map(([key, groupItems]) => {
+      const sorted = [...groupItems].sort(bySilenceDesc(today));
+      const quiet = sorted.filter(item => getStallState(item, today) === 'quiet');
+      return {
+        key,
+        label: key,
+        items: sorted,
+        quietCount: quiet.length,
+        worstSilence: quiet.reduce((max, item) => Math.max(max, getDaysSinceLastReport(item, today) ?? 0), 0),
+      };
+    })
+    .sort((a, b) => b.quietCount - a.quietCount || b.worstSilence - a.worstSilence || a.label.localeCompare(b.label));
+};

@@ -172,3 +172,34 @@ describe('ActionItemContext', () => {
     expect(item.checkIn?.reports).toHaveLength(1);
   });
 });
+
+describe('ActionItemContext at scale', () => {
+  it('seeds a roster big enough to exercise the chase list', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    expect(result.current.actionItems.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it('nudges a whole group in one pass', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    const ids = result.current.actionItems.slice(0, 3).map(item => item.id);
+
+    act(() => {
+      result.current.nudgeMany(ids, '2026-08-04');
+    });
+
+    ids.forEach(id => {
+      expect(result.current.getActionItemById(id)!.checkIn?.lastNudgedOn).toBe('2026-08-04');
+    });
+    // Everything outside the group is left alone.
+    const untouched = result.current.actionItems.find(item => !ids.includes(item.id))!;
+    expect(untouched.checkIn?.lastNudgedOn).toBeUndefined();
+  });
+
+  it('does nothing on an empty id list rather than stamping the board', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => {
+      result.current.nudgeMany([], '2026-08-04');
+    });
+    expect(result.current.actionItems.every(item => !item.checkIn?.lastNudgedOn)).toBe(true);
+  });
+});

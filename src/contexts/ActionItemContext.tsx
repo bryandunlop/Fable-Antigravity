@@ -1,14 +1,13 @@
 import React, { createContext, useContext, useState } from 'react';
 import { ActionItem, NewItemForm, CheckInCadence } from '../components/ActionItems/types';
-import { MOCK_ACTION_ITEMS } from '../components/ActionItems/constants';
 import { calculateProgress } from '../components/ActionItems/utils';
-import { getCurrentCheckInDueDate } from '../components/ActionItems/checkIn';
+import { buildSeedActionItems } from '../components/ActionItems/seedProjects';
 
 /**
  * The single store behind both action-item surfaces:
  *  - Tasks & Action Items (`/tasks-action-items`) — the current user's slice.
- *  - Rolling Action Items (`/critical-functions`, Actions tab) — the lead team's
- *    project tracker across everyone.
+ *  - Rolling Action Items (`/rolling-action-items`) — the lead team's project
+ *    tracker across everyone.
  *
  * Before this existed the two rendered unrelated mock arrays, so an item raised
  * in one was invisible in the other. Mirrors AuditContext/HazardContext so the
@@ -23,6 +22,8 @@ interface ActionItemContextType {
   setCheckInCadence: (id: string, cadence: CheckInCadence) => void;
   /** Poke a project that has gone quiet, without waiting for the next window. */
   nudge: (id: string, on?: string) => void;
+  /** Chase a whole group in one pass — one owner, or every quiet project. */
+  nudgeMany: (ids: string[], on?: string) => void;
   /** File one contributor's report for a check-in window. */
   recordCheckIn: (
     id: string,
@@ -34,96 +35,11 @@ const ActionItemContext = createContext<ActionItemContextType | undefined>(undef
 
 const todayIso = () => new Date().toISOString().split('T')[0];
 
-const daysAgo = (days: number) =>
-  new Date(Date.now() - days * 86_400_000).toISOString().split('T')[0];
-
-/**
- * Seed the demo with cadences AND real reporting history, so the board opens on
- * the states it exists to surface: two projects that have gone quiet at high
- * percentages, and one that is genuinely moving. A seed with no history would
- * make every project look identically stalled, which teaches the wrong thing.
- *
- * `daysSilent` drives the last report's date; `trend` is the reported progress
- * over successive check-ins, oldest first.
- */
-const CADENCE_SEED: Record<
-  string,
-  { cadence: CheckInCadence; contributorId: string; daysSilent: number; trend: number[]; notes: string[] }
-> = {
-  ACTION001: {
-    cadence: 'weekly',
-    contributorId: '1',
-    daysSilent: 21,
-    // Deliberately flat: reported the same figure twice, then went silent. This
-    // is the case a percent-complete bar renders as two-thirds healthy.
-    trend: [65, 65],
-    notes: ['Engine section opened up', 'Structural inspection still outstanding'],
-  },
-  ACTION002: {
-    cadence: 'biweekly',
-    contributorId: '1',
-    daysSilent: 1,
-    trend: [15, 30, 55],
-    notes: ['Started the VIP file review', 'Half the files re-checked', 'Emergency protocols redrafted'],
-  },
-  ACTION003: {
-    cadence: 'monthly',
-    contributorId: '1',
-    daysSilent: 34,
-    trend: [75, 75],
-    notes: ['Equipment inspection done', 'Final report still outstanding'],
-  },
-};
-
-const seedActionItems = (): ActionItem[] =>
-  MOCK_ACTION_ITEMS.map(item => {
-    if (item.checkIn) return item;
-
-    const seed = CADENCE_SEED[item.id];
-    if (!seed) return { ...item, checkIn: { cadence: 'none' as CheckInCadence, reports: [] } };
-
-    // Space the historical reports one cadence apart — that is what a project
-    // reporting on schedule and then falling silent actually looks like.
-    const spacing = { weekly: 7, biweekly: 14, monthly: 30, none: 14 }[seed.cadence];
-    const reports = seed.trend.map((progress, index) => {
-      const age = seed.daysSilent + (seed.trend.length - 1 - index) * spacing;
-      const on = daysAgo(age);
-      return {
-        contributorId: seed.contributorId,
-        dueOn: on,
-        reportedOn: on,
-        progress,
-        note: seed.notes[index] ?? 'Status update',
-      };
-    });
-
-    const seeded: ActionItem = {
-      ...item,
-      progress: seed.trend[seed.trend.length - 1],
-      checkIn: {
-        cadence: seed.cadence,
-        startedOn: daysAgo(seed.daysSilent + seed.trend.length * spacing),
-        reports,
-      },
-    };
-
-    // Re-point the newest report at the window that is actually open, so a
-    // project someone reported on yesterday counts toward the reporting rate
-    // rather than reading as silent-but-somehow-compliant.
-    const currentWindow = getCurrentCheckInDueDate(seeded, todayIso());
-    const newest = reports[reports.length - 1];
-    if (currentWindow && newest && newest.reportedOn >= currentWindow) {
-      newest.dueOn = currentWindow;
-    }
-
-    return seeded;
-  });
-
 const initialsOf = (name: string) =>
   name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
 
 export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [actionItems, setActionItems] = useState<ActionItem[]>(seedActionItems);
+  const [actionItems, setActionItems] = useState<ActionItem[]>(buildSeedActionItems);
 
   const getActionItemById = (id: string) => actionItems.find(item => item.id === id);
 
@@ -198,6 +114,26 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
+  const nudgeMany = (ids: string[], on?: string) => {
+    const stamped = on ?? todayIso();
+    const targets = new Set(ids);
+    setActionItems(prev =>
+      prev.map(item =>
+        targets.has(item.id)
+          ? {
+              ...item,
+              checkIn: {
+                cadence: item.checkIn?.cadence ?? 'none',
+                startedOn: item.checkIn?.startedOn ?? item.assignedDate,
+                reports: item.checkIn?.reports ?? [],
+                lastNudgedOn: stamped,
+              },
+            }
+          : item,
+      ),
+    );
+  };
+
   const recordCheckIn: ActionItemContextType['recordCheckIn'] = (id, report) => {
     setActionItems(prev =>
       prev.map(item => {
@@ -247,6 +183,7 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateActionItem,
         setCheckInCadence,
         nudge,
+        nudgeMany,
         recordCheckIn,
       }}
     >

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { ActionItem, CheckInReport, ProjectCheckIn } from './types';
 import {
+  groupForChase,
+  getOwner,
   getLastReportDate,
   getDaysSinceLastReport,
   getStallState,
@@ -181,5 +183,76 @@ describe('getStallSummary', () => {
 
   it('has nothing to report on an empty board', () => {
     expect(getStallSummary([], '2026-08-04')).toEqual({ quietCount: 0, longestSilence: 0, reported: 0, owed: 0, rate: 0 });
+  });
+});
+
+describe('groupForChase', () => {
+  const owned = (id: string, ownerName: string, module: string, reportOn: string | null, progress = 50) =>
+    makeItem({
+      id,
+      module,
+      progress,
+      contributors: [
+        { id: `${id}-c0`, name: ownerName, role: 'Owner', avatar: 'XX' },
+        { id: `${id}-c1`, name: 'Someone Else', role: 'Contributor', avatar: 'SE' },
+      ],
+      checkIn: {
+        cadence: 'weekly',
+        startedOn: '2026-06-01',
+        reports: reportOn ? [report(reportOn, progress, `${id}-c0`)] : [],
+      },
+    });
+
+  it('treats the first contributor as the owner, not everyone on the project', () => {
+    expect(getOwner(owned('A', 'David Brown', 'Safety', '2026-08-03'))?.name).toBe('David Brown');
+  });
+
+  it('puts one owner\'s stalled projects in a single group — one conversation, not three', () => {
+    const groups = groupForChase(
+      [
+        owned('A', 'David Brown', 'Safety', '2026-07-01'),
+        owned('B', 'David Brown', 'Ground Operations', '2026-07-10'),
+        owned('C', 'Sarah Wilson', 'Safety', '2026-08-03'),
+      ],
+      '2026-08-04',
+    );
+
+    expect(groups[0].label).toBe('David Brown');
+    expect(groups[0].items).toHaveLength(2);
+    expect(groups[0].quietCount).toBe(2);
+    expect(groups[0].worstSilence).toBe(34);
+  });
+
+  it('sorts the person to call first to the top, and all-reporting owners last', () => {
+    const groups = groupForChase(
+      [
+        owned('A', 'Reporting Rita', 'Safety', '2026-08-03'),
+        owned('B', 'Quiet Quentin', 'Safety', '2026-07-20'),
+        owned('C', 'Silent Sam', 'Safety', '2026-07-01'),
+      ],
+      '2026-08-04',
+    );
+
+    expect(groups.map(g => g.label)).toEqual(['Silent Sam', 'Quiet Quentin', 'Reporting Rita']);
+    expect(groups[2].quietCount).toBe(0);
+  });
+
+  it('regroups on a different axis without changing the ranking rule', () => {
+    const groups = groupForChase(
+      [
+        owned('A', 'David Brown', 'Safety', '2026-07-01'),
+        owned('B', 'Sarah Wilson', 'Safety', '2026-08-03'),
+        owned('C', 'Sarah Wilson', 'Ground Operations', '2026-08-03'),
+      ],
+      '2026-08-04',
+      'module',
+    );
+
+    expect(groups.map(g => g.label)).toEqual(['Safety', 'Ground Operations']);
+    expect(groups[0].quietCount).toBe(1);
+  });
+
+  it('is empty for an empty board rather than throwing', () => {
+    expect(groupForChase([], '2026-08-04')).toEqual([]);
   });
 });

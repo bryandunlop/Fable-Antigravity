@@ -51,7 +51,9 @@ import PostFlightChecklist from './components/PostFlightChecklist';
 import TurndownForm from './components/TurndownForm';
 import TurndownReports from './components/TurndownReports';
 import SchedulingDashboard from './components/SchedulingDashboard';
-import CriticalFunctionsPlan from './components/CriticalFunctionsPlan';
+import CriticalBusinessFunctions from './components/CriticalBusinessFunctions';
+import RollingActionItems from './components/RollingActionItems';
+import SuggestionBox from './components/SuggestionBox';
 import PilotCurrency from './components/PilotCurrency';
 import PassengerForms from './components/PassengerForms';
 import PublicPassengerForm from './components/PublicPassengerForm';
@@ -553,7 +555,13 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/critical-functions" element={<CriticalFunctionsPlan />} />
+                                {/* The old /critical-functions page carried all three as tabs.
+                                    Rolling Action Items has to hold 20+ projects for a VP's
+                                    admin, which does not fit in a third of a screen — so each
+                                    is now its own space. */}
+                                <Route path="/critical-functions" element={<CriticalBusinessFunctions />} />
+                                <Route path="/rolling-action-items" element={<RollingActionItems />} />
+                                <Route path="/suggestion-box" element={<SuggestionBox />} />
                                 <Route path="/parts-inventory" element={<PartsInventory />} />
                                 <Route path="/passenger-forms" element={<PassengerForms />} />
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
