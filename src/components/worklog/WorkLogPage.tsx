@@ -196,7 +196,7 @@ function clock(seconds: number): string {
 
 export default function WorkLogPage() {
   useWorkLogManifest();
-  const { entries, loading, pending, offline, addEntry, deleteEntry, refresh } = useWorkLog();
+  const { entries, loading, pending, problem, addEntry, deleteEntry, refresh } = useWorkLog();
   const today = todayLocal();
 
   const [fy, setFy] = useState(() => fiscalYearOf(today));
@@ -304,12 +304,35 @@ export default function WorkLogPage() {
         </div>
       </header>
 
-      {(offline || pending > 0) && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-          <CloudOff className="h-3.5 w-3.5 shrink-0" />
-          {pending > 0
-            ? `${pending} ${pending === 1 ? 'entry' : 'entries'} saved on this device, waiting to sync.`
-            : 'Offline — showing the copy stored on this device.'}
+      {(problem || pending > 0) && (
+        <div className="mb-4 space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          {problem && (
+            <div className="flex items-start gap-2">
+              <CloudOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                {problem.kind === 'network' &&
+                  'Can’t reach the server — showing the copy stored on this device.'}
+                {problem.kind === 'setup' && (
+                  <>
+                    Not set up yet. <span className="font-mono">{problem.hint}</span>
+                  </>
+                )}
+                {problem.kind === 'server' && (
+                  <>
+                    The server answered {problem.status} — this is a configuration problem, not a
+                    connection one. Check that <span className="font-mono">DATABASE_URL</span> is
+                    set.
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+          {pending > 0 && (
+            <div className="pl-[22px]">
+              {pending} {pending === 1 ? 'entry' : 'entries'} saved on this device, waiting to sync.
+              Nothing is lost.
+            </div>
+          )}
         </div>
       )}
 

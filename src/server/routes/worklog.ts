@@ -82,6 +82,22 @@ const newId = () => `wl_${crypto.randomUUID()}`;
 
 // ─── Read ───────────────────────────────────────────────────────────────────
 
+/**
+ * Postgres 42P01 — undefined_table.
+ *
+ * Worth naming rather than letting it 500: the table is created by a schema
+ * push that is easy to forget, and on the client an unexplained 500 is
+ * indistinguishable from having no signal. That ambiguity sent a real debugging
+ * session down the wrong path — the page said "offline" while sitting on good
+ * wifi, because a missing table and a missing network look identical from there.
+ */
+function isMissingTable(err: unknown): boolean {
+  const e = err as { code?: string; message?: string };
+  if (e?.code === '42P01') return true;
+  const m = e?.message ?? '';
+  return /relation .* does not exist/i.test(m);
+}
+
 worklogRoute.get('/', async (c) => {
   const db = c.get('db');
   const from = c.req.query('from');
@@ -92,11 +108,23 @@ worklogRoute.get('/', async (c) => {
     to && DATE_RE.test(to) ? lte(workLogEntries.localDate, to) : undefined,
   ].filter(Boolean);
 
-  const rows = bounds.length
-    ? await db.select().from(workLogEntries).where(and(...bounds))
-    : await db.select().from(workLogEntries);
-
-  return c.json({ entries: rows });
+  try {
+    const rows = bounds.length
+      ? await db.select().from(workLogEntries).where(and(...bounds))
+      : await db.select().from(workLogEntries);
+    return c.json({ entries: rows });
+  } catch (err) {
+    if (isMissingTable(err)) {
+      return c.json(
+        {
+          error: 'table_missing',
+          hint: 'work_log_entries does not exist yet — run: npm run db:push',
+        },
+        503,
+      );
+    }
+    throw err;
+  }
 });
 
 // ─── Write ──────────────────────────────────────────────────────────────────

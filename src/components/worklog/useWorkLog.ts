@@ -62,13 +62,26 @@ async function send(op: Op): Promise<void> {
   if (!res.ok && res.status !== 404) throw new Error(`DELETE ${res.status}`);
 }
 
+/**
+ * Why the last load failed, when it did.
+ *
+ * Deliberately not a single `offline` boolean. "Offline" was shown for every
+ * failure, including a server that answered perfectly well to say the table did
+ * not exist — so the page claimed no signal while sitting on good wifi, and the
+ * one message that would have explained it was the one it could not show.
+ */
+export type LoadProblem =
+  | { kind: 'network' }
+  | { kind: 'setup'; hint: string }
+  | { kind: 'server'; status: number };
+
 export interface UseWorkLog {
   entries: WorkLogEntry[];
   loading: boolean;
   /** Number of writes not yet acknowledged by the server. */
   pending: number;
-  /** True once a load has failed — the list shown is the local cache. */
-  offline: boolean;
+  /** Null when the last load succeeded; otherwise why it did not. */
+  problem: LoadProblem | null;
   addEntry: (input: {
     minutes: number;
     category: string;
@@ -86,7 +99,7 @@ export interface UseWorkLog {
 export function useWorkLog(): UseWorkLog {
   const [entries, setEntries] = useState<WorkLogEntry[]>(() => readJson<WorkLogEntry[]>(CACHE_KEY, []));
   const [loading, setLoading] = useState(true);
-  const [offline, setOffline] = useState(false);
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [pending, setPending] = useState(() => readJson<Op[]>(OUTBOX_KEY, []).length);
   const draining = useRef(false);
 
@@ -129,7 +142,15 @@ export function useWorkLog(): UseWorkLog {
     setLoading(true);
     try {
       const res = await fetch(API);
-      if (!res.ok) throw new Error(String(res.status));
+      if (!res.ok) {
+        // The server answered — so this is a configuration problem, not a
+        // connectivity one, and saying "offline" here would be a lie.
+        const body = await res.json().catch(() => null as unknown);
+        const hint = (body as { hint?: string } | null)?.hint;
+        setProblem(hint ? { kind: 'setup', hint } : { kind: 'server', status: res.status });
+        setLoading(false);
+        return;
+      }
       const body = (await res.json()) as { entries: WorkLogEntry[] };
       // Anything still queued is not on the server yet — re-apply it over the
       // fetched list so a pending write does not blink out of the UI.
@@ -138,9 +159,10 @@ export function useWorkLog(): UseWorkLog {
       const pendingDeletes = new Set(queued.flatMap((op) => (op.kind === 'delete' ? [op.id] : [])));
       const merged = [...body.entries, ...pendingCreates].filter((e) => !pendingDeletes.has(e.id));
       persist(merged);
-      setOffline(false);
+      setProblem(null);
     } catch {
-      setOffline(true); // keep whatever the cache holds
+      // fetch itself threw — genuinely unreachable. Keep the cached copy.
+      setProblem({ kind: 'network' });
     } finally {
       setLoading(false);
     }
@@ -201,5 +223,5 @@ export function useWorkLog(): UseWorkLog {
     [entries, persist, enqueue],
   );
 
-  return { entries, loading, pending, offline, addEntry, updateEntry, deleteEntry, refresh: load };
+  return { entries, loading, pending, problem, addEntry, updateEntry, deleteEntry, refresh: load };
 }

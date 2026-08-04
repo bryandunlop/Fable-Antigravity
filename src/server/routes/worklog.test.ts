@@ -187,3 +187,55 @@ describe('GET /worklog', () => {
     expect(res.status).toBe(200);
   });
 });
+
+/** A db whose reads reject, to stand in for an unmigrated database. */
+function failingDb(err: unknown) {
+  const box: Record<string, unknown> = {
+    then: (_res: unknown, rej?: (e: unknown) => unknown) => Promise.reject(err).catch(rej),
+  };
+  for (const m of ['select', 'from', 'where', 'insert', 'values', 'onConflictDoNothing', 'returning', 'update', 'set', 'delete']) {
+    box[m] = () => box;
+  }
+  return box;
+}
+
+function mountFailing(err: unknown) {
+  const app = new Hono<Env>();
+  const mw = async (c: { set: (k: 'db', v: Db) => void }, next: () => Promise<void>) => {
+    c.set('db', failingDb(err) as unknown as Db);
+    await next();
+  };
+  app.use('/worklog', mw);
+  app.use('/worklog/*', mw);
+  app.route('/worklog', worklogRoute);
+  return app;
+}
+
+describe('GET /worklog when the table has not been created', () => {
+  // Why this is worth a named response: a bare 500 is indistinguishable from
+  // "no signal" on the client, and the page said "offline" while on good wifi.
+  it('answers 503 with an actionable hint on Postgres 42P01', async () => {
+    const res = await mountFailing(Object.assign(new Error('boom'), { code: '42P01' })).request(
+      '/worklog',
+    );
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error: string; hint: string };
+    expect(body.error).toBe('table_missing');
+    expect(body.hint).toContain('db:push');
+  });
+
+  it('also recognises the message form, since drivers do not all set code', async () => {
+    const res = await mountFailing(
+      new Error('relation "work_log_entries" does not exist'),
+    ).request('/worklog');
+    expect(res.status).toBe(503);
+  });
+
+  it('does NOT dress up an unrelated failure as a setup problem', async () => {
+    // A connection reset must not tell the user to run a migration.
+    const res = await mountFailing(new Error('connection terminated unexpectedly')).request(
+      '/worklog',
+    );
+    expect(res.status).not.toBe(503);
+  });
+});
