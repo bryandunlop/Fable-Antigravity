@@ -306,4 +306,16 @@ export interface DocumentsState {
   reviews: DocReviewRecord[];
   /** Signature-level ack records (tech-log Signature shape, shared e-sign component). */
   signatures: Signature[];
+  /**
+   * D75 / LG-183 — the cabin shelf's section vocabulary, once someone has edited it.
+   *
+   * `undefined` means "never edited" and resolves to the shipped default (`CABIN_SECTIONS`) —
+   * see `engine/cabinSections`. Only cabin knowledge is user-editable this round; every other
+   * class still takes its categories from `DOC_CLASSES`.
+   *
+   * Note this is vocabulary, NOT applicability. Fleet type stays derived from the real fleet
+   * (`useFleetTypes`), because `AircraftType` is load-bearing for MEL items and serviceability
+   * and is not ours to widen from a documents screen.
+   */
+  cabinSections?: string[];
 }

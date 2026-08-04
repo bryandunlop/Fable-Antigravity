@@ -16,11 +16,17 @@ import type { AircraftType, CasColor } from '../../tech-log/types';
 import { CAS_KNOWLEDGE_CLASS_ID } from '../engine/casKnowledge';
 import { DOC_CLASS_LIST, classFor, type DocumentClassConfig } from '../classes';
 import { useDocuments, identityFor, publishApprovalRequestedEvent, publishRequiredReadEvent } from '../DocumentsContext';
+import { useFleetTypes } from '../../tech-log/TechLogContext';
+import { cabinSections } from '../engine/cabinSections';
 import { canAuthor, validateSubmit, validateDirectPublish } from '../engine/lifecycle';
 import { nextDocId, nextRevisionId, nextRevisionLabel, currentRevision } from '../engine/revisions';
 import { computeNextReviewDate } from '../engine/review';
 import { sectionsFromMarkdown, checksumForSections } from '../engine/blocks';
 import { SectionedEditor } from './SectionedEditor';
+import { StepFormEditor } from './StepFormEditor';
+import {
+  stepFormFromSections, stepFormToSections, stepFormToMarkdown, emptyStepFormModel, type StepFormModel,
+} from '../engine/stepForm';
 import { emptySection } from '../engine/blockEditor';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 
@@ -37,8 +43,9 @@ export type EditorMode =
 
 const ALL_ROLES = Object.values(ROLE_CATEGORIES).flat();
 
-/** D60 — canonical type strings ("500/650/800" is display shorthand only). */
-const FLEET_TYPES: AircraftType[] = ['G650ER', 'G500', 'G800'];
+// LG-183 — the fleet-applicability picker no longer restates the type union. `useFleetTypes`
+// derives it from the tails actually on file, so adding an aircraft in Admin → Fleet is the only
+// place a type is ever "added" and this picker cannot drift from the fleet.
 const CAS_COLORS: CasColor[] = ['WHITE', 'CYAN', 'AMBER', 'RED'];
 
 function todayIso(): string {
@@ -67,6 +74,7 @@ export function DocEditorDialog({
   const { state, createDoc, updateDocMeta, createDraft, updateDraft, submitForApproval, publishDirect } = useDocuments();
   const userRoles = [userRole, ...additionalRoles];
   const authorable = DOC_CLASS_LIST.filter((c) => canAuthor(c, userRoles));
+  const FLEET_TYPES = useFleetTypes();
 
   const [classId, setClassId] = useState('');
   const [title, setTitle] = useState('');
@@ -87,6 +95,12 @@ export function DocEditorDialog({
   const [casColor, setCasColor] = useState<CasColor>('AMBER');
   const [cmcCodes, setCmcCodes] = useState<string[]>([]);
   const [cmcDraft, setCmcDraft] = useState('');
+  // D75 — the semi-rigid form. `useStepForm` is state, not a derived `cfg.stepForm`, because an
+  // entry can outgrow the form: `stepFormFromSections` reports lossy and we fall back to the full
+  // editor rather than silently dropping the table someone added.
+  const [stepModel, setStepModel] = useState<StepFormModel>(emptyStepFormModel());
+  const [useStepForm, setUseStepForm] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -98,7 +112,10 @@ export function DocEditorDialog({
       // A prefilled category matters, not cosmetics: creating from a tail page must land the note
       // in a Ship Notes section. The class's first category is now a general-LIBRARY one, so
       // without this a note authored on a tail vanishes from the shelf it was created on.
-      setCategory(mode.prefill?.category ?? cfg?.categories[0] ?? '');
+      // LG-183 — the default category must come from the LIVE list for a step-form class, or a
+      // renamed section leaves every new entry born on a name the picker no longer offers.
+      const initialCats = cfg?.stepForm ? cabinSections(state) : (cfg?.categories ?? []);
+      setCategory(mode.prefill?.category ?? initialCats[0] ?? '');
       setRoles([]);
       // A .docx-import prefill (Slice 4a) seeds sections once; otherwise start blank.
       setSections(mode.prefill?.content ? sectionsFromMarkdown(mode.prefill.content, 'new') : [emptySection()]);
@@ -115,6 +132,11 @@ export function DocEditorDialog({
       setCasColor(mode.prefill?.casMeta?.casColor ?? 'AMBER');
       setCmcCodes(mode.prefill?.casMeta?.cmcCodes ?? []);
       setCmcDraft('');
+      // A new entry on a step-form class starts in the form; a .docx prefill starts in the full
+      // editor, because imported content is exactly the arbitrary shape the form cannot hold.
+      setStepModel(emptyStepFormModel());
+      setUseStepForm(!!cfg?.stepForm && !mode.prefill?.content);
+      setVideoUrl('');
     } else {
       const doc = mode.doc;
       const rev = mode.kind === 'revise' ? mode.baseRev : mode.rev;
@@ -158,11 +180,25 @@ export function DocEditorDialog({
       setCasColor(rev.casMeta?.casColor ?? 'AMBER');
       setCmcCodes(rev.casMeta?.cmcCodes ?? []);
       setCmcDraft('');
+      // Reading the existing tree decides the editor: the form opens only if it can hold what is
+      // already there. `revise` with a suggestion prefill is markdown, so read the parsed prefill,
+      // not the base revision — otherwise the form would show the OLD steps and save them back.
+      const bodySections =
+        mode.kind === 'revise' && mode.prefill?.content
+          ? sectionsFromMarkdown(mode.prefill.content, doc.id)
+          : rev.sections;
+      const { model, lossy } = stepFormFromSections(bodySections);
+      setStepModel(model);
+      setUseStepForm(!!cfg.stepForm && !lossy);
+      setVideoUrl(rev.videos?.[0]?.url ?? '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const cfg: DocumentClassConfig | undefined = classId ? classFor(classId) : undefined;
+  // LG-183 — cabin knowledge takes its sections from editable state; every other class still
+  // reads the constant on its class config.
+  const categoryOptions = cfg?.stepForm ? cabinSections(state) : (cfg?.categories ?? []);
   const hasPriorPublished = useMemo(() => {
     if (mode.kind === 'create') return false;
     return state.revisions.some(
@@ -193,9 +229,17 @@ export function DocEditorDialog({
 
   const buildRecords = (): { doc: Doc; rev: DocRevision; liveControlled: boolean } | null => {
     if (!cfg) return null;
-    const hasContent = sections.some((s) => s.title.trim() || s.blocks.some((b) => b.md.trim()));
+    // D75 — the form is a projection. Validate it here, but serialize it below against the real
+    // doc id, so form-authored blocks get the same `<docId>::<section>::bN` ids as any other.
+    const hasContent = useStepForm
+      ? stepFormToMarkdown(stepModel).trim().length > 0
+      : sections.some((s) => s.title.trim() || s.blocks.some((b) => b.md.trim()));
     if (!title.trim() || !hasContent || roles.length === 0) {
-      toast.error('Title, content, and at least one audience role are required.');
+      toast.error(
+        useStepForm
+          ? 'Title, at least one step, and at least one audience role are required.'
+          : 'Title, content, and at least one audience role are required.',
+      );
       return null;
     }
     const casEnabled = cfg.id === CAS_KNOWLEDGE_CLASS_ID;
@@ -258,6 +302,16 @@ export function DocEditorDialog({
         doc.roles.some((r, i) => r !== mode.doc.roles[i]) ||
         doc.tags.length !== mode.doc.tags.length ||
         doc.tags.some((t, i) => t !== mode.doc.tags[i]));
+    const bodySections = useStepForm ? stepFormToSections(stepModel, doc.id) : sections;
+    // Sidecar media. The video field is the step form's (D75, fork 3 — link only, no upload); the
+    // images/links beside it belong to migrated legacy bulletins and are carried forward so a
+    // revision is not the thing that deletes them.
+    const priorRev = mode.kind === 'create' ? undefined : mode.kind === 'revise' ? mode.baseRev : mode.rev;
+    const videos = cfg.stepForm
+      ? videoUrl.trim()
+        ? [{ url: videoUrl.trim(), title: title.trim() }]
+        : undefined
+      : priorRev?.videos;
     const rev: DocRevision = {
       id:
         mode.kind === 'edit-draft'
@@ -266,8 +320,11 @@ export function DocEditorDialog({
       docId: doc.id,
       revision: revisionLabel.trim() || '1.0',
       status: 'draft',
-      sections,
-      mockChecksum: checksumForSections(sections),
+      sections: bodySections,
+      mockChecksum: checksumForSections(bodySections),
+      images: priorRev?.images,
+      videos,
+      links: priorRev?.links,
       changeSummary: changeSummary.trim(),
       effectiveDate,
       authorUserId: userId,
@@ -363,7 +420,7 @@ export function DocEditorDialog({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Document class</Label>
-                <Select value={classId} onValueChange={(v: string) => { setClassId(v); const c = classFor(v); setCategory(c.categories[0]); setAckLevel(c.defaultAckLevel); setRequireAck(c.defaultAckLevel !== 'none'); }}>
+                <Select value={classId} onValueChange={(v: string) => { setClassId(v); const c = classFor(v); setCategory((c.stepForm ? cabinSections(state) : c.categories)[0]); setAckLevel(c.defaultAckLevel); setRequireAck(c.defaultAckLevel !== 'none'); }}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select class" /></SelectTrigger>
                   <SelectContent>
                     {authorable.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
@@ -375,7 +432,7 @@ export function DocEditorDialog({
                 <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(cfg?.categories ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -404,11 +461,59 @@ export function DocEditorDialog({
           </div>
 
           <div>
-            <Label className="text-xs">Content</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label className="text-xs">{useStepForm ? 'Steps' : 'Content'}</Label>
+              {/* Escape hatch, both ways. Form → full editor is always safe. Full editor → form is
+                  offered only when the current tree fits, and takes the parsed tree with it. */}
+              {cfg?.stepForm && (useStepForm ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => { setSections(stepFormToSections(stepModel, mode.kind === 'create' ? 'new' : mode.doc.id)); setUseStepForm(false); }}
+                >
+                  Switch to the full editor
+                </Button>
+              ) : stepFormFromSections(sections).lossy ? (
+                <span className="text-xs text-muted-foreground">
+                  This entry has content the step form can’t hold.
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => { setStepModel(stepFormFromSections(sections).model); setUseStepForm(true); }}
+                >
+                  Switch to the step form
+                </Button>
+              ))}
+            </div>
             <div className="mt-1">
-              <SectionedEditor sections={sections} onChange={setSections} />
+              {useStepForm ? (
+                <StepFormEditor model={stepModel} onChange={setStepModel} />
+              ) : (
+                <SectionedEditor sections={sections} onChange={setSections} />
+              )}
             </div>
           </div>
+
+          {cfg?.stepForm && (
+            <div>
+              <Label htmlFor="docVideo" className="text-xs">Video (optional)</Label>
+              <Input
+                id="docVideo"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="Link to the walkthrough — YouTube, Vimeo, or any URL"
+                className="mt-1"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                A link, not an upload. Record it wherever your crew already shares video and paste
+                the link here.
+              </p>
+            </div>
+          )}
 
           {hasPriorPublished && (
             <div>

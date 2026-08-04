@@ -54,7 +54,7 @@ export default function FloatingActionButton({ userRole }: FloatingActionButtonP
       case 'maintenance':
         return [
           { label: 'Tech Log', icon: Wrench, href: '/tech-log', color: 'bg-blue-500 hover:bg-blue-600' },
-          { label: 'AOG Declaration', icon: AlertTriangle, href: '/aog-management', color: 'bg-red-500 hover:bg-red-600', urgent: true },
+          { label: 'AOG Declaration', icon: AlertTriangle, href: '/tech-log/aog', color: 'bg-red-500 hover:bg-red-600', urgent: true },
           { label: 'Parts Request', icon: Package, href: '/aircraft-inventory', color: 'bg-green-500 hover:bg-green-600' }
         ];
       

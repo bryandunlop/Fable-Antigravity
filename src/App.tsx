@@ -65,7 +65,6 @@ import FlagRuleBuilder from './components/airport-info/FlagRuleBuilder';
 import { CompanyAirportProvider } from './components/airport-info/CompanyAirportContext';
 import FuelLoadRequest from './components/FuelLoadRequest';
 import UnifiedTasksActionItems from './components/UnifiedTasksActionItems';
-import AOGManagement from './components/AOGManagement';
 import LobbyDisplay from './components/LobbyDisplay';
 import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
@@ -89,7 +88,6 @@ import { DocumentsProvider } from './components/documents/DocumentsContext';
 import { PassengerProvider } from './components/passengers/PassengerContext';
 import FlightAttendantFlights from './components/inflight/FlightAttendantFlights';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
-import UnifiedTripWorkspace from './components/experimental/UnifiedTripWorkspace';
 import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
 import PassengerCurrencyDashboard from './components/passenger-currency/PassengerCurrencyDashboard';
 
@@ -551,7 +549,6 @@ export default function App() {
                                 <Route path="/parts-inventory" element={<PartsInventory />} />
                                 <Route path="/passenger-forms" element={<PassengerForms />} />
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
-                                <Route path="/aog-management" element={<AOGManagement />} />
                                 <Route path="/upcoming-flights" element={userRole === 'inflight' ? <FlightAttendantFlights /> : <UpcomingFlights userRole={userRole} />} />
                                 <Route path="/tech-log/*" element={<TechLogRoutes />} />
                                 <Route path="/fir/*" element={<FirRoutes userRole={userRole} additionalRoles={additionalRoles} />} />
@@ -632,7 +629,6 @@ export default function App() {
                                   <MaintenanceWorkflowProvider><MWPredictiveAnalytics /></MaintenanceWorkflowProvider>
                                 } />
                                 <Route path="/experimental/scheduling-command" element={<Navigate to="/scheduling-command" replace />} />
-                                <Route path="/experimental/unified-trip" element={<UnifiedTripWorkspace />} />
                                 {/* Real 404 — broken links are visible bugs, not silent redirects */}
                                 <Route path="*" element={<NotFound />} />
                               </Routes>

@@ -26,11 +26,25 @@ export const SYSTEM_USERS = [
     id: 'USR003',
     name: 'Mike Johnson',
     email: 'm.johnson@flightops.com',
-    roles: ['inflight', 'lead-fa', 'fa-manager', 'commissary-manager'],
+    // D75 — the cabin ROLES used to sit on one persona, so `resolveUserId('inflight')` and
+    // `resolveUserId('fa-manager')` returned the same user. With cabin knowledge on four-eyes that
+    // made the happy path unreachable in the demo: every FA submission came back "awaiting another
+    // approver", because the author and the only approver were literally the same person.
+    roles: ['inflight', 'lead-fa'],
     status: 'Active',
     lastLogin: '2025-02-01 16:45',
     department: 'Cabin Services',
     hireDate: '2019-11-22'
+  },
+  {
+    id: 'USR014',
+    name: 'Elena Marsh',
+    email: 'e.marsh@flightops.com',
+    roles: ['fa-manager', 'commissary-manager'],
+    status: 'Active',
+    lastLogin: '2025-02-02 08:30',
+    department: 'Cabin Services',
+    hireDate: '2018-03-05'
   },
   {
     id: 'USR004',

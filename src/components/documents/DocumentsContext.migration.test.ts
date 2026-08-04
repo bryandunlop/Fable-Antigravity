@@ -55,6 +55,6 @@ describe('DATA_VERSION', () => {
   // that actually protects stored data — every live version ships a migration step — is
   // asserted in casKnowledgeSeeds.test.ts.
   it('is the version this slice bumped to (D64 — the ship-note section vocabulary)', () => {
-    expect(DATA_VERSION).toBe('2026-07-30-ship-note-sections-v1');
+    expect(DATA_VERSION).toBe('2026-08-03-cabin-knowledge-v1');
   });
 });

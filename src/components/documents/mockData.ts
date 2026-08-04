@@ -8,6 +8,7 @@ import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
 import { mockSha256 } from '../tech-log/engine/signing';
 import { sectionsFromMarkdown, checksumForSections } from './engine/blocks';
+import { stepFormToSections, type StepFormModel } from './engine/stepForm';
 import { applyComplianceRefs } from './engine/regCatalog';
 import { operatorTodayIso } from '../../lib/operatorDate';
 
@@ -733,6 +734,127 @@ export function casKnowledgeSeed(): { docs: Doc[]; revisions: DocRevision[] } {
 }
 
 
+// ── D75: cabin knowledge (FA-authored, FA-manager approved, per fleet type) ──
+//
+// Built through `stepFormToSections` rather than hand-written markdown ON PURPOSE: the seed then
+// exercises the same serializer the form uses, so a demo entry cannot be shaped in a way the form
+// could never have produced. The three below are the examples Bryan named — bedding, cabin
+// lighting, cabin wifi — one per fleet type so the shelf's fleet filter has something to filter.
+interface CabinSeed {
+  id: string;
+  title: string;
+  category: string;
+  fleetTypes: AircraftType[];
+  tags: string[];
+  model: StepFormModel;
+  video?: string;
+  ageDays: number;
+}
+
+const CABIN_SEEDS: CabinSeed[] = [
+  {
+    id: 'CK-001',
+    title: 'Aft divan bedding — G650ER',
+    category: 'Bedding & crew rest',
+    fleetTypes: ['G650ER'],
+    tags: ['bedding', 'divan', 'turndown'],
+    ageDays: -34,
+    video: 'https://vimeo.com/gfo-cabin/divan-bedding-g650er',
+    model: {
+      steps: [
+        { key: 's1', text: 'Recline the divan fully and move the seat-back cushions to the forward closet.' },
+        { key: 's2', text: 'Fit the aft corners of the fitted sheet first — the forward corners tuck under the belt-buckle housing and will not seat if you start forward.' },
+        { key: 's3', text: 'Lay the duvet with the label end aft, then fold the top third back on itself.' },
+        { key: 's4', text: 'Two pillows aft, standing on edge against the bulkhead; the third lies flat as a back rest.' },
+      ],
+      caution: 'Do not stow the seat-back cushions in the aft baggage compartment — that space is placarded for the crew rest kit.',
+    },
+  },
+  {
+    id: 'CK-002',
+    title: 'Resetting cabin lighting after a scene freeze — G500',
+    category: 'Cabin systems & lighting',
+    fleetTypes: ['G500'],
+    tags: ['lighting', 'cms', 'reset'],
+    ageDays: -20,
+    model: {
+      steps: [
+        { key: 's1', text: 'Confirm the scene is genuinely frozen: change the zone brightness from a second touchscreen before resetting anything.' },
+        { key: 's2', text: 'Hold the cabin-light master on the forward galley panel for five seconds until the strip blinks twice.' },
+        { key: 's3', text: 'Wait a full thirty seconds. The zones come back one at a time, aft to forward — a zone still dark at twenty seconds is not a failure yet.' },
+        { key: 's4', text: 'Re-select the scene you wanted. Presets survive the reset; a manually dimmed zone does not.' },
+      ],
+      caution: 'Never cycle the master with passengers seated aft in darkness — brief them first, or wait for a cabin-service break.',
+    },
+  },
+  {
+    id: 'CK-003',
+    title: 'Cabin wifi is up but nothing loads — what to try before calling it a defect',
+    category: 'Connectivity & entertainment',
+    fleetTypes: ['G650ER', 'G500'],
+    tags: ['wifi', 'connectivity', 'satcom'],
+    ageDays: -8,
+    model: {
+      steps: [
+        { key: 's1', text: 'Check the router status page from the cabin tablet before touching anything — if it reports no space segment, this is coverage, not a fault, and no reset will help.' },
+        { key: 's2', text: 'Ask one passenger to forget the network and rejoin. A single device holding a stale lease looks exactly like an aircraft-wide outage.' },
+        { key: 's3', text: 'If two or more devices fail the same way, cycle the cabin router from the galley panel and allow four minutes for reacquisition.' },
+        { key: 's4', text: 'Still down after the cycle: write it up. Note the time, the region, and whether the status page saw a space segment — that is what maintenance needs.' },
+      ],
+      caution: '',
+    },
+  },
+];
+
+const cabinSeedDoc = (seed: CabinSeed): Doc => ({
+  id: seed.id,
+  classId: 'cabin-knowledge',
+  title: seed.title,
+  category: seed.category,
+  roles: ['inflight', 'lead-fa', 'fa-manager', 'pilot'],
+  ownerUserId: 'role:fa-manager',
+  ownerName: 'Cabin Services Manager Hart',
+  tags: seed.tags,
+  isPinned: false,
+  isArchived: false,
+  reviewCycleDays: 365,
+  nextReviewDate: daysFromNow(365 + seed.ageDays),
+  createdDate: daysFromNow(seed.ageDays),
+});
+
+const cabinSeedRevision = (seed: CabinSeed): DocRevision => {
+  const sections = stepFormToSections(seed.model, seed.id);
+  return {
+    id: `${seed.id}-r1`,
+    docId: seed.id,
+    revision: '1.0',
+    status: 'published',
+    sections,
+    changeSummary: '',
+    effectiveDate: daysFromNow(seed.ageDays),
+    authorUserId: 'role:lead-fa',
+    authorName: 'Lead FA Moreau',
+    requireAcknowledgment: false,
+    ackLevel: 'none',
+    mockChecksum: checksumForSections(sections),
+    submittedAtUtc: daysFromNow(seed.ageDays - 1) + 'T15:00:00.000Z',
+    // Four-eyes: drafted by the lead FA, published by the cabin services manager (D75).
+    decidedAtUtc: daysFromNow(seed.ageDays) + 'T11:00:00.000Z',
+    decidedByUserId: 'role:fa-manager',
+    decidedByName: 'Cabin Services Manager Hart',
+    publishedAtUtc: daysFromNow(seed.ageDays) + 'T12:00:00.000Z',
+    fleetTypes: seed.fleetTypes,
+    videos: seed.video ? [{ url: seed.video, title: seed.title }] : undefined,
+  };
+};
+
+/** D75 — exported so the stored-state migration brings an EXISTING demo store forward to the
+ *  cabin shelf. Without this the three entries reach only a fresh install, and anyone whose
+ *  browser already holds a documents store opens Cabin knowledge to an empty shelf. */
+export function cabinKnowledgeSeed(): { docs: Doc[]; revisions: DocRevision[] } {
+  return { docs: CABIN_SEEDS.map(cabinSeedDoc), revisions: CABIN_SEEDS.map(cabinSeedRevision) };
+}
+
 const SEED_DOCS: Doc[] = [
   {
     id: 'SOP-001',
@@ -958,8 +1080,8 @@ export function getSeedState(): DocumentsState {
     bulletinRevs.push(rev);
   }
   return {
-    docs: [...SEED_DOCS, ...bulletinDocs],
-    revisions: [...SEED_REVISIONS, ...bulletinRevs],
+    docs: [...SEED_DOCS, ...CABIN_SEEDS.map(cabinSeedDoc), ...bulletinDocs],
+    revisions: [...SEED_REVISIONS, ...CABIN_SEEDS.map(cabinSeedRevision), ...bulletinRevs],
     acknowledgments: SEED_ACKS,
     comments: SEED_COMMENTS,
     suggestions: SEED_SUGGESTIONS,

@@ -13,6 +13,10 @@ import type { Signature } from '../tech-log/types';
 import { classFor, docReaderPath } from './classes';
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision } from './engine/revisions';
+import {
+  cabinSections, canManageCabinSections, validateCabinSections, docsInCabinSection, applyCabinSections,
+  CABIN_SECTION_MANAGER_ROLES,
+} from './engine/cabinSections';
 import { canAuthor, validateSubmit, validateDecision, validateDirectPublish } from './engine/lifecycle';
 import { rolesCanManageDocuments } from './roles';
 import { computeNextReviewDate } from './engine/review';
@@ -32,7 +36,7 @@ export const VERSION_KEY = 'documents-data-version';
  *  a broken-render risk; the bump exists so a RETURNING user's curated CAS content is
  *  carried onto its revisions by the matching step in engine/migrations.ts rather than
  *  being stranded on a field nothing reads any more. */
-export const DATA_VERSION = '2026-07-30-ship-note-sections-v1';
+export const DATA_VERSION = '2026-08-03-cabin-knowledge-v1';
 /** Set once the legacy 'bulletins-state' store has been imported — a later
  * re-seed must never resurrect stale pre-migration bulletins (C5). */
 export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';
@@ -179,7 +183,8 @@ export type DocumentsAction =
       payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string };
     }
   | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string; actorRoles: string[] } }
-  | { type: 'PROMOTE_SCHEDULED'; payload: { atUtc: string; today: string } };
+  | { type: 'PROMOTE_SCHEDULED'; payload: { atUtc: string; today: string } }
+  | { type: 'SET_CABIN_SECTIONS'; payload: { sections: string[]; renames: Record<string, string>; actorRoles: string[] } };
 
 function warnNoop(reason: string | undefined): void {
   if (typeof console !== 'undefined') console.warn(`[documents] action rejected: ${reason ?? 'invalid'}`);
@@ -594,6 +599,34 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         ),
       };
     }
+    case 'SET_CABIN_SECTIONS': {
+      // D75 / LG-183 — the cabin shelf's vocabulary is user-owned. Gated here and not only in the
+      // dialog: the reducer is the authority for every other write in this store and this one is
+      // no different, even though a section name is not a signed record.
+      const { sections, renames, actorRoles } = action.payload;
+      if (!canManageCabinSections(actorRoles)) {
+        warnNoop(`cabin sections require one of: ${CABIN_SECTION_MANAGER_ROLES.join(', ')}`);
+        return state;
+      }
+      const v = validateCabinSections(sections);
+      if (!v.ok) {
+        warnNoop(`cabin sections rejected: ${v.error}`);
+        return state;
+      }
+      // A section that vanishes without a rename is a DELETE, and deleting one that still holds
+      // entries would strand them on a category the picker no longer offers — the exact mess D64's
+      // ship-note migration existed to clean up. Refuse rather than orphan.
+      const kept = new Set(sections.map((x) => x.trim()));
+      const current = cabinSections(state);
+      const orphaning = current.filter(
+        (old) => !kept.has(old) && !renames[old] && docsInCabinSection(state.docs, old).length > 0,
+      );
+      if (orphaning.length) {
+        warnNoop(`cannot remove a section that still holds entries: ${orphaning.join(', ')}`);
+        return state;
+      }
+      return applyCabinSections(state, sections, renames);
+    }
     case 'PROMOTE_SCHEDULED': {
       // C3: publish 'approved' (scheduled) revisions whose effective date has
       // arrived. Runs mid-session (not only at load) — see the provider effect.
@@ -647,6 +680,9 @@ interface Ctx {
   resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
   addSuggestionReply: (suggestionId: string, text: string, userRole: string) => void;
   completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
+  /** D75 / LG-183 — replace the cabin section vocabulary. `renames` (old → new) carries entries
+   *  across a rename; omit it for pure adds and reorders. Role-gated in the reducer. */
+  setCabinSections: (sections: string[], renames: Record<string, string>, actorRoles: string[]) => void;
 }
 
 const DocumentsContext = createContext<Ctx | undefined>(undefined);
@@ -886,6 +922,9 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     resolveSuggestion,
     addSuggestionReply,
     completeReview,
+    setCabinSections: useCallback((sections, renames, actorRoles) => {
+      dispatch({ type: 'SET_CABIN_SECTIONS', payload: { sections, renames, actorRoles } });
+    }, []),
   };
 
   return <DocumentsContext.Provider value={value}>{children}</DocumentsContext.Provider>;
