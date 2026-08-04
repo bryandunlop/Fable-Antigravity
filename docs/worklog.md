@@ -169,18 +169,24 @@ The page swaps the document's manifest link to `/worklog-manifest.json` while it
 
 ---
 
-## Setup
+## Setup — there isn't any
 
-The table is created by a schema push, matching how the rest of this project's database is managed (there are no migration files):
+Open `/worklog`. That is the whole procedure.
+
+**The table creates itself.** Every handler runs through `withTable`, which on Postgres `42P01` (undefined_table) issues `CREATE TABLE IF NOT EXISTS` and retries the query once. Once, not in a loop — a second `42P01` means the DDL did not take (no permission, wrong database) and that needs a person, not a retry.
+
+This is safe *here specifically* because `work_log_entries` is a personal table with no foreign key in either direction. It is not a licence to self-migrate product tables. The column list matches the Drizzle schema exactly, so a later `npm run db:push` is a no-op rather than a diff.
+
+**The history ships with the page.** `public/worklog-seed.json` carries the derivation, and the client applies it once per device — so the full fiscal year is on screen at first paint with no database, no script, and no signal. It is then pushed to Postgres in a single `/bulk` request. Ids are deterministic, so that push cannot duplicate what the CLI seeder wrote, in either order.
+
+The seed applies **once per device**, guarded on a stored flag rather than on "is the log empty" — otherwise a derived row you deleted on purpose would come back on the next load. Sessions derived *after* the bundle was generated arrive the normal way, from the database, once you re-run `worklog:seed`.
+
+If you prefer to do it explicitly, both still work and neither is required:
 
 ```bash
-npm run db:push
-```
-
-Then seed the derived history:
-
-```bash
-npx tsx scripts/derive-work-sessions.ts --seed
+npm run db:push        # create the table up front
+npm run worklog:seed   # push the derivation to the database
+npm run worklog:bundle # regenerate the static seed after new work lands
 ```
 
 ---

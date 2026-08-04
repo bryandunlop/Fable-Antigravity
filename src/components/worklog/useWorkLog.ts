@@ -85,6 +85,25 @@ async function readSeedBundle(): Promise<WorkLogEntry[] | null> {
   }
 }
 
+/**
+ * Ask the browser not to evict this origin's storage under pressure.
+ *
+ * Matters most in the case this page is built to survive: no database
+ * configured, so the local copy IS the record until one appears. Best-effort by
+ * definition — Safari grants it based on its own heuristics (home-screen
+ * install helps) and may refuse. A refusal is not a failure worth surfacing;
+ * the outbox and the CSV export are the real answers to durability.
+ */
+async function requestPersistentStorage(): Promise<void> {
+  try {
+    if (navigator.storage?.persist && !(await navigator.storage.persisted())) {
+      await navigator.storage.persist();
+    }
+  } catch {
+    // Not supported, or blocked. Nothing to do and nothing worth saying.
+  }
+}
+
 async function send(op: Op): Promise<void> {
   const json = { 'Content-Type': 'application/json' };
   if (op.kind === 'create') {
@@ -245,6 +264,7 @@ export function useWorkLog(): UseWorkLog {
     // Seed BEFORE talking to the server, so the history is on screen at first
     // paint even with no signal and nothing configured.
     void (async () => {
+      void requestPersistentStorage();
       const seeded = await readSeedBundle();
       if (seeded && seeded.length) {
         const existing = readJson<WorkLogEntry[]>(CACHE_KEY, []);
