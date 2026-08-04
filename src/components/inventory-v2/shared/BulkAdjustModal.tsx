@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -64,6 +64,7 @@ export default function BulkAdjustModal({ open, onOpenChange }: BulkAdjustModalP
             <Package className="w-5 h-5 text-primary" />
             Bulk Adjust Quantities
           </DialogTitle>
+          <DialogDescription>Correct counts for several items at once — each change is logged separately.</DialogDescription>
         </DialogHeader>
 
         <div className="relative">

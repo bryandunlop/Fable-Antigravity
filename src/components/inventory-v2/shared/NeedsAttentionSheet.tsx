@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ShoppingCart, Trash2 } from 'lucide-react';
 import { Button } from '../../ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../ui/sheet';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -52,6 +52,7 @@ export default function NeedsAttentionSheet({ open, onOpenChange, onOpenShopping
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Needs attention</SheetTitle>
+          <SheetDescription>Items below par and batches close to expiry.</SheetDescription>
         </SheetHeader>
         <div className="mt-4 space-y-6">
           {groups.length === 0 && (

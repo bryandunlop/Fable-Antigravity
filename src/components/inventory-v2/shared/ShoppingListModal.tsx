@@ -1,6 +1,6 @@
 // ─── Shopping List Modal ──────────────────────────────────────────────────────
 import React, { useMemo, useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Checkbox } from '../../ui/checkbox';
@@ -153,6 +153,7 @@ export default function ShoppingListModal({ open, onOpenChange }: ShoppingListMo
               {shoppingItems.length} items
             </Badge>
           </DialogTitle>
+          <DialogDescription>Everything currently below par, grouped by vendor.</DialogDescription>
         </DialogHeader>
 
         {shoppingItems.length === 0 ? (

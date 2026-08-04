@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Textarea } from './ui/textarea';
@@ -289,6 +289,7 @@ export default function CarTracking() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Car</DialogTitle>
+                <DialogDescription>Add a vehicle to the ground-transport pool so it can be assigned to flights.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -555,6 +556,7 @@ export default function CarTracking() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Assign Car to Flight</DialogTitle>
+            <DialogDescription>Match this vehicle to a flight and note who is driving.</DialogDescription>
           </DialogHeader>
           {selectedCar && (
             <div className="space-y-4">

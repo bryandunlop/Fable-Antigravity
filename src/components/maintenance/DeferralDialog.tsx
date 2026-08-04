@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -44,6 +44,11 @@ export default function DeferralDialog({ open, onOpenChange, squawkId, onComplet
                         <AlertTriangle className="w-5 h-5 text-amber-500" />
                         Defer Squawk per MEL
                     </DialogTitle>
+                    <DialogDescription>
+                        Record the governing MEL item, its category, and the operating
+                        limitations carried with the aircraft. The category drives the
+                        expiry date shown below.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ExternalLink, Send } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { Separator } from '../ui/separator';
@@ -128,6 +128,12 @@ export function TripDrawer({
         <SheetTitle className="sr-only">
           {identity ? `Trip ${identity.route}` : 'Loading trip'}
         </SheetTitle>
+        {/* Same reasoning for the description: Radix looks for it at mount too. */}
+        <SheetDescription className="sr-only">
+          {identity
+            ? `Readiness, crew and anything blocking departure for ${identity.route}.`
+            : 'Loading the trip detail.'}
+        </SheetDescription>
         {!trip || !identity ? (
           <p className="text-sm text-muted-foreground py-10 text-center">Loading trip…</p>
         ) : (

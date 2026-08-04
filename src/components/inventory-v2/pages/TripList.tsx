@@ -89,6 +89,7 @@ function NewTripDialog({
             <Plane className="h-5 w-5 text-amber-400" />
             Start Trip — {aircraft.tailNumber}
           </DialogTitle>
+          <DialogDescription>Open the commissary for this tail and set the trip going.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">

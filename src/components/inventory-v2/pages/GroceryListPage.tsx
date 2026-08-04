@@ -5,7 +5,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Textarea } from '../../ui/textarea';
 import { Badge } from '../../ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../ui/alert-dialog';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
@@ -726,6 +726,7 @@ function GroceryListInner({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add from Inventory</DialogTitle>
+            <DialogDescription>Pull an item you already track into this shopping list.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="relative">

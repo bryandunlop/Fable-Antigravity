@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Alert, AlertDescription } from './ui/alert';
 import { Progress } from './ui/progress';
 import { Calendar, Clock, AlertTriangle, Users, CheckCircle, XCircle, Plane, User, Bell } from 'lucide-react';
@@ -414,6 +414,7 @@ export default function CrewResourceManagement() {
                             <DialogContent className="max-w-2xl">
                               <DialogHeader>
                                 <DialogTitle>{crew.name} - Duty Details</DialogTitle>
+                                <DialogDescription>Duty and rest hours, currency, and upcoming assignments for this crew member.</DialogDescription>
                               </DialogHeader>
                               {selectedCrew && (
                                 <div className="space-y-4">

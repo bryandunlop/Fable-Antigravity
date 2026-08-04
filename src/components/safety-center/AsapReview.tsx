@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetTitle } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { ShieldCheck, Lock } from 'lucide-react';
@@ -52,11 +52,11 @@ export function AsapReview() {
           {current && (
             <>
               <div className="px-6 pt-6 pb-4 border-b border-border">
-                <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+                <SheetDescription className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
                   <span className="uppercase tracking-wide text-accent font-bold">ASAP</span>
                   <span>· confidential</span>
                   <span className="ml-auto tabular-nums">{current.id}</span>
-                </div>
+                </SheetDescription>
                 {/* SheetTitle renders an h2 — visible heading doubles as the Radix
                     accessible name, which was missing entirely (LG-30). */}
                 <SheetTitle className="text-lg font-semibold mt-2">{current.phase} · {current.airport}</SheetTitle>

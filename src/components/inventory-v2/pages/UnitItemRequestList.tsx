@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -127,6 +127,7 @@ const getStatusColors = (status: UnitItemRequest['status']) => {
                     {selectedRequest.isGuestRequest ? 'Guest' : 'Non-Guest'}
                   </Badge>
                 </SheetTitle>
+                <SheetDescription>Who asked for what, and where the request has got to.</SheetDescription>
               </SheetHeader>
               <div className="mt-4 space-y-4">
                 <div className="text-sm space-y-2">

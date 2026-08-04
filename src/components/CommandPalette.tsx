@@ -245,11 +245,14 @@ export default function CommandPalette({ isOpen, onClose, userRole, additionalRo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="p-0 max-w-2xl" aria-describedby="command-palette-description">
+      {/* No hand-written id on the description: it would displace the id Radix
+          generates and looks for, so Radix would warn on every open even though
+          the description is right there. Let Radix wire the pair itself. */}
+      <DialogContent className="p-0 max-w-2xl">
         <DialogTitle className="sr-only">
           Global Search
         </DialogTitle>
-        <DialogDescription id="command-palette-description" className="sr-only">
+        <DialogDescription className="sr-only">
           Search pages, inventory records, and quick links. Use arrow keys to navigate and Enter to select.
         </DialogDescription>
 

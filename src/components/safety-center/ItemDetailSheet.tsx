@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetTitle } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet';
 import { Button } from '../ui/button';
 import { StageBar, StatusPill, stageName } from './ui-bits';
 import type { SafetyItem, ThreadMsg } from './types';
@@ -42,16 +42,17 @@ export function ItemDetailSheet({
         {/* `open` and `item` are independent props, so the sheet can mount with no item.
             Radix asserts a Title at mount, so the empty case needs one too (LG-30). */}
         {!item && <SheetTitle className="sr-only">Item details</SheetTitle>}
+        {!item && <SheetDescription className="sr-only">No item selected yet.</SheetDescription>}
         {item && (
           <>
             <div className="px-6 pt-6 pb-4 border-b border-border">
               <div className="text-[11px] font-bold uppercase tracking-wide text-accent">{item.type}</div>
               {/* SheetTitle renders an h2 — the visible heading IS the accessible name. */}
               <SheetTitle className="text-lg font-semibold mt-2.5 mb-2 text-balance leading-snug">{item.title}</SheetTitle>
-              <div className="flex flex-wrap gap-2 items-center text-[12.5px] text-muted-foreground">
+              <SheetDescription className="flex flex-wrap gap-2 items-center text-[12.5px] text-muted-foreground">
                 {item.status && <StatusPill tone={item.status.tone}>{item.status.label}</StatusPill>}
                 {item.ref ? <span>{item.ref}</span> : item.sub ? <span>{item.sub}</span> : null}
-              </div>
+              </SheetDescription>
             </div>
 
             <div className="px-6 py-5 overflow-y-auto flex-1">

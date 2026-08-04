@@ -308,6 +308,7 @@ export default function AdminUserManagement() {
                           <DialogContent className="max-w-2xl">
                             <DialogHeader>
                               <DialogTitle>Edit User - {user.name}</DialogTitle>
+                              <DialogDescription>Change this person's role, department and account status.</DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-4">

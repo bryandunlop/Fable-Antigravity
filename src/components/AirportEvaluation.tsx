@@ -7,7 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Alert, AlertDescription } from './ui/alert';
 import {
   Plane,
@@ -606,6 +606,7 @@ export default function AirportEvaluation() {
                   <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle>Submit New Evaluation</DialogTitle>
+                      <DialogDescription>Rate an airport's handling and services so the next crew knows what to expect.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>

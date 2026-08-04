@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Search, BookOpen, Lightbulb } from 'lucide-react';
-import { Sheet, SheetContent, SheetTitle } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet';
 import type { PublishedReport } from './types';
 
 export function PublishedReports({ reports }: { reports: PublishedReport[] }) {
@@ -58,7 +58,7 @@ export function PublishedReports({ reports }: { reports: PublishedReport[] }) {
                 {/* SheetTitle renders an h2, so the visible heading doubles as the Radix
                     accessible name — no sr-only duplicate needed (LG-30). */}
                 <SheetTitle className="text-lg font-semibold mt-2.5 leading-snug text-balance">{open.title}</SheetTitle>
-                <div className="text-xs text-muted-foreground mt-1">{open.ref} · de-identified</div>
+                <SheetDescription className="text-xs text-muted-foreground mt-1">{open.ref} · de-identified</SheetDescription>
               </div>
               <div className="px-6 py-5 overflow-y-auto flex-1">
                 <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Summary</div>

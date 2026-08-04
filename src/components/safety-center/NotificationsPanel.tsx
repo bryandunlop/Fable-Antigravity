@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetTitle } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet';
 import { TriangleAlert, FileText, Check, Clock, type LucideIcon } from 'lucide-react';
 import type { KnowItem } from './types';
 
@@ -32,7 +32,7 @@ export function NotificationsPanel({
           {/* SheetTitle renders an h2 — visible heading doubles as the Radix
               accessible name, which was missing entirely (LG-30). */}
           <SheetTitle className="text-[17px] font-semibold">Notifications</SheetTitle>
-          <div className="text-xs text-muted-foreground mt-0.5">Things that happened — promoted to a task only when they need you.</div>
+          <SheetDescription className="text-xs text-muted-foreground mt-0.5">Things that happened — promoted to a task only when they need you.</SheetDescription>
         </div>
         <div className="overflow-y-auto flex-1 py-1">
           {items.map((n) => {

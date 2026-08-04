@@ -6,7 +6,7 @@ import { Label } from '../../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../ui/collapsible';
 import { ScrollArea } from '../../ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { SUPPLY_CATEGORIES, MOCK_USERS } from '../constants';
 import { toast } from 'sonner';
@@ -190,6 +190,7 @@ export default function ReceiveStockModal({ open, onOpenChange }: ReceiveStockMo
             <DialogTitle className="flex items-center gap-2">
               <PackagePlus className="w-5 h-5 text-primary" /> Receive Stock
             </DialogTitle>
+            <DialogDescription>Log what arrived, batch by batch, against the items you ordered.</DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-hidden">

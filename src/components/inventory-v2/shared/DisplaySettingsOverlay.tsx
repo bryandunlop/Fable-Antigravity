@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../ui/sheet';
 import { Switch } from '../../ui/switch';
 import { Label } from '../../ui/label';
 import { useInventoryV2 } from '../InventoryV2Context';
@@ -29,6 +29,7 @@ export default function DisplaySettingsOverlay({ open, onOpenChange }: DisplaySe
             <Settings className="w-5 h-5 text-primary" />
             Display Settings
           </SheetTitle>
+          <SheetDescription>How inventory items are grouped and sorted on screen.</SheetDescription>
         </SheetHeader>
         <div className="space-y-6 mt-6">
           <div className="flex items-center justify-between">

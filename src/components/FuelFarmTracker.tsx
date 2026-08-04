@@ -6,7 +6,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
@@ -190,6 +190,7 @@ export default function FuelFarmTracker() {
                   <FileText className="w-5 h-5" />
                   Export Monthly Report
                 </DialogTitle>
+                <DialogDescription>Pick the month to export; the report covers every fuel farm movement in it.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -247,6 +248,11 @@ export default function FuelFarmTracker() {
                 <DialogTitle>
                   {recordType === 'dispensed' ? 'Record Aircraft Fueling' : 'Record Fuel Farm Replenishment'}
                 </DialogTitle>
+                <DialogDescription>
+                  {recordType === 'dispensed'
+                    ? 'Log fuel drawn from the farm into an aircraft. The farm balance drops by this amount.'
+                    : 'Log a delivery into the farm. The farm balance rises by this amount.'}
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 {recordType === 'dispensed' && (
