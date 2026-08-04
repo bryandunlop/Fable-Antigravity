@@ -19,7 +19,7 @@ interface ActionItemContextType {
   getActionItemById: (id: string) => ActionItem | undefined;
   addActionItem: (form: NewItemForm, createdBy: string) => ActionItem;
   updateActionItem: (id: string, updates: Partial<ActionItem>) => void;
-  setCheckInCadence: (id: string, cadence: CheckInCadence) => void;
+  setCheckInCadence: (id: string, cadence: CheckInCadence, on?: string) => void;
   /** Poke a project that has gone quiet, without waiting for the next window. */
   nudge: (id: string, on?: string) => void;
   /** Chase a whole group in one pass — one owner, or every quiet project. */
@@ -117,20 +117,31 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setActionItems(prev => prev.map(item => (item.id === id ? { ...item, ...updates } : item)));
   };
 
-  const setCheckInCadence = (id: string, cadence: CheckInCadence) => {
+  const setCheckInCadence = (id: string, cadence: CheckInCadence, on?: string) => {
+    const from = on ?? todayIso();
     setActionItems(prev =>
-      prev.map(item =>
-        item.id === id
-          ? {
-              ...item,
-              checkIn: {
-                startedOn: item.checkIn?.startedOn ?? item.assignedDate,
-                reports: item.checkIn?.reports ?? [],
-                cadence,
-              },
-            }
-          : item,
-      ),
+      prev.map(item => {
+        if (item.id !== id) return item;
+        const existing = item.checkIn;
+        if (existing?.cadence === cadence) return item;
+
+        // Keep the rhythm that was in force before this change, so a stretch of
+        // silence is still judged against what was expected at the time.
+        const history = existing?.cadenceHistory ?? (
+          existing ? [{ cadence: existing.cadence, from: existing.startedOn ?? item.assignedDate }] : []
+        );
+
+        return {
+          ...item,
+          checkIn: {
+            startedOn: existing?.startedOn ?? item.assignedDate,
+            reports: existing?.reports ?? [],
+            lastNudgedOn: existing?.lastNudgedOn,
+            cadenceHistory: [...history, { cadence, from }],
+            cadence,
+          },
+        };
+      }),
     );
   };
 

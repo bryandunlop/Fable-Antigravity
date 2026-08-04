@@ -256,3 +256,49 @@ describe('groupForChase', () => {
     expect(groupForChase([], '2026-08-04')).toEqual([]);
   });
 });
+
+describe('cadence changes cannot rewrite the past', () => {
+  const quietWeekly = (cadenceHistory?: Array<{ cadence: 'weekly' | 'biweekly' | 'monthly' | 'none'; from: string }>) =>
+    makeItem({
+      checkIn: {
+        // Slowed to monthly today, after 21 days of weekly silence.
+        cadence: 'monthly',
+        startedOn: '2026-06-01',
+        cadenceHistory,
+        reports: [report('2026-07-14', 65)],
+      },
+    });
+
+  it('still calls a project quiet after its cadence is slowed', () => {
+    const item = quietWeekly([
+      { cadence: 'weekly', from: '2026-06-01' },
+      { cadence: 'monthly', from: '2026-08-04' },
+    ]);
+    // 21 days of silence: inside a monthly rhythm, but it was weekly at the time.
+    expect(getDaysSinceLastReport(item, '2026-08-04')).toBe(21);
+    expect(getStallState(item, '2026-08-04')).toBe('quiet');
+  });
+
+  it('applies the new, slower rhythm once the project reports again', () => {
+    const item = makeItem({
+      checkIn: {
+        cadence: 'monthly',
+        startedOn: '2026-06-01',
+        cadenceHistory: [
+          { cadence: 'weekly', from: '2026-06-01' },
+          { cadence: 'monthly', from: '2026-07-01' },
+        ],
+        reports: [report('2026-07-20', 65)],
+      },
+    });
+    // 15 days on, and only the monthly rhythm has been in force since — not quiet.
+    expect(getStallState(item, '2026-08-04')).toBe('moving');
+  });
+
+  it('falls back to the current cadence when there is no history', () => {
+    const item = makeItem({
+      checkIn: { cadence: 'weekly', startedOn: '2026-06-01', reports: [report('2026-07-01', 50)] },
+    });
+    expect(getStallState(item, '2026-08-04')).toBe('quiet');
+  });
+});

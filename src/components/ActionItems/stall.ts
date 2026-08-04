@@ -62,12 +62,44 @@ export const getDaysSinceLastReport = (item: ActionItem, today: string): number 
 
 export type StallState = 'landed' | 'quiet' | 'new' | 'moving';
 
+/**
+ * The interval a project should be judged against for a stretch of silence:
+ * the SHORTEST cadence that has been in force at any point during it.
+ *
+ * Slowing a cadence changes what is expected from here on; it does not excuse a
+ * report that was already owed. Judging the whole silence against the newest,
+ * slowest rhythm let a lead clear a stalled project off the board by agreeing to
+ * hear from it less often — the metric moved, the project didn't.
+ */
+const getGoverningInterval = (item: ActionItem, since: string | null): number | undefined => {
+  const current = item.checkIn?.cadence;
+  const history = [...(item.checkIn?.cadenceHistory ?? [])].sort((a, b) => a.from.localeCompare(b.from));
+
+  // No recorded history: the only rhythm we know of is the current one.
+  if (!history.length || !since) {
+    const days = current ? CADENCE_DAYS[current] : undefined;
+    return typeof days === 'number' ? days : undefined;
+  }
+
+  // A period governs the silence if it was still in force at some point after
+  // the last report — that is, if it ends after `since`. The final period runs
+  // to today, so it always qualifies.
+  const intervals = history
+    .filter((period, index) => {
+      const endsOn = history[index + 1]?.from;
+      return endsOn === undefined || endsOn > since;
+    })
+    .map(period => CADENCE_DAYS[period.cadence])
+    .filter((days): days is number => typeof days === 'number');
+
+  return intervals.length ? Math.min(...intervals) : undefined;
+};
+
 export const getStallState = (item: ActionItem, today: string): StallState => {
   if (item.status === 'Completed') return 'landed';
 
-  const cadence = item.checkIn?.cadence;
-  const interval = cadence ? CADENCE_DAYS[cadence] : undefined;
   const silence = getDaysSinceLastReport(item, today);
+  const interval = getGoverningInterval(item, getLastReportDate(item));
 
   // No cadence means nobody agreed to report on it — it cannot be "quiet".
   if (!interval || silence === null) return 'moving';

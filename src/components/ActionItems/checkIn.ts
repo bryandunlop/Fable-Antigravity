@@ -35,6 +35,18 @@ export const toIsoDate = (ms: number): string =>
  * Returns null when the project has no cadence, has no usable anchor, or has
  * not yet reached its first window.
  */
+/**
+ * Add whole calendar months, clamping to the end of a short month so the 31st
+ * lands on the 30th (or the 28th) rather than spilling into the next month.
+ */
+const addCalendarMonths = (iso: string, months: number): string => {
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(day, lastDay));
+  return toIsoDate(target.getTime());
+};
+
 export const getCurrentCheckInDueDate = (
   item: ActionItem,
   today: string,
@@ -46,6 +58,23 @@ export const getCurrentCheckInDueDate = (
   const anchor = anchorIso ? parseUtcDate(anchorIso) : null;
   const now = parseUtcDate(today);
   if (anchor === null || now === null) return null;
+
+  // Monthly means a calendar month, not 30 days — otherwise a project that
+  // reports on the 1st drifts backwards through the month until it is due
+  // twice in a January and never in a February.
+  if (cadence === 'monthly') {
+    let months = 0;
+    let due: string | null = null;
+    for (;;) {
+      const candidate = addCalendarMonths(anchorIso!, months + 1);
+      const candidateMs = parseUtcDate(candidate);
+      if (candidateMs === null || candidateMs > now) break;
+      due = candidate;
+      months += 1;
+      if (months > 600) break; // a half-century of windows is a data error, not a project
+    }
+    return due;
+  }
 
   const interval = CADENCE_DAYS[cadence];
   const elapsedDays = Math.floor((now - anchor) / MS_PER_DAY);

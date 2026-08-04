@@ -14,8 +14,23 @@ export interface CheckInReport {
   note: string;
 }
 
+/** A cadence and the date it came into force. */
+export interface CadencePeriod {
+  cadence: CheckInCadence;
+  from: string;
+}
+
 export interface ProjectCheckIn {
   cadence: CheckInCadence;
+  /**
+   * Every cadence this project has run on, oldest first.
+   *
+   * Without it, slowing a cadence rewrote the past: silence was judged against
+   * the CURRENT rhythm, so moving a weekly project to monthly made twenty days
+   * of silence stop counting instantly. A lead could make a stalled project
+   * disappear from the board by agreeing to hear from it less often.
+   */
+  cadenceHistory?: CadencePeriod[];
   /**
    * ISO date the cadence counts from. Defaults to the item's assignedDate when
    * absent, so an item created without an explicit anchor still schedules.

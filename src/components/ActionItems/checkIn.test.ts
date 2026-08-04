@@ -45,7 +45,22 @@ describe('getCurrentCheckInDueDate', () => {
     expect(getCurrentCheckInDueDate(makeItem({ cadence: 'weekly', startedOn: anchor, reports: [] }), '2026-01-15')).toBe('2026-01-15');
     expect(getCurrentCheckInDueDate(makeItem({ cadence: 'biweekly', startedOn: anchor, reports: [] }), '2026-01-15')).toBe('2026-01-15');
     expect(getCurrentCheckInDueDate(makeItem({ cadence: 'monthly', startedOn: anchor, reports: [] }), '2026-01-15')).toBeNull();
-    expect(getCurrentCheckInDueDate(makeItem({ cadence: 'monthly', startedOn: anchor, reports: [] }), '2026-01-31')).toBe('2026-01-31');
+    // A month is a calendar month, so the 31st is not yet a month after the 1st.
+    expect(getCurrentCheckInDueDate(makeItem({ cadence: 'monthly', startedOn: anchor, reports: [] }), '2026-01-31')).toBeNull();
+    expect(getCurrentCheckInDueDate(makeItem({ cadence: 'monthly', startedOn: anchor, reports: [] }), '2026-02-01')).toBe('2026-02-01');
+  });
+
+  it('keeps a monthly project on the same day of the month instead of drifting', () => {
+    const item = makeItem({ cadence: 'monthly', startedOn: '2026-01-15', reports: [] });
+    expect(getCurrentCheckInDueDate(item, '2026-02-15')).toBe('2026-02-15');
+    expect(getCurrentCheckInDueDate(item, '2026-04-20')).toBe('2026-04-15');
+    // Under 30-day arithmetic this would have slipped to the 11th by April.
+    expect(getCurrentCheckInDueDate(item, '2026-06-15')).toBe('2026-06-15');
+  });
+
+  it('clamps to the end of a short month rather than spilling into the next', () => {
+    const item = makeItem({ cadence: 'monthly', startedOn: '2026-01-31', reports: [] });
+    expect(getCurrentCheckInDueDate(item, '2026-03-01')).toBe('2026-02-28');
   });
 
   it('falls back to assignedDate when no explicit anchor is set', () => {
