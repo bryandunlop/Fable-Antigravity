@@ -220,6 +220,8 @@ describe('closing and reopening', () => {
       closedOn: '2026-08-04',
       closedBy: 'Lead Team',
       progressAtClose: 55,
+      // Recorded so reopening restores what it was rather than guessing.
+      previousStatus: 'In Progress',
     });
     // The reason is also in the feed, so it reads in context later.
     expect(item.recentActivity[0].action).toContain('closed this project at 55%');
@@ -234,7 +236,9 @@ describe('closing and reopening', () => {
     act(() => { result.current.reopenActionItem(id); });
 
     const item = result.current.getActionItemById(id)!;
-    expect(item.status).toBe('In Progress');
+    // Restored to what it actually was before the close — a project created
+    // and closed without ever starting comes back as Pending, not promoted.
+    expect(item.status).toBe('Pending');
     expect(item.closure).toBeUndefined();
     expect(item.recentActivity[0].action).toContain('reopened');
   });
@@ -249,5 +253,63 @@ describe('closing and reopening', () => {
     act(() => { result.current.reopenActionItem(id); });
 
     expect(result.current.getActionItemById(id)!.checkIn?.reports).toHaveLength(1);
+  });
+});
+
+describe('ownership and completion consistency', () => {
+  it('gives a new project an explicit owner rather than relying on array order', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => { result.current.addActionItem(form(), 'Lead Team'); });
+    expect(result.current.actionItems[0].ownerId).toBe('creator');
+  });
+
+  it('hands a project over explicitly', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    const seeded = result.current.actionItems.find(i => i.contributors.length > 1)!;
+    const second = seeded.contributors[1].id;
+
+    act(() => { result.current.setOwner(seeded.id, second); });
+    expect(result.current.getActionItemById(seeded.id)!.ownerId).toBe(second);
+  });
+
+  it('closes with a reason when a check-in reports 100%, so Completed always means one thing', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => { result.current.addActionItem(form(), 'Lead Team'); });
+    const id = result.current.actionItems[0].id;
+
+    act(() => {
+      result.current.recordCheckIn(id, { contributorId: 'creator', dueOn: '2026-08-08', progress: 100, note: 'shipped' });
+    });
+
+    const item = result.current.getActionItemById(id)!;
+    expect(item.status).toBe('Completed');
+    expect(item.closure?.reason).toContain('shipped');
+    expect(item.closure?.progressAtClose).toBe(100);
+  });
+
+  it('restores the status a project actually had, rather than promoting it', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => { result.current.addActionItem(form(), 'Lead Team'); });
+    const id = result.current.actionItems[0].id;
+    expect(result.current.getActionItemById(id)!.status).toBe('Pending');
+
+    act(() => { result.current.closeActionItem(id, 'Cancelled', 'Lead Team'); });
+    act(() => { result.current.reopenActionItem(id); });
+
+    // Was Pending before the close, so it is Pending again — not In Progress.
+    expect(result.current.getActionItemById(id)!.status).toBe('Pending');
+  });
+
+  it('keeps the cadence history through a nudge', () => {
+    const { result } = renderHook(() => useActionItems(), { wrapper });
+    act(() => { result.current.addActionItem(form(), 'Lead Team'); });
+    const id = result.current.actionItems[0].id;
+
+    act(() => { result.current.setCheckInCadence(id, 'monthly', '2026-08-04'); });
+    act(() => { result.current.nudge(id, '2026-08-05'); });
+
+    const item = result.current.getActionItemById(id)!;
+    expect(item.checkIn?.cadenceHistory?.length).toBe(2);
+    expect(item.checkIn?.lastNudgedOn).toBe('2026-08-05');
   });
 });

@@ -168,7 +168,8 @@ export const bySilenceDesc = (today: string) => (a: ActionItem, b: ActionItem) =
  * The first contributor is the project's owner — the person a lead or a VP's
  * admin actually chases. Everyone else on the project is a contributor.
  */
-export const getOwner = (item: ActionItem) => item.contributors[0] ?? null;
+export const getOwner = (item: ActionItem) =>
+  (item.ownerId && item.contributors.find(c => c.id === item.ownerId)) || item.contributors[0] || null;
 
 export type ChaseAxis = 'owner' | 'department' | 'status';
 

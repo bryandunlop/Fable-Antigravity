@@ -152,6 +152,7 @@ const fromSeed = (seed: ProjectSeed): ActionItem =>
       priority: seed.priority,
       status: 'In Progress',
       progress: seed.trend[seed.trend.length - 1],
+      ownerId: `${seed.id}-c0`,
       contributors: seed.people.map((name, index) => ({
         id: `${seed.id}-c${index}`,
         name,

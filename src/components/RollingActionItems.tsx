@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
@@ -13,7 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ActionItem, NewItemForm } from './ActionItems/types';
-import { CHECK_IN_CADENCE_OPTIONS } from './ActionItems/constants';
+import { CHECK_IN_CADENCE_OPTIONS, DEPARTMENT_OPTIONS, PRIORITY_OPTIONS } from './ActionItems/constants';
 import { getCheckInCompliance } from './ActionItems/checkIn';
 import {
   getDaysSinceLastReport, getProgressTrend, getStallState, getStallSummary,
@@ -89,6 +91,8 @@ export default function RollingActionItems() {
   const [isCreating, setIsCreating] = useState(false);
   /** Non-null while a chase run is in progress — the snapshot it walks. */
   const [runQueue, setRunQueue] = useState<string[] | null>(null);
+  /** The project being edited, as a copy, so Cancel discards. */
+  const [editing, setEditing] = useState<ActionItem | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
   const summary = getStallSummary(actionItems, today);
@@ -176,6 +180,9 @@ export default function RollingActionItems() {
     };
 
     updateActionItem(id, {
+      // Ownership is the ownerId, not the position — but keep the new owner
+      // first so every list that reads order still reads sensibly.
+      ownerId: incoming.id,
       contributors: [
         { ...incoming, role: 'Owner' },
         ...item.contributors.filter(c => c.name !== personName),
@@ -198,6 +205,22 @@ export default function RollingActionItems() {
       description: `"${item?.title ?? 'Project'}" closed at ${item?.progress ?? 0}% — ${reason}`,
       action: { label: 'Undo', onClick: () => reopenActionItem(id) },
     });
+  };
+
+  const saveEdit = () => {
+    if (!editing || !editing.title.trim()) return;
+    updateActionItem(editing.id, {
+      title: editing.title.trim(),
+      description: editing.description.trim(),
+      department: editing.department,
+      priority: editing.priority,
+      dueDate: editing.dueDate,
+    });
+    // Cadence goes through its own action so the change is dated and the
+    // history records what was expected before it.
+    if (editing.checkIn?.cadence) setCheckInCadence(editing.id, editing.checkIn.cadence);
+    setEditing(null);
+    toast.success('Project updated', { description: `"${editing.title.trim()}" saved.` });
   };
 
   const reopen = (item: ActionItem) => {
@@ -401,12 +424,15 @@ export default function RollingActionItems() {
                       const nudged = item.checkIn?.lastNudgedOn;
                       return (
                         <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 pl-11">
-                          <span className="flex-1 min-w-0 truncate text-sm">
+                          <button
+                            className="flex-1 min-w-0 truncate text-sm text-left hover:underline"
+                            onClick={() => setEditing({ ...item })}
+                          >
                             {item.title}
                             {item.closure && (
                               <span className="text-muted-foreground"> · closed at {item.closure.progressAtClose}%: {item.closure.reason}</span>
                             )}
-                          </span>
+                          </button>
                           {axis !== 'owner' && (
                             <span className="text-sm text-muted-foreground w-32 truncate text-right">
                               {getOwner(item)?.name ?? '—'}
@@ -524,6 +550,104 @@ export default function RollingActionItems() {
         </Card>
       )}
       </>
+      )}
+
+      {editing && (
+        <Dialog open onOpenChange={open => { if (!open) setEditing(null); }}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit project</DialogTitle>
+              <DialogDescription>
+                Owned by {getOwner(editing)?.name ?? 'nobody'} · created {editing.assignedDate}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-title" className="text-sm font-medium mb-2 block">
+                  Title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="edit-title"
+                  value={editing.title}
+                  onChange={e => setEditing({ ...editing, title: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-description" className="text-sm font-medium mb-2 block">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  rows={3}
+                  value={editing.description}
+                  onChange={e => setEditing({ ...editing, description: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Department</Label>
+                  <Select value={editing.department} onValueChange={(value: string) => setEditing({ ...editing, department: value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DEPARTMENT_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Priority</Label>
+                  <Select value={editing.priority} onValueChange={(value: string) => setEditing({ ...editing, priority: value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map(priority => (
+                        <SelectItem key={priority} value={priority}>{priority}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-due" className="text-sm font-medium mb-2 block">Due date</Label>
+                  <Input
+                    id="edit-due"
+                    type="date"
+                    value={editing.dueDate}
+                    onChange={e => setEditing({ ...editing, dueDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Check-in cadence</Label>
+                  <Select
+                    value={editing.checkIn?.cadence ?? 'none'}
+                    onValueChange={(value: string) => setEditing({
+                      ...editing,
+                      checkIn: {
+                        ...(editing.checkIn ?? { reports: [] }),
+                        cadence: value as CheckInCadence,
+                      },
+                    })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CHECK_IN_CADENCE_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+              <Button disabled={!editing.title.trim()} onClick={saveEdit}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       <NewItemDialog

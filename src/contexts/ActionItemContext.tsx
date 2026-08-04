@@ -20,6 +20,8 @@ interface ActionItemContextType {
   addActionItem: (form: NewItemForm, createdBy: string) => ActionItem;
   updateActionItem: (id: string, updates: Partial<ActionItem>) => void;
   setCheckInCadence: (id: string, cadence: CheckInCadence, on?: string) => void;
+  /** Hand a project to a named contributor. */
+  setOwner: (id: string, contributorId: string) => void;
   /** Poke a project that has gone quiet, without waiting for the next window. */
   nudge: (id: string, on?: string) => void;
   /** Chase a whole group in one pass — one owner, or every quiet project. */
@@ -99,6 +101,7 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       priority: form.priority,
       status: 'Pending',
       progress: sections.length ? calculateProgress(sections) : 0,
+      ownerId: 'creator',
       contributors: [
         { id: 'creator', name: createdBy, role: 'Owner', avatar: initialsOf(createdBy) },
       ],
@@ -115,6 +118,13 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const updateActionItem = (id: string, updates: Partial<ActionItem>) => {
     setActionItems(prev => prev.map(item => (item.id === id ? { ...item, ...updates } : item)));
+  };
+
+  /** Hand a project to someone, explicitly — not by shuffling an array. */
+  const setOwner = (id: string, contributorId: string) => {
+    setActionItems(prev =>
+      prev.map(item => (item.id === id ? { ...item, ownerId: contributorId } : item)),
+    );
   };
 
   const setCheckInCadence = (id: string, cadence: CheckInCadence, on?: string) => {
@@ -152,6 +162,7 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ? {
               ...item,
               checkIn: {
+                ...item.checkIn,
                 cadence: item.checkIn?.cadence ?? 'none',
                 startedOn: item.checkIn?.startedOn ?? item.assignedDate,
                 reports: item.checkIn?.reports ?? [],
@@ -172,6 +183,7 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ? {
               ...item,
               checkIn: {
+                ...item.checkIn,
                 cadence: item.checkIn?.cadence ?? 'none',
                 startedOn: item.checkIn?.startedOn ?? item.assignedDate,
                 reports: item.checkIn?.reports ?? [],
@@ -191,7 +203,7 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ? {
               ...item,
               status: 'Completed',
-              closure: { reason, closedOn, closedBy, progressAtClose: item.progress },
+              closure: { reason, closedOn, closedBy, progressAtClose: item.progress, previousStatus: item.status },
               recentActivity: [
                 {
                   id: Date.now(),
@@ -214,8 +226,9 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const { closure, ...rest } = item;
         return {
           ...rest,
-          // Back to In Progress — the stall helpers re-derive quiet from silence.
-          status: 'In Progress',
+          // Restore what it actually was. Forcing 'In Progress' promoted a
+          // project that had never started.
+          status: closure?.previousStatus ?? 'In Progress',
           recentActivity: [
             {
               id: Date.now(),
@@ -240,10 +253,23 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           r => !(r.contributorId === report.contributorId && r.dueOn === report.dueOn),
         );
         const contributor = item.contributors.find(c => c.id === report.contributorId);
+        const completing = report.progress >= 100;
         return {
           ...item,
           progress: report.progress,
-          status: report.progress >= 100 ? 'Completed' : 'In Progress',
+          status: completing ? 'Completed' : 'In Progress',
+          // Every completed project carries a closure, however it completed —
+          // otherwise "Completed" means two different things depending on which
+          // door it came through, and only one of them can be answered for.
+          closure: completing
+            ? {
+                reason: `Delivered — reported complete at check-in: ${report.note}`,
+                closedOn: report.reportedOn ?? todayIso(),
+                closedBy: item.contributors.find(c => c.id === report.contributorId)?.name ?? report.contributorId,
+                progressAtClose: report.progress,
+                previousStatus: item.status,
+              }
+            : undefined,
           checkIn: {
             ...existing,
             // The silence is broken; a standing nudge has served its purpose.
@@ -278,6 +304,7 @@ export const ActionItemProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         addActionItem,
         updateActionItem,
         setCheckInCadence,
+        setOwner,
         nudge,
         nudgeMany,
         closeActionItem,

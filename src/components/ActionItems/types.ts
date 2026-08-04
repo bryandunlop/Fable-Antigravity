@@ -51,6 +51,8 @@ export interface ProjectClosure {
   closedBy: string;
   /** Progress at the moment of closing — a project closed at 55% says so. */
   progressAtClose: number;
+  /** What it was before, so reopening restores rather than guesses. */
+  previousStatus: string;
 }
 
 /**
@@ -90,6 +92,12 @@ export interface ActionItem {
   department: string;
   /** Set only on tasks derived from another surface; absent on real projects. */
   source?: ActionItemSource;
+  /**
+   * Who owns this project. Ownership used to be positional — whoever happened
+   * to sit at contributors[0] — so any code that reordered the array silently
+   * handed the project to someone else.
+   */
+  ownerId?: string;
   assignedBy: string;
   assignedDate: string;
   dueDate: string;
