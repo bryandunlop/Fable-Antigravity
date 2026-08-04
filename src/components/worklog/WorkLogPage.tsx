@@ -119,15 +119,18 @@ function WeeklyChart({ entries }: { entries: WorkLogEntry[] }) {
 
   return (
     <div>
+      {/* Bars are DIRECT children of the fixed-height row. They used to sit in a
+          flex-col wrapper, and a percentage height resolves against the parent's
+          height — which, under `items-end`, is content-sized and therefore zero.
+          Every bar computed to nothing and the chart rendered blank. */}
       <div className="flex h-24 items-end gap-1">
         {recent.map((w) => (
-          <div key={w.key} className="group flex flex-1 flex-col items-center gap-1">
-            <div
-              className="w-full rounded-t bg-primary/80"
-              style={{ height: `${Math.max((w.minutes / max) * 100, w.minutes > 0 ? 4 : 1)}%` }}
-              title={`Week of ${w.key}: ${formatHours(w.minutes)} h`}
-            />
-          </div>
+          <div
+            key={w.key}
+            className="min-w-0 flex-1 rounded-t bg-primary/80"
+            style={{ height: `${Math.max((w.minutes / max) * 100, w.minutes > 0 ? 4 : 1)}%` }}
+            title={`Week of ${w.key}: ${formatHours(w.minutes)} h`}
+          />
         ))}
       </div>
       <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
