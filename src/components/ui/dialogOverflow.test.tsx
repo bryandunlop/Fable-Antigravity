@@ -21,7 +21,9 @@ describe('DialogContent overflow contract (TL-39)', () => {
   function openTallDialog() {
     return render(
       <Dialog open>
-        <DialogContent>
+        {/* Layout fixtures, not real surfaces — nothing to describe, so they take LG-55's
+            explicit opt-out rather than inventing copy no user will ever hear. */}
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Report defect</DialogTitle>
           </DialogHeader>
@@ -67,7 +69,7 @@ describe('DialogContent overflow contract (TL-39)', () => {
   it('lets a caller override the cap without losing the scroll container', () => {
     render(
       <Dialog open>
-        <DialogContent className="max-h-[50dvh]">
+        <DialogContent className="max-h-[50dvh]" aria-describedby={undefined}>
           <DialogTitle>Short</DialogTitle>
         </DialogContent>
       </Dialog>,
