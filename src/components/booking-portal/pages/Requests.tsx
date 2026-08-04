@@ -13,24 +13,22 @@ import { RequestDrawer } from '../components/RequestDrawer';
 import { RequestIdentityLine } from '../components/RequestIdentity';
 import { AsOf, StatusChip } from '../components/portalUi';
 import { usePortal } from '../BookingPortalContext';
+import type { Passenger, TripRequest } from '../types';
 
-export default function Requests() {
-  const { state, dispatch } = usePortal();
-  const navigate = useNavigate();
-  // A deep link to one request opens it in the drawer over this list rather
-  // than on a page of its own — one implementation, and closing it leaves you
-  // somewhere useful instead of nowhere.
-  const { id: deepLinkId } = useParams();
-  const [drawerId, setDrawerId] = useState<string | null>(deepLinkId ?? null);
-
-  const requests = state.requests.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const live = requests.filter((r) => r.status !== 'confirmed' && r.status !== 'declined');
-  const declined = requests.filter((r) => r.status === 'declined');
-  const done = requests.filter((r) => r.status === 'confirmed');
-
-  const Section = ({
-    title, rows, hint, accent,
-  }: { title: string; rows: typeof requests; hint: string; accent: string }) => (
+// Hoisted: a component defined inside the render is a new type every pass, so
+// React unmounts and remounts the whole section on each state change.
+function RequestSection({
+  title, rows, hint, accent, passengers, onOpen, onResubmit,
+}: {
+  title: string;
+  rows: TripRequest[];
+  hint: string;
+  accent: string;
+  passengers: Passenger[];
+  onOpen: (id: string) => void;
+  onResubmit: (id: string) => void;
+}) {
+  return (
     <Card>
       <CardHeader className="py-4">
         <CardTitle className="flex flex-wrap items-center gap-2.5 text-base">
@@ -47,16 +45,16 @@ export default function Requests() {
           rows.map((r) => (
             <div key={r.id} className="overflow-hidden rounded-lg border">
               <button
-                onClick={() => setDrawerId(r.id)}
+                onClick={() => onOpen(r.id)}
                 className="group flex w-full flex-wrap items-center justify-between gap-3 border-b bg-muted/50 px-4 py-2.5 text-left transition-colors hover:bg-accent"
               >
-                <RequestIdentityLine request={r} passengers={state.passengers} />
+                <RequestIdentityLine request={r} passengers={passengers} />
                 <StatusChip status={r.status} />
               </button>
               {r.status === 'declined' && r.declineReason && (
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
                   <span className="text-sm text-muted-foreground">"{r.declineReason}"</span>
-                  <Button variant="outline" size="sm" onClick={() => dispatch({ type: 'RESUBMIT_REQUEST', id: r.id })}>
+                  <Button variant="outline" size="sm" onClick={() => onResubmit(r.id)}>
                     Edit &amp; resubmit
                   </Button>
                 </div>
@@ -67,6 +65,22 @@ export default function Requests() {
       </CardContent>
     </Card>
   );
+}
+
+export default function Requests() {
+  const { state, dispatch } = usePortal();
+  const navigate = useNavigate();
+  // A deep link to one request opens it in the drawer over this list rather
+  // than on a page of its own — one implementation, and closing it leaves you
+  // somewhere useful instead of nowhere.
+  const { id: deepLinkId } = useParams();
+  const [drawerId, setDrawerId] = useState<string | null>(deepLinkId ?? null);
+
+  const requests = state.requests.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const live = requests.filter((r) => r.status !== 'confirmed' && r.status !== 'declined');
+  const declined = requests.filter((r) => r.status === 'declined');
+  const done = requests.filter((r) => r.status === 'confirmed');
+  const resubmit = (id: string) => dispatch({ type: 'RESUBMIT_REQUEST', id });
 
   return (
     <PortalShell
@@ -79,11 +93,11 @@ export default function Requests() {
       }
     >
       <div className="flex flex-col gap-4">
-        <Section title="In flight" rows={live} hint="submitted, waiting on a decision" accent="status-info" />
+        <RequestSection title="In flight" rows={live} hint="submitted, waiting on a decision" accent="status-info" passengers={state.passengers} onOpen={setDrawerId} onResubmit={resubmit} />
         {declined.length > 0 && (
-          <Section title="Declined — needs a change" rows={declined} hint="the reason travels with the decision" accent="status-error" />
+          <RequestSection title="Declined — needs a change" rows={declined} hint="the reason travels with the decision" accent="status-error" passengers={state.passengers} onOpen={setDrawerId} onResubmit={resubmit} />
         )}
-        <Section title="Confirmed" rows={done} hint="on the schedule — see Trips for the itinerary" accent="status-success" />
+        <RequestSection title="Confirmed" rows={done} hint="on the schedule — see Trips for the itinerary" accent="status-success" passengers={state.passengers} onOpen={setDrawerId} onResubmit={resubmit} />
       </div>
 
       <RequestDrawer
