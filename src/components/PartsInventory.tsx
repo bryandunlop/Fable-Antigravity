@@ -5,11 +5,12 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Alert, AlertDescription } from './ui/alert';
 import { Progress } from './ui/progress';
+import SummaryBar from './shared/SummaryBar';
+import RecordList, { RecordFold, RecordRow } from './shared/RecordList';
 import { 
   Package, 
   AlertTriangle, 
@@ -362,6 +363,27 @@ export default function PartsInventory() {
   const lowStockParts = parts.filter(part => part.status === 'low-stock' || part.status === 'out-of-stock').length;
   const pendingOrders = purchaseOrders.filter(po => po.status === 'pending' || po.status === 'approved').length;
 
+  // A part above its minimum needs nothing from anyone, so it folds out of the way.
+  // Ordering matches the page's own low-stock definition (see lowStockParts above).
+  const partsNeedingAttention = filteredParts.filter(part => part.status !== 'in-stock');
+  const partsInStock = filteredParts.filter(part => part.status === 'in-stock');
+
+  const ordersOutstanding = purchaseOrders.filter(o => o.status !== 'received' && o.status !== 'cancelled');
+  const ordersClosed = purchaseOrders.filter(o => o.status === 'received' || o.status === 'cancelled');
+
+  const orderMeta = (order: PurchaseOrder) =>
+    `${order.parts.length} line${order.parts.length === 1 ? '' : 's'} \u00b7 $${order.totalAmount.toLocaleString()} \u00b7 due ${new Date(order.expectedDelivery).toLocaleDateString()}`;
+
+  // What a tech needs before tapping through: how many are on the shelf against the
+  // minimum, and where. Cost and total value belong in the detail, not the scan line.
+  const partMeta = (part: Part) =>
+    [
+      part.description,
+      `${part.currentStock} of ${part.maxStock} (min ${part.minStock})`,
+      part.location,
+      part.serialTracked ? 'serial tracked' : null,
+    ].filter(Boolean).join(' \u00b7 ');
+
   const syncWithMyCMP = async () => {
     toast.info('Syncing with myCMP...');
     // Simulate API call
@@ -380,16 +402,18 @@ export default function PartsInventory() {
     toast.success('Alert acknowledged');
   };
 
+  // No page padding — Navigation's <main> is already p-6 pb-20 md:pb-6, and the
+  // second p-6 cost 48px of a 390pt phone.
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Parts & Inventory Management</h1>
           <p className="text-muted-foreground">
             Integrated with myCMP for G650 parts tracking and procurement
           </p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex gap-2 shrink-0">
           <Button onClick={syncWithMyCMP} variant="outline">
             <Settings className="h-4 w-4 mr-2" />
             Sync myCMP
@@ -403,17 +427,17 @@ export default function PartsInventory() {
 
       {/* myCMP Connection Status */}
       <Alert className={myCMPConnected ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
-        <div className="flex items-center">
-          {myCMPConnected ? (
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          ) : (
-            <XCircle className="h-4 w-4 text-red-600" />
-          )}
-          <AlertDescription className="ml-2">
-            myCMP Connection: {myCMPConnected ? 'Active' : 'Disconnected'} | 
-            Last Sync: {lastSync.toLocaleString()}
-          </AlertDescription>
-        </div>
+        {/* The icon must be a DIRECT child: Alert is a grid whose `has-[>svg]`
+            column rule only fires on a top-level svg. Wrapped, the text column
+            collapsed to ~130pt on a phone. */}
+        {myCMPConnected ? (
+          <CheckCircle className="h-4 w-4 text-green-600" />
+        ) : (
+          <XCircle className="h-4 w-4 text-red-600" />
+        )}
+        <AlertDescription>
+          myCMP connection: {myCMPConnected ? 'active' : 'disconnected'} · last sync {lastSync.toLocaleString()}
+        </AlertDescription>
       </Alert>
 
       {/* Stock Alerts */}
@@ -427,72 +451,33 @@ export default function PartsInventory() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="orders">Purchase Orders</TabsTrigger>
-          <TabsTrigger value="vendors">Vendors</TabsTrigger>
-          <TabsTrigger value="alerts">Stock Alerts</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        {/* Five labels in a five-column grid overlap each other at 390pt. Scrolling
+            the strip is the phone idiom; the grid returns once there is room. */}
+        <TabsList className="w-full flex overflow-x-auto justify-start sm:grid sm:grid-cols-5">
+          <TabsTrigger value="inventory" className="shrink-0">Inventory</TabsTrigger>
+          <TabsTrigger value="orders" className="shrink-0">Purchase Orders</TabsTrigger>
+          <TabsTrigger value="vendors" className="shrink-0">Vendors</TabsTrigger>
+          <TabsTrigger value="alerts" className="shrink-0">Stock Alerts</TabsTrigger>
+          <TabsTrigger value="analytics" className="shrink-0">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Parts</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{parts.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  {parts.filter(p => p.status === 'in-stock').length} in stock
-                </p>
-              </CardContent>
-            </Card>
+          {/* Four stat Cards were a screen and a half of chrome on a phone before
+              the first part. The same numbers read fine as one wrapping line, and
+              the two exception counts vanish at zero rather than reading as a score. */}
+          <SummaryBar
+            items={[
+              { label: 'parts', value: parts.length, icon: Package },
+              { label: 'in stock', value: parts.filter(p => p.status === 'in-stock').length },
+              { label: 'inventory value', value: `$${totalInventoryValue.toLocaleString()}`, icon: DollarSign },
+              { label: 'low or out of stock', value: lowStockParts, icon: AlertTriangle, tone: 'alert', hideWhenZero: true },
+              { label: 'orders awaiting delivery', value: pendingOrders, icon: Truck, hideWhenZero: true },
+            ]}
+          />
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${totalInventoryValue.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Total asset value
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{lowStockParts}</div>
-                <p className="text-xs text-muted-foreground">
-                  Require attention
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-                <Truck className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{pendingOrders}</div>
-                <p className="text-xs text-muted-foreground">
-                  Awaiting delivery
-                </p>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Search and Filters */}
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -505,7 +490,7 @@ export default function PartsInventory() {
               </div>
             </div>
             <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
@@ -524,137 +509,46 @@ export default function PartsInventory() {
             </Button>
           </div>
 
-          {/* Parts Table */}
+          {/* Was a nine-column table — Part Number / Description / Category / Stock
+              Level / Unit Cost / Total Value / Vendor / Status / Actions. Nine columns
+              cannot be made to work at 390pt, and a hangar phone is where a part gets
+              looked up. The row states what is short; a part sitting comfortably above
+              its minimum needs nothing from anyone, so it folds away. */}
           <Card>
             <CardHeader>
               <CardTitle>Parts Inventory</CardTitle>
               <CardDescription>Current stock levels and part information</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Part Number</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Stock Level</TableHead>
-                    <TableHead>Unit Cost</TableHead>
-                    <TableHead>Total Value</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredParts.map((part) => {
-                    const stockLevel = getStockLevel(part.currentStock, part.minStock, part.maxStock);
-                    
-                    return (
-                      <TableRow key={part.id}>
-                        <TableCell className="font-medium">{part.partNumber}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{part.description}</p>
-                            {part.serialTracked && (
-                              <Badge variant="outline" className="text-xs">Serial Tracked</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{part.category}</TableCell>
-                        <TableCell>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span>{part.currentStock}</span>
-                              <span className="text-muted-foreground">/ {part.maxStock}</span>
-                            </div>
-                            <Progress 
-                              value={stockLevel.percentage} 
-                              className="h-2"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Min: {part.minStock}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>${part.unitCost.toLocaleString()}</TableCell>
-                        <TableCell>${part.totalValue.toLocaleString()}</TableCell>
-                        <TableCell>{part.vendor}</TableCell>
-                        <TableCell>{getStatusBadge(part.status)}</TableCell>
-                        <TableCell>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={() => setSelectedPart(part)}>
-                                View Details
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>{part.partNumber} - Details</DialogTitle>
-                                <DialogDescription>{part.description}</DialogDescription>
-                              </DialogHeader>
-                              {selectedPart && (
-                                <div className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <Label>Category</Label>
-                                      <p>{selectedPart.category}</p>
-                                    </div>
-                                    <div>
-                                      <Label>Location</Label>
-                                      <p>{selectedPart.location}</p>
-                                    </div>
-                                    <div>
-                                      <Label>Current Stock</Label>
-                                      <p>{selectedPart.currentStock} units</p>
-                                    </div>
-                                    <div>
-                                      <Label>Min/Max Stock</Label>
-                                      <p>{selectedPart.minStock} / {selectedPart.maxStock}</p>
-                                    </div>
-                                    <div>
-                                      <Label>Unit Cost</Label>
-                                      <p>${selectedPart.unitCost.toLocaleString()}</p>
-                                    </div>
-                                    <div>
-                                      <Label>Total Value</Label>
-                                      <p>${selectedPart.totalValue.toLocaleString()}</p>
-                                    </div>
-                                    <div>
-                                      <Label>Lead Time</Label>
-                                      <p>{selectedPart.leadTime} days</p>
-                                    </div>
-                                    <div>
-                                      <Label>Last Ordered</Label>
-                                      <p>{selectedPart.lastOrdered}</p>
-                                    </div>
-                                  </div>
-                                  
-                                  <div>
-                                    <Label>Aircraft Compatibility</Label>
-                                    <div className="mt-2 flex space-x-2">
-                                      {selectedPart.aircraftCompatibility.map((aircraft, index) => (
-                                        <Badge key={index} variant="outline">{aircraft}</Badge>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div className="flex space-x-2 pt-4">
-                                    <Button>Create Purchase Order</Button>
-                                    <Button variant="outline">Update Stock</Button>
-                                    <Button variant="outline">Edit Part</Button>
-                                  </div>
-                                </div>
-                              )}
-                            </DialogContent>
-                          </Dialog>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <RecordList>
+                {partsNeedingAttention.map((part) => (
+                  <RecordRow
+                    key={part.id}
+                    title={part.partNumber}
+                    meta={partMeta(part)}
+                    trailing={getStatusBadge(part.status)}
+                    onOpen={() => setSelectedPart(part)}
+                  />
+                ))}
+                {partsNeedingAttention.length === 0 && (
+                  <p className="px-3 py-4 text-sm text-muted-foreground">Every part is above its minimum.</p>
+                )}
+                {partsInStock.length > 0 && (
+                  <RecordFold label={`${partsInStock.length} in stock`}>
+                    {partsInStock.map((part) => (
+                      <RecordRow
+                        key={part.id}
+                        title={part.partNumber}
+                        meta={partMeta(part)}
+                        onOpen={() => setSelectedPart(part)}
+                      />
+                    ))}
+                  </RecordFold>
+                )}
+              </RecordList>
             </CardContent>
           </Card>
+
         </TabsContent>
 
         <TabsContent value="orders" className="space-y-6">
@@ -664,40 +558,33 @@ export default function PartsInventory() {
               <CardDescription>Track purchase orders and delivery status</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>PO Number</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Parts</TableHead>
-                    <TableHead>Total Amount</TableHead>
-                    <TableHead>Order Date</TableHead>
-                    <TableHead>Expected Delivery</TableHead>
-                    <TableHead>Urgency</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {purchaseOrders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.poNumber}</TableCell>
-                      <TableCell>{order.vendor}</TableCell>
-                      <TableCell>
-                        {order.parts.map((part, index) => (
-                          <div key={index} className="text-sm">
-                            {part.partNumber} (Qty: {part.quantity})
-                          </div>
-                        ))}
-                      </TableCell>
-                      <TableCell>${order.totalAmount.toLocaleString()}</TableCell>
-                      <TableCell>{new Date(order.orderDate).toLocaleDateString()}</TableCell>
-                      <TableCell>{new Date(order.expectedDelivery).toLocaleDateString()}</TableCell>
-                      <TableCell>{getUrgencyBadge(order.urgency)}</TableCell>
-                      <TableCell>{getPOStatusBadge(order.status)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {/* Eight columns became one row per order. A received or cancelled PO is
+                  history, so it folds; what is left is what is still coming. */}
+              <RecordList>
+                {ordersOutstanding.map((order) => (
+                  <RecordRow
+                    key={order.id}
+                    title={`${order.poNumber} \u00b7 ${order.vendor}`}
+                    meta={orderMeta(order)}
+                    trailing={getUrgencyBadge(order.urgency)}
+                  />
+                ))}
+                {ordersOutstanding.length === 0 && (
+                  <p className="px-3 py-4 text-sm text-muted-foreground">Nothing on order.</p>
+                )}
+                {ordersClosed.length > 0 && (
+                  <RecordFold label={`${ordersClosed.length} received or cancelled`}>
+                    {ordersClosed.map((order) => (
+                      <RecordRow
+                        key={order.id}
+                        title={`${order.poNumber} \u00b7 ${order.vendor}`}
+                        meta={orderMeta(order)}
+                        trailing={getPOStatusBadge(order.status)}
+                      />
+                    ))}
+                  </RecordFold>
+                )}
+              </RecordList>
             </CardContent>
           </Card>
         </TabsContent>
@@ -709,55 +596,22 @@ export default function PartsInventory() {
               <CardDescription>Manage vendor relationships and performance</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Vendor Name</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Rating</TableHead>
-                    <TableHead>Lead Time</TableHead>
-                    <TableHead>On-Time Delivery</TableHead>
-                    <TableHead>Certifications</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {vendors.map((vendor) => (
-                    <TableRow key={vendor.id}>
-                      <TableCell className="font-medium">{vendor.name}</TableCell>
-                      <TableCell>
-                        <div>
-                          <p>{vendor.contact}</p>
-                          <p className="text-sm text-muted-foreground">{vendor.email}</p>
-                          <p className="text-sm text-muted-foreground">{vendor.phone}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <span className="text-yellow-500">★</span>
-                          <span className="ml-1">{vendor.rating}/5.0</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{vendor.leadTime} days</TableCell>
-                      <TableCell>{vendor.onTimeDelivery}%</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {vendor.certifications.map((cert, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {cert}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={vendor.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                          {vendor.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {/* Seven columns became one row per vendor. The certifications list is
+                  the reason to open a vendor, not the reason to scan the list. */}
+              <RecordList>
+                {vendors.map((vendor) => (
+                  <RecordRow
+                    key={vendor.id}
+                    title={vendor.name}
+                    meta={`${vendor.contact} \u00b7 ${vendor.phone} \u00b7 \u2605 ${vendor.rating}/5.0 \u00b7 ${vendor.leadTime}d lead \u00b7 ${vendor.onTimeDelivery}% on time`}
+                    trailing={
+                      <Badge className={`shrink-0 ${vendor.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {vendor.status}
+                      </Badge>
+                    }
+                  />
+                ))}
+              </RecordList>
             </CardContent>
           </Card>
         </TabsContent>
@@ -863,6 +717,77 @@ export default function PartsInventory() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* One dialog for the page, driven by the selected part — it used to be
+          re-declared inside every row of the table. */}
+      <Dialog open={!!selectedPart} onOpenChange={(open) => !open && setSelectedPart(null)}>
+        <DialogContent className="max-w-2xl">
+          {selectedPart && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedPart.partNumber} - Details</DialogTitle>
+                <DialogDescription>{selectedPart.description}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Category</Label>
+                    <p>{selectedPart.category}</p>
+                  </div>
+                  <div>
+                    <Label>Location</Label>
+                    <p>{selectedPart.location}</p>
+                  </div>
+                  <div>
+                    <Label>Current Stock</Label>
+                    <p>{selectedPart.currentStock} units</p>
+                  </div>
+                  <div>
+                    <Label>Min/Max Stock</Label>
+                    <p>{selectedPart.minStock} / {selectedPart.maxStock}</p>
+                  </div>
+                  <div>
+                    <Label>Unit Cost</Label>
+                    <p>${selectedPart.unitCost.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label>Total Value</Label>
+                    <p>${selectedPart.totalValue.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label>Vendor</Label>
+                    <p>{selectedPart.vendor}</p>
+                  </div>
+                  <div>
+                    <Label>Lead Time</Label>
+                    <p>{selectedPart.leadTime} days</p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Stock level</Label>
+                  <Progress value={getStockLevel(selectedPart.currentStock, selectedPart.minStock, selectedPart.maxStock).percentage} className="h-2 mt-2" />
+                </div>
+
+                <div>
+                  <Label>Aircraft Compatibility</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedPart.aircraftCompatibility.map((aircraft, index) => (
+                      <Badge key={index} variant="outline">{aircraft}</Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-4">
+                  <Button>Create Purchase Order</Button>
+                  <Button variant="outline">Update Stock</Button>
+                  <Button variant="outline">Edit Part</Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
