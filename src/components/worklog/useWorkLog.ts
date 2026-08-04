@@ -17,9 +17,14 @@ import { todayLocal, type WorkLogEntry } from './workLog';
 const API = '/api/worklog';
 const CACHE_KEY = 'worklog.entries.v1';
 const OUTBOX_KEY = 'worklog.outbox.v1';
+/** The derivation, shipped as a static asset. See scripts/derive-work-sessions.ts --bundle. */
+const SEED_URL = '/worklog-seed.json';
+/** Set once the bundle has been applied, so deleting a derived row keeps it deleted. */
+const SEEDED_KEY = 'worklog.seeded.v1';
 
 type Op =
   | { kind: 'create'; entry: WorkLogEntry }
+  | { kind: 'bulk'; entries: WorkLogEntry[] }
   | { kind: 'update'; id: string; patch: Partial<WorkLogEntry> }
   | { kind: 'delete'; id: string };
 
@@ -41,11 +46,59 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
+/**
+ * The derived sessions, applied once per device.
+ *
+ * Why the page ships with them rather than only reading them from the server:
+ * it has to be useful the first time it is opened on a phone — no migration
+ * run, no script run, possibly no signal. The bundle makes the full history
+ * present on first paint; the outbox then pushes it to the database when one is
+ * reachable. Ids are deterministic, so that push cannot duplicate what a CLI
+ * seed already wrote.
+ *
+ * Guarded on a stored flag rather than on "is the log empty", or deleting a
+ * derived row you disagreed with would resurrect it on the next load.
+ *
+ * The flag is claimed SYNCHRONOUSLY, before the fetch rather than after it.
+ * React invokes mount effects twice in development; with the write after the
+ * await, both calls passed the check before either had claimed it and the whole
+ * bundle uploaded twice. Nothing was corrupted — ids are deterministic and
+ * conflicts do nothing — but it was a wasted upload of every session. Claiming
+ * first closes that window, and the claim is released again if the fetch fails
+ * so a later load can retry.
+ */
+async function readSeedBundle(): Promise<WorkLogEntry[] | null> {
+  if (localStorage.getItem(SEEDED_KEY)) return null;
+  const stamp = new Date().toISOString();
+  localStorage.setItem(SEEDED_KEY, stamp);
+  try {
+    const res = await fetch(SEED_URL);
+    if (!res.ok) throw new Error(String(res.status));
+    const body = (await res.json()) as { entries?: Omit<WorkLogEntry, 'createdAt' | 'updatedAt'>[] };
+    if (!Array.isArray(body.entries) || body.entries.length === 0) return null;
+    return body.entries.map((e) => ({ ...e, createdAt: stamp, updatedAt: stamp }));
+  } catch {
+    // No bundle is not an error — the log just starts empty. Release the claim
+    // so a load with working assets can still seed later.
+    localStorage.removeItem(SEEDED_KEY);
+    return null;
+  }
+}
+
 async function send(op: Op): Promise<void> {
   const json = { 'Content-Type': 'application/json' };
   if (op.kind === 'create') {
     const res = await fetch(API, { method: 'POST', headers: json, body: JSON.stringify(op.entry) });
     if (!res.ok) throw new Error(`POST ${res.status}`);
+    return;
+  }
+  if (op.kind === 'bulk') {
+    const res = await fetch(`${API}/bulk`, {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ entries: op.entries }),
+    });
+    if (!res.ok) throw new Error(`POST bulk ${res.status}`);
     return;
   }
   if (op.kind === 'update') {
@@ -101,17 +154,27 @@ export function useWorkLog(): UseWorkLog {
   const [loading, setLoading] = useState(true);
   const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [pending, setPending] = useState(() => readJson<Op[]>(OUTBOX_KEY, []).length);
-  const draining = useRef(false);
+  const draining = useRef<Promise<void> | null>(null);
 
   const persist = useCallback((next: WorkLogEntry[]) => {
     setEntries(next);
     writeJson(CACHE_KEY, next);
   }, []);
 
-  const drain = useCallback(async () => {
-    if (draining.current) return;
-    draining.current = true;
-    try {
+  /**
+   * Flushes the outbox. Returns the in-flight promise when already running, so
+   * `await drain()` genuinely waits.
+   *
+   * It used to return undefined in that case, which made the guard silently
+   * turn `await drain()` into a no-op. That cost the seeded history: the bulk
+   * upload emptied the outbox while a `load()` issued moments earlier was still
+   * in flight, and that response — taken before the upload landed, so empty —
+   * was persisted over all 114 sessions. Ordering is the fix; re-applying the
+   * outbox on merge cannot help once the outbox is legitimately empty.
+   */
+  const drain = useCallback((): Promise<void> => {
+    if (draining.current) return draining.current;
+    const run = (async () => {
       let queue = readJson<Op[]>(OUTBOX_KEY, []);
       while (queue.length > 0) {
         try {
@@ -123,9 +186,11 @@ export function useWorkLog(): UseWorkLog {
         writeJson(OUTBOX_KEY, queue);
         setPending(queue.length);
       }
-    } finally {
-      draining.current = false;
-    }
+    })().finally(() => {
+      draining.current = null;
+    });
+    draining.current = run;
+    return run;
   }, []);
 
   const enqueue = useCallback(
@@ -152,12 +217,20 @@ export function useWorkLog(): UseWorkLog {
         return;
       }
       const body = (await res.json()) as { entries: WorkLogEntry[] };
-      // Anything still queued is not on the server yet — re-apply it over the
-      // fetched list so a pending write does not blink out of the UI.
+      // Anything still queued has NOT reached the server yet, so the fetched
+      // list is missing it. Re-apply the queue over the response, or a pending
+      // write blinks out of the UI — and, worse, a freshly created empty table
+      // would wipe the 114 seeded sessions that are still waiting to upload.
       const queued = readJson<Op[]>(OUTBOX_KEY, []);
-      const pendingCreates = queued.flatMap((op) => (op.kind === 'create' ? [op.entry] : []));
+      const pendingWrites = queued.flatMap((op) =>
+        op.kind === 'create' ? [op.entry] : op.kind === 'bulk' ? op.entries : [],
+      );
       const pendingDeletes = new Set(queued.flatMap((op) => (op.kind === 'delete' ? [op.id] : [])));
-      const merged = [...body.entries, ...pendingCreates].filter((e) => !pendingDeletes.has(e.id));
+      // Server rows win on id — they are the durable copy of the same entry.
+      const byId = new Map<string, WorkLogEntry>();
+      for (const e of pendingWrites) byId.set(e.id, e);
+      for (const e of body.entries) byId.set(e.id, e);
+      const merged = [...byId.values()].filter((e) => !pendingDeletes.has(e.id));
       persist(merged);
       setProblem(null);
     } catch {
@@ -169,15 +242,34 @@ export function useWorkLog(): UseWorkLog {
   }, [persist]);
 
   useEffect(() => {
-    void load();
-    void drain();
-    const onOnline = () => {
-      void drain();
-      void load();
+    // Seed BEFORE talking to the server, so the history is on screen at first
+    // paint even with no signal and nothing configured.
+    void (async () => {
+      const seeded = await readSeedBundle();
+      if (seeded && seeded.length) {
+        const existing = readJson<WorkLogEntry[]>(CACHE_KEY, []);
+        const byId = new Map(seeded.map((e) => [e.id, e]));
+        for (const e of existing) byId.set(e.id, e); // anything local already wins
+        persist([...byId.values()]);
+        enqueue({ kind: 'bulk', entries: seeded });
+      }
+      // Order matters: flush first, then read back. Reading before the flush
+      // lands returns a server state that predates our own writes.
+      await drain();
+      await load();
+    })();
+
+    const onOnline = async () => {
+      await drain();
+      await load();
     };
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
-  }, [load, drain]);
+    const listener = () => void onOnline();
+    window.addEventListener('online', listener);
+    return () => window.removeEventListener('online', listener);
+    // Mount-only: this is a one-shot bootstrap, and re-running it on every
+    // callback identity change would re-issue the seed request each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addEntry: UseWorkLog['addEntry'] = useCallback(
     (input) => {

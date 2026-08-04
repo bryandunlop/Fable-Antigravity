@@ -188,54 +188,118 @@ describe('GET /worklog', () => {
   });
 });
 
-/** A db whose reads reject, to stand in for an unmigrated database. */
-function failingDb(err: unknown) {
+/**
+ * A db that rejects queries until the table is "created".
+ *
+ * `execute` resolves on its own rather than through the shared thenable, which
+ * is what lets this model the real sequence: query fails 42P01 → CREATE TABLE →
+ * query succeeds.
+ */
+function recoveringDb(failWith: unknown, rows: unknown[] = []) {
+  const state = { created: false, executes: 0 };
   const box: Record<string, unknown> = {
-    then: (_res: unknown, rej?: (e: unknown) => unknown) => Promise.reject(err).catch(rej),
+    then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+      state.created ? Promise.resolve(rows).then(res) : Promise.reject(failWith).catch(rej),
+    execute: () => {
+      state.executes += 1;
+      state.created = true;
+      return Promise.resolve([]);
+    },
   };
-  for (const m of ['select', 'from', 'where', 'insert', 'values', 'onConflictDoNothing', 'returning', 'update', 'set', 'delete']) {
+  for (const m of [
+    'select', 'from', 'where', 'insert', 'values',
+    'onConflictDoNothing', 'returning', 'update', 'set', 'delete',
+  ]) {
     box[m] = () => box;
   }
-  return box;
+  return { db: box, state };
 }
 
-function mountFailing(err: unknown) {
+function mountRecovering(failWith: unknown, rows: unknown[] = []) {
+  const { db, state } = recoveringDb(failWith, rows);
   const app = new Hono<Env>();
   const mw = async (c: { set: (k: 'db', v: Db) => void }, next: () => Promise<void>) => {
-    c.set('db', failingDb(err) as unknown as Db);
+    c.set('db', db as unknown as Db);
     await next();
   };
   app.use('/worklog', mw);
   app.use('/worklog/*', mw);
   app.route('/worklog', worklogRoute);
-  return app;
+  return { app, state };
 }
 
-describe('GET /worklog when the table has not been created', () => {
-  // Why this is worth a named response: a bare 500 is indistinguishable from
-  // "no signal" on the client, and the page said "offline" while on good wifi.
-  it('answers 503 with an actionable hint on Postgres 42P01', async () => {
-    const res = await mountFailing(Object.assign(new Error('boom'), { code: '42P01' })).request(
-      '/worklog',
-    );
-    expect(res.status).toBe(503);
-    const body = (await res.json()) as { error: string; hint: string };
-    expect(body.error).toBe('table_missing');
-    expect(body.hint).toContain('db:push');
+describe('the table brings itself into existence', () => {
+  // The log has to work on a phone with no migration run. Every handler goes
+  // through withTable, so a missing table self-heals instead of 500ing.
+  const missing = () => Object.assign(new Error('boom'), { code: '42P01' });
+
+  it('creates the table and retries the read, rather than failing', async () => {
+    const { app, state } = mountRecovering(missing(), [valid]);
+    const res = await app.request('/worklog');
+    expect(res.status).toBe(200);
+    expect(state.executes).toBe(1);
+    await expect(res.json()).resolves.toEqual({ entries: [valid] });
   });
 
-  it('also recognises the message form, since drivers do not all set code', async () => {
-    const res = await mountFailing(
-      new Error('relation "work_log_entries" does not exist'),
-    ).request('/worklog');
-    expect(res.status).toBe(503);
+  it('recognises the message form too, since not every driver sets code', async () => {
+    const { app, state } = mountRecovering(new Error('relation "work_log_entries" does not exist'));
+    expect((await app.request('/worklog')).status).toBe(200);
+    expect(state.executes).toBe(1);
   });
 
-  it('does NOT dress up an unrelated failure as a setup problem', async () => {
-    // A connection reset must not tell the user to run a migration.
-    const res = await mountFailing(new Error('connection terminated unexpectedly')).request(
-      '/worklog',
-    );
-    expect(res.status).not.toBe(503);
+  it('self-heals on write as well as read', async () => {
+    const { app, state } = mountRecovering(missing(), [valid]);
+    const res = await post(app, valid);
+    expect(res.status).toBe(201);
+    expect(state.executes).toBe(1);
+  });
+
+  it('does NOT create a table in response to an unrelated failure', async () => {
+    // A connection reset must not be answered by running DDL.
+    const { app, state } = mountRecovering(new Error('connection terminated unexpectedly'));
+    const res = await app.request('/worklog');
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(state.executes).toBe(0);
+  });
+});
+
+describe('POST /worklog/bulk', () => {
+  it('accepts the derived sessions in one request', async () => {
+    const log: Captured[] = [];
+    const res = await mount([{ id: 'a' }, { id: 'b' }], log).request('/worklog/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: [valid, { ...valid, id: 'wl_2' }] }),
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ inserted: 2, received: 2 });
+  });
+
+  it('is a no-op on an empty list rather than an error', async () => {
+    const res = await mount().request('/worklog/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: [] }),
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ inserted: 0 });
+  });
+
+  it('rejects the whole batch if any row is invalid, rather than half-writing it', async () => {
+    const res = await mount().request('/worklog/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: [valid, { ...valid, minutes: -5 }] }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('refuses an implausibly large batch', async () => {
+    const res = await mount().request('/worklog/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: Array.from({ length: 2001 }, () => valid) }),
+    });
+    expect(res.status).toBe(413);
   });
 });

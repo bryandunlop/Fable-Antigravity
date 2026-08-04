@@ -243,6 +243,57 @@ function report(commits: CommitPoint[], sessions: DerivedSession[]) {
   console.log();
 }
 
+// ─── Static bundle ──────────────────────────────────────────────────────────
+
+/**
+ * Writes the derived sessions to public/worklog-seed.json.
+ *
+ * Why a static asset and not only a database seed: the page has to be useful on
+ * a phone the first time it is opened, with no migration run, no script run,
+ * and possibly no signal. Shipping the derivation as a file means the full
+ * history is there on first paint. The page pushes it to the database in one
+ * request when it can reach one, and ids are deterministic so that push is
+ * idempotent — the file and the CLI seeder cannot disagree or double up.
+ *
+ * Regenerate whenever the history moves: `npm run worklog:bundle`.
+ */
+async function writeBundle(sessions: DerivedSession[]) {
+  const { writeFile } = await import('node:fs/promises');
+  const path = 'public/worklog-seed.json';
+
+  const entries = sessions.map((s) => ({
+    id: s.id,
+    localDate: s.localDate,
+    minutes: s.minutes,
+    category: DERIVED_CATEGORY,
+    source: 'git' as const,
+    note: s.note,
+    startedAt: s.startedAt,
+    endedAt: s.endedAt,
+    commits: s.commits,
+  }));
+
+  const totalMinutes = entries.reduce((a, e) => a + e.minutes, 0);
+  await writeFile(
+    path,
+    `${JSON.stringify(
+      {
+        generatedFrom: repoPaths().map(shortName),
+        sessions: entries.length,
+        totalHours: Number((totalMinutes / 60).toFixed(1)),
+        entries,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  console.log(
+    `\nWrote ${path} — ${entries.length} sessions, ${hours(totalMinutes)} h, ` +
+      `from ${repoPaths().length} repositories.\n`,
+  );
+}
+
 // ─── Seeding ────────────────────────────────────────────────────────────────
 
 async function seed(sessions: DerivedSession[]) {
@@ -351,6 +402,7 @@ async function main() {
 
   report(commits, sessions);
 
+  if (process.argv.includes('--bundle')) await writeBundle(sessions);
   if (process.argv.includes('--seed')) await seed(sessions);
 }
 
