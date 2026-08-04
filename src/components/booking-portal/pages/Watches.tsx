@@ -32,7 +32,7 @@ export default function Watches() {
   };
 
   return (
-    <PortalShell title="Watches" actions={<AsOf>Fleet state as of {asOf}</AsOf>}>
+    <PortalShell title="Watches" meta={<AsOf>Fleet state as of {asOf}</AsOf>}>
       <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
         <div className="flex flex-col gap-3">
           {state.watches.map((w) => (

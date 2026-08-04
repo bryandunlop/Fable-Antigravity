@@ -34,7 +34,7 @@ export default function Passengers() {
   const others = state.passengers.filter((p) => p.kind !== 'principal');
 
   return (
-    <PortalShell title="Passengers" actions={<AsOf>Profiles read through from CRM {asOf} — nothing stored here</AsOf>}>
+    <PortalShell title="Passengers" meta={<AsOf>Profiles read through from CRM {asOf} — nothing stored here</AsOf>}>
       <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
         <div className="flex flex-col gap-4">
           {principals.map((p) => (

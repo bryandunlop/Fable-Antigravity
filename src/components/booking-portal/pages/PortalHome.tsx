@@ -29,7 +29,7 @@ export default function PortalHome() {
   const asOf = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <PortalShell title="This week" actions={<AsOf>Schedule as of {asOf} · advisory</AsOf>}>
+    <PortalShell title="This week" meta={<AsOf>Schedule as of {asOf} · advisory</AsOf>}>
       {activeWatches.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-3 border border-border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
           {activeWatches.map((w) => (

@@ -20,7 +20,7 @@ const TABS: { to: string; label: string; end?: boolean; scheduling?: boolean }[]
   { to: '/booking-portal/inbox', label: 'Inbox' },
 ];
 
-export function PortalShell({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
+export function PortalShell({ title, meta, actions, children }: { title: string; meta?: ReactNode; actions?: ReactNode; children: ReactNode }) {
   const { state, dispatch } = usePortal();
   const unread = state.inbox.filter((n) => n.actionNeeded && !n.read).length;
   const queueCount = rankQueue(state.requests).length + state.seatAsks.filter((s) => s.status === 'requested').length;
@@ -28,11 +28,14 @@ export function PortalShell({ title, actions, children }: { title: string; actio
   return (
     <div className="mx-auto max-w-7xl p-6">
       <div className="mb-1 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="gfo-eyebrow mb-1 text-muted-foreground">Booking Portal · demo shell</p>
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          {/* The as-of line belongs under the title, not in the control row — it is
+              long enough to wrap the persona toggle onto a second line otherwise. */}
+          {meta && <p className="mt-0.5">{meta}</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {actions}
           <div className="flex border border-border text-xs font-semibold">
             <button
@@ -53,10 +56,10 @@ export function PortalShell({ title, actions, children }: { title: string; actio
           <button
             type="button"
             onClick={() => dispatch({ type: 'RESET_DEMO' })}
-            title="Reset demo data"
+            title="Re-seed the portal's fixture data (does not touch the rest of myGFO)"
             className="flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted"
           >
-            <RotateCcw className="h-3.5 w-3.5" /> Reset demo
+            <RotateCcw className="h-3.5 w-3.5" /> Reset portal data
           </button>
         </div>
       </div>

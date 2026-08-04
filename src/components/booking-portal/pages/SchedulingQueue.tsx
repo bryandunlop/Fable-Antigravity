@@ -27,7 +27,7 @@ export default function SchedulingQueue() {
   }
 
   return (
-    <PortalShell title="Booking queue · daily clear 14:00 ET" actions={<AsOf>{queue.length + seatAsks.length} pending</AsOf>}>
+    <PortalShell title="Booking queue · daily clear 14:00 ET" meta={<AsOf>{queue.length + seatAsks.length} pending</AsOf>}>
       <SectionLabel>Trip requests — default order: tier, then request time</SectionLabel>
       <Card className="mb-6">
         <table className="w-full text-sm">

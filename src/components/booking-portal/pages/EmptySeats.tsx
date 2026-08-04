@@ -21,7 +21,7 @@ export default function EmptySeats() {
   const askFlight = state.flights.find((f) => f.id === askingFor);
 
   return (
-    <PortalShell title="Empty seats · next 30 days" actions={<AsOf>Seats as of {asOf} · advisory</AsOf>}>
+    <PortalShell title="Empty seats · next 30 days" meta={<AsOf>Seats as of {asOf} · advisory</AsOf>}>
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-3">
           {open.map((f) => {
