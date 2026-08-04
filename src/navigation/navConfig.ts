@@ -123,6 +123,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/schedule', label: 'Schedule Calendar', domain: 'scheduling', icon: Calendar, primary: true, roles: ['pilot', 'admin'] },
   { path: '/crew-scheduling-workload', label: 'Crew Workload & Travel', domain: 'scheduling', icon: BarChart3, primary: true, roles: ['scheduling', 'admin', 'lead'] },
   { path: '/vacation-request', label: 'Vacation Request', domain: 'scheduling', icon: CalendarCheck, primary: true, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },
+  { path: '/booking-portal', label: 'Booking Portal', domain: 'scheduling', icon: Send, primary: true, keywords: ['booking', 'empty seats', 'trip request', 'ea', 'watches', 'fleet hold'], roles: ['admin-assistant', 'scheduling', 'admin', 'lead'] },
   { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', domain: 'scheduling', icon: Calendar, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: MapPin, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: FileText, primary: false, roles: ['scheduling', 'admin'] },

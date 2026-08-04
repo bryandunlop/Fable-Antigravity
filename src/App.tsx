@@ -68,6 +68,7 @@ import UnifiedTasksActionItems from './components/UnifiedTasksActionItems';
 import LobbyDisplay from './components/LobbyDisplay';
 import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
+import BookingPortalRoutes from './components/booking-portal/BookingPortalRoutes';
 import RampMode from './components/tech-log/pages/RampMode';
 import FirRoutes from './components/fir/FirRoutes';
 import BookingProfile from './components/BookingProfile';
@@ -551,6 +552,14 @@ export default function App() {
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
                                 <Route path="/upcoming-flights" element={userRole === 'inflight' ? <FlightAttendantFlights /> : <UpcomingFlights userRole={userRole} />} />
                                 <Route path="/tech-log/*" element={<TechLogRoutes />} />
+                                <Route
+                                  path="/booking-portal/*"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'admin', 'lead']}>
+                                      <BookingPortalRoutes />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route path="/fir/*" element={<FirRoutes userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
