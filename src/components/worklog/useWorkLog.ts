@@ -279,13 +279,40 @@ export function useWorkLog(): UseWorkLog {
       await load();
     })();
 
-    const onOnline = async () => {
+    const resync = async () => {
       await drain();
       await load();
     };
-    const listener = () => void onOnline();
+    const listener = () => void resync();
     window.addEventListener('online', listener);
-    return () => window.removeEventListener('online', listener);
+
+    // Retry on a timer while anything is still queued.
+    //
+    // Without this the queue only moved on page load or an `online` event —
+    // and neither fires for the failure that actually happens: the server is
+    // reachable and answering, it just has no database configured. Entries sat
+    // in the outbox indefinitely with the page open, and the only way to flush
+    // them was to know to reload. Now fixing the deployment is enough; the
+    // phone notices within a minute on its own.
+    //
+    // `online` does not fire either when a PWA is resumed from the background,
+    // which is most of how this page gets used, so visibility change is wired
+    // to the same handler.
+    const RETRY_MS = 60_000;
+    const timer = setInterval(() => {
+      if (readJson<Op[]>(OUTBOX_KEY, []).length > 0) void resync();
+    }, RETRY_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void resync();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      window.removeEventListener('online', listener);
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(timer);
+    };
     // Mount-only: this is a one-shot bootstrap, and re-running it on every
     // callback identity change would re-issue the seed request each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps

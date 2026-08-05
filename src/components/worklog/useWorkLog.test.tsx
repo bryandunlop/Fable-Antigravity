@@ -111,6 +111,44 @@ describe('first run on a phone', () => {
   });
 });
 
+describe('a queue left waiting on a broken backend', () => {
+  it('flushes itself once the backend starts working, with no reload', async () => {
+    // The real case: DATABASE_URL unset on the deployment, so the server is
+    // reachable and answering 500. Neither a page load nor an `online` event
+    // will fire to retry — the entries just sat there. A visibility change is
+    // now enough, which is what returning to a backgrounded PWA produces.
+    let broken = true;
+    const calls = { bulk: 0 };
+    let stored: unknown[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const json = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('worklog-seed.json')) return json(SEED);
+      if (broken) return new Response('DATABASE_URL is not set', { status: 500 });
+      if (url.includes('/api/worklog/bulk')) {
+        calls.bulk += 1;
+        stored = (JSON.parse(String(init?.body)) as { entries: unknown[] }).entries;
+        return json({ inserted: stored.length });
+      }
+      return json({ entries: stored });
+    }) as typeof fetch;
+
+    const { result } = renderHook(() => useWorkLog());
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    await waitFor(() => expect(result.current.pending).toBe(1));
+    expect(result.current.problem).not.toBeNull();
+
+    // Deployment gets its database. Nothing reloads; the tab just comes back.
+    broken = false;
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    await waitFor(() => expect(result.current.pending).toBe(0), { timeout: 3000 });
+    expect(calls.bulk).toBe(1);
+    expect(result.current.entries).toHaveLength(2);
+  });
+});
+
 describe('second run on the same device', () => {
   it('does not re-seed once the bundle has been applied', async () => {
     localStorage.setItem('worklog.seeded.v1', '2026-08-04T00:00:00.000Z');
