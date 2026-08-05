@@ -141,6 +141,27 @@ already ride that null. Adding a nullable `requestId` gives a third scope:
 | request | null | set | null | review the ask; authorizer sign-off |
 | recurring | null | null | set | daily office checks (exists today) |
 
+### 5.0 The provisional ETD (a hole found while writing this, and its fix)
+
+`*BeforeEtd` due rules anchor to `DueContext.etdUtc`, and `dueDates.ts:40` **throws** when it is
+absent. A request has no ETD by design — `RequestLeg` carries `dateLocal` plus an optional
+`timeLocal`, and `types.ts` states plainly that UTC conversion happens at booking, when a real
+departure time exists. So a request-scoped item with a `daysBeforeEtd` rule would throw at
+instantiation.
+
+**Fix:** a request-scoped item derives a **provisional ETD** from its earliest leg —
+`timeLocal` when `timing === 'fixed'`, otherwise 12:00 office-local on `dateLocal` — and passes it
+as `ctx.etdUtc`. No engine change; one pure helper, `provisionalEtd(request)`.
+
+This is sound because the precision genuinely does not matter here: "review this ask ~30 days before
+travel" needs the right day, not the right minute, and the whole point of a request is that the
+minute is not yet known.
+
+**Hard constraint:** the provisional ETD is confined to due computation. It is never written to a
+leg, never stored on the request, and never displayed as a departure time. A derived guess that
+escapes into a surface implying a real ETD is a correctness bug, not a cosmetic one — and the
+existing `RequestLeg` comment exists precisely to stop that.
+
 **Why this matters more than it looks.** It means the admin's board renders identically either side
 of the booking boundary. A request-scoped `authorizer sign-off` and a trip-scoped
 `collect manifest` are the same kind of row, in the same list, sorted by the same due date. The
@@ -254,6 +275,9 @@ Pure logic TDD'd; UI browser-verified, per house rule.
   three-scope invariant, asserted as a type-level and runtime check.
 - **Due derivation:** `monthsBeforeEtd` and `daysBeforeEtd` against a fixed `NOW`, including the
   DST boundary the engine's existing tests already cover.
+- **Provisional ETD:** a `fixed`-timing request resolves to its `timeLocal`; a `flexible` one to
+  12:00 office-local; a request with no legs raises rather than guessing; and the provisional value
+  never appears on a leg or in a rendered departure time (§5.0's hard constraint, asserted).
 - **Re-trigger:** a completed manifest task re-opens when pax count changes; a completed catering
   task does not.
 - **Boards:** owner filter; band boundaries; an item with no open work never appears in "Needs me";
@@ -300,8 +324,12 @@ implemented.
   constraint 3 and with `CLAUDE.md`'s ledger list, which names neither. Worth one explicit
   confirmation before the migration is written.
 - **A4** `admin-assistant` becomes loginable per the framework's §9. Unchanged dependency.
-- **A5** §7.3's read of `buildRunBoard` is from its contract and header comment, not a full audit of
-  its callers. Verify before extending.
+- **A5** §7.3's read of `buildRunBoard` is from its contract, header comment and first 60 lines —
+  not an audit of its callers. If a caller assumes the group set is exactly the current four,
+  widening the bands breaks it. Verify before extending.
+- **A6** A day-precision provisional ETD (§5.0) is good enough for request-scoped due dates. True
+  for the review/authorization items proposed here; it would not be true for anything needing
+  hour precision, and no such request-scoped item is proposed.
 
 ## 13. Evidence posture
 
