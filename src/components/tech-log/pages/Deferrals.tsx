@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Wrench, TimerReset, Hammer } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
-import { formatRegulatoryCompact } from '../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryDeadline } from '../util/displayZone';
 import { currentRows } from '../engine/supersede';
 import { isDeferralExpired } from '../engine/pl25';
 import { useRaiseFixFromDeferral } from '../useRectify';
@@ -92,7 +92,7 @@ export default function Deferrals() {
                       clockStartUtc={d.clockStartDateUtc}
                       repairDueUtc={d.repairDueDateUtc}
                       category={d.category}
-                      dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                      dueLabel={`due by ${formatRegulatoryDeadline(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
                       extended={d.extensionUsed}
                     />
                   )}

@@ -4,7 +4,7 @@ import { Search, ClipboardCheck, ShieldAlert, Clock } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../../engine/pl25';
 import { GOVERNING_ZONE_OPTIONS, isOverride, validateGoverningOverride } from '../../util/governingZone';
-import { formatRegulatoryCompact, formatRegulatoryInstant, formatRegulatoryLabel } from '../../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryDeadline, formatRegulatoryInstant, formatRegulatoryLabel } from '../../util/displayZone';
 import { utcFromWallTime, wallTimeFromUtc } from '../../util/entryZone';
 import { canDeferDefect } from '../../engine/disposition';
 import { crewActionRequiredForMelItem, resolveDeferralCrewAction, entersPendingPlacard } from '../../engine/crewAction';
@@ -141,7 +141,10 @@ export function DeferralCreatePanel({
     const due = dueFromCategory(selectedMel as DeferrableMelItem, cs, { hours: 0, cycles: 0 }, governingZone);
     return {
       start: formatRegulatoryCompact(cs, 'GOVERNING', governingZone),
-      due: due.repairDueDateUtc ? formatRegulatoryCompact(due.repairDueDateUtc, 'GOVERNING', governingZone) : null,
+      due: due.repairDueDateUtc ? formatRegulatoryDeadline(due.repairDueDateUtc, 'GOVERNING', governingZone) : null,
+      // The boundary instant's own calendar day in the governing zone — the day the aircraft wakes
+      // up grounded — so "by 23:59 Aug 18" cannot be misread in either direction (LG-195).
+      groundsInto: due.repairDueDateUtc ? formatRegulatoryInstant(due.repairDueDateUtc, 'GOVERNING', governingZone).date : null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMelId, governingZone, dayOfDiscoveryUtc]);
@@ -401,7 +404,12 @@ export function DeferralCreatePanel({
                   </p>
                 </div>
                 {clockPreview && (
-                  <p className="mt-2 text-xs text-muted-foreground">clock starts {clockPreview.start}{clockPreview.due ? ` · repair due ${clockPreview.due}` : ' · usage-based'}</p>
+                  <>
+                    <p className="mt-2 text-xs text-muted-foreground">clock starts {clockPreview.start}{clockPreview.due ? ` · repair by ${clockPreview.due}` : ' · usage-based'}</p>
+                    {clockPreview.groundsInto && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">aircraft grounds at the start of {clockPreview.groundsInto}</p>
+                    )}
+                  </>
                 )}
               </div>
 

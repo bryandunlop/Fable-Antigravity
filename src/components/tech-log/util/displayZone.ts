@@ -50,8 +50,26 @@ export function formatRegulatoryLabel(iso: string, mode: DisplayZoneMode, govern
 }
 
 /** List-friendly render: drops the time when it is midnight in the shown zone (the governing-mode
- * common case), keeps it otherwise so a shifted lens (UTC/Local) still reads unambiguously. */
+ * common case), keeps it otherwise so a shifted lens (UTC/Local) still reads unambiguously.
+ * For START/point instants only (clock start, noticed/reported, signed-at). An END boundary must
+ * use formatRegulatoryDeadline — a midnight expiry rendered as its own bare date reads a full day
+ * late (LG-195). */
 export function formatRegulatoryCompact(iso: string, mode: DisplayZoneMode, governingZone: string, device?: string): string {
   const f = formatRegulatoryInstant(iso, mode, governingZone, device);
   return f.time === '00:00' ? `${f.date} ${f.zoneLabel}` : `${f.date} · ${f.time} ${f.zoneLabel}`;
+}
+
+/** Deadline render for an END boundary (deferral repair-due / expiry). A midnight boundary is the
+ * previous calendar day ending, so it renders as that day at 23:59 — PL-25's own idiom ("2359 on
+ * February 5"), never the bare next-day date a reader mistakes for an extra working day (LG-195).
+ * Non-midnight boundaries pass through with their time. Display-only: the grounding decision
+ * remains isDeferralExpired comparing UTC instants, and the stored instant never changes.
+ * NOT for CAMP coming-due dates — those are calendar days (due DURING that day), a different
+ * convention that formatRegulatoryCompact already renders correctly. */
+export function formatRegulatoryDeadline(iso: string, mode: DisplayZoneMode, governingZone: string, device?: string): string {
+  const f = formatRegulatoryInstant(iso, mode, governingZone, device);
+  if (f.time !== '00:00') return `${f.date} · ${f.time} ${f.zoneLabel}`;
+  const lastMinute = new Date(new Date(iso).getTime() - 60_000).toISOString();
+  const p = formatRegulatoryInstant(lastMinute, mode, governingZone, device);
+  return `${p.date} · ${p.time} ${p.zoneLabel}`;
 }

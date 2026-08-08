@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatReferences } from '../engine/workCardReferences';
 import { Inbox, AlertTriangle, Clock, CalendarClock, ClipboardList, ChevronRight, CheckCircle2, UserCheck, Eye } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
-import { formatRegulatoryCompact } from '../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryDeadline } from '../util/displayZone';
 import { DEFAULT_GOVERNING_TIMEZONE } from '../engine/pl25';
 import { currentRows } from '../engine/supersede';
 import { buildWorkQueue } from '../engine/workqueue';
@@ -220,7 +220,7 @@ export default function WorkQueue() {
                     clockStartUtc={d.clockStartDateUtc}
                     repairDueUtc={d.repairDueDateUtc}
                     category={d.category}
-                    dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                    dueLabel={`due by ${formatRegulatoryDeadline(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
                     extended={d.extensionUsed}
                   />
                 )}
@@ -253,7 +253,7 @@ export default function WorkQueue() {
                     clockStartUtc={d.clockStartDateUtc}
                     repairDueUtc={d.repairDueDateUtc}
                     category={d.category}
-                    dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                    dueLabel={`due by ${formatRegulatoryDeadline(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
                     extended={d.extensionUsed}
                   />
                 )}

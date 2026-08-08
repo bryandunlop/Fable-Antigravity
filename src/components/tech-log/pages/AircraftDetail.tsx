@@ -6,7 +6,7 @@ import {
   Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, ClipboardCheck, CloudDownload, ShieldCheck,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone, useLoginRoles } from '../TechLogContext';
-import { formatRegulatoryCompact, type DisplayZoneMode } from '../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryDeadline, type DisplayZoneMode } from '../util/displayZone';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
 import { deriveServiceability } from '../engine/serviceability';
@@ -121,7 +121,7 @@ function BlockerCard({
             <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
               {/* Only deferral rows carry a due instant, and a deferral always stores its governing
                   zone at signing — the D24 operator anchor is the fallback, never a guess. */}
-              <Clock className="h-3.5 w-3.5" /> repair due {formatRegulatoryCompact(row.dueUtc, displayZone, row.governingTimezone ?? DEFAULT_GOVERNING_TIMEZONE)}
+              <Clock className="h-3.5 w-3.5" /> repair by {formatRegulatoryDeadline(row.dueUtc, displayZone, row.governingTimezone ?? DEFAULT_GOVERNING_TIMEZONE)}
             </p>
           )}
           {row.detail && <p className="mt-0.5 text-xs text-muted-foreground">{row.detail}</p>}
@@ -696,7 +696,7 @@ export default function AircraftDetail() {
                         clockStartUtc={d.clockStartDateUtc}
                         repairDueUtc={d.repairDueDateUtc}
                         category={d.category}
-                        dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                        dueLabel={`due by ${formatRegulatoryDeadline(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
                         extended={d.extensionUsed}
                       />
                     )}
