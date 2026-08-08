@@ -22,6 +22,9 @@ import {
   domainsForRole, entriesForRoles, matchEntry,
   type NavEntry,
 } from '../navigation/navConfig';
+import {
+  initialSidebarOpen, readPersistedSidebarState, writePersistedSidebarState,
+} from '../navigation/sidebarDefault';
 
 // Above this many visible items, a role's sidebar is dense enough that quiet
 // (non-interactive) domain labels earn their keep as scroll anchors. Below it,
@@ -94,12 +97,17 @@ const DraggableNavigationGroup = ({
     const isActive = isActiveEntry(item);
     return (
       <SidebarMenuItem key={`${item.domain}:${item.label}`}>
-        <SidebarMenuButton asChild isActive={isActive} className={`relative overflow-hidden group transition-colors duration-200 ${isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' : 'text-sidebar-foreground bg-transparent hover:bg-white/10 hover:text-white'}`}>
+        {/* size-11! on the collapsed rail overrides the cva's size-8! — 44pt is
+            the smallest target a pilot should have to hit on a moving aircraft.
+            It has to sit on this className (the tailwind-merge side), not on the
+            Link below: Radix Slot concatenates asChild classes WITHOUT merging,
+            so a conflicting utility on the child never wins. */}
+        <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className={`relative overflow-hidden group transition-colors duration-200 group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center ${isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' : 'text-sidebar-foreground bg-transparent hover:bg-white/10 hover:text-white'}`}>
           <Link to={item.href ?? item.path} className="flex items-center gap-3 w-full relative">
             {isActive && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gfo-sunrise" />}
             {!isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-white/40 rounded-r-full transition-all duration-200 group-hover:h-3/4" />}
-            <Icon className={`w-4 h-4 z-10 ${isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground group-hover:text-white'}`} />
-            <span className="z-10 relative">{item.label}</span>
+            <Icon className={`w-4 h-4 shrink-0 z-10 ${isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground group-hover:text-white'}`} />
+            <span className="z-10 relative group-data-[collapsible=icon]:hidden">{item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -142,6 +150,28 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   const location = useLocation();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
+
+  // D80: the rail starts expanded above 1280 and collapsed below it, unless the
+  // user has made a choice — then their choice wins at every width. Computed in
+  // the initialiser rather than an effect so the rail never paints expanded and
+  // then snaps shut on the iPad.
+  //
+  // shadcn's own persistence writes a `sidebar_state` cookie that it expects a
+  // SERVER to read back into `defaultOpen`. This is a static export with no
+  // server, so that cookie is written and never read — the state does not
+  // actually survive a reload. Hence localStorage, which is also how this
+  // component already persists nav order.
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    initialSidebarOpen(
+      typeof window === 'undefined' ? Number.MAX_SAFE_INTEGER : window.innerWidth,
+      readPersistedSidebarState(),
+    ),
+  );
+
+  const handleSidebarOpenChange = React.useCallback((open: boolean) => {
+    setSidebarOpen(open);
+    writePersistedSidebarState(open);
+  }, []);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -276,12 +306,22 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   };
 
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={handleSidebarOpenChange}
+      // D80: the collapsed rail must stay finger-usable on the iPad, so it is
+      // wider than shadcn's 3rem default (which pairs with a 32px hit target).
+      style={{ '--sidebar-width-icon': '3.5rem' } as React.CSSProperties}
+    >
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <Sidebar className="border-r border-sidebar-border">
-          <SidebarHeader className="border-b border-white/5 p-4">
+        {/* collapsible="icon", not the shadcn default "offcanvas": D80 makes the
+            rail PERMANENT above 768 — collapsing to icons, never to nothing. That
+            single prop is what stops iPad portrait (834) rendering ~460pt of nav
+            against a 834pt screen (LG-198 / UI-UX review R4). */}
+        <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+          <SidebarHeader className="border-b border-white/5 p-4 group-data-[collapsible=icon]:p-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 group-data-[collapsible=icon]:hidden">
                 <h2 className="text-base font-bold tracking-tight text-white">Global Flight Operations</h2>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-gfo-sunrise font-bold">{getRoleDisplayName(userRole)}</p>
               </div>
@@ -290,8 +330,10 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               </div>
             </div>
 
-            {/* Customization controls */}
-            <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
+            {/* Customization controls. Hidden on the collapsed rail — there is no
+                room for a labelled button, and reordering groups you cannot read
+                is not a thing anyone wants to do. */}
+            <div className="mt-3 pt-3 border-t border-white/5 space-y-2 group-data-[collapsible=icon]:hidden">
               <Button
                 variant={isCustomizing ? "default" : "ghost"}
                 size="sm"
