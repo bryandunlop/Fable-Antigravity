@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AlertTriangle, Clock, CalendarClock, CalendarDays, ChevronRight, CheckCircle2, Cloud, CloudDownload, RefreshCw, ClipboardList, Hammer } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../TechLogContext';
-import { formatRegulatoryCompact, type DisplayZoneMode } from '../util/displayZone';
+import { formatRegulatoryDeadline, type DisplayZoneMode } from '../util/displayZone';
 import { useIntegration } from '../integration/useIntegration';
 import type { CampForecastItem } from '../integration/campClient';
 import { buildUpcomingBoard, createForecastCard, BUCKET_ORDER, type DueBucket, type UpcomingItem } from '../engine/upcomingBoard';
@@ -33,8 +33,11 @@ function dueLabel(it: UpcomingItem, displayZone: DisplayZoneMode): string {
   if (it.dueDateUtc) {
     // D24: MEL repair-clock rows carry a governing zone and honor the display lens; CAMP/recurring
     // rows are external dates with no governing zone, so they render as plain local dates.
+    // A DEFERRAL row's dueDateUtc IS the PL-25 repair boundary (upcomingBoard maps
+    // repairDueDateUtc straight in), so it takes the deadline render (LG-195); CAMP/recurring
+    // rows are external calendar dates with no governing zone and keep the plain date.
     const d = it.kind === 'DEFERRAL' && it.governingTimezone
-      ? formatRegulatoryCompact(it.dueDateUtc, displayZone, it.governingTimezone)
+      ? `by ${formatRegulatoryDeadline(it.dueDateUtc, displayZone, it.governingTimezone)}`
       : new Date(it.dueDateUtc).toLocaleDateString();
     if (it.dueInDays != null && it.dueInDays < 0) parts.push(`${d} · overdue ${Math.abs(it.dueInDays)}d`);
     else if (it.dueInDays != null) parts.push(`${d} · ${it.dueInDays}d`);
@@ -171,9 +174,9 @@ export default function ComingDue() {
                 <span className="text-[11px] text-muted-foreground">{a.total} due</span>
               </div>
               <div className="mt-1 flex gap-3 text-sm font-semibold tabular-nums">
-                <span className={a.counts.OVERDUE ? 'text-[var(--gfo-error-ink,#C81E2B)]' : 'text-muted-foreground/50'}>{a.counts.OVERDUE} over</span>
-                <span className={a.counts.DUE_7D ? 'text-[var(--gfo-warning-ink,#8A6200)]' : 'text-muted-foreground/50'}>{a.counts.DUE_7D} ·7d</span>
-                <span className={a.counts.DUE_30D ? '' : 'text-muted-foreground/50'}>{a.counts.DUE_30D} ·30d</span>
+                <span className={a.counts.OVERDUE ? 'text-[var(--gfo-error-ink,#C81E2B)]' : 'text-muted-foreground/50'}>{a.counts.OVERDUE} overdue</span>
+                <span className={a.counts.DUE_7D ? 'text-[var(--gfo-warning-ink,#8A6200)]' : 'text-muted-foreground/50'}>{a.counts.DUE_7D} due ≤7d</span>
+                <span className={a.counts.DUE_30D ? '' : 'text-muted-foreground/50'}>{a.counts.DUE_30D} due ≤30d</span>
               </div>
             </button>
           ))}

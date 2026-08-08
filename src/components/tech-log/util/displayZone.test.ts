@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatRegulatoryInstant, formatRegulatoryCompact } from './displayZone';
+import { formatRegulatoryInstant, formatRegulatoryCompact, formatRegulatoryDeadline } from './displayZone';
 
 // D24 display layer: a stored UTC instant is the SAME absolute moment everywhere; only the lens
 // changes. Default lens = the deferral's own governing zone (clean regulatory boundary), with
@@ -51,5 +51,47 @@ describe('formatRegulatoryCompact (list-friendly)', () => {
   it('includes the time when the shown zone is not at midnight', () => {
     expect(formatRegulatoryCompact(DUE, 'UTC', 'America/New_York')).toBe('Jan 30, 2026 · 05:00 UTC');
     expect(formatRegulatoryCompact(DUE, 'LOCAL', 'America/New_York', 'America/Los_Angeles')).toBe('Jan 29, 2026 · 21:00 PST');
+  });
+});
+
+describe('formatRegulatoryDeadline (LG-195 — an END boundary must never read a day late)', () => {
+  it('renders a midnight governing-zone boundary as the PREVIOUS day at 23:59 (PL-25 idiom)', () => {
+    // Cat C discovered Aug 8 ET: clock starts Aug 9, expires at the stroke of Aug 19 00:00 EDT.
+    // PL-25's own worked example prints "2359 on <the last day>" — never the bare next-day date.
+    expect(formatRegulatoryDeadline('2026-08-19T04:00:00.000Z', 'GOVERNING', 'America/New_York'))
+      .toBe('Aug 18, 2026 · 23:59 EDT');
+  });
+
+  it('matches the SME-ruled Feb-6 case: boundary Feb 6 00:00 EST renders as Feb 5 · 23:59 EST', () => {
+    // tech-log-pl25-feb6: clock_start + interval = Feb 6 00:00 ET is the SAME instant as
+    // "2359 on February 5" — the engine keeps Feb 6; only the display speaks Feb 5.
+    expect(formatRegulatoryDeadline('2026-02-06T05:00:00.000Z', 'GOVERNING', 'America/New_York'))
+      .toBe('Feb 5, 2026 · 23:59 EST');
+  });
+
+  it('keeps a non-midnight boundary exactly as it is (time shown, no shifting)', () => {
+    expect(formatRegulatoryDeadline('2026-08-18T18:30:00.000Z', 'GOVERNING', 'America/New_York'))
+      .toBe('Aug 18, 2026 · 14:30 EDT');
+  });
+
+  it('through the UTC lens a midnight-ET boundary is not midnight, so it passes through unshifted', () => {
+    expect(formatRegulatoryDeadline('2026-08-19T04:00:00.000Z', 'UTC', 'America/New_York'))
+      .toBe('Aug 19, 2026 · 04:00 UTC');
+  });
+
+  it('a boundary that IS midnight in the viewing lens shifts in that lens too (UTC-midnight case)', () => {
+    expect(formatRegulatoryDeadline('2026-08-19T00:00:00.000Z', 'UTC', 'America/New_York'))
+      .toBe('Aug 18, 2026 · 23:59 UTC');
+  });
+
+  it('stays DST-correct across fall-back: a midnight-EST boundary after the transition labels EST', () => {
+    // Nov 1 2026 is the US fall-back; a boundary at Nov 3 00:00 EST = 05:00Z renders Nov 2 · 23:59 EST.
+    expect(formatRegulatoryDeadline('2026-11-03T05:00:00.000Z', 'GOVERNING', 'America/New_York'))
+      .toBe('Nov 2, 2026 · 23:59 EST');
+  });
+
+  it('honors an overridden governing zone (D24 per-deferral override), not a fixed Eastern anchor', () => {
+    expect(formatRegulatoryDeadline('2026-01-30T06:00:00.000Z', 'GOVERNING', 'America/Chicago'))
+      .toBe('Jan 29, 2026 · 23:59 CST');
   });
 });

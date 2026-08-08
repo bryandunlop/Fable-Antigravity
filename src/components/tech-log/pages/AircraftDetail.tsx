@@ -6,7 +6,7 @@ import {
   Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, ClipboardCheck, CloudDownload, ShieldCheck,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone, useLoginRoles } from '../TechLogContext';
-import { formatRegulatoryCompact, type DisplayZoneMode } from '../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryDeadline, type DisplayZoneMode } from '../util/displayZone';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
 import { useRectifyToWorkCard } from '../useRectify';
 import { deriveServiceability } from '../engine/serviceability';
@@ -121,7 +121,7 @@ function BlockerCard({
             <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
               {/* Only deferral rows carry a due instant, and a deferral always stores its governing
                   zone at signing — the D24 operator anchor is the fallback, never a guess. */}
-              <Clock className="h-3.5 w-3.5" /> repair due {formatRegulatoryCompact(row.dueUtc, displayZone, row.governingTimezone ?? DEFAULT_GOVERNING_TIMEZONE)}
+              <Clock className="h-3.5 w-3.5" /> repair by {formatRegulatoryDeadline(row.dueUtc, displayZone, row.governingTimezone ?? DEFAULT_GOVERNING_TIMEZONE)}
             </p>
           )}
           {row.detail && <p className="mt-0.5 text-xs text-muted-foreground">{row.detail}</p>}
@@ -482,9 +482,14 @@ export default function AircraftDetail() {
                   ? `Stands between ${ac.tailNumber} and dispatch (${board.blockers.length})`
                   : `Nothing is holding ${ac.tailNumber} on the ground`}
               </CardTitle>
-              <Button size="sm" variant="outline" onClick={() => setReportOpen(true)}>
-                <FilePlus className="mr-1.5 h-4 w-4" /> Log a new issue
-              </Button>
+              {/* One canonical entry point per persona (LG-207): pilots already have "Report
+                  defect" on the tail banner above — rendering it here too put two identically
+                  named buttons on one screen. Maintenance has no banner button, so this is theirs. */}
+              {isMaint && (
+                <Button size="sm" variant="outline" onClick={() => setReportOpen(true)}>
+                  <FilePlus className="mr-1.5 h-4 w-4" /> Report defect
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-3">
               {board.blockers.length === 0 && (
@@ -696,7 +701,7 @@ export default function AircraftDetail() {
                         clockStartUtc={d.clockStartDateUtc}
                         repairDueUtc={d.repairDueDateUtc}
                         category={d.category}
-                        dueLabel={`due ${formatRegulatoryCompact(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
+                        dueLabel={`due by ${formatRegulatoryDeadline(d.repairDueDateUtc, displayZone, d.governingTimezone)}`}
                         extended={d.extensionUsed}
                       />
                     )}

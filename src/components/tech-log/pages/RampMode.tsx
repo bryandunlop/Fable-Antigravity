@@ -19,7 +19,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { X, ShieldCheck, AlertTriangle, MapPin, Printer, FileWarning } from 'lucide-react';
 import { useTechLog } from '../TechLogContext';
 import { buildRampView, type RampDeferralRow } from '../engine/rampCheck';
-import { formatRegulatoryCompact } from '../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryDeadline } from '../util/displayZone';
 import { printSignedRecord, mockPdfBlobUri } from '../util/printRecord';
 import { ServiceabilityChip } from '../components/ServiceabilityChip';
 import { Button } from '../../ui/button';
@@ -103,7 +103,7 @@ export default function RampMode() {
           heading: 'Repair interval',
           fields: [
             { label: 'Clock start', value: formatRegulatoryCompact(r.clockStartDateUtc, 'GOVERNING', r.governingTimezone) },
-            { label: 'Due', value: r.repairDueDateUtc ? formatRegulatoryCompact(r.repairDueDateUtc, 'GOVERNING', r.governingTimezone) : `${r.usageDueThreshold ?? '—'} ${r.repairIntervalUnit}` },
+            { label: 'Due', value: r.repairDueDateUtc ? `by ${formatRegulatoryDeadline(r.repairDueDateUtc, 'GOVERNING', r.governingTimezone)}` : `${r.usageDueThreshold ?? '—'} ${r.repairIntervalUnit}` },
             { label: 'Governing timezone', value: r.governingTimezone },
             { label: 'Extension', value: r.extensionUsed ? 'Used — once-only allowance spent' : 'Not used' },
           ],
@@ -244,7 +244,7 @@ function RampRow({
 }) {
   const bad = row.status !== 'ACTIVE';
   const due = row.repairDueDateUtc
-    ? formatRegulatoryCompact(row.repairDueDateUtc, 'GOVERNING', row.governingTimezone)
+    ? `by ${formatRegulatoryDeadline(row.repairDueDateUtc, 'GOVERNING', row.governingTimezone)}`
     : row.usageDueThreshold != null
       ? `${row.usageDueThreshold} ${row.repairIntervalUnit.toLowerCase()}s`
       : '—';

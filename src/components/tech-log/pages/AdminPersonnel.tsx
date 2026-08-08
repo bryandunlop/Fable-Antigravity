@@ -78,7 +78,7 @@ export default function AdminPersonnel() {
               <div><Label>A&P / IA certificate number</Label><Input className="mt-1" value={draft.apCertificateNumber ?? ''} onChange={e => setDraft({ ...draft, apCertificateNumber: e.target.value || undefined })} placeholder="e.g. AP-1234567" /></div>
               <label className="flex items-center gap-2"><Checkbox checked={draft.riiAuthorized} onCheckedChange={(v: unknown) => setDraft({ ...draft, riiAuthorized: v === true })} /><span className="text-xs">RII authorized (independent inspector)</span></label>
               <div><Label>RII-authorized ATA chapters (comma-separated)</Label><Input className="mt-1" value={ataText} onChange={e => setAtaText(e.target.value)} placeholder="e.g. 24, 27, 32" disabled={!draft.riiAuthorized} /></div>
-              <label className="flex items-center gap-2"><Checkbox checked={!!draft.crewDeferralAuthorized} onCheckedChange={(v: unknown) => setDraft({ ...draft, crewDeferralAuthorized: v === true })} /><span className="text-xs">Crew deferral authorized (may defer FC-deferrable MEL items)</span></label>
+              <label className="flex items-center gap-2"><Checkbox checked={!!draft.crewDeferralAuthorized} onCheckedChange={(v: unknown) => setDraft({ ...draft, crewDeferralAuthorized: v === true })} /><span className="text-xs">Crew deferral authorized (may defer items the MEL marks flight-crew deferrable)</span></label>
               <label className="flex items-center gap-2"><Checkbox checked={!!draft.placardAuthorized} onCheckedChange={(v: unknown) => setDraft({ ...draft, placardAuthorized: v === true })} /><span className="text-xs">Placard authorized (may attest a placard-only discharge)</span></label>
             </div>
           )}

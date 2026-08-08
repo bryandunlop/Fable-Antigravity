@@ -4,7 +4,7 @@ import { Search, ClipboardCheck, ShieldAlert, Clock } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../../TechLogContext';
 import { computeClockStart, computeRepairDue, DEFAULT_GOVERNING_TIMEZONE } from '../../engine/pl25';
 import { GOVERNING_ZONE_OPTIONS, isOverride, validateGoverningOverride } from '../../util/governingZone';
-import { formatRegulatoryCompact, formatRegulatoryInstant, formatRegulatoryLabel } from '../../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryDeadline, formatRegulatoryInstant, formatRegulatoryLabel } from '../../util/displayZone';
 import { utcFromWallTime, wallTimeFromUtc } from '../../util/entryZone';
 import { canDeferDefect } from '../../engine/disposition';
 import { crewActionRequiredForMelItem, resolveDeferralCrewAction, entersPendingPlacard } from '../../engine/crewAction';
@@ -141,7 +141,10 @@ export function DeferralCreatePanel({
     const due = dueFromCategory(selectedMel as DeferrableMelItem, cs, { hours: 0, cycles: 0 }, governingZone);
     return {
       start: formatRegulatoryCompact(cs, 'GOVERNING', governingZone),
-      due: due.repairDueDateUtc ? formatRegulatoryCompact(due.repairDueDateUtc, 'GOVERNING', governingZone) : null,
+      due: due.repairDueDateUtc ? formatRegulatoryDeadline(due.repairDueDateUtc, 'GOVERNING', governingZone) : null,
+      // The boundary instant's own calendar day in the governing zone — the day the aircraft wakes
+      // up grounded — so "by 23:59 Aug 18" cannot be misread in either direction (LG-195).
+      groundsInto: due.repairDueDateUtc ? formatRegulatoryInstant(due.repairDueDateUtc, 'GOVERNING', governingZone).date : null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMelId, governingZone, dayOfDiscoveryUtc]);
@@ -284,8 +287,8 @@ export function DeferralCreatePanel({
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   <Badge variant="outline">Cat {cat}</Badge>
                   <Badge variant="outline">{CATEGORY_DAYS[cat!] ? `${CATEGORY_DAYS[cat!]}-day clock` : 'per proviso'}</Badge>
-                  {selectedMel.numberInstalled != null && <Badge variant="outline">{selectedMel.numberRequired}/{selectedMel.numberInstalled} req</Badge>}
-                  {selectedMel.flightCrewDeferral ? <Badge variant="outline">FC-deferrable</Badge> : null}
+                  {selectedMel.numberInstalled != null && <Badge variant="outline">{selectedMel.numberInstalled} installed · {selectedMel.numberRequired} required to dispatch</Badge>}
+                  {selectedMel.flightCrewDeferral ? <Badge variant="outline">Crew may defer</Badge> : null}
                 </div>
                 {selectedMel.provisos && <p className="mt-2 text-xs text-muted-foreground">{selectedMel.provisos}</p>}
                 {selectedMel.mProcedure && <p className="mt-2 rounded bg-[var(--gfo-error,#EF3340)]/10 p-2 text-xs"><strong>(M):</strong> {selectedMel.mProcedure}</p>}
@@ -401,7 +404,12 @@ export function DeferralCreatePanel({
                   </p>
                 </div>
                 {clockPreview && (
-                  <p className="mt-2 text-xs text-muted-foreground">clock starts {clockPreview.start}{clockPreview.due ? ` · repair due ${clockPreview.due}` : ' · usage-based'}</p>
+                  <>
+                    <p className="mt-2 text-xs text-muted-foreground">clock starts {clockPreview.start}{clockPreview.due ? ` · repair by ${clockPreview.due}` : ' · usage-based'}</p>
+                    {clockPreview.groundsInto && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">aircraft grounds at the start of {clockPreview.groundsInto}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -414,7 +422,7 @@ export function DeferralCreatePanel({
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>
                 <Button onClick={beginSign} disabled={!canDeferDefect(user, selectedMel) || !ack || !validateGoverningOverride(governingZone, overrideReason).ok}>Sign deferral</Button>
               </div>
-              {!canDeferDefect(user, selectedMel) && <p className="text-xs text-[var(--gfo-error-ink,#C81E2B)]">{user.role === 'MAINTENANCE' ? '' : 'Crew may only defer flight-crew-deferrable (FC-deferrable) MEL items.'}</p>}
+              {!canDeferDefect(user, selectedMel) && <p className="text-xs text-[var(--gfo-error-ink,#C81E2B)]">{user.role === 'MAINTENANCE' ? '' : 'Crew may only defer items the MEL marks flight-crew deferrable.'}</p>}
             </>
           )}
         </CardContent>

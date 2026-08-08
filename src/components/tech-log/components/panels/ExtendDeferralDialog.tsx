@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { TimerReset, UserCheck } from 'lucide-react';
 import { useTechLog, useCurrentUser, useDisplayZone } from '../../TechLogContext';
-import { formatRegulatoryCompact } from '../../util/displayZone';
+import { formatRegulatoryCompact, formatRegulatoryDeadline } from '../../util/displayZone';
 import { useIntegration } from '../../integration/useIntegration';
 import { validateExtension, buildExtension } from '../../engine/extension';
 import { INTENT } from '../../constants';
@@ -47,7 +47,7 @@ export function ExtendDeferralDialog({
     if (!hardBlock.ok) return undefined;
     const { row } = buildExtension(deferral, user, 'preview', new Date().toISOString(), { rowId: 'preview', signatureId: 'preview' });
     return row.repairDueDateUtc
-      ? `new due date ${formatRegulatoryCompact(row.repairDueDateUtc, displayZone, row.governingTimezone)}`
+      ? `new due by ${formatRegulatoryDeadline(row.repairDueDateUtc, displayZone, row.governingTimezone)}`
       : `new usage limit ${row.usageDueThreshold} ${row.repairIntervalUnit === 'HOUR' ? 'airframe hours' : 'cycles'}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deferral.id, hardBlock.ok, displayZone]);
