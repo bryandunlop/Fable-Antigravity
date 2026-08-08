@@ -147,7 +147,12 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', railLabel: 'Sched Board', domain: 'scheduling', icon: LayoutDashboard, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: Route, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: ClipboardType, primary: false, roles: ['scheduling', 'admin'] },
-  { path: '/passenger-currency', label: 'Passenger Data Currency', railLabel: 'Passenger Data', domain: 'scheduling', icon: UserCheck, primary: false, keywords: ['passport', 'stale', 'outreach', 'manifest', 'crm'], roles: ['scheduling', 'admin'] },
+  // Merged into Passenger Forms as its "Data Currency" tab (Bryan, 2026-08-08):
+  // that page already carried Expiring Documents and Outdated Data, so this was
+  // the same job behind a second door — and "Passenger Forms" was the name Bryan
+  // wanted for BOTH. Route stays registered and deep-linkable; sidebar link only
+  // is withdrawn.
+  { path: '/passenger-currency', label: 'Passenger Forms · Data Currency', domain: 'scheduling', icon: UserCheck, sidebar: false, keywords: ['passport', 'stale', 'outreach', 'manifest', 'crm', 'passenger data currency'], roles: ['scheduling', 'admin'] },
 
   // ── Inflight ──────────────────────────────────────────────────────────────
   { path: '/upcoming-flights', label: 'Upcoming Trips', domain: 'inflight', icon: PlaneLanding, primary: true, keywords: ['flights', 'manifest'], roles: ['inflight', 'admin'] },

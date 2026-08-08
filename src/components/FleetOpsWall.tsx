@@ -8,8 +8,9 @@ import DutyRosterWidget from './DutyRosterWidget';
 import FleetMapPanel from './ops-wall/FleetMapPanel';
 import NasImpactTile from './ops-wall/NasImpactTile';
 import StationWeatherStrip from './ops-wall/StationWeatherStrip';
-import QuickLinksBar from './ops-wall/QuickLinksBar';
+import WeatherForecast from './WeatherForecast';
 import { HOME_STATION } from '../config/station';
+import QuickLinksBar from './ops-wall/QuickLinksBar';
 import { lookupAirport } from '../services/airportCoords';
 import { RAG_DOT } from './ops-wall/ragColors';
 
@@ -84,6 +85,19 @@ export default function FleetOpsWall({ userRole }: { userRole: string }) {
       </header>
 
       <StationWeatherStrip stations={stations} />
+
+      {/* The 7-day outlook D30 ratified (2026-07-14) — built then, but mounted by
+          nothing until now, so the component and its animation CSS shipped dead.
+          Placement is D30's own choice: directly beneath the METAR strip.
+
+          It stays behind WeatherForecast's advisory framing, which is the
+          mitigation D30 rests on, NOT decoration — this is NWS public forecast
+          data sitting next to official aviation products. [[Q14]] (owner: DOM)
+          is still OPEN on whether that adjacency is acceptable at all; per D30's
+          hinge, a ruling against moves this to a planning surface and the
+          provider, parser, route and cache all survive unchanged. Only this
+          mount point moves. */}
+      <WeatherForecast icaoId={HOME_STATION} />
 
       {/* Fleet rail + map */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(190px,220px)_minmax(0,1fr)]">
