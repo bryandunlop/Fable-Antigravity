@@ -287,8 +287,8 @@ export function DeferralCreatePanel({
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   <Badge variant="outline">Cat {cat}</Badge>
                   <Badge variant="outline">{CATEGORY_DAYS[cat!] ? `${CATEGORY_DAYS[cat!]}-day clock` : 'per proviso'}</Badge>
-                  {selectedMel.numberInstalled != null && <Badge variant="outline">{selectedMel.numberRequired}/{selectedMel.numberInstalled} req</Badge>}
-                  {selectedMel.flightCrewDeferral ? <Badge variant="outline">FC-deferrable</Badge> : null}
+                  {selectedMel.numberInstalled != null && <Badge variant="outline">{selectedMel.numberInstalled} installed · {selectedMel.numberRequired} required to dispatch</Badge>}
+                  {selectedMel.flightCrewDeferral ? <Badge variant="outline">Crew may defer</Badge> : null}
                 </div>
                 {selectedMel.provisos && <p className="mt-2 text-xs text-muted-foreground">{selectedMel.provisos}</p>}
                 {selectedMel.mProcedure && <p className="mt-2 rounded bg-[var(--gfo-error,#EF3340)]/10 p-2 text-xs"><strong>(M):</strong> {selectedMel.mProcedure}</p>}
@@ -422,7 +422,7 @@ export function DeferralCreatePanel({
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>
                 <Button onClick={beginSign} disabled={!canDeferDefect(user, selectedMel) || !ack || !validateGoverningOverride(governingZone, overrideReason).ok}>Sign deferral</Button>
               </div>
-              {!canDeferDefect(user, selectedMel) && <p className="text-xs text-[var(--gfo-error-ink,#C81E2B)]">{user.role === 'MAINTENANCE' ? '' : 'Crew may only defer flight-crew-deferrable (FC-deferrable) MEL items.'}</p>}
+              {!canDeferDefect(user, selectedMel) && <p className="text-xs text-[var(--gfo-error-ink,#C81E2B)]">{user.role === 'MAINTENANCE' ? '' : 'Crew may only defer items the MEL marks flight-crew deferrable.'}</p>}
             </>
           )}
         </CardContent>

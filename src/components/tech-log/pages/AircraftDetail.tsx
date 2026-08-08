@@ -482,9 +482,14 @@ export default function AircraftDetail() {
                   ? `Stands between ${ac.tailNumber} and dispatch (${board.blockers.length})`
                   : `Nothing is holding ${ac.tailNumber} on the ground`}
               </CardTitle>
-              <Button size="sm" variant="outline" onClick={() => setReportOpen(true)}>
-                <FilePlus className="mr-1.5 h-4 w-4" /> Log a new issue
-              </Button>
+              {/* One canonical entry point per persona (LG-207): pilots already have "Report
+                  defect" on the tail banner above — rendering it here too put two identically
+                  named buttons on one screen. Maintenance has no banner button, so this is theirs. */}
+              {isMaint && (
+                <Button size="sm" variant="outline" onClick={() => setReportOpen(true)}>
+                  <FilePlus className="mr-1.5 h-4 w-4" /> Report defect
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-3">
               {board.blockers.length === 0 && (

@@ -133,7 +133,7 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
 
       {/* Footer — always-available reporting */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
-        {tlAc && <button onClick={() => setSquawkOpen(true)} className="min-h-[44px] rounded border px-3 py-2 text-sm hover:bg-accent">Report a squawk</button>}
+        {tlAc && <button onClick={() => setSquawkOpen(true)} className="min-h-[44px] rounded border px-3 py-2 text-sm hover:bg-accent">Report defect</button>}
         {tlAc && <button onClick={() => setNuisanceOpen(true)} className="min-h-[44px] rounded border px-3 py-2 text-sm hover:bg-accent">Log nuisance item</button>}
       </div>
       <MessagesPanel />

@@ -776,7 +776,7 @@ export default function WorkCardDetail() {
                 <div>
                   <Label className="text-xs">RII inspector (authorized for ATA {card.ataChapter}, not the performer)</Label>
                   <Select value={inspectorOid} onValueChange={(v: string) => setInspectorOid(v)}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder={inspectors.length ? 'Select inspector' : 'No authorized inspector for this ATA'} /></SelectTrigger>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder={inspectors.length ? 'Select RII inspector — required' : 'No authorized inspector for this ATA'} /></SelectTrigger>
                     <SelectContent>{inspectors.map(p => <SelectItem key={p.oid} value={p.oid}>{p.displayName}</SelectItem>)}</SelectContent>
                   </Select>
                   {/* Keeps main's -ink token: the branch predates the contrast fix, and D68 removes

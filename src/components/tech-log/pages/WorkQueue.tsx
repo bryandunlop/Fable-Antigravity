@@ -272,7 +272,7 @@ export default function WorkQueue() {
         </Band>
 
         {/* ── Band 3: work in hand and things being watched ── */}
-        <Band title="In hand" hint="work under way and items being tracked" count={wq.counts.openWorkCards + wq.counts.watchItems} tone="track">
+        <Band title="In work" hint="work under way and items being tracked" count={wq.counts.openWorkCards + wq.counts.watchItems} tone="track">
           {wq.counts.openWorkCards + wq.counts.watchItems === 0 && <p className="text-sm text-muted-foreground">No open work cards or watch items.</p>}
 
           <Section icon={<ClipboardList className="h-4 w-4" />} title="Open work cards" keep={wq.counts.openWorkCards > 0} count={(riiOnly ? wq.openWorkCards.filter(isRii) : wq.openWorkCards).length}>

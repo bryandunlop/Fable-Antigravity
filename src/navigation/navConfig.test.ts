@@ -134,9 +134,11 @@ describe('domainsForRole', () => {
     expect(mx.more.map((e) => e.label)).toContain('Work Analytics');
     expect(mx.more.map((e) => e.label)).not.toContain('Maintenance Hub'); // sidebar: false
   });
-  it('pilot Flight Ops: workspace primary, absorbed pages behind More', () => {
+  it('pilot Flight Ops: workspace + tech log primary, absorbed pages behind More', () => {
+    // Tech Log joined Flight Ops for pilots on 2026-08-08 (LG-207): a pilot in the tech log is
+    // doing Flight Ops work, and the breadcrumb/sidebar must not file it under Maintenance.
     const fo = domainsForRole('pilot').find((d) => d.domain === 'flight-ops')!;
-    expect(fo.primary.map((e) => e.label)).toEqual(['Pilot Workspace']);
+    expect(fo.primary.map((e) => e.label)).toEqual(['Pilot Workspace', 'Tech Log']);
     expect(fo.more.map((e) => e.label)).toEqual(
       expect.arrayContaining(['Preflight Workflow', 'Standalone FRAT', 'My FRAT Submissions', 'Airport Information', 'Fuel Load Request']),
     );

@@ -462,7 +462,7 @@ function BriefingReadout({ b, disclosure, acknowledgedByName, unsnapshotted, onP
 
         {!!disclosure?.checksDue.length && (
           <div className="rounded bg-[var(--gfo-warning,#F1B434)]/10 px-2 py-1 text-xs">
-            {disclosure.checksDue.length} recurring check(s) due/expired — see Overview.
+            {disclosure.checksDue.length} recurring check(s) due/expired — see Airworthiness → Coming due.
           </div>
         )}
 

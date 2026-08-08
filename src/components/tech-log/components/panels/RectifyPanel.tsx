@@ -107,7 +107,7 @@ export function RectifyPanel({
           <div>
             <label className="text-xs font-medium">RII inspector (authorized for ATA {ata}, not the performer)</label>
             <Select value={inspectorOid} onValueChange={(v: string) => setInspectorOid(v)}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder={inspectors.length ? 'Select inspector' : 'No authorized inspector for this ATA'} /></SelectTrigger>
+              <SelectTrigger className="mt-1"><SelectValue placeholder={inspectors.length ? 'Select RII inspector — required' : 'No authorized inspector for this ATA'} /></SelectTrigger>
               <SelectContent>
                 {inspectors.map(p => <SelectItem key={p.oid} value={p.oid}>{p.displayName}</SelectItem>)}
               </SelectContent>

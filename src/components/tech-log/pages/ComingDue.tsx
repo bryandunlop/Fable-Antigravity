@@ -171,9 +171,9 @@ export default function ComingDue() {
                 <span className="text-[11px] text-muted-foreground">{a.total} due</span>
               </div>
               <div className="mt-1 flex gap-3 text-sm font-semibold tabular-nums">
-                <span className={a.counts.OVERDUE ? 'text-[var(--gfo-error-ink,#C81E2B)]' : 'text-muted-foreground/50'}>{a.counts.OVERDUE} over</span>
-                <span className={a.counts.DUE_7D ? 'text-[var(--gfo-warning-ink,#8A6200)]' : 'text-muted-foreground/50'}>{a.counts.DUE_7D} ·7d</span>
-                <span className={a.counts.DUE_30D ? '' : 'text-muted-foreground/50'}>{a.counts.DUE_30D} ·30d</span>
+                <span className={a.counts.OVERDUE ? 'text-[var(--gfo-error-ink,#C81E2B)]' : 'text-muted-foreground/50'}>{a.counts.OVERDUE} overdue</span>
+                <span className={a.counts.DUE_7D ? 'text-[var(--gfo-warning-ink,#8A6200)]' : 'text-muted-foreground/50'}>{a.counts.DUE_7D} due ≤7d</span>
+                <span className={a.counts.DUE_30D ? '' : 'text-muted-foreground/50'}>{a.counts.DUE_30D} due ≤30d</span>
               </div>
             </button>
           ))}

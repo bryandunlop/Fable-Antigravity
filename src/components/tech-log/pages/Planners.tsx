@@ -28,7 +28,7 @@ const STATUS_CLASS: Record<ProjectStatus, string> = {
   CLOSED: 'text-muted-foreground',
 };
 const PAUSE_LABEL: Record<ProjectPauseReason, string> = {
-  WAITING_PARTS: 'Waiting on parts (POO)', WAITING_HANGAR: 'Waiting on hangar', WAITING_VENDOR: 'Waiting on vendor',
+  WAITING_PARTS: 'Parts on order', WAITING_HANGAR: 'Waiting on hangar', WAITING_VENDOR: 'Waiting on vendor',
   AIRCRAFT_AWAY: 'Aircraft away', OTHER: 'Other',
 };
 const DEFAULT_PREP = ['Parts ordered', 'Task cards loaded', 'Job codes loaded', 'Tooling staged'];
@@ -337,7 +337,7 @@ export default function Planners() {
             </div>
             <div>
               <Label>Note{pauseReason === 'WAITING_PARTS' ? ' (required — what part, from whom)' : ' (optional)'}</Label>
-              <Input className="mt-1" placeholder="e.g. POO — brake assemblies from GAC Savannah, ETA next Tue" value={pauseNote} onChange={e => setPauseNote(e.target.value)} />
+              <Input className="mt-1" placeholder="e.g. brake assemblies from GAC Savannah, ETA next Tue" value={pauseNote} onChange={e => setPauseNote(e.target.value)} />
             </div>
           </div>
           <DialogFooter>

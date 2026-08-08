@@ -133,7 +133,7 @@ export function GatingReleasePanel({ deferral, onDone, onCancel }: { deferral: D
 
         {crewAttestation && <p className="rounded bg-[var(--gfo-warning,#F1B434)]/15 p-2 text-xs">Crew placard attestation (non-CRS). Items carrying an (M) procedure require maintenance.</p>}
         <div className="flex gap-2">
-          <Button variant="outline" onClick={onCancel}>Later</Button>
+          <Button variant="outline" onClick={onCancel}>Later — stays in Work Queue</Button>
           <Button onClick={begin} disabled={!canSign}><ShieldCheck className="mr-1.5 h-4 w-4" /> {crewAttestation ? 'Attest placard installed' : 'Sign discharge release'}</Button>
         </div>
         {!gate.ok && gate.code === 'EXPIRED' && <p className="text-xs text-[var(--gfo-error-ink,#C81E2B)]">This deferral already passed its repair-due condition and reads EXPIRED — discharging it now would silently un-ground an overdue item. Use an extension or correction instead.</p>}
