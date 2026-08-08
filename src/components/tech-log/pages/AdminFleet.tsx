@@ -82,9 +82,12 @@ export default function AdminFleet() {
                 </div>
               </div>
               <div className="flex gap-2">
+                {/* LG-211 — "& activate" read as something this button does. It does not: D23
+                    requires a separate DOM approver, and the old label hid that gate behind a verb
+                    that sounded like the person clicking could finish the job alone. */}
                 {ac.isProvisional && canEdit && (
                   <Button size="sm" disabled={hasPendingActivation(ac.id)} onClick={() => setActivateTarget(ac)}>
-                    <BadgeCheck className="mr-1.5 h-4 w-4" /> {hasPendingActivation(ac.id) ? 'Activation pending' : 'Propose D195 approval & activate'}
+                    <BadgeCheck className="mr-1.5 h-4 w-4" /> {hasPendingActivation(ac.id) ? 'Activation pending' : 'Propose activation (DOM approval required)'}
                   </Button>
                 )}
                 <Button size="sm" variant="outline" disabled={!canEdit || hasPendingEdit(ac.id)} onClick={() => setDraft({ ...ac })}><Pencil className="mr-1.5 h-4 w-4" /> Edit</Button>

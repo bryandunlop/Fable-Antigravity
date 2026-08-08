@@ -46,6 +46,9 @@ describe('maintenance project lifecycle (D28: planning → in work → paused �
     const r = transitionProject(project({ status: 'IN_WORK' }), 'CLOSED', 'm1', NOW, { openLinkedCards: 2 });
     expect(r.ok).toBe(false);
     expect(r.ok === false && r.error).toMatch(/open work card/i);
+    // LG-211 — the refusal names the act the button offered ("Archive"), not the internal state.
+    expect(r.ok === false && r.error).toMatch(/archive/i);
+    expect(r.ok === false && r.error).not.toMatch(/cannot close/i);
   });
 
   it('closes cleanly and stamps closedAtUtc; CLOSED is terminal', () => {
