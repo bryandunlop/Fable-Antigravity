@@ -143,6 +143,19 @@ describe('domainsForRole', () => {
       expect.arrayContaining(['Preflight Workflow', 'Standalone FRAT', 'My FRAT Submissions', 'Airport Information', 'Fuel Load Request']),
     );
   });
+  it('dual-role pilot (+dom) sees Tech Log once, under Flight Ops — the primary role wins (LG-207)', () => {
+    const groups = domainsForRole('pilot', ['dom']);
+    const techLogHomes = groups.filter((g) => [...g.primary, ...g.more].some((e) => e.path === '/tech-log'));
+    expect(techLogHomes.map((g) => g.domain)).toEqual(['flight-ops']);
+    // and the breadcrumb-scoped match agrees with the sidebar
+    expect(matchEntry('/tech-log/journey', entriesForRoles('pilot', ['dom']))!.domain).toBe('flight-ops');
+  });
+  it('dual-role maintenance (+pilot additional) keeps Tech Log under Maintenance', () => {
+    const groups = domainsForRole('maintenance', ['pilot']);
+    const techLogHomes = groups.filter((g) => [...g.primary, ...g.more].some((e) => e.path === '/tech-log'));
+    expect(techLogHomes.map((g) => g.domain)).toEqual(['maintenance']);
+    expect(matchEntry('/tech-log/journey', entriesForRoles('maintenance', ['pilot']))!.domain).toBe('maintenance');
+  });
   it('non-admin roles get no admin domain', () => {
     expect(domainsForRole('pilot').map((d) => d.domain)).not.toContain('admin');
   });

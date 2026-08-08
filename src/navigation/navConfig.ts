@@ -203,11 +203,22 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/ops', label: 'Ops Ledger', domain: 'admin', icon: Activity, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
 ];
 
-/** Entries visible to a user, by role. Same semantics as Navigation.tsx filtering. */
+/** Entries visible to a user, by role. Same semantics as Navigation.tsx filtering.
+ * Same-path variants (e.g. /tech-log's maintenance-domain vs pilot flight-ops entries, LG-207)
+ * are deduped here so a dual-role user (pilot + dom, say) never sees the page twice or gets the
+ * other persona's breadcrumb domain: the variant matching the PRIMARY userRole wins; the first
+ * eligible entry is the fallback when none names the primary role. */
 export function entriesForRoles(userRole: string, additionalRoles: string[] = []): NavEntry[] {
-  return NAV_ENTRIES.filter(
+  const eligible = NAV_ENTRIES.filter(
     e => e.roles.includes(userRole) || additionalRoles.some(r => e.roles.includes(r)),
   );
+  const byPath = new Map<string, NavEntry>();
+  for (const e of eligible) {
+    const held = byPath.get(e.path);
+    if (!held) { byPath.set(e.path, e); continue; }
+    if (!held.roles.includes(userRole) && e.roles.includes(userRole)) byPath.set(e.path, e);
+  }
+  return eligible.filter(e => byPath.get(e.path) === e);
 }
 
 export interface DomainGroup {
