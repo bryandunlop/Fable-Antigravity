@@ -97,6 +97,8 @@ export function DeferralCreatePanel({
       .filter(m => canDeferDefect(user, m))
       .filter(m => !q || m.subItemNumber.toLowerCase().includes(q) || m.title.toLowerCase().includes(q) || m.ataReference === q)
       .slice(0, 25);
+    // LG-211 — an empty list has three unrelated causes and the old copy said the same sentence for
+    // all three. `melEmptyCause` below separates them so the message can name a way out.
     // `user` IS a dependency: the list is now filtered by who is standing here (TL-37), and the
     // current user resolves from the login AFTER the first render. Omitting it cached the list
     // computed against whoever was resolved first — a maintenance user could be left looking at the
@@ -104,6 +106,21 @@ export function DeferralCreatePanel({
     // persona. Caught by `deferralClockDefault.test.tsx`, which went looking for an item the stale
     // list had dropped.
   }, [state.melItems, aircraft, query, user]);
+
+  /**
+   * LG-211 — WHY the list is empty, so the empty state can offer a way out instead of shrugging.
+   *
+   * Three causes, one of which used to be invisible: a crew member sees nothing because the items
+   * the MEL reserves to maintenance were filtered out (TL-37), and the old copy let that read as
+   * "this aircraft has no MEL". Down-route, that is a phone call.
+   */
+  const melEmptyCause = useMemo((): null | 'noQueryMatch' | 'crewFiltered' | 'noApprovedItems' => {
+    if (!aircraft || melMatches.length > 0) return null;
+    const forType = state.melItems.filter(m => m.aircraftType === aircraft.type && m.approvalState === 'APPROVED');
+    if (forType.length === 0) return 'noApprovedItems';
+    if (forType.filter(m => canDeferDefect(user, m)).length === 0) return 'crewFiltered';
+    return 'noQueryMatch';
+  }, [state.melItems, aircraft, melMatches.length, user]);
 
   const selectedMel = state.melItems.find(m => m.id === selectedMelId);
   // D69 — an NEF item carries no repair category, so there is no PL-25 interval to start. It is
@@ -271,7 +288,29 @@ export function DeferralCreatePanel({
                 <div className="text-xs text-muted-foreground">{m.title}</div>
               </button>
             ))}
-            {melMatches.length === 0 && <p className="p-2 text-xs text-muted-foreground">No matching MEL items.</p>}
+            {/* LG-211 — recover, not shrug. Each cause names the next thing to do. */}
+            {melEmptyCause === 'noQueryMatch' && (
+              <div className="space-y-1 p-2 text-xs text-muted-foreground">
+                <p>No MEL item matches “{query.trim()}”.</p>
+                <p>Search matches the item number or title anywhere in the text; an ATA reference must be the exact chapter (e.g. <span className="font-mono">32</span>).</p>
+                <Button size="sm" variant="outline" onClick={() => setQuery('')}>Clear the search</Button>
+              </div>
+            )}
+            {melEmptyCause === 'crewFiltered' && (
+              <div className="space-y-1 p-2 text-xs text-muted-foreground">
+                <p>
+                  Every {aircraft?.type} MEL item is marked maintenance-only, so none can be deferred
+                  by flight crew. This is the MEL’s rule, not a missing MEL.
+                </p>
+                <p>Ask maintenance to raise the deferral, or report the defect and let it be triaged on the ground.</p>
+              </div>
+            )}
+            {melEmptyCause === 'noApprovedItems' && (
+              <div className="space-y-1 p-2 text-xs text-muted-foreground">
+                <p>No approved MEL items exist for the {aircraft?.type} yet — nothing can be deferred on this tail.</p>
+                <p>An item is only selectable once its D195 approval is recorded (Admin → Fleet).</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

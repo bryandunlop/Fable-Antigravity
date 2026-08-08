@@ -131,10 +131,13 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         </ModuleCard>
       </div>
 
-      {/* Footer — always-available reporting */}
+      {/* Footer — always-available reporting.
+          LG-211: these were twin grey buttons, so the airworthiness-relevant act and the nuisance
+          capture looked like the same size of decision. Reporting a defect can ground the aircraft;
+          logging a nuisance item cannot. The primary treatment says which one that is. */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
-        {tlAc && <button onClick={() => setSquawkOpen(true)} className="min-h-[44px] rounded border px-3 py-2 text-sm hover:bg-accent">Report defect</button>}
-        {tlAc && <button onClick={() => setNuisanceOpen(true)} className="min-h-[44px] rounded border px-3 py-2 text-sm hover:bg-accent">Log nuisance item</button>}
+        {tlAc && <button onClick={() => setSquawkOpen(true)} className="min-h-[44px] rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Report defect</button>}
+        {tlAc && <button onClick={() => setNuisanceOpen(true)} className="min-h-[44px] rounded px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">Log nuisance item</button>}
       </div>
       <MessagesPanel />
 

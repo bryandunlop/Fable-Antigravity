@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   CalendarDays, KanbanSquare, Plus, Play, Pause, CheckCircle2, PackageSearch,
-  ChevronLeft, ChevronRight, Plane, Palmtree, ClipboardList, AlertTriangle, Wrench,
+  ChevronLeft, ChevronRight, Plane, Palmtree, ClipboardList, AlertTriangle, Wrench, Archive,
 } from 'lucide-react';
 import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { useIntegration } from '../integration/useIntegration';
@@ -20,7 +20,10 @@ import { Textarea } from '../../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 
-const STATUS_LABEL: Record<ProjectStatus, string> = { PLANNING: 'Planning', IN_WORK: 'In work', PAUSED: 'Paused', CLOSED: 'Closed' };
+// LG-211 — the CLOSED state reads to a technician as "close the work", which is a different act
+// with a different signature behind it. The planner is a plan; finishing with it is archiving it,
+// and nothing here closes a defect or signs a release. Label only — the state is still CLOSED.
+const STATUS_LABEL: Record<ProjectStatus, string> = { PLANNING: 'Planning', IN_WORK: 'In work', PAUSED: 'Paused', CLOSED: 'Archived' };
 const STATUS_CLASS: Record<ProjectStatus, string> = {
   PLANNING: 'border-[var(--gfo-daylight)] text-[var(--gfo-daylight)]',
   IN_WORK: 'bg-[var(--gfo-midnight)] text-white border-transparent',
@@ -231,7 +234,8 @@ export default function Planners() {
                                 {p.status === 'IN_WORK' && (
                                   <Button size="sm" variant="outline" onClick={() => { setPauseFor(p); setPauseReason('WAITING_PARTS'); setPauseNote(''); }}><Pause className="mr-1.5 h-3.5 w-3.5" /> Pause</Button>
                                 )}
-                                <Button size="sm" variant="outline" onClick={() => doTransition(p, 'CLOSED')}><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Close</Button>
+                                {/* LG-211 — "Close" read as closing the work; this archives the plan. */}
+                                <Button size="sm" variant="outline" onClick={() => doTransition(p, 'CLOSED')}><Archive className="mr-1.5 h-3.5 w-3.5" /> Archive</Button>
                               </div>
                             )}
                           </div>

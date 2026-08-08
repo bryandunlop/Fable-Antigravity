@@ -30,7 +30,10 @@ export function transitionProject(
     }
   }
   if (to === 'CLOSED' && (opts.openLinkedCards ?? 0) > 0) {
-    return { ok: false, error: `Cannot close — ${opts.openLinkedCards} linked open work card(s) remain.` };
+    // LG-211 — the button says "Archive"; the refusal has to use the same word, or the technician
+    // is told they cannot do a thing they were never offered. The STATE stays CLOSED; the words
+    // the user reads are what changed.
+    return { ok: false, error: `Cannot archive — ${opts.openLinkedCards} linked open work card(s) remain.` };
   }
   return {
     ok: true,
