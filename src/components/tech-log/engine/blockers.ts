@@ -53,7 +53,14 @@ export interface BlockerRow {
    *  display zone, and a regulatory time must never be rendered as a bare UTC ISO string. */
   dueUtc?: string;
   governingTimezone?: string;
+  /** Rendered as buttons, in this order. */
   actions: BlockerAction[];
+  /**
+   * LG-208 — rendered behind "More". A row asks one question and shows only its genuine answers.
+   * Today only the open-defect row uses it: signing a release with no work card raised is
+   * exception handling, not one of the two paths out of an open defect.
+   */
+  overflowActions?: BlockerAction[];
   /** True for the single row matching the serviceability rule currently governing the tail. */
   governing: boolean;
   defect?: Defect;
@@ -111,9 +118,13 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
     if (!open || coveredByActive(d.id)) continue;
     // Deferring is impossible on a provisional aircraft (its D195 MEL is pending FSDO approval),
     // so don't advertise the action there — the panel would reject it anyway.
-    const actions: BlockerAction[] = ac?.isProvisional
-      ? ['RAISE_CARD', 'SIGN_RELEASE']
-      : ['DEFER', 'RAISE_CARD', 'SIGN_RELEASE'];
+    // LG-208 — two promoted answers, never three. Deferring under the MEL and raising a work card
+    // are the two real paths out of an open defect; LG-154's judgement (software must not rank
+    // defer above rectify) is why they are equal-weight and why neither is styled as primary.
+    // Signing a release with no card raised is the exception — it goes behind More, where its
+    // label ("work already done") says when it applies.
+    const actions: BlockerAction[] = ac?.isProvisional ? ['RAISE_CARD'] : ['DEFER', 'RAISE_CARD'];
+    const overflowActions: BlockerAction[] = ['SIGN_RELEASE'];
     blockers.push({
       id: d.id, kind: 'DEFECT_OPEN', defect: d,
       title: `ATA ${d.ataChapter} — ${d.description}`,
@@ -123,6 +134,7 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
         : 'Rectified and released to service, or deferred under an MEL item.',
       governing: sv.governingRule === 1 && sv.drivingDefectId === d.id,
       actions,
+      overflowActions,
     });
   }
 
