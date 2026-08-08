@@ -4,7 +4,11 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, Wrench, FilePlus, Clock, ShieldAlert, CheckCircle2, CalendarClock, Plus,
   Printer, Package, PlaneTakeoff, History, TimerReset, ClipboardList, ClipboardCheck, CloudDownload, ShieldCheck,
+  MoreHorizontal,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '../../ui/dropdown-menu';
 import { useTechLog, useCurrentUser, useDisplayZone, useLoginRoles } from '../TechLogContext';
 import { formatRegulatoryCompact, formatRegulatoryDeadline, type DisplayZoneMode } from '../util/displayZone';
 import { useIntegration, expectedFromWo } from '../integration/useIntegration';
@@ -73,10 +77,13 @@ const CHECK_BADGE: Record<string, 'secondary' | 'destructive' | 'outline'> = { C
 
 // D42: the label says which of the two "fix it" paths you are taking. "Rectify" and "Quick CRS"
 // sat side by side with nothing on screen distinguishing raise-a-job from sign-it-off.
+// LG-208: both fix-it labels now carry the same "Rectify — " stem, so the pair reads as one
+// airworthiness act with two routes rather than two unrelated buttons, and "Sign release now" no
+// longer reads as "skip the work and sign it off" — its parenthetical says when it applies.
 const ACTION_LABEL: Record<BlockerAction, string> = {
-  DEFER: 'Defer (MEL)',
-  RAISE_CARD: 'Raise work card',
-  SIGN_RELEASE: 'Sign release now',
+  DEFER: 'Defer under MEL…',
+  RAISE_CARD: 'Rectify — raise work card',
+  SIGN_RELEASE: 'Rectify — sign release now (work already done)',
   SIGN_GATING: 'Sign (M)/placard release',
   MARK_CREW_ACTION: 'Mark crew action complied',
   ACCOMPLISH: 'Accomplish & sign',
@@ -84,8 +91,10 @@ const ACTION_LABEL: Record<BlockerAction, string> = {
   OPEN_CARD: 'Open card',
 };
 // The first action on a row is the one that most directly clears it.
+// LG-208: DEFECT_OPEN is deliberately absent. Choosing between deferring under the MEL and
+// rectifying IS the judgement the technician is paid to make (LG-154) — a row with no entry here
+// renders its buttons equal-weight, which is the honest treatment of that fork.
 const PRIMARY_ACTION: Partial<Record<string, BlockerAction>> = {
-  DEFECT_OPEN: 'DEFER',
   DEFERRAL_PENDING_PLACARD: 'SIGN_GATING',
   DEFERRAL_EXPIRED: 'RAISE_CARD',
   CHECK_EXPIRED: 'ACCOMPLISH',
@@ -127,8 +136,8 @@ function BlockerCard({
           {row.detail && <p className="mt-0.5 text-xs text-muted-foreground">{row.detail}</p>}
           <p className="mt-1 text-xs text-muted-foreground">Clears when: {row.clearsWhen}</p>
         </div>
-        {isMaint && row.actions.length > 0 && (
-          <div className="flex shrink-0 flex-wrap gap-2">
+        {isMaint && (row.actions.length > 0 || (row.overflowActions?.length ?? 0) > 0) && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {row.actions.map(a => (
               <Button
                 key={a}
@@ -139,6 +148,23 @@ function BlockerCard({
                 {ACTION_LABEL[a]}
               </Button>
             ))}
+            {/* LG-208 — everything that is not one of the row's genuine answers. */}
+            {(row.overflowActions?.length ?? 0) > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="ghost" aria-label="More actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {row.overflowActions!.map(a => (
+                    <DropdownMenuItem key={a} onSelect={() => onAction(row, a)}>
+                      {ACTION_LABEL[a]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         )}
       </div>
@@ -643,12 +669,25 @@ export default function AircraftDetail() {
                       </div>
                     ) : null}
                   </div>
-                  {/* D42: same three dispositions, same order, same words as the blocker board. */}
+                  {/* D42: same dispositions, same order, same words as the blocker board — LG-208
+                      regrouped both together, so the labels come from the one ACTION_LABEL map and
+                      the sign-without-a-card exception sits behind More on this card too. */}
                   {(isMaint || user.crewDeferralAuthorized) && isOpen && d.status === 'OPEN' && (
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => startTriage(d.id, 'defer')}><Wrench className="mr-1.5 h-4 w-4" /> Defer (MEL)</Button>
-                      {isMaint && <Button size="sm" onClick={() => rectifyToWorkCard(d)} title="Open a work card and go do the work"><ClipboardList className="mr-1.5 h-4 w-4" /> Raise work card</Button>}
-                      {isMaint && <Button size="sm" variant="outline" onClick={() => startTriage(d.id, 'rectify')} title="Work is already done — sign the release now"><CheckCircle2 className="mr-1.5 h-4 w-4" /> Sign release now</Button>}
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => startTriage(d.id, 'defer')}><Wrench className="mr-1.5 h-4 w-4" /> {ACTION_LABEL.DEFER}</Button>
+                      {isMaint && <Button size="sm" variant="outline" onClick={() => rectifyToWorkCard(d)} title="Open a work card and go do the work"><ClipboardList className="mr-1.5 h-4 w-4" /> {ACTION_LABEL.RAISE_CARD}</Button>}
+                      {isMaint && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" aria-label="More actions"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => startTriage(d.id, 'rectify')}>
+                              <CheckCircle2 className="mr-2 h-4 w-4" /> {ACTION_LABEL.SIGN_RELEASE}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   )}
                 </CardContent>

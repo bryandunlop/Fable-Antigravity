@@ -57,8 +57,31 @@ describe('buildBlockers — every grounding cause is a listed, actionable row', 
     expect(r.blockers).toHaveLength(1);
     const b = r.blockers[0];
     expect(b.kind).toBe('DEFECT_OPEN');
-    expect(b.actions).toEqual(expect.arrayContaining(['DEFER', 'RAISE_CARD', 'SIGN_RELEASE']));
+    expect([...b.actions, ...(b.overflowActions ?? [])]).toEqual(
+      expect.arrayContaining(['DEFER', 'RAISE_CARD', 'SIGN_RELEASE']),
+    );
     expect(b.governing).toBe(true);
+  });
+
+  // LG-208 — the card asks one question ("which path out of this defect?") and shows exactly two
+  // answers. Signing a release with no work card is the exception, not one of the two paths.
+  it('LG-208 — an open defect promotes defer + raise-card only; sign-release-now sits in overflow', () => {
+    const r = buildBlockers('ac1', { ...empty, defects: [defect()] }, NOW);
+    const b = r.blockers[0];
+    expect(b.actions).toEqual(['DEFER', 'RAISE_CARD']);
+    expect(b.overflowActions).toEqual(['SIGN_RELEASE']);
+  });
+
+  it('LG-208 — a provisional tail still shows two answers: raise-card promoted, sign-release overflowed', () => {
+    const prov: Aircraft = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
+    const r = buildBlockers(
+      'ac2',
+      { ...empty, aircraft: [ac, prov], defects: [defect({ id: 'd2', aircraftId: 'ac2' })] },
+      NOW,
+    );
+    const b = r.blockers.find(x => x.kind === 'DEFECT_OPEN')!;
+    expect(b.actions).toEqual(['RAISE_CARD']);
+    expect(b.overflowActions).toEqual(['SIGN_RELEASE']);
   });
 
   it('rule 2 — an expired deferral is its own blocker row, not a silent status', () => {
