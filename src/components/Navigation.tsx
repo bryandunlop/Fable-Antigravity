@@ -97,17 +97,28 @@ const DraggableNavigationGroup = ({
     const isActive = isActiveEntry(item);
     return (
       <SidebarMenuItem key={`${item.domain}:${item.label}`}>
-        {/* size-11! on the collapsed rail overrides the cva's size-8! — 44pt is
-            the smallest target a pilot should have to hit on a moving aircraft.
-            It has to sit on this className (the tailwind-merge side), not on the
-            Link below: Radix Slot concatenates asChild classes WITHOUT merging,
-            so a conflicting utility on the child never wins. */}
-        <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className={`relative overflow-hidden group transition-colors duration-200 group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center ${isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' : 'text-sidebar-foreground bg-transparent hover:bg-white/10 hover:text-white'}`}>
-          <Link to={item.href ?? item.path} className="flex items-center gap-3 w-full relative">
+        {/* On the collapsed rail this becomes a 64x52 icon-over-label tile rather
+            than shadcn's 32px icon square. The size overrides must sit on THIS
+            className (the tailwind-merge side) and not on the Link below: Radix
+            Slot concatenates asChild classes WITHOUT merging, so a conflicting
+            utility on the child never wins. */}
+        <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className={`relative overflow-hidden group transition-colors duration-200 group-data-[collapsible=icon]:h-auto! group-data-[collapsible=icon]:w-16! group-data-[collapsible=icon]:py-1.5! group-data-[collapsible=icon]:px-0.5! ${isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' : 'text-sidebar-foreground bg-transparent hover:bg-white/10 hover:text-white'}`}>
+          <Link to={item.href ?? item.path} className="flex items-center gap-3 w-full relative group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-0.5 group-data-[collapsible=icon]:text-center">
             {isActive && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gfo-sunrise" />}
             {!isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-white/40 rounded-r-full transition-all duration-200 group-hover:h-3/4" />}
             <Icon className={`w-4 h-4 shrink-0 z-10 ${isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground group-hover:text-white'}`} />
+            {/* Two spans, one per rail state — NOT one span with a ?? fallback.
+                A single span showed the short railLabel in the EXPANDED sidebar
+                too, so Irregularity Reports read as "Irregularity" at full width.
+                The expanded label is always the real one. */}
             <span className="z-10 relative group-data-[collapsible=icon]:hidden">{item.label}</span>
+            {/* The rail label is what makes the icons readable at all, and it must
+                WRAP to two lines — so whitespace-normal has to beat shadcn's cva
+                base `[&>span:last-child]:truncate`, which otherwise ties on
+                specificity and wins on source order (that is how these first came
+                out as "Pilot Curren…"). Names too long for two 9px lines carry an
+                explicit railLabel in the manifest. */}
+            <span className="z-10 relative hidden group-data-[collapsible=icon]:block text-[9px] leading-[1.15] w-full max-h-[22px] overflow-hidden group-data-[collapsible=icon]:whitespace-normal!">{item.railLabel ?? item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -309,9 +320,11 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     <SidebarProvider
       open={sidebarOpen}
       onOpenChange={handleSidebarOpenChange}
-      // D80: the collapsed rail must stay finger-usable on the iPad, so it is
-      // wider than shadcn's 3rem default (which pairs with a 32px hit target).
-      style={{ '--sidebar-width-icon': '3.5rem' } as React.CSSProperties}
+      // 76px, not shadcn's 3rem: the collapsed rail carries icon + tiny label,
+      // Files-app style, per UX Workflow Pass 2026-08-08 §W7 — "bare icons are a
+      // memory test, the opposite of minimal training" (LG-207). It also keeps
+      // the target finger-sized for a pilot on a moving aircraft.
+      style={{ '--sidebar-width-icon': '4.75rem' } as React.CSSProperties}
     >
       <div className="flex min-h-screen w-full overflow-x-hidden">
         {/* collapsible="icon", not the shadcn default "offcanvas": D80 makes the

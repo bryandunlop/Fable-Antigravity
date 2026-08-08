@@ -15,6 +15,7 @@ import { FRONT_DOORS } from './navigation/navConfig';
 import Navigation from './components/Navigation';
 import RouteChrome from './components/RouteChrome';
 import MobileBottomNav from './components/MobileBottomNav';
+import AirportsShell from './components/airport-info/AirportsShell';
 import AircraftStatus from './components/AircraftStatus';
 import FRATForm from './components/FRATForm';
 import FRATReview from './components/FRATReview';
@@ -283,12 +284,12 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/airport-evaluations" element={<AirportInformation currentUserOid={userRole} />} />
+                                <Route path="/airport-evaluations" element={<AirportsShell userRole={userRole} additionalRoles={additionalRoles}><AirportInformation currentUserOid={userRole} /></AirportsShell>} />
                                 <Route
                                   path="/airport-evaluations/flags"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
-                                      <FlagRuleBuilder />
+                                      <AirportsShell userRole={userRole} additionalRoles={additionalRoles}><FlagRuleBuilder /></AirportsShell>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -296,10 +297,12 @@ export default function App() {
                                   path="/airport-evaluations/review"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
-                                      <AirportProposalQueue
-                                        role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}
-                                        currentUserOid={userRole}
-                                      />
+                                      <AirportsShell userRole={userRole} additionalRoles={additionalRoles}>
+                                        <AirportProposalQueue
+                                          role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}
+                                          currentUserOid={userRole}
+                                        />
+                                      </AirportsShell>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -307,10 +310,12 @@ export default function App() {
                                   path="/airport-evaluations/worklist"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
-                                      <AirportEvaluationWorklist
-                                        role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}
-                                        currentUserOid={userRole}
-                                      />
+                                      <AirportsShell userRole={userRole} additionalRoles={additionalRoles}>
+                                        <AirportEvaluationWorklist
+                                          role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}
+                                          currentUserOid={userRole}
+                                        />
+                                      </AirportsShell>
                                     </ProtectedRoute>
                                   }
                                 />
