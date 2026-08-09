@@ -166,3 +166,22 @@ describe('formatBytes', () => {
     expect(formatBytes(2_400_000)).toBe('2.3 MB');
   });
 });
+
+describe('provenance survives an ordinary draft edit', () => {
+  // Found in review: DocEditorDialog rebuilds the revision object from scratch,
+  // and provenance is optional — so omitting it compiled cleanly and silently
+  // turned a received MEL into an "authored in myGFO" document, dropping it back
+  // to the meaningless placeholder digest. A fabricated provenance claim on the
+  // exact record D73 exists to protect.
+  it('an edited revision that keeps its provenance is still a received copy', () => {
+    const edited = { ...received, sections: [], changeSummary: 'Typo in the summary.' };
+    expect(isReceived(edited)).toBe(true);
+    expect(displayDigest(edited).hex).toBe(BYTES_SHA);
+  });
+
+  it('dropping provenance is what the bug looked like — it reverts to authored', () => {
+    const stripped = { ...received, provenance: undefined };
+    expect(originOf(stripped)).toBe('authored');
+    expect(displayDigest(stripped).hex).toBe(stripped.mockChecksum);
+  });
+});

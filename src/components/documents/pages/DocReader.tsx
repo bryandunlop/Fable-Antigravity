@@ -211,12 +211,15 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
           )}
           {author && (
             <>
-            {editableRev && (
+            {/* A received revision's content is bytes, not blocks — the block
+                editor has nothing to edit and would strip its provenance. New
+                bytes arrive through the ingest path as a new revision. */}
+            {editableRev && !isReceived(editableRev) && (
               <Button size="sm" variant="secondary" onClick={() => setEditor({ kind: 'edit-draft', doc, rev: editableRev })}>
                 <PencilLine className="mr-1.5 h-4 w-4" /> Edit draft (rev {editableRev.revision})
               </Button>
             )}
-            {rev && !editableRev && (
+            {rev && !isReceived(rev) && !editableRev && (
               <Button size="sm" variant="secondary" onClick={() => setEditor({ kind: 'revise', doc, baseRev: rev })}>
                 <FilePlus2 className="mr-1.5 h-4 w-4" /> New revision
               </Button>
