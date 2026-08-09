@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from './ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from './ui/sidebar';
 import NotificationCenter from './NotificationCenter';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetDemoDataButton } from './ResetDemoDataButton';
@@ -25,7 +25,7 @@ import {
 import {
   initialSidebarOpen, readPersistedSidebarState, writePersistedSidebarState,
 } from '../navigation/sidebarDefault';
-import { orderedGroupsForRole, shouldShowGroupLabels } from '../navigation/navOrder';
+import { orderedGroupsForRole, shouldShowGroupLabels, NAV_ORDER_KEY } from '../navigation/navOrder';
 
 // DENSE_ROLE_ITEM_THRESHOLD (30) lived here and gated group labels. Retired by
 // D80: it meant only `admin` (52 items) ever saw labels while pilot, inflight and
@@ -205,7 +205,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
   // Load custom order from localStorage
   const loadCustomOrder = () => {
-    const saved = localStorage.getItem(`nav-order-${userRole}`);
+    const saved = localStorage.getItem(NAV_ORDER_KEY(userRole));
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -261,7 +261,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   // Save custom order to localStorage
   const saveCustomOrder = (groups: NavigationGroup[]) => {
     const order = groups.map(g => g.label);
-    localStorage.setItem(`nav-order-${userRole}`, JSON.stringify(order));
+    localStorage.setItem(NAV_ORDER_KEY(userRole), JSON.stringify(order));
   };
 
   // Move group in the list
@@ -272,17 +272,27 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     setCustomOrderKeys(newGroups.map(g => g.label));
   };
 
-  // Save order when customization mode is turned off
+  // Persist ONLY on the customizing true -> false edge, i.e. when the user
+  // actually finishes reordering.
+  //
+  // This used to fire on mount as well (the guard was just `if (!isCustomizing)`,
+  // which is true on first render), so the app wrote a frozen group order for
+  // every user the first time they ever opened it — without anyone touching
+  // "Customize order". The stored order then beat the manifest forever, which
+  // silently defeats D80's own-domain-first ordering for every existing user.
+  // Caught because Scheduling would not move to the top of a scheduler's rail.
+  const wasCustomizing = React.useRef(isCustomizing);
   useEffect(() => {
-    if (!isCustomizing) {
+    if (wasCustomizing.current && !isCustomizing) {
       saveCustomOrder(navigationGroups);
     }
+    wasCustomizing.current = isCustomizing;
   }, [isCustomizing, navigationGroups]);
 
   // Reset to default order
   const resetToDefault = () => {
     setCustomOrderKeys(null);
-    localStorage.removeItem(`nav-order-${userRole}`);
+    localStorage.removeItem(NAV_ORDER_KEY(userRole));
   };
 
   // Always on now (D80) — a group label is how a reader ranks eighteen rows, not
@@ -341,32 +351,6 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               </div>
             </div>
 
-            {/* Customization controls. Hidden on the collapsed rail — there is no
-                room for a labelled button, and reordering groups you cannot read
-                is not a thing anyone wants to do. */}
-            <div className="mt-3 pt-3 border-t border-white/5 space-y-2 group-data-[collapsible=icon]:hidden">
-              <Button
-                variant={isCustomizing ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setIsCustomizing(!isCustomizing)}
-                className="w-full text-xs justify-start text-sidebar-foreground hover:text-white hover:bg-white/10"
-              >
-                <Settings className="w-3 h-3 mr-2" />
-                {isCustomizing ? 'Done Customizing' : 'Customize Order'}
-              </Button>
-
-              {isCustomizing && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetToDefault}
-                  className="w-full text-xs justify-start text-sidebar-foreground hover:text-white hover:bg-white/10"
-                >
-                  <RotateCcw className="w-3 h-3 mr-2" />
-                  Reset to Default
-                </Button>
-              )}
-            </div>
           </SidebarHeader>
 
           <SidebarContent className="px-2 py-2">
@@ -392,6 +376,33 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               />
             ))}
           </SidebarContent>
+
+          {/* Customize Order lives at the FOOT now (D80). It used to be the first
+              thing in the nav, above every destination on every device — a
+              power-user preference outranking Tech Log. Hidden on the collapsed
+              rail: reordering groups you cannot read is not a thing anyone wants. */}
+          <SidebarFooter className="border-t border-white/5 p-2 group-data-[collapsible=icon]:hidden">
+            <Button
+              variant={isCustomizing ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setIsCustomizing(!isCustomizing)}
+              className="w-full justify-start text-xs text-sidebar-foreground hover:bg-white/10 hover:text-white"
+            >
+              <Settings className="mr-2 h-3 w-3" />
+              {isCustomizing ? 'Done customizing' : 'Customize order'}
+            </Button>
+            {isCustomizing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetToDefault}
+                className="w-full justify-start text-xs text-sidebar-foreground hover:bg-white/10 hover:text-white"
+              >
+                <RotateCcw className="mr-2 h-3 w-3" />
+                Reset to default
+              </Button>
+            )}
+          </SidebarFooter>
         </Sidebar>
 
         <div className="flex-1 flex flex-col relative min-w-0">

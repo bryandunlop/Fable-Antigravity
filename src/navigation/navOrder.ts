@@ -77,3 +77,14 @@ export function orderedGroupsForRole(
 export function shouldShowGroupLabels(): boolean {
   return true;
 }
+
+/**
+ * localStorage key for a role's hand-reordered groups.
+ *
+ * v2 deliberately abandons every order stored under the old `nav-order-<role>`
+ * key. Those were not user choices: Navigation persisted the current order on
+ * MOUNT, so simply opening the app once froze that day's group sequence forever
+ * and it then outranked the manifest. Migrating them would carry the bug's
+ * output forward as if it were intent.
+ */
+export const NAV_ORDER_KEY = (userRole: string) => `nav-order-v2-${userRole}`;
