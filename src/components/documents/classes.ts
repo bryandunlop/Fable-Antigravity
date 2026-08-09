@@ -190,6 +190,32 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     categories: ['General Operations', 'Flight Operations', 'Maintenance', 'Emergency Procedures'],
     defaultAckDueDays: 14,
   },
+  /**
+   * D73 — a document myGFO RECEIVED rather than authored: the D195 MEL, an FSDO
+   * LOA, an (O)/(M) procedure extract, placard wording.
+   *
+   * Its content is bytes myGFO froze and hashed, so it is not written in the
+   * block editor and there is nothing to discuss inline — but it is controlled,
+   * and a new set of bytes rides the same draft → approve → publish path as any
+   * other revision. That is the point of D73's step G: a changed source file
+   * does not become a revision on its own, or SharePoint's edit button is an
+   * unsigned publish path into an airworthiness record.
+   */
+  'received-document': {
+    id: 'received-document',
+    label: 'Received Document',
+    labelPlural: 'Received Documents',
+    idPrefix: 'RCV',
+    controlled: true,
+    defaultAckLevel: 'initials',
+    ackLevelLocked: false,
+    authorRoles: ['document-manager', 'admin'],
+    approverRoles: APPROVERS,
+    commentsEnabled: false,
+    defaultReviewCycleDays: 365,
+    categories: ['Airworthiness', 'Regulatory', 'Manufacturer', 'General Operations'],
+    defaultAckDueDays: 14,
+  },
   'tribal-knowledge': {
     id: 'tribal-knowledge',
     label: 'Tribal Knowledge',

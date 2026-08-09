@@ -7,6 +7,7 @@ import type {
   DocSuggestion,
   DocSuggestionReply,
   DocReviewRecord,
+  DocSource,
   DocumentsState,
 } from './types';
 import type { Signature } from '../tech-log/types';
@@ -208,6 +209,31 @@ export type DocumentsAction =
         /** Used only when no working draft exists yet. */
         newRevisionSeed: { id: string; revision: string; effectiveDate: string };
         newBlockId: string;
+      };
+    }
+  | {
+      /**
+       * D73 — freeze bytes myGFO has already hashed as a DRAFT revision, which
+       * then rides the ordinary four-eyes pipeline.
+       *
+       * A draft, never a publish. A changed source file must not become the
+       * effective revision on its own: without the human gate, an external edit
+       * button is an unsigned publish path into an airworthiness record.
+       */
+      type: 'INGEST_RECEIVED_REVISION';
+      payload: { revision: DocRevision; actorRoles: string[] };
+    }
+  | {
+      /** Re-point or re-confirm where a document's source file lives. Reference
+       *  data — it touches no revision, so it never goes through four-eyes. */
+      type: 'CONFIRM_SOURCE';
+      payload: {
+        docId: string;
+        source: DocSource;
+        byUserId: string;
+        byName: string;
+        byRoles: string[];
+        atUtc: string;
       };
     }
   | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string; actorRoles: string[] } }
@@ -719,6 +745,71 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         ),
       };
     }
+    case 'INGEST_RECEIVED_REVISION': {
+      const { revision: rev, actorRoles } = action.payload;
+      const parent = state.docs.find((d) => d.id === rev.docId);
+      if (!parent) {
+        warnNoop(`no doc ${rev.docId} for received revision`);
+        return state;
+      }
+      // Holding a received document is a document-control act, not ordinary
+      // authoring: the operator is asserting these bytes ARE the MEL.
+      if (!rolesCanManageDocuments(actorRoles)) {
+        warnNoop('ingesting a received document requires a document manager');
+        return state;
+      }
+      // The whole point of the routing test is that myGFO holds the bytes AND
+      // knows their digest. A revision claiming to be a received copy without a
+      // hash myGFO computed itself would be a provenance claim with no evidence.
+      const att = rev.provenance?.attachment;
+      if (rev.provenance?.origin !== 'received-copy' || !att?.sha256 || !att.blobKey) {
+        warnNoop('a received revision requires frozen bytes and a myGFO-computed SHA-256');
+        return state;
+      }
+      if (state.revisions.some((r) => r.id === rev.id)) {
+        warnNoop(`revision ${rev.id} already exists`);
+        return state;
+      }
+      // The single-working-draft rule applies here too: a second in-flight
+      // revision would be as orphaned as any other.
+      const busy = inFlightRevision(rev.docId, state.revisions);
+      if (busy) {
+        warnNoop(`doc ${rev.docId} already has an in-flight revision (${busy.id}, ${busy.status})`);
+        return state;
+      }
+      return { ...state, revisions: [...state.revisions, { ...rev, status: 'draft' }] };
+    }
+    case 'CONFIRM_SOURCE': {
+      const p = action.payload;
+      const target = state.docs.find((d) => d.id === p.docId);
+      if (!target) {
+        warnNoop(`no doc ${p.docId} to confirm a source for`);
+        return state;
+      }
+      if (!rolesCanManageDocuments(p.byRoles)) {
+        warnNoop('confirming a document source requires a document manager');
+        return state;
+      }
+      // Touches the doc row only. A file that moved in SharePoint has not
+      // produced a new revision, and a signed revision's claim about its own
+      // bytes must not shift because someone corrected a link.
+      return {
+        ...state,
+        docs: state.docs.map((d) =>
+          d.id === p.docId
+            ? {
+                ...d,
+                source: {
+                  ...p.source,
+                  lastConfirmedAtUtc: p.atUtc,
+                  lastConfirmedByUserId: p.byUserId,
+                  lastConfirmedByName: p.byName,
+                },
+              }
+            : d,
+        ),
+      };
+    }
     case 'COMPLETE_REVIEW': {
       const { record, today, actorRoles } = action.payload;
       const doc = state.docs.find((d) => d.id === record.docId);
@@ -818,6 +909,10 @@ interface Ctx {
   resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
   /** Accept a suggestion into the document's single working draft, creating it if needed. */
   acceptSuggestionIntoDraft: (suggestionId: string, userRole: string, additionalRoles?: string[]) => void;
+  /** D73 — freeze already-hashed bytes as a draft revision (four-eyes follows). */
+  ingestReceivedRevision: (revision: DocRevision, userRole: string, additionalRoles?: string[]) => void;
+  /** D73 — record or re-confirm where a document's source file lives. */
+  confirmSource: (docId: string, source: DocSource, userRole: string, additionalRoles?: string[]) => void;
   addSuggestionReply: (suggestionId: string, text: string, userRole: string) => void;
   completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
   /** D75 / LG-183 — replace the cabin section vocabulary. `renames` (old → new) carries entries
@@ -1036,6 +1131,18 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     [state],
   );
 
+  const ingestReceivedRevision = useCallback<Ctx['ingestReceivedRevision']>((revision, userRole, additionalRoles = []) => {
+    dispatch({ type: 'INGEST_RECEIVED_REVISION', payload: { revision, actorRoles: [userRole, ...additionalRoles] } });
+  }, []);
+
+  const confirmSource = useCallback<Ctx['confirmSource']>((docId, source, userRole, additionalRoles = []) => {
+    const { userId, userName } = identityFor(userRole);
+    dispatch({
+      type: 'CONFIRM_SOURCE',
+      payload: { docId, source, byUserId: userId, byName: userName, byRoles: [userRole, ...additionalRoles], atUtc: nowUtc() },
+    });
+  }, []);
+
   const completeReview = useCallback<Ctx['completeReview']>((docId, outcome, note, userRole, additionalRoles = []) => {
     const { userId, userName } = identityFor(userRole);
     dispatch({
@@ -1094,6 +1201,8 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     addSuggestion,
     resolveSuggestion,
     acceptSuggestionIntoDraft,
+    ingestReceivedRevision,
+    confirmSource,
     addSuggestionReply,
     completeReview,
     setCabinSections: useCallback((sections, renames, actorRoles) => {
