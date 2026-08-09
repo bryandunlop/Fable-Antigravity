@@ -195,6 +195,30 @@ describe('lifecycle (four-eyes)', () => {
     expect(validateSubmit(rev({ status: 'draft', changeSummary: '' }), true).ok).toBe(false);
     expect(validateSubmit(rev({ status: 'draft', changeSummary: 'Gates changed.' }), true).ok).toBe(true);
   });
+  it('validateSubmit refuses while a staged change still holds a reader\'s words', () => {
+    const staged = (n: number) => rev({
+      status: 'draft',
+      changeSummary: 'Incorporates reader feedback.',
+      sections: [{
+        id: 'SOP-001::s1', level: 2, number: '1', title: 'Alpha',
+        blocks: [
+          { id: 'b1', type: 'paragraph' as const, md: 'Approved text.' },
+          ...Array.from({ length: n }, (_, i) => ({
+            id: `staged-${i}`, type: 'paragraph' as const, md: 'Reader words', stagedFromSuggestionId: `sug-00${i}`,
+          })),
+        ],
+      }],
+    });
+
+    const one = validateSubmit(staged(1), true);
+    expect(one.ok).toBe(false);
+    expect(one.error).toContain('1 staged change');
+
+    expect(validateSubmit(staged(2), true).error).toContain('2 staged changes');
+
+    // Cleared → the ordinary rules apply again.
+    expect(validateSubmit(staged(0), true).ok).toBe(true);
+  });
   it('validateSubmit rejects empty content and non-draft states', () => {
     expect(validateSubmit(rev({ status: 'draft', sections: [{ id: 'SOP-001::preamble', level: 1, number: '', title: '', blocks: [{ id: 'SOP-001::preamble::b0', type: 'paragraph', md: '  ' }] }] }), false).ok).toBe(false);
     expect(validateSubmit(rev({ status: 'published' }), false).ok).toBe(false);

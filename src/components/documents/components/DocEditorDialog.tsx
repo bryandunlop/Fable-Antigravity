@@ -351,7 +351,7 @@ export function DocEditorDialog({
       // revision via proposedMeta instead — the published doc stays untouched.
       if (!liveControlled) updateDocMeta(doc, userRole, additionalRoles);
       if (mode.kind === 'revise') createDraft(rev, userRoles);
-      else updateDraft(rev);
+      else updateDraft(rev, userRole, additionalRoles);
     }
     onPersisted?.();
   };

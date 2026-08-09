@@ -158,7 +158,7 @@ export type DocumentsAction =
   | { type: 'TOGGLE_PIN'; payload: { docId: string; actorRoles: string[] } }
   | { type: 'TOGGLE_ARCHIVE'; payload: { docId: string; actorRoles: string[] } }
   | { type: 'CREATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
-  | { type: 'UPDATE_DRAFT'; payload: DocRevision }
+  | { type: 'UPDATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'WITHDRAW_DRAFT'; payload: { revisionId: string; reason: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string } }
   | { type: 'SUBMIT_FOR_APPROVAL'; payload: { revisionId: string; atUtc: string } }
   | {
@@ -316,10 +316,18 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       return { ...state, revisions: [...state.revisions, rev] };
     }
     case 'UPDATE_DRAFT': {
-      const rev = action.payload;
+      const { revision: rev, actorRoles } = action.payload;
       const existing = state.revisions.find((r) => r.id === rev.id);
       if (!existing || (existing.status !== 'draft' && existing.status !== 'rejected')) {
         warnNoop('only a draft/rejected revision can be edited');
+        return state;
+      }
+      // C12: this was the one content mutation in the store with no authorization
+      // gate at all — it checked status and nothing else, so any caller could
+      // rewrite the body of a draft on its way into four-eyes.
+      const draftDoc = state.docs.find((d) => d.id === rev.docId);
+      if (!draftDoc || !canAuthor(classFor(draftDoc.classId), actorRoles)) {
+        warnNoop('editing a draft requires an authoring role for the doc\'s class');
         return state;
       }
       // Editing a rejected revision returns it to draft.
@@ -777,7 +785,7 @@ interface Ctx {
   togglePin: (docId: string, actorRoles: string[]) => void;
   toggleArchive: (docId: string, actorRoles: string[]) => void;
   createDraft: (revision: DocRevision, actorRoles: string[]) => void;
-  updateDraft: (revision: DocRevision) => void;
+  updateDraft: (revision: DocRevision, userRole: string, additionalRoles?: string[]) => void;
   withdrawDraft: (revisionId: string, reason: string, userRole: string, additionalRoles?: string[]) => void;
   submitForApproval: (revisionId: string) => void;
   decideApproval: (input: {
@@ -1061,7 +1069,11 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     togglePin: useCallback((id, actorRoles) => dispatch({ type: 'TOGGLE_PIN', payload: { docId: id, actorRoles } }), []),
     toggleArchive: useCallback((id, actorRoles) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: { docId: id, actorRoles } }), []),
     createDraft: useCallback((r, actorRoles) => dispatch({ type: 'CREATE_DRAFT', payload: { revision: r, actorRoles } }), []),
-    updateDraft: useCallback((r) => dispatch({ type: 'UPDATE_DRAFT', payload: r }), []),
+    updateDraft: useCallback<Ctx['updateDraft']>(
+      (r, userRole, additionalRoles = []) =>
+        dispatch({ type: 'UPDATE_DRAFT', payload: { revision: r, actorRoles: [userRole, ...additionalRoles] } }),
+      [],
+    ),
     withdrawDraft: useCallback((revisionId, reason, userRole, additionalRoles = []) => {
       const { userId, userName } = identityFor(userRole);
       dispatch({
