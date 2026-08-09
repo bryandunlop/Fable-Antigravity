@@ -37,6 +37,18 @@ export interface DocBlock {
   /** Regulation requirement ids this block satisfies (into regCatalog) — G1
    * compliance linking. Part of block content, so it rides the four-eyes revision. */
   complianceRefs?: string[];
+  /**
+   * This block was STAGED into the working draft by accepting reader suggestion
+   * `<id>`, and holds that reader's words verbatim. It is not document text yet:
+   * `validateSubmit` refuses a revision that still carries one, so a reader's
+   * prose can never reach four-eyes unedited. The maintainer resolves it by
+   * editing it into real wording, merging it up into its anchor, or deleting it.
+   *
+   * Deliberately absent from `canonicalizeSections`: authoring metadata whose
+   * lifetime is shorter than the draft it lives in must not perturb the content
+   * digest.
+   */
+  stagedFromSuggestionId?: string;
 }
 
 export interface DocSection {
@@ -265,6 +277,17 @@ export interface DocSuggestion {
   proposedChange: string;
   rationale: string;
   status: 'open' | 'accepted' | 'declined';
+  /**
+   * The revision that carries this suggestion's text. Written by
+   * ACCEPT_SUGGESTION_INTO_DRAFT in the same transition that flips `status` to
+   * 'accepted', so "accepted" and "a draft carries it" cannot disagree.
+   *
+   * Whether it SHIPPED is DERIVED, never stored: look the revision up and read
+   * its status (`suggestionOutcome`). A draft later withdrawn or rejected must
+   * stop claiming the suggestion shipped, and a second stored flag would drift
+   * the first time that happened.
+   */
+  resolvedIntoRevisionId?: string;
   resolvedByUserId?: string;
   resolvedByName?: string;
   resolutionNote?: string;

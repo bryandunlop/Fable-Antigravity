@@ -120,9 +120,11 @@ describe('revisions', () => {
     const revs = [rev({ id: 'r1', status: 'superseded' }), rev({ id: 'r2', status: 'published' })];
     expect(currentRevision('SOP-001', revs)?.id).toBe('r2');
   });
-  it('revisionsFor lists newest first', () => {
-    const revs = [rev({ id: 'a' }), rev({ id: 'b' })];
-    expect(revisionsFor('SOP-001', revs).map((r) => r.id)).toEqual(['b', 'a']);
+  it('revisionsFor lists newest first by the -rN sequence, not array position', () => {
+    const revs = [rev({ id: 'SOP-001-r1' }), rev({ id: 'SOP-001-r10' }), rev({ id: 'SOP-001-r2' })];
+    expect(revisionsFor('SOP-001', revs).map((r) => r.id)).toEqual([
+      'SOP-001-r10', 'SOP-001-r2', 'SOP-001-r1',
+    ]);
   });
   it('nextRevisionLabel handles major/minor and non-numeric labels', () => {
     expect(nextRevisionLabel(undefined)).toBe('1.0');
