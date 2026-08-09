@@ -353,7 +353,17 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
           </SidebarHeader>
 
-          <SidebarContent className="px-2 py-2">
+          {/* overflow-y-auto! overrides shadcn's cva base, which sets
+              `group-data-[collapsible=icon]:overflow-hidden` on this element
+              (ui/sidebar.tsx). That was harmless while "collapsed" meant OFFCANVAS
+              at zero width — nothing was there to scroll. D80 made the rail
+              PERMANENT, which turned it into silently lost navigation: inside a
+              position:fixed viewport-height container, any item past the fold had
+              no scrollbar, no gesture and no page-scroll fallback. Measured on
+              admin (47 items): 27 of 47 unreachable at 834x1112, 31 at 1440x900.
+              It also bit chief-pilot and maintenance at iPad landscape. The `!` is
+              required — same variant, so specificity ties. */}
+          <SidebarContent className="px-2 py-2 group-data-[collapsible=icon]:overflow-y-auto!">
             {isCustomizing && (
               <div className="p-3 mb-2 bg-white/10 border border-white/20 rounded-lg">
                 <p className="text-xs text-gfo-daylight-light flex items-center gap-2">

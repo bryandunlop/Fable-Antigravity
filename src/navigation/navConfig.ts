@@ -224,7 +224,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/critical-functions', label: 'Critical Functions', domain: 'admin', icon: ShieldCheck, primary: true, roles: ['lead', 'admin'] },
   { path: '/admin/airport-evaluation-officer', label: 'Airport Evaluation Officer', railLabel: 'Airport Officer', domain: 'admin', icon: BadgeCheck, primary: false, roles: ['airport-evaluator', 'admin'] },
   { path: '/foreflight-test-upload', label: 'ForeFlight Test Upload', domain: 'admin', icon: Upload, primary: false, keywords: ['foreflight'], roles: ['admin'] },
-  { path: '/foreflight-diagnostics', label: 'ForeFlight Sync Diagnostics', domain: 'admin', icon: Database, primary: false, keywords: ['foreflight', 'sync'], roles: ['admin'] },
+  { path: '/foreflight-diagnostics', label: 'ForeFlight Sync Diagnostics', railLabel: 'ForeFlight Sync', domain: 'admin', icon: Database, primary: false, keywords: ['foreflight', 'sync'], roles: ['admin'] },
   // The Work Ledger window (design §7). Hidden: the only door is the "Created by
   // Bryan Dunlop" credit on the login screen — project plumbing, not product.
   // It sits OUTSIDE the authenticated shell (public outer route) so the door
