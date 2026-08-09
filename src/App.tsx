@@ -15,7 +15,7 @@ import { FRONT_DOORS } from './navigation/navConfig';
 import Navigation from './components/Navigation';
 import RouteChrome from './components/RouteChrome';
 import MobileBottomNav from './components/MobileBottomNav';
-import AirportsShell from './components/airport-info/AirportsShell';
+import AirportsShell, { OFFICER_ROLES } from './components/airport-info/AirportsShell';
 import AircraftStatus from './components/AircraftStatus';
 import FRATForm from './components/FRATForm';
 import FRATReview from './components/FRATReview';
@@ -288,7 +288,7 @@ export default function App() {
                                 <Route
                                   path="/airport-evaluations/flags"
                                   element={
-                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={OFFICER_ROLES}>
                                       <AirportsShell userRole={userRole} additionalRoles={additionalRoles}><FlagRuleBuilder /></AirportsShell>
                                     </ProtectedRoute>
                                   }
@@ -296,7 +296,7 @@ export default function App() {
                                 <Route
                                   path="/airport-evaluations/review"
                                   element={
-                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={OFFICER_ROLES}>
                                       <AirportsShell userRole={userRole} additionalRoles={additionalRoles}>
                                         <AirportProposalQueue
                                           role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}
@@ -309,7 +309,7 @@ export default function App() {
                                 <Route
                                   path="/airport-evaluations/worklist"
                                   element={
-                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['airport-evaluator', 'chief-pilot', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={OFFICER_ROLES}>
                                       <AirportsShell userRole={userRole} additionalRoles={additionalRoles}>
                                         <AirportEvaluationWorklist
                                           role={userRole === 'chief-pilot' ? 'chief-pilot' : 'airport-evaluator'}

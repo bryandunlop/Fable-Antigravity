@@ -72,7 +72,11 @@ describe('mobile tabs resolve to registered routes', () => {
 describe('tab labels fit five cells on a 375pt phone (D80)', () => {
   it('no label exceeds MAX_TAB_LABEL_CHARS', () => {
     const over: string[] = [];
-    for (const role of MOBILE_NAV_ROLES) {
+    // The default/fallback branch must be in this loop, not just the named
+    // roles. It was not, and an 8-character "Aircraft" shipped green in the very
+    // commit that introduced the cap — every role NOT in MOBILE_NAV_ROLES (admin,
+    // lead, dom, chief-pilot, tax, …) lands on that branch on a phone.
+    for (const role of [...MOBILE_NAV_ROLES, 'unknown-role-falls-to-default']) {
       for (const item of mobileNavItemsForRole(role).slice(0, MAX_VISIBLE_TABS)) {
         if (item.name.length > MAX_TAB_LABEL_CHARS) over.push(`${role}: "${item.name}"`);
       }

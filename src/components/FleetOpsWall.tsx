@@ -84,20 +84,25 @@ export default function FleetOpsWall({ userRole }: { userRole: string }) {
         <FirLeadershipChip roles={[userRole]} />
       </header>
 
-      <StationWeatherStrip stations={stations} />
+      {/* ONE weather panel: the METAR strip and the 7-day outlook share a
+          container so they read as a single unit.
+          
+          D30's chosen option was the "unified METAR/TAF/outlook panel", NOT the
+          sibling-block option it explicitly rejected — and WeatherForecast opens
+          with its own `border-t`, a divider drawn to continue a card. Mounted as
+          a bare sibling that divider was orphaned, which was the visible tell
+          that the containment was wrong even though the adjacency was right.
 
-      {/* The 7-day outlook D30 ratified (2026-07-14) — built then, but mounted by
-          nothing until now, so the component and its animation CSS shipped dead.
-          Placement is D30's own choice: directly beneath the METAR strip.
-
-          It stays behind WeatherForecast's advisory framing, which is the
-          mitigation D30 rests on, NOT decoration — this is NWS public forecast
-          data sitting next to official aviation products. [[Q14]] (owner: DOM)
+          The outlook stays behind WeatherForecast's advisory framing, which is
+          the mitigation D30 rests on, NOT decoration — this is NWS *public*
+          forecast data next to official aviation products. [[Q14]] (owner: DOM)
           is still OPEN on whether that adjacency is acceptable at all; per D30's
-          hinge, a ruling against moves this to a planning surface and the
-          provider, parser, route and cache all survive unchanged. Only this
-          mount point moves. */}
-      <WeatherForecast icaoId={HOME_STATION} />
+          hinge a ruling against moves this to a planning surface, and provider,
+          parser, route and cache all survive. Only the mount point moves. */}
+      <section className="rounded-lg border border-border bg-card p-3" aria-label="Weather">
+        <StationWeatherStrip stations={stations} />
+        <WeatherForecast icaoId={HOME_STATION} />
+      </section>
 
       {/* Fleet rail + map */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(190px,220px)_minmax(0,1fr)]">

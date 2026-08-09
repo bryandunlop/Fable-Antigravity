@@ -31,7 +31,13 @@ const TABS: AirportTab[] = [
   { to: '/airport-evaluations/flags', label: 'Rules & flags', officerOnly: true },
 ];
 
-const OFFICER_ROLES = ['airport-evaluator', 'chief-pilot', 'admin'];
+/**
+ * The roles that may open the officer routes. Exported so App.tsx's
+ * ProtectedRoute lists import it rather than re-declaring the same literal —
+ * duplicated, the tab strip could offer a tab the route gate then refuses.
+ * The gate is still the enforcement; this only keeps the two in agreement.
+ */
+export const OFFICER_ROLES = ['airport-evaluator', 'chief-pilot', 'admin'];
 
 export function airportTabsForRoles(userRole: string, additionalRoles: string[] = []): AirportTab[] {
   const isOfficer = [userRole, ...additionalRoles].some((r) => OFFICER_ROLES.includes(r));

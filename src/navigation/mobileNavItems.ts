@@ -120,7 +120,7 @@ export function mobileNavItemsForRole(userRole: string): MobileNavItem[] {
       return [
         ...BASE_ITEMS,
         { name: 'Docs', href: '/documents', icon: FileText },
-        { name: 'Aircraft', href: '/aircraft', icon: Plane },
+        { name: 'Fleet', href: '/aircraft', icon: Plane },
       ];
   }
 }

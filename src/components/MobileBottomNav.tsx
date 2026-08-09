@@ -11,10 +11,9 @@ interface MobileBottomNavProps {
   additionalRoles?: string[];
   /** Phone-only sign-out: the header's Logout is md+ since D80. */
   onLogout?: () => void;
-  onOpenSearch?: () => void;
 }
 
-export default function MobileBottomNav({ userRole, additionalRoles = [], onLogout, onOpenSearch }: MobileBottomNavProps) {
+export default function MobileBottomNav({ userRole, additionalRoles = [], onLogout }: MobileBottomNavProps) {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -84,7 +83,7 @@ export default function MobileBottomNav({ userRole, additionalRoles = [], onLogo
         </button>
       </div>
 
-      <Sheet open={moreOpen} onOpenChange={(o) => { setMoreOpen(o); if (!o) setFilter(''); }}>
+      <Sheet open={moreOpen} onOpenChange={(open: boolean) => { setMoreOpen(open); if (!open) setFilter(''); }}>
         <SheetContent side="bottom" className="flex max-h-[80dvh] flex-col gap-0 overflow-hidden pb-[env(safe-area-inset-bottom)]">
           <SheetHeader className="pb-2">
             <SheetTitle>All pages</SheetTitle>
@@ -142,15 +141,6 @@ export default function MobileBottomNav({ userRole, additionalRoles = [], onLogo
               control up there and the classic mis-tap. */}
           <div className="mt-2 flex shrink-0 items-center justify-between gap-2 border-t border-border pt-3">
             <ThemeToggle />
-            {onOpenSearch && (
-              <button
-                type="button"
-                onClick={() => { setMoreOpen(false); onOpenSearch(); }}
-                className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <Search className="h-4 w-4" aria-hidden="true" /> Search system
-              </button>
-            )}
             {onLogout && (
               <button
                 type="button"
