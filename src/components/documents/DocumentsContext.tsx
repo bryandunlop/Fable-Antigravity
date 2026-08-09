@@ -34,12 +34,12 @@ import { eventStore } from '../../notifications/events';
 
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
-/** D65 — bumped to move `fleetTypes` / `casMeta` off the `Doc` row and onto
- *  `DocRevision`. Both fields are optional and absent reads correctly, so this is not
- *  a broken-render risk; the bump exists so a RETURNING user's curated CAS content is
- *  carried onto its revisions by the matching step in engine/migrations.ts rather than
- *  being stranded on a field nothing reads any more. */
-export const DATA_VERSION = '2026-08-03-cabin-knowledge-v1';
+/** Bumped for the one-working-draft invariant. A store written before the
+ *  CREATE_DRAFT guard can hold several in-flight revisions on one doc, all but one
+ *  of them unreachable; the matching step in engine/migrations.ts withdraws the
+ *  extras (tombstoned, never deleted) so a returning user's store satisfies the
+ *  rule the reducer now enforces. */
+export const DATA_VERSION = '2026-08-08-single-draft-v1';
 /** Set once the legacy 'bulletins-state' store has been imported — a later
  * re-seed must never resurrect stale pre-migration bulletins (C5). */
 export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';

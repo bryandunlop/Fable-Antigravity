@@ -7,7 +7,7 @@
 // graceful degradation, never data loss. New seed content for existing stores
 // is also a migration step's job (a fresh install gets it from the seeds).
 import type { AircraftType } from '../../tech-log/types';
-import type { Doc, DocCasMeta, DocumentsState } from '../types';
+import type { Doc, DocCasMeta, DocRevision, DocumentsState, RevisionStatus } from '../types';
 import { safetyReadSeed, casKnowledgeSeed, cabinKnowledgeSeed, TK_002_FLEET_TYPES } from '../mockData';
 
 /**
@@ -188,6 +188,60 @@ export const STORED_STATE_MIGRATIONS: StoredStateMigration[] = [
         docs: [...s.docs, ...missing],
         revisions: [...s.revisions, ...revisions.filter((r) => missingIds.has(r.docId))],
       };
+    },
+  },
+  {
+    // The one-working-draft invariant. A store written before the CREATE_DRAFT
+    // guard can hold two or more in-flight revisions on one doc; only one was
+    // ever reachable (DocReader's find()), so the rest are invisible AND
+    // uneditable — the exact orphan the guard exists to prevent.
+    //
+    // Extras are WITHDRAWN, not deleted. C7's tombstone ceremony already means
+    // "a draft pulled before publication": the reason records why and the
+    // author's words stay in the record. Deleting them would make this the only
+    // step in this module that destroys authored content.
+    //
+    // Which one survives:
+    //  - a 'pending-approval' revision always wins. It is already with an
+    //    approver, and withdrawing it out from under them is not a migration's
+    //    business.
+    //  - otherwise the highest '-rN'. That is what DocReader was actually
+    //    showing, so a returning user's visible draft is the one that survives.
+    //
+    // Deliberately NOT done: backfilling `resolvedIntoRevisionId` on suggestions
+    // accepted before that field existed. Nothing in the store links them, and a
+    // guess would be a fabricated provenance claim on a compliance surface. They
+    // read as 'accepted' with no revision link, which is honest.
+    to: '2026-08-08-single-draft-v1',
+    migrate: (s) => {
+      const IN_FLIGHT: RevisionStatus[] = ['draft', 'rejected', 'pending-approval'];
+      const seq = (r: DocRevision): number => {
+        const m = /-r(\d+)$/.exec(r.id);
+        return m ? parseInt(m[1], 10) : 0;
+      };
+      const keep = new Map<string, DocRevision>(); // docId -> surviving revision
+      for (const r of s.revisions) {
+        if (!IN_FLIGHT.includes(r.status)) continue;
+        const held = keep.get(r.docId);
+        if (!held) { keep.set(r.docId, r); continue; }
+        if (held.status === 'pending-approval') continue;
+        if (r.status === 'pending-approval' || seq(r) > seq(held)) keep.set(r.docId, r);
+      }
+      let changed = false;
+      const revisions = s.revisions.map((r) => {
+        if (!IN_FLIGHT.includes(r.status) || keep.get(r.docId)?.id === r.id) return r;
+        changed = true;
+        return {
+          ...r,
+          status: 'withdrawn' as const,
+          withdrawnAtUtc: new Date().toISOString(),
+          withdrawnByName: 'myGFO (data upgrade)',
+          withdrawalReason:
+            'Withdrawn automatically: this document held more than one open draft, which the '
+            + 'single-working-draft rule no longer allows. Its content is preserved here.',
+        };
+      });
+      return changed ? { ...s, revisions } : s;
     },
   },
 ];

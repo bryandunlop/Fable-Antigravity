@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { migrateRevisionForward, documentsStateIsUnusable, DATA_VERSION } from './DocumentsContext';
+import { STORED_STATE_MIGRATIONS } from './engine/migrations';
 
 describe('migrateRevisionForward', () => {
   it('splits a pre-block-model content blob into sections and drops content', () => {
@@ -54,7 +55,15 @@ describe('DATA_VERSION', () => {
   // Pins the CURRENT version, so a bump is always a deliberate edit here too. The rule
   // that actually protects stored data — every live version ships a migration step — is
   // asserted in casKnowledgeSeeds.test.ts.
-  it('is the version this slice bumped to (D64 — the ship-note section vocabulary)', () => {
-    expect(DATA_VERSION).toBe('2026-08-03-cabin-knowledge-v1');
+  it('is the version this slice bumped to (the one-working-draft invariant)', () => {
+    expect(DATA_VERSION).toBe('2026-08-08-single-draft-v1');
+  });
+
+  // The rule the module's own header states: every DATA_VERSION bump ships a
+  // step. Pinning it here means a bump that forgets one fails at the bump,
+  // rather than silently leaving returning users on the old shape.
+  it('matches the newest migration step', () => {
+    const newest = [...STORED_STATE_MIGRATIONS].sort((a, b) => a.to.localeCompare(b.to)).at(-1)!;
+    expect(DATA_VERSION).toBe(newest.to);
   });
 });
