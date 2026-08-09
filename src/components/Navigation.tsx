@@ -25,12 +25,12 @@ import {
 import {
   initialSidebarOpen, readPersistedSidebarState, writePersistedSidebarState,
 } from '../navigation/sidebarDefault';
+import { orderedGroupsForRole, shouldShowGroupLabels } from '../navigation/navOrder';
 
-// Above this many visible items, a role's sidebar is dense enough that quiet
-// (non-interactive) domain labels earn their keep as scroll anchors. Below it,
-// domain grouping is pure overhead — real data: admin=53 clears this, the next
-// largest role (lead=18) doesn't. See docs/superpowers/specs/2026-07-10-nav-flatten-design.md.
-const DENSE_ROLE_ITEM_THRESHOLD = 30;
+// DENSE_ROLE_ITEM_THRESHOLD (30) lived here and gated group labels. Retired by
+// D80: it meant only `admin` (52 items) ever saw labels while pilot, inflight and
+// maintenance sat at ~15-18 in one flat unlabelled run. See navigation/navOrder.ts
+// for why that answered the wrong question.
 
 
 interface NavigationProps {
@@ -230,7 +230,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     // One group per manifest domain, filtered to the user's roles. Primary and
     // "More" entries are merged into one visible list — primary items lead,
     // since that ordering was already curated; nothing is ever hidden.
-    const filtered: NavigationGroup[] = domainsForRole(userRole, additionalRoles).map((d) => ({
+    const filtered: NavigationGroup[] = orderedGroupsForRole(userRole, additionalRoles).map((d) => ({
       label: d.label,
       items: [...d.primary, ...d.more],
     }));
@@ -285,11 +285,9 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     localStorage.removeItem(`nav-order-${userRole}`);
   };
 
-  // Quiet domain labels earn their keep only for dense roles, or while
-  // customizing (you need something to grab). Otherwise the sidebar is one
-  // flat, always-visible list — see DENSE_ROLE_ITEM_THRESHOLD above.
-  const totalVisibleItems = navigationGroups.reduce((sum, g) => sum + g.items.length, 0);
-  const showLabels = isCustomizing || totalVisibleItems > DENSE_ROLE_ITEM_THRESHOLD;
+  // Always on now (D80) — a group label is how a reader ranks eighteen rows, not
+  // a scroll anchor for fifty. They are still quiet and non-interactive.
+  const showLabels = shouldShowGroupLabels();
 
   const getRoleDisplayName = (role: string) => {
     const roleMap: Record<string, string> = {
@@ -400,15 +398,25 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
           {/* Enhanced top bar with notification center */}
           <header className="sticky top-0 z-40 border-b border-border bg-card px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* Large, prominent sidebar toggle */}
-              <div className="flex items-center gap-3">
+              {/* Rail toggle — md and up ONLY. Below 768 this used to open the full
+                  sidebar as a sheet while the bottom bar's fifth cell opened a
+                  second sheet of the same eighteen items: two doors into one room,
+                  and the top-left one is out of thumb reach for a technician
+                  holding something in the other hand (D79/D80). The bottom bar is
+                  now the only phone nav. */}
+              <div className="hidden md:flex items-center gap-3">
                 <SidebarTrigger className="h-10 w-10 p-0 border border-border bg-card hover:bg-accent hover:text-accent-foreground text-foreground transition-all duration-200 shadow-sm rounded-lg">
                   <PanelLeft className="h-5 w-5" />
                   <span className="sr-only">Toggle navigation menu</span>
                 </SidebarTrigger>
               </div>
 
-              {/* Breadcrumbs / Page Title Placeholder */}
+              {/* Below md this is the only thing naming where you are: the phone
+                  header used to be a toggle, a gap and four icons, with the role
+                  eyebrow hidden. */}
+              <span className="md:hidden truncate text-sm font-semibold text-foreground">
+                {matchEntry(location.pathname, visibleEntries)?.label ?? 'Global Flight Operations'}
+              </span>
               <div className="hidden md:flex flex-col">
                 <span className="gfo-eyebrow">{getRoleDisplayName(userRole)} Workspace</span>
               </div>
@@ -438,16 +446,19 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               {/* Notification Center */}
               <NotificationCenter userRole={userRole} additionalRoles={additionalRoles} />
 
-              <ThemeToggle />
+              {/* Theme, reset and sign-out are md+ only. On a phone they are in the
+                  drawer's account block — a bare Logout icon at top-right is the
+                  classic mis-tap, and it was the only irreversible control up there. */}
+              <span className="hidden md:inline-flex"><ThemeToggle /></span>
 
               {/* Global "Reset demo data" — the one factory reset (D37 Wave-1 Q3) */}
-              <ResetDemoDataButton />
+              <span className="hidden md:inline-flex"><ResetDemoDataButton /></span>
 
               {/* Logout button */}
               <Button
                 variant="ghost"
                 onClick={onLogout}
-                className="flex items-center gap-2 px-3 py-2 text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors rounded-full"
+                className="hidden md:flex items-center gap-2 px-3 py-2 text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors rounded-full"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Logout</span>

@@ -46,6 +46,11 @@ export const MOBILE_NAV_ROLES = [
 // everything else stays reachable through More. (LG-19 / D37 Wave 1)
 export const MAX_VISIBLE_TABS = 4;
 
+// Tab labels are capped at ~7 characters. Five cells across a 375-390pt phone is
+// ~75pt each, and the old set overprinted outright — "Dashboard" and "Workspace"
+// literally touched. Shortening the LABEL only; every href is unchanged.
+export const MAX_TAB_LABEL_CHARS = 7;
+
 // Generic default for roles that are not phone-primary: Home + Tasks + two role
 // tabs. The three phone-primary roles below override this with explicit sets.
 const BASE_ITEMS: MobileNavItem[] = [
@@ -58,26 +63,26 @@ export function mobileNavItemsForRole(userRole: string): MobileNavItem[] {
     // ── Phone-primary roles: explicit four tabs (Bryan, 2026-07-24, D37 Wave-1 Q1) ──
     case 'pilot':
       return [
-        { name: 'Dashboard', href: '/', icon: Home },
-        { name: 'Workspace', href: '/pilot-workspace', icon: ClipboardCheck },
-        { name: 'Tech Log', href: '/tech-log', icon: FileText },
+        { name: 'Home', href: '/', icon: Home },
+        { name: 'Flights', href: '/pilot-workspace', icon: ClipboardCheck },
+        { name: 'Log', href: '/tech-log', icon: FileText },
         { name: 'Fuel', href: '/fuel-load-request', icon: Fuel },
       ];
 
     case 'inflight':
       return [
-        { name: 'Dashboard', href: '/', icon: Home },
-        { name: 'Passengers', href: '/passenger-database', icon: Users },
+        { name: 'Home', href: '/', icon: Home },
+        { name: 'Pax', href: '/passenger-database', icon: Users },
         { name: 'Trips', href: '/upcoming-flights', icon: Calendar },
-        { name: 'Catering', href: '/catering-tracker', icon: Utensils },
+        { name: 'Food', href: '/catering-tracker', icon: Utensils },
       ];
 
     // Maintenance drops Home/Tasks entirely — Bryan's four are all role work.
     case 'maintenance':
       return [
-        { name: 'Tech Log', href: '/tech-log', icon: FileText },
-        { name: 'Turndown', href: '/turndown-form', icon: ClipboardList },
-        { name: 'Fuel Farm', href: '/fuel-farm', icon: Fuel },
+        { name: 'Log', href: '/tech-log', icon: FileText },
+        { name: 'Turndn', href: '/turndown-form', icon: ClipboardList },
+        { name: 'Fuel', href: '/fuel-farm', icon: Fuel },
         { name: 'GRAT', href: '/grat/standalone', icon: Shield },
       ];
 
@@ -93,7 +98,7 @@ export function mobileNavItemsForRole(userRole: string): MobileNavItem[] {
       ];
 
     case 'document-manager':
-      return [...BASE_ITEMS, { name: 'Documents', href: '/documents', icon: FileText }];
+      return [...BASE_ITEMS, { name: 'Docs', href: '/documents', icon: FileText }];
 
     // Also over budget before, so Trips and Passengers never rendered; Documents
     // moves to More so the assistant's actual work surfaces are the visible ones.
@@ -101,20 +106,20 @@ export function mobileNavItemsForRole(userRole: string): MobileNavItem[] {
       return [
         ...BASE_ITEMS,
         { name: 'Trips', href: '/booking-profile', icon: BookOpen },
-        { name: 'Passengers', href: '/passenger-database', icon: Users },
+        { name: 'Pax', href: '/passenger-database', icon: Users },
       ];
 
     case 'scheduling':
       return [
         ...BASE_ITEMS,
-        { name: 'Schedule', href: '/schedule', icon: Calendar },
-        { name: 'Trip Coord', href: '/trip-coordination', icon: MapPin },
+        { name: 'Sched', href: '/schedule', icon: Calendar },
+        { name: 'Trips', href: '/trip-coordination', icon: MapPin },
       ];
 
     default:
       return [
         ...BASE_ITEMS,
-        { name: 'Documents', href: '/documents', icon: FileText },
+        { name: 'Docs', href: '/documents', icon: FileText },
         { name: 'Aircraft', href: '/aircraft', icon: Plane },
       ];
   }

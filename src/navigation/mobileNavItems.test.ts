@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mobileNavItemsForRole, MOBILE_NAV_ROLES, MAX_VISIBLE_TABS } from './mobileNavItems';
+import { mobileNavItemsForRole, MOBILE_NAV_ROLES, MAX_VISIBLE_TABS, MAX_TAB_LABEL_CHARS } from './mobileNavItems';
 import { readRouteTable, resolvesToRoute } from './routeAudit';
 
 // H1: every mobile "Documents" entry must point at the real /documents hub —
@@ -12,7 +12,11 @@ const DOCUMENT_ROLES = ['document-manager', 'unknown-role-falls-to-default'];
 describe('mobileNavItemsForRole (H1 — mobile nav routes to the real Documents hub)', () => {
   it.each(DOCUMENT_ROLES)('%s: Documents points to /documents', (role) => {
     const items = mobileNavItemsForRole(role);
-    const docs = items.find((i) => i.name === 'Documents');
+    // Matched on the destination, not the visible name — the label shortened to
+    // "Docs" in the D80 seven-character tab budget and this invariant is about
+    // where the tab GOES, not what it is called.
+    const docs = items.find((i) => /document/i.test(i.href));
+    expect(docs).toBeDefined();
     expect(docs?.href).toBe('/documents');
   });
 
@@ -62,5 +66,18 @@ describe('mobile tabs resolve to registered routes', () => {
     const hrefs = mobileNavItemsForRole('safety').map((i) => i.href);
     expect(hrefs).toContain('/safety');
     expect(hrefs).toContain('/safety/hazards');
+  });
+});
+
+describe('tab labels fit five cells on a 375pt phone (D80)', () => {
+  it('no label exceeds MAX_TAB_LABEL_CHARS', () => {
+    const over: string[] = [];
+    for (const role of MOBILE_NAV_ROLES) {
+      for (const item of mobileNavItemsForRole(role).slice(0, MAX_VISIBLE_TABS)) {
+        if (item.name.length > MAX_TAB_LABEL_CHARS) over.push(`${role}: "${item.name}"`);
+      }
+    }
+    // Before D80, pilot's "Dashboard" and "Workspace" overprinted each other.
+    expect(over).toEqual([]);
   });
 });

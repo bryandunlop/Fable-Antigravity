@@ -641,7 +641,7 @@ export default function App() {
                           </Navigation>
 
                           {/* Mobile Bottom Navigation */}
-                          <MobileBottomNav userRole={userRole} additionalRoles={additionalRoles} />
+                          <MobileBottomNav userRole={userRole} additionalRoles={additionalRoles} onLogout={handleLogout} />
 
                           {/* Network Status Banner */}
                           <NetworkStatus />
