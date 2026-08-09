@@ -12,7 +12,7 @@ import type {
 import type { Signature } from '../tech-log/types';
 import { classFor, docReaderPath } from './classes';
 import { getSeedState } from './mockData';
-import { applyPublish, promoteScheduled, currentRevision } from './engine/revisions';
+import { applyPublish, promoteScheduled, currentRevision, nextRevisionId, nextRevisionLabel } from './engine/revisions';
 import { inFlightRevision } from './engine/workbench';
 import {
   cabinSections, canManageCabinSections, validateCabinSections, docsInCabinSection, applyCabinSections,
@@ -24,7 +24,9 @@ import { computeNextReviewDate } from './engine/review';
 import { isTargetRole } from './engine/acknowledgments';
 import { migrateStoredState } from './engine/migrations';
 import { importLegacyBulletins, isBulletinClass } from './engine/bulletinCompat';
-import { contentFieldsFromMarkdown } from './engine/blocks';
+import { contentFieldsFromMarkdown, checksumForSections } from './engine/blocks';
+import { stageSuggestion } from './engine/blockEditor';
+import { appendChangeSummary } from './engine/suggestions';
 import { operatorTodayIso } from '../../lib/operatorDate';
 import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES, getRoleLabelByValue } from '../../lib/mockUsers';
 import { resolveUserId } from '../../notifications/identity';
@@ -182,6 +184,31 @@ export type DocumentsAction =
   | {
       type: 'RESOLVE_SUGGESTION';
       payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string };
+    }
+  | {
+      /**
+       * Accept a reader's suggestion INTO the document's working draft, creating
+       * that draft if it does not exist yet — one atomic transition.
+       *
+       * This replaces the old two-dispatch dance (create the draft in the editor,
+       * then resolve the suggestion when it persisted) that engine/acceptFlow.ts
+       * existed to keep in step. One transition makes the invariant
+       * "a suggestion is accepted IFF a revision carries a block staged from it"
+       * unrepresentable-if-violated, rather than merely coordinated.
+       *
+       * Ids are allocated by the caller so the reducer stays pure and testable.
+       */
+      type: 'ACCEPT_SUGGESTION_INTO_DRAFT';
+      payload: {
+        suggestionId: string;
+        byUserId: string;
+        byName: string;
+        byRoles: string[];
+        atUtc: string;
+        /** Used only when no working draft exists yet. */
+        newRevisionSeed: { id: string; revision: string; effectiveDate: string };
+        newBlockId: string;
+      };
     }
   | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string; actorRoles: string[] } }
   | { type: 'PROMOTE_SCHEDULED'; payload: { atUtc: string; today: string } }
@@ -590,6 +617,100 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         ),
       };
     }
+    case 'ACCEPT_SUGGESTION_INTO_DRAFT': {
+      const p = action.payload;
+      const sug = state.suggestions.find((s) => s.id === p.suggestionId);
+      // 1. No double-accept; a declined suggestion cannot be resurrected.
+      if (!sug || sug.status !== 'open') {
+        warnNoop('only an open suggestion can be accepted into a draft');
+        return state;
+      }
+      // 3. Structural.
+      const parent = state.docs.find((d) => d.id === sug.docId);
+      if (!parent) {
+        warnNoop(`no doc ${sug.docId} for suggestion ${sug.id}`);
+        return state;
+      }
+      // 2. Identical authority to RESOLVE_SUGGESTION — batching creates no new privilege.
+      const authorized =
+        rolesCanManageDocuments(p.byRoles) || canAuthor(classFor(parent.classId), p.byRoles);
+      if (!authorized) {
+        warnNoop('accepting a suggestion requires a document manager or an author of the doc');
+        return state;
+      }
+      const inFlight = inFlightRevision(parent.id, state.revisions);
+      // 4. A revision already with an approver is not mutable. The suggestion
+      //    stays open — the workbench tells the maintainer to wait or withdraw.
+      if (inFlight && inFlight.status === 'pending-approval') {
+        warnNoop(`revision ${inFlight.id} is pending approval — accept once it is decided`);
+        return state;
+      }
+      // 5. Either roll into the existing working draft, or base a new one on the
+      //    published revision. You cannot revise nothing, and ids never collide (C8).
+      const base = inFlight ?? currentRevision(parent.id, state.revisions);
+      if (!base) {
+        warnNoop(`doc ${parent.id} has no published revision to revise`);
+        return state;
+      }
+      const creating = !inFlight;
+      if (creating && state.revisions.some((r) => r.id === p.newRevisionSeed.id)) {
+        warnNoop(`revision ${p.newRevisionSeed.id} already exists`);
+        return state;
+      }
+      const sections = stageSuggestion(
+        structuredClone(base.sections),
+        sug,
+        p.newBlockId,
+      );
+      const target: DocRevision = creating
+        ? {
+            ...structuredClone(base),
+            id: p.newRevisionSeed.id,
+            revision: p.newRevisionSeed.revision,
+            effectiveDate: p.newRevisionSeed.effectiveDate,
+            // 6. status forced to 'draft' — see below for the rejected case.
+            status: 'draft',
+            authorUserId: p.byUserId,
+            authorName: p.byName,
+            sections,
+            changeSummary: appendChangeSummary('', sug),
+            mockChecksum: checksumForSections(sections),
+            submittedAtUtc: undefined,
+            decidedAtUtc: undefined,
+            decidedByUserId: undefined,
+            decidedByName: undefined,
+            rejectionReason: undefined,
+            publishedAtUtc: undefined,
+          }
+        : {
+            ...base,
+            // 6. A rejected draft that gains new content is a new attempt, not
+            //    still-rejected — matching UPDATE_DRAFT.
+            status: 'draft',
+            sections,
+            changeSummary: appendChangeSummary(base.changeSummary, sug),
+            mockChecksum: checksumForSections(sections),
+          };
+
+      return {
+        ...state,
+        revisions: creating
+          ? [...state.revisions, target]
+          : state.revisions.map((r) => (r.id === target.id ? target : r)),
+        suggestions: state.suggestions.map((s) =>
+          s.id === sug.id
+            ? {
+                ...s,
+                status: 'accepted' as const,
+                resolvedIntoRevisionId: target.id,
+                resolvedByUserId: p.byUserId,
+                resolvedByName: p.byName,
+                resolvedAtUtc: p.atUtc,
+              }
+            : s,
+        ),
+      };
+    }
     case 'COMPLETE_REVIEW': {
       const { record, today, actorRoles } = action.payload;
       const doc = state.docs.find((d) => d.id === record.docId);
@@ -687,6 +808,8 @@ interface Ctx {
     userRole: string;
   }) => void;
   resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
+  /** Accept a suggestion into the document's single working draft, creating it if needed. */
+  acceptSuggestionIntoDraft: (suggestionId: string, userRole: string, additionalRoles?: string[]) => void;
   addSuggestionReply: (suggestionId: string, text: string, userRole: string) => void;
   completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
   /** D75 / LG-183 — replace the cabin section vocabulary. `renames` (old → new) carries entries
@@ -876,6 +999,35 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Allocates the ids the reducer needs (so the reducer stays pure) and dispatches
+  // ONE transition. A suggestion-driven revision is a point release, so the label
+  // steps the minor: 3.0 → 3.1.
+  const acceptSuggestionIntoDraft = useCallback<Ctx['acceptSuggestionIntoDraft']>(
+    (suggestionId, userRole, additionalRoles = []) => {
+      const { userId, userName } = identityFor(userRole);
+      const sug = state.suggestions.find((s) => s.id === suggestionId);
+      if (!sug) return;
+      const base = currentRevision(sug.docId, state.revisions);
+      dispatch({
+        type: 'ACCEPT_SUGGESTION_INTO_DRAFT',
+        payload: {
+          suggestionId,
+          byUserId: userId,
+          byName: userName,
+          byRoles: [userRole, ...additionalRoles],
+          atUtc: nowUtc(),
+          newRevisionSeed: {
+            id: nextRevisionId(sug.docId, state.revisions),
+            revision: nextRevisionLabel(base?.revision, 'minor'),
+            effectiveDate: todayIso(),
+          },
+          newBlockId: localId('blk'),
+        },
+      });
+    },
+    [state],
+  );
+
   const completeReview = useCallback<Ctx['completeReview']>((docId, outcome, note, userRole, additionalRoles = []) => {
     const { userId, userName } = identityFor(userRole);
     dispatch({
@@ -929,6 +1081,7 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     deleteComment,
     addSuggestion,
     resolveSuggestion,
+    acceptSuggestionIntoDraft,
     addSuggestionReply,
     completeReview,
     setCabinSections: useCallback((sections, renames, actorRoles) => {
