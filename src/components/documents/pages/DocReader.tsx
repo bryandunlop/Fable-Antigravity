@@ -10,6 +10,7 @@ import { useDocuments } from '../DocumentsContext';
 import { classFor } from '../classes';
 import { canAuthor } from '../engine/lifecycle';
 import { currentRevision, revisionsFor, priorPublishedRevision } from '../engine/revisions';
+import { workingDraft } from '../engine/workbench';
 import { diffRevisions } from '../engine/diff';
 import { canManageDocuments } from '../roles';
 import { documentsRoleUniverse } from '../roles';
@@ -71,7 +72,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const userRoles = [userRole, ...additionalRoles];
   const manager = canManageDocuments(userRole, additionalRoles);
   const author = doc ? canAuthor(classFor(doc.classId), userRoles) : false;
-  const editableRev = allRevs.find((r) => r.status === 'draft' || r.status === 'rejected');
+  const editableRev = doc ? workingDraft(doc.id, state.revisions) : undefined;
 
   if (!doc || (!rev && !author && !manager)) {
     return (

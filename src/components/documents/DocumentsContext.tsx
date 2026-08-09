@@ -13,6 +13,7 @@ import type { Signature } from '../tech-log/types';
 import { classFor, docReaderPath } from './classes';
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision } from './engine/revisions';
+import { inFlightRevision } from './engine/workbench';
 import {
   cabinSections, canManageCabinSections, validateCabinSections, docsInCabinSection, applyCabinSections,
   CABIN_SECTION_MANAGER_ROLES,
@@ -275,6 +276,14 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       }
       if (state.revisions.some((r) => r.id === rev.id)) {
         warnNoop(`revision ${rev.id} already exists`);
+        return state;
+      }
+      // INVARIANT: at most one in-flight revision per document. Without this a
+      // second draft was appended and then orphaned — DocReader only ever
+      // reached one of them, so the other was invisible AND uneditable.
+      const inFlight = inFlightRevision(rev.docId, state.revisions);
+      if (inFlight) {
+        warnNoop(`doc ${rev.docId} already has an in-flight revision (${inFlight.id}, ${inFlight.status})`);
         return state;
       }
       return { ...state, revisions: [...state.revisions, rev] };
