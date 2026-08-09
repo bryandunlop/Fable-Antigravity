@@ -8,7 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { versionedAliases } from './vite.aliases';
 
 export default defineConfig({
-  base: '/fable-antigravity/',
+  base: process.env.NODE_ENV === 'production' ? '/fable-antigravity/' : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
