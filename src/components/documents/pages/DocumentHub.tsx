@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
+import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FileLock2, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -29,6 +29,7 @@ import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
 import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
 import { CabinKnowledgePanel } from '../components/CabinKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
+import { DocumentRegistry } from './DocumentRegistry';
 import { ComplianceMatrix } from '../components/ComplianceMatrix';
 import { DocEditorDialog } from '../components/DocEditorDialog';
 import { docxToImport } from '../engine/docxImport';
@@ -170,7 +171,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           wants "how does the bedding go together on this tail", not the SOP library; required
           reads still win, because those are the ones with a due date. */}
       <Tabs defaultValue={myOutstanding.length > 0 ? 'my-reads' : cabinCrew ? 'cabin-knowledge' : 'library'}>
-        <TabsList>
+        <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="my-reads" className="gap-1.5">
             <BookOpenCheck className="h-4 w-4" /> My required reads
             {myOutstanding.length > 0 && (
@@ -194,6 +195,11 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           {manager && (
             <TabsTrigger value="coverage" className="gap-1.5">
               <ShieldCheck className="h-4 w-4" /> Reg coverage
+            </TabsTrigger>
+          )}
+          {manager && (
+            <TabsTrigger value="sources" className="gap-1.5">
+              <FileLock2 className="h-4 w-4" /> Sources
             </TabsTrigger>
           )}
           {pendingApprovals.length > 0 || manager ? (
@@ -331,6 +337,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
         <TabsContent value="coverage" className="mt-4">
           <ComplianceMatrix />
+        </TabsContent>
+
+        <TabsContent value="sources" className="mt-4">
+          <DocumentRegistry userRole={userRole} additionalRoles={additionalRoles} />
         </TabsContent>
 
         <TabsContent value="approvals" className="mt-4">

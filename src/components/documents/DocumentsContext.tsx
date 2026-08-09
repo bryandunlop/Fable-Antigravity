@@ -32,6 +32,7 @@ import { operatorTodayIso } from '../../lib/operatorDate';
 import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES, getRoleLabelByValue } from '../../lib/mockUsers';
 import { resolveUserId } from '../../notifications/identity';
 import { eventStore } from '../../notifications/events';
+import { ensureDemoBlob } from './store/demoSeedBlob';
 
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
@@ -930,6 +931,11 @@ function localId(prefix: string): string {
 
 export function DocumentsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(documentsReducer, undefined, loadInitialState);
+
+  // The seeded received document ships with real bytes; put them in the blob
+  // store so it actually opens (and reads offline) rather than showing the
+  // "this device no longer holds the cached file" fallback on a fresh install.
+  useEffect(() => { void ensureDemoBlob(); }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {

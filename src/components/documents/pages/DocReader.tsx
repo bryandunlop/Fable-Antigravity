@@ -11,6 +11,8 @@ import { classFor, docManagePath } from '../classes';
 import { canAuthor } from '../engine/lifecycle';
 import { currentRevision, revisionsFor, priorPublishedRevision } from '../engine/revisions';
 import { workingDraft } from '../engine/workbench';
+import { isReceived, provenanceLabel } from '../engine/provenance';
+import { ReceivedRevisionView } from '../components/ReceivedRevisionView';
 import { InFlightBadges } from '../components/InFlightBadges';
 import { operatorTodayIso } from '../../../lib/operatorDate';
 import { diffRevisions } from '../engine/diff';
@@ -98,7 +100,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
 
   // Inline suggestions: hover-to-suggest on the right gutter (any reader); pins on
   // blocks with open suggestions visible to owner/managers/author (spec S-1).
-  const renderBlockGutter = rev
+  const renderBlockGutter = rev && !isReceived(rev)
     ? (blockId: string) => {
         const visibleOpen = (byBlock.get(blockId) ?? []).filter((s) => canSeeSuggestion(s, userId, userRoles, doc));
         const active = activeBlock?.id === blockId;
@@ -141,7 +143,12 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
           <SyncAgeChip />
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {diff?.hasChanges && rev && (
+          {isReceived(rev) && (
+            <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+              Received document — revisions are compared by digest, not line by line
+            </span>
+          )}
+          {!isReceived(rev) && diff?.hasChanges && rev && (
             <>
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
                 {changeCount} change{changeCount === 1 ? '' : 's'} in rev {rev.revision}
@@ -161,7 +168,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               )}
             </>
           )}
-          {rev && (
+          {rev && !isReceived(rev) && (
             <Button
               size="sm"
               variant="outline"
@@ -170,7 +177,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               <Printer className="mr-1.5 h-4 w-4" /> Export PDF
             </Button>
           )}
-          {rev && (manager || author) && (
+          {rev && !isReceived(rev) && (manager || author) && (
             <Button
               size="sm"
               variant="outline"
@@ -222,6 +229,9 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
       {headerRev && (
         <div className="space-y-2">
           <DocIdentityHeader doc={doc} rev={headerRev} />
+          {isReceived(headerRev) && (
+            <p className="text-xs text-muted-foreground">{provenanceLabel(doc, headerRev)}</p>
+          )}
           {(manager || author) && (
             <InFlightBadges
               doc={doc}
@@ -249,12 +259,18 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
       {rev ? (
         <GfoPanel>
           <article ref={articleRef} className="prose-bulletin">
-            {showingDiff && diff ? (
-              <DiffedContent diff={diff} renderBlockGutter={renderBlockGutter} />
+            {isReceived(rev) ? (
+              <ReceivedRevisionView doc={doc} rev={rev} />
             ) : (
-              <SectionedContent sections={rev.sections} renderBlockGutter={renderBlockGutter} />
+              <>
+                {showingDiff && diff ? (
+                  <DiffedContent diff={diff} renderBlockGutter={renderBlockGutter} />
+                ) : (
+                  <SectionedContent sections={rev.sections} renderBlockGutter={renderBlockGutter} />
+                )}
+                <RevisionMedia rev={rev} />
+              </>
             )}
-            <RevisionMedia rev={rev} />
           </article>
           <AckPanel doc={doc} rev={rev} userRole={userRole} />
         </GfoPanel>
