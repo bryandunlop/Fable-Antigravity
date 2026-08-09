@@ -63,6 +63,19 @@ export function docReaderPath(docId: string): string {
   return `/documents/${docId}`;
 }
 
+/** The maintainer surface for one document — everything in flight on it.
+ * `tab` / `suggestion` let a cross-document queue land on the actual work. */
+export function docManagePath(
+  docId: string,
+  opts: { tab?: 'suggestions' | 'draft' | 'approval' | 'review' | 'history'; suggestion?: string } = {},
+): string {
+  const q = new URLSearchParams();
+  if (opts.tab) q.set('tab', opts.tab);
+  if (opts.suggestion) q.set('suggestion', opts.suggestion);
+  const qs = q.toString();
+  return `/documents/${docId}/manage${qs ? `?${qs}` : ''}`;
+}
+
 /**
  * D64 — the Ship Notes shelf's section headings, in display order.
  *

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { GFO_STATUS_CLASS, type GfoStatus } from '../../gfo/status';
-import type { DocRevision, RevisionStatus } from '../types';
+import type { DocRevision, DocSuggestion, RevisionStatus } from '../types';
 
 const STATUS_TONE: Record<RevisionStatus, GfoStatus> = {
   draft: 'neutral',
@@ -34,10 +34,14 @@ export function RevisionTimeline({
   revisions,
   canManage = false,
   onWithdraw,
+  suggestions = [],
 }: {
   revisions: DocRevision[];
   canManage?: boolean;
   onWithdraw?: (revisionId: string, reason: string) => void;
+  /** When supplied, each revision names the reader suggestions it carries —
+   *  the reverse of DocSuggestion.resolvedIntoRevisionId. */
+  suggestions?: DocSuggestion[];
 }) {
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
@@ -76,6 +80,18 @@ export function RevisionTimeline({
             {r.changeSummary.trim() && (
               <p className="mt-1 text-xs text-muted-foreground">What changed: {r.changeSummary}</p>
             )}
+            {/* Which readers this revision answers — credit visible on the record,
+                not only inside the change summary's prose. */}
+            {(() => {
+              const carried = suggestions.filter((s) => s.resolvedIntoRevisionId === r.id);
+              if (carried.length === 0) return null;
+              return (
+                <p className="mt-1 text-xs text-sky-800 dark:text-sky-300">
+                  Carries {carried.length} reader suggestion{carried.length === 1 ? '' : 's'} —{' '}
+                  {[...new Set(carried.map((s) => s.authorName))].join(', ')}
+                </p>
+              );
+            })()}
 
             {canManage && onWithdraw && WITHDRAWABLE.includes(r.status) && (
               withdrawingId === r.id ? (

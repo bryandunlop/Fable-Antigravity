@@ -23,7 +23,7 @@ import { groupDocsByCategory, yearsFor, matchesYear } from '../engine/library';
 import { documentsRoleUniverse, canManageDocuments } from '../roles';
 import { DocIdentityLine } from '../components/DocIdentity';
 import { RequiredReadsList } from '../components/RequiredReadsList';
-import { ReviewFlagBadge } from '../components/ReviewFlagBadge';
+import { InFlightBadges } from '../components/InFlightBadges';
 import { ApprovalQueuePanel } from '../components/ApprovalQueuePanel';
 import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
 import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
@@ -206,7 +206,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           ) : null}
           {seesFeedback && (
             <TabsTrigger value="feedback" className="gap-1.5">
-              <MessageSquareText className="h-4 w-4" /> Feedback
+              <MessageSquareText className="h-4 w-4" /> Suggestions
               {openSugs > 0 && (
                 <Badge variant="secondary" className="ml-1 px-1.5 text-[10px]">{openSugs}</Badge>
               )}
@@ -291,7 +291,15 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
                                 {!rev && <p className="mt-0.5 text-xs text-muted-foreground">No published revision yet</p>}
                               </div>
                               {doc.isArchived && <Badge variant="outline" className="shrink-0 text-[10px]">Archived</Badge>}
-                              {manager && <ReviewFlagBadge doc={doc} todayIso={todayIso} />}
+                              {manager && (
+                                <InFlightBadges
+                                  doc={doc}
+                                  revisions={state.revisions}
+                                  suggestions={state.suggestions}
+                                  todayIso={todayIso}
+                                  className="shrink-0"
+                                />
+                              )}
                               {manager && summary && (
                                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground" title="Read-and-acknowledge compliance">
                                   {summary.read}/{summary.total} read

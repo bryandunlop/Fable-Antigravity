@@ -28,6 +28,7 @@ import AirportEvaluationOfficer from './components/AirportEvaluationOfficer';
 import ScheduleCalendar from './components/ScheduleCalendar';
 import { DocumentHub } from './components/documents/pages/DocumentHub';
 import { DocReader } from './components/documents/pages/DocReader';
+import { DocWorkbench } from './components/documents/pages/DocWorkbench';
 import LeadDashboard from './components/LeadDashboard';
 import ManagerInsights from './components/ManagerInsights';
 import AirportServicesDatabase from './components/AirportServicesDatabase';
@@ -380,6 +381,7 @@ export default function App() {
                                 {/* Unified document-compliance hub (legacy document surfaces deleted 2026-07-11) */}
                                 <Route path="/documents" element={<DocumentHub userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/documents/:docId" element={<DocReader userRole={userRole} additionalRoles={additionalRoles} />} />
+                                <Route path="/documents/:docId/manage" element={<DocWorkbench userRole={userRole} additionalRoles={additionalRoles} />} />
 
                                 <Route
                                   path="/lead-dashboard"

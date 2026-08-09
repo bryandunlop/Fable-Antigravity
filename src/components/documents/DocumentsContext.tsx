@@ -10,7 +10,7 @@ import type {
   DocumentsState,
 } from './types';
 import type { Signature } from '../tech-log/types';
-import { classFor, docReaderPath } from './classes';
+import { classFor, docReaderPath, docManagePath } from './classes';
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision, nextRevisionId, nextRevisionLabel } from './engine/revisions';
 import { inFlightRevision } from './engine/workbench';
@@ -1143,7 +1143,7 @@ export function publishApprovalRequestedEvent(doc: Doc, rev: DocRevision): void 
     title: `Approval requested: ${doc.title}`,
     detail: `${doc.id} rev ${rev.revision} submitted by ${rev.authorName}`,
     module: 'Documents',
-    link: '/documents',
+    link: docManagePath(doc.id, { tab: 'approval' }),
     audienceRoles: classFor(doc.classId).approverRoles,
   });
 }
@@ -1156,7 +1156,7 @@ export function publishWithdrawnEvent(doc: Doc, rev: DocRevision, byName: string
     title: `Approval request withdrawn: ${doc.title}`,
     detail: `${doc.id} rev ${rev.revision} was withdrawn by ${byName}`,
     module: 'Documents',
-    link: '/documents',
+    link: docManagePath(doc.id, { tab: 'history' }),
     audienceRoles: classFor(doc.classId).approverRoles,
   });
 }
@@ -1168,7 +1168,7 @@ export function publishSuggestionFiledEvent(doc: Doc, byName: string): void {
     title: `Suggestion filed on ${doc.title}`,
     detail: `${doc.id} — feedback from ${byName}`,
     module: 'Documents',
-    link: '/documents',
+    link: docManagePath(doc.id, { tab: 'suggestions' }),
     audienceRoles: ['document-manager', 'admin'],
   });
 }

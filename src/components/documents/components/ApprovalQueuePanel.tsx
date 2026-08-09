@@ -18,7 +18,17 @@ import { operatorTodayIso } from '../../../lib/operatorDate';
 
 /** Pending-approval queue for approver roles. Own submissions are decision-
  * disabled (four-eyes) — the guard also lives in the reducer. */
-export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
+export function ApprovalQueuePanel({
+  userRole,
+  additionalRoles = [],
+  docId,
+}: {
+  userRole: string;
+  additionalRoles?: string[];
+  /** Scope the queue to one document — the workbench's Approval tab. Omitted in
+   *  the hub, which is deliberately the cross-document view. */
+  docId?: string;
+}) {
   const { state, decideApproval } = useDocuments();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<'changes' | 'content'>('changes');
@@ -37,7 +47,7 @@ export function ApprovalQueuePanel({ userRole, additionalRoles = [] }: { userRol
   const todayIso = operatorTodayIso();
 
   const pending = state.revisions
-    .filter((r) => r.status === 'pending-approval')
+    .filter((r) => r.status === 'pending-approval' && (!docId || r.docId === docId))
     .map((rev) => ({ rev, doc: state.docs.find((d) => d.id === rev.docId)! }))
     .filter((x) => x.doc && canApprove(classFor(x.doc.classId), userRoles))
     .sort((a, b) => (a.rev.submittedAtUtc ?? '').localeCompare(b.rev.submittedAtUtc ?? ''));
