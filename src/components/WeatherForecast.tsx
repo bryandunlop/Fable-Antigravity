@@ -53,8 +53,13 @@ export default function WeatherForecast({ icaoId }: WeatherForecastProps) {
               is live, or vice versa. */}
           {result?.isDemo && <WeatherDemoChip reason={result.demoReason} />}
         </div>
-        {/* The mitigation on file for Q14 — do not remove without a DOM ruling. */}
-        <div className="text-[10px] text-muted-foreground/70 italic">
+        {/* The mitigation on file for Q14 — do not remove without a DOM ruling.
+            It was 10px, italic, at 70% opacity: the LEAST legible text in a
+            component whose whole compliance posture rests on it, and fainter than
+            every data value it qualifies. A control cannot mitigate what nobody
+            reads. Now 11px, upright, full muted-foreground — still quiet, because
+            it is advisory rather than a warning, but actually readable. */}
+        <div className="text-[11px] font-medium text-muted-foreground">
           Planning outlook — not for flight planning
         </div>
       </div>

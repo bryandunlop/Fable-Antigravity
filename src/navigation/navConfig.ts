@@ -10,11 +10,14 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity, AlertOctagon, AlertTriangle, Archive, ArrowRightLeft, BarChart3,
-  Boxes, Building2, Calendar, CalendarCheck, ClipboardCheck,
-  ClipboardList, Database, FileText, Flag, Fuel, HardHat, Home, Layers,
-  MapPin, Monitor, Package, PackagePlus, Plane, Send, Settings, Shield,
-  Sliders, Sparkles, Target, Upload, UserCheck, Users, Utensils, Warehouse,
-  Wrench,
+  Boxes, Building2, Calendar, CalendarCheck, CalendarDays, Car, ClipboardCheck,
+  ClipboardList, ClipboardPen, ClipboardType, Database, FileCheck, FileText,
+  FileWarning, Flag,
+  Fuel, Gauge, HardHat, Home, IdCard, Layers, LayoutDashboard, ListChecks,
+  MapPin, MapPinCheck, Monitor, Package, PackagePlus, Plane, PlaneTakeoff, Route,
+  Send, Settings, Shield, ShieldCheck, Sliders, Sparkles, Target, Timer, Upload,
+  BadgeCheck, BookUser, PlaneLanding, Radar, SearchCheck, Stamp,
+  UserCheck, Users, Utensils, Warehouse, Wrench,
 } from 'lucide-react';
 
 export type Domain =
@@ -50,6 +53,9 @@ export interface NavEntry {
   sidebar?: boolean;      // false = never a sidebar item (breadcrumbs/⌘K only)
   searchable?: boolean;   // false = excluded from the command-palette page index
   detailLabel?: string;   // breadcrumb leaf for sub-paths (e.g. trip detail)
+  railLabel?: string;     // shorter label for the 76px collapsed rail (D80). Only
+                          // needed where the full label cannot wrap into two 9px
+                          // lines; everything else reuses `label`.
   hidden?: boolean;       // true = render NO link anywhere (sidebar + ⌘K), but the
                           // route stays registered and audited. "Hidden means render
                           // no link; it does not mean unknown to the system."
@@ -84,13 +90,17 @@ export const DEFAULT_OPEN_DOMAINS: Record<string, Domain[]> = {
 export const NAV_ENTRIES: readonly NavEntry[] = [
   // ── Home ──────────────────────────────────────────────────────────────────
   { path: '/', label: 'Dashboard', domain: 'home', icon: Home, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
-  { path: '/tasks-action-items', label: 'Tasks & Action Items', domain: 'home', icon: Target, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  { path: '/tasks-action-items', label: 'My Tasks', domain: 'home', icon: Target, primary: true, keywords: ['action items'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   // Per-approver inbox (D39): requests awaiting your role's sign-off, plus what you filed.
-  { path: '/approvals', label: 'Approvals', domain: 'home', icon: ClipboardCheck, primary: true, keywords: ['approve', 'waiver', 'sign-off', 'request'], roles: ['pilot', 'chief-pilot', 'inflight', 'fa-manager', 'maintenance', 'chief-inspector', 'shift-lead', 'safety', 'lead', 'scheduling', 'document-manager', 'admin', 'dom'] },
+  { path: '/approvals', label: 'Approvals', domain: 'home', icon: Stamp, primary: true, keywords: ['approve', 'waiver', 'sign-off', 'request'], roles: ['pilot', 'chief-pilot', 'inflight', 'fa-manager', 'maintenance', 'chief-inspector', 'shift-lead', 'safety', 'lead', 'scheduling', 'document-manager', 'admin', 'dom'] },
   // D66: Procedural Bulletins and Flight Ops Bulletins used to sit here and under
   // flight-ops as their own doors. They read in the Document Center now — one place,
   // all documents — so their keywords moved onto that entry rather than being lost.
-  { path: '/currency-dashboard', label: 'Currency Dashboard', domain: 'home', icon: UserCheck, primary: true, keywords: ['currency', 'compliance', 'landings', '61.58'], roles: ['pilot', 'admin', 'lead', 'scheduling'] },
+  // "Pilot Currency", not bare "Currency" (Bryan, 2026-08-08): unqualified it
+  // reads as money, and the platform has a second currency — passenger data
+  // currency — one domain away. The page component is literally PilotCurrency,
+  // and schedulers read it to crew a trip, so the qualifier serves them too.
+  { path: '/currency-dashboard', label: 'Pilot Currency', domain: 'home', icon: IdCard, primary: true, keywords: ['currency', 'compliance', 'landings', '61.58', 'dashboard', 'qualification'], roles: ['pilot', 'admin', 'lead', 'scheduling'] },
   // '/aog-management' and '/experimental/unified-trip' (Trip Sandbox) were REMOVED 2026-08-03:
   // the tech log owns AOG (`/tech-log/aog`), and the sandbox was a beta that never graduated.
   // The tech-log AOG page is maintenance-scoped, so this narrows who sees an AOG surface at all —
@@ -98,53 +108,69 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // standalone page.
 
   // ── Flight Ops — the Pilot Workspace is the front item; absorbed pages behind More ──
-  { path: '/pilot-workspace', label: 'Pilot Workspace', domain: 'flight-ops', icon: CalendarCheck, primary: true, keywords: ['flight hub', 'my flights', 'preflight'], roles: ['pilot', 'chief-pilot', 'admin'] },
-  { path: '/frat', label: 'Preflight Workflow', domain: 'flight-ops', icon: ClipboardList, primary: false, keywords: ['frat', 'risk', 'preflight'], roles: ['pilot', 'admin'] },
-  { path: '/frat/standalone', label: 'Standalone FRAT', domain: 'flight-ops', icon: Shield, primary: false, roles: ['pilot', 'admin'] },
-  { path: '/frat/my-submissions', label: 'My FRAT Submissions', domain: 'flight-ops', icon: FileText, primary: false, roles: ['pilot', 'admin'] },
-  { path: '/airport-evaluations', label: 'Airport Information', domain: 'flight-ops', icon: MapPin, primary: false, roles: ['pilot', 'admin'] },
+  // Label matches the page's own H1 ("Flight Hub"). It used to read "Pilot
+  // Workspace" while the page said Flight Hub — two names for one place, which
+  // the 2026-08-08 label pass (LG-207) exists to kill. Old label kept as a
+  // keyword so ⌘K still finds it.
+  { path: '/pilot-workspace', label: 'Flight Hub', domain: 'flight-ops', icon: PlaneTakeoff, primary: true, keywords: ['pilot workspace', 'my flights', 'preflight'], roles: ['pilot', 'chief-pilot', 'admin'] },
+  { path: '/frat', label: 'Preflight', domain: 'flight-ops', icon: ClipboardList, primary: false, keywords: ['frat', 'risk', 'workflow'], roles: ['pilot', 'admin'] },
+  // FRAT and GRAT stay: Bryan confirmed 2026-08-08 that crews say them aloud, so
+  // replacing an operator's own vocabulary would itself be anti-training.
+  { path: '/frat/standalone', label: 'Standalone FRAT', domain: 'flight-ops', icon: Gauge, primary: false, keywords: ['risk assessment', 'new'], roles: ['pilot', 'admin'] },
+  { path: '/frat/my-submissions', label: 'FRAT Submissions', domain: 'flight-ops', icon: FileCheck, primary: false, keywords: ['my submissions', 'risk assessments'], roles: ['pilot', 'admin'] },
+  // ── Airports: ONE nav destination, four tabs (AirportsShell) ──────────────
+  // Was four sidebar rows carrying four identical MapPin icons. The three
+  // officer routes below keep their paths, gates and ⌘K entries — only the
+  // sidebar link is withdrawn, per "hidden means render no link, not unknown".
+  { path: '/airport-evaluations', label: 'Airports', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['airport', 'information', 'directory'], roles: ['pilot', 'admin', 'airport-evaluator', 'chief-pilot'] },
   // The mock-backed directory that /airport-evaluations replaced (D45, D48). Unlinked,
   // but still routed because it owns the propose/review/publish screens until those are
   // rewired onto real state (D46).
   { path: '/airport-evaluations/legacy', label: 'Airport Information (legacy mock)', domain: 'flight-ops', icon: MapPin, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
-  { path: '/airport-evaluations/worklist', label: 'Airport Worklist', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['airport', 'worklist', 'review', 'stale', 'overdue', 'never reviewed'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
-  { path: '/airport-evaluations/review', label: 'Airport Page Review', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['airport', 'proposal', 'approve', 'company page'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
-  { path: '/airport-evaluations/flags', label: 'Airport Flags', domain: 'flight-ops', icon: MapPin, primary: false, keywords: ['flag', 'rule', 'short runway', 'noise abatement'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
-  { path: '/fuel-load-request', label: 'Fuel Load Request', domain: 'flight-ops', icon: Fuel, primary: false, roles: ['pilot', 'admin'] },
+  // sidebar: false — reached through the Airports tab strip, not a nav row.
+  { path: '/airport-evaluations/worklist', label: 'Airports · Needs review', domain: 'flight-ops', icon: MapPinCheck, sidebar: false, keywords: ['airport', 'worklist', 'review', 'stale', 'overdue', 'never reviewed'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
+  { path: '/airport-evaluations/review', label: 'Airports · Proposals', domain: 'flight-ops', icon: ClipboardPen, sidebar: false, keywords: ['airport', 'proposal', 'approve', 'company page', 'page review'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
+  { path: '/airport-evaluations/flags', label: 'Airports · Rules & flags', domain: 'flight-ops', icon: Flag, sidebar: false, keywords: ['flag', 'rule', 'short runway', 'noise abatement'], roles: ['airport-evaluator', 'chief-pilot', 'admin'] },
+  { path: '/fuel-load-request', label: 'Fuel Requests', domain: 'flight-ops', icon: Fuel, primary: false, keywords: ['fuel load request', 'uplift'], roles: ['pilot', 'admin'] },
   { path: '/frat/review', label: 'FRAT Review', domain: 'flight-ops', icon: FileText, sidebar: false, roles: ['safety', 'admin'] },
   { path: '/flight-operations-center', label: 'Flight Operations Center', domain: 'flight-ops', icon: Monitor, sidebar: false, keywords: ['foc', 'ops center'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   { path: '/aircraft', label: 'Aircraft Status', domain: 'flight-ops', icon: Plane, sidebar: false, keywords: ['fleet', 'tail number', 'status'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   // FIR — retrospective ops explainability (docs/FIR_MODULE_DESIGN.md). Any role can open one (§7 bottom-up capture).
-  { path: '/fir', label: 'Irregularity Reports', domain: 'flight-ops', icon: Flag, primary: false, detailLabel: 'FIR', keywords: ['fir', 'irregularity', 'aog report', 'delay', 'debrief', 'downtime', 'why'], roles: ['pilot', 'chief-pilot', 'inflight', 'maintenance', 'maintenance-coordinator', 'dom', 'lead', 'safety', 'scheduling', 'admin'] },
+  { path: '/fir', label: 'Irregularity Reports', railLabel: 'Irregularity', domain: 'flight-ops', icon: Flag, primary: false, detailLabel: 'FIR', keywords: ['fir', 'irregularity', 'aog report', 'delay', 'debrief', 'downtime', 'why'], roles: ['pilot', 'chief-pilot', 'inflight', 'maintenance', 'maintenance-coordinator', 'dom', 'lead', 'safety', 'scheduling', 'admin'] },
   { path: '/fleet-map', label: 'Live Fleet Map', domain: 'flight-ops', icon: MapPin, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
 
   // ── Scheduling — the Scheduling Workspace leads ───────────────────────────
-  { path: '/scheduling-command', label: 'Master Command Center', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['run board', 'checklist', 'handoff', 'plan board', 'trips', 'templates'], roles: ['scheduling', 'admin'] },
+  { path: '/scheduling-command', label: 'Scheduling', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['master command center', 'run board', 'checklist', 'handoff', 'plan board', 'trips', 'templates'], roles: ['scheduling', 'admin'] },
   { path: '/schedule', label: 'Schedule Calendar', domain: 'scheduling', icon: Calendar, primary: true, roles: ['pilot', 'admin'] },
-  { path: '/crew-scheduling-workload', label: 'Crew Workload & Travel', domain: 'scheduling', icon: BarChart3, primary: true, roles: ['scheduling', 'admin', 'lead'] },
-  { path: '/vacation-request', label: 'Vacation Request', domain: 'scheduling', icon: CalendarCheck, primary: true, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },
-  { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', domain: 'scheduling', icon: Calendar, primary: false, roles: ['scheduling', 'admin'] },
-  { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: MapPin, primary: false, roles: ['scheduling', 'admin'] },
-  { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: FileText, primary: false, roles: ['scheduling', 'admin'] },
-  { path: '/passenger-currency', label: 'Passenger Data Currency', domain: 'scheduling', icon: UserCheck, primary: false, keywords: ['passport', 'stale', 'outreach', 'manifest', 'crm'], roles: ['scheduling', 'admin'] },
+  { path: '/crew-scheduling-workload', label: 'Crew Workload', domain: 'scheduling', icon: BookUser, primary: true, keywords: ['travel'], roles: ['scheduling', 'admin', 'lead'] },
+  { path: '/vacation-request', label: 'Vacation Request', domain: 'scheduling', icon: CalendarDays, primary: true, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },
+  { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', railLabel: 'Sched Board', domain: 'scheduling', icon: LayoutDashboard, primary: false, roles: ['scheduling', 'admin'] },
+  { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: Route, primary: false, roles: ['scheduling', 'admin'] },
+  { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: ClipboardType, primary: false, roles: ['scheduling', 'admin'] },
+  // Merged into Passenger Forms as its "Data Currency" tab (Bryan, 2026-08-08):
+  // that page already carried Expiring Documents and Outdated Data, so this was
+  // the same job behind a second door — and "Passenger Forms" was the name Bryan
+  // wanted for BOTH. Route stays registered and deep-linkable; sidebar link only
+  // is withdrawn.
+  { path: '/passenger-currency', label: 'Passenger Forms · Data Currency', domain: 'scheduling', icon: UserCheck, sidebar: false, keywords: ['passport', 'stale', 'outreach', 'manifest', 'crm', 'passenger data currency'], roles: ['scheduling', 'admin'] },
 
   // ── Inflight ──────────────────────────────────────────────────────────────
-  { path: '/upcoming-flights', label: 'Upcoming Trips', domain: 'inflight', icon: Calendar, primary: true, keywords: ['flights', 'manifest'], roles: ['inflight', 'admin'] },
-  { path: '/upcoming-flights', label: 'Flight Calendar', domain: 'inflight', icon: Calendar, primary: true, roles: ['pilot'] },
-  { path: '/passenger-database', label: 'Passenger Database', domain: 'inflight', icon: Users, primary: true, keywords: ['vip', 'preferences', 'allergies', 'guest'], roles: ['inflight', 'admin'] },
+  { path: '/upcoming-flights', label: 'Upcoming Trips', domain: 'inflight', icon: PlaneLanding, primary: true, keywords: ['flights', 'manifest'], roles: ['inflight', 'admin'] },
+  { path: '/upcoming-flights', label: 'Flight Calendar', domain: 'inflight', icon: PlaneLanding, primary: true, roles: ['pilot'] },
+  { path: '/passenger-database', label: 'Passenger Database', railLabel: 'Passengers', domain: 'inflight', icon: Users, primary: true, keywords: ['vip', 'preferences', 'allergies', 'guest'], roles: ['inflight', 'admin'] },
   { path: '/catering-tracker', label: 'Catering Tracker', domain: 'inflight', icon: Utensils, primary: true, roles: ['inflight', 'admin'] },
-  { path: '/post-flight-checklist', label: 'Post-Flight Checklist', domain: 'inflight', icon: ClipboardCheck, primary: true, roles: ['inflight', 'admin'] },
+  { path: '/post-flight-checklist', label: 'Post-Flight Checklist', railLabel: 'Post-Flight', domain: 'inflight', icon: ListChecks, primary: true, roles: ['inflight', 'admin'] },
   { path: '/aircraft-inventory', label: 'Aircraft Inventory', domain: 'inflight', icon: Package, primary: false, roles: ['inflight', 'admin'] },
-  { path: '/aircraft-cleaning', label: 'Aircraft Cleaning', domain: 'inflight', icon: Sparkles, primary: false, roles: ['inflight', 'admin'] },
+  { path: '/aircraft-cleaning', label: 'Aircraft Cleaning', railLabel: 'Cleaning', domain: 'inflight', icon: Sparkles, primary: false, roles: ['inflight', 'admin'] },
   { path: '/catering-orders', label: 'Catering Orders', domain: 'inflight', icon: Utensils, sidebar: false, roles: ['inflight', 'admin'] },
 
   // ── Inventory ─────────────────────────────────────────────────────────────
   { path: '/inventory-v2/trips', label: 'Trips', domain: 'inventory', icon: Plane, primary: true, detailLabel: 'Trip', roles: ['inflight', 'admin', 'commissary-manager'] },
-  { path: '/inventory-v2/inspections', label: 'Inspections', domain: 'inventory', icon: ClipboardCheck, primary: true, roles: ['inflight', 'admin', 'commissary-manager'] },
+  { path: '/inventory-v2/inspections', label: 'Inspections', domain: 'inventory', icon: SearchCheck, primary: true, roles: ['inflight', 'admin', 'commissary-manager'] },
   { path: '/inventory-v2/commissary', label: 'Commissary', domain: 'inventory', icon: Warehouse, primary: true, keywords: ['stock', 'stockroom', 'par'], roles: ['inflight', 'admin', 'commissary-manager'] },
   { path: '/inventory-v2/replenish', label: 'Replenish', domain: 'inventory', icon: PackagePlus, primary: true, keywords: ['restock'], roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/unit-requests', label: 'Unit Requests', domain: 'inventory', icon: Send, primary: true, roles: ['inflight', 'admin'] },
-  { path: '/inventory-v2/settings', label: 'Inventory Settings', domain: 'inventory', icon: Settings, primary: false, keywords: ['par levels', 'fleet', 'items'], roles: ['admin', 'commissary-manager'] },
+  { path: '/inventory-v2/settings', label: 'Inventory Settings', domain: 'inventory', icon: Sliders, primary: false, keywords: ['par levels', 'fleet', 'items'], roles: ['admin', 'commissary-manager'] },
   { path: '/inventory-v2/activity-log', label: 'Activity Log', domain: 'inventory', icon: Activity, sidebar: false, roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/unit-request', label: 'New Unit Request', domain: 'inventory', icon: Send, sidebar: false, searchable: false, roles: ['inflight', 'admin'] },
   { path: '/inventory-v2/inspection', label: 'Inspection', domain: 'inventory', icon: ClipboardCheck, sidebar: false, searchable: false, detailLabel: 'Review', roles: ['inflight', 'admin'] },
@@ -157,13 +183,16 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/tech-log', label: 'Tech Log', domain: 'flight-ops', icon: FileText, primary: true, keywords: ['squawk', 'defect', 'deferral', 'mel', 'release', 'work card', 'aog', 'aircraft on ground'], roles: ['pilot'] },
   { path: '/parts-inventory', label: 'Parts Inventory', domain: 'maintenance', icon: Boxes, primary: true, keywords: ['mycmp', 'procurement', 'stock'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/tech-work-analytics', label: 'Work Analytics', domain: 'maintenance', icon: BarChart3, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-  { path: '/mttr-dashboard', label: 'MTTR Dashboard', domain: 'maintenance', icon: Activity, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-  { path: '/turndown-reports', label: 'Turndown Reports', domain: 'maintenance', icon: FileText, primary: false, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
+  // Out of the nav per Bryan, 2026-08-08 ("we can delete MTTR Dashboard"). The
+  // ROUTE stays registered and ⌘K-findable — de-navving is the two-way door;
+  // deleting the page is not, and nothing else asked for that.
+  { path: '/mttr-dashboard', label: 'Repair Time (MTTR)', domain: 'maintenance', icon: Timer, sidebar: false, keywords: ['mttr', 'mean time to repair'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+  { path: '/turndown-reports', label: 'Turndown Reports', domain: 'maintenance', icon: FileWarning, primary: false, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
   { path: '/turndown-form', label: 'Turndown Form', domain: 'maintenance', icon: ClipboardList, primary: false, roles: ['maintenance', 'maintenance-coordinator'] },
-  { path: '/car-tracking', label: 'Car Tracking', domain: 'maintenance', icon: Package, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+  { path: '/car-tracking', label: 'Vehicles', domain: 'maintenance', icon: Car, primary: false, keywords: ['car tracking', 'rental'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/airport-services', label: 'Airport Services', domain: 'maintenance', icon: Building2, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/fuel-farm', label: 'Fuel Farm Tracker', domain: 'maintenance', icon: Fuel, primary: false, roles: ['maintenance', 'maintenance-coordinator', 'dom'] },
-  { path: '/grat/standalone', label: 'Standalone GRAT', domain: 'maintenance', icon: Shield, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
+  { path: '/grat/standalone', label: 'GRAT', domain: 'maintenance', icon: HardHat, primary: false, keywords: ['standalone', 'ground risk assessment'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/aircraft-cleaning', label: 'Aircraft Cleaning', domain: 'maintenance', icon: Sparkles, primary: false, roles: ['pilot', 'maintenance', 'maintenance-coordinator', 'dom'] },
   // Out of the nav (trim-hard) — routes stay reachable; breadcrumbs/⌘K still resolve them.
   { path: '/maintenance-hub', label: 'Maintenance Hub', domain: 'maintenance', icon: Monitor, sidebar: false, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
@@ -189,13 +218,13 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
 
   // ── Admin ─────────────────────────────────────────────────────────────────
   { path: '/admin', label: 'Admin Panel', domain: 'admin', icon: Settings, primary: true, keywords: ['users', 'management'], roles: ['admin'] },
-  { path: '/lead-dashboard', label: 'Lead Dashboard', domain: 'admin', icon: BarChart3, primary: true, roles: ['lead', 'admin'] },
+  { path: '/lead-dashboard', label: 'Lead Dashboard', domain: 'admin', icon: Radar, primary: true, roles: ['lead', 'admin'] },
   { path: '/manager-insights', label: 'Manager Insights', domain: 'admin', icon: Layers, primary: true, roles: ['lead', 'admin'] },
   { path: '/live-metrics', label: 'Live Metrics', domain: 'admin', icon: Activity, primary: true, keywords: ['kpi'], roles: ['lead', 'admin'] },
-  { path: '/critical-functions', label: 'Critical Functions', domain: 'admin', icon: Shield, primary: true, roles: ['lead', 'admin'] },
-  { path: '/admin/airport-evaluation-officer', label: 'Airport Evaluation Officer', domain: 'admin', icon: MapPin, primary: false, roles: ['airport-evaluator', 'admin'] },
+  { path: '/critical-functions', label: 'Critical Functions', domain: 'admin', icon: ShieldCheck, primary: true, roles: ['lead', 'admin'] },
+  { path: '/admin/airport-evaluation-officer', label: 'Airport Evaluation Officer', railLabel: 'Airport Officer', domain: 'admin', icon: BadgeCheck, primary: false, roles: ['airport-evaluator', 'admin'] },
   { path: '/foreflight-test-upload', label: 'ForeFlight Test Upload', domain: 'admin', icon: Upload, primary: false, keywords: ['foreflight'], roles: ['admin'] },
-  { path: '/foreflight-diagnostics', label: 'ForeFlight Sync Diagnostics', domain: 'admin', icon: Database, primary: false, keywords: ['foreflight', 'sync'], roles: ['admin'] },
+  { path: '/foreflight-diagnostics', label: 'ForeFlight Sync Diagnostics', railLabel: 'ForeFlight Sync', domain: 'admin', icon: Database, primary: false, keywords: ['foreflight', 'sync'], roles: ['admin'] },
   // The Work Ledger window (design §7). Hidden: the only door is the "Created by
   // Bryan Dunlop" credit on the login screen — project plumbing, not product.
   // It sits OUTSIDE the authenticated shell (public outer route) so the door

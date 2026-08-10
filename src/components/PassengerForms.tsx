@@ -6,6 +6,12 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+// Passenger data currency merged in as a tab (Bryan, 2026-08-08). It was a
+// separate nav row labelled "Passenger Data Currency" while this page already
+// carried Expiring Documents and Outdated Data — the same job, two doors. The
+// /passenger-currency route stays registered and deep-linkable; only its sidebar
+// link is withdrawn.
+import PassengerCurrencyDashboard from './passenger-currency/PassengerCurrencyDashboard';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
@@ -327,7 +333,11 @@ export default function PassengerForms() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        {/* Wraps rather than forcing five equal columns. `grid-cols-N` was
+            already tight at four and overprinted outright at five once Data
+            Currency joined — and the iPad content column is narrower than the
+            desktop one this was tuned on (D80). */}
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="all">
             All Submissions ({submissions.length})
           </TabsTrigger>
@@ -349,7 +359,12 @@ export default function PassengerForms() {
               <Badge className="ml-2 bg-red-500">{outdatedDataCount}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="currency">Data Currency</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="currency" className="mt-6">
+          <PassengerCurrencyDashboard />
+        </TabsContent>
 
         <TabsContent value="all" className="mt-6">
           <Card>

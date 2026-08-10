@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from './ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from './ui/sidebar';
 import NotificationCenter from './NotificationCenter';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetDemoDataButton } from './ResetDemoDataButton';
@@ -22,12 +22,15 @@ import {
   domainsForRole, entriesForRoles, matchEntry,
   type NavEntry,
 } from '../navigation/navConfig';
+import {
+  initialSidebarOpen, readPersistedSidebarState, writePersistedSidebarState,
+} from '../navigation/sidebarDefault';
+import { orderedGroupsForRole, shouldShowGroupLabels, NAV_ORDER_KEY } from '../navigation/navOrder';
 
-// Above this many visible items, a role's sidebar is dense enough that quiet
-// (non-interactive) domain labels earn their keep as scroll anchors. Below it,
-// domain grouping is pure overhead — real data: admin=53 clears this, the next
-// largest role (lead=18) doesn't. See docs/superpowers/specs/2026-07-10-nav-flatten-design.md.
-const DENSE_ROLE_ITEM_THRESHOLD = 30;
+// DENSE_ROLE_ITEM_THRESHOLD (30) lived here and gated group labels. Retired by
+// D80: it meant only `admin` (52 items) ever saw labels while pilot, inflight and
+// maintenance sat at ~15-18 in one flat unlabelled run. See navigation/navOrder.ts
+// for why that answered the wrong question.
 
 
 interface NavigationProps {
@@ -94,12 +97,28 @@ const DraggableNavigationGroup = ({
     const isActive = isActiveEntry(item);
     return (
       <SidebarMenuItem key={`${item.domain}:${item.label}`}>
-        <SidebarMenuButton asChild isActive={isActive} className={`relative overflow-hidden group transition-colors duration-200 ${isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' : 'text-sidebar-foreground bg-transparent hover:bg-white/10 hover:text-white'}`}>
-          <Link to={item.href ?? item.path} className="flex items-center gap-3 w-full relative">
+        {/* On the collapsed rail this becomes a 64x52 icon-over-label tile rather
+            than shadcn's 32px icon square. The size overrides must sit on THIS
+            className (the tailwind-merge side) and not on the Link below: Radix
+            Slot concatenates asChild classes WITHOUT merging, so a conflicting
+            utility on the child never wins. */}
+        <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className={`relative overflow-hidden group transition-colors duration-200 group-data-[collapsible=icon]:h-auto! group-data-[collapsible=icon]:w-16! group-data-[collapsible=icon]:py-1.5! group-data-[collapsible=icon]:px-0.5! ${isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' : 'text-sidebar-foreground bg-transparent hover:bg-white/10 hover:text-white'}`}>
+          <Link to={item.href ?? item.path} className="flex items-center gap-3 w-full relative group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-0.5 group-data-[collapsible=icon]:text-center">
             {isActive && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gfo-sunrise" />}
             {!isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-white/40 rounded-r-full transition-all duration-200 group-hover:h-3/4" />}
-            <Icon className={`w-4 h-4 z-10 ${isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground group-hover:text-white'}`} />
-            <span className="z-10 relative">{item.label}</span>
+            <Icon className={`w-4 h-4 shrink-0 z-10 ${isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground group-hover:text-white'}`} />
+            {/* Two spans, one per rail state — NOT one span with a ?? fallback.
+                A single span showed the short railLabel in the EXPANDED sidebar
+                too, so Irregularity Reports read as "Irregularity" at full width.
+                The expanded label is always the real one. */}
+            <span className="z-10 relative group-data-[collapsible=icon]:hidden">{item.label}</span>
+            {/* The rail label is what makes the icons readable at all, and it must
+                WRAP to two lines — so whitespace-normal has to beat shadcn's cva
+                base `[&>span:last-child]:truncate`, which otherwise ties on
+                specificity and wins on source order (that is how these first came
+                out as "Pilot Curren…"). Names too long for two 9px lines carry an
+                explicit railLabel in the manifest. */}
+            <span className="z-10 relative hidden group-data-[collapsible=icon]:block text-[9px] leading-[1.15] w-full max-h-[22px] overflow-hidden group-data-[collapsible=icon]:whitespace-normal!">{item.railLabel ?? item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -143,6 +162,28 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
 
+  // D80: the rail starts expanded above 1280 and collapsed below it, unless the
+  // user has made a choice — then their choice wins at every width. Computed in
+  // the initialiser rather than an effect so the rail never paints expanded and
+  // then snaps shut on the iPad.
+  //
+  // shadcn's own persistence writes a `sidebar_state` cookie that it expects a
+  // SERVER to read back into `defaultOpen`. This is a static export with no
+  // server, so that cookie is written and never read — the state does not
+  // actually survive a reload. Hence localStorage, which is also how this
+  // component already persists nav order.
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    initialSidebarOpen(
+      typeof window === 'undefined' ? Number.MAX_SAFE_INTEGER : window.innerWidth,
+      readPersistedSidebarState(),
+    ),
+  );
+
+  const handleSidebarOpenChange = React.useCallback((open: boolean) => {
+    setSidebarOpen(open);
+    writePersistedSidebarState(open);
+  }, []);
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -164,7 +205,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
 
   // Load custom order from localStorage
   const loadCustomOrder = () => {
-    const saved = localStorage.getItem(`nav-order-${userRole}`);
+    const saved = localStorage.getItem(NAV_ORDER_KEY(userRole));
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -189,7 +230,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     // One group per manifest domain, filtered to the user's roles. Primary and
     // "More" entries are merged into one visible list — primary items lead,
     // since that ordering was already curated; nothing is ever hidden.
-    const filtered: NavigationGroup[] = domainsForRole(userRole, additionalRoles).map((d) => ({
+    const filtered: NavigationGroup[] = orderedGroupsForRole(userRole, additionalRoles).map((d) => ({
       label: d.label,
       items: [...d.primary, ...d.more],
     }));
@@ -220,7 +261,7 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   // Save custom order to localStorage
   const saveCustomOrder = (groups: NavigationGroup[]) => {
     const order = groups.map(g => g.label);
-    localStorage.setItem(`nav-order-${userRole}`, JSON.stringify(order));
+    localStorage.setItem(NAV_ORDER_KEY(userRole), JSON.stringify(order));
   };
 
   // Move group in the list
@@ -231,24 +272,32 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
     setCustomOrderKeys(newGroups.map(g => g.label));
   };
 
-  // Save order when customization mode is turned off
+  // Persist ONLY on the customizing true -> false edge, i.e. when the user
+  // actually finishes reordering.
+  //
+  // This used to fire on mount as well (the guard was just `if (!isCustomizing)`,
+  // which is true on first render), so the app wrote a frozen group order for
+  // every user the first time they ever opened it — without anyone touching
+  // "Customize order". The stored order then beat the manifest forever, which
+  // silently defeats D80's own-domain-first ordering for every existing user.
+  // Caught because Scheduling would not move to the top of a scheduler's rail.
+  const wasCustomizing = React.useRef(isCustomizing);
   useEffect(() => {
-    if (!isCustomizing) {
+    if (wasCustomizing.current && !isCustomizing) {
       saveCustomOrder(navigationGroups);
     }
+    wasCustomizing.current = isCustomizing;
   }, [isCustomizing, navigationGroups]);
 
   // Reset to default order
   const resetToDefault = () => {
     setCustomOrderKeys(null);
-    localStorage.removeItem(`nav-order-${userRole}`);
+    localStorage.removeItem(NAV_ORDER_KEY(userRole));
   };
 
-  // Quiet domain labels earn their keep only for dense roles, or while
-  // customizing (you need something to grab). Otherwise the sidebar is one
-  // flat, always-visible list — see DENSE_ROLE_ITEM_THRESHOLD above.
-  const totalVisibleItems = navigationGroups.reduce((sum, g) => sum + g.items.length, 0);
-  const showLabels = isCustomizing || totalVisibleItems > DENSE_ROLE_ITEM_THRESHOLD;
+  // Always on now (D80) — a group label is how a reader ranks eighteen rows, not
+  // a scroll anchor for fifty. They are still quiet and non-interactive.
+  const showLabels = shouldShowGroupLabels();
 
   const getRoleDisplayName = (role: string) => {
     const roleMap: Record<string, string> = {
@@ -276,12 +325,24 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
   };
 
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={handleSidebarOpenChange}
+      // 76px, not shadcn's 3rem: the collapsed rail carries icon + tiny label,
+      // Files-app style, per UX Workflow Pass 2026-08-08 §W7 — "bare icons are a
+      // memory test, the opposite of minimal training" (LG-207). It also keeps
+      // the target finger-sized for a pilot on a moving aircraft.
+      style={{ '--sidebar-width-icon': '4.75rem' } as React.CSSProperties}
+    >
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <Sidebar className="border-r border-sidebar-border">
-          <SidebarHeader className="border-b border-white/5 p-4">
+        {/* collapsible="icon", not the shadcn default "offcanvas": D80 makes the
+            rail PERMANENT above 768 — collapsing to icons, never to nothing. That
+            single prop is what stops iPad portrait (834) rendering ~460pt of nav
+            against a 834pt screen (LG-198 / UI-UX review R4). */}
+        <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+          <SidebarHeader className="border-b border-white/5 p-4 group-data-[collapsible=icon]:p-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 group-data-[collapsible=icon]:hidden">
                 <h2 className="text-base font-bold tracking-tight text-white">Global Flight Operations</h2>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-gfo-sunrise font-bold">{getRoleDisplayName(userRole)}</p>
               </div>
@@ -290,33 +351,19 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               </div>
             </div>
 
-            {/* Customization controls */}
-            <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
-              <Button
-                variant={isCustomizing ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setIsCustomizing(!isCustomizing)}
-                className="w-full text-xs justify-start text-sidebar-foreground hover:text-white hover:bg-white/10"
-              >
-                <Settings className="w-3 h-3 mr-2" />
-                {isCustomizing ? 'Done Customizing' : 'Customize Order'}
-              </Button>
-
-              {isCustomizing && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetToDefault}
-                  className="w-full text-xs justify-start text-sidebar-foreground hover:text-white hover:bg-white/10"
-                >
-                  <RotateCcw className="w-3 h-3 mr-2" />
-                  Reset to Default
-                </Button>
-              )}
-            </div>
           </SidebarHeader>
 
-          <SidebarContent className="px-2 py-2">
+          {/* overflow-y-auto! overrides shadcn's cva base, which sets
+              `group-data-[collapsible=icon]:overflow-hidden` on this element
+              (ui/sidebar.tsx). That was harmless while "collapsed" meant OFFCANVAS
+              at zero width — nothing was there to scroll. D80 made the rail
+              PERMANENT, which turned it into silently lost navigation: inside a
+              position:fixed viewport-height container, any item past the fold had
+              no scrollbar, no gesture and no page-scroll fallback. Measured on
+              admin (47 items): 27 of 47 unreachable at 834x1112, 31 at 1440x900.
+              It also bit chief-pilot and maintenance at iPad landscape. The `!` is
+              required — same variant, so specificity ties. */}
+          <SidebarContent className="px-2 py-2 group-data-[collapsible=icon]:overflow-y-auto!">
             {isCustomizing && (
               <div className="p-3 mb-2 bg-white/10 border border-white/20 rounded-lg">
                 <p className="text-xs text-gfo-daylight-light flex items-center gap-2">
@@ -339,21 +386,58 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               />
             ))}
           </SidebarContent>
+
+          {/* Customize Order lives at the FOOT now (D80). It used to be the first
+              thing in the nav, above every destination on every device — a
+              power-user preference outranking Tech Log. Hidden on the collapsed
+              rail: reordering groups you cannot read is not a thing anyone wants. */}
+          <SidebarFooter className="border-t border-white/5 p-2 group-data-[collapsible=icon]:hidden">
+            <Button
+              variant={isCustomizing ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setIsCustomizing(!isCustomizing)}
+              className="w-full justify-start text-xs text-sidebar-foreground hover:bg-white/10 hover:text-white"
+            >
+              <Settings className="mr-2 h-3 w-3" />
+              {isCustomizing ? 'Done customizing' : 'Customize order'}
+            </Button>
+            {isCustomizing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetToDefault}
+                className="w-full justify-start text-xs text-sidebar-foreground hover:bg-white/10 hover:text-white"
+              >
+                <RotateCcw className="mr-2 h-3 w-3" />
+                Reset to default
+              </Button>
+            )}
+          </SidebarFooter>
         </Sidebar>
 
         <div className="flex-1 flex flex-col relative min-w-0">
           {/* Enhanced top bar with notification center */}
           <header className="sticky top-0 z-40 border-b border-border bg-card px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* Large, prominent sidebar toggle */}
-              <div className="flex items-center gap-3">
+              {/* Rail toggle — md and up ONLY. Below 768 this used to open the full
+                  sidebar as a sheet while the bottom bar's fifth cell opened a
+                  second sheet of the same eighteen items: two doors into one room,
+                  and the top-left one is out of thumb reach for a technician
+                  holding something in the other hand (D79/D80). The bottom bar is
+                  now the only phone nav. */}
+              <div className="hidden md:flex items-center gap-3">
                 <SidebarTrigger className="h-10 w-10 p-0 border border-border bg-card hover:bg-accent hover:text-accent-foreground text-foreground transition-all duration-200 shadow-sm rounded-lg">
                   <PanelLeft className="h-5 w-5" />
                   <span className="sr-only">Toggle navigation menu</span>
                 </SidebarTrigger>
               </div>
 
-              {/* Breadcrumbs / Page Title Placeholder */}
+              {/* Below md this is the only thing naming where you are: the phone
+                  header used to be a toggle, a gap and four icons, with the role
+                  eyebrow hidden. */}
+              <span className="md:hidden truncate text-sm font-semibold text-foreground">
+                {matchEntry(location.pathname, visibleEntries)?.label ?? 'Global Flight Operations'}
+              </span>
               <div className="hidden md:flex flex-col">
                 <span className="gfo-eyebrow">{getRoleDisplayName(userRole)} Workspace</span>
               </div>
@@ -383,16 +467,19 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
               {/* Notification Center */}
               <NotificationCenter userRole={userRole} additionalRoles={additionalRoles} />
 
-              <ThemeToggle />
+              {/* Theme, reset and sign-out are md+ only. On a phone they are in the
+                  drawer's account block — a bare Logout icon at top-right is the
+                  classic mis-tap, and it was the only irreversible control up there. */}
+              <span className="hidden md:inline-flex"><ThemeToggle /></span>
 
               {/* Global "Reset demo data" — the one factory reset (D37 Wave-1 Q3) */}
-              <ResetDemoDataButton />
+              <span className="hidden md:inline-flex"><ResetDemoDataButton /></span>
 
               {/* Logout button */}
               <Button
                 variant="ghost"
                 onClick={onLogout}
-                className="flex items-center gap-2 px-3 py-2 text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors rounded-full"
+                className="hidden md:flex items-center gap-2 px-3 py-2 text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors rounded-full"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Logout</span>

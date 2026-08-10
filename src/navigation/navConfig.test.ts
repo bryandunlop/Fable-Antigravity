@@ -138,10 +138,17 @@ describe('domainsForRole', () => {
     // Tech Log joined Flight Ops for pilots on 2026-08-08 (LG-207): a pilot in the tech log is
     // doing Flight Ops work, and the breadcrumb/sidebar must not file it under Maintenance.
     const fo = domainsForRole('pilot').find((d) => d.domain === 'flight-ops')!;
-    expect(fo.primary.map((e) => e.label)).toEqual(['Pilot Workspace', 'Tech Log']);
+    // "Flight Hub" since the 2026-08-08 label pass — the label now matches the
+    // page's own H1 instead of contradicting it. The path is unchanged.
+    expect(fo.primary.map((e) => e.label)).toEqual(['Flight Hub', 'Tech Log']);
+    // Labels per the 2026-08-08 pass; FRAT/GRAT survive because crews say them
+    // aloud. The four Airport rows collapsed into one "Airports" destination with
+    // a tab strip (AirportsShell), so a pilot pays one nav slot for that workflow
+    // instead of four — and the four identical MapPins are gone.
     expect(fo.more.map((e) => e.label)).toEqual(
-      expect.arrayContaining(['Preflight Workflow', 'Standalone FRAT', 'My FRAT Submissions', 'Airport Information', 'Fuel Load Request']),
+      expect.arrayContaining(['Preflight', 'Standalone FRAT', 'FRAT Submissions', 'Airports', 'Fuel Requests']),
     );
+    expect(fo.more.map((e) => e.label)).not.toContain('Airport Worklist');
   });
   it('dual-role pilot (+dom) sees Tech Log once, under Flight Ops — the primary role wins (LG-207)', () => {
     const groups = domainsForRole('pilot', ['dom']);
