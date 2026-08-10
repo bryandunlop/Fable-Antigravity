@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { DocumentsState } from '../types';
+import type { DocRevision, DocumentsState } from '../types';
 import { migrateStoredState, STORED_STATE_MIGRATIONS, type StoredStateMigration } from './migrations';
 import { safetyReadSeed } from '../mockData';
 
@@ -135,5 +135,86 @@ describe('D64 — ship-note section vocabulary', () => {
     const s = base({ docs: [d('TK-1', 'Maintenance')] as never, revisions: [r('TK-1', ['G650ER'])] as never });
     const once = run(s);
     expect(run(once).docs[0].category).toBe(once.docs[0].category);
+  });
+});
+
+describe('2026-08-08-single-draft-v1 — collapse orphaned drafts', () => {
+  const step = STORED_STATE_MIGRATIONS.find((m) => m.to === '2026-08-08-single-draft-v1')!;
+
+  function r(id: string, status: string, docId = 'SOP-001'): DocRevision {
+    return {
+      id, docId, revision: '1.0', status: status as DocRevision['status'],
+      sections: [], changeSummary: '', effectiveDate: '2026-01-01',
+      authorUserId: 'USR007', authorName: 'Emily Chen',
+      requireAcknowledgment: false, ackLevel: 'none', mockChecksum: 'x',
+    };
+  }
+  const inFlight = (s: DocumentsState) =>
+    s.revisions.filter((x) => ['draft', 'rejected', 'pending-approval'].includes(x.status));
+
+  it('leaves exactly one in-flight revision per document', () => {
+    const out = step.migrate(emptyState({
+      revisions: [r('SOP-001-r1', 'published'), r('SOP-001-r2', 'draft'), r('SOP-001-r3', 'draft')],
+    }));
+    expect(inFlight(out)).toHaveLength(1);
+  });
+
+  it('keeps the highest -rN — what DocReader was actually showing', () => {
+    const out = step.migrate(emptyState({
+      revisions: [r('SOP-001-r2', 'draft'), r('SOP-001-r10', 'draft'), r('SOP-001-r3', 'draft')],
+    }));
+    expect(inFlight(out)[0].id).toBe('SOP-001-r10');
+  });
+
+  it('a pending-approval revision wins over a higher-numbered draft', () => {
+    const out = step.migrate(emptyState({
+      revisions: [r('SOP-001-r2', 'pending-approval'), r('SOP-001-r9', 'draft')],
+    }));
+    expect(inFlight(out)[0].id).toBe('SOP-001-r2');
+  });
+
+  it('withdraws rather than deletes — the author\'s words survive with a reason', () => {
+    const out = step.migrate(emptyState({
+      revisions: [r('SOP-001-r1', 'draft'), r('SOP-001-r2', 'draft')],
+    }));
+    expect(out.revisions).toHaveLength(2);
+    const pulled = out.revisions.find((x) => x.id === 'SOP-001-r1')!;
+    expect(pulled.status).toBe('withdrawn');
+    expect(pulled.withdrawalReason).toContain('more than one open draft');
+    expect(pulled.withdrawnAtUtc).toBeTruthy();
+  });
+
+  it('scopes per document', () => {
+    const out = step.migrate(emptyState({
+      revisions: [r('SOP-001-r1', 'draft'), r('SOP-002-r1', 'draft', 'SOP-002')],
+    }));
+    expect(inFlight(out)).toHaveLength(2);
+  });
+
+  it('is a no-op — same object — when the store already satisfies the rule', () => {
+    const stored = emptyState({ revisions: [r('SOP-001-r1', 'published'), r('SOP-001-r2', 'draft')] });
+    expect(step.migrate(stored)).toBe(stored);
+  });
+
+  it('is idempotent', () => {
+    const once = step.migrate(emptyState({
+      revisions: [r('SOP-001-r1', 'draft'), r('SOP-001-r2', 'draft'), r('SOP-001-r3', 'draft')],
+    }));
+    expect(step.migrate(once)).toBe(once);
+  });
+
+  it('touches nothing outside revisions', () => {
+    const stored = emptyState({
+      docs: [{ id: 'SOP-001' } as never],
+      acknowledgments: [{ id: 'ack-1' } as never],
+      suggestions: [{ id: 'sug-1', status: 'accepted' } as never],
+      revisions: [r('SOP-001-r1', 'draft'), r('SOP-001-r2', 'draft')],
+    });
+    const out = step.migrate(stored);
+    expect(out.docs).toBe(stored.docs);
+    expect(out.acknowledgments).toBe(stored.acknowledgments);
+    // Suggestions accepted before resolvedIntoRevisionId existed are NOT backfilled:
+    // a guessed link would be a fabricated provenance claim.
+    expect(out.suggestions).toBe(stored.suggestions);
   });
 });

@@ -10,6 +10,7 @@ import { SignCeremonyDialog } from '../../tech-log/components/SignCeremonyDialog
 import type { Doc, DocRevision } from '../types';
 import { useDocuments, identityFor } from '../DocumentsContext';
 import { isAcknowledged, acknowledgedFor, isTargetRole } from '../engine/acknowledgments';
+import { displayDigest } from '../engine/provenance';
 import { formatDateOnly } from '../../../lib/operatorDate';
 
 /**
@@ -31,6 +32,11 @@ export function AckPanel({ doc, rev, userRole }: { doc: Doc; rev: DocRevision; u
   const acked = isAcknowledged(rev, state.acknowledgments, userId);
   const myAck = acknowledgedFor(rev, state.acknowledgments).find((a) => a.userId === userId);
   const hasChangeSummary = !!rev.changeSummary.trim();
+  // The signature must bind the digest that actually attests this content. For a
+  // RECEIVED revision that is the SHA-256 myGFO computed over the real bytes —
+  // `mockChecksum` covers only the generated placeholder, so signing it would
+  // attest a description of the document instead of the document.
+  const ackDigest = displayDigest(rev);
 
   if (acked && myAck) {
     const sig = myAck.signatureId ? state.signatures.find((s) => s.id === myAck.signatureId) : undefined;
@@ -117,7 +123,7 @@ export function AckPanel({ doc, rev, userRole }: { doc: Doc; rev: DocRevision; u
             <p className="flex items-start gap-2 text-xs text-amber-900/80 dark:text-amber-200/80">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               This revision requires an electronic signature — the signed record binds your identity to this
-              exact content (digest {rev.mockChecksum.slice(0, 12)}…).
+              exact content (digest {ackDigest.short}…).
             </p>
             <Button onClick={() => setCeremonyOpen(true)} size="sm">
               <PenLine className="mr-1.5 h-4 w-4" /> Read &amp; sign…
@@ -130,8 +136,8 @@ export function AckPanel({ doc, rev, userRole }: { doc: Doc; rev: DocRevision; u
               signedEntityId={rev.id}
               intentStatement={`I have read and understood ${doc.id} "${doc.title}" rev ${rev.revision}, effective ${rev.effectiveDate}${hasChangeSummary ? ', including the summary of changes' : ''}.`}
               requireStepUp
-              payloadExtra={rev.mockChecksum}
-              payloadSummary={`Signature covers the document content digest ${rev.mockChecksum.slice(0, 16)}…`}
+              payloadExtra={ackDigest.hex}
+              payloadSummary={`Signature covers the document content digest ${ackDigest.hex.slice(0, 16)}…`}
               onSigned={(sig) => acknowledgeSignature(doc, rev, sig, userRole)}
               title="Read & sign acknowledgment"
             />

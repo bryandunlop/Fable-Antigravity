@@ -7,12 +7,14 @@ import type {
   DocSuggestion,
   DocSuggestionReply,
   DocReviewRecord,
+  DocSource,
   DocumentsState,
 } from './types';
 import type { Signature } from '../tech-log/types';
-import { classFor, docReaderPath } from './classes';
+import { classFor, docReaderPath, docManagePath } from './classes';
 import { getSeedState } from './mockData';
-import { applyPublish, promoteScheduled, currentRevision } from './engine/revisions';
+import { applyPublish, promoteScheduled, currentRevision, nextRevisionId, nextRevisionLabel } from './engine/revisions';
+import { inFlightRevision } from './engine/workbench';
 import {
   cabinSections, canManageCabinSections, validateCabinSections, docsInCabinSection, applyCabinSections,
   CABIN_SECTION_MANAGER_ROLES,
@@ -23,20 +25,23 @@ import { computeNextReviewDate } from './engine/review';
 import { isTargetRole } from './engine/acknowledgments';
 import { migrateStoredState } from './engine/migrations';
 import { importLegacyBulletins, isBulletinClass } from './engine/bulletinCompat';
-import { contentFieldsFromMarkdown } from './engine/blocks';
+import { contentFieldsFromMarkdown, checksumForSections } from './engine/blocks';
+import { stageSuggestion } from './engine/blockEditor';
+import { appendChangeSummary } from './engine/suggestions';
 import { operatorTodayIso } from '../../lib/operatorDate';
 import { SYSTEM_USERS, ROLE_CATEGORIES, ADDITIONAL_ROLES, getRoleLabelByValue } from '../../lib/mockUsers';
 import { resolveUserId } from '../../notifications/identity';
 import { eventStore } from '../../notifications/events';
+import { ensureDemoBlob } from './store/demoSeedBlob';
 
 export const STORAGE_KEY = 'documents-state';
 export const VERSION_KEY = 'documents-data-version';
-/** D65 — bumped to move `fleetTypes` / `casMeta` off the `Doc` row and onto
- *  `DocRevision`. Both fields are optional and absent reads correctly, so this is not
- *  a broken-render risk; the bump exists so a RETURNING user's curated CAS content is
- *  carried onto its revisions by the matching step in engine/migrations.ts rather than
- *  being stranded on a field nothing reads any more. */
-export const DATA_VERSION = '2026-08-03-cabin-knowledge-v1';
+/** Bumped for the one-working-draft invariant. A store written before the
+ *  CREATE_DRAFT guard can hold several in-flight revisions on one doc, all but one
+ *  of them unreachable; the matching step in engine/migrations.ts withdraws the
+ *  extras (tombstoned, never deleted) so a returning user's store satisfies the
+ *  rule the reducer now enforces. */
+export const DATA_VERSION = '2026-08-08-single-draft-v1';
 /** Set once the legacy 'bulletins-state' store has been imported — a later
  * re-seed must never resurrect stale pre-migration bulletins (C5). */
 export const BULLETINS_IMPORTED_KEY = 'documents-bulletins-imported';
@@ -155,7 +160,7 @@ export type DocumentsAction =
   | { type: 'TOGGLE_PIN'; payload: { docId: string; actorRoles: string[] } }
   | { type: 'TOGGLE_ARCHIVE'; payload: { docId: string; actorRoles: string[] } }
   | { type: 'CREATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
-  | { type: 'UPDATE_DRAFT'; payload: DocRevision }
+  | { type: 'UPDATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'WITHDRAW_DRAFT'; payload: { revisionId: string; reason: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string } }
   | { type: 'SUBMIT_FOR_APPROVAL'; payload: { revisionId: string; atUtc: string } }
   | {
@@ -181,6 +186,56 @@ export type DocumentsAction =
   | {
       type: 'RESOLVE_SUGGESTION';
       payload: { id: string; status: 'accepted' | 'declined'; note?: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string };
+    }
+  | {
+      /**
+       * Accept a reader's suggestion INTO the document's working draft, creating
+       * that draft if it does not exist yet — one atomic transition.
+       *
+       * This replaces the old two-dispatch dance (create the draft in the editor,
+       * then resolve the suggestion when it persisted) that engine/acceptFlow.ts
+       * existed to keep in step. One transition makes the invariant
+       * "a suggestion is accepted IFF a revision carries a block staged from it"
+       * unrepresentable-if-violated, rather than merely coordinated.
+       *
+       * Ids are allocated by the caller so the reducer stays pure and testable.
+       */
+      type: 'ACCEPT_SUGGESTION_INTO_DRAFT';
+      payload: {
+        suggestionId: string;
+        byUserId: string;
+        byName: string;
+        byRoles: string[];
+        atUtc: string;
+        /** Used only when no working draft exists yet. */
+        newRevisionSeed: { id: string; revision: string; effectiveDate: string };
+        newBlockId: string;
+      };
+    }
+  | {
+      /**
+       * D73 — freeze bytes myGFO has already hashed as a DRAFT revision, which
+       * then rides the ordinary four-eyes pipeline.
+       *
+       * A draft, never a publish. A changed source file must not become the
+       * effective revision on its own: without the human gate, an external edit
+       * button is an unsigned publish path into an airworthiness record.
+       */
+      type: 'INGEST_RECEIVED_REVISION';
+      payload: { revision: DocRevision; actorRoles: string[] };
+    }
+  | {
+      /** Re-point or re-confirm where a document's source file lives. Reference
+       *  data — it touches no revision, so it never goes through four-eyes. */
+      type: 'CONFIRM_SOURCE';
+      payload: {
+        docId: string;
+        source: DocSource;
+        byUserId: string;
+        byName: string;
+        byRoles: string[];
+        atUtc: string;
+      };
     }
   | { type: 'COMPLETE_REVIEW'; payload: { record: DocReviewRecord; today: string; actorRoles: string[] } }
   | { type: 'PROMOTE_SCHEDULED'; payload: { atUtc: string; today: string } }
@@ -277,13 +332,29 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         warnNoop(`revision ${rev.id} already exists`);
         return state;
       }
+      // INVARIANT: at most one in-flight revision per document. Without this a
+      // second draft was appended and then orphaned — DocReader only ever
+      // reached one of them, so the other was invisible AND uneditable.
+      const inFlight = inFlightRevision(rev.docId, state.revisions);
+      if (inFlight) {
+        warnNoop(`doc ${rev.docId} already has an in-flight revision (${inFlight.id}, ${inFlight.status})`);
+        return state;
+      }
       return { ...state, revisions: [...state.revisions, rev] };
     }
     case 'UPDATE_DRAFT': {
-      const rev = action.payload;
+      const { revision: rev, actorRoles } = action.payload;
       const existing = state.revisions.find((r) => r.id === rev.id);
       if (!existing || (existing.status !== 'draft' && existing.status !== 'rejected')) {
         warnNoop('only a draft/rejected revision can be edited');
+        return state;
+      }
+      // C12: this was the one content mutation in the store with no authorization
+      // gate at all — it checked status and nothing else, so any caller could
+      // rewrite the body of a draft on its way into four-eyes.
+      const draftDoc = state.docs.find((d) => d.id === rev.docId);
+      if (!draftDoc || !canAuthor(classFor(draftDoc.classId), actorRoles)) {
+        warnNoop('editing a draft requires an authoring role for the doc\'s class');
         return state;
       }
       // Editing a rejected revision returns it to draft.
@@ -581,6 +652,165 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         ),
       };
     }
+    case 'ACCEPT_SUGGESTION_INTO_DRAFT': {
+      const p = action.payload;
+      const sug = state.suggestions.find((s) => s.id === p.suggestionId);
+      // 1. No double-accept; a declined suggestion cannot be resurrected.
+      if (!sug || sug.status !== 'open') {
+        warnNoop('only an open suggestion can be accepted into a draft');
+        return state;
+      }
+      // 3. Structural.
+      const parent = state.docs.find((d) => d.id === sug.docId);
+      if (!parent) {
+        warnNoop(`no doc ${sug.docId} for suggestion ${sug.id}`);
+        return state;
+      }
+      // 2. Identical authority to RESOLVE_SUGGESTION — batching creates no new privilege.
+      const authorized =
+        rolesCanManageDocuments(p.byRoles) || canAuthor(classFor(parent.classId), p.byRoles);
+      if (!authorized) {
+        warnNoop('accepting a suggestion requires a document manager or an author of the doc');
+        return state;
+      }
+      const inFlight = inFlightRevision(parent.id, state.revisions);
+      // 4. A revision already with an approver is not mutable. The suggestion
+      //    stays open — the workbench tells the maintainer to wait or withdraw.
+      if (inFlight && inFlight.status === 'pending-approval') {
+        warnNoop(`revision ${inFlight.id} is pending approval — accept once it is decided`);
+        return state;
+      }
+      // 5. Either roll into the existing working draft, or base a new one on the
+      //    published revision. You cannot revise nothing, and ids never collide (C8).
+      const base = inFlight ?? currentRevision(parent.id, state.revisions);
+      if (!base) {
+        warnNoop(`doc ${parent.id} has no published revision to revise`);
+        return state;
+      }
+      const creating = !inFlight;
+      if (creating && state.revisions.some((r) => r.id === p.newRevisionSeed.id)) {
+        warnNoop(`revision ${p.newRevisionSeed.id} already exists`);
+        return state;
+      }
+      const sections = stageSuggestion(
+        structuredClone(base.sections),
+        sug,
+        p.newBlockId,
+      );
+      const target: DocRevision = creating
+        ? {
+            ...structuredClone(base),
+            id: p.newRevisionSeed.id,
+            revision: p.newRevisionSeed.revision,
+            effectiveDate: p.newRevisionSeed.effectiveDate,
+            // 6. status forced to 'draft' — see below for the rejected case.
+            status: 'draft',
+            authorUserId: p.byUserId,
+            authorName: p.byName,
+            sections,
+            changeSummary: appendChangeSummary('', sug),
+            mockChecksum: checksumForSections(sections),
+            submittedAtUtc: undefined,
+            decidedAtUtc: undefined,
+            decidedByUserId: undefined,
+            decidedByName: undefined,
+            rejectionReason: undefined,
+            publishedAtUtc: undefined,
+          }
+        : {
+            ...base,
+            // 6. A rejected draft that gains new content is a new attempt, not
+            //    still-rejected — matching UPDATE_DRAFT.
+            status: 'draft',
+            sections,
+            changeSummary: appendChangeSummary(base.changeSummary, sug),
+            mockChecksum: checksumForSections(sections),
+          };
+
+      return {
+        ...state,
+        revisions: creating
+          ? [...state.revisions, target]
+          : state.revisions.map((r) => (r.id === target.id ? target : r)),
+        suggestions: state.suggestions.map((s) =>
+          s.id === sug.id
+            ? {
+                ...s,
+                status: 'accepted' as const,
+                resolvedIntoRevisionId: target.id,
+                resolvedByUserId: p.byUserId,
+                resolvedByName: p.byName,
+                resolvedAtUtc: p.atUtc,
+              }
+            : s,
+        ),
+      };
+    }
+    case 'INGEST_RECEIVED_REVISION': {
+      const { revision: rev, actorRoles } = action.payload;
+      const parent = state.docs.find((d) => d.id === rev.docId);
+      if (!parent) {
+        warnNoop(`no doc ${rev.docId} for received revision`);
+        return state;
+      }
+      // Holding a received document is a document-control act, not ordinary
+      // authoring: the operator is asserting these bytes ARE the MEL.
+      if (!rolesCanManageDocuments(actorRoles)) {
+        warnNoop('ingesting a received document requires a document manager');
+        return state;
+      }
+      // The whole point of the routing test is that myGFO holds the bytes AND
+      // knows their digest. A revision claiming to be a received copy without a
+      // hash myGFO computed itself would be a provenance claim with no evidence.
+      const att = rev.provenance?.attachment;
+      if (rev.provenance?.origin !== 'received-copy' || !att?.sha256 || !att.blobKey) {
+        warnNoop('a received revision requires frozen bytes and a myGFO-computed SHA-256');
+        return state;
+      }
+      if (state.revisions.some((r) => r.id === rev.id)) {
+        warnNoop(`revision ${rev.id} already exists`);
+        return state;
+      }
+      // The single-working-draft rule applies here too: a second in-flight
+      // revision would be as orphaned as any other.
+      const busy = inFlightRevision(rev.docId, state.revisions);
+      if (busy) {
+        warnNoop(`doc ${rev.docId} already has an in-flight revision (${busy.id}, ${busy.status})`);
+        return state;
+      }
+      return { ...state, revisions: [...state.revisions, { ...rev, status: 'draft' }] };
+    }
+    case 'CONFIRM_SOURCE': {
+      const p = action.payload;
+      const target = state.docs.find((d) => d.id === p.docId);
+      if (!target) {
+        warnNoop(`no doc ${p.docId} to confirm a source for`);
+        return state;
+      }
+      if (!rolesCanManageDocuments(p.byRoles)) {
+        warnNoop('confirming a document source requires a document manager');
+        return state;
+      }
+      // Touches the doc row only. A file that moved in SharePoint has not
+      // produced a new revision, and a signed revision's claim about its own
+      // bytes must not shift because someone corrected a link.
+      return {
+        ...state,
+        docs: state.docs.map((d) =>
+          d.id === p.docId
+            ? {
+                ...d,
+                source: {
+                  ...p.source,
+                  lastConfirmedAtUtc: p.atUtc,
+                  lastConfirmedByUserId: p.byUserId,
+                  lastConfirmedByName: p.byName,
+                },
+              }
+            : d,
+        ),
+      };
+    }
     case 'COMPLETE_REVIEW': {
       const { record, today, actorRoles } = action.payload;
       const doc = state.docs.find((d) => d.id === record.docId);
@@ -647,7 +877,7 @@ interface Ctx {
   togglePin: (docId: string, actorRoles: string[]) => void;
   toggleArchive: (docId: string, actorRoles: string[]) => void;
   createDraft: (revision: DocRevision, actorRoles: string[]) => void;
-  updateDraft: (revision: DocRevision) => void;
+  updateDraft: (revision: DocRevision, userRole: string, additionalRoles?: string[]) => void;
   withdrawDraft: (revisionId: string, reason: string, userRole: string, additionalRoles?: string[]) => void;
   submitForApproval: (revisionId: string) => void;
   decideApproval: (input: {
@@ -678,6 +908,12 @@ interface Ctx {
     userRole: string;
   }) => void;
   resolveSuggestion: (id: string, status: 'accepted' | 'declined', note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
+  /** Accept a suggestion into the document's single working draft, creating it if needed. */
+  acceptSuggestionIntoDraft: (suggestionId: string, userRole: string, additionalRoles?: string[]) => void;
+  /** D73 — freeze already-hashed bytes as a draft revision (four-eyes follows). */
+  ingestReceivedRevision: (revision: DocRevision, userRole: string, additionalRoles?: string[]) => void;
+  /** D73 — record or re-confirm where a document's source file lives. */
+  confirmSource: (docId: string, source: DocSource, userRole: string, additionalRoles?: string[]) => void;
   addSuggestionReply: (suggestionId: string, text: string, userRole: string) => void;
   completeReview: (docId: string, outcome: DocReviewRecord['outcome'], note: string | undefined, userRole: string, additionalRoles?: string[]) => void;
   /** D75 / LG-183 — replace the cabin section vocabulary. `renames` (old → new) carries entries
@@ -695,6 +931,11 @@ function localId(prefix: string): string {
 
 export function DocumentsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(documentsReducer, undefined, loadInitialState);
+
+  // The seeded received document ships with real bytes; put them in the blob
+  // store so it actually opens (and reads offline) rather than showing the
+  // "this device no longer holds the cached file" fallback on a fresh install.
+  useEffect(() => { void ensureDemoBlob(); }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -867,6 +1108,47 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Allocates the ids the reducer needs (so the reducer stays pure) and dispatches
+  // ONE transition. A suggestion-driven revision is a point release, so the label
+  // steps the minor: 3.0 → 3.1.
+  const acceptSuggestionIntoDraft = useCallback<Ctx['acceptSuggestionIntoDraft']>(
+    (suggestionId, userRole, additionalRoles = []) => {
+      const { userId, userName } = identityFor(userRole);
+      const sug = state.suggestions.find((s) => s.id === suggestionId);
+      if (!sug) return;
+      const base = currentRevision(sug.docId, state.revisions);
+      dispatch({
+        type: 'ACCEPT_SUGGESTION_INTO_DRAFT',
+        payload: {
+          suggestionId,
+          byUserId: userId,
+          byName: userName,
+          byRoles: [userRole, ...additionalRoles],
+          atUtc: nowUtc(),
+          newRevisionSeed: {
+            id: nextRevisionId(sug.docId, state.revisions),
+            revision: nextRevisionLabel(base?.revision, 'minor'),
+            effectiveDate: todayIso(),
+          },
+          newBlockId: localId('blk'),
+        },
+      });
+    },
+    [state],
+  );
+
+  const ingestReceivedRevision = useCallback<Ctx['ingestReceivedRevision']>((revision, userRole, additionalRoles = []) => {
+    dispatch({ type: 'INGEST_RECEIVED_REVISION', payload: { revision, actorRoles: [userRole, ...additionalRoles] } });
+  }, []);
+
+  const confirmSource = useCallback<Ctx['confirmSource']>((docId, source, userRole, additionalRoles = []) => {
+    const { userId, userName } = identityFor(userRole);
+    dispatch({
+      type: 'CONFIRM_SOURCE',
+      payload: { docId, source, byUserId: userId, byName: userName, byRoles: [userRole, ...additionalRoles], atUtc: nowUtc() },
+    });
+  }, []);
+
   const completeReview = useCallback<Ctx['completeReview']>((docId, outcome, note, userRole, additionalRoles = []) => {
     const { userId, userName } = identityFor(userRole);
     dispatch({
@@ -900,7 +1182,11 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     togglePin: useCallback((id, actorRoles) => dispatch({ type: 'TOGGLE_PIN', payload: { docId: id, actorRoles } }), []),
     toggleArchive: useCallback((id, actorRoles) => dispatch({ type: 'TOGGLE_ARCHIVE', payload: { docId: id, actorRoles } }), []),
     createDraft: useCallback((r, actorRoles) => dispatch({ type: 'CREATE_DRAFT', payload: { revision: r, actorRoles } }), []),
-    updateDraft: useCallback((r) => dispatch({ type: 'UPDATE_DRAFT', payload: r }), []),
+    updateDraft: useCallback<Ctx['updateDraft']>(
+      (r, userRole, additionalRoles = []) =>
+        dispatch({ type: 'UPDATE_DRAFT', payload: { revision: r, actorRoles: [userRole, ...additionalRoles] } }),
+      [],
+    ),
     withdrawDraft: useCallback((revisionId, reason, userRole, additionalRoles = []) => {
       const { userId, userName } = identityFor(userRole);
       dispatch({
@@ -920,6 +1206,9 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     deleteComment,
     addSuggestion,
     resolveSuggestion,
+    acceptSuggestionIntoDraft,
+    ingestReceivedRevision,
+    confirmSource,
     addSuggestionReply,
     completeReview,
     setCabinSections: useCallback((sections, renames, actorRoles) => {
@@ -969,7 +1258,7 @@ export function publishApprovalRequestedEvent(doc: Doc, rev: DocRevision): void 
     title: `Approval requested: ${doc.title}`,
     detail: `${doc.id} rev ${rev.revision} submitted by ${rev.authorName}`,
     module: 'Documents',
-    link: '/documents',
+    link: docManagePath(doc.id, { tab: 'approval' }),
     audienceRoles: classFor(doc.classId).approverRoles,
   });
 }
@@ -982,7 +1271,7 @@ export function publishWithdrawnEvent(doc: Doc, rev: DocRevision, byName: string
     title: `Approval request withdrawn: ${doc.title}`,
     detail: `${doc.id} rev ${rev.revision} was withdrawn by ${byName}`,
     module: 'Documents',
-    link: '/documents',
+    link: docManagePath(doc.id, { tab: 'history' }),
     audienceRoles: classFor(doc.classId).approverRoles,
   });
 }
@@ -994,7 +1283,7 @@ export function publishSuggestionFiledEvent(doc: Doc, byName: string): void {
     title: `Suggestion filed on ${doc.title}`,
     detail: `${doc.id} — feedback from ${byName}`,
     module: 'Documents',
-    link: '/documents',
+    link: docManagePath(doc.id, { tab: 'suggestions' }),
     audienceRoles: ['document-manager', 'admin'],
   });
 }

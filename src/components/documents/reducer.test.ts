@@ -103,16 +103,27 @@ describe('documentsReducer four-eyes guards (no-ops on invalid transitions)', ()
     let s = documentsReducer(state(), decide({ approve: false, reason: 'Gate table conflicts with FOM 4.2.' }));
     expect(s.revisions[0].status).toBe('rejected');
     expect(s.revisions[0].rejectionReason).toBe('Gate table conflicts with FOM 4.2.');
-    s = documentsReducer(s, {
-      type: 'UPDATE_DRAFT',
-      payload: {
-        ...s.revisions[0],
-        sections: [{ id: 'SOP-001::preamble', level: 1, number: '', title: '', blocks: [{ id: 'SOP-001::preamble::b0', type: 'paragraph', md: 'Fixed' }] }],
-      },
-    });
+    const fixed = {
+      ...s.revisions[0],
+      sections: [{ id: 'SOP-001::preamble', level: 1, number: '', title: '', blocks: [{ id: 'SOP-001::preamble::b0', type: 'paragraph' as const, md: 'Fixed' }] }],
+    };
+    s = documentsReducer(s, { type: 'UPDATE_DRAFT', payload: { revision: fixed, actorRoles: ['document-manager'] } });
     expect(s.revisions[0].status).toBe('draft');
     s = documentsReducer(s, { type: 'SUBMIT_FOR_APPROVAL', payload: { revisionId: 'SOP-001-r1', atUtc: NOW } });
     expect(s.revisions[0].status).toBe('pending-approval');
+  });
+
+  it('UPDATE_DRAFT refuses a caller with no authoring role for the class', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const before = state({ revisions: [rev({ status: 'draft' })] });
+    const tampered = {
+      ...before.revisions[0],
+      sections: [{ id: 'SOP-001::preamble', level: 1, number: '', title: '', blocks: [{ id: 'SOP-001::preamble::b0', type: 'paragraph' as const, md: 'Slipped in' }] }],
+    };
+
+    const after = documentsReducer(before, { type: 'UPDATE_DRAFT', payload: { revision: tampered, actorRoles: ['pilot'] } });
+
+    expect(after).toBe(before);
   });
 
   it('PUBLISH_DIRECT on a controlled class is a no-op', () => {

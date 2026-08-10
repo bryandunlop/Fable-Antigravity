@@ -37,6 +37,18 @@ export interface DocBlock {
   /** Regulation requirement ids this block satisfies (into regCatalog) — G1
    * compliance linking. Part of block content, so it rides the four-eyes revision. */
   complianceRefs?: string[];
+  /**
+   * This block was STAGED into the working draft by accepting reader suggestion
+   * `<id>`, and holds that reader's words verbatim. It is not document text yet:
+   * `validateSubmit` refuses a revision that still carries one, so a reader's
+   * prose can never reach four-eyes unedited. The maintainer resolves it by
+   * editing it into real wording, merging it up into its anchor, or deleting it.
+   *
+   * Deliberately absent from `canonicalizeSections`: authoring metadata whose
+   * lifetime is shorter than the draft it lives in must not perturb the content
+   * digest.
+   */
+  stagedFromSuggestionId?: string;
 }
 
 export interface DocSection {
@@ -100,6 +112,85 @@ export interface DocCmcRow {
   supersededNote?: string;
 }
 
+/**
+ * D73 — how a document's content got into myGFO.
+ *
+ * myGFO is the SYSTEM OF RECORD, not a cache of SharePoint. Sync is pull-only;
+ * myGFO never writes back. One writer per document.
+ *
+ * The ROUTING TEST: bytes are ingested if and only if EITHER a signature depends
+ * on the content, OR it must be producible onboard — the D195 MEL, an FSDO LOA,
+ * an (O)/(M) procedure text, placard wording. Everything else is a pointer.
+ */
+export type DocOriginKind =
+  /** Written in myGFO through the block editor. The default; `undefined` reads as this. */
+  | 'authored'
+  /** Bytes received from outside, hashed by myGFO, frozen, cached offline. */
+  | 'received-copy'
+  /** Not held at all: resolved at access time from driveId + itemId. */
+  | 'external-pointer';
+
+/**
+ * The frozen bytes of a received revision.
+ *
+ * APPEND-ONLY. Once a revision carries one, neither the blob nor the hash may be
+ * rewritten: new bytes are a NEW revision, confirmed by a human (D73 step G).
+ * Without that gate, an external edit button becomes an unsigned publish path
+ * into an airworthiness record.
+ */
+export interface DocAttachment {
+  /** Key into the IndexedDB blob store. */
+  blobKey: string;
+  filename: string;
+  mimeType: string;
+  byteLength: number;
+  /** Computed by myGFO over these exact bytes. NEVER a vendor-reported hash:
+   *  Graph supplies no SHA-256 on a business tenant. */
+  sha256: string;
+}
+
+/** Why this document is held as bytes rather than pointed at — the D73 routing
+ *  test, recorded so an auditor reads the reasoning instead of inferring it. */
+export type CarriageReason = 'signature-attested' | 'required-onboard';
+
+/** Where a REVISION's content came from. Append-only, like the revision itself:
+ *  it is the frozen claim about what these exact bytes are. */
+export interface DocProvenance {
+  origin: DocOriginKind;
+  /** Present iff origin === 'received-copy'. */
+  attachment?: DocAttachment;
+  ingestedAtUtc?: string;
+  ingestedByUserId?: string;
+  ingestedByName?: string;
+  /** Human-readable origin: 'P&G SharePoint — Flight Ops / MEL', 'FSDO letter, 2026-06-02'. */
+  sourceLabel?: string;
+  /** The source version AS OBSERVED AT INGEST. Not a live pointer — SharePoint
+   *  trims version history permanently, so a pinned versionId can cease to exist. */
+  sourceVersionId?: string;
+  carriageReason?: CarriageReason;
+}
+
+/**
+ * Where a DOCUMENT's source file lives — the pointer half.
+ *
+ * Reference data, updatable, and deliberately NOT on the revision: a file that
+ * moves in SharePoint has not produced a new revision of the document, and
+ * pushing that through four-eyes would put content approvers in the business of
+ * approving URLs.
+ */
+export interface DocSource {
+  kind: 'sharepoint' | 'vendor-portal' | 'manual-upload' | 'other';
+  driveId?: string;
+  itemId?: string;
+  /** An item URL a person can open. NEVER a Graph @microsoft.graph.downloadUrl —
+   *  those expire in ~1h and outlive permission revocation. */
+  webUrl?: string;
+  label: string;
+  lastConfirmedAtUtc?: string;
+  lastConfirmedByUserId?: string;
+  lastConfirmedByName?: string;
+}
+
 export interface Doc {
   id: string; // 'SOP-001' — generated from the class idPrefix
   classId: string; // key into DOC_CLASSES
@@ -118,6 +209,9 @@ export interface Doc {
   /** ISO date; staleness / overdue-for-review derives from this. */
   nextReviewDate?: string;
   createdDate: string;
+  /** Where this document's source file lives, when it is not authored here.
+   *  Updatable reference data — see DocSource. */
+  source?: DocSource;
   // D65 — `fleetTypes` and `casMeta` used to live HERE. They now ride DocRevision:
   // see the note on those fields below.
 }
@@ -138,8 +232,13 @@ export interface DocRevision {
   ackLevel: AckLevel;
   /** Drives the overdue chase list. */
   ackDueDate?: string;
-  /** mockSha256 of the canonical section serialization — shown as an integrity chip; folded into signature payloads. */
+  /** mockSha256 of the canonical section serialization — shown as an integrity chip; folded into signature payloads.
+   *  For a RECEIVED revision this covers only the generated placeholder and is
+   *  therefore meaningless: read the digest through `displayDigest()`, never
+   *  this field directly. */
   mockChecksum: string;
+  /** D73 — where this revision's content came from. Absent reads as 'authored'. */
+  provenance?: DocProvenance;
   submittedAtUtc?: string;
   decidedAtUtc?: string;
   decidedByUserId?: string; // approver; never === authorUserId (reducer-enforced)
@@ -265,6 +364,17 @@ export interface DocSuggestion {
   proposedChange: string;
   rationale: string;
   status: 'open' | 'accepted' | 'declined';
+  /**
+   * The revision that carries this suggestion's text. Written by
+   * ACCEPT_SUGGESTION_INTO_DRAFT in the same transition that flips `status` to
+   * 'accepted', so "accepted" and "a draft carries it" cannot disagree.
+   *
+   * Whether it SHIPPED is DERIVED, never stored: look the revision up and read
+   * its status (`suggestionOutcome`). A draft later withdrawn or rejected must
+   * stop claiming the suggestion shipped, and a second stored flag would drift
+   * the first time that happened.
+   */
+  resolvedIntoRevisionId?: string;
   resolvedByUserId?: string;
   resolvedByName?: string;
   resolutionNote?: string;

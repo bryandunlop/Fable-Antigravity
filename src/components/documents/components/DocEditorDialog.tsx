@@ -325,6 +325,12 @@ export function DocEditorDialog({
       images: priorRev?.images,
       videos,
       links: priorRev?.links,
+      // D73 — a received revision's provenance is its frozen claim about which
+      // bytes it is. Rebuilding the revision object here without carrying it
+      // would silently turn a received MEL into an "authored in myGFO" document
+      // and drop it back to the meaningless placeholder digest. It is content,
+      // not chrome, so it rides forward exactly like images/links do.
+      provenance: priorRev?.provenance,
       changeSummary: changeSummary.trim(),
       effectiveDate,
       authorUserId: userId,
@@ -351,7 +357,7 @@ export function DocEditorDialog({
       // revision via proposedMeta instead — the published doc stays untouched.
       if (!liveControlled) updateDocMeta(doc, userRole, additionalRoles);
       if (mode.kind === 'revise') createDraft(rev, userRoles);
-      else updateDraft(rev);
+      else updateDraft(rev, userRole, additionalRoles);
     }
     onPersisted?.();
   };

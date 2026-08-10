@@ -2,6 +2,8 @@ import { Badge } from '../../ui/badge';
 import { FileCheck2, PenLine } from 'lucide-react';
 import type { Doc, DocRevision } from '../types';
 import { classFor } from '../classes';
+import { displayDigest } from '../engine/provenance';
+import { OriginBadge } from './OriginBadge';
 import { formatDateOnly } from '../../../lib/operatorDate';
 
 // The one way a controlled document is identified everywhere: TITLE + doc number
@@ -22,6 +24,7 @@ export function DocIdentityLine({ doc, rev }: { doc: Doc; rev?: DocRevision }) {
       <span className="truncate font-medium text-foreground">{doc.title}</span>
       {rev && <span className="shrink-0 text-xs text-muted-foreground">rev {rev.revision} · eff {fmtDate(rev.effectiveDate)}</span>}
       <span className="shrink-0 text-[11px] text-muted-foreground/70">{doc.id}</span>
+      <OriginBadge rev={rev} className="shrink-0" />
     </span>
   );
 }
@@ -35,6 +38,7 @@ export function DocIdentityHeader({ doc, rev }: { doc: Doc; rev: DocRevision }) 
         <span>{cfg.label}</span>
         <span className="text-muted-foreground/60">·</span>
         <span className="text-muted-foreground">{doc.id}</span>
+        <OriginBadge rev={rev} />
       </div>
       <h1 className="text-2xl font-semibold leading-tight text-primary">{doc.title}</h1>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
@@ -48,9 +52,19 @@ export function DocIdentityHeader({ doc, rev }: { doc: Doc; rev: DocRevision }) 
             {rev.ackDueDate ? ` by ${fmtDate(rev.ackDueDate)}` : ''}
           </span>
         )}
-        <span className="font-mono text-[11px] text-muted-foreground/70" title="Content integrity digest (demo — not a real SHA-256 yet)">
-          digest (demo) {rev.mockChecksum.slice(0, 12)}…
-        </span>
+        {/* A received revision carries TWO digests — the placeholder checksum and
+            the real SHA-256 over its bytes. displayDigest picks; nothing here does. */}
+        {(() => {
+          const d = displayDigest(rev);
+          return (
+            <span
+              className="font-mono text-[11px] text-muted-foreground/70"
+              title={d.real ? `SHA-256 computed by myGFO: ${d.hex}` : 'Content integrity digest (demo — not a real SHA-256 yet)'}
+            >
+              {d.label} {d.short}…
+            </span>
+          );
+        })()}
       </div>
     </div>
   );

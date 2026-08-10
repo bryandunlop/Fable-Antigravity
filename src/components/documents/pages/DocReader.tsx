@@ -1,15 +1,20 @@
 import { useState, useMemo, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users, GitCompareArrows, ChevronUp, ChevronDown, Printer, FileText } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, PencilLine, History, Users, GitCompareArrows, ChevronUp, ChevronDown, Printer, FileText, Settings2 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
 import { RevisionMedia } from '../components/RevisionMedia';
 import { DiffedContent } from '../components/DiffedContent';
 import { useDocuments } from '../DocumentsContext';
-import { classFor } from '../classes';
+import { classFor, docManagePath } from '../classes';
 import { canAuthor } from '../engine/lifecycle';
 import { currentRevision, revisionsFor, priorPublishedRevision } from '../engine/revisions';
+import { workingDraft } from '../engine/workbench';
+import { isReceived, provenanceLabel } from '../engine/provenance';
+import { ReceivedRevisionView } from '../components/ReceivedRevisionView';
+import { InFlightBadges } from '../components/InFlightBadges';
+import { operatorTodayIso } from '../../../lib/operatorDate';
 import { diffRevisions } from '../engine/diff';
 import { canManageDocuments } from '../roles';
 import { documentsRoleUniverse } from '../roles';
@@ -28,9 +33,6 @@ import { InlineSuggestComposer } from '../components/InlineSuggestComposer';
 import { InlineSuggestionThread } from '../components/InlineSuggestionThread';
 import { openSuggestionsByBlock, canSeeSuggestion } from '../engine/suggestions';
 import { identityFor, publishWithdrawnEvent } from '../DocumentsContext';
-import {
-  IDLE_ACCEPT_FLOW, beginAccept, acceptFlowOnPersisted, acceptFlowOnCancelled, acceptPrefill, type AcceptFlow,
-} from '../engine/acceptFlow';
 import type { DocSuggestion } from '../types';
 import { toast } from 'sonner';
 import { printDocument } from '../util/printDocument';
@@ -39,12 +41,12 @@ import { SyncAgeChip } from '../components/SyncAgeChip';
 
 export function DocReader({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   const { docId } = useParams<{ docId: string }>();
-  const { state, resolveSuggestion, withdrawDraft } = useDocuments();
+  const { state, withdrawDraft } = useDocuments();
+  const navigate = useNavigate();
   const [editor, setEditor] = useState<EditorMode | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [showChanges, setShowChanges] = useState(true);
   const [activeBlock, setActiveBlock] = useState<{ id: string; mode: 'compose' | 'thread' } | null>(null);
-  const [acceptFlow, setAcceptFlow] = useState<AcceptFlow>(IDLE_ACCEPT_FLOW);
   const articleRef = useRef<HTMLElement>(null);
   const changeIdxRef = useRef(-1);
 
@@ -71,7 +73,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const userRoles = [userRole, ...additionalRoles];
   const manager = canManageDocuments(userRole, additionalRoles);
   const author = doc ? canAuthor(classFor(doc.classId), userRoles) : false;
-  const editableRev = allRevs.find((r) => r.status === 'draft' || r.status === 'rejected');
+  const editableRev = doc ? workingDraft(doc.id, state.revisions) : undefined;
 
   if (!doc || (!rev && !author && !manager)) {
     return (
@@ -88,28 +90,17 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const priorRevisions = allRevs.filter((r) => r.id !== headerRev?.id && r.status === 'superseded');
   const showChangeSummary = rev && rev.changeSummary.trim() && priorRevisions.length > 0;
 
-  // Accepting a suggestion opens a pre-filled draft revision; the decision is only
-  // recorded once that draft actually persists (acceptFlow — the C4 invariant).
+  // The reader does not accept suggestions any more. Accepting is a maintainer act
+  // that belongs beside the document's other open work — otherwise each accept is
+  // judged alone, which is how you end up with five drafts for five suggestions.
   const acceptSuggestion = (s: DocSuggestion) => {
-    const baseRev = currentRevision(doc.id, state.revisions);
-    if (!baseRev) { toast.error('No published revision to revise — the suggestion stays open.'); return; }
-    setAcceptFlow(beginAccept(s.id));
-    setEditor({ kind: 'revise', doc, baseRev, prefill: acceptPrefill(s) });
     setActiveBlock(null);
-  };
-
-  const onEditorPersisted = () => {
-    const { resolveSuggestionId, flow } = acceptFlowOnPersisted(acceptFlow);
-    setAcceptFlow(flow);
-    if (resolveSuggestionId) {
-      resolveSuggestion(resolveSuggestionId, 'accepted', undefined, userRole, additionalRoles);
-      toast.success('Suggestion accepted — draft created.');
-    }
+    navigate(docManagePath(doc.id, { tab: 'suggestions', suggestion: s.id }));
   };
 
   // Inline suggestions: hover-to-suggest on the right gutter (any reader); pins on
   // blocks with open suggestions visible to owner/managers/author (spec S-1).
-  const renderBlockGutter = rev
+  const renderBlockGutter = rev && !isReceived(rev)
     ? (blockId: string) => {
         const visibleOpen = (byBlock.get(blockId) ?? []).filter((s) => canSeeSuggestion(s, userId, userRoles, doc));
         const active = activeBlock?.id === blockId;
@@ -152,13 +143,18 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
           <SyncAgeChip />
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {diff?.hasChanges && rev && (
+          {isReceived(rev) && (
+            <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+              Received document — revisions are compared by digest, not line by line
+            </span>
+          )}
+          {!isReceived(rev) && diff?.hasChanges && rev && (
             <>
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
                 {changeCount} change{changeCount === 1 ? '' : 's'} in rev {rev.revision}
               </span>
               <Button size="sm" variant={showChanges ? 'secondary' : 'outline'} onClick={() => setShowChanges((v) => !v)}>
-                <GitCompareArrows className="mr-1.5 h-4 w-4" /> {showChanges ? 'Changes: on' : 'Changes: off'}
+                <GitCompareArrows className="mr-1.5 h-4 w-4" /> {showChanges ? 'Compare: on' : 'Compare: off'}
               </Button>
               {showingDiff && (
                 <div className="flex items-center">
@@ -172,7 +168,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               )}
             </>
           )}
-          {rev && (
+          {rev && !isReceived(rev) && (
             <Button
               size="sm"
               variant="outline"
@@ -181,7 +177,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               <Printer className="mr-1.5 h-4 w-4" /> Export PDF
             </Button>
           )}
-          {rev && (manager || author) && (
+          {rev && !isReceived(rev) && (manager || author) && (
             <Button
               size="sm"
               variant="outline"
@@ -205,17 +201,25 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
           )}
           {rev && (
             <Button size="sm" variant="outline" onClick={() => setSuggesting(true)}>
-              <MessageSquarePlus className="mr-1.5 h-4 w-4" /> Suggest a change
+              <MessageSquarePlus className="mr-1.5 h-4 w-4" /> Suggest an edit
+            </Button>
+          )}
+          {(manager || author) && (
+            <Button size="sm" variant="secondary" asChild>
+              <Link to={docManagePath(doc.id)}><Settings2 className="mr-1.5 h-4 w-4" /> Manage</Link>
             </Button>
           )}
           {author && (
             <>
-            {editableRev && (
+            {/* A received revision's content is bytes, not blocks — the block
+                editor has nothing to edit and would strip its provenance. New
+                bytes arrive through the ingest path as a new revision. */}
+            {editableRev && !isReceived(editableRev) && (
               <Button size="sm" variant="secondary" onClick={() => setEditor({ kind: 'edit-draft', doc, rev: editableRev })}>
                 <PencilLine className="mr-1.5 h-4 w-4" /> Edit draft (rev {editableRev.revision})
               </Button>
             )}
-            {rev && !editableRev && (
+            {rev && !isReceived(rev) && !editableRev && (
               <Button size="sm" variant="secondary" onClick={() => setEditor({ kind: 'revise', doc, baseRev: rev })}>
                 <FilePlus2 className="mr-1.5 h-4 w-4" /> New revision
               </Button>
@@ -225,7 +229,22 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
         </div>
       </div>
 
-      {headerRev && <DocIdentityHeader doc={doc} rev={headerRev} />}
+      {headerRev && (
+        <div className="space-y-2">
+          <DocIdentityHeader doc={doc} rev={headerRev} />
+          {isReceived(headerRev) && (
+            <p className="text-xs text-muted-foreground">{provenanceLabel(doc, headerRev)}</p>
+          )}
+          {(manager || author) && (
+            <InFlightBadges
+              doc={doc}
+              revisions={state.revisions}
+              suggestions={state.suggestions}
+              todayIso={operatorTodayIso()}
+            />
+          )}
+        </div>
+      )}
 
       {/* D60/D65 — the entry's fleet applicability and curated CAS facts, read back to the reader.
           `rev` is the CURRENT PUBLISHED revision, so this shows exactly what the catalog offers. */}
@@ -243,12 +262,18 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
       {rev ? (
         <GfoPanel>
           <article ref={articleRef} className="prose-bulletin">
-            {showingDiff && diff ? (
-              <DiffedContent diff={diff} renderBlockGutter={renderBlockGutter} />
+            {isReceived(rev) ? (
+              <ReceivedRevisionView doc={doc} rev={rev} />
             ) : (
-              <SectionedContent sections={rev.sections} renderBlockGutter={renderBlockGutter} />
+              <>
+                {showingDiff && diff ? (
+                  <DiffedContent diff={diff} renderBlockGutter={renderBlockGutter} />
+                ) : (
+                  <SectionedContent sections={rev.sections} renderBlockGutter={renderBlockGutter} />
+                )}
+                <RevisionMedia rev={rev} />
+              </>
             )}
-            <RevisionMedia rev={rev} />
           </article>
           <AckPanel doc={doc} rev={rev} userRole={userRole} />
         </GfoPanel>
@@ -257,7 +282,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
       )}
 
       {rev && classFor(doc.classId).commentsEnabled && (
-        <GfoPanel title="Field notes & comments" action={<MessageSquare className="h-4 w-4 text-muted-foreground" />}>
+        <GfoPanel title="Discussion" action={<MessageSquare className="h-4 w-4 text-muted-foreground" />}>
           <CommentThread doc={doc} userRole={userRole} />
         </GfoPanel>
       )}
@@ -294,8 +319,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
       {editor && (
         <DocEditorDialog
           open={!!editor}
-          onOpenChange={(o) => { if (!o) { setEditor(null); setAcceptFlow(acceptFlowOnCancelled(acceptFlow).flow); } }}
-          onPersisted={onEditorPersisted}
+          onOpenChange={(o) => { if (!o) setEditor(null); }}
           mode={editor}
           userRole={userRole}
           additionalRoles={additionalRoles}

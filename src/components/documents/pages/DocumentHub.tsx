@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
+import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FileLock2, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -23,12 +23,13 @@ import { groupDocsByCategory, yearsFor, matchesYear } from '../engine/library';
 import { documentsRoleUniverse, canManageDocuments } from '../roles';
 import { DocIdentityLine } from '../components/DocIdentity';
 import { RequiredReadsList } from '../components/RequiredReadsList';
-import { ReviewFlagBadge } from '../components/ReviewFlagBadge';
+import { InFlightBadges } from '../components/InFlightBadges';
 import { ApprovalQueuePanel } from '../components/ApprovalQueuePanel';
 import { SuggestionQueuePanel } from '../components/SuggestionQueuePanel';
 import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
 import { CabinKnowledgePanel } from '../components/CabinKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
+import { DocumentRegistry } from './DocumentRegistry';
 import { ComplianceMatrix } from '../components/ComplianceMatrix';
 import { DocEditorDialog } from '../components/DocEditorDialog';
 import { docxToImport } from '../engine/docxImport';
@@ -170,7 +171,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           wants "how does the bedding go together on this tail", not the SOP library; required
           reads still win, because those are the ones with a due date. */}
       <Tabs defaultValue={myOutstanding.length > 0 ? 'my-reads' : cabinCrew ? 'cabin-knowledge' : 'library'}>
-        <TabsList>
+        <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="my-reads" className="gap-1.5">
             <BookOpenCheck className="h-4 w-4" /> My required reads
             {myOutstanding.length > 0 && (
@@ -196,6 +197,11 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
               <ShieldCheck className="h-4 w-4" /> Reg coverage
             </TabsTrigger>
           )}
+          {manager && (
+            <TabsTrigger value="sources" className="gap-1.5">
+              <FileLock2 className="h-4 w-4" /> Sources
+            </TabsTrigger>
+          )}
           {pendingApprovals.length > 0 || manager ? (
             <TabsTrigger value="approvals" className="gap-1.5">
               <CheckSquare className="h-4 w-4" /> Approvals
@@ -206,7 +212,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           ) : null}
           {seesFeedback && (
             <TabsTrigger value="feedback" className="gap-1.5">
-              <MessageSquareText className="h-4 w-4" /> Feedback
+              <MessageSquareText className="h-4 w-4" /> Suggestions
               {openSugs > 0 && (
                 <Badge variant="secondary" className="ml-1 px-1.5 text-[10px]">{openSugs}</Badge>
               )}
@@ -291,7 +297,15 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
                                 {!rev && <p className="mt-0.5 text-xs text-muted-foreground">No published revision yet</p>}
                               </div>
                               {doc.isArchived && <Badge variant="outline" className="shrink-0 text-[10px]">Archived</Badge>}
-                              {manager && <ReviewFlagBadge doc={doc} todayIso={todayIso} />}
+                              {manager && (
+                                <InFlightBadges
+                                  doc={doc}
+                                  revisions={state.revisions}
+                                  suggestions={state.suggestions}
+                                  todayIso={todayIso}
+                                  className="shrink-0"
+                                />
+                              )}
                               {manager && summary && (
                                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground" title="Read-and-acknowledge compliance">
                                   {summary.read}/{summary.total} read
@@ -323,6 +337,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
         <TabsContent value="coverage" className="mt-4">
           <ComplianceMatrix />
+        </TabsContent>
+
+        <TabsContent value="sources" className="mt-4">
+          <DocumentRegistry userRole={userRole} additionalRoles={additionalRoles} />
         </TabsContent>
 
         <TabsContent value="approvals" className="mt-4">

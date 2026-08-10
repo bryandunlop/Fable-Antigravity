@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   emptySection, editBlockMd, addBlockAfter, deleteBlock, moveBlock,
   splitBlock, mergeBlockUp, addSection, moveSection, setSectionHeading, deleteSection,
-  setBlockComplianceRefs,
+  setBlockComplianceRefs, stageSuggestion, clearStagedMark,
 } from './blockEditor';
 import type { DocSection } from '../types';
 
@@ -100,5 +100,80 @@ describe('setBlockComplianceRefs', () => {
     expect(set[0].blocks[0].complianceRefs).toEqual(['far-91-175', 'opspec-c074']);
     const cleared = setBlockComplianceRefs(set, 'b1', []);
     expect(cleared[0].blocks[0].complianceRefs).toBeUndefined();
+  });
+});
+
+describe('stageSuggestion', () => {
+  const sug = {
+    id: 'sug-001',
+    blockId: 'b1',
+    proposedChange: 'Add a gusty crosswind note',
+    authorName: 'Marco Diaz',
+  };
+
+  it('inserts a marked block immediately after its anchor, verbatim', () => {
+    const out = stageSuggestion(sections(), sug, 'staged-1');
+    expect(out[0].blocks.map((b) => b.id)).toEqual(['b1', 'staged-1', 'b2']);
+    expect(out[0].blocks[1]).toMatchObject({
+      md: 'Add a gusty crosswind note',
+      stagedFromSuggestionId: 'sug-001',
+    });
+  });
+
+  it('never rewrites the anchor block', () => {
+    const out = stageSuggestion(sections(), sug, 'staged-1');
+    expect(out[0].blocks[0]).toEqual({ id: 'b1', type: 'paragraph', md: 'First.' });
+  });
+
+  it('preserves every existing block id, so revision diffs stay precise', () => {
+    const before = sections();
+    const out = stageSuggestion(before, sug, 'staged-1');
+    for (const b of before[0].blocks) {
+      expect(out[0].blocks.some((x) => x.id === b.id)).toBe(true);
+    }
+  });
+
+  it('appends rather than dropping when the anchor was deleted in a later revision', () => {
+    const out = stageSuggestion(sections(), { ...sug, blockId: 'gone' }, 'staged-1');
+    expect(out[0].blocks.map((b) => b.id)).toEqual(['b1', 'b2', 'staged-1']);
+  });
+
+  it('appends rather than dropping when the suggestion was never anchored', () => {
+    const out = stageSuggestion(sections(), { ...sug, blockId: undefined }, 'staged-1');
+    expect(out[0].blocks.map((b) => b.id)).toEqual(['b1', 'b2', 'staged-1']);
+  });
+
+  it('does not mutate its input', () => {
+    const before = sections();
+    stageSuggestion(before, sug, 'staged-1');
+    expect(before[0].blocks).toHaveLength(2);
+  });
+});
+
+describe('clearStagedMark', () => {
+  function staged(): DocSection[] {
+    const out = stageSuggestion(sections(), {
+      id: 'sug-001', blockId: 'b1', proposedChange: 'Reader words', authorName: 'Marco Diaz',
+    }, 'staged-1');
+    return stageSuggestion(out, {
+      id: 'sug-002', blockId: 'b2', proposedChange: 'More reader words', authorName: 'Ana Reyes',
+    }, 'staged-2');
+  }
+
+  it('clears only the named block', () => {
+    const out = clearStagedMark(staged(), 'staged-1');
+    expect(out[0].blocks.find((b) => b.id === 'staged-1')?.stagedFromSuggestionId).toBeUndefined();
+    expect(out[0].blocks.find((b) => b.id === 'staged-2')?.stagedFromSuggestionId).toBe('sug-002');
+  });
+
+  it('editing a staged block clears the mark too — the usual path', () => {
+    const out = editBlockMd(staged(), 'staged-1', 'Expect gusts to 25 kt on runway 08.');
+    expect(out[0].blocks.find((b) => b.id === 'staged-1')?.stagedFromSuggestionId).toBeUndefined();
+  });
+
+  it('does not mutate its input', () => {
+    const before = staged();
+    clearStagedMark(before, 'staged-1');
+    expect(before[0].blocks.find((b) => b.id === 'staged-1')?.stagedFromSuggestionId).toBe('sug-001');
   });
 });

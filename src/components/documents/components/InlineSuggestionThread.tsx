@@ -19,7 +19,9 @@ export function InlineSuggestionThread({
   userRole: string;
   additionalRoles?: string[];
   canManage: boolean;
-  onAccept: (sug: DocSuggestion) => void; // reuses DocReader's accept→draft flow
+  /** Opens this suggestion in the document's workbench, where it is staged
+   *  into the single working draft alongside any others. */
+  onAccept: (sug: DocSuggestion) => void;
   onClose: () => void;
 }) {
   const { state, addSuggestionReply, resolveSuggestion } = useDocuments();
@@ -71,7 +73,7 @@ export function InlineSuggestionThread({
               <Button size="sm" variant="outline" onClick={() => setReplyFor(s.id)}>Reply</Button>
               {canManage && (
                 <>
-                  <Button size="sm" onClick={() => onAccept(s)}><Check className="mr-1 h-3 w-3" /> Accept → draft</Button>
+                  <Button size="sm" onClick={() => onAccept(s)}><Check className="mr-1 h-3 w-3" /> Triage in Manage</Button>
                   <Button size="sm" variant="outline" onClick={() => setDeclineFor(declineFor === s.id ? null : s.id)}>Decline</Button>
                 </>
               )}
