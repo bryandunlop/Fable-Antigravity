@@ -63,6 +63,19 @@ export function docReaderPath(docId: string): string {
   return `/documents/${docId}`;
 }
 
+/** The maintainer surface for one document — everything in flight on it.
+ * `tab` / `suggestion` let a cross-document queue land on the actual work. */
+export function docManagePath(
+  docId: string,
+  opts: { tab?: 'suggestions' | 'draft' | 'approval' | 'review' | 'history'; suggestion?: string } = {},
+): string {
+  const q = new URLSearchParams();
+  if (opts.tab) q.set('tab', opts.tab);
+  if (opts.suggestion) q.set('suggestion', opts.suggestion);
+  const qs = q.toString();
+  return `/documents/${docId}/manage${qs ? `?${qs}` : ''}`;
+}
+
 /**
  * D64 — the Ship Notes shelf's section headings, in display order.
  *
@@ -175,6 +188,32 @@ export const DOC_CLASSES: Record<string, DocumentClassConfig> = {
     commentsEnabled: false,
     defaultReviewCycleDays: 365,
     categories: ['General Operations', 'Flight Operations', 'Maintenance', 'Emergency Procedures'],
+    defaultAckDueDays: 14,
+  },
+  /**
+   * D73 — a document myGFO RECEIVED rather than authored: the D195 MEL, an FSDO
+   * LOA, an (O)/(M) procedure extract, placard wording.
+   *
+   * Its content is bytes myGFO froze and hashed, so it is not written in the
+   * block editor and there is nothing to discuss inline — but it is controlled,
+   * and a new set of bytes rides the same draft → approve → publish path as any
+   * other revision. That is the point of D73's step G: a changed source file
+   * does not become a revision on its own, or SharePoint's edit button is an
+   * unsigned publish path into an airworthiness record.
+   */
+  'received-document': {
+    id: 'received-document',
+    label: 'Received Document',
+    labelPlural: 'Received Documents',
+    idPrefix: 'RCV',
+    controlled: true,
+    defaultAckLevel: 'initials',
+    ackLevelLocked: false,
+    authorRoles: ['document-manager', 'admin'],
+    approverRoles: APPROVERS,
+    commentsEnabled: false,
+    defaultReviewCycleDays: 365,
+    categories: ['Airworthiness', 'Regulatory', 'Manufacturer', 'General Operations'],
     defaultAckDueDays: 14,
   },
   'tribal-knowledge': {

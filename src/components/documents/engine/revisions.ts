@@ -8,19 +8,26 @@ export function currentRevision(docId: string, revisions: DocRevision[]): DocRev
   return revisions.find((r) => r.docId === docId && r.status === 'published');
 }
 
-/** All revisions of a doc, newest first (by revision id sequence). */
+/** The numeric '-rN' suffix of a revision id, so r10 outranks r2. */
+function seq(r: Pick<DocRevision, 'id'>): number {
+  const m = /-r(\d+)$/.exec(r.id);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+/** All revisions of a doc, newest first by the '-rN' id sequence.
+ * (This sorted by array position — insertion order, not revision order — until
+ * 2026-08-08, disagreeing with priorPublishedRevision in this same file.) */
 export function revisionsFor(docId: string, revisions: DocRevision[]): DocRevision[] {
-  return revisions.filter((r) => r.docId === docId).slice().reverse();
+  return revisions
+    .filter((r) => r.docId === docId)
+    .slice()
+    .sort((a, b) => seq(b) - seq(a));
 }
 
 /** The superseded revision immediately before the current published one — the
  * baseline the reader diffs against. Ordered by the numeric '-rN' id suffix (so
  * r10 outranks r2), newest first. Undefined when there is no prior. */
 export function priorPublishedRevision(docId: string, revisions: DocRevision[]): DocRevision | undefined {
-  const seq = (r: DocRevision): number => {
-    const m = /-r(\d+)$/.exec(r.id);
-    return m ? parseInt(m[1], 10) : 0;
-  };
   return revisions
     .filter((r) => r.docId === docId && r.status === 'superseded')
     .slice()

@@ -28,6 +28,18 @@ export function validateSubmit(
     return { ok: false, error: 'Only a draft (or rejected draft) can be submitted for approval.' };
   }
   if (!sectionsPlainText(rev.sections).trim()) return { ok: false, error: 'Content is required before submitting.' };
+  // A staged block holds a reader's own words, carried in verbatim when their
+  // suggestion was accepted. Letting one through would put unreviewed prose into
+  // a controlled document under the author's name — so no revision reaches
+  // four-eyes until every staged change is worked into real wording.
+  const staged = rev.sections.flatMap((s) => s.blocks.filter((b) => b.stagedFromSuggestionId)).length;
+  if (staged > 0) {
+    const it = staged === 1 ? 'it' : 'them';
+    return {
+      ok: false,
+      error: `${staged} staged change${staged === 1 ? '' : 's'} still hold${staged === 1 ? 's' : ''} a reader's words — edit ${it} into the document, merge ${it} up, or remove ${it} before submitting.`,
+    };
+  }
   if (hasPriorPublished && !rev.changeSummary.trim()) {
     return { ok: false, error: 'A "what changed" summary is required when re-issuing a published document.' };
   }

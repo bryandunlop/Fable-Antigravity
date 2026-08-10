@@ -7,7 +7,11 @@ import type { Signature, AircraftType, CasColor } from '../tech-log/types';
 import { SEED_BULLETINS } from '../bulletins/mockData';
 import { bulletinToDocAndRevision } from './engine/bulletinCompat';
 import { mockSha256 } from '../tech-log/engine/signing';
-import { sectionsFromMarkdown, checksumForSections } from './engine/blocks';
+import { sectionsFromMarkdown, checksumForSections, contentFieldsFromMarkdown } from './engine/blocks';
+import { receivedPlaceholderSections } from './engine/provenance';
+import {
+  MEL_DEMO_BLOB_KEY, MEL_DEMO_BYTE_LENGTH, MEL_DEMO_FILENAME, MEL_DEMO_SHA256,
+} from './store/demoSeedBlob';
 import { stepFormToSections, type StepFormModel } from './engine/stepForm';
 import { applyComplianceRefs } from './engine/regCatalog';
 import { operatorTodayIso } from '../../lib/operatorDate';
@@ -855,6 +859,132 @@ export function cabinKnowledgeSeed(): { docs: Doc[]; revisions: DocRevision[] } 
   return { docs: CABIN_SEEDS.map(cabinSeedDoc), revisions: CABIN_SEEDS.map(cabinSeedRevision) };
 }
 
+/**
+ * D73 seeds — the two ways myGFO holds a document it did not author, so the
+ * distinction is visible in the demo rather than described in a doc.
+ *
+ * RCV-001 is the ingest branch: the D195 MEL, held as bytes because it must be
+ * producible onboard. RCV-002 is the pointer branch: an OEM catalogue nobody
+ * signs and nobody carries, so myGFO stores a link and says plainly that it is
+ * not available offline.
+ *
+ * RCV-001 ships with REAL bytes and their TRUE digest (store/demoSeedBlob,
+ * pinned by its test). A seeded hash that backed no file would be exactly the
+ * failure this feature must not have — a digest labelled "computed by myGFO"
+ * with nothing behind it.
+ */
+const melAttachment = {
+  blobKey: MEL_DEMO_BLOB_KEY,
+  filename: MEL_DEMO_FILENAME,
+  mimeType: 'application/pdf',
+  byteLength: MEL_DEMO_BYTE_LENGTH,
+  sha256: MEL_DEMO_SHA256,
+};
+
+const melProvenance = {
+  origin: 'received-copy' as const,
+  attachment: melAttachment,
+  ingestedAtUtc: daysFromNow(-24) + 'T14:10:00.000Z',
+  ingestedByUserId: 'USR005',
+  ingestedByName: 'Lisa Anderson',
+  sourceLabel: 'P&G SharePoint — Flight Ops / MEL',
+  carriageReason: 'required-onboard' as const,
+};
+
+const rcv1Sections = receivedPlaceholderSections('RCV-001', melAttachment, melProvenance);
+
+const rcv1r1: DocRevision = {
+  id: 'RCV-001-r1',
+  docId: 'RCV-001',
+  revision: '15',
+  status: 'published',
+  sections: rcv1Sections,
+  changeSummary: '',
+  effectiveDate: daysFromNow(-24),
+  authorUserId: 'USR005',
+  authorName: 'Lisa Anderson',
+  requireAcknowledgment: true,
+  ackLevel: 'initials',
+  ackDueDate: daysFromNow(-10),
+  mockChecksum: checksumForSections(rcv1Sections),
+  publishedAtUtc: daysFromNow(-24) + 'T14:30:00.000Z',
+  provenance: melProvenance,
+};
+
+const catalogueSections = contentFieldsFromMarkdown(
+  'The G650ER illustrated parts catalogue is published by Gulfstream and read in their portal. '
+  + 'myGFO records where it lives so it can be found from here; it is not carried on the aircraft '
+  + 'and nothing in myGFO attests its content.',
+  'RCV-002',
+);
+
+const rcv2r1: DocRevision = {
+  id: 'RCV-002-r1',
+  docId: 'RCV-002',
+  revision: '2026-06',
+  status: 'published',
+  ...catalogueSections,
+  changeSummary: '',
+  effectiveDate: daysFromNow(-60),
+  authorUserId: 'USR005',
+  authorName: 'Lisa Anderson',
+  requireAcknowledgment: false,
+  ackLevel: 'none',
+  publishedAtUtc: daysFromNow(-60) + 'T09:00:00.000Z',
+  provenance: {
+    origin: 'external-pointer' as const,
+    sourceLabel: 'myGulfstream technical publications portal',
+  },
+};
+
+const RECEIVED_SEED_DOCS: Doc[] = [
+  {
+    id: 'RCV-001',
+    classId: 'received-document',
+    title: 'D195 Master Minimum Equipment List',
+    category: 'Airworthiness',
+    roles: ['all'],
+    ownerUserId: 'USR005',
+    ownerName: 'Lisa Anderson',
+    tags: ['MEL', 'deferrals', 'carriage'],
+    isPinned: true,
+    isArchived: false,
+    reviewCycleDays: 365,
+    nextReviewDate: daysFromNow(341),
+    createdDate: '2025-06-01',
+    source: {
+      kind: 'sharepoint',
+      driveId: 'b!demo-flightops-drive',
+      itemId: '01DEMOMELITEM',
+      label: 'P&G SharePoint — Flight Ops / MEL',
+      lastConfirmedAtUtc: daysFromNow(-24) + 'T14:10:00.000Z',
+      lastConfirmedByUserId: 'USR005',
+      lastConfirmedByName: 'Lisa Anderson',
+    },
+  },
+  {
+    id: 'RCV-002',
+    classId: 'received-document',
+    title: 'G650ER Illustrated Parts Catalogue',
+    category: 'Manufacturer',
+    roles: ['maintenance', 'dom', 'lead', 'admin'],
+    ownerUserId: 'USR005',
+    ownerName: 'Lisa Anderson',
+    tags: ['OEM', 'parts'],
+    isPinned: false,
+    isArchived: false,
+    createdDate: '2025-03-01',
+    source: {
+      kind: 'vendor-portal',
+      webUrl: 'https://my.gulfstream.com/',
+      label: 'myGulfstream technical publications portal',
+      lastConfirmedAtUtc: daysFromNow(-60) + 'T09:00:00.000Z',
+      lastConfirmedByUserId: 'USR005',
+      lastConfirmedByName: 'Lisa Anderson',
+    },
+  },
+];
+
 const SEED_DOCS: Doc[] = [
   {
     id: 'SOP-001',
@@ -951,10 +1081,13 @@ const SEED_DOCS: Doc[] = [
     // D65 — the fleet tag this entry needed now lives on `tk2r1`, its published revision.
   },
   ...casKnowledgeSeed().docs,
+  ...RECEIVED_SEED_DOCS,
 ];
 
 const SEED_REVISIONS: DocRevision[] = [
   sop1r1, sop1r2, sop2r1, sop3r1, gom3r1, gomSmsR1, tk1r1, tk2r1,
+  // D73 — the two ways myGFO holds a document it did not author.
+  rcv1r1, rcv2r1,
   // D60 CAS knowledge — a fresh install gets these here; an existing store gets them
   // from the version-keyed migration step (engine/migrations.ts).
   ...casKnowledgeSeed().revisions,
