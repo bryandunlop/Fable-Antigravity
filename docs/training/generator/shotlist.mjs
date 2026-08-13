@@ -209,10 +209,10 @@ export const SHOTS = [
   // ───────────────────────── LEAD TEAM ─────────────────────────
   { role: 'lead', path: '/lead-dashboard', id: 'lead-dashboard', calls: [
     { n: 1, find: 'Active Flights' }, { n: 2, find: 'DELAY ALERTS' },
-    { n: 3, find: 'Tracked Passengers' }, { n: 5, find: 'Manager Insights', place: 'tr' },
+    { n: 3, find: 'Tracked Passengers' }, { n: 4, find: 'Manager Insights', place: 'tr' },
   ]},
   { role: 'lead', path: '/lead-dashboard', id: 'lead-dashboard-b', scrollTo: 'Aircraft Status', calls: [
-    { n: 4, find: 'Aircraft Status' },
+    { n: 5, find: 'Aircraft Status' },
   ]},
   { role: 'lead', path: '/manager-insights', id: 'lead-manager-insights', calls: [
     { n: 1, find: 'Operations Analytics' }, { n: 2, find: 'On-Time Rate' },

@@ -1231,7 +1231,7 @@ export const DOCS = [
             [1, 'Headline counters: active flights, aircraft available, tracked passengers, active alerts.'],
             [2, 'Delay Alerts — station, cause, affected flight and delay in minutes.'],
             [3, 'Tracked Passengers — VIPs with their current flight and its state.'],
-            [5, 'Manager Insights — the route through to deep-dive analytics.'],
+            [4, 'Manager Insights — the route through to deep-dive analytics.'],
           ],
         },
       },
@@ -1244,7 +1244,7 @@ export const DOCS = [
           id: 'lead-dashboard-b',
           caption: 'Lead Dashboard — fleet status with hours to next inspection.',
           calls: [
-            [4, 'Aircraft Status — state, location, and hours to next inspection per tail.'],
+            [5, 'Aircraft Status — state, location, and hours to next inspection per tail.'],
           ],
         },
       },
