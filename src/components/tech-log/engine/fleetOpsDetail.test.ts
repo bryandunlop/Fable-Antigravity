@@ -71,6 +71,39 @@ describe('summarizeFleetOpsDetail', () => {
     expect(row.deferralClock!.daysRemaining).toBe(3);
   });
 
+  it('an extended (superseded) deferral clock reads the SUPERSEDING row, not the stale original', () => {
+    // buildExtension supersedes with {...original, supersedesId, later due} — both rows read
+    // ACTIVE in state.deferrals, so a raw filter picks the stale pre-extension clock (review
+    // finding: every sibling consumer wraps state.deferrals in currentRows() first).
+    const original = deferral({ repairDueDateUtc: '2026-06-24T00:00:00Z' });
+    const extended = deferral({
+      id: 'df1-ext', supersedesId: 'df1', repairDueDateUtc: '2026-07-04T00:00:00Z',
+      repairIntervalValue: 20, extensionUsed: true,
+    });
+    const [row] = summarizeFleetOpsDetail(
+      { ...base, defects: [defect({ status: 'DEFERRED' })], deferrals: [original, extended] },
+      NOW,
+    );
+    expect(row.status).toBe('AMBER');
+    expect(row.deferralClock!.repairDueDateUtc).toBe('2026-07-04T00:00:00Z');
+    expect(row.deferralClock!.daysRemaining).toBe(13);
+    expect(row.deferralClock!.intervalDays).toBe(20);
+  });
+
+  it('RED via an expired/never-done recurring check surfaces the CHECK as the headline', () => {
+    const check = {
+      id: 'chk1', aircraftId: 'ac1', name: 'Transponder test (91.413)', intervalUnit: 'MONTH' as const,
+      intervalValue: 24, ataChapter: '34', active: true, createdAtUtc: NOW,
+    };
+    const [row] = summarizeFleetOpsDetail(
+      { ...base, defects: [], deferrals: [], recurringChecks: [check], recurringAccomplishments: [] },
+      NOW,
+    );
+    expect(row.status).toBe('RED');
+    expect(row.headline).toBe('Transponder test (91.413)');
+    expect(row.ataChapter).toBe('34');
+  });
+
   it('carries the base airworthiness fields (superset of FleetAirworthinessEntry)', () => {
     const [row] = summarizeFleetOpsDetail({ ...base, defects: [defect()], deferrals: [] }, NOW);
     expect(row.tailNumber).toBe('N5PG');

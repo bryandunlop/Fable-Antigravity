@@ -6,6 +6,7 @@
 
 import type { AircraftType, MelCategory, Serviceability, TechLogState } from '../types';
 import { deriveServiceability } from './serviceability';
+import { currentRows } from './supersede';
 
 export interface FleetOpsDeferralClock {
   category: MelCategory | null;
@@ -52,11 +53,21 @@ export function summarizeFleetOpsDetail(state: OpsState, asOfUtc: string): Fleet
         state.defects.find(d => d.id === r.drivingDefectId) ??
         // Rule-2 RED (expired deferral): surface the deferral's underlying defect.
         state.defects.find(d => d.id === state.deferrals.find(df => df.id === r.drivingDeferralId)?.defectId);
-      headline = driving?.description ?? null;
-      ataChapter = driving?.ataChapter ?? null;
+      if (driving) {
+        headline = driving.description;
+        ataChapter = driving.ataChapter ?? null;
+      } else {
+        // Rule-3 RED: an expired/never-done recurring dispatch-gating check (§17.4)
+        // grounds with no defect row at all — surface the check, not a generic label.
+        const check = (state.recurringChecks ?? []).find(c => c.id === r.drivingCheckId);
+        headline = check?.name ?? null;
+        ataChapter = check?.ataChapter ?? null;
+      }
     } else if (r.status === 'AMBER') {
       // The governing clock is the soonest-due ACTIVE deferral for this tail.
-      const active = state.deferrals
+      // currentRows first: an extension supersedes with a same-status row, and the
+      // raw array would hand the stale pre-extension clock to every card and wall.
+      const active = currentRows(state.deferrals)
         .filter(df => df.aircraftId === ac.id && df.status === 'ACTIVE')
         .sort((a, b) => Date.parse(a.repairDueDateUtc ?? '9999-12-31') - Date.parse(b.repairDueDateUtc ?? '9999-12-31'));
       const governing = active[0];
