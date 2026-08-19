@@ -10,23 +10,23 @@ import { newId } from '../tech-log/util/id';
 import { deriveTripReadiness } from '../tech-log/engine/readiness';
 import { deriveSchedulingReadiness } from '../../scheduling/engine/readiness';
 import { deriveCustody, type CustodyState } from '../tech-log/engine/custody';
+import { deriveServiceability } from '../tech-log/engine/serviceability';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { Bell, CalendarRange, Timer } from 'lucide-react';
 import { composePilotReadiness, type PilotReadiness } from './selectors';
 import { deriveTripModules, totalOutstanding } from './moduleStatus';
-import { currentLegIndex, selectedLegIndex } from './legContext';
 import ReadinessPill from './ReadinessPill';
 import MessagesPanel from './panels/MessagesPanel';
 import { ModuleCard } from './panels/ModuleCard';
 import { HandoverCard } from './panels/HandoverCard';
 import TripBriefPanel from './panels/TripBriefPanel';
-import { LegStepper } from './panels/LegStepper';
 import { LegFuelSection } from './panels/LegFuelSection';
-import { LegDayOfSection } from './panels/LegDayOfSection';
 import { LegFratSection } from './panels/LegFratSection';
+import { DayOfPane } from './panels/DayOfPane';
+import { deriveDayOfQueue, beforePushProgress, type QueueItem } from './dayOfQueue';
 import { PrepMatrix } from './panels/PrepMatrix';
 import { derivePrepRows, prepOutstanding, prepLocked } from './prepMatrix';
-import { derivePaneMode, type PaneMode } from './paneMode';
+import { derivePaneMode, nextDepartureUtc, type PaneMode } from './paneMode';
 import { LogNuisanceItemDialog } from './panels/LogNuisanceItemDialog';
 import type { TripRecord } from '../../scheduling/store/types';
 
@@ -83,11 +83,11 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   const legs = tlTrip?.legs ?? [];
 
   const now = nowUtc();
-  const currentIdx = currentLegIndex(legs, now);
-  // Selected leg + airport drawer live in the URL (?leg, ?airport) so the pilot's place survives any
-  // navigation away and back. Absent ?leg auto-follows the current (first-not-departed) leg.
-  const selectedIdx = selectedLegIndex(legs, searchParams.get('leg'), currentIdx);
-  const selectedLeg = legs[selectedIdx];
+  // `?leg` is gone with the leg stepper (D84 slice 3): neither pane has a "selected leg" any more.
+  // The prep matrix addresses every leg at once, and the day-of queue is ordered by clock across
+  // legs — so the thing the URL used to remember no longer exists. Every panel that DOES open for a
+  // single leg names it in its own param (?frat, ?fuel, ?airport), which is what actually survives
+  // navigating away and back.
   const airportLeg = legs.find((l) => l.id === searchParams.get('airport'));
   // Maintenance handover accept lives in the URL too (?handover), so the pilot's place — including a
   // half-completed accept — survives navigating away and back, exactly like the airport drawer.
@@ -106,6 +106,12 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   const rawMode = searchParams.get('mode');
   const paneMode = derivePaneMode(legs, now, rawMode === 'prep' || rawMode === 'day-of' ? rawMode : undefined);
   const prepRows = derivePrepRows(tlTrip, tlAc, now);
+  const queue = deriveDayOfQueue(tlTrip, tlAc, now);
+  const progress = beforePushProgress(tlTrip, tlAc, now);
+  const nextDepUtc = nextDepartureUtc(legs, now);
+  const nextLeg = legs.find((l) => l.departureTimeUtc === nextDepUtc);
+  const openQueueItem = (i: QueueItem) =>
+    setParam(i.kind === 'airport' ? 'airport' : i.kind, i.legId);
 
   const setParam = (key: string, value: string | null) =>
     setSearchParams((prev) => {
@@ -113,8 +119,6 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
       if (value === null) p.delete(key); else p.set(key, value);
       return p;
     }, { replace: true });
-  // Pinning the current leg clears the param so day-of auto-follow resumes.
-  const selectLeg = (i: number) => setParam('leg', i === currentIdx ? null : legs[i]?.id ?? null);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,10 +132,12 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   }, [store, tick, state, trip]);
 
   const modules = deriveTripModules(tlTrip, tlAc, state, readiness?.scheduling, now);
-  const [fratStatus, fuelStatus, handoverStatus, schedulingStatus] = modules;
+  const [, , handoverStatus, schedulingStatus] = modules;
   // Custody is aircraft-keyed (by tail) — shown whenever the trip's aircraft is known, matching the
   // handover card and pill, which reflect real custody even before the trip is released to preflight.
   const custody = tlAc ? deriveCustody(tlAc.id, state, now).state : undefined;
+  const svStatus = tlAc ? deriveServiceability(tlAc.id, state, now).status : 'GREEN';
+  const activeDeferrals = tlAc ? state.deferrals.filter((d) => d.aircraftId === tlAc.id && d.status === 'ACTIVE').length : 0;
   const outstanding = totalOutstanding(modules);
 
   return (
@@ -187,32 +193,28 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         </>
       ) : (
       <>
-      {tlTrip && legs.length > 1 && (
-        <LegStepper legs={legs} currentIndex={currentIdx < 0 ? 0 : currentIdx} selectedIndex={selectedIdx}
-          officeTzOffsetMinutes={officeTzOffsetMinutes} onSelect={selectLeg} />
-      )}
-
-      {/* Four-module board — landscape: 2×2; portrait: stacked. D84 slice 3 replaces this with the
-          countdown + clock-ranked queue; until then day-of keeps the board it has always had. */}
-      <div className="grid grid-cols-1 gap-3 landscape:grid-cols-2">
-        <ModuleCard status={fratStatus}>
-          {tlTrip && selectedLeg
-            ? <LegDayOfSection tlTrip={tlTrip} leg={selectedLeg} tripNumber={trip.tripNumber}
-                onOpenAirport={() => setParam('airport', selectedLeg.id)} />
-            : <p className="text-sm text-muted-foreground">Not released to preflight yet.</p>}
-        </ModuleCard>
-        <ModuleCard status={fuelStatus}>
-          {tlTrip && selectedLeg
-            ? <LegFuelSection tlTrip={tlTrip} leg={selectedLeg} />
-            : <p className="text-sm text-muted-foreground">Not released to preflight yet.</p>}
-        </ModuleCard>
-        <ModuleCard status={handoverStatus}>
-          <HandoverCard trip={trip} onOpenHandover={() => setParam('handover', '1')} />
-        </ModuleCard>
+        {/* DAY-OF PANE — the four-module board is gone. Inside T-4h the only useful ordering is
+            time, and four equal boxes left the pilot to work out which mattered next. */}
+        <DayOfPane
+          nowUtc={now}
+          nextDepartureUtc={nextDepUtc}
+          route={nextLeg ? { from: nextLeg.departureIcao, to: nextLeg.arrivalIcao } : undefined}
+          legSequence={nextLeg?.sequence}
+          legCount={legs.length}
+          progress={progress}
+          queue={queue}
+          serviceability={svStatus}
+          custody={custody}
+          deferralCount={activeDeferrals}
+          onOpenHandover={() => setParam('handover', '1')}
+          onOpenItem={openQueueItem}
+        />
+        {/* Scheduling survives the board as a single card. The queue is pilot-ACTIONABLE items, and
+            an operator item still in progress (customs, a permit) is neither actionable nor
+            droppable — losing a whole information source silently is the worse error. */}
         <ModuleCard status={schedulingStatus}>
           <TripBriefPanel trip={trip} userRole={userRole} />
         </ModuleCard>
-      </div>
       </>
       )}
 

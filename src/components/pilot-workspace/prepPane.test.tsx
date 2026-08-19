@@ -12,8 +12,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
  * own contents are covered by prepMatrix.test.ts, and the clock by paneMode.test.ts.
  */
 vi.mock('./panels/PrepMatrix', () => ({ PrepMatrix: () => <div data-testid="prep-matrix" /> }));
-vi.mock('./panels/LegStepper', () => ({ LegStepper: () => <div data-testid="leg-stepper" /> }));
-vi.mock('./panels/LegDayOfSection', () => ({ LegDayOfSection: () => <div data-testid="day-of-section" /> }));
+vi.mock('./panels/DayOfPane', () => ({ DayOfPane: () => <div data-testid="day-of-pane" /> }));
 vi.mock('./panels/LegFratSection', () => ({ LegFratSection: () => null }));
 vi.mock('./panels/LegFuelSection', () => ({ LegFuelSection: () => null }));
 vi.mock('./panels/HandoverCard', () => ({ HandoverCard: () => <div data-testid="handover-card" /> }));
@@ -70,13 +69,12 @@ describe('prep vs day-of pane (D84)', () => {
     // still the right instrument.
     renderAt('');
     expect(screen.getByTestId('prep-matrix')).toBeInTheDocument();
-    expect(screen.queryByTestId('leg-stepper')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('day-of-pane')).not.toBeInTheDocument();
   });
 
-  it('opens in day-of once inside T-4h: stepper and board, no matrix', () => {
+  it('opens the day-of pane inside T-4h, and never both panes at once', () => {
     renderAt('?mode=day-of');
-    expect(screen.getByTestId('leg-stepper')).toBeInTheDocument();
-    expect(screen.getByTestId('day-of-section')).toBeInTheDocument();
+    expect(screen.getByTestId('day-of-pane')).toBeInTheDocument();
     expect(screen.queryByTestId('prep-matrix')).not.toBeInTheDocument();
   });
 
@@ -85,13 +83,19 @@ describe('prep vs day-of pane (D84)', () => {
     // wearing the new one's clothes.
     renderAt('?mode=prep');
     expect(screen.getByTestId('prep-matrix')).toBeInTheDocument();
-    expect(screen.queryByTestId('leg-stepper')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('day-of-section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('day-of-pane')).not.toBeInTheDocument();
   });
 
   it('keeps the per-TRIP cards in prep, because a per-leg matrix cannot hold them', () => {
     renderAt('?mode=prep');
     expect(screen.getByTestId('handover-card')).toBeInTheDocument();
+    expect(screen.getByTestId('scheduling-card')).toBeInTheDocument();
+  });
+
+  it('keeps Scheduling in day-of too — the queue is actionable items, not every information source', () => {
+    // An operator item still in progress (customs, a permit) is neither pilot-actionable nor
+    // droppable. Losing a whole information source silently is the worse error.
+    renderAt('?mode=day-of');
     expect(screen.getByTestId('scheduling-card')).toBeInTheDocument();
   });
 
