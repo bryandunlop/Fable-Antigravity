@@ -61,7 +61,7 @@ function dotClass(state: StepState): string {
 export function ChainStrip({ req, className = '' }: { req: ApprovalRequest; className?: string }) {
   const nodes = chainNodes(req);
   return (
-    <ol className={`flex items-center gap-0 flex-wrap ${className}`} aria-label="Approval chain">
+    <ol className={`flex items-start sm:items-center gap-2 sm:gap-0 flex-col sm:flex-row sm:flex-wrap ${className}`} aria-label="Approval chain">
       {nodes.map((n, i) => {
         const Icon = ICON[n.state];
         return (
@@ -77,7 +77,11 @@ export function ChainStrip({ req, className = '' }: { req: ApprovalRequest; clas
                 <span className="block text-[11px] text-muted-foreground mt-px">{n.sub}</span>
               </span>
             </div>
-            {i < nodes.length - 1 && <span className="w-8 h-px bg-border mx-3 shrink-0" aria-hidden />}
+            {/* The connector is decoration between nodes on one line. Once the
+                strip wraps — which it always does on a phone — a dash hanging
+                off the end of each row points at nothing, so it is dropped
+                below sm and the nodes read as a stacked list instead. */}
+            {i < nodes.length - 1 && <span className="hidden sm:block w-8 h-px bg-border mx-3 shrink-0" aria-hidden />}
           </li>
         );
       })}

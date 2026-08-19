@@ -15,8 +15,8 @@ import { SubmissionsArchive } from './SubmissionsArchive';
 import { PublishedArea } from './PublishedArea';
 import { FormManager } from './FormManager';
 import { OperationsAudits, MyAudits, auditsForMe } from './AuditsArea';
-import { ReviewsArea } from './ReviewsArea';
 import { DecideArea } from './DecideArea';
+import { AsapReview } from './AsapReview';
 import { RequiredReadsList } from '../documents/components/RequiredReadsList';
 import { useDocuments, identityFor } from '../documents/DocumentsContext';
 import { unacknowledgedRequiredReads } from '../documents/engine/acknowledgments';
@@ -56,6 +56,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const [searchParams, setSearchParams] = useSearchParams();
   const door = (searchParams.get('door') as Door | null);
   const [selected, setSelected] = useState<SafetyItem | null>(null);
+  const [asapId, setAsapId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [knowOpen, setKnowOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -134,7 +135,15 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     if (d) setSearchParams({ door: d });
     else setSearchParams({});
   }
-  function open(item: SafetyItem) { setSelected(item); setDetailOpen(true); }
+  // ASAP has its own detail surface, and must keep it: the sheet carries the
+  // confidentiality banner and the de-identification step, and the generic
+  // detail sheet has neither. Routing an ASAP card into the generic sheet would
+  // quietly drop both.
+  function open(item: SafetyItem) {
+    if (item.type === 'ASAP' && item.sourceId) { setAsapId(item.sourceId); return; }
+    setSelected(item);
+    setDetailOpen(true);
+  }
   function toggleDone(id: string) {
     setDoneSet((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
@@ -411,17 +420,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
               ? <CaseBoard items={model.ops.move} onOpen={open} />
               : <CaseQueue items={model.ops.move} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
                   emptySmall="No new reports need you right now." />)}
-            {verb === 'decide' && (
-              <>
-                <DecideArea userRole={userRole} additionalRoles={additionalRoles} actorName={CURRENT_USER.name} />
-                {/* The FRAT/GRAT/ASAP consoles are still their own surfaces; C5
-                    replaced only the approval half of the old Reviews tab. */}
-                <div className="mt-8 pt-6 border-t border-border">
-                  <div className="gfo-eyebrow mb-1">Assessment reviews</div>
-                  <ReviewsArea userRole={userRole} additionalRoles={additionalRoles} />
-                </div>
-              </>
-            )}
+            {verb === 'decide' && <DecideArea userRole={userRole} additionalRoles={additionalRoles} actorName={CURRENT_USER.name} />}
             {verb === 'investigate' && (shape === 'board'
               ? <CaseBoard items={atPhase(model.ops.track, 1)} onOpen={open} />
               : <CaseQueue items={atPhase(model.ops.track, 1)} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
@@ -437,6 +436,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         </div>
       )}
 
+      <AsapReview selectedId={asapId} onSelectedIdChange={setAsapId} hideList />
       <ItemDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} onAdvance={advanceHazard} onOpenWorkflow={openWorkflow} />
       <NotificationsPanel items={knowItems} open={knowOpen} onOpenChange={setKnowOpen} />
       <ReportDialog open={reportOpen} onOpenChange={setReportOpen} initialKind={reportKind} onFiled={handleFiled} />

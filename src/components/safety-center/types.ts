@@ -146,7 +146,6 @@ export interface SafetyModel {
   ops: { move: SafetyItem[]; track: SafetyItem[]; done: SafetyItem[] };
   submissions: SafetyItem[];      // every record ever filed — the SM archive
   published: PublishedReport[];   // de-identified lessons-learned library
-  know: KnowItem[];
 }
 
 export type SafetyView = 'my' | 'ops';

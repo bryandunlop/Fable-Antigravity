@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildSafetyModel, hazardToItem, phaseIndexOf, ageInStage } from './useSafetyModel';
+import type { AsapReport } from './asapReports';
+import { buildSafetyModel, hazardToItem, phaseIndexOf, ageInStage, asapToItem } from './useSafetyModel';
 import { WORKFLOW_STAGES, type Hazard } from '../../contexts/HazardContext';
 
 function makeHazard(over: Partial<Hazard>): Hazard {
@@ -100,7 +101,6 @@ describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
     expect(m.ops.move).toEqual([]);
     expect(m.ops.track).toEqual([]);
     expect(m.ops.done).toEqual([]);
-    expect(m.know).toEqual([]);
   });
 
   it("puts the reporter's own open hazard in my.waiting and the ops inbox", () => {
@@ -151,5 +151,84 @@ describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
     expect(m.submissions.length).toBeGreaterThan(0);
     expect(m.published.length).toBeGreaterThan(0);
     expect(m.submissions.every((s) => s.bucket === 'done')).toBe(true);
+  });
+});
+
+// ── D85 · C7: ASAP reports ride the same surfaces as hazards ────────────────
+// They used to be reachable only from a sub-tab, so a safety manager had to
+// remember to go and look. The confidentiality rule travels with them.
+
+describe('asapToItem', () => {
+  const rep = (over: Partial<AsapReport> = {}): AsapReport => ({
+    id: 'ASAP-2026-014', phase: 'Approach', airport: 'KTEB',
+    description: 'Went around.', contributing: '', severity: 'Medium',
+    submittedAt: new Date().toISOString(), status: 'Open', deidentified: true,
+    ...over,
+  });
+
+  it('never carries a reporter identity — ASAP is non-punitive and confidential', () => {
+    const i = asapToItem(rep());
+    expect(i.submittedBy).toBe('Confidential');
+    // and nothing else on the item may leak one
+    expect(JSON.stringify(i)).not.toMatch(/Dunlop|Ellis|Smith/);
+  });
+
+  it('routes Open to triage, Under review to the tracked phase, Resolved to done', () => {
+    expect(asapToItem(rep({ status: 'Open' })).bucket).toBe('move');
+    expect(asapToItem(rep({ status: 'Under review' })).bucket).toBe('track');
+    expect(asapToItem(rep({ status: 'Resolved' })).bucket).toBe('done');
+  });
+
+  it('lands on the same phase indices the hazard board groups by', () => {
+    expect(asapToItem(rep({ status: 'Open' })).phaseIndex).toBe(0);
+    expect(asapToItem(rep({ status: 'Under review' })).phaseIndex).toBe(1);
+  });
+
+  it('titles the card by phase and airport, not by a person', () => {
+    expect(asapToItem(rep()).title).toBe('Approach · KTEB');
+  });
+
+  it('carries a numeric age so the board can bucket it', () => {
+    const old = asapToItem(rep({ submittedAt: '2026-01-01T00:00:00Z' }));
+    expect(typeof old.ageDays).toBe('number');
+    expect(old.ageDays!).toBeGreaterThan(0);
+  });
+
+  it('marks a long-open report stalled, the same as a hazard', () => {
+    const old = rep({ submittedAt: new Date(Date.now() - 45 * 86_400_000).toISOString() });
+    expect(asapToItem(old).stalled).toBe(true);
+  });
+
+  it('never marks a resolved report stalled, however old', () => {
+    const old = rep({ status: 'Resolved', submittedAt: '2020-01-01T00:00:00Z' });
+    expect(asapToItem(old).stalled).toBe(false);
+  });
+
+  it('keeps its own id so the card can open the ASAP sheet', () => {
+    expect(asapToItem(rep()).sourceId).toBe('ASAP-2026-014');
+    expect(asapToItem(rep()).type).toBe('ASAP');
+  });
+});
+
+describe('buildSafetyModel with ASAP', () => {
+  const asap = (id: string, status: AsapReport['status']): AsapReport => ({
+    id, phase: 'Cruise', airport: 'KTEB', description: 'x', contributing: '',
+    severity: 'Low', submittedAt: new Date().toISOString(), status, deidentified: true,
+  });
+
+  it('puts open ASAP reports in the triage bucket beside hazards', () => {
+    const m = buildSafetyModel([], [asap('A1', 'Open'), asap('A2', 'Under review')]);
+    expect(m.ops.move.map((i) => i.sourceId)).toContain('A1');
+    expect(m.ops.track.map((i) => i.sourceId)).toContain('A2');
+  });
+
+  it('includes them in the records archive', () => {
+    const m = buildSafetyModel([], [asap('A1', 'Resolved')]);
+    expect(m.submissions.some((i) => i.sourceId === 'A1')).toBe(true);
+  });
+
+  it('still works when no ASAP reports are passed at all', () => {
+    expect(() => buildSafetyModel([], [])).not.toThrow();
+    expect(buildSafetyModel([]).ops.move).toEqual([]);
   });
 });

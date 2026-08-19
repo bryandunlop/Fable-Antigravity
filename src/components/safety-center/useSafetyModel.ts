@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import { differenceInCalendarDays } from 'date-fns';
 import { useHazards, WORKFLOW_STAGES, type Hazard } from '../../contexts/HazardContext';
+import { useAsapReports, type AsapReport } from './asapReports';
 import type { PublishedReport, SafetyItem, SafetyModel, StatusChip, ThreadMsg } from './types';
 import { MOCK_SUBMISSIONS, MOCK_PUBLISHED } from './forms';
 
@@ -112,6 +113,40 @@ export function hazardToItem(h: Hazard): SafetyItem {
   };
 }
 
+/** ASAP reports are reports, and they were reachable only from a sub-tab — a
+ *  safety manager had to REMEMBER to go and look. They now ride the same Triage
+ *  and Investigate surfaces as hazards.
+ *
+ *  ASAP is non-punitive and confidential: the store deliberately holds no
+ *  reporter identity, and nothing here may invent one. The card shows the phase
+ *  and airport, never a person, and opening it goes to the ASAP sheet with its
+ *  de-identification step rather than the generic detail sheet. */
+export function asapToItem(r: AsapReport): SafetyItem {
+  const phase = r.status === 'Open' ? 0 : r.status === 'Under review' ? 1 : 4;
+  const closed = phase === 4;
+  const age = Math.max(0, differenceInCalendarDays(new Date(), new Date(r.submittedAt)));
+  return {
+    id: `asap-${r.id}`,
+    type: 'ASAP',
+    bucket: closed ? 'done' : phase === 0 ? 'move' : 'track',
+    sourceId: r.id,
+    ref: r.id,
+    title: `${r.phase} · ${r.airport}`,
+    sub: r.deidentified ? 'De-identified' : 'Contains raw detail',
+    phaseIndex: phase,
+    stalled: !closed && age > STALL_DAYS,
+    ageDays: age,
+    ageLabel: closed ? '' : `${age} day${age === 1 ? '' : 's'} old`,
+    // Never a name. ASAP confidentiality is the whole point of the programme.
+    submittedBy: 'Confidential',
+    date: r.submittedAt.slice(0, 10),
+    when: closed ? r.submittedAt.slice(0, 10) : undefined,
+    status: { label: r.status, tone: r.status === 'Resolved' ? 'green' : r.status === 'Open' ? 'amber' : 'neutral' },
+    mine: r.status === 'Open',
+    nextAction: 'Review',
+  };
+}
+
 // Demo identity — matches the reporter stamped by SafetyCenter.handleFiled.
 const REPORTER = 'Capt. Dunlop';
 
@@ -140,7 +175,7 @@ function hazardToWaitingItem(h: Hazard): SafetyItem {
   };
 }
 
-export function buildSafetyModel(hazards: Hazard[], extraMove: SafetyItem[] = []): SafetyModel {
+export function buildSafetyModel(hazards: Hazard[], asap: AsapReport[] = []): SafetyModel {
   // Dedup by id defensively — the persisted hazard store can carry duplicate
   // rows after a multi-instance localStorage race (see HazardContext load/merge).
   const seen = new Set<string>();
@@ -150,9 +185,11 @@ export function buildSafetyModel(hazards: Hazard[], extraMove: SafetyItem[] = []
     return true;
   });
   const hz = live.map(hazardToItem);
-  const hzMove = hz.filter((i) => i.bucket === 'move');
-  const hzTrack = hz.filter((i) => i.bucket === 'track');
-  const hzDone = hz.filter((i) => i.bucket === 'done');
+  const asapItems = (asap || []).map(asapToItem);
+  const all = [...hz, ...asapItems];
+  const hzMove = all.filter((i) => i.bucket === 'move');
+  const hzTrack = all.filter((i) => i.bucket === 'track');
+  const hzDone = all.filter((i) => i.bucket === 'done');
   // Crew: my own open reports (visible as "with the safety team").
   const myWaiting = live
     .filter((h) => !h.isAnonymous && h.reportedBy === REPORTER && phaseIndexOf(h.workflowStage) < 4)
@@ -160,7 +197,7 @@ export function buildSafetyModel(hazards: Hazard[], extraMove: SafetyItem[] = []
   const myDone = hzDone.filter((i) => i.submittedBy === REPORTER);
 
   // Submissions archive = every hazard (any state) + seeded non-hazard history.
-  const submissions: SafetyItem[] = [...hz, ...MOCK_SUBMISSIONS]
+  const submissions: SafetyItem[] = [...hz, ...asapItems, ...MOCK_SUBMISSIONS]
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   // Published library = de-identified final reports.
@@ -179,7 +216,9 @@ export function buildSafetyModel(hazards: Hazard[], extraMove: SafetyItem[] = []
 
   return {
     my: {
-      move: extraMove,
+      // The crew's "needs you" list is crewWorklist's job now (D85 · C2) — it
+      // merges three stores this model never saw. Nothing fills this any more.
+      move: [],
       waiting: myWaiting,
       done: myDone,
     },
@@ -190,11 +229,11 @@ export function buildSafetyModel(hazards: Hazard[], extraMove: SafetyItem[] = []
     },
     submissions,
     published: [...MOCK_PUBLISHED, ...derivedPublished],
-    know: [],
   };
 }
 
-export function useSafetyModel(extraMove: SafetyItem[] = []): SafetyModel {
+export function useSafetyModel(): SafetyModel {
   const { hazards } = useHazards();
-  return useMemo(() => buildSafetyModel(hazards || [], extraMove), [hazards, extraMove]);
+  const { reports } = useAsapReports();
+  return useMemo(() => buildSafetyModel(hazards || [], reports || []), [hazards, reports]);
 }
