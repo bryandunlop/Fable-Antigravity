@@ -31,7 +31,7 @@ export function SubmissionsArchive({ items, onOpen, initialQuery = '' }: { items
       <div className="flex gap-2 flex-wrap mb-3">
         {TYPES.map((t) => (
           <button key={t} onClick={() => setType(t)}
-            className={`text-[13.5px] font-medium rounded-full px-4 py-2 min-h-[40px] border transition-colors ${type === t ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
+            className={`text-[13.5px] font-medium rounded-full px-4 py-2 min-h-[44px] border transition-colors ${type === t ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
             {t === 'All' ? 'All types' : t.charAt(0) + t.slice(1).toLowerCase()}
           </button>
         ))}

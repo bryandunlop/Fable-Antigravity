@@ -34,7 +34,7 @@ export function VerbRail({ active, counts, onSelect }: Props) {
             <button
               onClick={() => onSelect(v.id)}
               aria-current={on ? 'page' : undefined}
-              className={`w-full flex items-center gap-2.5 h-10 px-2.5 rounded-lg transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${
+              className={`w-full flex items-center gap-2.5 h-11 px-2.5 rounded-lg transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${
                 on ? 'bg-secondary text-secondary-foreground' : 'text-foreground hover:bg-muted/60'
               }`}
             >

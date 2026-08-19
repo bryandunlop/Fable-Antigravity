@@ -40,7 +40,7 @@ export function OperationsAudits() {
       <div className="flex gap-2 flex-wrap mb-1">
         {TABS.map(([key, label]) => (
           <button key={key} onClick={() => setSub(key)}
-            className={`text-[14px] font-semibold px-4 py-2 min-h-[40px] rounded-full border transition-colors ${sub === key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
+            className={`text-[14px] font-semibold px-4 py-2 min-h-[44px] rounded-full border transition-colors ${sub === key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
             {label}
           </button>
         ))}
