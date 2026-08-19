@@ -20,7 +20,20 @@ export interface ApprovalStep {
   decidedByName?: string;
   decidedAt?: string;        // ISO
   comment?: string;
+  // D85 — the specific person this step is addressed to. Naming someone
+  // EXCLUDES the rest of the role: the request leaves every other holder of
+  // that role's inbox. An unnamed step stays role-wide, as D39 built it.
+  assigneeUserId?: string;
+  assigneeName?: string;
+  /** Set when the step was re-pointed at a different person after the fact —
+   *  who did it and when. An excluded request whose named approver is away is
+   *  otherwise stuck where nobody can see it. */
+  reassignedByName?: string;
+  reassignedAt?: string;
 }
+
+/** Who a step is addressed to, when the sender named an individual. */
+export interface Assignee { userId: string; name: string; }
 
 export interface ApprovalRequest {
   id: string;
@@ -92,6 +105,10 @@ export function applyDecision(
   actorName: string,
   comment: string | undefined,
   at: string,
+  /** Who the NEXT step is addressed to. Approving is the moment the sender
+   *  chooses the individual, so it rides with the decision rather than being a
+   *  second write that could fail on its own. */
+  nextAssignee?: Assignee,
 ): ApprovalRequest {
   if (req.status !== 'pending' || req.currentStep < 0) return req;
   const chain = req.chain.map((s, i) =>
@@ -103,12 +120,40 @@ export function applyDecision(
     return { ...req, chain, status: 'denied', currentStep: -1 };
   }
   const isLast = req.currentStep === chain.length - 1;
+  const nextIndex = req.currentStep + 1;
+  const withAssignee = (!isLast && nextAssignee)
+    ? chain.map((st, i) => (i === nextIndex
+        ? { ...st, assigneeUserId: nextAssignee.userId, assigneeName: nextAssignee.name }
+        : st))
+    : chain;
   return {
     ...req,
-    chain,
+    chain: withAssignee,
     status: isLast ? 'approved' : 'pending',
-    currentStep: isLast ? -1 : req.currentStep + 1,
+    currentStep: isLast ? -1 : nextIndex,
   };
+}
+
+/** Re-point the current step at a different person. Only a pending step can be
+ *  reassigned — a decided step is history. */
+export function reassignCurrentStep(
+  req: ApprovalRequest,
+  to: Assignee,
+  byName: string,
+  at: string,
+): ApprovalRequest {
+  if (req.status !== 'pending' || req.currentStep < 0) return req;
+  return {
+    ...req,
+    chain: req.chain.map((st, i) => (i === req.currentStep
+      ? { ...st, assigneeUserId: to.userId, assigneeName: to.name, reassignedByName: byName, reassignedAt: at }
+      : st)),
+  };
+}
+
+/** The step the request is currently waiting on (or undefined). */
+export function currentStep(req: ApprovalRequest): ApprovalStep | undefined {
+  return req.status === 'pending' && req.currentStep >= 0 ? req.chain[req.currentStep] : undefined;
 }
 
 /** The role whose decision the request is currently waiting on (or undefined). */
@@ -116,11 +161,37 @@ export function currentApproverRole(req: ApprovalRequest): string | undefined {
   return req.status === 'pending' && req.currentStep >= 0 ? req.chain[req.currentStep]?.role : undefined;
 }
 
-/** Requests awaiting a decision from any of the given roles (the approver inbox). */
-export function pendingForRoles(requests: ApprovalRequest[], roles: string[]): ApprovalRequest[] {
+/** Requests awaiting a decision from this viewer (the approver inbox).
+ *
+ *  `viewerUserId` is REQUIRED, and deliberately so. D85 made a named approver
+ *  EXCLUSIVE — naming someone removes the request from every other holder of
+ *  that role. A role-only version of this selector would still show the request
+ *  to all of them, and the exclusion would be cosmetic: the one way this feature
+ *  fails is silently, by showing too much. Making the id required means the
+ *  compiler finds every call site rather than one of them defaulting to
+ *  "everybody". */
+export function pendingForRoles(
+  requests: ApprovalRequest[],
+  roles: string[],
+  viewerUserId: string,
+): ApprovalRequest[] {
   return requests.filter((r) => {
-    const role = currentApproverRole(r);
-    return role != null && roles.includes(role);
+    const step = currentStep(r);
+    if (!step || !roles.includes(step.role)) return false;
+    // Unnamed → the whole role sees it. Named → only that person.
+    return !step.assigneeUserId || step.assigneeUserId === viewerUserId;
+  });
+}
+
+/** Requests one of these roles has already moved along, still pending with
+ *  someone else — the "With the chain" list. A forwarded waiver must not vanish
+ *  from the person who forwarded it; this is the only thing that will surface
+ *  one rotting in a named approver's inbox. */
+export function advancedByRoles(requests: ApprovalRequest[], roles: string[]): ApprovalRequest[] {
+  return requests.filter((r) => {
+    if (r.status !== 'pending' || r.currentStep < 0) return false;
+    return r.chain.some((st, i) =>
+      i < r.currentStep && st.status === 'approved' && roles.includes(st.role));
   });
 }
 
@@ -142,7 +213,7 @@ const SEED: ApprovalRequest[] = [
     requestedByRole: 'pilot', requestedByName: 'Capt. Dunlop', requestedAt: '2026-07-21T18:40:00Z',
     chain: [
       { role: 'safety', status: 'pending' },
-      { role: 'chief-pilot', status: 'pending' },
+      { role: 'lead', status: 'pending' },
     ],
     currentStep: 0, status: 'pending',
   },
@@ -153,8 +224,11 @@ const SEED: ApprovalRequest[] = [
     fieldLabels: { request: 'What are you requesting?', justification: 'Reason / justification' },
     requestedByRole: 'pilot', requestedByName: 'Capt. Ellis', requestedAt: '2026-07-20T21:05:00Z',
     chain: [
-      { role: 'safety', status: 'approved', decidedByName: 'J. Kerr (Safety)', decidedAt: '2026-07-21T13:10:00Z', comment: 'Risk justified; standard SOP allowance.' },
-      { role: 'chief-pilot', status: 'pending' },
+      { role: 'safety', status: 'approved', decidedByName: 'J. Kerr (Safety)', decidedAt: '2026-07-21T13:10:00Z', comment: 'Risk justified; standard SOP allowance. Flagging that this is the second single-engine taxi request at KTEB this month.' },
+      // Already forwarded to an individual, so the demo opens with one request
+      // in "With the chain" — the list that exists because a named approver
+      // excludes everyone else and a rotting request would otherwise be invisible.
+      { role: 'lead', status: 'pending', assigneeUserId: 'USR015', assigneeName: 'Priya Raman' },
     ],
     currentStep: 1, status: 'pending',
   },
@@ -186,12 +260,26 @@ export function createApprovalRequest(input: Omit<BuildInput, 'id' | 'requestedA
   return req;
 }
 
-export function decideRequest(id: string, decision: 'approve' | 'deny', actorName: string, comment?: string): ApprovalRequest | undefined {
+export function decideRequest(
+  id: string, decision: 'approve' | 'deny', actorName: string, comment?: string, nextAssignee?: Assignee,
+): ApprovalRequest | undefined {
   const at = new Date().toISOString();
   let updated: ApprovalRequest | undefined;
   save(load().map((r) => {
     if (r.id !== id) return r;
-    updated = applyDecision(r, decision, actorName, comment, at);
+    updated = applyDecision(r, decision, actorName, comment, at, nextAssignee);
+    return updated;
+  }));
+  emit();
+  return updated;
+}
+
+export function reassignRequest(id: string, to: Assignee, byName: string): ApprovalRequest | undefined {
+  const at = new Date().toISOString();
+  let updated: ApprovalRequest | undefined;
+  save(load().map((r) => {
+    if (r.id !== id) return r;
+    updated = reassignCurrentStep(r, to, byName, at);
     return updated;
   }));
   emit();

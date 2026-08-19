@@ -56,6 +56,31 @@ export const SYSTEM_USERS = [
     department: 'Operations',
     hireDate: '2016-01-08'
   },
+  // D85 — Lead Team is the waiver chain's final approver, and naming an
+  // individual EXCLUDES the rest of the role. One lead user made both the person
+  // picker and the reassignment path undemonstrable: there was nobody else to
+  // pick, and nowhere to reassign to. Same fix D75 applied to the cabin roles.
+  // Added AFTER David Brown so resolveUserId('lead') still resolves to him.
+  {
+    id: 'USR015',
+    name: 'Priya Raman',
+    email: 'p.raman@flightops.com',
+    roles: ['lead'],
+    status: 'Active',
+    lastLogin: '2025-02-02 07:50',
+    department: 'Operations',
+    hireDate: '2017-09-12'
+  },
+  {
+    id: 'USR016',
+    name: 'Marcus Webb',
+    email: 'm.webb@flightops.com',
+    roles: ['lead'],
+    status: 'Active',
+    lastLogin: '2025-02-01 19:20',
+    department: 'Operations',
+    hireDate: '2021-04-26'
+  },
   {
     id: 'USR005',
     name: 'Lisa Anderson',
