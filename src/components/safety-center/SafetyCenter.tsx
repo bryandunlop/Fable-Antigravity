@@ -335,7 +335,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         <div className="flex gap-2 mt-4">
           {(['my', 'ops'] as SafetyView[]).map((v) => (
             <button key={v} onClick={() => switchView(v)}
-              className={`text-[14px] font-semibold px-4 py-2 min-h-[40px] rounded-full border transition-colors ${view === v ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border'}`}>
+              className={`text-[14px] font-semibold px-4 py-2 min-h-[44px] rounded-full border transition-colors ${view === v ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border'}`}>
               {v === 'my' ? 'My safety' : 'Operations'}
             </button>
           ))}
@@ -392,7 +392,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
             <div className="flex gap-2 w-max">
               {VERBS.map((v) => (
                 <button key={v.id} onClick={() => selectVerb(v.id)}
-                  className={`flex items-center gap-2 h-10 px-4 rounded-full border text-[14px] whitespace-nowrap transition-colors ${
+                  className={`flex items-center gap-2 h-11 px-4 rounded-full border text-[14px] whitespace-nowrap transition-colors ${
                     v.id === verb ? 'bg-secondary text-secondary-foreground border-secondary font-semibold'
                                   : 'bg-card text-muted-foreground border-border'}`}>
                   {v.label}
@@ -490,7 +490,7 @@ function SubChips({ value, onChange, options }: { value: string; onChange: (v: s
     <div className="flex gap-2 flex-wrap">
       {options.map(([key, label]) => (
         <button key={key} onClick={() => onChange(key)}
-          className={`text-[14px] font-semibold px-4 py-2 min-h-[40px] rounded-full border transition-colors ${value === key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
+          className={`text-[14px] font-semibold px-4 py-2 min-h-[44px] rounded-full border transition-colors ${value === key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
           {label}
         </button>
       ))}

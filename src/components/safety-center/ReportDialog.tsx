@@ -164,7 +164,7 @@ function TemplateField({ field, value, onChange, invalid }: {
         <div className="flex gap-2 flex-wrap">
           {(field.options || []).map((o) => (
             <button key={o} type="button" onClick={() => onChange(o)}
-              className={`text-[13.5px] font-medium px-3.5 py-2 min-h-[40px] rounded-md border transition-colors ${value === o ? 'bg-accent/10 border-accent text-accent' : 'bg-card border-border text-muted-foreground hover:border-muted-foreground/40'}`}>
+              className={`text-[13.5px] font-medium px-3.5 py-2 min-h-[44px] rounded-md border transition-colors ${value === o ? 'bg-accent/10 border-accent text-accent' : 'bg-card border-border text-muted-foreground hover:border-muted-foreground/40'}`}>
               {o}
             </button>
           ))}
