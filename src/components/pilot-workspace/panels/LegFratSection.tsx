@@ -42,7 +42,9 @@ export function LegFratSection({
 
   const submitFrat = (data: FratSubmission) => {
     if (fratEarlySubmitWarning(new Date().toISOString(), leg.departureTimeUtc)) {
-      if (!window.confirm('This FRAT is being submitted well before departure — conditions may change. Submit anyway?')) return;
+      // Names the real reason rather than a generic "conditions may change": crews fill the FRAT
+      // ahead but review and submit it at the brief, so a submission from prep is out of process.
+      if (!window.confirm('FRATs are normally reviewed and submitted at the crew brief, inside 4 hours of departure. Submit this one now anyway?')) return;
     }
     completeFratOnLeg({
       dispatch, newId, trip: tlTrip, leg, actorOid: user.oid,
@@ -74,6 +76,14 @@ export function LegFratSection({
             {fratOpen ? 'Close FRAT' : leg.fratStatus === 'IN_PROGRESS' ? 'Resume FRAT (draft)' : 'Start FRAT'}
           </button>
         </div>
+      )}
+      {/* Opened from the prep matrix, say what prep is FOR — a draft — so the pilot is not led into
+          an out-of-process submission by a form whose primary button says Submit. */}
+      {!chrome && (
+        <p className="mb-3 rounded border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Fill this in now and <span className="font-medium text-foreground">save a draft</span> — the crew brief,
+          inside 4 hours of departure, is where it gets reviewed and submitted.
+        </p>
       )}
       {fratOpen && (
         <div className={chrome ? 'mt-2 border-t pt-2' : ''}>

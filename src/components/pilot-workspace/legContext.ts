@@ -1,4 +1,18 @@
-export const FRAT_EARLY_SUBMIT_WARN_HOURS = 24;
+import { T_MINUS_COMMIT_HOURS } from '../tech-log/engine/dispatchWindow';
+
+/**
+ * A FRAT submitted earlier than this is out of process, and gets a confirm (Bryan, 2026-08-19).
+ *
+ * How crews actually work it: the FRAT is FILLED IN ahead of time — that is what the prep matrix is
+ * for — but it is reviewed and SUBMITTED at the crew brief before the flight, and that brief is
+ * typically inside four hours. So prep produces a DRAFT and day-of produces the submission.
+ *
+ * This was 24h, which let a whole prep pass submit finished assessments silently. Aligning it to
+ * T_MINUS_COMMIT_HOURS makes the warning fire MORE often, deliberately: it now catches exactly the
+ * case it should — someone finishing a FRAT days out and submitting it instead of leaving a draft
+ * for the brief. The same boundary governs the fuel-farm lock and the prep/day-of pane switch.
+ */
+export const FRAT_EARLY_SUBMIT_WARN_HOURS = T_MINUS_COMMIT_HOURS;
 
 /** Index of the first leg not yet departed (the leg to prep/fly); the last leg if all have departed; -1 if none. */
 export function currentLegIndex(legs: { departureTimeUtc: string }[], nowUtc: string): number {
