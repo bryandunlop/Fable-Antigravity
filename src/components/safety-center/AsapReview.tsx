@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import { ShieldCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Lock, Pause } from 'lucide-react';
 import { useAsapReports, type AsapReport, type AsapStatus } from './asapReports';
 
 const TONE: Record<AsapStatus, string> = { 'Open': 'sc-amber', 'Under review': 'sc-accent', 'Resolved': 'sc-green' };
@@ -44,6 +44,20 @@ export function AsapReview({ selectedId, onSelectedIdChange, hideList }: Props =
   return (
     <div className={hideList ? '' : 'mt-4'}>
       {!hideList && <>
+      {/* The programme is paused (Bryan, 2026-08-19) pending the outbound
+          integration to a third-party de-identification service. Saying so is
+          not decoration: the "Mark de-identified" control below is a stand-in for
+          work that service will do, and a demo that let it read as the real
+          thing would teach a rebuild team that myGFO de-identifies ASAP itself.
+          It does not. */}
+      <div className="rounded-lg px-3.5 py-3 text-[12.5px] leading-relaxed sc-amber mb-3 flex items-start gap-2">
+        <Pause className="w-4 h-4 shrink-0 mt-px" />
+        <span>
+          <b>Paused.</b> ASAP is moving to a form that goes out to a third-party service for
+          de-identification. Until that is built, nothing here has been de-identified by anyone but us —
+          the control below records an intention, not a completed process.
+        </span>
+      </div>
       <div className="rounded-md px-3 py-2.5 text-[12.5px] leading-snug sc-accent mb-3 flex items-center gap-2">
         <Lock className="w-4 h-4 shrink-0" /> ASAP is confidential and non-punitive — reporter identity is never shown. De-identify before sharing any detail.
       </div>
