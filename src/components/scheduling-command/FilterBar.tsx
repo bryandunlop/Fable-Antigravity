@@ -69,7 +69,7 @@ export function FilterBar({
       </div>
 
       <div className="flex items-center gap-2 ml-auto">
-        <span className="text-xs text-muted-foreground">Horizon</span>
+        <span className="text-xs text-muted-foreground">Window</span>
         <div className="flex bg-muted rounded-lg p-0.5 gap-0.5">
           {HORIZON_PRESETS.map(d => (
             <button key={d} onClick={() => onHorizon(d)}
