@@ -232,7 +232,11 @@ export default function FRATForm({ userRole = 'pilot' }: FRATFormProps) {
         route: `${formData.departure} → ${formData.destination}`,
         departureTime: '08:00', // Would come from form
         estimatedFlightTime: '3h 30m', // Would be calculated
-        status: riskLevel === 'High' ? 'Requires Review' : (riskLevel === 'Medium' ? 'Pending' : 'Approved'),
+        // D85 (2026-08-19) — filing a FRAT does not approve it, and a low-risk
+        // one is not "Approved" by the act of submitting. Nobody approves a
+        // FRAT: the crew own it and the safety manager attests afterwards that
+        // they saw it. Risk still drives `priority` below, which is real.
+        status: 'Filed',
         priority: riskLevel === 'High' ? 'Critical' : (riskLevel === 'Medium' ? 'High' : 'Low'),
         totalScore,
         maxScore: 25,

@@ -23,6 +23,7 @@ const KEY = 'frat_submissions';
 
 interface FratRow {
   id: string;
+  status?: string;
   flightNumber?: string;
   date?: string;
   route?: string;
@@ -32,8 +33,10 @@ interface FratRow {
   riskLevel?: string;
   totalScore?: number;
   maxScore?: number;
-  /** D85 — the attestation. Deliberately NOT `status`: reusing the console's
-   *  Approved/Rejected field would put the approval model back. */
+  /** D85 — the attestation, and the SOURCE OF TRUTH for whether it happened.
+   *  `status` is written alongside for the crew's list, but every screen derives
+   *  "Seen" from `seenAt`, so a stale or hand-edited status cannot claim an
+   *  attestation nobody made. */
   seenByName?: string;
   seenAt?: string;
 }
@@ -55,7 +58,10 @@ export function FratSeen({ actorName }: { actorName: string }) {
 
   function markSeen(id: string) {
     const next = load().map((r) => (r.id === id
-      ? { ...r, seenByName: actorName, seenAt: new Date().toISOString() }
+      // `status: 'Seen'` is written for the crew's own list, which reads the
+      // same store; `seenAt` remains the source of truth that the crew screen
+      // derives from, so the two cannot drift apart.
+      ? { ...r, status: 'Seen', seenByName: actorName, seenAt: new Date().toISOString() }
       : r));
     try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* demo storage */ }
     setRows(next);
