@@ -18,6 +18,7 @@ import type { TaskInstance, TaskAction, Readiness } from '../../scheduling/engin
 import { StatusBadge, AckBadge, ReflagBadge, TaskActionButtons, formatDueTime, groupByCategory, airportLabel } from './taskRowHelpers';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+import { useRehydrateTechLog } from '../tech-log/TechLogContext';
 import { releaseSchedulingTripToPreflight, readPreflightSummary, readTripLifecycleSummary } from '../tech-log/bridge';
 
 interface TripsPanelProps {
@@ -51,6 +52,7 @@ function readinessBadgeClassName(state: Readiness['state']): string {
 }
 
 export default function TripsPanel({ userRole, focusTrip }: TripsPanelProps) {
+  const rehydrateTechLog = useRehydrateTechLog();
   const { service, store, tick, bump, nowUtc } = useSchedulingWorkspace();
   const navigate = useNavigate();
   const [trips, setTrips] = useState<TripRecord[]>([]);
@@ -217,6 +219,10 @@ export default function TripsPanel({ userRole, focusTrip }: TripsPanelProps) {
           arrivalTimeUtc: l.arrivalTimeUtc,
         })),
       });
+      // The bridge wrote through storage, not through the reducer — pull the live state back in
+      // line so the pilot workspace sees the release without a page reload (which, in the demo,
+      // would re-seed the date-relative trips and throw the release away).
+      rehydrateTechLog();
       toast[createdAircraft ? 'warning' : 'success'](
         createdAircraft
           ? `Released — no fleet aircraft for ${trip.tail}, created a demo placeholder`

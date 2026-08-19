@@ -62,7 +62,15 @@ export function HandoverCard({ trip, onOpenHandover }: { trip: TripRecord; onOpe
             onClick={onOpenHandover}
             className="inline-flex items-center min-h-[44px] rounded border px-3 py-2 text-xs hover:bg-accent"
           >
-            {custody === 'WITH_CREW' ? 'View briefing' : custody === 'OFFERED' ? 'Review & accept' : 'Open handover'}
+            {/* RED grounding beats custody. This card rendered "Unserviceable — grounded" above a
+                button reading "Review & accept" — the words said stop and the control invited a PIC
+                signature on an aircraft that may not be dispatched. Same defect the day-of hero had
+                (D84 slice 3); `moduleStatus.handoverModule` in this same directory already gets the
+                precedence right, and CLAUDE.md states it. */}
+            {sv === 'RED' ? 'Open handover'
+              : custody === 'WITH_CREW' ? 'View briefing'
+              : custody === 'OFFERED' ? 'Review & accept'
+              : 'Open handover'}
           </button>
         </div>
       )}
