@@ -29,8 +29,9 @@ function TypeBadge({ t }: { t: TripIdentityData }) {
   return null;
 }
 
-/** Compact one-line identity for rows and cluster headers. */
-export function TripIdentityLine({ trip }: { trip: TripIdentityData }) {
+/** Compact one-line identity for rows and cluster headers. `compact` drops the trip number —
+ * dense worklist rows (the Horizon spine) lean on route+date+tail; the drawer owns the number. */
+export function TripIdentityLine({ trip, compact = false }: { trip: TripIdentityData; compact?: boolean }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
       <Badge variant="secondary" className="px-1.5 text-[10px] font-semibold shrink-0">{trip.aircraft}</Badge>
@@ -40,7 +41,7 @@ export function TripIdentityLine({ trip }: { trip: TripIdentityData }) {
       </span>
       <TypeBadge t={trip} />
       {trip.priority === 'vip' && <Badge variant="outline" className="text-[10px] px-1.5">VIP</Badge>}
-      <span className="text-[11px] text-muted-foreground/70 shrink-0">{trip.tripNumber}</span>
+      {!compact && <span className="text-[11px] text-muted-foreground/70 shrink-0">{trip.tripNumber}</span>}
     </span>
   );
 }
