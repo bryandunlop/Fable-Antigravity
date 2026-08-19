@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bell, Plus, Check, ChevronRight, ChevronLeft, FileText, PenLine, ClipboardList, BookOpen, ClipboardCheck } from 'lucide-react';
+import { Bell, Plus, Check, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useNotificationFeed } from '../../notifications/useNotificationFeed';
 import { eventStore } from '../../notifications/events';
@@ -25,25 +25,21 @@ import { createCws } from './cwsRecognitions';
 import { getFormTemplates, templateForKind, describeWithExtras, MULTI_SEP } from './formTemplates';
 import { createApprovalRequest, roleLabel } from './approvalRequests';
 import MyFRATSubmissions from '../MyFRATSubmissions';
+import { CrewHome, type Door } from './CrewHome';
+import { buildCrewWorklist, type CrewTask } from './crewWorklist';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
 
 const CURRENT_USER = { id: 'u-demo', name: 'Capt. Dunlop' };
 
 interface Props { userRole: string; additionalRoles?: string[] }
 
-// IA (D38, four plain doors): crew gets one page — a Report button and four
-// doors named after the job (My reports · Read and sign · My assessments ·
-// Library). No attention-state language, no tabs behind toggles. The manager
-// keeps a tabbed console under plain names. The move/waiting/done buckets
-// survive only as internal derivation for counts and ordering.
-type Door = 'reports' | 'reads' | 'assessments' | 'library' | 'audits';
-
-const DOORS: { key: Door; label: string; icon: typeof FileText }[] = [
-  { key: 'reports', label: 'My reports', icon: FileText },
-  { key: 'reads', label: 'Read and sign', icon: PenLine },
-  { key: 'assessments', label: 'My assessments', icon: ClipboardList },
-  { key: 'library', label: 'Library', icon: BookOpen },
-];
+// IA (D85, superseding D38's door grid): crew get ONE page — a Report button, a
+// worklist of what actually needs them, and a quiet index of the five areas
+// underneath. The doors survive as that index and keep their `?door=` param, so
+// deep links and notification targets are unchanged; what changed is that the
+// menu no longer stands between the crew and the answer. The manager console is
+// re-navigated separately (C3). The move/waiting/done buckets survive only as
+// internal derivation for counts and ordering.
 
 export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) {
   const roles = [userRole, ...additionalRoles];
@@ -62,7 +58,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
 
   const model = useSafetyModel();
   const feed = useNotificationFeed(userRole, additionalRoles);
-  const { submitHazard, updateHazard } = useHazards();
+  const { hazards, submitHazard, updateHazard } = useHazards();
   const { audits } = useAudits();
   // Read-and-sign is served by the one Documents compliance engine (TL-6 / D29),
   // not a Safety-Center-local store. Required reads are role-targeted; the demo's
@@ -71,18 +67,44 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const { userId: docsUserId } = identityFor(userRole);
   const navigate = useNavigate();
 
-  const pendingInitials = unacknowledgedRequiredReads(
-    docsState.docs,
-    docsState.revisions,
-    docsState.acknowledgments,
-    userRole,
-    docsUserId,
-  ).length;
-  const myAudits = auditsForMe(audits);
+  // Read-and-sign is role-targeted and recomputed from the Documents engine, so
+  // it is memoized here rather than re-derived per consumer — the crew worklist
+  // and the index row both read this one list.
+  const requiredReads = useMemo(
+    () => unacknowledgedRequiredReads(
+      docsState.docs, docsState.revisions, docsState.acknowledgments, userRole, docsUserId,
+    ),
+    [docsState.docs, docsState.revisions, docsState.acknowledgments, userRole, docsUserId],
+  );
+
+  const pendingInitials = requiredReads.length;
+  const myAudits = useMemo(() => auditsForMe(audits), [audits]);
   const hasAudits = myAudits.length > 0;
   const auditsDue = myAudits.filter((a) => a.status !== 'Complete').length;
   const openReports = model.my.waiting.length + model.my.move.length;
-  const needsYou = model.my.move.length + pendingInitials + auditsDue;
+
+  // The crew worklist (D85). `nowMs` is passed in rather than read inside the
+  // builder so the derivation stays pure and fixture-testable.
+  const crewTasks = useMemo(
+    () => buildCrewWorklist({
+      reads: requiredReads,
+      hazards: hazards || [],
+      // MY audits, not every audit — `auditsForMe` is the same filter the index
+      // row counts with. Passing the raw list put unassigned pool audits on a
+      // crew member's worklist and made the two numbers disagree on screen.
+      audits: myAudits,
+      reporterName: CURRENT_USER.name,
+      nowMs: Date.now(),
+    }),
+    [requiredReads, hazards, myAudits],
+  );
+
+  /** A worklist row opens the door that can act on it. Reply rows additionally
+   *  carry the hazard id so the archive can scroll to it. */
+  function openCrewTask(t: CrewTask) {
+    if (t.kind === 'reply') setSearchParams({ door: 'reports', item: t.sourceId });
+    else openDoor(t.door);
+  }
 
   // The bell reads the real app notification feed (Safety module) — a filed
   // report shows up here and in the app-wide bell.
@@ -240,13 +262,6 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     return null;
   }
 
-  const doorSub: Record<Door, string> = {
-    reports: openReports > 0 ? `${openReports} open · with the safety team` : 'Nothing open right now',
-    reads: pendingInitials > 0 ? `${pendingInitials} waiting for your initials` : 'All current',
-    assessments: 'FRAT and GRAT history',
-    library: 'Lessons, newsletters, recognitions',
-    audits: 'Audits assigned to you',
-  };
   const doorTitle: Record<Door, string> = {
     reports: 'My reports', reads: 'Read and sign', assessments: 'My assessments', library: 'Library', audits: 'My audits',
   };
@@ -260,7 +275,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight m-0">Safety</h1>
           <div className="text-[13.5px] text-muted-foreground mt-0.5">
-            {view === 'my' ? 'See something? One button reports it. Everything else is behind a door named for the job.' : 'Act on what needs you; shepherd every open case.'}
+            {view === 'my' ? 'See something? One button reports it.' : 'Act on what needs you; shepherd every open case.'}
           </div>
         </div>
         <div className="flex-1" />
@@ -286,46 +301,19 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         </div>
       )}
 
-      {/* ── Crew: one page, four doors ── */}
+      {/* ── Crew: worklist over a quiet index (D85 · A1) ── */}
       {view === 'my' && !door && (
-        <div className="mt-6">
-          {needsYou === 0
-            ? <div className="text-[14px] text-muted-foreground mb-4 px-0.5">Nothing needs you right now.</div>
-            : <div className="text-[14px] text-foreground mb-4 px-0.5 font-medium">{needsYou} {needsYou === 1 ? 'thing needs' : 'things need'} you — the doors below show where.</div>}
-
-          {/* Audits keep a persistent entry point whenever the user has any —
-              due ones get the amber banner, otherwise a quiet row — so audit
-              history stays reachable when nothing is due. */}
-          {hasAudits && (
-            <button onClick={() => openDoor('audits')}
-              className={`w-full text-left flex items-center gap-3 bg-card border rounded-lg px-4 py-3.5 min-h-[56px] mb-4 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${auditsDue > 0 ? 'border-[color:var(--gfo-warning)]/50 hover:border-[color:var(--gfo-warning)]' : 'border-border hover:border-muted-foreground/40'}`}>
-              <ClipboardCheck className={`w-5 h-5 shrink-0 ${auditsDue > 0 ? 'text-[color:var(--gfo-warning)]' : 'text-muted-foreground'}`} />
-              <div className="flex-1 text-[14.5px] text-foreground">
-                {auditsDue > 0
-                  ? <>Audits assigned to you — <span className="font-semibold">{auditsDue} due</span></>
-                  : <>My audits — <span className="text-muted-foreground">all complete</span></>}
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
-            </button>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {DOORS.map(({ key, label, icon: Icon }) => {
-              const attention = (key === 'reads' && pendingInitials > 0);
-              return (
-                <button key={key} onClick={() => openDoor(key)}
-                  className="text-left bg-card border border-border rounded-lg px-5 py-5 min-h-[104px] cursor-pointer hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1">
-                  <div className="flex items-start justify-between">
-                    <Icon className="w-[22px] h-[22px] text-muted-foreground" />
-                    <ChevronRight className="w-5 h-5 text-muted-foreground/50" />
-                  </div>
-                  <div className="text-[16px] font-semibold text-foreground mt-2.5">{label}</div>
-                  <div className={`text-[13px] mt-0.5 ${attention ? 'text-[color:var(--gfo-error)] font-medium' : 'text-muted-foreground'}`}>{doorSub[key]}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <CrewHome
+          tasks={crewTasks.tasks}
+          more={crewTasks.more}
+          openReports={openReports}
+          pendingReads={pendingInitials}
+          auditsDue={auditsDue}
+          hasAudits={hasAudits}
+          onOpenDoor={openDoor}
+          onOpenTask={openCrewTask}
+          onSearch={(q) => setSearchParams(q.trim() ? { door: 'reports', q: q.trim() } : { door: 'reports' })}
+        />
       )}
 
       {/* ── Crew: inside a door ── */}
@@ -340,7 +328,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
           {door === 'reports' && (
             <>
               <p className="text-[13.5px] text-muted-foreground mt-1 px-0.5">Everything you've filed — tap one to see its status and the safety team's replies.</p>
-              <SubmissionsArchive items={model.submissions.filter((s) => s.submittedBy === CURRENT_USER.name || s.submittedBy === 'You')} onOpen={open} />
+              <SubmissionsArchive items={model.submissions.filter((s) => s.submittedBy === CURRENT_USER.name || s.submittedBy === 'You')} onOpen={open} initialQuery={searchParams.get('q') ?? ''} />
             </>
           )}
           {door === 'reads' && <div className="mt-3"><RequiredReadsList userRole={userRole} /></div>}

@@ -5,8 +5,8 @@ import type { SafetyItem, SafetyItemType } from './types';
 
 const TYPES: (SafetyItemType | 'All')[] = ['All', 'HAZARD', 'ASAP', 'FRAT', 'GRAT', 'WAIVER', 'AUDIT', 'CWS'];
 
-export function SubmissionsArchive({ items, onOpen }: { items: SafetyItem[]; onOpen: (i: SafetyItem) => void }) {
-  const [q, setQ] = useState('');
+export function SubmissionsArchive({ items, onOpen, initialQuery = '' }: { items: SafetyItem[]; onOpen: (i: SafetyItem) => void; initialQuery?: string }) {
+  const [q, setQ] = useState(initialQuery);
   const [type, setType] = useState<SafetyItemType | 'All'>('All');
 
   const filtered = useMemo(() => {
