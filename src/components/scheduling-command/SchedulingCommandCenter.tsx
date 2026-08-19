@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { AlertTriangle, CalendarDays, ChevronRight, ClipboardList, Eye, Inbox as InboxIcon, LayoutList, Loader2, Rows3, Send, Telescope, Tv } from 'lucide-react';
+import { CalendarDays, ClipboardList, Eye, Inbox as InboxIcon, LayoutList, Loader2, Rows3, Send, Telescope, Tv } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
@@ -12,18 +12,17 @@ import PilotVisibilityPanel from '../scheduling-workspace/PilotVisibilityPanel';
 import type { TaskAction } from '../../scheduling/engine/tasks';
 import { boardTripOf, toBoardTask, type BoardTrip, type BoardTask } from './adapter';
 import { readFleetServiceability, readTripServiceabilityAlerts, type TripForAlerts } from '../tech-log/bridge';
-import { OpsAlertsPanel } from './OpsAlertsPanel';
+import { AttentionBand } from './AttentionBand';
 import { toTripsForAlerts } from './alertTrips';
 import { fleetRowsFor } from './fleet';
-import { deriveTripStatus } from './tripStatus';
 import { PlanBoard } from './PlanBoard';
 import { CalendarView } from './CalendarView';
 import { DispatchTable } from './DispatchTable';
 import { FilterBar } from './FilterBar';
 import { TripDrawer } from './TripDrawer';
-import { buildHorizonBoard, officeTasksDueToday, type OverdueItem } from './horizonSelectors';
+import { buildHorizonBoard, officeTasksDueToday } from './horizonSelectors';
 import { HorizonView } from './HorizonView';
-import { matchesTripTypeFilter } from './tripFilters';
+import { matchesTripTypeFilter, hasOpenWork, filterCounts } from './tripFilters';
 import type { TripType } from '../../scheduling/engine';
 
 // One home, four lenses (D87): Horizon (default) / Fleet board / Calendar / List are PROJECTIONS
@@ -46,27 +45,6 @@ const UTILITY_TABS: { key: Utility; label: string; icon: React.ElementType }[] =
   { key: 'pilot-visibility', label: 'Pilot visibility', icon: Eye },
 ];
 
-/** Task-overdue strip — persists across every lens; the only red that isn't aircraft RAG. */
-function OverdueStrip({ overdue, onOpenTrip }: { overdue: OverdueItem[]; onOpenTrip: (tripId: string) => void }) {
-  if (overdue.length === 0) return null;
-  return (
-    <button
-      onClick={() => onOpenTrip(overdue[0].tripId)}
-      className="w-full flex items-center gap-2.5 text-left rounded-md px-3 py-2 border border-[var(--gfo-error,#EF3340)]/40 bg-[var(--gfo-error,#EF3340)]/10 hover:bg-[var(--gfo-error,#EF3340)]/15 transition-colors"
-    >
-      <AlertTriangle className="h-4 w-4 text-[var(--gfo-error,#EF3340)] shrink-0" />
-      <span className="text-xs font-medium text-[var(--gfo-error,#EF3340)]">
-        {overdue.length} need{overdue.length === 1 ? 's' : ''} attention now
-      </span>
-      <span className="text-xs text-muted-foreground truncate">
-        {overdue[0].tail} {overdue[0].route} · {overdue[0].actionTitle} · {overdue[0].dueLabel}
-        {overdue.length > 1 ? ` · +${overdue.length - 1} more` : ''}
-      </span>
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
-    </button>
-  );
-}
-
 /**
  * The scheduling hub, in the GFO design language. ONE home with four lenses over the same
  * filtered trips — Horizon ("what's coming, keyed by when work is due", the default), Fleet board
@@ -88,7 +66,7 @@ export default function SchedulingCommandCenter({
   const [searchTerm, setSearchTerm] = useState('');
   const [tailFilter, setTailFilter] = useState<Set<string>>(new Set());
   const [tripTypeFilter, setTripTypeFilter] = useState<Set<TripType>>(new Set());
-  const [actionRequiredOnly, setActionRequiredOnly] = useState(false);
+  const [hideCleared, setHideCleared] = useState(false);
   const [horizonDays, setHorizonDays] = useState(30);
   const [drawer, setDrawer] = useState<{ tripId: string; taskId?: string } | null>(null);
 
@@ -147,10 +125,7 @@ export default function SchedulingCommandCenter({
   const filteredTrips = useMemo(() => trips.filter(t => {
     if (tailFilter.size > 0 && !tailFilter.has(t.aircraft)) return false;
     if (!matchesTripTypeFilter(t.tripType, tripTypeFilter)) return false;
-    if (actionRequiredOnly) {
-      const s = deriveTripStatus(t, nowMs);
-      if (s !== 'blocked' && s !== 'behind' && s !== 'attention' && s !== 'uninteracted') return false;
-    }
+    if (hideCleared && !hasOpenWork(t)) return false; // work-ahead: hide only fully-cleared trips
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       if (!t.tripNumber.toLowerCase().includes(s) && !t.client.toLowerCase().includes(s) &&
@@ -158,7 +133,9 @@ export default function SchedulingCommandCenter({
     }
     return true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [trips, tailFilter, tripTypeFilter, actionRequiredOnly, searchTerm]);
+  }), [trips, tailFilter, tripTypeFilter, hideCleared, searchTerm]);
+
+  const counts = useMemo(() => filterCounts(trips), [trips]);
 
   const horizonModel = useMemo(
     () => buildHorizonBoard(filteredTrips, nowMs, horizonDays),
@@ -238,17 +215,16 @@ export default function SchedulingCommandCenter({
         </div>
       </div>
 
-      {/* Persist across every lens: serviceability alerts (aircraft RAG) + task-overdue strip. */}
-      {onLensSurface && <OpsAlertsPanel alerts={opsAlerts} onOpenTrip={openTrip} />}
-      {onLensSurface && <OverdueStrip overdue={horizonModel.overdue} onOpenTrip={openTrip} />}
+      {/* Persists across every lens: ONE attention band — aircraft RAG | task urgency, expandable. */}
+      {onLensSurface && <AttentionBand alerts={opsAlerts} overdue={horizonModel.overdue} onOpenTrip={openTrip} />}
 
       {onLensSurface && (
         <FilterBar
-          fleet={fleetRowsFor(trips)}
+          fleet={fleetRowsFor(trips)} counts={counts}
           searchTerm={searchTerm} onSearch={setSearchTerm}
           tailFilter={tailFilter} onToggleTail={toggleTail}
           tripTypeFilter={tripTypeFilter} onToggleTripType={toggleTripType}
-          actionRequiredOnly={actionRequiredOnly} onActionRequired={setActionRequiredOnly}
+          hideCleared={hideCleared} onHideCleared={setHideCleared}
           horizonDays={horizonDays} onHorizon={setHorizonDays}
         />
       )}
