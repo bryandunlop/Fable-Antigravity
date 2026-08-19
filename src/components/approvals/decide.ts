@@ -5,7 +5,7 @@
 // drifting apart that the manager-cockpit option deliberately accepted.
 
 import { eventStore } from '../../notifications/events';
-import { decideRequest, currentApproverRole, roleLabel, type ApprovalRequest } from '../safety-center/approvalRequests';
+import { decideRequest, currentApproverRole, currentStep, roleLabel, type ApprovalRequest, type Assignee } from '../safety-center/approvalRequests';
 
 /** Apply an approve/deny to the request's current step and notify the requester
  *  (and, if it advanced, the next approver). `actingRoleId` is the role the
@@ -16,9 +16,12 @@ export function decideAndNotify(
   decision: 'approve' | 'deny',
   actingRoleId: string,
   comment?: string,
+  /** D85 — who the next step is addressed to. Naming someone excludes the rest
+   *  of that role, so the notification says who is expected to act. */
+  nextAssignee?: Assignee,
 ): ApprovalRequest | undefined {
   const actor = roleLabel(actingRoleId);
-  const updated = decideRequest(req.id, decision, actor, comment);
+  const updated = decideRequest(req.id, decision, actor, comment, nextAssignee);
   if (!updated) return undefined;
   const note = comment?.trim();
   eventStore.publish({
@@ -29,7 +32,11 @@ export function decideAndNotify(
       : (updated.status === 'approved' ? `${req.formLabel} approved: ${req.subjectTitle}` : `${req.subjectTitle}: ${actor} approved`),
     detail: decision === 'deny'
       ? (note ? `${actor}: “${note}”` : `Denied by ${actor}`)
-      : (updated.status === 'approved' ? 'Fully approved' : `Now with ${roleLabel(currentApproverRole(updated) || '')}`),
+      : (updated.status === 'approved'
+          ? 'Fully approved'
+          // Name the person when one was chosen — "Now with Lead Team" is not
+          // actionable when only one member of Lead Team can now see it.
+          : `Now with ${currentStep(updated)?.assigneeName ?? roleLabel(currentApproverRole(updated) || '')}`),
     module: 'Safety', link: '/approvals',
     audienceRoles: [req.requestedByRole, ...(updated.status === 'pending' && currentApproverRole(updated) ? [currentApproverRole(updated) as string] : [])],
   });

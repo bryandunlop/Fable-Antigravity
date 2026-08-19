@@ -5,6 +5,7 @@ import {
   useApprovalRequests, pendingForRoles, requestedByName, currentApproverRole, roleLabel,
   type ApprovalRequest,
 } from '../safety-center/approvalRequests';
+import { resolveUserId } from '../../notifications/identity';
 import { decideAndNotify } from './decide';
 import { timeAgo } from './format';
 
@@ -19,7 +20,10 @@ export default function ApprovalsInbox({ userRole, additionalRoles = [] }: Props
   const roles = useMemo(() => [userRole, ...additionalRoles], [userRole, additionalRoles]);
   const { requests } = useApprovalRequests();
 
-  const awaiting = pendingForRoles(requests, roles);
+  // D85 — a step addressed to an individual leaves everyone else's inbox, so the
+  // inbox is filtered by WHO is looking, not only by their roles.
+  const viewerUserId = resolveUserId(userRole);
+  const awaiting = pendingForRoles(requests, roles, viewerUserId);
   const mine = requestedByName(requests, CURRENT_USER.name);
 
   function decide(req: ApprovalRequest, decision: 'approve' | 'deny', comment?: string) {

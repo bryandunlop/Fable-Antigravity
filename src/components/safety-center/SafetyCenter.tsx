@@ -16,6 +16,7 @@ import { PublishedArea } from './PublishedArea';
 import { FormManager } from './FormManager';
 import { OperationsAudits, MyAudits, auditsForMe } from './AuditsArea';
 import { ReviewsArea } from './ReviewsArea';
+import { DecideArea } from './DecideArea';
 import { RequiredReadsList } from '../documents/components/RequiredReadsList';
 import { useDocuments, identityFor } from '../documents/DocumentsContext';
 import { unacknowledgedRequiredReads } from '../documents/engine/acknowledgments';
@@ -30,7 +31,8 @@ import { VERBS, parseVerb, verbDef, verbCounts, atPhase, type VerbId, type Shape
 import { CaseBoard } from './CaseBoard';
 import { CaseQueue } from './CaseQueue';
 import { canToggle, loadOverrides, resolveShape, saveOverrides, withOverride, type ShapeOverrides } from './shapes';
-import { useApprovalRequests, pendingForRoles } from './approvalRequests';
+import { useApprovalRequests, pendingForRoles, advancedByRoles } from './approvalRequests';
+import { resolveUserId } from '../../notifications/identity';
 import { buildCrewWorklist, type CrewTask } from './crewWorklist';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
 
@@ -258,14 +260,17 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   // Manager navigation is by VERB now (D85). The counts live in verbs.ts so the
   // rail's numbers are a pure function of the model rather than a switch here.
   const verb = parseVerb(searchParams.get('verb'));
+  // D85 — the Decide count must match the Decide list, and both exclude a step
+  // addressed to somebody else.
+  const viewerUserId = resolveUserId(userRole);
   const counts = useMemo(
     () => verbCounts({
       move: model.ops.move,
       track: model.ops.track,
-      pendingApprovals: pendingForRoles(approvalRequests, roles).length,
+      pendingApprovals: pendingForRoles(approvalRequests, roles, viewerUserId).length,
       auditsOpen: audits.filter((a) => a.status !== 'Complete').length,
     }),
-    [model.ops.move, model.ops.track, approvalRequests, roles, audits],
+    [model.ops.move, model.ops.track, approvalRequests, roles, viewerUserId, audits],
   );
 
   // Shape overrides are a per-verb preference: turning Mitigate into a board
@@ -406,7 +411,17 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
               ? <CaseBoard items={model.ops.move} onOpen={open} />
               : <CaseQueue items={model.ops.move} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
                   emptySmall="No new reports need you right now." />)}
-            {verb === 'decide' && <ReviewsArea userRole={userRole} additionalRoles={additionalRoles} />}
+            {verb === 'decide' && (
+              <>
+                <DecideArea userRole={userRole} additionalRoles={additionalRoles} actorName={CURRENT_USER.name} />
+                {/* The FRAT/GRAT/ASAP consoles are still their own surfaces; C5
+                    replaced only the approval half of the old Reviews tab. */}
+                <div className="mt-8 pt-6 border-t border-border">
+                  <div className="gfo-eyebrow mb-1">Assessment reviews</div>
+                  <ReviewsArea userRole={userRole} additionalRoles={additionalRoles} />
+                </div>
+              </>
+            )}
             {verb === 'investigate' && (shape === 'board'
               ? <CaseBoard items={atPhase(model.ops.track, 1)} onOpen={open} />
               : <CaseQueue items={atPhase(model.ops.track, 1)} doneSet={doneSet} onToggle={toggleDone} onOpen={open}

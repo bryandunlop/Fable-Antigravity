@@ -72,7 +72,10 @@ export const SEED_TEMPLATES: FormTemplate[] = [
     id: 'tpl-waiver', kind: 'Waiver', name: 'Waiver request', description: 'Request an exception or extension.', scored: false,
     // Flagship of the D39 routing engine: a filed waiver walks Safety Manager
     // then Chief Pilot, each deciding from their own Approvals inbox.
-    approvalChain: ['safety', 'chief-pilot'],
+    // D85 — the line manager is Lead Team (Bryan, 2026-08-18). Safety reviews and
+    // recommends; Lead Team is final approval or denial. Still manager-editable
+    // per D39 — this is the default, not a hard-coding.
+    approvalChain: ['safety', 'lead'],
     fields: [
       { id: 'request', label: 'What are you requesting?', type: 'textarea', required: true },
       { id: 'justification', label: 'Reason / justification', type: 'textarea', required: true },
