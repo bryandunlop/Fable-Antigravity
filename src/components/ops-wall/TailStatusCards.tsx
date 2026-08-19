@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Plane } from 'lucide-react';
 import type { UnifiedFleetAircraft } from '../hooks/useUnifiedFleetStatus';
 import { RAG_DOT } from './ragColors';
-import AircraftSilhouette from '../ui/AircraftSilhouette';
 import { formatUntilEt } from '../../services/etClock';
 import type { TodayLeg } from '../../services/todaysOpsMock';
 
@@ -110,11 +109,6 @@ export default function TailStatusCards({
               <span className="font-mono text-[15px] font-bold">{ac.tailNumber}</span>
               <span className="text-[10px] text-muted-foreground">{shortType(ac.model)}</span>
             </div>
-            <AircraftSilhouette
-              type={shortType(ac.model)}
-              className="h-6 w-auto self-start text-muted-foreground/45"
-              title={`${ac.tailNumber} — ${shortType(ac.model)}`}
-            />
             <span
               className="text-[11px] font-semibold tracking-wide"
               style={{ color: STATUS_TEXT[ac.airworthiness.status] }}
