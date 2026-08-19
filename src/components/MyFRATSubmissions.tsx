@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { daysAgo } from '../lib/demoDates';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -40,7 +41,15 @@ interface FRATSubmission {
   route: string;
   departureTime: string;
   estimatedFlightTime: string;
-  status: 'Draft' | 'Pending' | 'Approved' | 'Rejected' | 'Requires Review';
+  // D85 (2026-08-19) — a FRAT is not approved or rejected by anybody. The crew
+  // own it; the safety manager attests afterwards that they saw it. The old
+  // ladder (Pending · Approved · Rejected · Requires Review) described a review
+  // nobody performs, and the crew's own screen was the last place still showing
+  // a pilot their assessment had been "Rejected".
+  status: 'Draft' | 'Filed' | 'Seen';
+  /** Written by the safety manager's attestation (see FratSeen). */
+  seenByName?: string;
+  seenAt?: string;
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
   totalScore: number;
   maxScore: number;
@@ -86,7 +95,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
         {
           id: 'FRAT_USER_001',
           flightNumber: 'G650-001',
-          date: '2025-02-08',
+          date: daysAgo(3),
           submittedBy: currentUser,
           pilotInCommand: currentUser,
           secondInCommand: 'Captain Sarah Mitchell',
@@ -94,12 +103,12 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
           route: 'KTEB → EGLL',
           departureTime: '22:30',
           estimatedFlightTime: '7h 45m',
-          status: 'Pending',
+          status: 'Filed',
           priority: 'Critical',
           totalScore: 21,
           maxScore: 25,
           riskLevel: 'Critical',
-          submittedAt: '2025-02-07T18:45:00Z',
+          submittedAt: `${daysAgo(4)}T18:45:00Z`,
           factors: {
             weather: 5,
             airport: 4,
@@ -133,7 +142,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
         {
           id: 'FRAT_USER_002',
           flightNumber: 'G650-002',
-          date: '2025-02-06',
+          date: daysAgo(5),
           submittedBy: currentUser,
           pilotInCommand: currentUser,
           secondInCommand: 'FO Marcus Chen',
@@ -141,15 +150,15 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
           route: 'KPBI → KTEB',
           departureTime: '14:15',
           estimatedFlightTime: '2h 45m',
-          status: 'Approved',
+          status: 'Filed',
           priority: 'Low',
           totalScore: 8,
           maxScore: 25,
           riskLevel: 'Low',
-          submittedAt: '2025-02-06T12:45:00Z',
+          submittedAt: `${daysAgo(5)}T12:45:00Z`,
           reviewedBy: 'Chief Pilot Robert Williams',
           reviewedAt: '2025-02-06T13:30:00Z',
-          reviewComments: 'Standard domestic flight profile. Weather conditions favorable. Approved for operations.',
+          reviewComments: 'Seen by safety — standard domestic profile, no follow-up needed.',
           factors: {
             weather: 1,
             airport: 2,
@@ -178,7 +187,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
         {
           id: 'FRAT_USER_003',
           flightNumber: 'G650-003',
-          date: '2025-02-05',
+          date: daysAgo(6),
           submittedBy: currentUser,
           pilotInCommand: currentUser,
           secondInCommand: 'Captain Elena Rodriguez',
@@ -186,12 +195,12 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
           route: 'KJFK → MYNN',
           departureTime: '09:45',
           estimatedFlightTime: '3h 20m',
-          status: 'Requires Review',
+          status: 'Filed',
           priority: 'High',
           totalScore: 16,
           maxScore: 25,
           riskLevel: 'High',
-          submittedAt: '2025-02-05T07:30:00Z',
+          submittedAt: `${daysAgo(6)}T07:30:00Z`,
           reviewedBy: 'Safety Manager Jennifer Park',
           reviewedAt: '2025-02-05T14:20:00Z',
           reviewComments: 'Caribbean routing approved but monitor tropical weather development. Confirm ETOPS alternate availability.',
@@ -227,19 +236,19 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
         {
           id: 'FRAT_USER_004',
           flightNumber: 'G650-004',
-          date: '2025-02-04',
+          date: daysAgo(7),
           submittedBy: currentUser,
           pilotInCommand: currentUser,
           aircraft: 'N944TK (Gulfstream G650)',
           route: 'KLAS → KSEA',
           departureTime: '16:30',
           estimatedFlightTime: '2h 55m',
-          status: 'Rejected',
+          status: 'Filed',
           priority: 'High',
           totalScore: 19,
           maxScore: 25,
           riskLevel: 'High',
-          submittedAt: '2025-02-04T14:15:00Z',
+          submittedAt: `${daysAgo(7)}T14:15:00Z`,
           reviewedBy: 'Chief Pilot Robert Williams',
           reviewedAt: '2025-02-04T15:45:00Z',
           reviewComments: 'Flight rejected due to severe mountain wave conditions and crew duty time limitations. Recommend postponement until conditions improve.',
@@ -275,7 +284,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
         {
           id: 'FRAT_DRAFT_001',
           flightNumber: 'G650-005',
-          date: '2025-02-09',
+          date: daysAgo(2),
           submittedBy: currentUser,
           pilotInCommand: currentUser,
           secondInCommand: 'FO Alexandra Kim',
@@ -288,7 +297,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
           totalScore: 13,
           maxScore: 25,
           riskLevel: 'Medium',
-          submittedAt: '2025-02-08T16:20:00Z',
+          submittedAt: `${daysAgo(3)}T16:20:00Z`,
           factors: {
             weather: 3,
             airport: 2,
@@ -319,7 +328,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
         {
           id: 'FRAT_DRAFT_002',
           flightNumber: 'G650-006',
-          date: '2025-02-10',
+          date: daysAgo(1),
           submittedBy: currentUser,
           pilotInCommand: currentUser,
           aircraft: 'N966TK (Gulfstream G650)',
@@ -331,7 +340,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
           totalScore: 9,
           maxScore: 25,
           riskLevel: 'Low',
-          submittedAt: '2025-02-08T20:10:00Z',
+          submittedAt: `${daysAgo(3)}T20:10:00Z`,
           factors: {
             weather: 2,
             airport: 2,
@@ -359,7 +368,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
         {
           id: 'FRAT_USER_005',
           flightNumber: 'G650-007',
-          date: '2025-02-02',
+          date: daysAgo(5),
           submittedBy: currentUser,
           pilotInCommand: currentUser,
           secondInCommand: 'Captain David Thompson',
@@ -367,12 +376,12 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
           route: 'KBOS → LEMD',
           departureTime: '20:45',
           estimatedFlightTime: '6h 55m',
-          status: 'Approved',
+          status: 'Filed',
           priority: 'Medium',
           totalScore: 14,
           maxScore: 25,
           riskLevel: 'Medium',
-          submittedAt: '2025-02-02T17:30:00Z',
+          submittedAt: `${daysAgo(5)}T17:30:00Z`,
           reviewedBy: 'International Operations Manager Lisa Chang',
           reviewedAt: '2025-02-02T19:15:00Z',
           reviewComments: 'Transatlantic flight approved. Weather conditions acceptable for ETOPS operations. Monitor Madrid arrival conditions.',
@@ -415,7 +424,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
           route: 'PANC → RJAA',
           departureTime: '14:20',
           estimatedFlightTime: '7h 10m',
-          status: 'Approved',
+          status: 'Filed',
           priority: 'High',
           totalScore: 17,
           maxScore: 25,
@@ -464,12 +473,16 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
 
   const [submissions, setSubmissions] = useState<FRATSubmission[]>(getUserSubmissions());
 
+  /** Legacy rows carry the retired ladder. All of it collapses to "filed" —
+   *  none of those states meant anything that happened. `Seen` is derived from
+   *  the attestation itself so the two can never disagree. */
+  const displayStatus = (s: FRATSubmission): FRATSubmission['status'] =>
+    s.status === 'Draft' ? 'Draft' : (s.seenAt ? 'Seen' : 'Filed');
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Approved': return 'bg-green-100 text-green-800';
-      case 'Rejected': return 'bg-red-100 text-red-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
-      case 'Requires Review': return 'bg-orange-100 text-orange-800';
+      case 'Seen': return 'bg-green-100 text-green-800';
+      case 'Filed': return 'bg-blue-100 text-blue-800';
       case 'Draft': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -513,7 +526,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
             <strong>Route:</strong> {submission.route}
           </div>
           <div>
-            <strong>Status:</strong> <Badge className={getStatusColor(submission.status)}>{submission.status}</Badge>
+            <strong>Status:</strong> <Badge className={getStatusColor(displayStatus(submission))}>{displayStatus(submission)}</Badge>
           </div>
         </div>
 
@@ -562,7 +575,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
         submission.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
         submission.aircraft.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === 'all' || submission.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || displayStatus(submission) === statusFilter;
 
       // Date range filter
       const submissionDate = new Date(submission.submittedAt);
@@ -601,8 +614,8 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
   };
 
   const handleEditSubmission = (submission: FRATSubmission) => {
-    if (submission.status !== 'Draft' && submission.status !== 'Rejected') {
-      toast.error('Only draft or rejected submissions can be edited');
+    if (displayStatus(submission) !== 'Draft') {
+      toast.error('A filed FRAT is a record of the assessment you flew on — it cannot be edited.');
       return;
     }
 
@@ -621,7 +634,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
     
     if (!submission) return;
     
-    if (submission.status !== 'Draft') {
+    if (displayStatus(submission) !== 'Draft') {
       toast.error('Only draft submissions can be deleted');
       return;
     }
@@ -636,12 +649,11 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
 
   const getSubmissionStats = () => {
     const total = submissions.length;
-    const drafts = submissions.filter(s => s.status === 'Draft').length;
-    const pending = submissions.filter(s => s.status === 'Pending' || s.status === 'Requires Review').length;
-    const approved = submissions.filter(s => s.status === 'Approved').length;
-    const rejected = submissions.filter(s => s.status === 'Rejected').length;
+    const drafts = submissions.filter(s => displayStatus(s) === 'Draft').length;
+    const filed = submissions.filter(s => displayStatus(s) === 'Filed').length;
+    const seen = submissions.filter(s => displayStatus(s) === 'Seen').length;
 
-    return { total, drafts, pending, approved, rejected };
+    return { total, drafts, pending: filed, approved: seen, rejected: 0 };
   };
 
   const stats = getSubmissionStats();
@@ -669,72 +681,12 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">
-              All time
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Drafts</CardTitle>
-            <Edit className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{stats.drafts}</div>
-            <p className="text-xs text-muted-foreground">
-              Not submitted
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-            <p className="text-xs text-muted-foreground">
-              Under review
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-            <p className="text-xs text-muted-foreground">
-              Ready to fly
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rejected</CardTitle>
-            <X className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-            <p className="text-xs text-muted-foreground">
-              Need revision
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* The five-tile KPI strip is gone. Three of its tiles — Pending Review,
+          Approved, Rejected ("Ready to fly" / "Need revision") — described a
+          review nobody performs, and "Ready to fly" is the most dangerous thing
+          on the page: it implies a FRAT gates dispatch. It does not. The list
+          below already says what each submission is, so the counts sit beside
+          the filter rather than in a row of cards. */}
 
       {/* Filters */}
       <Card>
@@ -750,6 +702,10 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
               />
             </div>
             
+            <div className="text-[13px] text-muted-foreground self-center whitespace-nowrap">
+              {stats.total} filed · {stats.drafts} draft · {stats.approved} seen by safety
+            </div>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
@@ -757,10 +713,8 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="Draft">Draft</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Requires Review">Requires Review</SelectItem>
-                <SelectItem value="Approved">Approved</SelectItem>
-                <SelectItem value="Rejected">Rejected</SelectItem>
+                <SelectItem value="Filed">Filed</SelectItem>
+                <SelectItem value="Seen">Seen by safety</SelectItem>
               </SelectContent>
             </Select>
 
@@ -825,7 +779,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="font-medium">{submission.flightNumber}</span>
                                 <Badge variant="outline">{submission.aircraft}</Badge>
-                                <Badge className={getStatusColor(submission.status)}>
+                                <Badge className={getStatusColor(displayStatus(submission))}>
                                   {submission.status}
                                 </Badge>
                                 <Badge className={getRiskLevelColor(submission.riskLevel)}>
@@ -836,7 +790,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                                 {submission.route} • {new Date(submission.date).toLocaleDateString()} at {submission.departureTime}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {submission.status === 'Draft' ? 'Saved' : 'Submitted'} {new Date(submission.submittedAt).toLocaleString()}
+                                {displayStatus(submission) === 'Draft' ? 'Saved' : 'Submitted'} {new Date(submission.submittedAt).toLocaleString()}
                               </p>
                               {submission.reviewComments && (
                                 <p className="text-sm text-blue-600 mt-1">
@@ -864,7 +818,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                                 </DialogContent>
                               </Dialog>
 
-                              {(submission.status === 'Draft' || submission.status === 'Rejected') && (
+                              {displayStatus(submission) === 'Draft' && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -882,7 +836,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                                 <Copy className="w-4 h-4" />
                               </Button>
 
-                              {submission.status === 'Draft' && (
+                              {displayStatus(submission) === 'Draft' && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -896,7 +850,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                         </div>
 
                         {/* Quick Actions for Drafts */}
-                        {submission.status === 'Draft' && (
+                        {displayStatus(submission) === 'Draft' && (
                           <div className="mt-3 pt-3 border-t">
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-muted-foreground">
@@ -929,7 +883,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{submission.flightNumber}</CardTitle>
-                    <Badge className={getStatusColor(submission.status)}>
+                    <Badge className={getStatusColor(displayStatus(submission))}>
                       {submission.status}
                     </Badge>
                   </div>
@@ -972,7 +926,7 @@ export default function MyFRATSubmissions({ userRole }: MyFRATSubmissionsProps) 
                       </DialogContent>
                     </Dialog>
 
-                    {(submission.status === 'Draft' || submission.status === 'Rejected') && (
+                    {displayStatus(submission) === 'Draft' && (
                       <Button
                         variant="outline"
                         size="sm"
