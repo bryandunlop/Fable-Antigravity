@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bell, Plus, Check, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Bell, Plus, Check, ChevronRight, ChevronLeft, LayoutGrid, List } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useNotificationFeed } from '../../notifications/useNotificationFeed';
 import { eventStore } from '../../notifications/events';
@@ -8,7 +8,6 @@ import { useHazards, WORKFLOW_STAGES } from '../../contexts/HazardContext';
 import { useAudits } from '../../contexts/AuditContext';
 import { useSafetyModel } from './useSafetyModel';
 import { ToneStyles } from './ui-bits';
-import { TrackBoard } from './TrackBoard';
 import { ItemDetailSheet } from './ItemDetailSheet';
 import { NotificationsPanel } from './NotificationsPanel';
 import { ReportDialog, type Kind } from './ReportDialog';
@@ -27,7 +26,10 @@ import { createApprovalRequest, roleLabel } from './approvalRequests';
 import MyFRATSubmissions from '../MyFRATSubmissions';
 import { CrewHome, type Door } from './CrewHome';
 import { VerbRail } from './VerbRail';
-import { VERBS, parseVerb, verbDef, verbCounts, atPhase, type VerbId } from './verbs';
+import { VERBS, parseVerb, verbDef, verbCounts, atPhase, type VerbId, type Shape } from './verbs';
+import { CaseBoard } from './CaseBoard';
+import { CaseQueue } from './CaseQueue';
+import { canToggle, loadOverrides, resolveShape, saveOverrides, withOverride, type ShapeOverrides } from './shapes';
 import { useApprovalRequests, pendingForRoles } from './approvalRequests';
 import { buildCrewWorklist, type CrewTask } from './crewWorklist';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
@@ -266,6 +268,19 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     [model.ops.move, model.ops.track, approvalRequests, roles, audits],
   );
 
+  // Shape overrides are a per-verb preference: turning Mitigate into a board
+  // must not turn Triage into one. Read once on mount — a preference does not
+  // need to react to another tab.
+  const [shapeOverrides, setShapeOverrides] = useState<ShapeOverrides>(() => loadOverrides());
+  const shape = resolveShape(verb, shapeOverrides);
+  function chooseShape(next: Shape) {
+    setShapeOverrides((prev) => {
+      const updated = withOverride(prev, verb, next);
+      saveOverrides(updated);
+      return updated;
+    });
+  }
+
   function selectVerb(v: VerbId) {
     setSearchParams(v === VERBS[0].id ? {} : { verb: v });
   }
@@ -376,15 +391,30 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
           </div>
 
           <div className="flex-1 min-w-0">
-            <h2 className="text-[19px] font-semibold tracking-tight m-0">{verbDef(verb).label}</h2>
-            <div className="text-[13.5px] text-muted-foreground mt-0.5 mb-1">{verbDef(verb).blurb}</div>
+            <div className="flex items-start gap-4 flex-wrap">
+              <div>
+                <h2 className="text-[19px] font-semibold tracking-tight m-0">{verbDef(verb).label}</h2>
+                <div className="text-[13.5px] text-muted-foreground mt-0.5">{verbDef(verb).blurb}</div>
+              </div>
+              <div className="flex-1" />
+              {canToggle(verb) && <ShapeToggle verb={verb} shape={shape} onChoose={chooseShape} />}
+            </div>
 
-            {/* C3 mounts what each verb's old tab mounted — navigation only. The
-                per-verb shapes and the Queue/Board toggle land in C4. */}
-            {verb === 'triage' && <MoveList items={model.ops.move} heading={null} doneSet={doneSet} onToggle={toggleDone} onOpen={open} />}
+            {/* Each verb opens the shape its job deserves; the toggle is an
+                override, and only appears where there is something to switch to. */}
+            {verb === 'triage' && (shape === 'board'
+              ? <CaseBoard items={model.ops.move} onOpen={open} />
+              : <CaseQueue items={model.ops.move} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
+                  emptySmall="No new reports need you right now." />)}
             {verb === 'decide' && <ReviewsArea userRole={userRole} additionalRoles={additionalRoles} />}
-            {verb === 'investigate' && <TrackBoard items={atPhase(model.ops.track, 1)} onOpen={open} />}
-            {verb === 'mitigate' && <TrackBoard items={atPhase(model.ops.track, 2)} onOpen={open} />}
+            {verb === 'investigate' && (shape === 'board'
+              ? <CaseBoard items={atPhase(model.ops.track, 1)} onOpen={open} />
+              : <CaseQueue items={atPhase(model.ops.track, 1)} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
+                  emptyBig="Nothing under investigation." emptySmall="No case is at that stage right now." />)}
+            {verb === 'mitigate' && (shape === 'board'
+              ? <CaseBoard items={atPhase(model.ops.track, 2)} onOpen={open} />
+              : <CaseQueue items={atPhase(model.ops.track, 2)} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
+                  emptyBig="No mitigations in flight." emptySmall="Nothing is waiting on a corrective action." />)}
             {verb === 'assure' && <OperationsAudits />}
             {verb === 'publish' && <PublishedArea view="ops" reports={model.published} />}
             {verb === 'records' && <RecordsArea submissions={model.submissions} onOpen={open} />}
@@ -418,6 +448,28 @@ function RecordsArea({ submissions, onOpen }: { submissions: SafetyItem[]; onOpe
   );
 }
 
+function ShapeToggle({ verb, shape, onChoose }: { verb: VerbId; shape: Shape; onChoose: (s: Shape) => void }) {
+  const options = verbDef(verb).shapes;
+  const ICON: Partial<Record<Shape, typeof List>> = { queue: List, board: LayoutGrid };
+  const LABEL: Partial<Record<Shape, string>> = { queue: 'Queue', board: 'Board' };
+  return (
+    <div className="flex border border-border rounded-md overflow-hidden bg-card h-9" role="group" aria-label="View as">
+      {options.map((o) => {
+        const Icon = ICON[o] ?? List;
+        const on = o === shape;
+        return (
+          <button key={o} onClick={() => onChoose(o)} aria-pressed={on}
+            className={`flex items-center gap-1.5 px-3.5 text-[13px] transition-colors cursor-pointer ${
+              on ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-foreground font-medium'}`}>
+            <Icon className="w-[15px] h-[15px]" />
+            {LABEL[o] ?? o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function SubChips({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
     <div className="flex gap-2 flex-wrap">
@@ -431,55 +483,4 @@ function SubChips({ value, onChange, options }: { value: string; onChange: (v: s
   );
 }
 
-function SectionHeading({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`text-[12px] uppercase tracking-wider text-muted-foreground font-semibold mt-5 mb-2.5 px-0.5 ${className}`}>{children}</div>;
-}
 
-function MoveList({ items, heading, doneSet, onToggle, onOpen }: {
-  items: SafetyItem[]; heading?: string | null; doneSet: Set<string>; onToggle: (id: string) => void; onOpen: (i: SafetyItem) => void;
-}) {
-  if (!items.length) {
-    return <Empty big="You're all caught up." small="No new reports need you right now." />;
-  }
-  return (
-    <>
-      {heading !== null && <SectionHeading>{heading ?? 'Decisions waiting on you'}</SectionHeading>}
-      <div className="flex flex-col gap-2">
-        {items.map((i) => {
-          const done = doneSet.has(i.id);
-          return (
-            // A clickable row that also contains a checkbox button, so it stays a
-            // div with an explicit button role + keyboard handler (a <button> can't
-            // nest the checkbox <button>).
-            <div key={i.id} role="button" tabIndex={0} onClick={() => onOpen(i)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(i); } }}
-              className={`flex items-center gap-3 bg-card border border-border rounded-lg pl-2 pr-4 py-2.5 min-h-[60px] cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${done ? 'opacity-50' : ''}`}>
-              {/* 44px hit area around a 24px checkbox */}
-              <button onClick={(e) => { e.stopPropagation(); onToggle(i.id); }} aria-label={done ? 'Mark not done' : 'Mark done'}
-                className="w-11 h-11 grid place-items-center shrink-0 rounded-lg hover:bg-muted/60 transition-colors">
-                <span className={`w-6 h-6 rounded-sm border-2 grid place-items-center transition-colors ${done ? 'bg-[color:var(--gfo-success)] border-[color:var(--gfo-success)] text-white' : 'border-muted-foreground/40 text-transparent'}`}>
-                  <Check className="w-3.5 h-3.5" />
-                </span>
-              </button>
-              <div className={`flex-1 min-w-0 ${done ? 'line-through text-muted-foreground' : ''}`}>
-                <div className="text-[15px] text-foreground">{i.title}</div>
-                {i.sub && <div className="text-[12.5px] text-muted-foreground mt-0.5">{i.sub}</div>}
-              </div>
-              {i.due && <span className={`text-[13px] font-semibold whitespace-nowrap ${i.due.tone === 'red' ? 'text-[color:var(--gfo-error)]' : i.due.tone === 'amber' ? 'text-[color:var(--gfo-warning)]' : 'text-muted-foreground'}`}>{i.due.label}</span>}
-              <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-function Empty({ big, small }: { big: string; small: string }) {
-  return (
-    <div className="text-center py-12">
-      <div className="text-[16px] text-foreground/70 font-medium mb-1">{big}</div>
-      <div className="text-[14px] text-muted-foreground max-w-md mx-auto">{small}</div>
-    </div>
-  );
-}
