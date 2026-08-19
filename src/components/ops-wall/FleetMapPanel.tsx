@@ -7,6 +7,8 @@ interface FleetMapPanelProps {
   fleet: UnifiedFleetAircraft[];
   homeBase?: string;
   className?: string;
+  /** 'dark' pins the basemap dark regardless of app theme — for the fixed-palette TV walls (D88). */
+  theme?: 'auto' | 'dark';
 }
 
 /** Re-renders on browser online/offline transitions. */

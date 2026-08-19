@@ -104,3 +104,15 @@ export function satcomStatuses(): AircraftStatus[] {
       : [],
   }));
 }
+
+/** Crew duty windows for the ops wall's duty band (D88). "HH:MM" ET, same convention as TODAY_LEGS. */
+export interface DutyWindow {
+  crew: string;
+  start: string;
+  end: string;
+}
+
+export const DUTY_WINDOWS: DutyWindow[] = [
+  { crew: 'Hartley / Munoz', start: '06:30', end: '18:30' },
+  { crew: 'Okafor / Lindgren', start: '11:00', end: '23:00' },
+];

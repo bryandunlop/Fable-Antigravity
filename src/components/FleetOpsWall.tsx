@@ -1,18 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Loader2, Plane } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useUnifiedFleetStatus } from './hooks/useUnifiedFleetStatus';
 import { FirLeadershipChip } from './fir/components/FirLeadershipChip';
 import DailyFlightsWidget from './DailyFlightsWidget';
+import TailStatusCards from './ops-wall/TailStatusCards';
 import DutyRosterWidget from './DutyRosterWidget';
-import FleetMapPanel from './ops-wall/FleetMapPanel';
 import NasImpactTile from './ops-wall/NasImpactTile';
 import StationWeatherStrip from './ops-wall/StationWeatherStrip';
 import WeatherForecast from './WeatherForecast';
 import { HOME_STATION } from '../config/station';
 import QuickLinksBar from './ops-wall/QuickLinksBar';
 import { lookupAirport } from '../services/airportCoords';
-import { RAG_DOT } from './ops-wall/ragColors';
 
 /** Stations shown alongside home. Kept short so the strip stays one line. */
 const MAX_DESTINATION_STATIONS = 3;
@@ -48,14 +46,16 @@ function useOpsClock(): string {
 }
 
 /**
- * The fleet ops wall — the home screen.
+ * The fleet ops wall — the everyday landing page (D88).
  *
- * Replaces the previous 2x2 card grid. The organising idea is a live picture
- * first: where the fleet is and whether it is airworthy, with the day's
- * operational context supporting it rather than competing with it.
+ * The organising idea is airworthiness first: a per-tail status rail answers
+ * "who can fly, and why not" before anything else, with the day's operational
+ * context (weather, flights, NAS, duty) supporting it.
  *
- * The map area is deliberately a first-class region. It currently renders an
- * interim schematic; the Leaflet view at /fleet-map is the intended occupant.
+ * D88 REVERSED the earlier "map is a first-class region" ruling: the aircraft
+ * map is not critical for the everyday user and moved to the maintenance TV
+ * wall (/wall/maintenance). Other roles reach it on demand — the fixed Fleet
+ * map tile in QuickLinksBar links /fleet-map.
  */
 export default function FleetOpsWall({ userRole }: { userRole: string }) {
   const { fleet, dispatchable, inFlight, satcomLoading, isRefreshing } = useUnifiedFleetStatus();
@@ -80,12 +80,26 @@ export default function FleetOpsWall({ userRole }: { userRole: string }) {
         <div className="flex items-baseline gap-3">
           <h1 className="text-xl font-medium">{greeting(new Date().getHours())}</h1>
           <span className="font-mono text-xs text-muted-foreground">{clock}</span>
+          {(satcomLoading || isRefreshing) && (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-label="Refreshing" />
+          )}
         </div>
-        <FirLeadershipChip roles={[userRole]} />
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs text-muted-foreground">
+            {dispatchable} of {fleet.length} dispatchable · {inFlight} in flight
+            {grounded > 0 && <span className="font-semibold text-[#EF3340]"> · {grounded} grounded</span>}
+          </span>
+          <FirLeadershipChip roles={[userRole]} />
+        </div>
       </header>
 
-      {/* ONE weather panel: the METAR strip and the 7-day outlook share a
-          container so they read as a single unit.
+      {/* Per-tail status rail — D88, the page's lead. Cards from sm up; a compact
+          status list on phones. Each links to /aircraft. */}
+      <TailStatusCards fleet={fleet} />
+
+      {/* ONE weather panel: the METAR strip and the outlook share a
+          container so they read as a single unit. 5 days per D88 (was 7) —
+          Bryan 2026-08-19, "could probably actually do 5 days to save space".
           
           D30's chosen option was the "unified METAR/TAF/outlook panel", NOT the
           sibling-block option it explicitly rejected — and WeatherForecast opens
@@ -101,56 +115,8 @@ export default function FleetOpsWall({ userRole }: { userRole: string }) {
           parser, route and cache all survive. Only the mount point moves. */}
       <section className="rounded-lg border border-border bg-card p-3" aria-label="Weather">
         <StationWeatherStrip stations={stations} />
-        <WeatherForecast icaoId={HOME_STATION} />
+        <WeatherForecast icaoId={HOME_STATION} maxDays={5} />
       </section>
-
-      {/* Fleet rail + map */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(190px,220px)_minmax(0,1fr)]">
-        <section
-          className="rounded-lg border border-border bg-card p-3"
-          aria-label="Fleet status"
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-sm font-medium">
-              Fleet
-              {(satcomLoading || isRefreshing) && (
-                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-              )}
-            </span>
-            <Link to="/aircraft" className="text-[11px] text-muted-foreground hover:text-foreground">
-              {fleet.length} tails
-            </Link>
-          </div>
-
-          <ul className="space-y-1.5">
-            {fleet.map(ac => (
-              <li key={ac.tailNumber} className="flex items-center gap-2 text-xs">
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: RAG_DOT[ac.airworthiness.status] ?? 'var(--muted-foreground)' }}
-                  aria-label={ac.airworthiness.status}
-                />
-                <span className="font-mono text-foreground/90">{ac.tailNumber}</span>
-                <span className="text-muted-foreground">{ac.airworthiness.type}</span>
-                <span className="ml-auto truncate text-[11px] text-muted-foreground">
-                  {ac.flightStatus === 'in-flight' ? (
-                    <Plane className="h-3 w-3 text-primary" aria-label="In flight" />
-                  ) : (
-                    ac.location ?? '—'
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
-            {dispatchable} dispatchable · {inFlight} in flight
-            {grounded > 0 && ` · ${grounded} grounded`}
-          </p>
-        </section>
-
-        <FleetMapPanel fleet={fleet} homeBase={HOME_STATION} className="min-h-[300px]" />
-      </div>
 
       {/* Dock */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">

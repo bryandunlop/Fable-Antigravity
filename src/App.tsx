@@ -71,6 +71,8 @@ import LobbyDisplay from './components/LobbyDisplay';
 import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
 import RampMode from './components/tech-log/pages/RampMode';
+import OpsWall from './components/wall/OpsWall';
+import MaintenanceWall from './components/wall/MaintenanceWall';
 import FirRoutes from './components/fir/FirRoutes';
 import BookingProfile from './components/BookingProfile';
 import TripBuilderRoute from './components/trips/TripBuilderRoute';
@@ -239,6 +241,16 @@ export default function App() {
                         meant a read-only screen could still clobber the tab that did the signing. */}
                     <Route path="/tech-log/aircraft/:tail/ramp" element={
                       !isAuthenticated ? <Navigate to="/login" replace /> : <RampMode />
+                    } />
+
+                    {/* D88 hangar TV walls — read-only displays, full-bleed without the sidebar
+                        chrome, same placement rationale as ramp mode above. Sibling of D87's
+                        /scheduling-wall below; a shared /wall family lives in components/wall/. */}
+                    <Route path="/wall/ops" element={
+                      !isAuthenticated ? <Navigate to="/login" replace /> : <OpsWall />
+                    } />
+                    <Route path="/wall/maintenance" element={
+                      !isAuthenticated ? <Navigate to="/login" replace /> : <MaintenanceWall />
                     } />
 
                     {/* D87 scheduling wall — read-only TV mode for the ops area. Out here with

@@ -138,6 +138,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // FIR — retrospective ops explainability (docs/FIR_MODULE_DESIGN.md). Any role can open one (§7 bottom-up capture).
   { path: '/fir', label: 'Irregularity Reports', railLabel: 'Irregularity', domain: 'flight-ops', icon: Flag, primary: false, detailLabel: 'FIR', keywords: ['fir', 'irregularity', 'aog report', 'delay', 'debrief', 'downtime', 'why'], roles: ['pilot', 'chief-pilot', 'inflight', 'maintenance', 'maintenance-coordinator', 'dom', 'lead', 'safety', 'scheduling', 'admin'] },
   { path: '/fleet-map', label: 'Live Fleet Map', domain: 'flight-ops', icon: MapPin, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  // D88 hangar TV walls — no sidebar item, but searchable so whoever sets the TV up finds them
+  // via the command palette (same precedent as D87's /scheduling-wall).
+  { path: '/wall/ops', label: 'Ops Wall (TV)', domain: 'flight-ops', icon: Monitor, sidebar: false, keywords: ['hangar tv', 'display', 'wallboard', 'swimlane'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  { path: '/wall/maintenance', label: 'Maintenance Wall (TV)', domain: 'maintenance', icon: Monitor, sidebar: false, keywords: ['hangar tv', 'mx wall', 'display', 'fleet map'], roles: ['maintenance', 'admin', 'lead'] },
 
   // ── Scheduling — the Scheduling Workspace leads ───────────────────────────
   { path: '/scheduling-command', label: 'Scheduling', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['master command center', 'horizon', 'checklist', 'handoff', 'fleet board', 'trips', 'templates'], roles: ['scheduling', 'admin'] },

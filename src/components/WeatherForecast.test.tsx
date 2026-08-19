@@ -6,12 +6,20 @@ import WeatherForecast from './WeatherForecast';
 // network service. Stub it so this test is deterministic and offline. periods
 // is empty on purpose: the advisory label renders independent of forecast
 // state, which is exactly the point below.
+let mockPeriods: unknown[] = [];
 vi.mock('../services/nwsForecastService', () => ({
   fetchForecast: vi.fn(async () => ({
-    periods: [],
+    periods: mockPeriods,
     fetchedAt: '2026-07-24T00:00:00Z',
   })),
 }));
+
+function period(n: number) {
+  return {
+    number: n, name: `Day ${n}`, isDaytime: true, tempC: 20 + n, windKt: 8,
+    precipProbability: 10, shortForecast: 'Sunny', detailedForecast: 'Sunny all day',
+  };
+}
 
 describe('WeatherForecast — Q14 advisory label (TL-11)', () => {
   it('renders the "not for flight planning" mitigation label', async () => {
@@ -33,5 +41,19 @@ describe('WeatherForecast — Q14 advisory label (TL-11)', () => {
     // returns. With the empty mock the loaded state shows the no-data message.
     // (This is the async pattern every future component test here should copy.)
     await screen.findByText(/No outlook available/i);
+  });
+});
+
+describe('WeatherForecast — maxDays (D88)', () => {
+  it('caps the rendered outlook at maxDays and labels accordingly', async () => {
+    mockPeriods = [1, 2, 3, 4, 5, 6, 7].map(period);
+    render(<WeatherForecast icaoId="KLUK" maxDays={5} />);
+
+    expect(screen.getByText('5-DAY OUTLOOK')).toBeInTheDocument();
+    await screen.findByText('Day 5');
+    expect(screen.queryByText('Day 6')).not.toBeInTheDocument();
+    // The Q14 mitigation label survives the cap.
+    expect(screen.getByText('Planning outlook — not for flight planning')).toBeInTheDocument();
+    mockPeriods = [];
   });
 });
