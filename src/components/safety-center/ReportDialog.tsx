@@ -78,8 +78,8 @@ export function ReportDialog({
                 const Icon = TYPES[k].icon;
                 return (
                   <button key={k} onClick={() => { setKind(k); setStep(1); }}
-                    className="text-left border border-border rounded-[10px] p-3.5 flex gap-3 items-start hover:border-accent hover:bg-accent/5 transition-colors">
-                    <div className="w-[34px] h-[34px] rounded-[9px] grid place-items-center shrink-0" style={{ background: TYPES[k].bg }}>
+                    className="text-left border border-border rounded-lg p-3.5 flex gap-3 items-start hover:border-accent hover:bg-accent/5 transition-colors">
+                    <div className="w-[34px] h-[34px] rounded-md grid place-items-center shrink-0" style={{ background: TYPES[k].bg }}>
                       <Icon className="w-[17px] h-[17px] text-foreground" />
                     </div>
                     <div>
@@ -95,7 +95,7 @@ export function ReportDialog({
           {step === 1 && template && (
             <div className="flex flex-col gap-3.5">
               {kind === 'asap' && (
-                <div className="rounded-[9px] px-3 py-2.5 text-[12.5px] leading-snug sc-accent">🔒 Confidential — your name is separated from the event before review.</div>
+                <div className="rounded-md px-3 py-2.5 text-[12.5px] leading-snug sc-accent">🔒 Confidential — your name is separated from the event before review.</div>
               )}
               {template.fields.map((f) => (
                 <TemplateField key={f.id} field={f} value={values[f.id] || ''} onChange={(v) => set(f.id, v)}
@@ -164,7 +164,7 @@ function TemplateField({ field, value, onChange, invalid }: {
         <div className="flex gap-2 flex-wrap">
           {(field.options || []).map((o) => (
             <button key={o} type="button" onClick={() => onChange(o)}
-              className={`text-[13.5px] font-medium px-3.5 py-2 min-h-[40px] rounded-[9px] border transition-colors ${value === o ? 'bg-accent/10 border-accent text-accent' : 'bg-card border-border text-muted-foreground hover:border-muted-foreground/40'}`}>
+              className={`text-[13.5px] font-medium px-3.5 py-2 min-h-[40px] rounded-md border transition-colors ${value === o ? 'bg-accent/10 border-accent text-accent' : 'bg-card border-border text-muted-foreground hover:border-muted-foreground/40'}`}>
               {o}
             </button>
           ))}
@@ -199,7 +199,7 @@ function TemplateField({ field, value, onChange, invalid }: {
     return (
       <button type="button" onClick={() => onChange(on ? '' : 'true')}
         className="flex items-center gap-2.5 text-left min-h-[44px] group">
-        <span className={`w-6 h-6 rounded-[7px] border-2 grid place-items-center transition-colors shrink-0 ${on ? 'bg-accent border-accent text-white' : 'border-muted-foreground/40 text-transparent group-hover:border-muted-foreground/70'}`}>
+        <span className={`w-6 h-6 rounded-sm border-2 grid place-items-center transition-colors shrink-0 ${on ? 'bg-accent border-accent text-white' : 'border-muted-foreground/40 text-transparent group-hover:border-muted-foreground/70'}`}>
           <Check className="w-3.5 h-3.5" />
         </span>
         <span className="text-[14px] text-foreground">{field.label}</span>

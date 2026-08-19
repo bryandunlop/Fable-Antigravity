@@ -21,7 +21,7 @@ export function SubmissionsArchive({ items, onOpen }: { items: SafetyItem[]; onO
 
   return (
     <div className="mt-4">
-      <div className="flex items-center gap-2.5 bg-card border border-border rounded-[12px] px-3.5 h-12 mb-3">
+      <div className="flex items-center gap-2.5 bg-card border border-border rounded-lg px-3.5 h-12 mb-3">
         <Search className="w-5 h-5 text-muted-foreground shrink-0" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search — title, tail, reporter, ref…"
           className="flex-1 bg-transparent outline-none text-[15px] text-foreground placeholder:text-muted-foreground" />
@@ -50,7 +50,7 @@ export function SubmissionsArchive({ items, onOpen }: { items: SafetyItem[]; onO
         <div className="flex flex-col gap-2">
           {filtered.map((i) => (
             <button key={i.id} onClick={() => onOpen(i)}
-              className="text-left grid grid-cols-[70px_1fr_auto] gap-3.5 items-center bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[56px] hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995]">
+              className="text-left grid grid-cols-[70px_1fr_auto] gap-3.5 items-center bg-card border border-border rounded-lg px-4 py-3.5 min-h-[56px] hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995]">
               <TypeLabel>{i.type}</TypeLabel>
               <div className="min-w-0">
                 <div className="text-[14.5px] text-foreground truncate">{i.title}</div>

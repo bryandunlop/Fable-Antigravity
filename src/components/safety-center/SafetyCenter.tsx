@@ -252,7 +252,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   };
 
   return (
-    <div className="max-w-[1080px] mx-auto px-6 py-6" style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}>
+    <div className="max-w-[1080px] mx-auto px-6 py-6">
       <ToneStyles />
 
       {/* header */}
@@ -266,7 +266,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         <div className="flex-1" />
         <div className="flex items-center gap-2.5">
           <button onClick={() => setKnowOpen(true)} aria-label="Notifications"
-            className="relative w-11 h-11 rounded-[11px] border border-muted-foreground/30 bg-card grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            className="relative w-11 h-11 rounded-lg border border-muted-foreground/30 bg-card grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             <Bell className="w-[21px] h-[21px]" />
             {knowItems.length > 0 && <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] rounded-full bg-[color:var(--gfo-error)] text-white text-[10px] font-bold grid place-items-center px-1">{knowItems.length}</span>}
           </button>
@@ -298,7 +298,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
               history stays reachable when nothing is due. */}
           {hasAudits && (
             <button onClick={() => openDoor('audits')}
-              className={`w-full text-left flex items-center gap-3 bg-card border rounded-[12px] px-4 py-3.5 min-h-[56px] mb-4 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${auditsDue > 0 ? 'border-[color:var(--gfo-warning)]/50 hover:border-[color:var(--gfo-warning)]' : 'border-border hover:border-muted-foreground/40'}`}>
+              className={`w-full text-left flex items-center gap-3 bg-card border rounded-lg px-4 py-3.5 min-h-[56px] mb-4 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${auditsDue > 0 ? 'border-[color:var(--gfo-warning)]/50 hover:border-[color:var(--gfo-warning)]' : 'border-border hover:border-muted-foreground/40'}`}>
               <ClipboardCheck className={`w-5 h-5 shrink-0 ${auditsDue > 0 ? 'text-[color:var(--gfo-warning)]' : 'text-muted-foreground'}`} />
               <div className="flex-1 text-[14.5px] text-foreground">
                 {auditsDue > 0
@@ -314,7 +314,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
               const attention = (key === 'reads' && pendingInitials > 0);
               return (
                 <button key={key} onClick={() => openDoor(key)}
-                  className="text-left bg-card border border-border rounded-[12px] px-5 py-5 min-h-[104px] cursor-pointer hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1">
+                  className="text-left bg-card border border-border rounded-lg px-5 py-5 min-h-[104px] cursor-pointer hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1">
                   <div className="flex items-start justify-between">
                     <Icon className="w-[22px] h-[22px] text-muted-foreground" />
                     <ChevronRight className="w-5 h-5 text-muted-foreground/50" />
@@ -360,7 +360,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
               { n: model.ops.track.length, l: 'Open cases', tone: 'neutral' },
               { n: model.ops.done.length, l: 'Closed', tone: 'green' },
             ].map((s, i) => (
-              <div key={i} className="bg-card border border-border rounded-[12px] px-4 py-3.5 min-w-[130px] flex-1">
+              <div key={i} className="bg-card border border-border rounded-lg px-4 py-3.5 min-w-[130px] flex-1">
                 <div className={`text-[26px] font-semibold tracking-tight leading-none tabular-nums ${STAT_TONE[s.tone]}`}>{s.n}</div>
                 <div className="text-[12.5px] text-muted-foreground mt-1">{s.l}</div>
               </div>
@@ -457,11 +457,11 @@ function MoveList({ items, heading, doneSet, onToggle, onOpen }: {
             // nest the checkbox <button>).
             <div key={i.id} role="button" tabIndex={0} onClick={() => onOpen(i)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(i); } }}
-              className={`flex items-center gap-3 bg-card border border-border rounded-[12px] pl-2 pr-4 py-2.5 min-h-[60px] cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${done ? 'opacity-50' : ''}`}>
+              className={`flex items-center gap-3 bg-card border border-border rounded-lg pl-2 pr-4 py-2.5 min-h-[60px] cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${done ? 'opacity-50' : ''}`}>
               {/* 44px hit area around a 24px checkbox */}
               <button onClick={(e) => { e.stopPropagation(); onToggle(i.id); }} aria-label={done ? 'Mark not done' : 'Mark done'}
-                className="w-11 h-11 grid place-items-center shrink-0 rounded-[10px] hover:bg-muted/60 transition-colors">
-                <span className={`w-6 h-6 rounded-[7px] border-2 grid place-items-center transition-colors ${done ? 'bg-[color:var(--gfo-success)] border-[color:var(--gfo-success)] text-white' : 'border-muted-foreground/40 text-transparent'}`}>
+                className="w-11 h-11 grid place-items-center shrink-0 rounded-lg hover:bg-muted/60 transition-colors">
+                <span className={`w-6 h-6 rounded-sm border-2 grid place-items-center transition-colors ${done ? 'bg-[color:var(--gfo-success)] border-[color:var(--gfo-success)] text-white' : 'border-muted-foreground/40 text-transparent'}`}>
                   <Check className="w-3.5 h-3.5" />
                 </span>
               </button>

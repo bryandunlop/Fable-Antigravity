@@ -17,7 +17,7 @@ export function PublishedReports({ reports }: { reports: PublishedReport[] }) {
     <div className="mt-4">
       <p className="text-[13px] text-muted-foreground mb-4 px-0.5">De-identified lessons learned, shared across the department. Every closed hazard that carries a lesson ends up here.</p>
 
-      <div className="flex items-center gap-2 bg-card border border-border rounded-[10px] px-3 h-10 mb-4">
+      <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 h-10 mb-4">
         <Search className="w-4 h-4 text-muted-foreground shrink-0" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search published reports…"
           className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground" />
@@ -29,7 +29,7 @@ export function PublishedReports({ reports }: { reports: PublishedReport[] }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {filtered.map((r) => (
             <button key={r.id} onClick={() => setOpen(r)}
-              className="text-left bg-card border border-border rounded-[12px] p-4 hover:border-accent hover:shadow-sm transition-all">
+              className="text-left bg-card border border-border rounded-lg p-4 hover:border-accent hover:shadow-sm transition-all">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)' }}>
                   <BookOpen className="w-4 h-4 text-accent" />
