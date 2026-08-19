@@ -11,10 +11,11 @@ import { deriveTripReadiness } from '../tech-log/engine/readiness';
 import { deriveSchedulingReadiness } from '../../scheduling/engine/readiness';
 import { deriveCustody, type CustodyState } from '../tech-log/engine/custody';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
+import { Bell } from 'lucide-react';
 import { composePilotReadiness, type PilotReadiness } from './selectors';
 import { deriveTripModules, totalOutstanding } from './moduleStatus';
 import { currentLegIndex, selectedLegIndex } from './legContext';
-import ReadinessBar from './ReadinessBar';
+import ReadinessPill from './ReadinessPill';
 import MessagesPanel from './panels/MessagesPanel';
 import { ModuleCard } from './panels/ModuleCard';
 import { HandoverCard } from './panels/HandoverCard';
@@ -61,6 +62,10 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   // Maintenance handover accept lives in the URL too (?handover), so the pilot's place — including a
   // half-completed accept — survives navigating away and back, exactly like the airport drawer.
   const handoverOpen = !!searchParams.get('handover');
+  // Messages joins the same URL-driven family (?airport, ?handover). It used to be a permanent
+  // panel at the bottom of the page, which on a 1194x834 iPad meant it was permanently below the
+  // fold — a section nobody could see, costing the layout its whole tail (D84).
+  const messagesOpen = !!searchParams.get('messages');
 
   const setParam = (key: string, value: string | null) =>
     setSearchParams((prev) => {
@@ -90,21 +95,24 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   const outstanding = totalOutstanding(modules);
 
   return (
-    <div className="space-y-4">
-      {/* Trip header — identity, custody, one readiness verdict */}
-      <div className="space-y-3 rounded-lg border p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-semibold">{trip.tripNumber} · {trip.tail} · {trip.aircraftType}</div>
-            <div className="text-sm text-muted-foreground">
-              {trip.tripType} · {legs.length} legs{outstanding > 0 ? ` · ${outstanding} to prep` : ''}
-            </div>
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Trip header — identity, custody and the readiness verdict on ONE row. This is the only
+          heading the workspace has now: the page title and lede it used to sit under said nothing
+          this line does not, and cost ~80pt above the fold. */}
+      <div className="flex flex-none flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-card px-5 py-3">
+        <div className="min-w-0">
+          <div className="text-lg font-semibold leading-tight">{trip.tripNumber} · {trip.tail} · {trip.aircraftType}</div>
+          <div className="text-xs text-muted-foreground">
+            {trip.tripType} · {legs.length} legs{outstanding > 0 ? ` · ${outstanding} to prep` : ''}
           </div>
-          {custody && <PilotCustodyChip state={custody} />}
         </div>
-        {readiness && <ReadinessBar readiness={readiness} />}
+        <div className="flex shrink-0 items-center gap-2.5">
+          {custody && <PilotCustodyChip state={custody} />}
+          {readiness && <ReadinessPill readiness={readiness} />}
+        </div>
       </div>
 
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
       {tlTrip && legs.length > 1 && (
         <LegStepper legs={legs} currentIndex={currentIdx < 0 ? 0 : currentIdx} selectedIndex={selectedIdx}
           officeTzOffsetMinutes={officeTzOffsetMinutes} onSelect={selectLeg} />
@@ -131,15 +139,21 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         </ModuleCard>
       </div>
 
-      {/* Footer — always-available reporting.
+      </div>
+
+      {/* Bottom bar — always-available reporting, pinned rather than scrolled past.
           LG-211: these were twin grey buttons, so the airworthiness-relevant act and the nuisance
           capture looked like the same size of decision. Reporting a defect can ground the aircraft;
           logging a nuisance item cannot. The primary treatment says which one that is. */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
-        {tlAc && <button onClick={() => setSquawkOpen(true)} className="min-h-[44px] rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Report defect</button>}
-        {tlAc && <button onClick={() => setNuisanceOpen(true)} className="min-h-[44px] rounded px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">Log nuisance item</button>}
+      <div className="flex flex-none flex-wrap items-center gap-2 border-t border-border bg-card px-5 py-2.5">
+        {tlAc && <button onClick={() => setSquawkOpen(true)} className="min-h-[44px] rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 duration-fast">Report defect</button>}
+        {tlAc && <button onClick={() => setNuisanceOpen(true)} className="min-h-[44px] rounded px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground duration-fast">Log nuisance item</button>}
+        <span className="flex-1" />
+        <button onClick={() => setParam('messages', '1')}
+          className="inline-flex min-h-[44px] items-center gap-2 rounded px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground duration-fast">
+          <Bell className="h-4 w-4" aria-hidden /> Messages
+        </button>
       </div>
-      <MessagesPanel />
 
       {tlAc && <ReportDefectDialog open={squawkOpen} onOpenChange={setSquawkOpen} lockTail={tlAc.tailNumber} />}
       {tlAc && <LogNuisanceItemDialog open={nuisanceOpen} onOpenChange={setNuisanceOpen} aircraft={tlAc} />}
@@ -167,6 +181,18 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
               </div>
             </>
           )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Messages — the same slide-over treatment as airport review and handover, so the pilot's
+          place survives navigating away and back. */}
+      <Sheet open={messagesOpen} onOpenChange={(o: boolean) => { if (!o) setParam('messages', null); }}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Messages</SheetTitle>
+            <SheetDescription>Scheduling and operations items addressed to the crew.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4"><MessagesPanel /></div>
         </SheetContent>
       </Sheet>
 

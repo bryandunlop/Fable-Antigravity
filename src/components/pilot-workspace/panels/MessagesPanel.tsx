@@ -28,9 +28,10 @@ export default function MessagesPanel() {
     }
   }
 
+  // Bare content — the slide-over supplies the title (D84). This was a permanent section at the
+  // foot of the trip page, which on a 1194x834 iPad put it permanently below the fold.
   return (
-    <section className="rounded-lg border p-4">
-      <h2 className="font-semibold mb-2">Messages</h2>
+    <div>
       {events.length === 0 && <p className="text-sm text-muted-foreground">No messages.</p>}
       <ul className="space-y-2">
         {events.map((e) => (
@@ -42,6 +43,6 @@ export default function MessagesPanel() {
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }
