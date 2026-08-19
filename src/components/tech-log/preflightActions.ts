@@ -1,4 +1,5 @@
 import type { Trip, TripLeg, TechLogAction, FratRecord, FratRecordSection } from './types';
+import { T_MINUS_COMMIT_HOURS } from './engine/dispatchWindow';
 
 /** The submitted assessment as the form hands it over — the template's `icon` is ignored. */
 export interface FratAssessmentSection {
@@ -98,8 +99,10 @@ export function markAirportReviewedOnLeg(args: Base): void {
  * How long before ETD a home-base fuel-farm request stops being accepted. Exported because the prep
  * matrix (D84) has to RENDER this boundary — show the lock time, and stop offering a button that
  * would be refused — and a second copy of `4` is exactly how the two would drift apart.
+ *
+ * This is THE boundary the rest of the app now aligns to; see `engine/dispatchWindow`.
  */
-export const FUEL_LOCK_HOURS_BEFORE_ETD = 4;
+export const FUEL_LOCK_HOURS_BEFORE_ETD = T_MINUS_COMMIT_HOURS;
 
 export function submitFuelOnLeg(args: Base & { lbs: number; nowMs: number }): { ok: true } | { ok: false; error: string } {
   const hoursUntil = (new Date(args.leg.departureTimeUtc).getTime() - args.nowMs) / 3_600_000;

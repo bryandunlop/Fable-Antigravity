@@ -64,9 +64,17 @@ const renderAt = (search: string) =>
   );
 
 describe('prep vs day-of pane (D84)', () => {
-  it('opens in day-of inside the threshold: stepper and board, no matrix', () => {
-    // Next departure 14:20Z, now 08:33Z — 5h47m out, inside the 12h window.
+  it('opens in PREP at 5h47m out, because the T-4h boundary has not passed', () => {
+    // Next departure 14:20Z, now 08:33Z. Under the old 12h guess this was day-of; aligned to the
+    // fuel lock it is prep, and that is the point — fuel is still requestable, so the matrix is
+    // still the right instrument.
     renderAt('');
+    expect(screen.getByTestId('prep-matrix')).toBeInTheDocument();
+    expect(screen.queryByTestId('leg-stepper')).not.toBeInTheDocument();
+  });
+
+  it('opens in day-of once inside T-4h: stepper and board, no matrix', () => {
+    renderAt('?mode=day-of');
     expect(screen.getByTestId('leg-stepper')).toBeInTheDocument();
     expect(screen.getByTestId('day-of-section')).toBeInTheDocument();
     expect(screen.queryByTestId('prep-matrix')).not.toBeInTheDocument();

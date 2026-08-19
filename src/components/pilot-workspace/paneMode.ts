@@ -1,4 +1,5 @@
 import type { TripLeg } from '../tech-log/types';
+import { T_MINUS_COMMIT_HOURS } from '../tech-log/engine/dispatchWindow';
 
 /**
  * Which instrument the pilot workspace hands you, per D84.
@@ -11,17 +12,21 @@ import type { TripLeg } from '../tech-log/types';
  * The clock chooses, and the pilot can override — a mode that changes under you without a way back
  * is a trap, and a mode you must remember to enter is a chore (both were drawn and rejected).
  *
- * THE THRESHOLD IS A GUESS AND IS MARKED AS ONE. 12h covers the duty day and lands comfortably
- * before the T-4h home-base fuel lock (`requiresFuelFarmSubmission`), so the countdown surfaces
- * that lock while it can still be acted on; 4h would be too late to help and 24h is noise. The real
- * number is a Chief Pilot ruling — see D84's open list. It is one constant so that ruling is a
- * one-line change.
+ * THE THRESHOLD IS T-4h, THE SAME BOUNDARY AS THE FUEL LOCK (Bryan, 2026-08-19). It is not a guess
+ * any more and it is not this module's to pick — see `tech-log/engine/dispatchWindow` for why one
+ * number governs all of them.
+ *
+ * It shipped as 12h for a day, on the reasoning that day-of should surface the fuel lock while that
+ * lock could still be acted on. That was backwards: fuel is PREP work and belongs in the prep matrix
+ * (which shows its lock time in the cell), so a day-of queue whose most urgent item for eight hours
+ * was a prep task would have been a queue about the wrong thing. Aligned, the panes mean something
+ * concrete — prep is "everything is still actionable", day-of is "the last reversible thing closed".
  *
  * DELIBERATELY NOT CALENDAR MATH. This is a fixed offset from an instant, so no timezone and no DST
  * transition can move it. That is the opposite of the PL-25 repair clock (D24), which is anchored to
  * an operator reference zone and must be computed with the IANA database. Do not unify them.
  */
-export const DAY_OF_THRESHOLD_HOURS = 12;
+export const DAY_OF_THRESHOLD_HOURS = T_MINUS_COMMIT_HOURS;
 
 export type PaneMode = 'prep' | 'day-of';
 

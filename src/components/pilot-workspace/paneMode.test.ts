@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DAY_OF_THRESHOLD_HOURS, derivePaneMode, nextDepartureUtc } from './paneMode';
+import { FUEL_LOCK_HOURS_BEFORE_ETD } from '../tech-log/preflightActions';
 import type { TripLeg } from '../tech-log/types';
 
 const leg = (sequence: number, departureTimeUtc: string): TripLeg =>
@@ -34,12 +35,21 @@ describe('pane mode (D84)', () => {
     // 3 days out — the pass where a pilot requests fuel, fills FRATs and checks airports.
     const m = derivePaneMode(LEGS, '2026-08-15T09:12:00Z');
     expect(m.mode).toBe('prep');
-    expect(m.opensAtUtc).toBe('2026-08-18T02:20:00.000Z'); // 14:20 minus 12h; toISOString keeps ms, as the seed does
+    expect(m.opensAtUtc).toBe('2026-08-18T10:20:00.000Z'); // 14:20 minus 4h — the same instant fuel locks
   });
 
   it('flips to day-of exactly AT the threshold, not after it', () => {
-    expect(derivePaneMode(LEGS, '2026-08-18T02:20:00Z').mode).toBe('day-of');
-    expect(derivePaneMode(LEGS, '2026-08-18T02:19:59Z').mode).toBe('prep');
+    expect(derivePaneMode(LEGS, '2026-08-18T10:20:00Z').mode).toBe('day-of');
+    expect(derivePaneMode(LEGS, '2026-08-18T10:19:59Z').mode).toBe('prep');
+  });
+
+  it('flips at the same instant the home-base fuel request locks — one boundary, not two', () => {
+    // The whole point of aligning them: prep is "everything is still actionable" and day-of is
+    // "the last reversible thing has closed". If these two drift apart that sentence stops being
+    // true, so this test fails on ANY divergence rather than on a particular number.
+    const etd = new Date(LEGS[0].departureTimeUtc).getTime();
+    const fuelLocksAt = new Date(etd - FUEL_LOCK_HOURS_BEFORE_ETD * 3_600_000).toISOString();
+    expect(derivePaneMode(LEGS, '2026-08-15T09:12:00Z').opensAtUtc).toBe(fuelLocksAt);
   });
 
   it('stays day-of once the last leg has departed — you are flying, not planning', () => {
@@ -58,14 +68,15 @@ describe('pane mode (D84)', () => {
     expect(early.auto).toBe('prep');
     expect(early.overridden).toBe(true);
 
-    const late = derivePaneMode(LEGS, '2026-08-18T08:33:00Z', 'prep');
+    // 12:00Z is 2h20 before the 14:20 departure — inside the T-4h window, so the clock says day-of.
+    const late = derivePaneMode(LEGS, '2026-08-18T12:00:00Z', 'prep');
     expect(late.mode).toBe('prep');
     expect(late.auto).toBe('day-of');
     expect(late.overridden).toBe(true);
   });
 
   it('does not report an override when the choice agrees with the clock', () => {
-    const m = derivePaneMode(LEGS, '2026-08-18T08:33:00Z', 'day-of');
+    const m = derivePaneMode(LEGS, '2026-08-18T12:00:00Z', 'day-of');
     expect(m.overridden).toBe(false);
   });
 
@@ -74,9 +85,9 @@ describe('pane mode (D84)', () => {
     // before, spans the transition: a calendar-day or local-hour reading would be an hour out.
     // This clock is a fixed offset from an instant — deliberately NOT the PL-25 calendar-day
     // clock of D24, which IS timezone-anchored. Do not "fix" this into calendar math.
-    const dstLegs = [leg(1, '2026-11-01T13:00:00Z')];
-    expect(derivePaneMode(dstLegs, '2026-11-01T01:00:00Z').mode).toBe('day-of'); // T-12h exactly
-    expect(derivePaneMode(dstLegs, '2026-11-01T00:59:00Z').mode).toBe('prep');
-    expect(DAY_OF_THRESHOLD_HOURS).toBe(12);
+    const dstLegs = [leg(1, '2026-11-01T09:00:00Z')];
+    expect(derivePaneMode(dstLegs, '2026-11-01T05:00:00Z').mode).toBe('day-of'); // T-4h exactly
+    expect(derivePaneMode(dstLegs, '2026-11-01T04:59:00Z').mode).toBe('prep');
+    expect(DAY_OF_THRESHOLD_HOURS).toBe(4);
   });
 });
