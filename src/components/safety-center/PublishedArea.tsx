@@ -59,7 +59,7 @@ function NewsletterPanel({ isMgr }: { isMgr: boolean }) {
       <div className="flex flex-col gap-2">
         {newsletters.map((n) => (
           <button key={n.id} onClick={() => setRead(n)}
-            className="text-left bg-card border border-border rounded-[11px] p-4 hover:border-accent hover:shadow-sm transition-all">
+            className="text-left bg-card border border-border rounded-lg p-4 hover:border-accent hover:shadow-sm transition-all">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)' }}><Newspaper className="w-4 h-4 text-accent" /></div>
               <div className="text-[15px] font-medium text-foreground">{n.title}</div>
@@ -142,7 +142,7 @@ function RecognitionsWall() {
       <p className="text-[13px] text-muted-foreground mb-4">Caught Working Safely — peers recognizing peers. File one from the <b className="text-foreground font-medium">Report</b> button.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {recognitions.map((r) => (
-          <div key={r.id} className="bg-card border border-border rounded-[12px] p-4" style={{ borderColor: 'color-mix(in srgb, var(--gfo-sunrise) 45%, var(--border))' }}>
+          <div key={r.id} className="bg-card border border-border rounded-lg p-4" style={{ borderColor: 'color-mix(in srgb, var(--gfo-sunrise) 45%, var(--border))' }}>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-8 h-8 rounded-full grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--gfo-sunrise) 24%, transparent)' }}><Award className="w-4 h-4" style={{ color: 'var(--gfo-sunrise-deep, #B8913D)' }} /></div>
               <div className="text-[14px] font-medium text-foreground">{r.recognized}</div>

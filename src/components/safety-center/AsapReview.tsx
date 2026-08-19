@@ -21,7 +21,7 @@ export function AsapReview() {
 
   return (
     <div className="mt-4">
-      <div className="rounded-[9px] px-3 py-2.5 text-[12.5px] leading-snug sc-accent mb-3 flex items-center gap-2">
+      <div className="rounded-md px-3 py-2.5 text-[12.5px] leading-snug sc-accent mb-3 flex items-center gap-2">
         <Lock className="w-4 h-4 shrink-0" /> ASAP is confidential and non-punitive — reporter identity is never shown. De-identify before sharing any detail.
       </div>
 
@@ -36,7 +36,7 @@ export function AsapReview() {
         {shown.length === 0 && <div className="text-center py-10 text-muted-foreground text-sm">No reports in this state.</div>}
         {shown.map((r) => (
           <button key={r.id} onClick={() => openReport(r)}
-            className="text-left grid grid-cols-[auto_1fr_auto] gap-3 items-center bg-card border border-border rounded-[10px] px-4 py-3 hover:border-muted-foreground/40 hover:shadow-sm transition-all">
+            className="text-left grid grid-cols-[auto_1fr_auto] gap-3 items-center bg-card border border-border rounded-lg px-4 py-3 hover:border-muted-foreground/40 hover:shadow-sm transition-all">
             <span className="text-[11px] text-muted-foreground font-semibold tabular-nums">{r.id}</span>
             <div className="min-w-0">
               <div className="text-[14px] font-medium text-foreground truncate">{r.phase} · {r.airport}</div>

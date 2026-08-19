@@ -30,7 +30,7 @@ export default function ApprovalsInbox({ userRole, additionalRoles = [] }: Props
   }
 
   return (
-    <div className="max-w-[900px] mx-auto px-6 py-6" style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}>
+    <div className="max-w-[900px] mx-auto px-6 py-6">
       <div className="flex items-center gap-2.5 mb-1">
         <ShieldCheck className="w-6 h-6 text-accent" />
         <h1 className="text-[22px] font-semibold tracking-tight m-0">Approvals</h1>
@@ -57,13 +57,13 @@ function AwaitingCard({ req, actingRole, onDecide }: { req: ApprovalRequest; act
   const stepNo = req.currentStep + 1;
 
   return (
-    <div className="bg-card border border-border rounded-[12px] p-4">
+    <div className="bg-card border border-border rounded-lg p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[15px] font-medium text-foreground">{req.subjectTitle}</div>
           <div className="text-[12.5px] text-muted-foreground mt-0.5">{req.formLabel} · requested by {req.requestedByName} · {timeAgo(req.requestedAt)}</div>
         </div>
-        <span className="text-[11px] bg-accent/10 text-accent px-2 py-1 rounded-[8px] whitespace-nowrap shrink-0">Step {stepNo} of {req.chain.length}</span>
+        <span className="text-[11px] bg-accent/10 text-accent px-2 py-1 rounded-md whitespace-nowrap shrink-0">Step {stepNo} of {req.chain.length}</span>
       </div>
 
       {/* prior approvals in the chain */}
@@ -78,7 +78,7 @@ function AwaitingCard({ req, actingRole, onDecide }: { req: ApprovalRequest; act
         {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />} {open ? 'Hide' : 'View'} request details
       </button>
       {open && (
-        <div className="mt-2 border border-border rounded-[9px] divide-y divide-border">
+        <div className="mt-2 border border-border rounded-md divide-y divide-border">
           {Object.entries(req.values).filter(([, v]) => (v || '').trim()).map(([id, v]) => (
             <div key={id} className="px-3 py-2">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">{req.fieldLabels[id] || id}</div>
@@ -95,7 +95,7 @@ function AwaitingCard({ req, actingRole, onDecide }: { req: ApprovalRequest; act
       {commenting && (
         <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} autoFocus
           placeholder="Add a note for the requester and next approver…"
-          className="w-full mt-3 bg-background border border-border rounded-[9px] px-3 py-2 text-[13.5px] outline-none focus:border-accent" />
+          className="w-full mt-3 bg-background border border-border rounded-md px-3 py-2 text-[13.5px] outline-none focus:border-accent" />
       )}
 
       <div className="flex flex-wrap gap-2 mt-3">
@@ -125,7 +125,7 @@ function MineRow({ req }: { req: ApprovalRequest }) {
   // approver's note — surface the last actioned step's comment (esp. a denial).
   const lastDecided = [...req.chain].reverse().find((s) => s.status !== 'pending');
   return (
-    <div className="bg-card border border-border rounded-[12px] px-4 py-3">
+    <div className="bg-card border border-border rounded-lg px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[14px] text-foreground truncate">{req.subjectTitle}</div>
@@ -146,5 +146,5 @@ function SectionHeading({ children, className = '' }: { children: React.ReactNod
   return <div className={`text-[12px] uppercase tracking-wider text-muted-foreground font-semibold mb-2.5 px-0.5 ${className}`}>{children}</div>;
 }
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-[13.5px] text-muted-foreground bg-card border border-border rounded-[12px] px-4 py-5 text-center">{children}</div>;
+  return <div className="text-[13.5px] text-muted-foreground bg-card border border-border rounded-lg px-4 py-5 text-center">{children}</div>;
 }

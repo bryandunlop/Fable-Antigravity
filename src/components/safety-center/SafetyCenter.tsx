@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bell, Plus, Check, ChevronRight, ChevronLeft, FileText, PenLine, ClipboardList, BookOpen, ClipboardCheck } from 'lucide-react';
+import { Bell, Plus, Check, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useNotificationFeed } from '../../notifications/useNotificationFeed';
 import { eventStore } from '../../notifications/events';
@@ -25,32 +25,30 @@ import { createCws } from './cwsRecognitions';
 import { getFormTemplates, templateForKind, describeWithExtras, MULTI_SEP } from './formTemplates';
 import { createApprovalRequest, roleLabel } from './approvalRequests';
 import MyFRATSubmissions from '../MyFRATSubmissions';
+import { CrewHome, type Door } from './CrewHome';
+import { VerbRail } from './VerbRail';
+import { VERBS, parseVerb, verbDef, verbCounts, atPhase, type VerbId } from './verbs';
+import { useApprovalRequests, pendingForRoles } from './approvalRequests';
+import { buildCrewWorklist, type CrewTask } from './crewWorklist';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
 
 const CURRENT_USER = { id: 'u-demo', name: 'Capt. Dunlop' };
 
 interface Props { userRole: string; additionalRoles?: string[] }
 
-// IA (D38, four plain doors): crew gets one page — a Report button and four
-// doors named after the job (My reports · Read and sign · My assessments ·
-// Library). No attention-state language, no tabs behind toggles. The manager
-// keeps a tabbed console under plain names. The move/waiting/done buckets
-// survive only as internal derivation for counts and ordering.
-type Door = 'reports' | 'reads' | 'assessments' | 'library' | 'audits';
-
-const DOORS: { key: Door; label: string; icon: typeof FileText }[] = [
-  { key: 'reports', label: 'My reports', icon: FileText },
-  { key: 'reads', label: 'Read and sign', icon: PenLine },
-  { key: 'assessments', label: 'My assessments', icon: ClipboardList },
-  { key: 'library', label: 'Library', icon: BookOpen },
-];
+// IA (D85, superseding D38's door grid): crew get ONE page — a Report button, a
+// worklist of what actually needs them, and a quiet index of the five areas
+// underneath. The doors survive as that index and keep their `?door=` param, so
+// deep links and notification targets are unchanged; what changed is that the
+// menu no longer stands between the crew and the answer. The manager console is
+// re-navigated separately (C3). The move/waiting/done buckets survive only as
+// internal derivation for counts and ordering.
 
 export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) {
-  const roles = [userRole, ...additionalRoles];
+  const roles = useMemo(() => [userRole, ...additionalRoles], [userRole, additionalRoles]);
   const hasManagerAccess = roles.some((r) => r === 'safety' || r === 'admin');
 
   const [view, setView] = useState<SafetyView>(hasManagerAccess ? 'ops' : 'my');
-  const [tab, setTab] = useState<string>('inbox');
   const [searchParams, setSearchParams] = useSearchParams();
   const door = (searchParams.get('door') as Door | null);
   const [selected, setSelected] = useState<SafetyItem | null>(null);
@@ -62,8 +60,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
 
   const model = useSafetyModel();
   const feed = useNotificationFeed(userRole, additionalRoles);
-  const { submitHazard, updateHazard } = useHazards();
+  const { hazards, submitHazard, updateHazard } = useHazards();
   const { audits } = useAudits();
+  const { requests: approvalRequests } = useApprovalRequests();
   // Read-and-sign is served by the one Documents compliance engine (TL-6 / D29),
   // not a Safety-Center-local store. Required reads are role-targeted; the demo's
   // crew user resolves to a representative id per role.
@@ -71,18 +70,44 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const { userId: docsUserId } = identityFor(userRole);
   const navigate = useNavigate();
 
-  const pendingInitials = unacknowledgedRequiredReads(
-    docsState.docs,
-    docsState.revisions,
-    docsState.acknowledgments,
-    userRole,
-    docsUserId,
-  ).length;
-  const myAudits = auditsForMe(audits);
+  // Read-and-sign is role-targeted and recomputed from the Documents engine, so
+  // it is memoized here rather than re-derived per consumer — the crew worklist
+  // and the index row both read this one list.
+  const requiredReads = useMemo(
+    () => unacknowledgedRequiredReads(
+      docsState.docs, docsState.revisions, docsState.acknowledgments, userRole, docsUserId,
+    ),
+    [docsState.docs, docsState.revisions, docsState.acknowledgments, userRole, docsUserId],
+  );
+
+  const pendingInitials = requiredReads.length;
+  const myAudits = useMemo(() => auditsForMe(audits), [audits]);
   const hasAudits = myAudits.length > 0;
   const auditsDue = myAudits.filter((a) => a.status !== 'Complete').length;
   const openReports = model.my.waiting.length + model.my.move.length;
-  const needsYou = model.my.move.length + pendingInitials + auditsDue;
+
+  // The crew worklist (D85). `nowMs` is passed in rather than read inside the
+  // builder so the derivation stays pure and fixture-testable.
+  const crewTasks = useMemo(
+    () => buildCrewWorklist({
+      reads: requiredReads,
+      hazards: hazards || [],
+      // MY audits, not every audit — `auditsForMe` is the same filter the index
+      // row counts with. Passing the raw list put unassigned pool audits on a
+      // crew member's worklist and made the two numbers disagree on screen.
+      audits: myAudits,
+      reporterName: CURRENT_USER.name,
+      nowMs: Date.now(),
+    }),
+    [requiredReads, hazards, myAudits],
+  );
+
+  /** A worklist row opens the door that can act on it. Reply rows additionally
+   *  carry the hazard id so the archive can scroll to it. */
+  function openCrewTask(t: CrewTask) {
+    if (t.kind === 'reply') setSearchParams({ door: 'reports', item: t.sourceId });
+    else openDoor(t.door);
+  }
 
   // The bell reads the real app notification feed (Safety module) — a filed
   // report shows up here and in the app-wide bell.
@@ -100,7 +125,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
       }));
   }, [feed.entries]);
 
-  function switchView(v: SafetyView) { setView(v); setTab('inbox'); setSearchParams({}, { replace: true }); }
+  function switchView(v: SafetyView) { setView(v); setSearchParams({}, { replace: true }); }
   function openDoor(d: Door | null) {
     if (d) setSearchParams({ door: d });
     else setSearchParams({});
@@ -228,31 +253,33 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     navigate(hasManagerAccess && view === 'ops' ? `/safety/hazard-workflow/${item.sourceId}` : `/safety/hazards/${item.sourceId}`);
   }
 
-  const stalled = model.ops.track.filter((i) => i.stalled).length;
+  // Manager navigation is by VERB now (D85). The counts live in verbs.ts so the
+  // rail's numbers are a pure function of the model rather than a switch here.
+  const verb = parseVerb(searchParams.get('verb'));
+  const counts = useMemo(
+    () => verbCounts({
+      move: model.ops.move,
+      track: model.ops.track,
+      pendingApprovals: pendingForRoles(approvalRequests, roles).length,
+      auditsOpen: audits.filter((a) => a.status !== 'Complete').length,
+    }),
+    [model.ops.move, model.ops.track, approvalRequests, roles, audits],
+  );
 
-  const opsTabs: [string, string][] = [
-    ['inbox', 'New reports'], ['track', 'Open cases'], ['reviews', 'Reviews'], ['audits', 'Audits'], ['manage', 'Admin'],
-  ];
-
-  function countFor(key: string): number | null {
-    if (key === 'inbox') return model.ops.move.length;
-    if (key === 'track') return model.ops.track.length;
-    return null;
+  function selectVerb(v: VerbId) {
+    setSearchParams(v === VERBS[0].id ? {} : { verb: v });
   }
 
-  const doorSub: Record<Door, string> = {
-    reports: openReports > 0 ? `${openReports} open · with the safety team` : 'Nothing open right now',
-    reads: pendingInitials > 0 ? `${pendingInitials} waiting for your initials` : 'All current',
-    assessments: 'FRAT and GRAT history',
-    library: 'Lessons, newsletters, recognitions',
-    audits: 'Audits assigned to you',
-  };
   const doorTitle: Record<Door, string> = {
     reports: 'My reports', reads: 'Read and sign', assessments: 'My assessments', library: 'Library', audits: 'My audits',
   };
 
   return (
-    <div className="max-w-[1080px] mx-auto px-6 py-6" style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}>
+    // The crew page is one reading column and stays at 1080. The console puts a
+    // 188px rail inside the same container, so capping it at 1080 spent 40% of a
+    // 1280 window on chrome (measured) and left 168px per board column — too
+    // narrow for the cards C4 will put there.
+    <div className={`${view === 'ops' ? 'max-w-[1560px]' : 'max-w-[1080px]'} mx-auto px-6 py-6`}>
       <ToneStyles />
 
       {/* header */}
@@ -260,13 +287,13 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight m-0">Safety</h1>
           <div className="text-[13.5px] text-muted-foreground mt-0.5">
-            {view === 'my' ? 'See something? One button reports it. Everything else is behind a door named for the job.' : 'Act on what needs you; shepherd every open case.'}
+            {view === 'my' ? 'See something? One button reports it.' : 'Act on what needs you; shepherd every open case.'}
           </div>
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2.5">
           <button onClick={() => setKnowOpen(true)} aria-label="Notifications"
-            className="relative w-11 h-11 rounded-[11px] border border-muted-foreground/30 bg-card grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            className="relative w-11 h-11 rounded-lg border border-muted-foreground/30 bg-card grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             <Bell className="w-[21px] h-[21px]" />
             {knowItems.length > 0 && <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] rounded-full bg-[color:var(--gfo-error)] text-white text-[10px] font-bold grid place-items-center px-1">{knowItems.length}</span>}
           </button>
@@ -286,46 +313,19 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         </div>
       )}
 
-      {/* ── Crew: one page, four doors ── */}
+      {/* ── Crew: worklist over a quiet index (D85 · A1) ── */}
       {view === 'my' && !door && (
-        <div className="mt-6">
-          {needsYou === 0
-            ? <div className="text-[14px] text-muted-foreground mb-4 px-0.5">Nothing needs you right now.</div>
-            : <div className="text-[14px] text-foreground mb-4 px-0.5 font-medium">{needsYou} {needsYou === 1 ? 'thing needs' : 'things need'} you — the doors below show where.</div>}
-
-          {/* Audits keep a persistent entry point whenever the user has any —
-              due ones get the amber banner, otherwise a quiet row — so audit
-              history stays reachable when nothing is due. */}
-          {hasAudits && (
-            <button onClick={() => openDoor('audits')}
-              className={`w-full text-left flex items-center gap-3 bg-card border rounded-[12px] px-4 py-3.5 min-h-[56px] mb-4 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${auditsDue > 0 ? 'border-[color:var(--gfo-warning)]/50 hover:border-[color:var(--gfo-warning)]' : 'border-border hover:border-muted-foreground/40'}`}>
-              <ClipboardCheck className={`w-5 h-5 shrink-0 ${auditsDue > 0 ? 'text-[color:var(--gfo-warning)]' : 'text-muted-foreground'}`} />
-              <div className="flex-1 text-[14.5px] text-foreground">
-                {auditsDue > 0
-                  ? <>Audits assigned to you — <span className="font-semibold">{auditsDue} due</span></>
-                  : <>My audits — <span className="text-muted-foreground">all complete</span></>}
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
-            </button>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {DOORS.map(({ key, label, icon: Icon }) => {
-              const attention = (key === 'reads' && pendingInitials > 0);
-              return (
-                <button key={key} onClick={() => openDoor(key)}
-                  className="text-left bg-card border border-border rounded-[12px] px-5 py-5 min-h-[104px] cursor-pointer hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1">
-                  <div className="flex items-start justify-between">
-                    <Icon className="w-[22px] h-[22px] text-muted-foreground" />
-                    <ChevronRight className="w-5 h-5 text-muted-foreground/50" />
-                  </div>
-                  <div className="text-[16px] font-semibold text-foreground mt-2.5">{label}</div>
-                  <div className={`text-[13px] mt-0.5 ${attention ? 'text-[color:var(--gfo-error)] font-medium' : 'text-muted-foreground'}`}>{doorSub[key]}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <CrewHome
+          tasks={crewTasks.tasks}
+          more={crewTasks.more}
+          openReports={openReports}
+          pendingReads={pendingInitials}
+          auditsDue={auditsDue}
+          hasAudits={hasAudits}
+          onOpenDoor={openDoor}
+          onOpenTask={openCrewTask}
+          onSearch={(q) => setSearchParams(q.trim() ? { door: 'reports', q: q.trim() } : { door: 'reports' })}
+        />
       )}
 
       {/* ── Crew: inside a door ── */}
@@ -340,7 +340,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
           {door === 'reports' && (
             <>
               <p className="text-[13.5px] text-muted-foreground mt-1 px-0.5">Everything you've filed — tap one to see its status and the safety team's replies.</p>
-              <SubmissionsArchive items={model.submissions.filter((s) => s.submittedBy === CURRENT_USER.name || s.submittedBy === 'You')} onOpen={open} />
+              <SubmissionsArchive items={model.submissions.filter((s) => s.submittedBy === CURRENT_USER.name || s.submittedBy === 'You')} onOpen={open} initialQuery={searchParams.get('q') ?? ''} />
             </>
           )}
           {door === 'reads' && <div className="mt-3"><RequiredReadsList userRole={userRole} /></div>}
@@ -350,47 +350,46 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         </div>
       )}
 
-      {/* ── Manager console ── */}
+      {/* ── Manager console: a rail of verbs (D85 · Flip 3) ── */}
       {view === 'ops' && (
-        <>
-          <div className="flex gap-3 flex-wrap my-5">
-            {[
-              { n: model.ops.move.length, l: 'New reports', tone: 'amber' },
-              { n: stalled, l: 'Stalled >30d', tone: 'red' },
-              { n: model.ops.track.length, l: 'Open cases', tone: 'neutral' },
-              { n: model.ops.done.length, l: 'Closed', tone: 'green' },
-            ].map((s, i) => (
-              <div key={i} className="bg-card border border-border rounded-[12px] px-4 py-3.5 min-w-[130px] flex-1">
-                <div className={`text-[26px] font-semibold tracking-tight leading-none tabular-nums ${STAT_TONE[s.tone]}`}>{s.n}</div>
-                <div className="text-[12.5px] text-muted-foreground mt-1">{s.l}</div>
-              </div>
-            ))}
+        <div className="flex gap-6 mt-5 items-start">
+          <div className="w-[188px] shrink-0 sticky top-6 hidden md:block">
+            <VerbRail active={verb} counts={counts} onSelect={selectVerb} />
           </div>
 
-          <div className="flex items-center gap-0 border-b border-border overflow-x-auto">
-            {opsTabs.map(([key, label]) => {
-              const count = countFor(key);
-              const on = tab === key;
-              const showStall = key === 'track' && stalled > 0;
-              return (
-                <button key={key} onClick={() => setTab(key)}
-                  className={`relative text-[15px] font-semibold py-3 mr-6 min-h-[48px] flex items-center gap-2 whitespace-nowrap ${on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}>
-                  {label}
-                  {count != null && count > 0 && <span className={`text-[12px] font-semibold rounded-full px-2 py-0.5 tabular-nums ${showStall ? 'sc-red' : key === 'inbox' ? 'bg-[color:var(--gfo-error)] text-white' : 'bg-muted text-muted-foreground'}`}>{count}</span>}
-                  {on && <span className="absolute left-0 right-0 -bottom-px h-[3px] bg-accent rounded" />}
+          {/* Below md the rail would eat the whole column, so it becomes a
+              horizontal scroller of the same verbs. */}
+          <div className="md:hidden -mx-6 px-6 overflow-x-auto mb-3">
+            <div className="flex gap-2 w-max">
+              {VERBS.map((v) => (
+                <button key={v.id} onClick={() => selectVerb(v.id)}
+                  className={`flex items-center gap-2 h-10 px-4 rounded-full border text-[14px] whitespace-nowrap transition-colors ${
+                    v.id === verb ? 'bg-secondary text-secondary-foreground border-secondary font-semibold'
+                                  : 'bg-card text-muted-foreground border-border'}`}>
+                  {v.label}
+                  {counts[v.id].n != null && counts[v.id].n! > 0 && (
+                    <span className="text-[12px] font-semibold tabular-nums">{counts[v.id].n}</span>
+                  )}
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
 
-          <div className="mt-2">
-            {tab === 'inbox' && <MoveList items={model.ops.move} heading="Decisions waiting on you" doneSet={doneSet} onToggle={toggleDone} onOpen={open} />}
-            {tab === 'track' && <TrackBoard items={model.ops.track} onOpen={open} />}
-            {tab === 'reviews' && <ReviewsArea userRole={userRole} additionalRoles={additionalRoles} />}
-            {tab === 'audits' && <OperationsAudits />}
-            {tab === 'manage' && <ManageArea submissions={model.submissions} published={model.published} onOpen={open} />}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[19px] font-semibold tracking-tight m-0">{verbDef(verb).label}</h2>
+            <div className="text-[13.5px] text-muted-foreground mt-0.5 mb-1">{verbDef(verb).blurb}</div>
+
+            {/* C3 mounts what each verb's old tab mounted — navigation only. The
+                per-verb shapes and the Queue/Board toggle land in C4. */}
+            {verb === 'triage' && <MoveList items={model.ops.move} heading={null} doneSet={doneSet} onToggle={toggleDone} onOpen={open} />}
+            {verb === 'decide' && <ReviewsArea userRole={userRole} additionalRoles={additionalRoles} />}
+            {verb === 'investigate' && <TrackBoard items={atPhase(model.ops.track, 1)} onOpen={open} />}
+            {verb === 'mitigate' && <TrackBoard items={atPhase(model.ops.track, 2)} onOpen={open} />}
+            {verb === 'assure' && <OperationsAudits />}
+            {verb === 'publish' && <PublishedArea view="ops" reports={model.published} />}
+            {verb === 'records' && <RecordsArea submissions={model.submissions} onOpen={open} />}
           </div>
-        </>
+        </div>
       )}
 
       <ItemDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} onAdvance={advanceHazard} onOpenWorkflow={openWorkflow} />
@@ -400,23 +399,20 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   );
 }
 
-const STAT_TONE: Record<string, string> = {
-  red: 'text-[color:var(--gfo-error)]', amber: 'text-[color:var(--gfo-warning)]',
-  green: 'text-[color:var(--gfo-success)]', neutral: 'text-foreground',
-};
-
-// ── manager: Admin (the occasional stuff, out of the daily path) ────────────
-function ManageArea({ submissions, published, onOpen }: { submissions: SafetyItem[]; published: import('./types').PublishedReport[]; onOpen: (i: SafetyItem) => void }) {
-  const [sub, setSub] = useState<'records' | 'comms' | 'forms'>('records');
+// Records: every record ever filed, plus the form setup behind them. The
+// "Communications" panel that used to live here is its own verb now (Publish),
+// which is the whole point of navigating by job — publishing a lesson is not the
+// same errand as looking up an old submission.
+function RecordsArea({ submissions, onOpen }: { submissions: SafetyItem[]; onOpen: (i: SafetyItem) => void }) {
+  const [sub, setSub] = useState<'records' | 'forms'>('records');
   return (
     <div className="mt-4">
       <SubChips
         value={sub}
         onChange={(v) => setSub(v as typeof sub)}
-        options={[['records', 'All records'], ['comms', 'Communications'], ['forms', 'Form setup']]}
+        options={[['records', 'All records'], ['forms', 'Form setup']]}
       />
       {sub === 'records' && <SubmissionsArchive items={submissions} onOpen={onOpen} />}
-      {sub === 'comms' && <PublishedArea view="ops" reports={published} />}
       {sub === 'forms' && <FormManager />}
     </div>
   );
@@ -457,11 +453,11 @@ function MoveList({ items, heading, doneSet, onToggle, onOpen }: {
             // nest the checkbox <button>).
             <div key={i.id} role="button" tabIndex={0} onClick={() => onOpen(i)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(i); } }}
-              className={`flex items-center gap-3 bg-card border border-border rounded-[12px] pl-2 pr-4 py-2.5 min-h-[60px] cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${done ? 'opacity-50' : ''}`}>
+              className={`flex items-center gap-3 bg-card border border-border rounded-lg pl-2 pr-4 py-2.5 min-h-[60px] cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${done ? 'opacity-50' : ''}`}>
               {/* 44px hit area around a 24px checkbox */}
               <button onClick={(e) => { e.stopPropagation(); onToggle(i.id); }} aria-label={done ? 'Mark not done' : 'Mark done'}
-                className="w-11 h-11 grid place-items-center shrink-0 rounded-[10px] hover:bg-muted/60 transition-colors">
-                <span className={`w-6 h-6 rounded-[7px] border-2 grid place-items-center transition-colors ${done ? 'bg-[color:var(--gfo-success)] border-[color:var(--gfo-success)] text-white' : 'border-muted-foreground/40 text-transparent'}`}>
+                className="w-11 h-11 grid place-items-center shrink-0 rounded-lg hover:bg-muted/60 transition-colors">
+                <span className={`w-6 h-6 rounded-sm border-2 grid place-items-center transition-colors ${done ? 'bg-[color:var(--gfo-success)] border-[color:var(--gfo-success)] text-white' : 'border-muted-foreground/40 text-transparent'}`}>
                   <Check className="w-3.5 h-3.5" />
                 </span>
               </button>
