@@ -13,7 +13,6 @@ export { default as UnitItemRequestList } from './pages/UnitItemRequestList';
 export { default as TripList } from './pages/TripList';
 export { default as TripHome } from './pages/TripHome';
 export { default as GroceryListPage } from './pages/GroceryListPage';
-export { default as LegReconciliation } from './pages/LegReconciliation';
 export { default as CommissaryKiosk } from './pages/CommissaryKiosk';
 
 // Shared components

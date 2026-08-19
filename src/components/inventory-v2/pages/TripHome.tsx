@@ -15,82 +15,20 @@ import {
 import { toast } from 'sonner';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
-import { LEG_PHASE_COLORS, SUPPLY_CATEGORIES } from '../constants';
+import { LEG_PHASE_COLORS } from '../constants';
 import { formatRelativeTime } from '../shared/dateUtils';
-import { getCompartmentsForAircraft, getCompartmentLabel } from '../compartmentConfig';
+import { getCompartmentsForAircraft } from '../compartmentConfig';
 import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
 import QuickTapView from '../shared/QuickTapView';
 import ManageQuickAddDialog from '../shared/ManageQuickAddDialog';
 import { getOnBoardQty } from '../tripMath';
+import { buildLedgerRows, groupByCompartment, groupByCategory, belowParRows } from '../tripLedger';
+import type { BelowParRow } from '../tripLedger';
+import { LedgerRow, LedgerHeader, LedgerSectionHeader } from '../shared/LedgerRow';
 import { selectLoggableItems } from '../loggableItems';
-import { TripLoadExtras } from './TripLoadExtras';
-import { TripRestoreStock } from './TripRestoreStock';
-
-// ─── Item Row ───────────────────────────────────────────────────────────────
-
-interface ItemRowProps {
-  item: InventoryItemV2;
-  legUsage: number;
-  onBoard: number;
-  compartmentLabel: string;
-  onIncrement: () => void;
-  onDecrement: () => void;
-  selected?: boolean;
-  starred?: boolean;
-  onToggleStar?: () => void;
-}
-
-function ItemRow({ item, legUsage, onBoard, compartmentLabel, onIncrement, onDecrement, selected, starred, onToggleStar }: ItemRowProps) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-3 px-4 py-3 border-b border-border/60 transition-colors',
-        legUsage === 0 && 'opacity-50',
-        selected && 'bg-primary/10 border-l-2 border-l-primary'
-      )}
-    >
-      {onToggleStar && (
-        <button
-          onClick={onToggleStar}
-          className="shrink-0 text-muted-foreground hover:text-amber-400 transition-colors"
-          aria-label={starred ? 'Unpin item' : 'Pin item'}
-        >
-          <Star size={14} className={cn(starred && 'fill-amber-400 text-amber-400')} />
-        </button>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate">{item.itemName}</p>
-        <p className="text-xs text-muted-foreground">
-          {compartmentLabel} · {onBoard} on board
-        </p>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={onDecrement}
-          className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center text-lg hover:bg-muted/80 transition-colors"
-          disabled={legUsage === 0}
-        >
-          −
-        </button>
-        <span
-          className={cn(
-            'w-8 text-center text-base font-bold',
-            legUsage > 0 ? 'text-blue-400' : 'text-muted-foreground'
-          )}
-        >
-          {legUsage}
-        </span>
-        <button
-          onClick={onIncrement}
-          className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center text-lg hover:bg-muted/80 transition-colors"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
+import { AddStockSheet, type StockSource } from './AddStockSheet';
+import { EndLegReview } from './EndLegReview';
 
 // ─── Next Leg Dialog ────────────────────────────────────────────────────────
 
@@ -187,75 +125,6 @@ function NextLegDialog({
           </Button>
           <Button onClick={handleSubmit} disabled={!origin.trim() || !destination.trim()} className="flex-1">
             {isEdit ? 'Confirm & Go' : 'Add & Go'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Trip Complete Dialog ───────────────────────────────────────────────────
-
-function TripCompleteDialog({
-  open,
-  onClose,
-  trip,
-  onStartReplenish,
-  onStartInspection,
-}: {
-  open: boolean;
-  onClose: () => void;
-  trip: Trip;
-  onStartReplenish: () => void;
-  onStartInspection: () => void;
-}) {
-  const totalUsed = trip.legs.reduce(
-    (sum, l) => sum + l.usageLog.reduce((s, e) => s + e.qtyUsed, 0), 0
-  );
-
-  return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-            Trip Complete — What's Next?
-          </DialogTitle>
-          <DialogDescription>Choose what happens to the remaining stock now the trip has closed.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 py-2">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-muted-foreground text-xs">Aircraft</p>
-              <p className="font-mono font-bold">{trip.tailNumber}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Legs Flown</p>
-              <p className="font-bold">{trip.legs.length}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Total Items Used</p>
-              <p className="font-bold">{totalUsed}</p>
-            </div>
-            {trip.tripName && (
-              <div>
-                <p className="text-muted-foreground text-xs">Trip</p>
-                <p className="font-medium truncate">{trip.tripName}</p>
-              </div>
-            )}
-          </div>
-        </div>
-        <DialogFooter className="flex-col gap-2">
-          <Button onClick={onStartInspection} className="w-full bg-blue-600 hover:bg-blue-500">
-            <ClipboardCheck className="mr-2 h-4 w-4" />
-            Start Inspection
-          </Button>
-          <Button onClick={onStartReplenish} variant="outline" className="w-full">
-            <Package className="mr-2 h-4 w-4" />
-            Restock Aircraft
-          </Button>
-          <Button variant="ghost" onClick={onClose} className="w-full text-muted-foreground">
-            Done
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -362,12 +231,17 @@ function TripViewInner({
   });
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCompartment, setSelectedCompartment] = useState<string | null>(null);
   const [showNextLeg, setShowNextLeg] = useState(false);
-  const [showTripComplete, setShowTripComplete] = useState(false);
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showManageQuickAdd, setShowManageQuickAdd] = useState(false);
-  const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
+  const [screen, setScreen] = useState<'trip' | 'add-stock' | 'end-leg'>('trip');
+  const [discrepancy, setDiscrepancy] = useState('');
+  // Which side of the source switch the sheet opens on. Both entry points reach
+  // the same sheet — "Pull from Commissary" and "Restore Stock" were never two
+  // jobs, only two defaults (D86).
+  const [stockSource, setStockSource] = useState<StockSource>('commissary');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const undoToastRef = useRef<string | number | undefined>(undefined);
@@ -377,7 +251,9 @@ function TripViewInner({
     localStorage.setItem('inv2-trip-view-mode', view);
   }, [view]);
 
-  // Entry point from LegReconciliation's last-leg handoff (?confirmComplete=1):
+  // Legacy entry point: the end-of-leg review used to be its own route and
+  // handed the last leg back here through ?confirmComplete=1. The review is a
+  // state of this screen now (D86), but an old link can still carry the param.
   // open the same confirm dialog the footer button uses, then strip the param
   // so refresh/back doesn't re-trigger it.
   useEffect(() => {
@@ -530,10 +406,51 @@ function TripViewInner({
     [state.compartmentConfigs, aircraftType]
   );
 
-  const relevantCategories = useMemo(() => {
-    const cats = new Set(filteredItems.map(i => i.supplyCategory));
-    return SUPPLY_CATEGORIES.filter(c => cats.has(c.id)).map(c => c.id);
-  }, [filteredItems]);
+  // ─── The stock ledger (D86) ───────────────────────────────────────────────
+  // One set of numbers, arranged three ways. `filteredItems` stays the logging
+  // list (TL-43) and the ledger is built over exactly it, so every lens agrees.
+
+  const ledgerRows = useMemo(
+    () => buildLedgerRows({ items: filteredItems, trip, leg: activeLeg, aircraftType }),
+    [filteredItems, trip, activeLeg, aircraftType],
+  );
+
+  const compartmentGroups = useMemo(
+    () => groupByCompartment(ledgerRows, compartments),
+    [ledgerRows, compartments],
+  );
+  const compartmentChips = useMemo(
+    () => compartmentGroups.map(g => ({ id: g.id, label: g.label, count: g.rowCount })),
+    [compartmentGroups],
+  );
+  // The picked compartment can fall out of the list when a search narrows it —
+  // fall back to the first that still has rows rather than rendering nothing.
+  const activeCompartmentId =
+    compartmentChips.find(c => c.id === selectedCompartment)?.id ?? compartmentChips[0]?.id;
+  const activeCompartment = compartmentGroups.find(g => g.id === activeCompartmentId);
+
+  const categoryGroups = useMemo(() => groupByCategory(ledgerRows), [ledgerRows]);
+  const categoryChips = useMemo(
+    () => categoryGroups.map(g => ({ id: g.id, label: g.label, count: g.rowCount })),
+    [categoryGroups],
+  );
+  const visibleCategoryGroups = useMemo(
+    () => (selectedCategory === 'all' ? categoryGroups : categoryGroups.filter(g => g.id === selectedCategory)),
+    [categoryGroups, selectedCategory],
+  );
+
+  const favoriteRows = useMemo(
+    () => ledgerRows.filter(r => isFavorite(r.item.id)),
+    [ledgerRows, isFavorite],
+  );
+
+  // What the aircraft is short when the trip closes — computed over the WHOLE
+  // stocked list, not the search-narrowed one, so a stray search cannot shrink
+  // the restock list.
+  const belowPar = useMemo(
+    () => belowParRows(buildLedgerRows({ items: state.items, trip, leg: activeLeg, aircraftType })),
+    [state.items, trip, activeLeg, aircraftType],
+  );
 
   // ─── Grocery list item count ──────────────────────────────────────────────
 
@@ -558,17 +475,71 @@ function TripViewInner({
         >
           <ChevronLeft size={16} /> Fleet
         </button>
-        <div className="text-center py-12 space-y-4">
+        <div className="text-center py-8 space-y-3">
           <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
           <h1 className="text-2xl font-bold">Trip Complete</h1>
           <p className="text-muted-foreground">
             {trip.tailNumber} · {trip.legs.length} legs · {trip.tripName || 'Unnamed Trip'}
           </p>
+        </div>
+
+        {/* What the aircraft is short — the argument for what to do next (D86).
+            This screen used to offer one green Restock button and no reason to
+            press it. */}
+        {belowPar.length > 0 ? (
+          <Card className="max-w-xl mx-auto overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 bg-muted/60 border-b border-border">
+              <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+                Below par on arrival
+              </span>
+              <span className="text-xs text-muted-foreground">{belowPar.length} lines</span>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {belowPar.map(row => (
+                <div
+                  key={row.item.id}
+                  className="flex items-center gap-3 px-4 py-2 border-b border-border/60 last:border-0"
+                >
+                  <span className="flex-1 min-w-0 text-sm truncate text-left">{row.item.itemName}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {row.onBoard}/{row.par}
+                  </span>
+                  <span
+                    className={cn(
+                      'w-20 text-right text-xs font-semibold tabular-nums',
+                      row.onBoard <= 0 ? 'text-destructive' : 'text-amber-600 dark:text-amber-400',
+                    )}
+                  >
+                    short {row.short}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : (
+          <p className="text-center text-sm text-muted-foreground">
+            Everything came back at or above par — nothing to restock.
+          </p>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-xl mx-auto">
           <Button
             onClick={() => navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`)}
-            className="bg-emerald-600 hover:bg-emerald-500"
+            className={cn('flex-1', belowPar.length === 0 && 'sm:flex-none')}
+            variant={belowPar.length > 0 ? 'default' : 'outline'}
           >
-            Restock Aircraft
+            <Package className="mr-2 h-4 w-4" />
+            {belowPar.length > 0
+              ? `Restock ${belowPar.length} line${belowPar.length === 1 ? '' : 's'}`
+              : 'Restock Aircraft'}
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => navigate(`/inventory-v2/inspection?tail=${trip.tailNumber}`)}
+          >
+            <ClipboardCheck className="mr-2 h-4 w-4" />
+            Start Inspection
           </Button>
         </div>
       </div>
@@ -651,6 +622,69 @@ function TripViewInner({
     setShowNextLeg(false);
   }
 
+  // ─── Closing a leg (D86) ─────────────────────────────────────────────────
+  // Was a route of its own; it is a state of this screen now. Same dispatches.
+
+  function handleGenerateGroceryList() {
+    if (!activeLeg) return;
+    const existing = state.groceryLists.find(g => g.tripId === trip.id && g.legId === activeLeg.id);
+    if (existing) {
+      navigate('grocery-list');
+      return;
+    }
+    const usageRows = activeLeg.usageLog.filter(e => e.qtyUsed > 0);
+    dispatch({
+      type: 'ADD_GROCERY_LIST',
+      payload: {
+        id: `gl-${crypto.randomUUID()}`,
+        tripId: trip.id,
+        legId: activeLeg.id,
+        tailNumber: trip.tailNumber,
+        status: 'draft',
+        items: usageRows.map(e => ({
+          id: crypto.randomUUID(),
+          itemId: e.itemId,
+          qtyNeeded: e.qtyUsed,
+          qtyFulfilled: 0,
+        })),
+        generatedAt: new Date().toISOString(),
+        generatedBy: state.currentUser.name,
+      },
+    });
+    navigate('grocery-list');
+  }
+
+  function handleCompleteLegFromReview() {
+    if (!activeLeg) return;
+    if (discrepancy.trim()) {
+      dispatch({
+        type: 'ADD_TRIP_NOTE',
+        payload: {
+          tripId: trip.id,
+          note: {
+            id: `tn-${crypto.randomUUID()}`,
+            tripId: trip.id,
+            legId: activeLeg.id,
+            text: `⚠️ Discrepancy: ${discrepancy.trim()}`,
+            author: state.currentUser.name,
+            createdAt: new Date().toISOString(),
+          },
+        },
+      });
+      setDiscrepancy('');
+    }
+    setScreen('trip');
+    if (isLastLeg) {
+      // The old route bounced back through ?confirmComplete=1 to reach this
+      // dialog. Same screen now, so it is just a call.
+      setShowConfirmComplete(true);
+    } else {
+      // ADVANCE_TO_NEXT_LEG completes the active leg itself — dispatching
+      // COMPLETE_LEG first leaves its reducer no active leg to find.
+      dispatch({ type: 'ADVANCE_TO_NEXT_LEG', payload: trip.id });
+    }
+  }
+
   function handleCompleteTrip() {
     setShowConfirmComplete(true);
   }
@@ -663,7 +697,7 @@ function TripViewInner({
       payload: { tripId: trip.id, legId: activeLeg.id, phase: 'complete' },
     });
     // Mark the final leg's status completed too — keeps leg state identical to
-    // the LegReconciliation entry point and lets REOPEN_TRIP (undo) find it.
+    // the end-of-leg review's entry point and lets REOPEN_TRIP (undo) find it.
     dispatch({ type: 'COMPLETE_LEG', payload: { tripId: trip.id, legId: activeLeg.id } });
     dispatch({ type: 'COMPLETE_TRIP', payload: trip.id });
 
@@ -674,33 +708,45 @@ function TripViewInner({
         label: 'Undo',
         onClick: () => {
           dispatch({ type: 'REOPEN_TRIP', payload: tripId });
-          setShowTripComplete(false);
         },
       },
     });
 
-    setShowTripComplete(true);
   }
 
-  function handleStartReplenish() {
-    setShowTripComplete(false);
-    navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`);
-  }
 
-  function handleStartInspection() {
-    setShowTripComplete(false);
-    navigate(`/inventory-v2/inspection?tail=${trip.tailNumber}`);
-  }
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
   // Sub-screen renders
-  if (screen === 'load-extras') {
-    return <TripLoadExtras trip={trip} onBack={() => setScreen('trip')} />;
+  if (screen === 'end-leg' && activeLeg) {
+    return (
+      <EndLegReview
+        trip={trip}
+        leg={activeLeg}
+        rows={ledgerRows}
+        isLastLeg={isLastLeg}
+        discrepancy={discrepancy}
+        onDiscrepancyChange={setDiscrepancy}
+        onIncrement={handleIncrement}
+        onDecrement={handleDecrement}
+        onGenerateGroceryList={handleGenerateGroceryList}
+        onComplete={handleCompleteLegFromReview}
+        onBack={() => setScreen('trip')}
+      />
+    );
   }
 
-  if (screen === 'restore-stock' && activeLeg) {
-    return <TripRestoreStock trip={trip} leg={activeLeg} onBack={() => setScreen('trip')} />;
+  if (screen === 'add-stock') {
+    return (
+      <AddStockSheet
+        trip={trip}
+        leg={activeLeg}
+        lens={view === 'category' ? 'category' : 'compartment'}
+        initialSource={stockSource}
+        onBack={() => setScreen('trip')}
+      />
+    );
   }
 
   return (
@@ -724,7 +770,7 @@ function TripViewInner({
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5"
-                onClick={() => setScreen('load-extras')}
+                onClick={() => { setStockSource('commissary'); setScreen('add-stock'); }}
               >
                 <Package size={14} />
                 <span className="hidden sm:inline">Pull from Commissary</span>
@@ -866,146 +912,133 @@ function TripViewInner({
                 />
               )}
 
-              {/* ── Compartment view ── */}
+              {/* ── Compartment lens (D86) ──
+                  A PICKER, not eight stacked headings: Forward Galley alone is 61
+                  of the G650's 149 lines, so grouping on its own reduced nothing.
+                  You stand in one compartment at a time, and the item's own
+                  `location` is the shelf inside it. */}
               {view === 'compartment' && (
-                <Card className="bg-card border-border overflow-hidden">
-                  {favoriteItems.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-border">
-                        <Star size={12} className="fill-amber-400 text-amber-400" />
-                        <span className="text-xs font-semibold uppercase tracking-wide text-amber-500">Pinned</span>
-                      </div>
-                      {favoriteItems.map(item => {
-                        const idx = filteredItems.findIndex(i => i.id === item.id);
-                        return (
-                          <ItemRow
-                            key={`fav-${item.id}`}
-                            item={item}
-                            legUsage={getLegUsage(item)}
-                            onBoard={getOnBoard(item)}
-                            compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                            onIncrement={() => handleIncrement(item)}
-                            onDecrement={() => handleDecrement(item)}
-                            selected={selectedIndex === idx}
-                            starred
-                            onToggleStar={() => toggleFavorite(item.id)}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                  {compartments.map(compartment => {
-                    const sectionItems = filteredItems.filter(
-                      item => item.compartmentId === compartment.id
-                    );
-                    if (sectionItems.length === 0) return null;
-                    const sectionUsage = sectionItems.reduce((sum, item) => sum + getLegUsage(item), 0);
-
-                    return (
-                      <div key={compartment.id}>
-                        <div className="flex items-center justify-between px-4 py-2 bg-muted/60 border-b border-border">
-                          <span className={cn('text-xs font-semibold uppercase tracking-wide', compartment.color)}>
-                            {compartment.label}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {sectionUsage > 0 ? `${sectionUsage} used` : ''}
-                          </span>
-                        </div>
-                        {sectionItems.map(item => {
-                          const idx = filteredItems.findIndex(i => i.id === item.id);
-                          return (
-                            <ItemRow
-                              key={item.id}
-                              item={item}
-                              legUsage={getLegUsage(item)}
-                              onBoard={getOnBoard(item)}
-                              compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                              onIncrement={() => handleIncrement(item)}
-                              onDecrement={() => handleDecrement(item)}
-                              selected={selectedIndex === idx}
-                              starred={isFavorite(item.id)}
-                              onToggleStar={() => toggleFavorite(item.id)}
-                            />
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                  {filteredItems.length === 0 && (
-                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No items match your search.
-                    </div>
-                  )}
-                </Card>
-              )}
-
-              {/* ── Category view ── */}
-              {view === 'category' && (
-                <div className="space-y-4">
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {(['all', ...relevantCategories] as string[]).map(cat => (
+                <div className="space-y-3">
+                  <div className="flex gap-2 flex-wrap">
+                    {compartmentChips.map(chip => (
                       <button
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
+                        key={chip.id}
+                        onClick={() => setSelectedCompartment(chip.id)}
                         className={cn(
-                          'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
-                          selectedCategory === cat
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-muted text-muted-foreground hover:text-foreground'
+                          'flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium transition-colors border',
+                          chip.id === activeCompartmentId
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card text-muted-foreground border-border hover:text-foreground'
                         )}
                       >
-                        {cat === 'all'
-                          ? 'All'
-                          : SUPPLY_CATEGORIES.find(c => c.id === cat)?.label ?? cat}
+                        {chip.label}
+                        <span className={cn(
+                          'rounded-full px-1.5 text-[10px]',
+                          chip.id === activeCompartmentId ? 'bg-white/20' : 'bg-muted'
+                        )}>
+                          {chip.count}
+                        </span>
                       </button>
                     ))}
                   </div>
+
                   <Card className="bg-card border-border overflow-hidden">
-                    {favoriteItems.length > 0 && selectedCategory === 'all' && (
-                      <div>
-                        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-border">
+                    <LedgerHeader />
+                    {favoriteRows.length > 0 && (
+                      <>
+                        <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border-b border-border">
                           <Star size={12} className="fill-amber-400 text-amber-400" />
                           <span className="text-xs font-semibold uppercase tracking-wide text-amber-500">Pinned</span>
                         </div>
-                        {favoriteItems.map(item => {
-                          const idx = filteredItems.findIndex(i => i.id === item.id);
-                          return (
-                            <ItemRow
-                              key={`fav-${item.id}`}
-                              item={item}
-                              legUsage={getLegUsage(item)}
-                              onBoard={getOnBoard(item)}
-                              compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                              onIncrement={() => handleIncrement(item)}
-                              onDecrement={() => handleDecrement(item)}
-                              selected={selectedIndex === idx}
-                              starred
-                              onToggleStar={() => toggleFavorite(item.id)}
-                            />
-                          );
-                        })}
+                        {favoriteRows.map(row => (
+                          <LedgerRow
+                            key={`fav-${row.item.id}`}
+                            row={row}
+                            onIncrement={() => handleIncrement(row.item)}
+                            onDecrement={() => handleDecrement(row.item)}
+                            selected={selectedIndex === filteredItems.findIndex(i => i.id === row.item.id)}
+                            starred
+                            onToggleStar={() => toggleFavorite(row.item.id)}
+                          />
+                        ))}
+                      </>
+                    )}
+                    {activeCompartment?.sections.map(section => (
+                      <div key={section.key}>
+                        <LedgerSectionHeader
+                          label={section.label}
+                          note={`${section.rows.length} item${section.rows.length === 1 ? '' : 's'}`}
+                        />
+                        {section.rows.map(row => (
+                          <LedgerRow
+                            key={row.item.id}
+                            row={row}
+                            onIncrement={() => handleIncrement(row.item)}
+                            onDecrement={() => handleDecrement(row.item)}
+                            selected={selectedIndex === filteredItems.findIndex(i => i.id === row.item.id)}
+                            starred={isFavorite(row.item.id)}
+                            onToggleStar={() => toggleFavorite(row.item.id)}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                    {!activeCompartment && (
+                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No items match your search.
                       </div>
                     )}
-                    {filteredItems
-                      .filter(item => selectedCategory === 'all' || item.supplyCategory === selectedCategory)
-                      .map(item => {
-                        const idx = filteredItems.findIndex(i => i.id === item.id);
-                        return (
-                          <ItemRow
-                            key={item.id}
-                            item={item}
-                            legUsage={getLegUsage(item)}
-                            onBoard={getOnBoard(item)}
-                            compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                            onIncrement={() => handleIncrement(item)}
-                            onDecrement={() => handleDecrement(item)}
-                            selected={selectedIndex === idx}
-                            starred={isFavorite(item.id)}
-                            onToggleStar={() => toggleFavorite(item.id)}
+                  </Card>
+                </div>
+              )}
+
+              {/* ── Category lens (D86) — same ledger, grouped by supply type ── */}
+              {view === 'category' && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {[{ id: 'all', label: 'All', count: ledgerRows.length }, ...categoryChips].map(chip => (
+                      <button
+                        key={chip.id}
+                        onClick={() => setSelectedCategory(chip.id)}
+                        className={cn(
+                          'flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
+                          selectedCategory === chip.id
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card text-muted-foreground border-border hover:text-foreground'
+                        )}
+                      >
+                        {chip.label}
+                        <span className={cn(
+                          'rounded-full px-1.5 text-[10px]',
+                          selectedCategory === chip.id ? 'bg-white/20' : 'bg-muted'
+                        )}>
+                          {chip.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <Card className="bg-card border-border overflow-hidden">
+                    <LedgerHeader />
+                    {visibleCategoryGroups.map(group => (
+                      <div key={group.id}>
+                        <LedgerSectionHeader
+                          label={group.label}
+                          note={group.usedTotal > 0 ? `${group.usedTotal} used` : undefined}
+                        />
+                        {group.sections[0].rows.map(row => (
+                          <LedgerRow
+                            key={row.item.id}
+                            row={row}
+                            onIncrement={() => handleIncrement(row.item)}
+                            onDecrement={() => handleDecrement(row.item)}
+                            selected={selectedIndex === filteredItems.findIndex(i => i.id === row.item.id)}
+                            starred={isFavorite(row.item.id)}
+                            onToggleStar={() => toggleFavorite(row.item.id)}
                           />
-                        );
-                      })}
-                    {filteredItems.filter(item => selectedCategory === 'all' || item.supplyCategory === selectedCategory).length === 0 && (
+                        ))}
+                      </div>
+                    ))}
+                    {visibleCategoryGroups.length === 0 && (
                       <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                         No items match your search.
                       </div>
@@ -1101,7 +1134,7 @@ function TripViewInner({
                   variant="ghost"
                   size="sm"
                   className="flex-1 h-10 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setScreen('restore-stock')}
+                  onClick={() => { setStockSource('road'); setScreen('add-stock'); }}
                 >
                   <Package className="mr-1.5 h-3.5 w-3.5" />
                   Restore Stock
@@ -1117,7 +1150,7 @@ function TripViewInner({
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => setScreen('load-extras')}
+                    onClick={() => { setStockSource('commissary'); setScreen('add-stock'); }}
                   >
                     <Package className="mr-2 h-4 w-4" />
                     Pull from Commissary
@@ -1165,7 +1198,7 @@ function TripViewInner({
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => activeLeg && navigate(`/inventory-v2/trips/${trip.id}/reconcile`)}
+                    onClick={() => setScreen('end-leg')}
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     Review Leg
@@ -1211,16 +1244,6 @@ function TripViewInner({
         trip={trip}
       />
 
-      <TripCompleteDialog
-        open={showTripComplete}
-        onClose={() => {
-          setShowTripComplete(false);
-          navigate('/inventory-v2/trips');
-        }}
-        trip={trip}
-        onStartReplenish={handleStartReplenish}
-        onStartInspection={handleStartInspection}
-      />
 
       <ManageQuickAddDialog
         open={showManageQuickAdd}

@@ -147,7 +147,7 @@ import CommissaryItemDetail from './components/inventory-v2/pages/CommissaryItem
 import TripListV2 from './components/inventory-v2/pages/TripList';
 import TripHomeV2 from './components/inventory-v2/pages/TripHome';
 import GroceryListPageV2 from './components/inventory-v2/pages/GroceryListPage';
-import LegReconciliationV2 from './components/inventory-v2/pages/LegReconciliation';
+import ReconcileRedirect from './components/inventory-v2/pages/ReconcileRedirect';
 import CommissaryKiosk from './components/inventory-v2/pages/CommissaryKiosk';
 import ActivityLog from './components/inventory-v2/pages/ActivityLog';
 
@@ -506,7 +506,7 @@ export default function App() {
                                 <Route path="/inventory-v2/trips" element={<InventoryRouteWrapper userRole={userRole}><TripListV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId" element={<InventoryRouteWrapper userRole={userRole}><TripHomeV2 /></InventoryRouteWrapper>} />
                                 <Route path="/inventory-v2/trips/:tripId/grocery-list" element={<InventoryRouteWrapper userRole={userRole}><GroceryListPageV2 /></InventoryRouteWrapper>} />
-                                <Route path="/inventory-v2/trips/:tripId/reconcile" element={<InventoryRouteWrapper userRole={userRole}><LegReconciliationV2 /></InventoryRouteWrapper>} />
+                                <Route path="/inventory-v2/trips/:tripId/reconcile" element={<ReconcileRedirect />} />
                                 <Route path="/inventory-v2/activity-log" element={<InventoryRouteWrapper userRole={userRole}><ActivityLog /></InventoryRouteWrapper>} />
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
