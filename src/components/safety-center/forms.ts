@@ -17,17 +17,17 @@ export const MOCK_SUBMISSIONS: SafetyItem[] = [
     actions: [{ label: 'View', primary: true }],
   },
   {
-    id: 's-waiver-1', type: 'WAIVER', bucket: 'done', title: 'Duty-time extension', submittedBy: 'Capt. Dunlop', date: '2026-06-30', tail: 'N1PG',
+    id: 's-waiver-1', type: 'WAIVER', bucket: 'done', title: 'Duty-time extension', submittedBy: 'Captain John Smith', date: '2026-06-30', tail: 'N1PG',
     status: { label: 'Approved', tone: 'green' }, when: '2026-06-30',
     fields: [['Ref', 'W-88'], ['Request', '+1:30 duty'], ['Reviewed by', 'DOM']].map(([label, value]) => ({ label, value })),
     thread: [{ who: 'R. Vance (DOM)', role: 'team', at: '2026-06-30', text: 'Approved with a fatigue check-in at KASE.' }],
     actions: [{ label: 'View', primary: true }],
   },
   {
-    id: 's-cws-1', type: 'CWS', bucket: 'done', title: 'Recognized J. Kerr — proactive FOD sweep', submittedBy: 'Capt. Dunlop', date: '2026-07-02',
+    id: 's-cws-1', type: 'CWS', bucket: 'done', title: 'Recognized J. Kerr — proactive FOD sweep', submittedBy: 'Captain John Smith', date: '2026-07-02',
     status: { label: 'Logged', tone: 'neutral' }, when: '2026-07-02',
     fields: [['Recognized', 'J. Kerr'], ['For', 'Unprompted FOD sweep before tow']].map(([label, value]) => ({ label, value })),
-    thread: [{ who: 'Capt. Dunlop', role: 'you', at: '2026-07-02', text: 'Full FOD sweep before an unscheduled tow — worth noting.' }],
+    thread: [{ who: 'Captain John Smith', role: 'you', at: '2026-07-02', text: 'Full FOD sweep before an unscheduled tow — worth noting.' }],
     actions: [{ label: 'View', primary: true }],
   },
   {

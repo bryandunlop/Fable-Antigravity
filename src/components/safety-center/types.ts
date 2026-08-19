@@ -117,6 +117,12 @@ export interface FormTemplate {
   // creates an ApprovalRequest routed through these roles in turn. Undefined /
   // empty = no approval step. Not honored for Hazard (its own workflow governs).
   approvalChain?: string[];
+  /** May an approver END this request outright? Waivers only for now (Bryan,
+   *  2026-08-19). The chain engine is generic, so without this a CWS
+   *  recognition could be killed with the same button — which is not what
+   *  anyone means by declining. Absent reads as FALSE: a form has to earn the
+   *  power to be refused outright, and "send back" is always available. */
+  canDecline?: boolean;
 }
 
 // ---- Published reports (everyone) ----

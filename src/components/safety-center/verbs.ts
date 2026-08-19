@@ -7,16 +7,17 @@
 //
 // The verbs are not a rename of the old tabs. Two of them cut across the old
 // containers on purpose:
-//   · Triage carries hazards AND ASAP reports. Both are reports; ASAP used to be
-//     reachable only from a sub-tab, so a manager had to remember to look.
+//   · ASAP is its own verb — its own legal regime, not another report type. It
+//     never joins a shared board: the narrative is raw crew testimony until a
+//     third-party service de-identifies it.
 //   · Assure carries the audit programme AND the FRAT/GRAT reviews. Approving a
 //     request is a decision; reviewing a risk assessment is assurance. The old
 //     "Reviews" tab held both, which is the confusion this rework exists to end.
 
-import { Inbox, CircleCheck, Search, Wrench, ClipboardCheck, Megaphone, Archive } from 'lucide-react';
+import { Inbox, CircleCheck, Search, Wrench, ClipboardCheck, Megaphone, Archive, Lock } from 'lucide-react';
 import type { SafetyItem } from './types';
 
-export type VerbId = 'triage' | 'decide' | 'investigate' | 'mitigate' | 'assure' | 'publish' | 'records';
+export type VerbId = 'triage' | 'asap' | 'decide' | 'investigate' | 'mitigate' | 'assure' | 'publish' | 'records';
 
 /** What a verb's surface looks like. Consumed for real in C4; declared here so
  *  the decision lives with the verb rather than in a switch at a call site. */
@@ -39,10 +40,16 @@ export interface VerbDef {
 export const VERBS: VerbDef[] = [
   { id: 'triage', label: 'Triage', group: 'daily', icon: Inbox,
     defaultShape: 'board', shapes: ['board', 'queue'],
-    blurb: 'Hazards and ASAP reports nobody has picked up yet' },
+    blurb: 'Hazards nobody has picked up yet' },
   // Decide keeps a single shape until C5 replaces ReviewsArea with the real
   // review surface. Offering a Board toggle over four stacked consoles would be
   // a control with nothing behind it.
+  // ASAP is its own verb because it is its own LEGAL regime, not because it is
+  // another kind of report. It never appears on a shared board: the narrative is
+  // raw crew testimony until a third-party service de-identifies it.
+  { id: 'asap', label: 'ASAP', group: 'daily', icon: Lock,
+    defaultShape: 'list', shapes: ['list'],
+    blurb: 'Confidential crew reports — de-identified before anyone else sees them' },
   { id: 'decide', label: 'Decide', group: 'daily', icon: CircleCheck,
     defaultShape: 'queue', shapes: ['queue'],
     blurb: 'Waivers and approvals waiting on your review' },
@@ -92,6 +99,8 @@ export interface VerbCountInput {
   pendingApprovals: number;
   /** Audits not yet Complete. */
   auditsOpen: number;
+  /** ASAP reports not yet Resolved. Counted, never listed on a shared surface. */
+  asapOpen: number;
 }
 
 /** Phase indices from useSafetyModel's PHASE_OF collapse. */
@@ -112,6 +121,7 @@ export function verbCounts(input: VerbCountInput): Record<VerbId, VerbCount> {
 
   return {
     triage: { n: input.move.length, tone: input.move.length > 0 ? 'amber' : 'none' },
+    asap: { n: input.asapOpen, tone: input.asapOpen > 0 ? 'amber' : 'none' },
     decide: { n: input.pendingApprovals, tone: input.pendingApprovals > 0 ? 'amber' : 'none' },
     investigate: { n: investigating.length, tone: tone(investigating) },
     mitigate: { n: mitigating.length, tone: tone(mitigating) },

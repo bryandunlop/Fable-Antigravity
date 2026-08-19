@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildRequest, applyDecision, currentApproverRole, pendingForRoles, requestedByName,
-  advancedByRoles, reassignCurrentStep,
+  advancedByRoles, reassignCurrentStep, resubmit,
   type ApprovalRequest, type ApprovalStep, type BuildInput, type RequestStatus,
 } from './approvalRequests';
 
@@ -255,5 +255,150 @@ describe('D85 — naming an individual on a step', () => {
       expect(a).toEqual(['pending']);
       expect(b).toEqual(['approved']);
     });
+  });
+});
+
+// ── 2026-08-19: a request can go DOWN the chain and back up again ──────────
+// "no they can send back good idea" / "yes lets have that be possible and it can
+// go all the way back down and up". Send-back is the answer to "not with this
+// justification", which previously had no expression other than killing the
+// request.
+
+describe('send_back', () => {
+  const REQ = (chain: ApprovalStep[], currentStep = 0, status: RequestStatus = 'pending'): ApprovalRequest => ({
+    id: 'AR-S', formKind: 'waiver', formLabel: 'Waiver', subjectTitle: 'A waiver',
+    values: {}, fieldLabels: {},
+    requestedByRole: 'pilot', requestedByName: 'Capt. Dunlop', requestedAt: '2026-08-01T00:00:00Z',
+    chain, currentStep, status, history: [],
+  });
+  const T = '2026-08-19T10:00:00Z';
+
+  it('moves DOWN one step, not straight to the requester', () => {
+    const r = REQ([
+      { role: 'safety', status: 'approved', decidedByName: 'J. Kerr', comment: 'ok' },
+      { role: 'lead', status: 'pending' },
+    ], 1);
+    const out = applyDecision(r, 'send_back', 'David Brown', 'Need the fatigue plan attached.', T);
+    expect(out.currentStep).toBe(0);
+    expect(out.status).toBe('pending');
+  });
+
+  it('clears the step below so it must be decided again', () => {
+    const r = REQ([
+      { role: 'safety', status: 'approved', decidedByName: 'J. Kerr', decidedAt: T, comment: 'ok' },
+      { role: 'lead', status: 'pending' },
+    ], 1);
+    const out = applyDecision(r, 'send_back', 'David Brown', 'More detail please.', T);
+    expect(out.chain[0].status).toBe('pending');
+    expect(out.chain[0].decidedByName).toBeUndefined();
+    expect(out.chain[0].comment).toBeUndefined();
+  });
+
+  it('keeps the cleared approval in history — the round trip is not erased', () => {
+    const r = REQ([
+      { role: 'safety', status: 'approved', decidedByName: 'J. Kerr', decidedAt: T, comment: 'Safety-acceptable.' },
+      { role: 'lead', status: 'pending' },
+    ], 1);
+    const out = applyDecision(r, 'send_back', 'David Brown', 'More detail.', T);
+    expect(out.history!.map((e) => e.action)).toEqual(['sent_back']);
+    expect(out.history![0].comment).toBe('More detail.');
+  });
+
+  it('returns to the REQUESTER from the first step — there is nobody below', () => {
+    const r = REQ([{ role: 'safety', status: 'pending' }, { role: 'lead', status: 'pending' }], 0);
+    const out = applyDecision(r, 'send_back', 'J. Kerr', 'Which trip is this?', T);
+    expect(out.status).toBe('returned');
+    expect(out.currentStep).toBe(-1);
+  });
+
+  it('is distinct from a decline — a returned request is not finished', () => {
+    const r = REQ([{ role: 'safety', status: 'pending' }], 0);
+    const returned = applyDecision(r, 'send_back', 'J. Kerr', 'why?', T);
+    const declined = applyDecision(r, 'deny', 'J. Kerr', 'no', T);
+    expect(returned.status).toBe('returned');
+    expect(declined.status).toBe('denied');
+    expect(returned.chain[0].status).toBe('pending');
+    expect(declined.chain[0].status).toBe('denied');
+  });
+
+  it('takes a returned request out of every approver inbox', () => {
+    const r = REQ([{ role: 'safety', status: 'pending' }, { role: 'lead', status: 'pending' }], 0);
+    const out = applyDecision(r, 'send_back', 'J. Kerr', 'why?', T);
+    expect(pendingForRoles([out], ['safety'], 'USR006')).toHaveLength(0);
+    expect(pendingForRoles([out], ['lead'], 'USR004')).toHaveLength(0);
+  });
+
+  it('walks all the way down one step at a time', () => {
+    let r = REQ([
+      { role: 'safety', status: 'approved' },
+      { role: 'chief-pilot', status: 'approved' },
+      { role: 'lead', status: 'pending' },
+    ], 2);
+    r = applyDecision(r, 'send_back', 'David Brown', 'a', T);
+    expect(r.currentStep).toBe(1);
+    r = applyDecision(r, 'send_back', 'Capt. Smith', 'b', T);
+    expect(r.currentStep).toBe(0);
+    r = applyDecision(r, 'send_back', 'J. Kerr', 'c', T);
+    expect(r.status).toBe('returned');
+    expect(r.history!.map((e) => e.action)).toEqual(['sent_back', 'sent_back', 'sent_back']);
+  });
+
+  it('and back up again', () => {
+    let r = REQ([{ role: 'safety', status: 'pending' }, { role: 'lead', status: 'pending' }], 0);
+    r = applyDecision(r, 'send_back', 'J. Kerr', 'why?', T);
+    r = resubmit(r, 'Capt. Dunlop', 'Fatigue plan attached.', T);
+    expect(r.status).toBe('pending');
+    expect(r.currentStep).toBe(0);
+    r = applyDecision(r, 'approve', 'J. Kerr', 'ok now', T);
+    r = applyDecision(r, 'approve', 'David Brown', 'approved', T);
+    expect(r.status).toBe('approved');
+    expect(r.history!.map((e) => e.action)).toEqual(['sent_back', 'resubmitted', 'approved', 'approved']);
+  });
+
+  it('is a no-op on a finished request', () => {
+    const done = REQ([{ role: 'safety', status: 'approved' }], -1, 'approved');
+    expect(applyDecision(done, 'send_back', 'x', 'y', T)).toBe(done);
+  });
+});
+
+describe('resubmit', () => {
+  const returned = (): ApprovalRequest => ({
+    id: 'AR-T', formKind: 'waiver', formLabel: 'Waiver', subjectTitle: 'A waiver',
+    values: {}, fieldLabels: {},
+    requestedByRole: 'pilot', requestedByName: 'Capt. Dunlop', requestedAt: '2026-08-01T00:00:00Z',
+    chain: [
+      { role: 'safety', status: 'pending' },
+      { role: 'lead', status: 'pending', assigneeUserId: 'USR015', assigneeName: 'Priya Raman' },
+    ],
+    currentStep: -1, status: 'returned', history: [],
+  });
+
+  it('puts it back at the bottom of the chain', () => {
+    const out = resubmit(returned(), 'Capt. Dunlop', 'Updated.', '2026-08-19T11:00:00Z');
+    expect(out.status).toBe('pending');
+    expect(out.currentStep).toBe(0);
+  });
+
+  it('clears every step so each approver decides again on what is now written', () => {
+    const r = returned();
+    r.chain[0] = { role: 'safety', status: 'approved', decidedByName: 'J. Kerr', comment: 'stale' };
+    const out = resubmit(r, 'Capt. Dunlop', 'Updated.', '2026-08-19T11:00:00Z');
+    expect(out.chain.every((s) => s.status === 'pending')).toBe(true);
+    expect(out.chain[0].comment).toBeUndefined();
+  });
+
+  it('keeps a named approver named — re-submitting does not un-address it', () => {
+    const out = resubmit(returned(), 'Capt. Dunlop', 'Updated.', '2026-08-19T11:00:00Z');
+    expect(out.chain[1].assigneeName).toBe('Priya Raman');
+  });
+
+  it('records the re-submission and what changed', () => {
+    const out = resubmit(returned(), 'Capt. Dunlop', 'Fatigue plan attached.', '2026-08-19T11:00:00Z');
+    expect(out.history!.at(-1)).toMatchObject({ action: 'resubmitted', comment: 'Fatigue plan attached.' });
+  });
+
+  it('refuses anything that is not returned', () => {
+    const pending = { ...returned(), status: 'pending' as RequestStatus, currentStep: 0 };
+    expect(resubmit(pending, 'x', 'y', 'z')).toBe(pending);
   });
 });

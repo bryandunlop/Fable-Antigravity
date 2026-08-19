@@ -113,14 +113,20 @@ export function hazardToItem(h: Hazard): SafetyItem {
   };
 }
 
-/** ASAP reports are reports, and they were reachable only from a sub-tab — a
- *  safety manager had to REMEMBER to go and look. They now ride the same Triage
- *  and Investigate surfaces as hazards.
+/** ASAP reports get their OWN confidential surface, not a slot on the shared
+ *  boards.
  *
- *  ASAP is non-punitive and confidential: the store deliberately holds no
- *  reporter identity, and nothing here may invent one. The card shows the phase
- *  and airport, never a person, and opening it goes to the ASAP sheet with its
- *  de-identification step rather than the generic detail sheet. */
+ *  C7 put them on Triage and Investigate beside hazards, on the reasoning that a
+ *  report nobody can see is a report nobody works. That was the wrong trade:
+ *  ASAP will be a form that goes out via API to a THIRD PARTY for
+ *  de-identification (Bryan, 2026-08-19), which means the narrative myGFO holds
+ *  before that round trip is raw crew testimony. "Taxi · KTEB, 1 day ago" beside
+ *  a schedule is not de-identification in a four-aircraft fleet, and the
+ *  programme's protection is the only reason crews file at all.
+ *
+ *  So these items are built for the ASAP verb alone and are deliberately NOT
+ *  merged into ops.move / ops.track. The store still holds no reporter identity
+ *  and nothing here may invent one. */
 export function asapToItem(r: AsapReport): SafetyItem {
   const phase = r.status === 'Open' ? 0 : r.status === 'Under review' ? 1 : 4;
   const closed = phase === 4;
@@ -147,8 +153,9 @@ export function asapToItem(r: AsapReport): SafetyItem {
   };
 }
 
-// Demo identity — matches the reporter stamped by SafetyCenter.handleFiled.
-const REPORTER = 'Capt. Dunlop';
+// Who "my reports" means. Passed in rather than hardcoded: the demo resolves
+// the acting persona from SYSTEM_USERS (see actingUser.ts), and a constant here
+// silently emptied every pilot's own list except one imaginary person's.
 
 /** The reporter's own open hazard, shaped for their Waiting list — so "track it
  *  under Waiting" is literally true the moment they file. */
@@ -175,7 +182,7 @@ function hazardToWaitingItem(h: Hazard): SafetyItem {
   };
 }
 
-export function buildSafetyModel(hazards: Hazard[], asap: AsapReport[] = []): SafetyModel {
+export function buildSafetyModel(hazards: Hazard[], asap: AsapReport[] = [], reporterName = ''): SafetyModel {
   // Dedup by id defensively — the persisted hazard store can carry duplicate
   // rows after a multi-instance localStorage race (see HazardContext load/merge).
   const seen = new Set<string>();
@@ -186,17 +193,20 @@ export function buildSafetyModel(hazards: Hazard[], asap: AsapReport[] = []): Sa
   });
   const hz = live.map(hazardToItem);
   const asapItems = (asap || []).map(asapToItem);
-  const all = [...hz, ...asapItems];
-  const hzMove = all.filter((i) => i.bucket === 'move');
-  const hzTrack = all.filter((i) => i.bucket === 'track');
-  const hzDone = all.filter((i) => i.bucket === 'done');
+  // Hazards only. ASAP is confidential until an external service de-identifies
+  // it, so it never joins a shared board — see asapToItem.
+  const hzMove = hz.filter((i) => i.bucket === 'move');
+  const hzTrack = hz.filter((i) => i.bucket === 'track');
+  const hzDone = hz.filter((i) => i.bucket === 'done');
   // Crew: my own open reports (visible as "with the safety team").
   const myWaiting = live
-    .filter((h) => !h.isAnonymous && h.reportedBy === REPORTER && phaseIndexOf(h.workflowStage) < 4)
+    .filter((h) => !h.isAnonymous && h.reportedBy === reporterName && phaseIndexOf(h.workflowStage) < 4)
     .map(hazardToWaitingItem);
-  const myDone = hzDone.filter((i) => i.submittedBy === REPORTER);
+  const myDone = hzDone.filter((i) => i.submittedBy === reporterName);
 
   // Submissions archive = every hazard (any state) + seeded non-hazard history.
+  // The records archive lists ASAP by reference only — the row carries no
+  // narrative, and opening it goes to the confidential surface.
   const submissions: SafetyItem[] = [...hz, ...asapItems, ...MOCK_SUBMISSIONS]
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
@@ -232,8 +242,8 @@ export function buildSafetyModel(hazards: Hazard[], asap: AsapReport[] = []): Sa
   };
 }
 
-export function useSafetyModel(): SafetyModel {
+export function useSafetyModel(reporterName = ''): SafetyModel {
   const { hazards } = useHazards();
   const { reports } = useAsapReports();
-  return useMemo(() => buildSafetyModel(hazards || [], reports || []), [hazards, reports]);
+  return useMemo(() => buildSafetyModel(hazards || [], reports || [], reporterName), [hazards, reports, reporterName]);
 }

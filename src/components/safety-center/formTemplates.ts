@@ -19,8 +19,8 @@ import type { Kind } from './ReportDialog';
 const KEY = 'sc_form_templates_v1';
 // Bumping SEED_VERSION replaces stored templates with the new seeds — demo
 // semantics: a seed upgrade wins over saved manager edits. v3 adds the waiver
-// approvalChain (D39).
-const SEED_VERSION = 3;
+// approvalChain (D39); v4 adds canDecline (D85, 2026-08-19).
+const SEED_VERSION = 4;
 
 export const SEED_TEMPLATES: FormTemplate[] = [
   {
@@ -76,6 +76,7 @@ export const SEED_TEMPLATES: FormTemplate[] = [
     // recommends; Lead Team is final approval or denial. Still manager-editable
     // per D39 — this is the default, not a hard-coding.
     approvalChain: ['safety', 'lead'],
+    canDecline: true,
     fields: [
       { id: 'request', label: 'What are you requesting?', type: 'textarea', required: true },
       { id: 'justification', label: 'Reason / justification', type: 'textarea', required: true },
@@ -161,6 +162,18 @@ export function useFormTemplates() {
 const KIND_TO_TEMPLATE_ID: Record<Kind, string> = {
   hazard: 'tpl-hazard', asap: 'tpl-asap', cws: 'tpl-cws', waiver: 'tpl-waiver',
 };
+
+/** May an approver END a request of this kind, rather than send it back?
+ *
+ *  Read from the SEEDS, deliberately — not from the stored, manager-editable
+ *  copy. Templates are manager-configurable (D39), and this is a policy
+ *  capability rather than a form-authoring choice: editing a form's fields must
+ *  not be able to grant, or silently drop, the power to kill a request. It
+ *  already failed that way once — a template saved before this field existed
+ *  read `undefined` and the Decline button quietly disappeared. */
+export function canDeclineKind(kind: Kind): boolean {
+  return SEED_TEMPLATES.find((t) => t.id === KIND_TO_TEMPLATE_ID[kind])?.canDecline === true;
+}
 
 export function templateForKind(templates: FormTemplate[], kind: Kind): FormTemplate | undefined {
   return templates.find((t) => t.id === KIND_TO_TEMPLATE_ID[kind]);

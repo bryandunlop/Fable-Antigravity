@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SEED_TEMPLATES, templateForKind, missingRequired, extraFields, extraLines,
-  describeWithExtras, sanitizeTemplate, KNOWN_IDS, MULTI_SEP,
+  describeWithExtras, sanitizeTemplate, KNOWN_IDS, MULTI_SEP, canDeclineKind,
 } from './formTemplates';
 import type { FormTemplate } from './types';
 
@@ -109,5 +109,43 @@ describe('multiselect separator round-trip', () => {
   it('splits back into the chosen options', () => {
     const joined = ['Fatigue', 'Stress'].join(MULTI_SEP);
     expect(joined.split(MULTI_SEP)).toEqual(['Fatigue', 'Stress']);
+  });
+});
+
+// ── 2026-08-19: declining is a per-form capability ─────────────────────────
+// "Lets just start with waivers." The chain engine is generic, so without this
+// gate a recognition could be ended with the same button that ends a waiver.
+
+describe('canDecline', () => {
+  it('is on for waivers', () => {
+    const t = SEED_TEMPLATES.find((x) => x.kind === 'Waiver');
+    expect(t?.canDecline).toBe(true);
+  });
+
+  it('is absent — and therefore off — everywhere else', () => {
+    for (const t of SEED_TEMPLATES.filter((x) => x.kind !== 'Waiver')) {
+      expect(t.canDecline).not.toBe(true);
+    }
+  });
+
+  it('only a template with a chain can be declined at all', () => {
+    for (const t of SEED_TEMPLATES) {
+      if (t.canDecline) expect((t.approvalChain ?? []).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('canDeclineKind', () => {
+  it('is true only for waivers', () => {
+    expect(canDeclineKind('waiver')).toBe(true);
+    expect(canDeclineKind('hazard')).toBe(false);
+    expect(canDeclineKind('asap')).toBe(false);
+    expect(canDeclineKind('cws')).toBe(false);
+  });
+
+  it('reads the seed, so a template saved before the field existed cannot drop it', () => {
+    // The real failure this guards: a stored template from an earlier seed
+    // version read `undefined`, and the Decline button silently disappeared.
+    expect(canDeclineKind('waiver')).toBe(true);
   });
 });
