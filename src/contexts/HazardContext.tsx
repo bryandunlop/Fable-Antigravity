@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { daysAgo, today } from '../lib/demoDates';
+import { daysAgo, daysAhead, today } from '../lib/demoDates';
 import { eventStore } from '../notifications/events';
 import { dedupeHazardsById, loadStoredHazards } from './hazardPersistence';
 
@@ -262,8 +262,8 @@ const INITIAL_HAZARDS: Hazard[] = [
         immediateActions: 'Runway closed to traffic, maintenance notified',
         potentialConsequences: 'Reduced braking effectiveness, potential aircraft damage or incident',
         assignedTo: 'Mike Johnson',
-        dueDate: '2024-02-07',
-        effectivenessReviewDate: '2024-02-15',
+        dueDate: daysAhead(4),
+        effectivenessReviewDate: daysAhead(25),
         riskFactors: ['Lack of Awareness'],
         priority: 'High',
         isPublished: true, // Legacy/Mock data should be visible
@@ -283,8 +283,8 @@ const INITIAL_HAZARDS: Hazard[] = [
         immediateActions: 'Crew advised to use alternative approach path, wildlife control notified',
         potentialConsequences: 'Bird strike damage to aircraft, potential engine failure',
         assignedTo: 'David Brown',
-        dueDate: '2024-02-08',
-        effectivenessReviewDate: '2024-02-12',
+        dueDate: daysAgo(6),
+        effectivenessReviewDate: daysAhead(12),
         riskFactors: ['Lack of Resources'],
         priority: 'High',
         isPublished: true,
@@ -304,8 +304,8 @@ const INITIAL_HAZARDS: Hazard[] = [
         immediateActions: 'GPU taken out of service, backup unit deployed',
         potentialConsequences: 'Avionics damage, flight delays',
         assignedTo: 'Tom Wilson',
-        dueDate: '2024-02-05',
-        effectivenessReviewDate: '2024-03-04',
+        dueDate: daysAgo(58),
+        effectivenessReviewDate: daysAgo(40),
         priority: 'Medium',
         isPublished: true,
         submitterId: 'legacy_user'
@@ -324,8 +324,8 @@ const INITIAL_HAZARDS: Hazard[] = [
         immediateActions: 'Area cordoned off, fuel operations suspended for tank 2',
         potentialConsequences: 'Environmental contamination, fire hazard, fuel shortage',
         assignedTo: 'Lisa Chen',
-        dueDate: '2024-02-07',
-        effectivenessReviewDate: '2024-02-20',
+        dueDate: daysAhead(19),
+        effectivenessReviewDate: daysAhead(45),
         priority: 'High',
         isPublished: true,
         submitterId: 'legacy_user'
@@ -342,7 +342,7 @@ const INITIAL_HAZARDS: Hazard[] = [
         description: 'Lighting on FBO ramp is insufficient for night operations.',
         immediateActions: 'Portable lighting requested.',
         potentialConsequences: 'Trip hazard, vehicle collision.',
-        effectivenessReviewDate: '2024-07-15',
+        effectivenessReviewDate: daysAhead(45),
         priority: 'Low',
         isPublished: true,
         submitterId: 'legacy_user'

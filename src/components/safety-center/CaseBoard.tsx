@@ -39,7 +39,33 @@ export function groupByAge(items: SafetyItem[]): BoardColumn[] {
   }));
 }
 
-function CaseCard({ item, onOpen }: { item: SafetyItem; onOpen: (i: SafetyItem) => void }) {
+/** Due-date buckets, most urgent FIRST — the reverse of the age board, because
+ *  here the thing you must not miss is the overdue one, and it belongs where the
+ *  eye lands first. Anything with no due date gets its own column rather than
+ *  being silently sorted in among dated work. */
+export function groupByDue(items: SafetyItem[]): BoardColumn[] {
+  const bucket = (i: SafetyItem): string => {
+    const d = i.dueDays;
+    if (d === undefined) return 'undated';
+    if (d < 0) return 'overdue';
+    if (d <= 7) return 'week';
+    if (d <= 30) return 'month';
+    return 'later';
+  };
+  const defs: [string, string][] = [
+    ['overdue', 'Overdue'], ['week', 'Due this week'], ['month', 'Due this month'],
+    ['later', 'Later'], ['undated', 'No due date'],
+  ];
+  return defs.map(([key, label]) => ({
+    key,
+    label,
+    // Soonest first inside a column: the most overdue sits on top of Overdue.
+    items: items.filter((i) => bucket(i) === key)
+      .sort((a, b) => (a.dueDays ?? Number.MAX_SAFE_INTEGER) - (b.dueDays ?? Number.MAX_SAFE_INTEGER)),
+  }));
+}
+
+function CaseCard({ item, onOpen, showDue }: { item: SafetyItem; onOpen: (i: SafetyItem) => void; showDue?: boolean }) {
   return (
     <button onClick={() => onOpen(item)}
       className="w-full text-left bg-card border border-border rounded-lg p-3 flex flex-col gap-2 cursor-pointer transition-all hover:border-muted-foreground/40 hover:shadow-sm active:scale-[.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1">
@@ -47,7 +73,11 @@ function CaseCard({ item, onOpen }: { item: SafetyItem; onOpen: (i: SafetyItem) 
         <TypeLabel>{item.type}</TypeLabel>
         <div className="flex-1" />
         {item.stalled && <TriangleAlert className="w-3.5 h-3.5 text-[color:var(--gfo-error-ink)] shrink-0" />}
-        {item.ageDays != null && (
+        {showDue && item.dueDays != null ? (
+          <span className={`text-[11.5px] font-semibold whitespace-nowrap ${item.dueDays < 0 ? 'text-[color:var(--gfo-error-ink)]' : item.dueDays <= 7 ? 'text-[color:var(--gfo-warning-ink)]' : 'text-muted-foreground'}`}>
+            {item.dueDays < 0 ? `${-item.dueDays}d over` : item.dueDays === 0 ? 'Due today' : `${item.dueDays}d left`}
+          </span>
+        ) : item.ageDays != null && (
           <span className={`text-[11.5px] font-semibold tabular-nums ${item.stalled ? 'text-[color:var(--gfo-error-ink)]' : 'text-muted-foreground'}`}>
             {item.ageDays}d
           </span>
@@ -68,8 +98,10 @@ function CaseCard({ item, onOpen }: { item: SafetyItem; onOpen: (i: SafetyItem) 
   );
 }
 
-export function CaseBoard({ items, onOpen }: { items: SafetyItem[]; onOpen: (i: SafetyItem) => void }) {
-  const columns = groupByAge(items);
+export function CaseBoard({ items, onOpen, grouping = 'age' }: {
+  items: SafetyItem[]; onOpen: (i: SafetyItem) => void; grouping?: 'age' | 'due';
+}) {
+  const columns = grouping === 'due' ? groupByDue(items) : groupByAge(items);
 
   if (!items.length) {
     return (
@@ -92,7 +124,7 @@ export function CaseBoard({ items, onOpen }: { items: SafetyItem[]; onOpen: (i: 
               <span className="text-[12px] font-semibold text-muted-foreground tabular-nums">{col.items.length}</span>
             </div>
             <div className="bg-muted/50 rounded-lg p-2 flex flex-col gap-2 min-h-[120px]">
-              {col.items.map((i) => <CaseCard key={i.id} item={i} onOpen={onOpen} />)}
+              {col.items.map((i) => <CaseCard key={i.id} item={i} onOpen={onOpen} showDue={grouping === 'due'} />)}
             </div>
           </div>
         ))}

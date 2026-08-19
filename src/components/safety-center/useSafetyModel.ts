@@ -66,6 +66,16 @@ function threadFor(h: Hazard): ThreadMsg[] {
   return [{ who: 'System', role: 'system', at: '', text: `Reported by ${h.reportedBy || 'crew'} — ${h.description?.slice(0, 120) || 'no description'}` }];
 }
 
+/** Whole days until `iso`, negative once past. Calendar-day granularity so a
+ *  date does not read overdue partway through the day it is due. */
+export function daysUntil(iso: string | undefined, nowMs = Date.now()): number | undefined {
+  if (!iso) return undefined;
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return undefined;
+  const day = 86_400_000;
+  return Math.floor(t / day) - Math.floor(nowMs / day);
+}
+
 export function hazardToItem(h: Hazard): SafetyItem {
   const phase = phaseIndexOf(h.workflowStage);
   const age = ageInStage(h);
@@ -87,6 +97,7 @@ export function hazardToItem(h: Hazard): SafetyItem {
     stalled,
     ageLabel: closed ? '' : `${age} day${age === 1 ? '' : 's'} in stage`,
     ageDays: age,
+    dueDays: daysUntil(h.dueDate),
     owner,
     mine,
     waitingText: mine

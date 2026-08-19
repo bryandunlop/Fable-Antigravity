@@ -4,7 +4,7 @@ import {
   type ShapeOverrides,
 } from './shapes';
 import { VERBS, verbDef } from './verbs';
-import { groupByAge } from './CaseBoard';
+import { groupByAge, groupByDue } from './CaseBoard';
 import { queueOrder } from './CaseQueue';
 import type { SafetyItem } from './types';
 
@@ -134,5 +134,53 @@ describe('queueOrder', () => {
     const items = [item({ id: 'a', ageDays: 1 }), item({ id: 'b', ageDays: 9 })];
     queueOrder(items);
     expect(items.map((i) => i.id)).toEqual(['a', 'b']);
+  });
+});
+
+// ── 2026-08-19: Mitigate groups by DUE date, not by age ────────────────────
+// "Yea that would make sense." A corrective action is governed by when it is
+// owed; how long it has been open says less.
+
+describe('groupByDue', () => {
+  it('always returns the five columns, most urgent first', () => {
+    expect(groupByDue([]).map((c) => c.key)).toEqual(['overdue', 'week', 'month', 'later', 'undated']);
+  });
+
+  it('buckets on the boundaries the labels promise', () => {
+    const items = [
+      item({ id: 'over', dueDays: -1 }), item({ id: 'today', dueDays: 0 }),
+      item({ id: 'w', dueDays: 7 }), item({ id: 'm', dueDays: 8 }),
+      item({ id: 'm2', dueDays: 30 }), item({ id: 'later', dueDays: 31 }),
+    ];
+    const byKey = Object.fromEntries(groupByDue(items).map((c) => [c.key, c.items.map((i) => i.id)]));
+    expect(byKey.overdue).toEqual(['over']);
+    expect(byKey.week).toEqual(['today', 'w']);
+    expect(byKey.month).toEqual(['m', 'm2']);
+    expect(byKey.later).toEqual(['later']);
+  });
+
+  it('gives undated work its own column rather than hiding it among dated work', () => {
+    const byKey = Object.fromEntries(groupByDue([item({ id: 'x' })]).map((c) => [c.key, c.items.map((i) => i.id)]));
+    expect(byKey.undated).toEqual(['x']);
+    expect(byKey.later).toEqual([]);
+  });
+
+  it('puts the MOST overdue on top — the opposite of the age board', () => {
+    const cols = groupByDue([item({ id: 'a', dueDays: -2 }), item({ id: 'b', dueDays: -30 })]);
+    expect(cols[0].items.map((i) => i.id)).toEqual(['b', 'a']);
+  });
+
+  it('loses nothing', () => {
+    const items = Array.from({ length: 15 }, (_, n) => item({ id: `i${n}`, dueDays: n - 5 }));
+    const placed = groupByDue(items).flatMap((c) => c.items.map((i) => i.id));
+    expect(placed.sort()).toEqual(items.map((i) => i.id).sort());
+  });
+});
+
+describe('per-verb board grouping', () => {
+  it('is due-based for Mitigate and age-based everywhere else', () => {
+    expect(verbDef('mitigate').boardGrouping).toBe('due');
+    expect(verbDef('triage').boardGrouping).toBeUndefined();
+    expect(verbDef('investigate').boardGrouping).toBeUndefined();
   });
 });
