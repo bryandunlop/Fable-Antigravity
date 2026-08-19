@@ -8,6 +8,7 @@ import type { Aircraft, AircraftType, Serviceability, Trip, TripLeg, TechLogStat
 import { getDefaultState } from './mockData/scenarios';
 import { deriveServiceability } from './engine/serviceability';
 import { deriveTripServiceabilityAlerts, type TripForAlerts, type TripServiceabilityAlert, type TripAlertKind } from './engine/tripAlerts';
+import { summarizeFleetOpsDetail, type FleetOpsTailDetail } from './engine/fleetOpsDetail';
 import { STORAGE_KEY, VERSION_KEY, DATA_VERSION } from './TechLogContext';
 import { HOME_STATION } from '../../config/station';
 
@@ -215,6 +216,13 @@ export function summarizeFleetAirworthiness(state: TechLogState, asOfUtc: string
 export function readFleetAirworthiness(asOfUtc: string): FleetAirworthinessEntry[] {
   return summarizeFleetAirworthiness(loadPersistedTechLogState(), asOfUtc);
 }
+
+/** THIN localStorage wrapper over engine/fleetOpsDetail (pure logic + tests live there). D88. */
+export function readFleetOpsDetail(asOfUtc: string): FleetOpsTailDetail[] {
+  return summarizeFleetOpsDetail(loadPersistedTechLogState(), asOfUtc);
+}
+
+export type { FleetOpsTailDetail };
 
 export type { TripForAlerts, TripServiceabilityAlert, TripAlertKind };
 

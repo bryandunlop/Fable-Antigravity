@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { readFleetAirworthiness } from '../tech-log/bridge';
-import type { FleetAirworthinessEntry } from '../tech-log/bridge';
+import { readFleetOpsDetail } from '../tech-log/bridge';
+import type { FleetOpsTailDetail } from '../tech-log/bridge';
 import { useSatcomDirect } from './useSatcomDirect';
 import type { AircraftPosition, AircraftStatus as SatcomAircraftStatus } from './useSatcomDirect';
 
@@ -9,7 +9,7 @@ export type FlightStatus = 'in-flight' | 'taxi' | 'on-ground' | 'parked' | 'unkn
 export interface UnifiedFleetAircraft {
   tailNumber: string;
   model: string;
-  airworthiness: FleetAirworthinessEntry;
+  airworthiness: FleetOpsTailDetail;
   position?: AircraftPosition;
   satcom?: SatcomAircraftStatus;
   flightStatus: FlightStatus;
@@ -60,7 +60,7 @@ export function useUnifiedFleetStatus() {
   const { aircraftPositions, aircraftStatuses, loading, isRefreshing, error, lastUpdate } = useSatcomDirect();
 
   const airworthiness = useMemo(
-    () => readFleetAirworthiness(new Date().toISOString()),
+    () => readFleetOpsDetail(new Date().toISOString()),
     // Re-derive on each satcom refresh tick so releases/rectifications surface within a cycle.
     [lastUpdate]
   );
