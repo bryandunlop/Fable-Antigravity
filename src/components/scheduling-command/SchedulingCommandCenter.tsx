@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { CalendarClock, CalendarDays, ClipboardList, Eye, Inbox as InboxIcon, LayoutList, ListChecks, Loader2, Plus, Rows3, Send } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ChevronRight, ClipboardList, Eye, Inbox as InboxIcon, LayoutList, Loader2, Rows3, Send, Telescope, Tv } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
@@ -16,34 +17,62 @@ import { toTripsForAlerts } from './alertTrips';
 import { fleetRowsFor } from './fleet';
 import { deriveTripStatus } from './tripStatus';
 import { PlanBoard } from './PlanBoard';
-import { RunBoard, type FunnelFilter } from './RunBoard';
 import { CalendarView } from './CalendarView';
 import { DispatchTable } from './DispatchTable';
 import { FilterBar } from './FilterBar';
 import { TripDrawer } from './TripDrawer';
-import { NewTripDialog } from './NewTripDialog';
-import { buildRunBoard, type RunTask } from './runBoardSelectors';
-import { buildUpcomingBoard } from './upcomingLanesSelectors';
-import { UpcomingLanes } from './UpcomingLanes';
+import { buildHorizonBoard, officeTasksDueToday, type OverdueItem } from './horizonSelectors';
+import { HorizonView } from './HorizonView';
 import { matchesTripTypeFilter } from './tripFilters';
 import type { TripType } from '../../scheduling/engine';
 
-type Surface = 'schedule' | 'upcoming' | 'action' | 'templates' | 'inbox' | 'foreflight' | 'pilot-visibility';
-type ScheduleView = 'board' | 'calendar' | 'list';
+// One home, four lenses (D87): Horizon (default) / Fleet board / Calendar / List are PROJECTIONS
+// of the same filtered trip set — not surfaces with their own content models. The old
+// Schedule / Upcoming / Action Center tabs folded into this.
+type Lens = 'horizon' | 'board' | 'calendar' | 'list';
+type Utility = 'templates' | 'inbox' | 'foreflight' | 'pilot-visibility';
 
-const UTILITY_TABS: { key: Surface; label: string; icon: React.ElementType }[] = [
+const LENSES: { key: Lens; label: string; icon: React.ElementType }[] = [
+  { key: 'horizon', label: 'Horizon', icon: Telescope },
+  { key: 'board', label: 'Fleet board', icon: Rows3 },
+  { key: 'calendar', label: 'Calendar', icon: CalendarDays },
+  { key: 'list', label: 'List', icon: LayoutList },
+];
+
+const UTILITY_TABS: { key: Utility; label: string; icon: React.ElementType }[] = [
   { key: 'templates', label: 'Templates', icon: ClipboardList },
   { key: 'inbox', label: 'Inbox', icon: InboxIcon },
   { key: 'foreflight', label: 'ForeFlight', icon: Send },
   { key: 'pilot-visibility', label: 'Pilot visibility', icon: Eye },
 ];
 
+/** Task-overdue strip — persists across every lens; the only red that isn't aircraft RAG. */
+function OverdueStrip({ overdue, onOpenTrip }: { overdue: OverdueItem[]; onOpenTrip: (tripId: string) => void }) {
+  if (overdue.length === 0) return null;
+  return (
+    <button
+      onClick={() => onOpenTrip(overdue[0].tripId)}
+      className="w-full flex items-center gap-2.5 text-left rounded-md px-3 py-2 border border-[var(--gfo-error,#EF3340)]/40 bg-[var(--gfo-error,#EF3340)]/10 hover:bg-[var(--gfo-error,#EF3340)]/15 transition-colors"
+    >
+      <AlertTriangle className="h-4 w-4 text-[var(--gfo-error,#EF3340)] shrink-0" />
+      <span className="text-xs font-medium text-[var(--gfo-error,#EF3340)]">
+        {overdue.length} need{overdue.length === 1 ? 's' : ''} attention now
+      </span>
+      <span className="text-xs text-muted-foreground truncate">
+        {overdue[0].tail} {overdue[0].route} · {overdue[0].actionTitle} · {overdue[0].dueLabel}
+        {overdue.length > 1 ? ` · +${overdue.length - 1} more` : ''}
+      </span>
+      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
+    </button>
+  );
+}
+
 /**
- * The scheduling hub, in the GFO design language. Two primary surfaces — Schedule (plan board /
- * calendar / list views of the same trips: "where is everything") and Action Center (trip-clustered
- * due work: "what needs me now") — plus quiet utility panels. Every trip reference opens the Trip
- * Drawer over the current view, so the scheduler never loses their place and always sees exactly
- * which trip's checklist they're working.
+ * The scheduling hub, in the GFO design language. ONE home with four lenses over the same
+ * filtered trips — Horizon ("what's coming, keyed by when work is due", the default), Fleet board
+ * (tail × time), Calendar, List — plus quiet utility panels. The overdue strip and serviceability
+ * alerts persist across lenses. Trips arrive from the myairops sync — there is no manual
+ * trip-creation path here. Every trip reference opens the Trip Drawer over the current lens.
  */
 export default function SchedulingCommandCenter({
   userRole = 'scheduling',
@@ -54,16 +83,14 @@ export default function SchedulingCommandCenter({
 }) {
   const { service, store, ready, tick, bump, nowUtc, officeTzOffsetMinutes } = useSchedulingWorkspace();
 
-  const [surface, setSurface] = useState<Surface>('schedule');
-  const [scheduleView, setScheduleView] = useState<ScheduleView>('board');
+  const [lens, setLens] = useState<Lens>('horizon');
+  const [utility, setUtility] = useState<Utility | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [tailFilter, setTailFilter] = useState<Set<string>>(new Set());
   const [tripTypeFilter, setTripTypeFilter] = useState<Set<TripType>>(new Set());
   const [actionRequiredOnly, setActionRequiredOnly] = useState(false);
   const [horizonDays, setHorizonDays] = useState(30);
-  const [funnelFilters, setFunnelFilters] = useState<Set<FunnelFilter>>(new Set());
   const [drawer, setDrawer] = useState<{ tripId: string; taskId?: string } | null>(null);
-  const [newTripOpen, setNewTripOpen] = useState(false);
 
   const [trips, setTrips] = useState<BoardTrip[]>([]);
   const [alertTrips, setAlertTrips] = useState<TripForAlerts[]>([]);
@@ -133,22 +160,22 @@ export default function SchedulingCommandCenter({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [trips, tailFilter, tripTypeFilter, actionRequiredOnly, searchTerm]);
 
-  const runModel = useMemo(
-    () => buildRunBoard(filteredTrips, officeTasks, nowMs, horizonDays),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredTrips, officeTasks, horizonDays],
-  );
-
-  const upcomingModel = useMemo(
-    () => buildUpcomingBoard(filteredTrips, nowMs, horizonDays),
+  const horizonModel = useMemo(
+    () => buildHorizonBoard(filteredTrips, nowMs, horizonDays),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filteredTrips, horizonDays],
   );
 
+  const officeToday = useMemo(
+    () => officeTasksDueToday(officeTasks, nowMs),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [officeTasks],
+  );
+
   const openTrip = (tripId: string, taskId?: string) => setDrawer({ tripId, taskId });
-  const onTaskAction = async (task: RunTask, action: TaskAction) => {
+  const onTaskAction = async (task: BoardTask, action: TaskAction) => {
     try {
-      await service.applyAction(task.key, action, userRole, nowUtc());
+      await service.applyAction(task.id, action, userRole, nowUtc());
       bump();
     } catch (err) {
       toast.error(`Couldn't ${action.kind} task: ${err instanceof Error ? err.message : 'unknown error'}`);
@@ -158,8 +185,6 @@ export default function SchedulingCommandCenter({
     setTailFilter(prev => { const s = new Set(prev); s.has(tail) ? s.delete(tail) : s.add(tail); return s; });
   const toggleTripType = (t: TripType) =>
     setTripTypeFilter(prev => { const s = new Set(prev); s.has(t) ? s.delete(t) : s.add(t); return s; });
-  const toggleFunnel = (f: FunnelFilter) =>
-    setFunnelFilters(prev => { const s = new Set(prev); s.has(f) ? s.delete(f) : s.add(f); return s; });
 
   if (!ready) {
     return (
@@ -169,57 +194,42 @@ export default function SchedulingCommandCenter({
     );
   }
 
-  const showsFilterBar = surface === 'schedule' || surface === 'upcoming' || surface === 'action';
+  const onLensSurface = utility === null;
 
   return (
     <div className="space-y-4">
-      {/* Page header — standard GFO chrome */}
+      {/* Page header — standard GFO chrome. No New-trip: trips arrive from the myairops sync. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Scheduling</h1>
           <p className="text-sm text-muted-foreground">
-            {trips.length} trips · readiness derived live from checklist state
+            {trips.length} trips · synced from myairops · readiness derived live from checklist state
           </p>
         </div>
-        <Button onClick={() => setNewTripOpen(true)}>
-          <Plus className="h-4 w-4 mr-1.5" /> New trip
+        <Button variant="outline" size="sm" asChild className="text-muted-foreground">
+          <Link to="/scheduling-wall"><Tv className="h-4 w-4 mr-1.5" /> Ops wall</Link>
         </Button>
       </div>
 
-      {/* Surfaces: two primary + quiet utilities */}
+      {/* The lens switch: four projections of the same trips + quiet utilities */}
       <div className="flex flex-wrap items-center gap-3 border-b pb-px">
-        <Tabs value={surface === 'schedule' || surface === 'upcoming' || surface === 'action' ? surface : ''} className="w-auto">
+        <Tabs value={onLensSurface ? lens : ''} className="w-auto">
           <TabsList>
-            <TabsTrigger value="schedule" onClick={() => setSurface('schedule')}>
-              <Rows3 className="h-4 w-4 mr-1.5" /> Schedule
-            </TabsTrigger>
-            <TabsTrigger value="upcoming" onClick={() => setSurface('upcoming')}>
-              <CalendarClock className="h-4 w-4 mr-1.5" /> Upcoming
-            </TabsTrigger>
-            <TabsTrigger value="action" onClick={() => setSurface('action')}>
-              <ListChecks className="h-4 w-4 mr-1.5" /> Action Center
-            </TabsTrigger>
+            {LENSES.map(({ key, label, icon: Icon }) => (
+              <TabsTrigger key={key} value={key} onClick={() => { setLens(key); setUtility(null); }}>
+                <Icon className="h-4 w-4 mr-1.5" /> {label}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </Tabs>
-
-        {surface === 'schedule' && (
-          <div className="flex bg-muted rounded-lg p-0.5 gap-0.5">
-            {([['board', Rows3, 'Board'], ['calendar', CalendarDays, 'Calendar'], ['list', LayoutList, 'List']] as const).map(([v, Icon, label]) => (
-              <button key={v} onClick={() => setScheduleView(v)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${scheduleView === v ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                <Icon className="h-3.5 w-3.5" /> {label}
-              </button>
-            ))}
-          </div>
-        )}
 
         <div className="flex items-center gap-1 ml-auto">
           {UTILITY_TABS.map(({ key, label, icon: Icon }) => (
             <Button
               key={key}
-              variant={surface === key ? 'secondary' : 'ghost'}
+              variant={utility === key ? 'secondary' : 'ghost'}
               size="sm"
-              onClick={() => setSurface(key)}
+              onClick={() => setUtility(prev => (prev === key ? null : key))}
               className="text-muted-foreground data-[active]:text-foreground"
             >
               <Icon className="h-4 w-4 mr-1.5" /> {label}
@@ -228,9 +238,11 @@ export default function SchedulingCommandCenter({
         </div>
       </div>
 
-      {showsFilterBar && <OpsAlertsPanel alerts={opsAlerts} onOpenTrip={openTrip} />}
+      {/* Persist across every lens: serviceability alerts (aircraft RAG) + task-overdue strip. */}
+      {onLensSurface && <OpsAlertsPanel alerts={opsAlerts} onOpenTrip={openTrip} />}
+      {onLensSurface && <OverdueStrip overdue={horizonModel.overdue} onOpenTrip={openTrip} />}
 
-      {showsFilterBar && (
+      {onLensSurface && (
         <FilterBar
           fleet={fleetRowsFor(trips)}
           searchTerm={searchTerm} onSearch={setSearchTerm}
@@ -241,45 +253,35 @@ export default function SchedulingCommandCenter({
         />
       )}
 
-      {/* Active surface */}
-      {surface === 'schedule' && scheduleView === 'board' && (
-        <PlanBoard trips={filteredTrips} nowMs={nowMs} serviceability={fleetServiceability} onTripClick={t => openTrip(t.id)} />
-      )}
-      {surface === 'schedule' && scheduleView === 'calendar' && (
-        <CalendarView trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
-      )}
-      {surface === 'schedule' && scheduleView === 'list' && (
-        <DispatchTable trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
-      )}
-      {surface === 'upcoming' && (
-        <UpcomingLanes model={upcomingModel} onOpenTrip={openTrip} />
-      )}
-      {surface === 'action' && (
-        <RunBoard
-          model={runModel} trips={filteredTrips}
-          funnelFilters={funnelFilters} onToggleFunnel={toggleFunnel}
-          onAction={onTaskAction} onOpenTrip={openTrip}
+      {/* Active lens */}
+      {onLensSurface && lens === 'horizon' && (
+        <HorizonView
+          model={horizonModel} officeToday={officeToday}
+          nowMs={nowMs} horizonDays={horizonDays}
+          onOpenTrip={openTrip} onOfficeAction={onTaskAction}
         />
       )}
-      {surface === 'templates' && <TemplatesPanel userRole={userRole} additionalRoles={additionalRoles} />}
-      {surface === 'inbox' && <InboxPanel defaultTargetRole="pilot" />}
-      {surface === 'foreflight' && <ForeFlightPanel />}
-      {surface === 'pilot-visibility' && <PilotVisibilityPanel />}
+      {onLensSurface && lens === 'board' && (
+        <PlanBoard trips={filteredTrips} nowMs={nowMs} serviceability={fleetServiceability} onTripClick={t => openTrip(t.id)} />
+      )}
+      {onLensSurface && lens === 'calendar' && (
+        <CalendarView trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
+      )}
+      {onLensSurface && lens === 'list' && (
+        <DispatchTable trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
+      )}
+      {utility === 'templates' && <TemplatesPanel userRole={userRole} additionalRoles={additionalRoles} />}
+      {utility === 'inbox' && <InboxPanel defaultTargetRole="pilot" />}
+      {utility === 'foreflight' && <ForeFlightPanel />}
+      {utility === 'pilot-visibility' && <PilotVisibilityPanel />}
 
-      {/* The trip workspace, over whichever view you're in */}
+      {/* The trip workspace, over whichever lens you're in */}
       <TripDrawer
         tripId={drawer?.tripId ?? null}
         focusTaskId={drawer?.taskId}
         open={!!drawer}
         onOpenChange={o => { if (!o) setDrawer(null); }}
         userRole={userRole}
-      />
-
-      <NewTripDialog
-        open={newTripOpen}
-        onOpenChange={setNewTripOpen}
-        userRole={userRole}
-        onCreated={tripId => openTrip(tripId)}
       />
     </div>
   );

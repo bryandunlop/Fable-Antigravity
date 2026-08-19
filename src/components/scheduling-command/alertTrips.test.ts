@@ -36,7 +36,7 @@ describe('toTripsForAlerts', () => {
         arrivalTimeUtc: '2026-07-22T11:40:00.000Z', paxCount: 2,
       }],
     });
-    const noArrival = trip({ id: 't2' }); // NewTripDialog-style leg: departure only
+    const noArrival = trip({ id: 't2' }); // departure-only leg (arrival not yet known)
     const [a, b] = toTripsForAlerts([withArrival, noArrival]);
     expect(a.legs[0].arrivalTimeUtc).toBe('2026-07-22T11:40:00.000Z');
     expect('arrivalTimeUtc' in b.legs[0]).toBe(false);
