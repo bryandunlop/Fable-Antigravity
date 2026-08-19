@@ -23,6 +23,7 @@ import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewM
 import QuickTapView from '../shared/QuickTapView';
 import ManageQuickAddDialog from '../shared/ManageQuickAddDialog';
 import { getOnBoardQty } from '../tripMath';
+import { selectLoggableItems } from '../loggableItems';
 import { TripLoadExtras } from './TripLoadExtras';
 import { TripRestoreStock } from './TripRestoreStock';
 
@@ -405,15 +406,14 @@ function TripViewInner({
 
   // ─── Quick Count Logic ──────────────────────────────────────────────────
 
-  const filteredItems = useMemo(() => {
-    const lowerSearch = search.toLowerCase();
-    return state.items.filter(item => {
-      const qty = item.defaultQuantities[aircraftType];
-      if (!qty || qty <= 0) return false;
-      if (search && !item.itemName.toLowerCase().includes(lowerSearch)) return false;
-      return true;
-    });
-  }, [state.items, aircraftType, search]);
+  // Compartment and Category used to filter on par + search only, while Quick Tap
+  // filtered `isConsumable !== false` inside QuickTapView — 149 items vs 98 on the
+  // G650, so switching view changed the list under the user (TL-43). One shared
+  // definition now, in loggableItems.ts.
+  const filteredItems = useMemo(
+    () => selectLoggableItems({ items: state.items, aircraftType, activeLeg, search }),
+    [state.items, aircraftType, activeLeg, search],
+  );
 
   // ─── Favorites ────────────────────────────────────────────────────────────
 
