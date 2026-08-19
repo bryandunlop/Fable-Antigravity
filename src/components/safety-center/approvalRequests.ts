@@ -12,7 +12,31 @@ import { useEffect, useReducer } from 'react';
 import { ALL_ROLES, ADDITIONAL_ROLES, getRoleLabelByValue } from '../../lib/mockUsers';
 
 export type StepStatus = 'pending' | 'approved' | 'denied';
-export type RequestStatus = 'pending' | 'approved' | 'denied';
+/** `returned` — sent back past the first approver, so the ball is with the
+ *  REQUESTER. Distinct from `denied`, which ends the request for good. */
+export type RequestStatus = 'pending' | 'approved' | 'denied' | 'returned';
+
+/** Approving moves up the chain; sending back moves down it, one step at a time,
+ *  all the way to the requester if it needs to. Declining ends it. */
+export type Decision = 'approve' | 'deny' | 'send_back';
+
+/** An append-only trail of everything that happened to a request.
+ *
+ *  It exists because a request can now go DOWN the chain and back up again: a
+ *  step's status is reset to `pending` when it is sent back, so without a
+ *  separate trail, "safety approved this, then Lead Team sent it back, then
+ *  safety approved it again" would render as a single approval with no memory of
+ *  the round trip. The chain says where the request IS; the history says what
+ *  happened to it. */
+export interface ApprovalEvent {
+  at: string;
+  actorName: string;
+  role: string;
+  action: 'approved' | 'declined' | 'sent_back' | 'reassigned' | 'resubmitted';
+  comment?: string;
+  /** Reassignment only — who it was re-pointed at. */
+  toName?: string;
+}
 
 export interface ApprovalStep {
   role: string;              // role id from the catalog
@@ -46,8 +70,11 @@ export interface ApprovalRequest {
   requestedByName: string;
   requestedAt: string;       // ISO
   chain: ApprovalStep[];
-  currentStep: number;       // index into chain; -1 when finished
+  currentStep: number;       // index into chain; -1 when finished or returned
   status: RequestStatus;
+  /** Append-only; see ApprovalEvent. Optional so requests stored before this
+   *  existed still load. */
+  history?: ApprovalEvent[];
 }
 
 // Any role can be picked as an approver — the full login catalog.
@@ -93,15 +120,26 @@ export function buildRequest(input: BuildInput): ApprovalRequest {
     chain,
     currentStep: gated ? 0 : -1,
     status: gated ? 'pending' : 'approved',
+    history: [],
   };
 }
 
-/** Apply an approve/deny to the current step. Approve advances to the next
- *  step (or completes on the last); deny stops the chain. A no-op on a request
- *  that is already finished. */
+function withEvent(req: ApprovalRequest, event: ApprovalEvent): ApprovalEvent[] {
+  return [...(req.history ?? []), event];
+}
+
+/** Apply a decision to the current step.
+ *
+ *  approve   — advances, or completes on the last step.
+ *  deny      — stops the chain for good.
+ *  send_back — moves DOWN one step, so the previous approver decides again. From
+ *              the first step there is no approver below, so it returns to the
+ *              requester and the request reads `returned`.
+ *
+ *  A no-op on a request that is already finished or returned. */
 export function applyDecision(
   req: ApprovalRequest,
-  decision: 'approve' | 'deny',
+  decision: Decision,
   actorName: string,
   comment: string | undefined,
   at: string,
@@ -111,14 +149,42 @@ export function applyDecision(
   nextAssignee?: Assignee,
 ): ApprovalRequest {
   if (req.status !== 'pending' || req.currentStep < 0) return req;
+  const actingRole = req.chain[req.currentStep]?.role ?? '';
+  const note = comment?.trim() || undefined;
+
+  if (decision === 'send_back') {
+    const event: ApprovalEvent = { at, actorName, role: actingRole, action: 'sent_back', comment: note };
+    // Back past the first approver = back to the person who filed it.
+    if (req.currentStep === 0) {
+      return { ...req, status: 'returned', currentStep: -1, history: withEvent(req, event) };
+    }
+    const target = req.currentStep - 1;
+    return {
+      ...req,
+      // The step below must decide again, so its earlier approval is cleared —
+      // the trail of it lives in `history`, not in the chain.
+      chain: req.chain.map((st, i) => (i === target
+        ? { ...st, status: 'pending' as StepStatus, decidedByName: undefined, decidedAt: undefined, comment: undefined }
+        : st)),
+      currentStep: target,
+      status: 'pending',
+      history: withEvent(req, event),
+    };
+  }
+
   const chain = req.chain.map((s, i) =>
     i === req.currentStep
-      ? { ...s, status: decision === 'approve' ? ('approved' as StepStatus) : ('denied' as StepStatus), decidedByName: actorName, decidedAt: at, comment: comment?.trim() || undefined }
+      ? { ...s, status: decision === 'approve' ? ('approved' as StepStatus) : ('denied' as StepStatus), decidedByName: actorName, decidedAt: at, comment: note }
       : s,
   );
+
   if (decision === 'deny') {
-    return { ...req, chain, status: 'denied', currentStep: -1 };
+    return {
+      ...req, chain, status: 'denied', currentStep: -1,
+      history: withEvent(req, { at, actorName, role: actingRole, action: 'declined', comment: note }),
+    };
   }
+
   const isLast = req.currentStep === chain.length - 1;
   const nextIndex = req.currentStep + 1;
   const withAssignee = (!isLast && nextAssignee)
@@ -131,6 +197,27 @@ export function applyDecision(
     chain: withAssignee,
     status: isLast ? 'approved' : 'pending',
     currentStep: isLast ? -1 : nextIndex,
+    history: withEvent(req, { at, actorName, role: actingRole, action: 'approved', comment: note }),
+  };
+}
+
+/** Put a returned request back into the chain at the bottom. Everything the
+ *  approvers said stays in `history`; the chain itself starts clean so each of
+ *  them decides on what the requester has now written. */
+export function resubmit(req: ApprovalRequest, actorName: string, comment: string | undefined, at: string): ApprovalRequest {
+  if (req.status !== 'returned') return req;
+  return {
+    ...req,
+    chain: req.chain.map((st) => ({
+      ...st,
+      status: 'pending' as StepStatus,
+      decidedByName: undefined,
+      decidedAt: undefined,
+      comment: undefined,
+    })),
+    currentStep: 0,
+    status: 'pending',
+    history: withEvent(req, { at, actorName, role: req.requestedByRole, action: 'resubmitted', comment: comment?.trim() || undefined }),
   };
 }
 
@@ -148,6 +235,10 @@ export function reassignCurrentStep(
     chain: req.chain.map((st, i) => (i === req.currentStep
       ? { ...st, assigneeUserId: to.userId, assigneeName: to.name, reassignedByName: byName, reassignedAt: at }
       : st)),
+    history: withEvent(req, {
+      at, actorName: byName, role: req.chain[req.currentStep]?.role ?? '',
+      action: 'reassigned', toName: to.name,
+    }),
   };
 }
 
@@ -210,7 +301,7 @@ const SEED: ApprovalRequest[] = [
     subjectTitle: 'Duty-time extension — KASE overnight',
     values: { request: '+1:30 duty-time extension for a KASE overnight repositioning', justification: 'Weather delay compressed the day; crew rested, fatigue plan attached.', tripDate: 'T-2026-0721' },
     fieldLabels: { request: 'What are you requesting?', justification: 'Reason / justification', tripDate: 'Trip / date' },
-    requestedByRole: 'pilot', requestedByName: 'Capt. Dunlop', requestedAt: '2026-07-21T18:40:00Z',
+    requestedByRole: 'pilot', requestedByName: 'Captain John Smith', requestedAt: '2026-07-21T18:40:00Z',
     chain: [
       { role: 'safety', status: 'pending' },
       { role: 'lead', status: 'pending' },
@@ -222,7 +313,7 @@ const SEED: ApprovalRequest[] = [
     subjectTitle: 'Procedure deviation — single-engine taxi',
     values: { request: 'Single-engine taxi at KTEB to reduce FOD exposure on the east ramp', justification: 'Congested ramp, long taxi; SOP allows with Chief Pilot concurrence.' },
     fieldLabels: { request: 'What are you requesting?', justification: 'Reason / justification' },
-    requestedByRole: 'pilot', requestedByName: 'Capt. Ellis', requestedAt: '2026-07-20T21:05:00Z',
+    requestedByRole: 'pilot', requestedByName: 'First Officer Emily Chen', requestedAt: '2026-07-20T21:05:00Z',
     chain: [
       { role: 'safety', status: 'approved', decidedByName: 'J. Kerr (Safety)', decidedAt: '2026-07-21T13:10:00Z', comment: 'Risk justified; standard SOP allowance. Flagging that this is the second single-engine taxi request at KTEB this month.' },
       // Already forwarded to an individual, so the demo opens with one request
@@ -261,13 +352,25 @@ export function createApprovalRequest(input: Omit<BuildInput, 'id' | 'requestedA
 }
 
 export function decideRequest(
-  id: string, decision: 'approve' | 'deny', actorName: string, comment?: string, nextAssignee?: Assignee,
+  id: string, decision: Decision, actorName: string, comment?: string, nextAssignee?: Assignee,
 ): ApprovalRequest | undefined {
   const at = new Date().toISOString();
   let updated: ApprovalRequest | undefined;
   save(load().map((r) => {
     if (r.id !== id) return r;
     updated = applyDecision(r, decision, actorName, comment, at, nextAssignee);
+    return updated;
+  }));
+  emit();
+  return updated;
+}
+
+export function resubmitRequest(id: string, actorName: string, comment?: string): ApprovalRequest | undefined {
+  const at = new Date().toISOString();
+  let updated: ApprovalRequest | undefined;
+  save(load().map((r) => {
+    if (r.id !== id) return r;
+    updated = resubmit(r, actorName, comment, at);
     return updated;
   }));
   emit();

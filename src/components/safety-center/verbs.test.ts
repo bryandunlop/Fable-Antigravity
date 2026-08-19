@@ -6,7 +6,7 @@ const item = (over: Partial<SafetyItem> = {}): SafetyItem =>
   ({ id: 'i', type: 'HAZARD', bucket: 'track', title: 't', ...over } as SafetyItem);
 
 const input = (over: Partial<VerbCountInput> = {}): VerbCountInput =>
-  ({ move: [], track: [], pendingApprovals: 0, auditsOpen: 0, ...over });
+  ({ move: [], track: [], pendingApprovals: 0, auditsOpen: 0, asapOpen: 0, ...over });
 
 describe('the verb catalog', () => {
   it('has a unique id per verb', () => {
@@ -82,6 +82,10 @@ describe('verbCounts', () => {
     }));
     expect(c.investigate.tone).toBe('red');
     expect(c.mitigate.tone).toBe('none');
+  });
+
+  it('counts open ASAP reports without listing them anywhere shared', () => {
+    expect(verbCounts(input({ asapOpen: 2 })).asap).toEqual({ n: 2, tone: 'amber' });
   });
 
   it('carries no number on Publish or Records — they are places, not queues', () => {

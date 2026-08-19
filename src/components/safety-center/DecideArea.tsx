@@ -4,10 +4,18 @@
 // "the safety manager gets the waiver and then can send it up the chain to the
 // line manager. who then is final approval or denial." (Bryan, 2026-08-18)
 //
-// So the primary action is "Send to …", not "Approve". Safety may still decline
-// outright — that was asked separately and answered "Safety can decline" — and
-// declining ends the request before it reaches anyone else, which the screen
-// says in place rather than leaving to be discovered.
+// So the primary action is "Send to …", not "Approve".
+//
+// THREE outcomes, not two (Bryan, 2026-08-19):
+//   · Send to …   — up the chain.
+//   · Send back   — DOWN the chain, one step at a time, all the way to the
+//                   requester if it needs to, and then back up again. This is
+//                   the answer to "not with this justification", which used to
+//                   have no expression other than killing the request.
+//   · Decline     — ends it. Waivers only: the chain engine is generic, so
+//                   without a per-form capability a recognition could be killed
+//                   with the same button.
+// Both destructive-ish outcomes require a reason. An approval does not.
 //
 // The queue splits by WHO IS HOLDING IT. A forwarded waiver must not vanish
 // from the person who forwarded it: with a named approver excluding the rest of
@@ -24,6 +32,8 @@ import {
   useApprovalRequests, pendingForRoles, advancedByRoles, currentStep, roleLabel,
   reassignRequest, type ApprovalRequest, type Assignee,
 } from './approvalRequests';
+import { canDeclineKind } from './formTemplates';
+import type { Kind } from './ReportDialog';
 import { ChainStrip } from './ChainStrip';
 
 interface Props { userRole: string; additionalRoles?: string[]; actorName: string }
@@ -138,6 +148,7 @@ function QueueRow({ req, active, onSelect, muted }: { req: ApprovalRequest; acti
 function ReviewPanel({ req, roles, viewerUserId, actorName, actingRoleId }: {
   req: ApprovalRequest; roles: string[]; viewerUserId: string; actorName: string; actingRoleId: string;
 }) {
+  const canReassign = roles.includes('safety') || roles.includes('admin');
   const step = currentStep(req);
   const isMine = !!step && roles.includes(step.role) && (!step.assigneeUserId || step.assigneeUserId === viewerUserId);
   const nextStep = req.chain[req.currentStep + 1];
@@ -147,12 +158,21 @@ function ReviewPanel({ req, roles, viewerUserId, actorName, actingRoleId }: {
   const [sendTo, setSendTo] = useState<string>(candidates[0]?.userId ?? '');
   const [reassigning, setReassigning] = useState(false);
 
+  // Declining ENDS the request, so it is a per-form capability rather than a
+  // property of the chain engine — waivers only (Bryan, 2026-08-19). Sending
+  // back is always available: it is the non-destructive answer.
+  const canDecline = canDeclineKind(req.formKind as Kind);
+  const hasReason = recommendation.trim().length > 0;
+
   function send() {
     const to = candidates.find((c) => c.userId === sendTo);
     decideAndNotify(req, 'approve', actingRoleId, recommendation.trim() || undefined, to);
   }
+  function sendBack() {
+    decideAndNotify(req, 'send_back', actingRoleId, recommendation.trim());
+  }
   function decline() {
-    decideAndNotify(req, 'deny', actingRoleId, recommendation.trim() || undefined);
+    decideAndNotify(req, 'deny', actingRoleId, recommendation.trim());
   }
 
   return (
@@ -234,17 +254,27 @@ function ReviewPanel({ req, roles, viewerUserId, actorName, actingRoleId }: {
             )}
 
             <div className="flex items-center gap-2.5 flex-wrap pt-3 border-t border-border">
-              <Button onClick={send} className="h-10">
+              <Button onClick={send} className="h-11">
                 {nextStep ? `Send to ${candidates.find((c) => c.userId === sendTo)?.name ?? roleLabel(nextStep.role)}` : 'Approve'}
               </Button>
-              <div className="flex-1" />
-              <button onClick={decline}
-                className="h-10 px-4 rounded-md border border-[color:var(--gfo-error-ink)] text-[color:var(--gfo-error-ink)] text-[14px] font-medium hover:bg-[color:var(--gfo-error)]/10 transition-colors">
-                Decline here
+              <button onClick={sendBack} disabled={!hasReason}
+                className="h-11 px-4 rounded-md border border-border text-[14px] font-medium transition-colors enabled:hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+                Send back to {req.requestedByName.split(' ').slice(-1)[0]}
               </button>
+              <div className="flex-1" />
+              {canDecline && (
+                <button onClick={decline} disabled={!hasReason}
+                  className="h-11 px-4 rounded-md border border-[color:var(--gfo-error-ink)] text-[color:var(--gfo-error-ink)] text-[14px] font-medium transition-colors enabled:hover:bg-[color:var(--gfo-error)]/10 disabled:opacity-40 disabled:cursor-not-allowed">
+                  Decline here
+                </button>
+              )}
             </div>
             <div className="text-[11.5px] text-muted-foreground -mt-2">
-              Declining ends the request{nextStep ? ` — it does not reach ${roleLabel(nextStep.role)}.` : '.'}
+              {!hasReason
+                ? 'Sending back or declining needs a reason — write one above.'
+                : canDecline
+                  ? `Sending back returns it for more information. Declining ends it${nextStep ? ` — it does not reach ${roleLabel(nextStep.role)}` : ''}.`
+                  : 'Sending back returns it for more information.'}
             </div>
           </>
         )}
@@ -258,14 +288,17 @@ function ReviewPanel({ req, roles, viewerUserId, actorName, actingRoleId }: {
               {(ageDays(req.requestedAt, Date.now()) ?? 0) > 7 && <TriangleAlert className="w-4 h-4 text-[color:var(--gfo-error-ink)] shrink-0" />}
               Waiting on {step.assigneeName ?? roleLabel(step.role)}.
             </div>
-            {reassigning ? (
+            {/* Re-pointing decides who signs, so it is SAFETY's call and nobody
+                else's (Bryan, 2026-08-19) — even though this panel is also
+                reachable by other roles through the same console. */}
+            {canReassign && (reassigning ? (
               <ReassignRow req={req} roleId={step.role} actorName={actorName} onDone={() => setReassigning(false)} />
             ) : (
               <button onClick={() => setReassigning(true)}
-                className="self-start h-9 px-3.5 rounded-md border border-border text-[13.5px] font-medium hover:bg-muted transition-colors flex items-center gap-2">
+                className="self-start h-11 px-3.5 rounded-md border border-border text-[13.5px] font-medium hover:bg-muted transition-colors flex items-center gap-2">
                 <UserRoundCog className="w-4 h-4" /> Re-point at someone else
               </button>
-            )}
+            ))}
           </div>
         )}
       </div>

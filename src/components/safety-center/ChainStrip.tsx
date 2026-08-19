@@ -21,11 +21,15 @@ export interface ChainNode {
 }
 
 export function chainNodes(req: ApprovalRequest): ChainNode[] {
+  // A returned request is back with the person who filed it, so THEY are the
+  // live step — nothing in the chain is. Without this the strip would show a
+  // returned request as though it were still sitting with an approver.
+  const returned = req.status === 'returned';
   const filed: ChainNode = {
     key: 'filed',
     who: req.requestedByName,
-    sub: 'Requested',
-    state: 'done',
+    sub: returned ? 'Sent back — with them now' : 'Requested',
+    state: returned ? 'now' : 'done',
   };
   const steps = req.chain.map((st: ApprovalStep, i: number): ChainNode => {
     const state: StepState =

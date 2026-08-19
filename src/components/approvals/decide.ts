@@ -5,7 +5,7 @@
 // drifting apart that the manager-cockpit option deliberately accepted.
 
 import { eventStore } from '../../notifications/events';
-import { decideRequest, currentApproverRole, currentStep, roleLabel, type ApprovalRequest, type Assignee } from '../safety-center/approvalRequests';
+import { decideRequest, currentApproverRole, currentStep, roleLabel, type ApprovalRequest, type Assignee, type Decision } from '../safety-center/approvalRequests';
 
 /** Apply an approve/deny to the request's current step and notify the requester
  *  (and, if it advanced, the next approver). `actingRoleId` is the role the
@@ -13,7 +13,7 @@ import { decideRequest, currentApproverRole, currentStep, roleLabel, type Approv
  *  Returns the updated request, or undefined if the id was already finished. */
 export function decideAndNotify(
   req: ApprovalRequest,
-  decision: 'approve' | 'deny',
+  decision: Decision,
   actingRoleId: string,
   comment?: string,
   /** D85 — who the next step is addressed to. Naming someone excludes the rest
@@ -24,21 +24,33 @@ export function decideAndNotify(
   const updated = decideRequest(req.id, decision, actor, comment, nextAssignee);
   if (!updated) return undefined;
   const note = comment?.trim();
+  const backTo = currentStep(updated)?.assigneeName
+    ?? roleLabel(currentApproverRole(updated) || '')
+    ?? '';
   eventStore.publish({
     id: `approval-decided-${req.id}-${Date.now()}`,
     severity: decision === 'deny' ? 'warn' : 'info',
     title: decision === 'deny'
-      ? `${req.formLabel} denied: ${req.subjectTitle}`
-      : (updated.status === 'approved' ? `${req.formLabel} approved: ${req.subjectTitle}` : `${req.subjectTitle}: ${actor} approved`),
+      ? `${req.formLabel} declined: ${req.subjectTitle}`
+      : decision === 'send_back'
+        ? `${req.formLabel} sent back: ${req.subjectTitle}`
+        : (updated.status === 'approved' ? `${req.formLabel} approved: ${req.subjectTitle}` : `${req.subjectTitle}: ${actor} approved`),
     detail: decision === 'deny'
-      ? (note ? `${actor}: “${note}”` : `Denied by ${actor}`)
-      : (updated.status === 'approved'
-          ? 'Fully approved'
-          // Name the person when one was chosen — "Now with Lead Team" is not
-          // actionable when only one member of Lead Team can now see it.
-          : `Now with ${currentStep(updated)?.assigneeName ?? roleLabel(currentApproverRole(updated) || '')}`),
+      ? (note ? `${actor}: “${note}”` : `Declined by ${actor}`)
+      : decision === 'send_back'
+        // A send-back is only actionable if the reason travels with it.
+        ? (updated.status === 'returned'
+            ? `Back with you — ${actor}: “${note ?? 'no reason given'}”`
+            : `Back with ${backTo} — ${actor}: “${note ?? 'no reason given'}”`)
+        : (updated.status === 'approved'
+            ? 'Fully approved'
+            // Name the person when one was chosen — "Now with Lead Team" is not
+            // actionable when only one member of Lead Team can now see it.
+            : `Now with ${currentStep(updated)?.assigneeName ?? roleLabel(currentApproverRole(updated) || '')}`),
     module: 'Safety', link: '/approvals',
-    audienceRoles: [req.requestedByRole, ...(updated.status === 'pending' && currentApproverRole(updated) ? [currentApproverRole(updated) as string] : [])],
+    audienceRoles: decision === 'send_back' && updated.status === 'returned'
+      ? [req.requestedByRole]
+      : [req.requestedByRole, ...(updated.status === 'pending' && currentApproverRole(updated) ? [currentApproverRole(updated) as string] : [])],
   });
   return updated;
 }

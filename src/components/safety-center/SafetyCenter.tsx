@@ -17,6 +17,8 @@ import { FormManager } from './FormManager';
 import { OperationsAudits, MyAudits, auditsForMe } from './AuditsArea';
 import { DecideArea } from './DecideArea';
 import { AsapReview } from './AsapReview';
+import { useAsapReports } from './asapReports';
+import { actingUser } from './actingUser';
 import { RequiredReadsList } from '../documents/components/RequiredReadsList';
 import { useDocuments, identityFor } from '../documents/DocumentsContext';
 import { unacknowledgedRequiredReads } from '../documents/engine/acknowledgments';
@@ -36,8 +38,6 @@ import { resolveUserId } from '../../notifications/identity';
 import { buildCrewWorklist, type CrewTask } from './crewWorklist';
 import type { KnowItem, SafetyItem, SafetyView } from './types';
 
-const CURRENT_USER = { id: 'u-demo', name: 'Capt. Dunlop' };
-
 interface Props { userRole: string; additionalRoles?: string[] }
 
 // IA (D85, superseding D38's door grid): crew get ONE page — a Report button, a
@@ -52,6 +52,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const roles = useMemo(() => [userRole, ...additionalRoles], [userRole, additionalRoles]);
   const hasManagerAccess = roles.some((r) => r === 'safety' || r === 'admin');
 
+  // One identity source for filing, matching and approving — see actingUser.ts.
+  const CURRENT_USER = actingUser(userRole);
+
   const [view, setView] = useState<SafetyView>(hasManagerAccess ? 'ops' : 'my');
   const [searchParams, setSearchParams] = useSearchParams();
   const door = (searchParams.get('door') as Door | null);
@@ -63,11 +66,12 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const [reportKind, setReportKind] = useState<Kind | null>(null);
   const [doneSet, setDoneSet] = useState<Set<string>>(new Set());
 
-  const model = useSafetyModel();
+  const model = useSafetyModel(CURRENT_USER.name);
   const feed = useNotificationFeed(userRole, additionalRoles);
   const { hazards, submitHazard, updateHazard } = useHazards();
   const { audits } = useAudits();
   const { requests: approvalRequests } = useApprovalRequests();
+  const { reports: asapReports } = useAsapReports();
   // Read-and-sign is served by the one Documents compliance engine (TL-6 / D29),
   // not a Safety-Center-local store. Required reads are role-targeted; the demo's
   // crew user resolves to a representative id per role.
@@ -135,10 +139,9 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
     if (d) setSearchParams({ door: d });
     else setSearchParams({});
   }
-  // ASAP has its own detail surface, and must keep it: the sheet carries the
-  // confidentiality banner and the de-identification step, and the generic
-  // detail sheet has neither. Routing an ASAP card into the generic sheet would
-  // quietly drop both.
+  // An ASAP row in the records archive opens the confidential surface, never the
+  // generic detail sheet — that sheet has neither the confidentiality banner nor
+  // the de-identification step, and would render raw narrative beside hazards.
   function open(item: SafetyItem) {
     if (item.type === 'ASAP' && item.sourceId) { setAsapId(item.sourceId); return; }
     setSelected(item);
@@ -199,7 +202,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
         location: (values.location || '').trim() || 'Unspecified',
         category: (values.category || '').trim() || 'Other',
         severity: (values.severity || '').trim() || 'Medium',
-        reportedBy: anonymous ? 'Anonymous' : 'Capt. Dunlop',
+        reportedBy: anonymous ? 'Anonymous' : CURRENT_USER.name,
         immediateActions: (values.immediate || '').trim(),
         potentialConsequences: (values.consequences || '').trim(),
         suggestedCorrectiveAction: (values.corrective || '').trim() || undefined,
@@ -271,15 +274,16 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
   const verb = parseVerb(searchParams.get('verb'));
   // D85 — the Decide count must match the Decide list, and both exclude a step
   // addressed to somebody else.
-  const viewerUserId = resolveUserId(userRole);
+  const viewerUserId = CURRENT_USER.id;
   const counts = useMemo(
     () => verbCounts({
       move: model.ops.move,
       track: model.ops.track,
       pendingApprovals: pendingForRoles(approvalRequests, roles, viewerUserId).length,
       auditsOpen: audits.filter((a) => a.status !== 'Complete').length,
+      asapOpen: asapReports.filter((r) => r.status !== 'Resolved').length,
     }),
-    [model.ops.move, model.ops.track, approvalRequests, roles, viewerUserId, audits],
+    [model.ops.move, model.ops.track, approvalRequests, roles, viewerUserId, audits, asapReports],
   );
 
   // Shape overrides are a per-verb preference: turning Mitigate into a board
@@ -420,6 +424,7 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
               ? <CaseBoard items={model.ops.move} onOpen={open} />
               : <CaseQueue items={model.ops.move} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
                   emptySmall="No new reports need you right now." />)}
+            {verb === 'asap' && <AsapReview />}
             {verb === 'decide' && <DecideArea userRole={userRole} additionalRoles={additionalRoles} actorName={CURRENT_USER.name} />}
             {verb === 'investigate' && (shape === 'board'
               ? <CaseBoard items={atPhase(model.ops.track, 1)} onOpen={open} />

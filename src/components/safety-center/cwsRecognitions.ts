@@ -15,7 +15,7 @@ export interface CwsRecognition {
 const KEY = 'sc_cws_recognitions_v1';
 
 const SEED: CwsRecognition[] = [
-  { id: 'CWS-014', recognized: 'J. Kerr', forWhat: 'Ran a full FOD sweep before an unscheduled tow — unprompted.', submittedBy: 'Capt. Dunlop', submittedAt: '2026-07-02T15:20:00Z' },
+  { id: 'CWS-014', recognized: 'J. Kerr', forWhat: 'Ran a full FOD sweep before an unscheduled tow — unprompted.', submittedBy: 'Captain John Smith', submittedAt: '2026-07-02T15:20:00Z' },
   { id: 'CWS-013', recognized: 'T. Ward', forWhat: 'Caught a mis-set nitrogen regulator during a strut service and stopped the job.', submittedBy: 'K. Bell', submittedAt: '2026-06-28T11:05:00Z' },
   { id: 'CWS-012', recognized: 'M. Cho', forWhat: 'Proactively re-briefed the cabin on a last-minute passenger allergy.', submittedBy: 'Capt. Ellis', submittedAt: '2026-06-24T19:40:00Z' },
 ];

@@ -68,3 +68,25 @@ describe('chainNodes', () => {
     expect(n.every((x) => x.state === 'done')).toBe(true);
   });
 });
+
+describe('chainNodes — a returned request', () => {
+  const returned = (): ApprovalRequest => ({
+    id: 'AR-R', formKind: 'waiver', formLabel: 'Waiver', subjectTitle: 'A waiver',
+    values: {}, fieldLabels: {},
+    requestedByRole: 'pilot', requestedByName: 'Capt. Dunlop', requestedAt: '2026-08-01T00:00:00Z',
+    chain: [{ role: 'safety', status: 'pending' }, { role: 'lead', status: 'pending' }],
+    currentStep: -1, status: 'returned',
+  });
+
+  it('puts the live step on the REQUESTER, not on an approver', () => {
+    const n = chainNodes(returned());
+    expect(n[0].state).toBe('now');
+    expect(n[0].sub).toBe('Sent back — with them now');
+  });
+
+  it('leaves every approver waiting', () => {
+    const n = chainNodes(returned());
+    expect(n.slice(1).every((x) => x.state === 'waiting')).toBe(true);
+    expect(n.filter((x) => x.state === 'now')).toHaveLength(1);
+  });
+});

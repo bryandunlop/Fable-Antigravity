@@ -94,7 +94,7 @@ describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
   const REPORTER = 'Capt. Dunlop';
 
   it('derives every work-list row from the hazards passed in — empty in, empty out', () => {
-    const m = buildSafetyModel([]);
+    const m = buildSafetyModel([], [], REPORTER);
     expect(m.my.move).toEqual([]);
     expect(m.my.waiting).toEqual([]);
     expect(m.my.done).toEqual([]);
@@ -106,7 +106,7 @@ describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
   it("puts the reporter's own open hazard in my.waiting and the ops inbox", () => {
     const m = buildSafetyModel([
       makeHazard({ id: 'H-9', reportedBy: REPORTER, workflowStage: WORKFLOW_STAGES.SUBMITTED }),
-    ]);
+    ], [], REPORTER);
     expect(m.my.waiting).toHaveLength(1);
     expect(m.my.waiting[0].sourceId).toBe('H-9');
     expect(m.ops.move).toHaveLength(1);
@@ -116,14 +116,14 @@ describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
     const m = buildSafetyModel([
       makeHazard({ id: 'H-1', reportedBy: REPORTER, isAnonymous: true }),
       makeHazard({ id: 'H-2', reportedBy: 'Someone Else' }),
-    ]);
+    ], [], REPORTER);
     expect(m.my.waiting).toEqual([]);
   });
 
   it("routes the reporter's closed hazard to my.done, not my.waiting", () => {
     const m = buildSafetyModel([
       makeHazard({ id: 'H-3', reportedBy: REPORTER, workflowStage: WORKFLOW_STAGES.CLOSED }),
-    ]);
+    ], [], REPORTER);
     expect(m.my.waiting).toEqual([]);
     expect(m.my.done).toHaveLength(1);
   });
@@ -132,7 +132,7 @@ describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
     const m = buildSafetyModel([
       makeHazard({ id: 'HZ-010', reportedBy: REPORTER }),
       makeHazard({ id: 'HZ-010', reportedBy: REPORTER }),
-    ]);
+    ], [], REPORTER);
     expect(m.ops.move).toHaveLength(1);
     expect(m.submissions.filter((s) => s.sourceId === 'HZ-010')).toHaveLength(1);
   });
@@ -140,13 +140,13 @@ describe('buildSafetyModel — work lists carry no mock rows (D38)', () => {
   it('skips deleted hazards everywhere', () => {
     const m = buildSafetyModel([
       makeHazard({ id: 'H-4', reportedBy: REPORTER, isDeleted: true } as Partial<Hazard>),
-    ]);
+    ], [], REPORTER);
     expect(m.ops.move).toEqual([]);
     expect(m.submissions.filter((s) => s.sourceId === 'H-4')).toEqual([]);
   });
 
   it('keeps archive/library seeds out of the work lists but present in submissions/published', () => {
-    const m = buildSafetyModel([]);
+    const m = buildSafetyModel([], [], REPORTER);
     // History seeds are allowed in the archive and library only.
     expect(m.submissions.length).toBeGreaterThan(0);
     expect(m.published.length).toBeGreaterThan(0);
@@ -216,10 +216,23 @@ describe('buildSafetyModel with ASAP', () => {
     severity: 'Low', submittedAt: new Date().toISOString(), status, deidentified: true,
   });
 
-  it('puts open ASAP reports in the triage bucket beside hazards', () => {
+  // The guarantee, not a preference: ASAP will be de-identified by a THIRD PARTY
+  // via API (Bryan, 2026-08-19), so the narrative myGFO holds before that round
+  // trip is raw crew testimony. It must never reach a board anyone in the
+  // console can read. If this test ever goes green the other way, the ASAP
+  // programme's confidentiality has been broken by a refactor.
+  it('keeps ASAP reports OFF the shared triage and investigate boards', () => {
     const m = buildSafetyModel([], [asap('A1', 'Open'), asap('A2', 'Under review')]);
-    expect(m.ops.move.map((i) => i.sourceId)).toContain('A1');
-    expect(m.ops.track.map((i) => i.sourceId)).toContain('A2');
+    expect(m.ops.move.map((i) => i.sourceId)).not.toContain('A1');
+    expect(m.ops.track.map((i) => i.sourceId)).not.toContain('A2');
+    expect(m.ops.move.concat(m.ops.track).every((i) => i.type !== 'ASAP')).toBe(true);
+  });
+
+  it('carries no narrative on the archive row — the detail lives behind the confidential surface', () => {
+    const m = buildSafetyModel([], [asap('A1', 'Resolved')]);
+    const row = m.submissions.find((i) => i.sourceId === 'A1')!;
+    expect(row.title).not.toMatch(/x/);           // the seed's description
+    expect(row.submittedBy).toBe('Confidential');
   });
 
   it('includes them in the records archive', () => {
@@ -229,6 +242,6 @@ describe('buildSafetyModel with ASAP', () => {
 
   it('still works when no ASAP reports are passed at all', () => {
     expect(() => buildSafetyModel([], [])).not.toThrow();
-    expect(buildSafetyModel([]).ops.move).toEqual([]);
+    expect(buildSafetyModel([], []).ops.move).toEqual([]);
   });
 });
