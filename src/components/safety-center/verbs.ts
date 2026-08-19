@@ -24,24 +24,37 @@ export interface VerbDef {
   blurb: string;
   icon: typeof Inbox;
   defaultShape: Shape;
+  /** Every shape this verb can render, `defaultShape` first. A verb with one
+   *  entry shows no toggle — a control that does nothing is worse than none. */
+  shapes: Shape[];
   /** `daily` verbs sit above the rule, `periodic` below it. */
   group: 'daily' | 'periodic';
 }
 
 export const VERBS: VerbDef[] = [
-  { id: 'triage', label: 'Triage', group: 'daily', icon: Inbox, defaultShape: 'board',
+  { id: 'triage', label: 'Triage', group: 'daily', icon: Inbox,
+    defaultShape: 'board', shapes: ['board', 'queue'],
     blurb: 'Reports nobody has picked up yet' },
-  { id: 'decide', label: 'Decide', group: 'daily', icon: CircleCheck, defaultShape: 'queue',
+  // Decide keeps a single shape until C5 replaces ReviewsArea with the real
+  // review surface. Offering a Board toggle over four stacked consoles would be
+  // a control with nothing behind it.
+  { id: 'decide', label: 'Decide', group: 'daily', icon: CircleCheck,
+    defaultShape: 'queue', shapes: ['queue'],
     blurb: 'Requests waiting on your review' },
-  { id: 'investigate', label: 'Investigate', group: 'daily', icon: Search, defaultShape: 'board',
+  { id: 'investigate', label: 'Investigate', group: 'daily', icon: Search,
+    defaultShape: 'board', shapes: ['board', 'queue'],
     blurb: 'Open cases being worked' },
-  { id: 'mitigate', label: 'Mitigate', group: 'daily', icon: Wrench, defaultShape: 'queue',
+  { id: 'mitigate', label: 'Mitigate', group: 'daily', icon: Wrench,
+    defaultShape: 'queue', shapes: ['queue', 'board'],
     blurb: 'Corrective actions in flight' },
-  { id: 'assure', label: 'Assure', group: 'periodic', icon: ClipboardCheck, defaultShape: 'calendar',
+  { id: 'assure', label: 'Assure', group: 'periodic', icon: ClipboardCheck,
+    defaultShape: 'calendar', shapes: ['calendar'],
     blurb: 'Audits and their findings' },
-  { id: 'publish', label: 'Publish', group: 'periodic', icon: Megaphone, defaultShape: 'list',
+  { id: 'publish', label: 'Publish', group: 'periodic', icon: Megaphone,
+    defaultShape: 'list', shapes: ['list'],
     blurb: 'Lessons, newsletters and recognitions' },
-  { id: 'records', label: 'Records', group: 'periodic', icon: Archive, defaultShape: 'table',
+  { id: 'records', label: 'Records', group: 'periodic', icon: Archive,
+    defaultShape: 'table', shapes: ['table'],
     blurb: 'Every record ever filed, and the form setup behind them' },
 ];
 

@@ -85,6 +85,7 @@ export function hazardToItem(h: Hazard): SafetyItem {
     phaseIndex: phase,
     stalled,
     ageLabel: closed ? '' : `${age} day${age === 1 ? '' : 's'} in stage`,
+    ageDays: age,
     owner,
     mine,
     waitingText: mine
