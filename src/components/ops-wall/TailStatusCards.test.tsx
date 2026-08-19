@@ -37,7 +37,7 @@ const FLEET: UnifiedFleetAircraft[] = [
       tailNumber: 'N5PG', type: 'G500', isProvisional: false, status: 'AMBER',
       openAffectingDefects: 0, activeDeferrals: 1,
       headline: 'Galley chiller', ataChapter: '25',
-      deferralClock: { category: 'C', repairDueDateUtc: '2026-08-25T03:59:00Z', daysRemaining: 6, intervalDays: 10 },
+      deferralClock: { category: 'C', repairDueDateUtc: '2026-08-25T03:59:00Z', governingTimezone: 'America/New_York', daysRemaining: 6, intervalDays: 10 },
     },
   }),
 ];
