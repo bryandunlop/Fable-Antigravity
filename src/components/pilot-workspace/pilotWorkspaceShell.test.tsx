@@ -57,23 +57,21 @@ describe('pilot workspace shell (D84)', () => {
     expect(screen.getByText(/select a flight/i)).toBeInTheDocument();
   });
 
-  it('takes the viewport minus the app header AND the breadcrumb, cancelling main\'s padding', () => {
-    // The split view only works if it owns a bounded height: the list and the detail pane scroll
-    // independently and the detail pane pins a bottom bar. <main> is `flex-1 overflow-auto p-6
-    // pb-20 md:pb-6` and renders BreadcrumbNav above the route, so the shell has to cancel that
-    // padding and subtract BOTH chrome heights.
-    //
-    // The inventory-v2 pages use the same idiom but subtract only the header (4.5625rem), so they
-    // overflow by the breadcrumb's ~38px. This asserts the pilot workspace does not inherit that
-    // bug — and if the header or breadcrumb ever changes height, this is what should fail.
+  it('takes the viewport minus every piece of chrome above and below it', () => {
+    // The split view only works if it owns a bounded height: the two columns scroll independently
+    // and the detail pane pins a bottom bar. Anything left over becomes page scroll, which is the
+    // exact defect this slice exists to remove.
     const { container } = renderAt('/pilot-workspace/trips/demo-trip-domestic');
     const shell = container.firstElementChild as HTMLElement;
 
-    expect(shell.className).toMatch(/-m-6/);          // cancel main's p-6
-    expect(shell.className).toMatch(/-mb-20/);        // ...and the phone bottom-nav reserve
-    expect(shell.className).toMatch(/4\.5625rem/);    // app header, 73px
-    expect(shell.className).toMatch(/2\.375rem/);     // BreadcrumbNav, text-sm row + mb-4
+    expect(shell.className).toMatch(/4\.5625rem/);   // app header, 73px
+    expect(shell.className).toMatch(/2\.375rem/);    // BreadcrumbNav, 21.43px row + mb-4
+    expect(shell.className).toMatch(/5rem\)/);       // <main>'s pb-20 below md
+    expect(shell.className).toMatch(/md:h-\[calc\(100dvh(-[\d.]+rem){4}\)\]/); // ...pb-6 at md+
     expect(shell.className).toMatch(/overflow-hidden/);
+    // NOT the inventory-v2 negative-margin idiom: App's page-transition wrapper means a negative
+    // bottom margin here cancels nothing, and measuring showed it left 13px of page overflow.
+    expect(shell.className).not.toMatch(/-m-6|-mb-20/);
   });
 
   it('spends no vertical space on a page title or subtitle', () => {

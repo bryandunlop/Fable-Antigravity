@@ -14,16 +14,27 @@ import type { TripRecord } from '../../scheduling/store/types';
  * not cost a route change. The URL still carries the trip (`/pilot-workspace/trips/:tripId`), so
  * deep links, refresh and Back all behave exactly as before — only the layout changed.
  *
- * Height: this route opts out of <main>'s padding and takes the viewport, the same way the
- * inventory-v2 pages do, so the list and the detail pane scroll independently and the detail
- * pane's bottom bar stays put. The subtracted rem values are the app header (4.5625rem = 73px:
- * py-4 + a 40px control row + the 1px rule), the phone bottom nav that <main> reserves with pb-20
- * below md, and BreadcrumbNav (2.375rem = 38px: a text-sm row plus its mb-4). `fullHeightShell`
- * is pinned by a test — if the header or the breadcrumb changes height, that test is the thing
- * that should fail, not a pilot's fold.
+ * Height: the split view only works if it owns a BOUNDED height — the two columns scroll
+ * independently and the detail pane pins a bottom bar. <main> is `flex-1 overflow-auto p-6 pb-20
+ * md:pb-6` and renders BreadcrumbNav above the route, so the height is the viewport minus that
+ * chrome, measured rather than guessed:
+ *
+ *   4.5625rem  app header — py-4 + a 40px control row + the 1px rule = 73px
+ *   1.5rem     <main>'s p-6 top
+ *   2.375rem   BreadcrumbNav — a 21.43px text-sm row plus its mb-4 = 37.43px
+ *   1.5rem     <main>'s pb-6 (md and up); 5rem below md, where it reserves the phone bottom nav
+ *
+ * The inventory-v2 pages solve this with `-m-6 -mb-20 md:-mb-6` and subtract only the header.
+ * That idiom does NOT work here and is worth the note: App wraps every route in a page-transition
+ * div, so the shell is not a child of <main> and its negative bottom margin cancels nothing —
+ * measured, it left 13px of page overflow, which is exactly the scroll this slice exists to remove.
+ * Living inside the page gutter instead costs 24px and removes a whole class of bug.
+ *
+ * Pinned by a test: if the header or the breadcrumb changes height, that test should fail, not a
+ * pilot's fold.
  */
 const fullHeightShell =
-  '-m-6 -mb-20 md:-mb-6 flex h-[calc(100dvh-9.125rem-2.375rem)] md:h-[calc(100dvh-4.5625rem-2.375rem)] overflow-hidden';
+  'flex overflow-hidden rounded-lg border border-border h-[calc(100dvh-4.5625rem-1.5rem-2.375rem-5rem)] md:h-[calc(100dvh-4.5625rem-1.5rem-2.375rem-1.5rem)]';
 
 /** One trip's Flight Hub, resolved from the :tripId in the URL. undefined = loading, null = gone. */
 function FlightHubRoute({ userRole }: { userRole: string }) {

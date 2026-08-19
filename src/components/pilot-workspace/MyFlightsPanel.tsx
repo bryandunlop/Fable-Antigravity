@@ -109,8 +109,13 @@ export default function MyFlightsPanel({
     const badge = t.tripType === 'international' ? "Int'l" : t.tripType === 'dca_dassp' ? 'DASSP' : null;
     return (
       <button key={t.id} onClick={() => onOpen(t)} aria-current={selected ? 'true' : undefined}
+        // Selection has to out-rank the in-progress pin, or the trip you are looking at reads as
+        // less prominent than one you are not: bg-accent/40 alone is heavier than bg-secondary.
+        // The inset bar is what makes the open trip unmistakable, and it matches the mock.
         className={`w-full text-left rounded-lg border p-3 hover:bg-accent duration-fast ${
-          selected ? 'border-primary bg-secondary' : pinned ? 'border-primary bg-accent/40' : ''
+          selected
+            ? 'border-primary bg-secondary shadow-[inset_3px_0_0_var(--primary)]'
+            : pinned ? 'border-primary bg-accent/40' : ''
         }`}>
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 font-semibold">
@@ -149,7 +154,9 @@ export default function MyFlightsPanel({
             <button key={t.id} onClick={() => onOpen(t)} aria-current={t.id === selectedTripId ? 'true' : undefined}
               title={`${t.tripNumber} · ${t.tail}`}
               className={`flex w-14 flex-col items-center gap-0.5 rounded-lg border p-2 hover:bg-accent duration-fast ${
-                t.id === selectedTripId ? 'border-primary bg-secondary' : 'border-border'
+                t.id === selectedTripId
+                  ? 'border-primary bg-secondary shadow-[inset_2px_0_0_var(--primary)]'
+                  : 'border-border'
               }`}>
               {r && <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[r.state]}`} aria-hidden />}
               <span className="text-[12px] font-semibold leading-tight tracking-tight">{t.tail}</span>
