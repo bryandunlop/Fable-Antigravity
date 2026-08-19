@@ -140,7 +140,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/fleet-map', label: 'Live Fleet Map', domain: 'flight-ops', icon: MapPin, sidebar: false, searchable: false, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
 
   // ── Scheduling — the Scheduling Workspace leads ───────────────────────────
-  { path: '/scheduling-command', label: 'Scheduling', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['master command center', 'run board', 'checklist', 'handoff', 'plan board', 'trips', 'templates'], roles: ['scheduling', 'admin'] },
+  { path: '/scheduling-command', label: 'Scheduling', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['master command center', 'horizon', 'checklist', 'handoff', 'fleet board', 'trips', 'templates'], roles: ['scheduling', 'admin'] },
+  // D87 wall — TV mode reached from the command center's "Ops wall" button; no sidebar link,
+  // but ⌘K-searchable so whoever sets the TV up can find it.
+  { path: '/scheduling-wall', label: 'Scheduling Wall (TV)', domain: 'scheduling', icon: CalendarCheck, sidebar: false, keywords: ['ops wall', 'tv', 'wallboard'], roles: ['scheduling', 'admin'] },
   { path: '/schedule', label: 'Schedule Calendar', domain: 'scheduling', icon: Calendar, primary: true, roles: ['pilot', 'admin'] },
   { path: '/crew-scheduling-workload', label: 'Crew Workload', domain: 'scheduling', icon: BookUser, primary: true, keywords: ['travel'], roles: ['scheduling', 'admin', 'lead'] },
   { path: '/vacation-request', label: 'Vacation Request', domain: 'scheduling', icon: CalendarDays, primary: true, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },

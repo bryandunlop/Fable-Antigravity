@@ -91,6 +91,7 @@ import { PassengerProvider } from './components/passengers/PassengerContext';
 import FlightAttendantFlights from './components/inflight/FlightAttendantFlights';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
+import SchedulingWall from './components/scheduling-command/SchedulingWall';
 import PassengerCurrencyDashboard from './components/passenger-currency/PassengerCurrencyDashboard';
 
 import ForeFlightSyncProvider from './components/ForeFlightSyncProvider';
@@ -238,6 +239,16 @@ export default function App() {
                         meant a read-only screen could still clobber the tab that did the signing. */}
                     <Route path="/tech-log/aircraft/:tail/ramp" element={
                       !isAuthenticated ? <Navigate to="/login" replace /> : <RampMode />
+                    } />
+
+                    {/* D87 scheduling wall — read-only TV mode for the ops area. Out here with
+                        ramp mode so it renders full-bleed without the sidebar chrome. */}
+                    <Route path="/scheduling-wall" element={
+                      !isAuthenticated ? <Navigate to="/login" replace /> : (
+                        <SchedulingWorkspaceProvider>
+                          <SchedulingWall />
+                        </SchedulingWorkspaceProvider>
+                      )
                     } />
 
                     {/* Login Route — lands each role at its workspace front door */}
