@@ -6,7 +6,7 @@ import { boardTripOf, type BoardTrip } from './adapter';
 import { readFleetAirworthiness, readTripServiceabilityAlerts, type TripForAlerts } from '../tech-log/bridge';
 import { toTripsForAlerts } from './alertTrips';
 import { groupAlertsByAircraft } from './alertGroups';
-import { KNOWN_FLEET } from './fleet';
+import { fleetRowsFor } from './fleet';
 import { buildWallModel } from './wallSelectors';
 import type { TripDerivedStatus } from './tripStatus';
 
@@ -101,6 +101,7 @@ export default function SchedulingWall() {
     );
   }
 
+  const attentionTotal = alertGroups.length + model.attention.length;
   const attentionShown = [...alertGroups.map(g => ({
     key: `svc-${g.tail}`,
     chip: g.severity === 'red' ? 'GROUNDING' : 'CAUTION',
@@ -129,9 +130,10 @@ export default function SchedulingWall() {
         </div>
       </div>
 
-      {/* Fleet strip — the room's shared picture of the fleet (aircraft RAG) */}
-      <div className="grid grid-cols-4 gap-5">
-        {KNOWN_FLEET.map(ac => {
+      {/* Fleet strip — the room's shared picture of the fleet (aircraft RAG). fleetRowsFor, not
+          KNOWN_FLEET: a tail that only exists in trips must still appear on the wall. */}
+      <div className="grid grid-cols-4 gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+        {fleetRowsFor(trips).map(ac => {
           const entry = fleet.find(f => f.tailNumber === ac.tail);
           const status = entry?.status;
           const color = status ? RAG_COLOR[status] : '#B9C2E0';
@@ -195,6 +197,9 @@ export default function SchedulingWall() {
             </div>
           ))}
           {attentionShown.length === 0 && <div className="text-lg text-[#B9C2E0]">Nothing needs a human right now.</div>}
+          {attentionTotal > attentionShown.length && (
+            <div className="text-base font-medium text-[#7FCCFE]">+ {attentionTotal - attentionShown.length} more need attention — see Scheduling</div>
+          )}
           <div className="mt-auto text-base text-[#B9C2E0]">
             Everything else is on track — {model.quietCount} trip{model.quietCount === 1 ? '' : 's'} need nothing today
           </div>
