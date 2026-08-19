@@ -47,8 +47,8 @@ export function MyAudits({ dueOnly = false }: { dueOnly?: boolean }) {
 
   const activeRows = active.map((a) => (
     <button key={a.id} onClick={() => openAudit(a)}
-      className="text-left bg-card border border-border rounded-[12px] px-4 py-4 min-h-[60px] flex items-center gap-3 hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995]">
-      <div className="w-10 h-10 rounded-[10px] grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)' }}>
+      className="text-left bg-card border border-border rounded-lg px-4 py-4 min-h-[60px] flex items-center gap-3 hover:border-muted-foreground/40 hover:shadow-sm transition-all active:scale-[.995]">
+      <div className="w-10 h-10 rounded-lg grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)' }}>
         <ClipboardCheck className="w-5 h-5 text-accent" />
       </div>
       <div className="flex-1 min-w-0">
@@ -97,8 +97,8 @@ export function MyAudits({ dueOnly = false }: { dueOnly?: boolean }) {
           <div className="flex flex-col gap-2">
             {done.map((a) => (
               <button key={a.id} onClick={() => openAudit(a)}
-                className="text-left bg-card border border-border rounded-[12px] px-4 py-3.5 min-h-[52px] flex items-center gap-3 opacity-80 hover:opacity-100 transition-opacity">
-                <div className="w-6 h-6 rounded-[7px] grid place-items-center shrink-0 sc-green">✓</div>
+                className="text-left bg-card border border-border rounded-lg px-4 py-3.5 min-h-[52px] flex items-center gap-3 opacity-80 hover:opacity-100 transition-opacity">
+                <div className="w-6 h-6 rounded-sm grid place-items-center shrink-0 sc-green">✓</div>
                 <div className="flex-1 min-w-0 text-[14px] text-muted-foreground truncate">{a.title}</div>
                 <span className="text-[12px] text-muted-foreground shrink-0">{a.dueDate}</span>
               </button>

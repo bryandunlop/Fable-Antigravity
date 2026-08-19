@@ -54,6 +54,9 @@ export interface SafetyItem {
   phaseIndex?: number; // index into PHASES
   stalled?: boolean;
   ageLabel?: string;
+  /** Days in the current stage, as a NUMBER. `ageLabel` is display-only and
+   *  cannot be grouped on, which is what a board needs to bucket by age. */
+  ageDays?: number;
   owner?: string;      // who holds the ball
   waitingText?: string;
   nextAction?: string;

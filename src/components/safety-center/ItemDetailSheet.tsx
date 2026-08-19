@@ -57,7 +57,7 @@ export function ItemDetailSheet({
 
             <div className="px-6 py-5 overflow-y-auto flex-1">
               {typeof item.phaseIndex === 'number' && item.bucket === 'track' && (
-                <div className="rounded-[10px] bg-muted px-3.5 py-3 mb-5">
+                <div className="rounded-lg bg-muted px-3.5 py-3 mb-5">
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Lifecycle</div>
                   <div className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground flex-wrap">
                     <StageBar phaseIndex={item.phaseIndex} stalled={item.stalled} />

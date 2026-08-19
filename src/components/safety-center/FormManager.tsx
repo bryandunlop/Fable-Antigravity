@@ -104,7 +104,7 @@ export function FormManager() {
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 px-0.5">Form templates</div>
         {templates.map((t) => (
           <button key={t.id} onClick={() => setSelectedId(t.id)}
-            className={`text-left rounded-[10px] px-3 py-2.5 border transition-colors ${t.id === selectedId ? 'bg-accent/10 border-accent' : 'bg-card border-border hover:border-muted-foreground/40'}`}>
+            className={`text-left rounded-lg px-3 py-2.5 border transition-colors ${t.id === selectedId ? 'bg-accent/10 border-accent' : 'bg-card border-border hover:border-muted-foreground/40'}`}>
             <div className="flex items-center gap-2">
               <span className={`text-[14px] font-medium ${t.id === selectedId ? 'text-accent' : 'text-foreground'}`}>{t.name}</span>
               {dirtyIds.has(t.id) && <span className="text-[9px] font-bold uppercase tracking-wide text-[color:var(--gfo-warning)] ml-auto">unsaved</span>}
@@ -116,7 +116,7 @@ export function FormManager() {
       </div>
 
       {/* editor */}
-      <div className="bg-card border border-border rounded-[12px] p-5">
+      <div className="bg-card border border-border rounded-lg p-5">
         <div className="flex items-start justify-between gap-3 mb-1">
           <div>
             <h3 className="text-[16px] font-semibold">{selected.name}</h3>
@@ -130,7 +130,7 @@ export function FormManager() {
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-5 mb-2">Fields</div>
         <div className="flex flex-col gap-2">
           {selected.fields.map((f, idx) => (
-            <div key={f.id} className="bg-muted/40 border border-border rounded-[9px] px-2.5 py-2">
+            <div key={f.id} className="bg-muted/40 border border-border rounded-md px-2.5 py-2">
               <div className="flex items-center gap-2">
                 <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0" />
                 <input value={f.label} onChange={(e) => updateField(f.id, { label: e.target.value })}
@@ -172,7 +172,7 @@ export function FormManager() {
         <div className="mt-6 pt-5 border-t border-border">
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Approval routing</div>
           {!isRoutable ? (
-            <div className="text-[12.5px] text-muted-foreground bg-muted/40 border border-border rounded-[9px] px-3 py-2.5">
+            <div className="text-[12.5px] text-muted-foreground bg-muted/40 border border-border rounded-md px-3 py-2.5">
               {ownFlowNote}
             </div>
           ) : chain.length === 0 ? (
@@ -188,7 +188,7 @@ export function FormManager() {
                 {chain.map((role, i) => (
                   <div key={i}>
                     {i > 0 && <div className="flex items-center gap-1 text-muted-foreground/60 pl-2.5 py-0.5"><ArrowDownRight className="w-3.5 h-3.5" /></div>}
-                    <div className="flex items-center gap-2 bg-muted/40 border border-border rounded-[9px] px-2.5 py-2">
+                    <div className="flex items-center gap-2 bg-muted/40 border border-border rounded-md px-2.5 py-2">
                       <span className="w-[22px] h-[22px] rounded-full bg-accent/15 text-accent text-[12px] font-semibold grid place-items-center shrink-0">{i + 1}</span>
                       <select value={role} onChange={(e) => setApprover(i, e.target.value)}
                         className="flex-1 min-w-0 text-[13.5px] bg-card border border-border rounded-md px-2 py-1.5 text-foreground">
