@@ -37,18 +37,13 @@ export function groupLegsByDay<T extends { departureTimeUtc: string }>(
   return groups;
 }
 
-/** Which phase leads: day-of when in progress or within the threshold of the current leg's ETD, else prep. */
-export function defaultPhase(
-  tripStatus: string,
-  currentLegEtdUtc: string | undefined,
-  nowUtc: string,
-  thresholdHours: number = 24,
-): 'prep' | 'day-of' {
-  if (tripStatus === 'in_progress') return 'day-of';
-  if (!currentLegEtdUtc) return 'prep';
-  const hoursUntil = (new Date(currentLegEtdUtc).getTime() - new Date(nowUtc).getTime()) / 3_600_000;
-  return hoursUntil <= thresholdHours ? 'day-of' : 'prep';
-}
+// `defaultPhase()` lived here and is deliberately gone (D84 slice 2).
+//
+// It answered "prep or day-of?" for the Prep/Day-of TOGGLE, which the 2026-07-07 four-module board
+// dissolved — leaving it dead, referenced only by its own tests, for over a month. That was harmless
+// until this slice reintroduced the same question in `paneMode.derivePaneMode`, at which point two
+// live-looking answers with DIFFERENT thresholds (24h here, 12h there) sat one import apart. The
+// next person to need this would have had a coin-flip. `paneMode.ts` is the only answer now.
 
 /** Split the pilot's actionable items into outstanding (not done, leading) and done (collapsed), order preserved. */
 export function partitionOutstanding<T extends { done: boolean }>(items: T[]): { outstanding: T[]; done: T[] } {

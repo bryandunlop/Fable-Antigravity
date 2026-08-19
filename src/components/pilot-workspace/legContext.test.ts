@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  currentLegIndex, groupLegsByDay, defaultPhase, partitionOutstanding, fratEarlySubmitWarning,
+  currentLegIndex, groupLegsByDay, partitionOutstanding, fratEarlySubmitWarning,
   selectedLegIndex,
 } from './legContext';
 
@@ -53,20 +53,6 @@ describe('groupLegsByDay', () => {
     expect(groups.map(g => g.dayKey)).toEqual(['2026-07-09', '2026-07-10']);
     expect(groups[0].legs.map(x => x.index)).toEqual([0, 1]); // first two are the same local day
     expect(groups[1].legs.map(x => x.index)).toEqual([2]);
-  });
-});
-
-describe('defaultPhase', () => {
-  const NOW = '2026-07-09T12:00:00.000Z';
-  it('is day-of when the trip is in progress', () => {
-    expect(defaultPhase('in_progress', '2026-07-20T00:00:00.000Z', NOW)).toBe('day-of');
-  });
-  it('is day-of within the threshold and prep beyond it', () => {
-    expect(defaultPhase('confirmed', '2026-07-09T20:00:00.000Z', NOW)).toBe('day-of'); // 8h out
-    expect(defaultPhase('confirmed', '2026-07-12T12:00:00.000Z', NOW)).toBe('prep');   // 3d out
-  });
-  it('is prep when there is no current leg ETD', () => {
-    expect(defaultPhase('confirmed', undefined, NOW)).toBe('prep');
   });
 });
 
