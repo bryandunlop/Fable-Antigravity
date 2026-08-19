@@ -191,3 +191,27 @@ export function belowParRows(rows: LedgerRow[]): BelowParRow[] {
     .map(r => ({ ...r, short: r.par - r.onBoard }))
     .sort((a, b) => b.short - a.short || a.item.itemName.localeCompare(b.item.itemName));
 }
+
+export interface ReviewRow extends LedgerRow {
+  /** On board when this leg began: par + loads − usage through the PREVIOUS leg. */
+  startedWith: number;
+  /** What is left now — startedWith minus this leg's usage. */
+  remaining: number;
+}
+
+/**
+ * The end-of-leg review (D86): the same ledger rows, with the two extra columns
+ * the review needs. `prevLegId` is the leg before the one being closed, or null
+ * when closing the first — the scoping `getOnBoardQty` already understands, so
+ * the review and the live list can never disagree about the maths.
+ */
+export function toReviewRows(
+  rows: LedgerRow[],
+  trip: Trip,
+  prevLegId: string | null,
+): ReviewRow[] {
+  return rows.map(row => {
+    const startedWith = getOnBoardQty(trip, row.item.id, row.par, { upToLegId: prevLegId });
+    return { ...row, startedWith, remaining: startedWith - row.used };
+  });
+}

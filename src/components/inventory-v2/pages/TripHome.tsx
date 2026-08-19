@@ -27,6 +27,7 @@ import { buildLedgerRows, groupByCompartment, groupByCategory } from '../tripLed
 import { LedgerRow, LedgerHeader, LedgerSectionHeader } from '../shared/LedgerRow';
 import { selectLoggableItems } from '../loggableItems';
 import { AddStockSheet, type StockSource } from './AddStockSheet';
+import { EndLegReview } from './EndLegReview';
 
 // ─── Next Leg Dialog ────────────────────────────────────────────────────────
 
@@ -304,7 +305,8 @@ function TripViewInner({
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showManageQuickAdd, setShowManageQuickAdd] = useState(false);
-  const [screen, setScreen] = useState<'trip' | 'add-stock'>('trip');
+  const [screen, setScreen] = useState<'trip' | 'add-stock' | 'end-leg'>('trip');
+  const [discrepancy, setDiscrepancy] = useState('');
   // Which side of the source switch the sheet opens on. Both entry points reach
   // the same sheet — "Pull from Commissary" and "Restore Stock" were never two
   // jobs, only two defaults (D86).
@@ -318,7 +320,9 @@ function TripViewInner({
     localStorage.setItem('inv2-trip-view-mode', view);
   }, [view]);
 
-  // Entry point from LegReconciliation's last-leg handoff (?confirmComplete=1):
+  // Legacy entry point: the end-of-leg review used to be its own route and
+  // handed the last leg back here through ?confirmComplete=1. The review is a
+  // state of this screen now (D86), but an old link can still carry the param.
   // open the same confirm dialog the footer button uses, then strip the param
   // so refresh/back doesn't re-trigger it.
   useEffect(() => {
@@ -625,6 +629,69 @@ function TripViewInner({
     setShowNextLeg(false);
   }
 
+  // ─── Closing a leg (D86) ─────────────────────────────────────────────────
+  // Was a route of its own; it is a state of this screen now. Same dispatches.
+
+  function handleGenerateGroceryList() {
+    if (!activeLeg) return;
+    const existing = state.groceryLists.find(g => g.tripId === trip.id && g.legId === activeLeg.id);
+    if (existing) {
+      navigate('grocery-list');
+      return;
+    }
+    const usageRows = activeLeg.usageLog.filter(e => e.qtyUsed > 0);
+    dispatch({
+      type: 'ADD_GROCERY_LIST',
+      payload: {
+        id: `gl-${crypto.randomUUID()}`,
+        tripId: trip.id,
+        legId: activeLeg.id,
+        tailNumber: trip.tailNumber,
+        status: 'draft',
+        items: usageRows.map(e => ({
+          id: crypto.randomUUID(),
+          itemId: e.itemId,
+          qtyNeeded: e.qtyUsed,
+          qtyFulfilled: 0,
+        })),
+        generatedAt: new Date().toISOString(),
+        generatedBy: state.currentUser.name,
+      },
+    });
+    navigate('grocery-list');
+  }
+
+  function handleCompleteLegFromReview() {
+    if (!activeLeg) return;
+    if (discrepancy.trim()) {
+      dispatch({
+        type: 'ADD_TRIP_NOTE',
+        payload: {
+          tripId: trip.id,
+          note: {
+            id: `tn-${crypto.randomUUID()}`,
+            tripId: trip.id,
+            legId: activeLeg.id,
+            text: `⚠️ Discrepancy: ${discrepancy.trim()}`,
+            author: state.currentUser.name,
+            createdAt: new Date().toISOString(),
+          },
+        },
+      });
+      setDiscrepancy('');
+    }
+    setScreen('trip');
+    if (isLastLeg) {
+      // The old route bounced back through ?confirmComplete=1 to reach this
+      // dialog. Same screen now, so it is just a call.
+      setShowConfirmComplete(true);
+    } else {
+      // ADVANCE_TO_NEXT_LEG completes the active leg itself — dispatching
+      // COMPLETE_LEG first leaves its reducer no active leg to find.
+      dispatch({ type: 'ADVANCE_TO_NEXT_LEG', payload: trip.id });
+    }
+  }
+
   function handleCompleteTrip() {
     setShowConfirmComplete(true);
   }
@@ -637,7 +704,7 @@ function TripViewInner({
       payload: { tripId: trip.id, legId: activeLeg.id, phase: 'complete' },
     });
     // Mark the final leg's status completed too — keeps leg state identical to
-    // the LegReconciliation entry point and lets REOPEN_TRIP (undo) find it.
+    // the end-of-leg review's entry point and lets REOPEN_TRIP (undo) find it.
     dispatch({ type: 'COMPLETE_LEG', payload: { tripId: trip.id, legId: activeLeg.id } });
     dispatch({ type: 'COMPLETE_TRIP', payload: trip.id });
 
@@ -669,6 +736,24 @@ function TripViewInner({
   // ─── Render ───────────────────────────────────────────────────────────────
 
   // Sub-screen renders
+  if (screen === 'end-leg' && activeLeg) {
+    return (
+      <EndLegReview
+        trip={trip}
+        leg={activeLeg}
+        rows={ledgerRows}
+        isLastLeg={isLastLeg}
+        discrepancy={discrepancy}
+        onDiscrepancyChange={setDiscrepancy}
+        onIncrement={handleIncrement}
+        onDecrement={handleDecrement}
+        onGenerateGroceryList={handleGenerateGroceryList}
+        onComplete={handleCompleteLegFromReview}
+        onBack={() => setScreen('trip')}
+      />
+    );
+  }
+
   if (screen === 'add-stock') {
     return (
       <AddStockSheet
@@ -1130,7 +1215,7 @@ function TripViewInner({
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => activeLeg && navigate(`/inventory-v2/trips/${trip.id}/reconcile`)}
+                    onClick={() => setScreen('end-leg')}
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     Review Leg

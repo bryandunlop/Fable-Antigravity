@@ -5,6 +5,7 @@ import {
   groupByCategory,
   compartmentSummary,
   belowParRows,
+  toReviewRows,
 } from './tripLedger';
 import type { InventoryItemV2, Trip, TripLeg, CompartmentDefinition } from './types';
 
@@ -229,5 +230,31 @@ describe('belowParRows', () => {
     const l = leg();
     const rows = buildLedgerRows({ items: ITEMS, trip: trip([l]), leg: l, aircraftType: 'G650' });
     expect(belowParRows(rows)).toEqual([]);
+  });
+});
+
+// ─── toReviewRows ────────────────────────────────────────────────────────────
+
+describe('toReviewRows', () => {
+  it('reports what the leg started with and what is left, for the first leg', () => {
+    const l = leg([['1', 4]]);
+    const t = trip([l], [{ itemId: '1', qty: 4 }]);
+    const rows = buildLedgerRows({ items: ITEMS, trip: t, leg: l, aircraftType: 'G650' });
+    const review = toReviewRows(rows, t, null);
+    const perrier = review.find(r => r.item.itemName === 'Perrier 330ml')!;
+    // Pre-trip load counts before the leg flew: 8 par + 4 loaded = 12 to start.
+    expect(perrier.startedWith).toBe(12);
+    expect(perrier.used).toBe(4);
+    expect(perrier.remaining).toBe(8);
+  });
+
+  it('excludes the closing leg’s own usage from what it started with', () => {
+    const l1 = { ...leg([['1', 3]]), id: 'leg-1', legNumber: 1, status: 'completed' as const };
+    const l2 = { ...leg([['1', 2]]), id: 'leg-2', legNumber: 2 };
+    const t = trip([l1, l2]);
+    const rows = buildLedgerRows({ items: ITEMS, trip: t, leg: l2, aircraftType: 'G650' });
+    const perrier = toReviewRows(rows, t, 'leg-1').find(r => r.item.itemName === 'Perrier 330ml')!;
+    expect(perrier.startedWith).toBe(5); // 8 par − 3 used on leg 1
+    expect(perrier.remaining).toBe(3);   // − 2 used on leg 2
   });
 });
