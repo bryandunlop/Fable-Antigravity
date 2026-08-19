@@ -183,7 +183,7 @@ export function summarizeFleetServiceability(state: TechLogState, asOfUtc: strin
 
 /** THIN localStorage wrapper — the only untested seam. */
 export function readFleetServiceability(asOfUtc: string): FleetServiceability {
-  return summarizeFleetServiceability(loadState(), asOfUtc);
+  return summarizeFleetServiceability(loadPersistedTechLogState(), asOfUtc);
 }
 
 /** Per-tail airworthiness detail for fleet surfaces outside tech-log (widget, /aircraft). */
@@ -213,19 +213,27 @@ export function summarizeFleetAirworthiness(state: TechLogState, asOfUtc: string
 
 /** THIN localStorage wrapper — the only untested seam. */
 export function readFleetAirworthiness(asOfUtc: string): FleetAirworthinessEntry[] {
-  return summarizeFleetAirworthiness(loadState(), asOfUtc);
+  return summarizeFleetAirworthiness(loadPersistedTechLogState(), asOfUtc);
 }
 
 export type { TripForAlerts, TripServiceabilityAlert, TripAlertKind };
 
 /** THIN localStorage wrapper over engine/tripAlerts (pure logic + tests live there). */
 export function readTripServiceabilityAlerts(trips: TripForAlerts[], nowUtc: string): TripServiceabilityAlert[] {
-  return deriveTripServiceabilityAlerts(loadState(), trips, nowUtc);
+  return deriveTripServiceabilityAlerts(loadPersistedTechLogState(), trips, nowUtc);
 }
 
 const newLocalId = (p: string) => `${p}-${Math.random().toString(36).slice(2, 10)}`;
 
-function loadState(): TechLogState {
+/**
+ * The persisted tech-log state, read straight from storage.
+ *
+ * Exported because the bridge WRITES through storage rather than through the reducer, so anything
+ * that wants the live React state to catch up has to be handed the same bytes — see
+ * `useRehydrateTechLog`. Keeping the read in one place means the write and the catch-up can never
+ * disagree about version gating or defaults.
+ */
+export function loadPersistedTechLogState(): TechLogState {
   if (typeof localStorage === 'undefined') return getDefaultState();
   try {
     if (localStorage.getItem(VERSION_KEY) !== DATA_VERSION) {
@@ -248,7 +256,7 @@ function saveState(state: TechLogState): void {
 export function releaseSchedulingTripToPreflight(
   input: PreflightTripInput
 ): { techLogTripId: string; createdAircraft: boolean } {
-  const state = loadState();
+  const state = loadPersistedTechLogState();
   const result = projectTripIntoTechLogState(state, input, newLocalId);
   saveState(result.state);
   return { techLogTripId: result.techLogTripId, createdAircraft: result.createdAircraft };
@@ -256,12 +264,12 @@ export function releaseSchedulingTripToPreflight(
 
 /** THIN localStorage wrapper — the only untested seam. */
 export function readPreflightSummary(tripNumber: string): PreflightSummary | null {
-  const state = loadState();
+  const state = loadPersistedTechLogState();
   return summarizePreflight(state, tripNumber);
 }
 
 /** THIN localStorage wrapper — the only untested seam. */
 export function readTripLifecycleSummary(tripNumber: string): TripLifecycleSummary | null {
-  const state = loadState();
+  const state = loadPersistedTechLogState();
   return summarizeTripLifecycle(state, tripNumber);
 }
