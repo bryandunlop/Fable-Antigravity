@@ -11,6 +11,7 @@ import WeatherForecast from './WeatherForecast';
 import { HOME_STATION } from '../config/station';
 import QuickLinksBar from './ops-wall/QuickLinksBar';
 import { lookupAirport } from '../services/airportCoords';
+import { TODAY_LEGS } from '../services/todaysOpsMock';
 
 /** Stations shown alongside home. Kept short so the strip stays one line. */
 const MAX_DESTINATION_STATIONS = 3;
@@ -58,7 +59,7 @@ function useOpsClock(): string {
  * map tile in QuickLinksBar links /fleet-map.
  */
 export default function FleetOpsWall({ userRole }: { userRole: string }) {
-  const { fleet, dispatchable, inFlight, satcomLoading, isRefreshing } = useUnifiedFleetStatus();
+  const { fleet, dispatchable, inFlight, satcomLoading, isRefreshing, lastUpdate } = useUnifiedFleetStatus();
   const clock = useOpsClock();
 
   // Weather follows the aircraft: home field plus wherever the fleet is heading.
@@ -89,13 +90,21 @@ export default function FleetOpsWall({ userRole }: { userRole: string }) {
             {dispatchable} of {fleet.length} dispatchable · {inFlight} in flight
             {grounded > 0 && <span className="font-semibold text-[#EF3340]"> · {grounded} grounded</span>}
           </span>
+          {/* Phase 1 serviceability is fresh-on-sync (D14), not pushed — so the page
+              must say WHEN this picture was taken. Without it an iPad left open all
+              morning looks exactly like one that just refreshed. */}
+          <span className="font-mono text-[11px] text-muted-foreground/70">
+            Updated {lastUpdate.toLocaleTimeString('en-US', {
+              hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York',
+            })} ET
+          </span>
           <FirLeadershipChip roles={[userRole]} />
         </div>
       </header>
 
       {/* Per-tail status rail — D88, the page's lead. Cards from sm up; a compact
           status list on phones. Each links to /aircraft. */}
-      <TailStatusCards fleet={fleet} />
+      <TailStatusCards fleet={fleet} legs={TODAY_LEGS} />
 
       {/* ONE weather panel: the METAR strip and the outlook share a
           container so they read as a single unit. 5 days per D88 (was 7) —

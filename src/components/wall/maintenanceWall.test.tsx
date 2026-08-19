@@ -88,7 +88,7 @@ describe('OpsWallView (D88)', () => {
     // N5PG (AMBER) flies today, so its lane shows the flight block and the MEL
     // note lives in the lane label.
     expect(screen.getByText(/MEL C · 6d left/)).toBeInTheDocument();
-    expect(screen.getByText('LUK → MIA')).toBeInTheDocument();
+    expect(screen.getByText(/LUK → MIA · 4 pax/)).toBeInTheDocument();
     expect(screen.getByText('CREW DUTY')).toBeInTheDocument();
     expect(screen.getByText('NOW')).toBeInTheDocument();
   });

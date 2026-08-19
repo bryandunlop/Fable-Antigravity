@@ -4,6 +4,7 @@ import { Badge } from './ui/badge';
 import { Plane, MapPin, Clock, Calendar, ChevronRight, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { TODAY_LEGS } from '../services/todaysOpsMock';
+import { formatUntilEt } from '../services/etClock';
 
 export default function DailyFlightsWidget() {
     // Sourced from todaysOpsMock so the tails and routes match the fleet map and
@@ -99,6 +100,14 @@ export default function DailyFlightsWidget() {
                                         <div className={`flex items-center gap-1 ${getEtaColor(flight.etaStatus)}`}>
                                             <Activity className="w-3 h-3" />
                                             ETA: {flight.estimatedArrival}
+                                        </div>
+                                    )}
+                                    {/* Departure countdown — "13:15 ET" alone makes the reader
+                                        do the subtraction. Drops out once the time is past
+                                        rather than counting up at a departed aircraft. */}
+                                    {flight.status === 'Scheduled' && formatUntilEt(flight.departureTime, new Date()) && (
+                                        <div className="text-foreground/70">
+                                            Departs {flight.departureTime} &middot; {formatUntilEt(flight.departureTime, new Date())}
                                         </div>
                                     )}
                                 </div>

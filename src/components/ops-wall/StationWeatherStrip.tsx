@@ -6,6 +6,9 @@ import {
   formatVisibility,
   type WeatherResult,
 } from '../../services/aviationWeatherService';
+import { conditionFromMetar } from '../../services/weatherConditions';
+import { WeatherIcon } from '../ui/WeatherIcons';
+import SunTimesChip from './SunTimesChip';
 
 /** METARs update roughly hourly; match WeatherWidget's cadence. */
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -71,6 +74,10 @@ export default function StationWeatherStrip({
 
             {metar ? (
               <>
+                {/* Same glyph vocabulary as the outlook below, so one row of
+                    weather does not speak two visual languages. Decorative:
+                    every value it sits beside is still written out. */}
+                <WeatherIcon condition={conditionFromMetar(metar)} size={16} title={metar.wxString} />
                 <span className="text-muted-foreground">{formatWind(metar)}</span>
                 <span className="text-muted-foreground">{formatVisibility(metar.visib)}</span>
                 <span className="text-muted-foreground/80">{metar.fltcat}</span>
@@ -91,6 +98,8 @@ export default function StationWeatherStrip({
           </span>
         );
       })}
+
+      {stations[0] && <SunTimesChip station={stations[0]} />}
     </div>
   );
 }
