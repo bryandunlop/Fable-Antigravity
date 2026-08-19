@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useReducer, useRe
 import { toast } from 'sonner';
 import type { TechLogState, TechLogAction, Personnel, AuditEntry, PendingApproval, SupersedeEntityType, AircraftType } from './types';
 import { getDefaultState } from './mockData/scenarios';
+import { loadPersistedTechLogState } from './bridge';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { wouldFork, buildSupersedeConflict } from './engine/supersede';
 import { canRecordPostflight } from './engine/custody';
@@ -384,6 +385,27 @@ export function useLoginRoles(): string[] {
 }
 
 /** Current persona (Personnel record) derived from state.currentUserOid. */
+/**
+ * Pull the live React state back in line with what is in storage.
+ *
+ * `bridge.ts` writes through localStorage directly — `releaseSchedulingTripToPreflight` does
+ * loadState -> project -> saveState — so a release updated storage and the mounted provider never
+ * heard about it. In the app that meant a scheduler could release a trip to preflight, see the
+ * success toast, and the PILOT WORKSPACE would still say "not released to preflight" until a full
+ * page reload. In the demo it was worse than that: reloading re-seeds the date-relative demo trips,
+ * which threw the release away, so a released multi-leg trip could never be reached at all.
+ *
+ * Call this immediately after any bridge write. RESET_STATE is a whole-state replacement, which is
+ * exactly the semantics wanted here — and it preserves the signed-in user, so rehydrating does not
+ * bounce the current person back to the seed pilot.
+ */
+export function useRehydrateTechLog(): () => void {
+  const { dispatch } = useTechLog();
+  return useCallback(() => {
+    dispatch({ type: 'RESET_STATE', payload: loadPersistedTechLogState() });
+  }, [dispatch]);
+}
+
 export function useCurrentUser() {
   const { state } = useTechLog();
   return state.personnel.find(p => p.oid === state.currentUserOid) ?? state.personnel[0];

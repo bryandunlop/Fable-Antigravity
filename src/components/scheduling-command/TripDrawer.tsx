@@ -8,6 +8,7 @@ import { Progress } from '../ui/progress';
 import { Separator } from '../ui/separator';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
 import { StatusBadge, AckBadge, TaskActionButtons, formatDueTime, groupByCategory } from '../scheduling-workspace/taskRowHelpers';
+import { useRehydrateTechLog } from '../tech-log/TechLogContext';
 import { releaseSchedulingTripToPreflight, readPreflightSummary } from '../tech-log/bridge';
 import type { TripRecord } from '../../scheduling/store';
 import type { TaskInstance, TaskAction, Readiness } from '../../scheduling/engine';
@@ -42,6 +43,7 @@ export function TripDrawer({
   userRole: string;
 }) {
   const { service, store, tick, bump, nowUtc } = useSchedulingWorkspace();
+  const rehydrateTechLog = useRehydrateTechLog();
   const navigate = useNavigate();
   const [trip, setTrip] = useState<TripRecord | null>(null);
   const [instances, setInstances] = useState<TaskInstance[]>([]);
@@ -107,6 +109,8 @@ export function TripDrawer({
           departureTimeUtc: l.departureTimeUtc, arrivalTimeUtc: l.arrivalTimeUtc,
         })),
       });
+      // Same seam as TripsPanel: the bridge writes storage, not the reducer.
+      rehydrateTechLog();
       toast[createdAircraft ? 'warning' : 'success'](
         createdAircraft
           ? `Released — no fleet aircraft for ${trip.tail}, created a demo placeholder`
