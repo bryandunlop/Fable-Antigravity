@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Clock, OctagonAlert } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Clock, OctagonAlert } from 'lucide-react';
 import type { TripServiceabilityAlert } from '../tech-log/bridge';
 import { groupAlertsByAircraft } from './alertGroups';
 import { OpsAlertsPanel } from './OpsAlertsPanel';
@@ -11,19 +11,23 @@ import type { OverdueItem } from './horizonSelectors';
 // the right is task lateness. Collapsed, the pair costs ~44px where the old stack of alert cards
 // plus overdue strip cost ~300px.
 
-function Segment({ icon, strong, rest, expanded, onToggle, children }: {
+function Segment({ icon, strong, rest, tone, expanded, onToggle, children }: {
   icon: React.ReactNode;
   strong: string;
   rest: string;
+  tone: 'red' | 'amber';
   expanded: boolean;
   onToggle: () => void;
   children?: React.ReactNode;
 }) {
+  const border = tone === 'red'
+    ? 'border-[var(--gfo-error,#EF3340)]/40 hover:bg-[var(--gfo-error,#EF3340)]/5'
+    : 'border-[var(--gfo-warning,#F1B434)]/50 hover:bg-[var(--gfo-warning,#F1B434)]/5';
   return (
     <div className="min-w-0">
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-2.5 text-left rounded-md px-3 py-2 border border-[var(--gfo-error,#EF3340)]/40 bg-card hover:bg-[var(--gfo-error,#EF3340)]/5 transition-colors"
+        className={`w-full flex items-center gap-2.5 text-left rounded-md px-3 py-2 border bg-card transition-colors ${border}`}
       >
         {icon}
         <span className="text-xs min-w-0 truncate">
@@ -52,6 +56,7 @@ export function AttentionBand({ alerts, overdue, onOpenTrip }: {
   const hasTasks = overdue.length > 0;
   if (!hasAircraft && !hasTasks) return null;
 
+  const anyRed = groups.some(g => g.severity === 'red');
   const aircraftSummary = groups
     .map(g => `${g.tail} ${g.headline.length > 34 ? `${g.headline.slice(0, 34)}…` : g.headline}`)
     .slice(0, 3)
@@ -61,7 +66,10 @@ export function AttentionBand({ alerts, overdue, onOpenTrip }: {
     <div className={`grid gap-2.5 ${hasAircraft && hasTasks ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
       {hasAircraft && (
         <Segment
-          icon={<OctagonAlert className="h-4 w-4 text-red-600 shrink-0" />}
+          icon={anyRed
+            ? <OctagonAlert className="h-4 w-4 text-red-600 shrink-0" />
+            : <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />}
+          tone={anyRed ? 'red' : 'amber'}
           strong={`Aircraft — ${groups.length} affect ${alerts.length} trip${alerts.length === 1 ? '' : 's'}.`}
           rest={aircraftSummary}
           expanded={aircraftOpen}
@@ -73,6 +81,7 @@ export function AttentionBand({ alerts, overdue, onOpenTrip }: {
       {hasTasks && (
         <Segment
           icon={<Clock className="h-4 w-4 text-[var(--gfo-error,#EF3340)] shrink-0" />}
+          tone="red"
           strong={`Tasks — ${overdue.length} overdue.`}
           rest={`worst ${overdue[0].dueLabel.replace('Overdue ', '')}: ${overdue[0].actionTitle} · ${overdue[0].tail} ${overdue[0].route}`}
           expanded={tasksOpen}
