@@ -11,7 +11,7 @@ import { deriveTripReadiness } from '../tech-log/engine/readiness';
 import { deriveSchedulingReadiness } from '../../scheduling/engine/readiness';
 import { deriveCustody, type CustodyState } from '../tech-log/engine/custody';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
-import { Bell } from 'lucide-react';
+import { Bell, CalendarRange, Timer } from 'lucide-react';
 import { composePilotReadiness, type PilotReadiness } from './selectors';
 import { deriveTripModules, totalOutstanding } from './moduleStatus';
 import { currentLegIndex, selectedLegIndex } from './legContext';
@@ -23,6 +23,10 @@ import TripBriefPanel from './panels/TripBriefPanel';
 import { LegStepper } from './panels/LegStepper';
 import { LegFuelSection } from './panels/LegFuelSection';
 import { LegDayOfSection } from './panels/LegDayOfSection';
+import { LegFratSection } from './panels/LegFratSection';
+import { PrepMatrix } from './panels/PrepMatrix';
+import { derivePrepRows, prepOutstanding, prepLocked } from './prepMatrix';
+import { derivePaneMode, type PaneMode } from './paneMode';
 import { LogNuisanceItemDialog } from './panels/LogNuisanceItemDialog';
 import type { TripRecord } from '../../scheduling/store/types';
 
@@ -35,6 +39,32 @@ const CUSTODY: Record<CustodyState, { dot: string; label: string }> = {
 function PilotCustodyChip({ state }: { state: CustodyState }) {
   const c = CUSTODY[state];
   return <span className="gfo-chip shrink-0"><span className={`gfo-chip-dot ${c.dot}`} aria-hidden /> {c.label}</span>;
+}
+
+/**
+ * Which pane you are in, when the other one opens, and a way into it (D84).
+ *
+ * The mode is allowed to change under the pilot — that is the point — so it must always be legible
+ * and always reversible. A silent switch is a trap; a switch with no way back is a worse one.
+ */
+function PaneModeChip({ mode, onSet }: { mode: ReturnType<typeof derivePaneMode>; onSet: (m: PaneMode) => void }) {
+  const isPrep = mode.mode === 'prep';
+  const other: PaneMode = isPrep ? 'day-of' : 'prep';
+  return (
+    <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-muted py-1 pl-3 pr-1 text-xs text-muted-foreground">
+      {isPrep ? <CalendarRange className="h-3.5 w-3.5" aria-hidden /> : <Timer className="h-3.5 w-3.5" aria-hidden />}
+      <span className="font-semibold text-foreground">{isPrep ? 'Prep' : 'Day-of'}</span>
+      {mode.overridden
+        ? <span>· your choice</span>
+        : isPrep && mode.opensAtUtc
+          ? <span className="hidden xl:inline">· day-of opens {mode.opensAtUtc.slice(11, 16)}Z</span>
+          : null}
+      <button type="button" onClick={() => onSet(other)}
+        className="rounded-full border border-border bg-card px-2.5 py-1 font-medium text-primary duration-fast hover:bg-accent">
+        {isPrep ? 'Day-of' : 'Prep'}
+      </button>
+    </span>
+  );
 }
 
 /** The pilot trip workspace: one four-module board (FRAT & airport · Fuel · Maintenance handover ·
@@ -66,6 +96,16 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   // panel at the bottom of the page, which on a 1194x834 iPad meant it was permanently below the
   // fold — a section nobody could see, costing the layout its whole tail (D84).
   const messagesOpen = !!searchParams.get('messages');
+  // FRAT and fuel join the family too, because the prep matrix has to open them for ANY leg without
+  // walking the stepper — the whole point of prep being worked by item rather than by leg.
+  const fratLeg = legs.find((l) => l.id === searchParams.get('frat'));
+  const fuelLeg = legs.find((l) => l.id === searchParams.get('fuel'));
+
+  // Which instrument this trip gets (D84). The clock decides; ?mode is the pilot's override and
+  // lives in the URL like everything else here, so a shared link opens on what they were looking at.
+  const rawMode = searchParams.get('mode');
+  const paneMode = derivePaneMode(legs, now, rawMode === 'prep' || rawMode === 'day-of' ? rawMode : undefined);
+  const prepRows = derivePrepRows(tlTrip, tlAc, now);
 
   const setParam = (key: string, value: string | null) =>
     setSearchParams((prev) => {
@@ -103,22 +143,57 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         <div className="min-w-0">
           <div className="text-lg font-semibold leading-tight">{trip.tripNumber} · {trip.tail} · {trip.aircraftType}</div>
           <div className="text-xs text-muted-foreground">
-            {trip.tripType} · {legs.length} legs{outstanding > 0 ? ` · ${outstanding} to prep` : ''}
+            {trip.tripType} · {legs.length} legs
+            {/* In prep the matrix IS the work, so its own count is the honest one — the day-of
+                module roll-up counts things the prep pane does not show. */}
+            {paneMode.mode === 'prep'
+              ? (prepOutstanding(prepRows) > 0 ? ` · ${prepOutstanding(prepRows)} to prep` : '')
+              : (outstanding > 0 ? ` · ${outstanding} to prep` : '')}
+            {prepLocked(prepRows) > 0 && (
+              <span className="text-[var(--gfo-error-ink)]"> · {prepLocked(prepRows)} locked</span>
+            )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2.5">
+        {/* Wraps rather than clipping: custody + a long BLOCKED reason + the mode chip overflow
+            1194pt, and the right-most chip is the one that disappears. */}
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           {custody && <PilotCustodyChip state={custody} />}
           {readiness && <ReadinessPill readiness={readiness} />}
+          <PaneModeChip mode={paneMode} onSet={(m) => setParam('mode', m)} />
         </div>
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+
+      {/* PREP PANE — the matrix replaces the leg stepper AND the two per-leg module cards, because
+          days out the job is one pass down each column rather than four walks through the trip.
+          Aircraft and Scheduling stay: they are per-trip, not per-leg, so a matrix cannot hold them. */}
+      {paneMode.mode === 'prep' ? (
+        <>
+          <PrepMatrix
+            rows={prepRows}
+            onOpenFrat={(id) => setParam('frat', id)}
+            onOpenAirport={(id) => setParam('airport', id)}
+            onOpenFuel={(id) => setParam('fuel', id)}
+          />
+          <div className="grid grid-cols-1 gap-3 landscape:grid-cols-2">
+            <ModuleCard status={handoverStatus}>
+              <HandoverCard trip={trip} onOpenHandover={() => setParam('handover', '1')} />
+            </ModuleCard>
+            <ModuleCard status={schedulingStatus}>
+              <TripBriefPanel trip={trip} userRole={userRole} />
+            </ModuleCard>
+          </div>
+        </>
+      ) : (
+      <>
       {tlTrip && legs.length > 1 && (
         <LegStepper legs={legs} currentIndex={currentIdx < 0 ? 0 : currentIdx} selectedIndex={selectedIdx}
           officeTzOffsetMinutes={officeTzOffsetMinutes} onSelect={selectLeg} />
       )}
 
-      {/* Four-module board — landscape: 2×2; portrait: stacked */}
+      {/* Four-module board — landscape: 2×2; portrait: stacked. D84 slice 3 replaces this with the
+          countdown + clock-ranked queue; until then day-of keeps the board it has always had. */}
       <div className="grid grid-cols-1 gap-3 landscape:grid-cols-2">
         <ModuleCard status={fratStatus}>
           {tlTrip && selectedLeg
@@ -138,6 +213,8 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
           <TripBriefPanel trip={trip} userRole={userRole} />
         </ModuleCard>
       </div>
+      </>
+      )}
 
       </div>
 
@@ -179,6 +256,40 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
                   onMarkReviewed={() => markAirportReviewedOnLeg({ dispatch, newId, trip: tlTrip, leg: airportLeg, actorOid: user.oid })}
                 />
               </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* FRAT for any leg, opened from the prep matrix. Renders the SAME panel the day-of board
+          uses, so the early-submit warning and the draft path cannot diverge between the two. */}
+      <Sheet open={!!fratLeg && !!tlTrip} onOpenChange={(o: boolean) => { if (!o) setParam('frat', null); }}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          {fratLeg && tlTrip && (
+            <>
+              <SheetHeader>
+                <SheetTitle>FRAT · leg {fratLeg.sequence}</SheetTitle>
+                <SheetDescription>{fratLeg.departureIcao} → {fratLeg.arrivalIcao} · {trip.tripNumber}</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4">
+                <LegFratSection tlTrip={tlTrip} leg={fratLeg} tripNumber={trip.tripNumber} autoOpen
+                  onDone={() => setParam('frat', null)} />
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Home-base fuel request for any leg, likewise. */}
+      <Sheet open={!!fuelLeg && !!tlTrip} onOpenChange={(o: boolean) => { if (!o) setParam('fuel', null); }}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          {fuelLeg && tlTrip && (
+            <>
+              <SheetHeader>
+                <SheetTitle>Fuel · leg {fuelLeg.sequence}</SheetTitle>
+                <SheetDescription>{fuelLeg.departureIcao} fuel farm · {trip.tripNumber}</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4"><LegFuelSection tlTrip={tlTrip} leg={fuelLeg} /></div>
             </>
           )}
         </SheetContent>
