@@ -15,82 +15,19 @@ import {
 import { toast } from 'sonner';
 import { useInventoryV2 } from '../InventoryV2Context';
 import { OfflineBanner } from '../shared/OfflineBanner';
-import { LEG_PHASE_COLORS, SUPPLY_CATEGORIES } from '../constants';
+import { LEG_PHASE_COLORS } from '../constants';
 import { formatRelativeTime } from '../shared/dateUtils';
-import { getCompartmentsForAircraft, getCompartmentLabel } from '../compartmentConfig';
+import { getCompartmentsForAircraft } from '../compartmentConfig';
 import { cn } from '../../ui/utils';
 import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewMode } from '../types';
 import QuickTapView from '../shared/QuickTapView';
 import ManageQuickAddDialog from '../shared/ManageQuickAddDialog';
 import { getOnBoardQty } from '../tripMath';
+import { buildLedgerRows, groupByCompartment, groupByCategory } from '../tripLedger';
+import { LedgerRow, LedgerHeader, LedgerSectionHeader } from '../shared/LedgerRow';
 import { selectLoggableItems } from '../loggableItems';
 import { TripLoadExtras } from './TripLoadExtras';
 import { TripRestoreStock } from './TripRestoreStock';
-
-// ─── Item Row ───────────────────────────────────────────────────────────────
-
-interface ItemRowProps {
-  item: InventoryItemV2;
-  legUsage: number;
-  onBoard: number;
-  compartmentLabel: string;
-  onIncrement: () => void;
-  onDecrement: () => void;
-  selected?: boolean;
-  starred?: boolean;
-  onToggleStar?: () => void;
-}
-
-function ItemRow({ item, legUsage, onBoard, compartmentLabel, onIncrement, onDecrement, selected, starred, onToggleStar }: ItemRowProps) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-3 px-4 py-3 border-b border-border/60 transition-colors',
-        legUsage === 0 && 'opacity-50',
-        selected && 'bg-primary/10 border-l-2 border-l-primary'
-      )}
-    >
-      {onToggleStar && (
-        <button
-          onClick={onToggleStar}
-          className="shrink-0 text-muted-foreground hover:text-amber-400 transition-colors"
-          aria-label={starred ? 'Unpin item' : 'Pin item'}
-        >
-          <Star size={14} className={cn(starred && 'fill-amber-400 text-amber-400')} />
-        </button>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate">{item.itemName}</p>
-        <p className="text-xs text-muted-foreground">
-          {compartmentLabel} · {onBoard} on board
-        </p>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={onDecrement}
-          className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center text-lg hover:bg-muted/80 transition-colors"
-          disabled={legUsage === 0}
-        >
-          −
-        </button>
-        <span
-          className={cn(
-            'w-8 text-center text-base font-bold',
-            legUsage > 0 ? 'text-blue-400' : 'text-muted-foreground'
-          )}
-        >
-          {legUsage}
-        </span>
-        <button
-          onClick={onIncrement}
-          className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center text-lg hover:bg-muted/80 transition-colors"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ─── Next Leg Dialog ────────────────────────────────────────────────────────
 
@@ -362,6 +299,7 @@ function TripViewInner({
   });
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCompartment, setSelectedCompartment] = useState<string | null>(null);
   const [showNextLeg, setShowNextLeg] = useState(false);
   const [showTripComplete, setShowTripComplete] = useState(false);
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
@@ -530,10 +468,43 @@ function TripViewInner({
     [state.compartmentConfigs, aircraftType]
   );
 
-  const relevantCategories = useMemo(() => {
-    const cats = new Set(filteredItems.map(i => i.supplyCategory));
-    return SUPPLY_CATEGORIES.filter(c => cats.has(c.id)).map(c => c.id);
-  }, [filteredItems]);
+  // ─── The stock ledger (D86) ───────────────────────────────────────────────
+  // One set of numbers, arranged three ways. `filteredItems` stays the logging
+  // list (TL-43) and the ledger is built over exactly it, so every lens agrees.
+
+  const ledgerRows = useMemo(
+    () => buildLedgerRows({ items: filteredItems, trip, leg: activeLeg, aircraftType }),
+    [filteredItems, trip, activeLeg, aircraftType],
+  );
+
+  const compartmentGroups = useMemo(
+    () => groupByCompartment(ledgerRows, compartments),
+    [ledgerRows, compartments],
+  );
+  const compartmentChips = useMemo(
+    () => compartmentGroups.map(g => ({ id: g.id, label: g.label, count: g.rowCount })),
+    [compartmentGroups],
+  );
+  // The picked compartment can fall out of the list when a search narrows it —
+  // fall back to the first that still has rows rather than rendering nothing.
+  const activeCompartmentId =
+    compartmentChips.find(c => c.id === selectedCompartment)?.id ?? compartmentChips[0]?.id;
+  const activeCompartment = compartmentGroups.find(g => g.id === activeCompartmentId);
+
+  const categoryGroups = useMemo(() => groupByCategory(ledgerRows), [ledgerRows]);
+  const categoryChips = useMemo(
+    () => categoryGroups.map(g => ({ id: g.id, label: g.label, count: g.rowCount })),
+    [categoryGroups],
+  );
+  const visibleCategoryGroups = useMemo(
+    () => (selectedCategory === 'all' ? categoryGroups : categoryGroups.filter(g => g.id === selectedCategory)),
+    [categoryGroups, selectedCategory],
+  );
+
+  const favoriteRows = useMemo(
+    () => ledgerRows.filter(r => isFavorite(r.item.id)),
+    [ledgerRows, isFavorite],
+  );
 
   // ─── Grocery list item count ──────────────────────────────────────────────
 
@@ -866,146 +837,133 @@ function TripViewInner({
                 />
               )}
 
-              {/* ── Compartment view ── */}
+              {/* ── Compartment lens (D86) ──
+                  A PICKER, not eight stacked headings: Forward Galley alone is 61
+                  of the G650's 149 lines, so grouping on its own reduced nothing.
+                  You stand in one compartment at a time, and the item's own
+                  `location` is the shelf inside it. */}
               {view === 'compartment' && (
-                <Card className="bg-card border-border overflow-hidden">
-                  {favoriteItems.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-border">
-                        <Star size={12} className="fill-amber-400 text-amber-400" />
-                        <span className="text-xs font-semibold uppercase tracking-wide text-amber-500">Pinned</span>
-                      </div>
-                      {favoriteItems.map(item => {
-                        const idx = filteredItems.findIndex(i => i.id === item.id);
-                        return (
-                          <ItemRow
-                            key={`fav-${item.id}`}
-                            item={item}
-                            legUsage={getLegUsage(item)}
-                            onBoard={getOnBoard(item)}
-                            compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                            onIncrement={() => handleIncrement(item)}
-                            onDecrement={() => handleDecrement(item)}
-                            selected={selectedIndex === idx}
-                            starred
-                            onToggleStar={() => toggleFavorite(item.id)}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                  {compartments.map(compartment => {
-                    const sectionItems = filteredItems.filter(
-                      item => item.compartmentId === compartment.id
-                    );
-                    if (sectionItems.length === 0) return null;
-                    const sectionUsage = sectionItems.reduce((sum, item) => sum + getLegUsage(item), 0);
-
-                    return (
-                      <div key={compartment.id}>
-                        <div className="flex items-center justify-between px-4 py-2 bg-muted/60 border-b border-border">
-                          <span className={cn('text-xs font-semibold uppercase tracking-wide', compartment.color)}>
-                            {compartment.label}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {sectionUsage > 0 ? `${sectionUsage} used` : ''}
-                          </span>
-                        </div>
-                        {sectionItems.map(item => {
-                          const idx = filteredItems.findIndex(i => i.id === item.id);
-                          return (
-                            <ItemRow
-                              key={item.id}
-                              item={item}
-                              legUsage={getLegUsage(item)}
-                              onBoard={getOnBoard(item)}
-                              compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                              onIncrement={() => handleIncrement(item)}
-                              onDecrement={() => handleDecrement(item)}
-                              selected={selectedIndex === idx}
-                              starred={isFavorite(item.id)}
-                              onToggleStar={() => toggleFavorite(item.id)}
-                            />
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                  {filteredItems.length === 0 && (
-                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No items match your search.
-                    </div>
-                  )}
-                </Card>
-              )}
-
-              {/* ── Category view ── */}
-              {view === 'category' && (
-                <div className="space-y-4">
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {(['all', ...relevantCategories] as string[]).map(cat => (
+                <div className="space-y-3">
+                  <div className="flex gap-2 flex-wrap">
+                    {compartmentChips.map(chip => (
                       <button
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
+                        key={chip.id}
+                        onClick={() => setSelectedCompartment(chip.id)}
                         className={cn(
-                          'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
-                          selectedCategory === cat
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-muted text-muted-foreground hover:text-foreground'
+                          'flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium transition-colors border',
+                          chip.id === activeCompartmentId
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card text-muted-foreground border-border hover:text-foreground'
                         )}
                       >
-                        {cat === 'all'
-                          ? 'All'
-                          : SUPPLY_CATEGORIES.find(c => c.id === cat)?.label ?? cat}
+                        {chip.label}
+                        <span className={cn(
+                          'rounded-full px-1.5 text-[10px]',
+                          chip.id === activeCompartmentId ? 'bg-white/20' : 'bg-muted'
+                        )}>
+                          {chip.count}
+                        </span>
                       </button>
                     ))}
                   </div>
+
                   <Card className="bg-card border-border overflow-hidden">
-                    {favoriteItems.length > 0 && selectedCategory === 'all' && (
-                      <div>
-                        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-border">
+                    <LedgerHeader />
+                    {favoriteRows.length > 0 && (
+                      <>
+                        <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border-b border-border">
                           <Star size={12} className="fill-amber-400 text-amber-400" />
                           <span className="text-xs font-semibold uppercase tracking-wide text-amber-500">Pinned</span>
                         </div>
-                        {favoriteItems.map(item => {
-                          const idx = filteredItems.findIndex(i => i.id === item.id);
-                          return (
-                            <ItemRow
-                              key={`fav-${item.id}`}
-                              item={item}
-                              legUsage={getLegUsage(item)}
-                              onBoard={getOnBoard(item)}
-                              compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                              onIncrement={() => handleIncrement(item)}
-                              onDecrement={() => handleDecrement(item)}
-                              selected={selectedIndex === idx}
-                              starred
-                              onToggleStar={() => toggleFavorite(item.id)}
-                            />
-                          );
-                        })}
+                        {favoriteRows.map(row => (
+                          <LedgerRow
+                            key={`fav-${row.item.id}`}
+                            row={row}
+                            onIncrement={() => handleIncrement(row.item)}
+                            onDecrement={() => handleDecrement(row.item)}
+                            selected={selectedIndex === filteredItems.findIndex(i => i.id === row.item.id)}
+                            starred
+                            onToggleStar={() => toggleFavorite(row.item.id)}
+                          />
+                        ))}
+                      </>
+                    )}
+                    {activeCompartment?.sections.map(section => (
+                      <div key={section.key}>
+                        <LedgerSectionHeader
+                          label={section.label}
+                          note={`${section.rows.length} item${section.rows.length === 1 ? '' : 's'}`}
+                        />
+                        {section.rows.map(row => (
+                          <LedgerRow
+                            key={row.item.id}
+                            row={row}
+                            onIncrement={() => handleIncrement(row.item)}
+                            onDecrement={() => handleDecrement(row.item)}
+                            selected={selectedIndex === filteredItems.findIndex(i => i.id === row.item.id)}
+                            starred={isFavorite(row.item.id)}
+                            onToggleStar={() => toggleFavorite(row.item.id)}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                    {!activeCompartment && (
+                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No items match your search.
                       </div>
                     )}
-                    {filteredItems
-                      .filter(item => selectedCategory === 'all' || item.supplyCategory === selectedCategory)
-                      .map(item => {
-                        const idx = filteredItems.findIndex(i => i.id === item.id);
-                        return (
-                          <ItemRow
-                            key={item.id}
-                            item={item}
-                            legUsage={getLegUsage(item)}
-                            onBoard={getOnBoard(item)}
-                            compartmentLabel={getCompartmentLabel(state.compartmentConfigs, aircraftType, item.compartmentId)}
-                            onIncrement={() => handleIncrement(item)}
-                            onDecrement={() => handleDecrement(item)}
-                            selected={selectedIndex === idx}
-                            starred={isFavorite(item.id)}
-                            onToggleStar={() => toggleFavorite(item.id)}
+                  </Card>
+                </div>
+              )}
+
+              {/* ── Category lens (D86) — same ledger, grouped by supply type ── */}
+              {view === 'category' && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {[{ id: 'all', label: 'All', count: ledgerRows.length }, ...categoryChips].map(chip => (
+                      <button
+                        key={chip.id}
+                        onClick={() => setSelectedCategory(chip.id)}
+                        className={cn(
+                          'flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
+                          selectedCategory === chip.id
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card text-muted-foreground border-border hover:text-foreground'
+                        )}
+                      >
+                        {chip.label}
+                        <span className={cn(
+                          'rounded-full px-1.5 text-[10px]',
+                          selectedCategory === chip.id ? 'bg-white/20' : 'bg-muted'
+                        )}>
+                          {chip.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <Card className="bg-card border-border overflow-hidden">
+                    <LedgerHeader />
+                    {visibleCategoryGroups.map(group => (
+                      <div key={group.id}>
+                        <LedgerSectionHeader
+                          label={group.label}
+                          note={group.usedTotal > 0 ? `${group.usedTotal} used` : undefined}
+                        />
+                        {group.sections[0].rows.map(row => (
+                          <LedgerRow
+                            key={row.item.id}
+                            row={row}
+                            onIncrement={() => handleIncrement(row.item)}
+                            onDecrement={() => handleDecrement(row.item)}
+                            selected={selectedIndex === filteredItems.findIndex(i => i.id === row.item.id)}
+                            starred={isFavorite(row.item.id)}
+                            onToggleStar={() => toggleFavorite(row.item.id)}
                           />
-                        );
-                      })}
-                    {filteredItems.filter(item => selectedCategory === 'all' || item.supplyCategory === selectedCategory).length === 0 && (
+                        ))}
+                      </div>
+                    ))}
+                    {visibleCategoryGroups.length === 0 && (
                       <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                         No items match your search.
                       </div>
