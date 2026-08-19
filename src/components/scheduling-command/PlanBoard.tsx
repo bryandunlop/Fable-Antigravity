@@ -9,6 +9,7 @@ import { fleetRowsFor } from './fleet';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
 import { TripIdentityLine } from './TripIdentity';
 import { buildWindow, dayColumns, barGeometry, packLanes, type ZoomPreset } from './planBoardMath';
+import { nextDuePerTail, beyondWindowWeeks } from './boardBridges';
 
 const DAY_MS = 86400000;
 const BAR_H = 30;
@@ -29,12 +30,15 @@ export function PlanBoard({
   nowMs,
   serviceability,
   onTripClick,
+  onOpenHorizon,
 }: {
   trips: BoardTrip[];
   nowMs: number;
   /** tail → tech-log derived GREEN/AMBER/RED; tails without a tech-log record get a hollow dot. */
   serviceability?: FleetServiceability;
   onTripClick: (trip: BoardTrip) => void;
+  /** Optional lens switch — the shelf's "full forward picture" link (D87). */
+  onOpenHorizon?: () => void;
 }) {
   const [zoom, setZoom] = useState<ZoomPreset>('month');
   const [page, setPage] = useState(0);
@@ -57,6 +61,12 @@ export function PlanBoard({
   }), [trips, window_]);
 
   const conflictCount = rows.reduce((n, r) => n + r.lanes.conflictIds.size, 0);
+
+  // The board's bridges to "what's coming" (D87): a per-tail next-due chip and, below the grid,
+  // per-week summaries of trips departing beyond the visible window.
+  const nextDue = useMemo(() => nextDuePerTail(trips, nowMs), [trips, nowMs]);
+  const windowEndMs = window_.start.getTime() + window_.days * DAY_MS;
+  const beyond = useMemo(() => beyondWindowWeeks(trips, windowEndMs, nowMs), [trips, windowEndMs, nowMs]);
 
   // Today marker position (fractional, so it sits at the current hour within the day column).
   const todayPct = ((nowMs - window_.start.getTime()) / (window_.days * DAY_MS)) * 100;
@@ -94,7 +104,7 @@ export function PlanBoard({
       </div>
 
       <div className="overflow-x-auto">
-        <div style={{ minWidth: boardW + 176 }}>
+        <div style={{ minWidth: boardW + 176 + 176 }}>
           {/* Day header */}
           <div className="flex sticky top-0 z-20 bg-card border-b">
             <div className="w-44 shrink-0 sticky left-0 z-30 bg-card border-r px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-end">Aircraft</div>
@@ -113,6 +123,7 @@ export function PlanBoard({
                 ))}
               </div>
             </div>
+            <div className="w-44 shrink-0 sticky right-0 z-30 bg-card border-l px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-end">Next due</div>
           </div>
 
           {/* Tail rows */}
@@ -200,11 +211,67 @@ export function PlanBoard({
                     );
                   })}
                 </div>
+                <div className="w-44 shrink-0 sticky right-0 z-10 bg-card border-l px-3 flex items-center" style={{ height: rowH }}>
+                  {(() => {
+                    const chip = nextDue.get(ac.tail);
+                    if (!chip) return <span className="text-[11px] text-muted-foreground/60">—</span>;
+                    const chipTrip = trips.find(t => t.id === chip.tripId);
+                    const alarming = chip.severity !== 'upcoming';
+                    return (
+                      <button
+                        onClick={() => chipTrip && onTripClick(chipTrip)}
+                        title={chip.label}
+                        className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-muted/60 ${
+                          alarming
+                            ? 'border-[var(--gfo-error,#EF3340)]/60 text-[var(--gfo-error,#EF3340)]'
+                            : 'border-border text-foreground'
+                        }`}
+                      >
+                        <span className="truncate">{chip.label}</span>
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Beyond this window — the board's forward picture, one line per week (D87) */}
+      {beyond.weeks.length > 0 && (
+        <div className="px-5 py-3 border-t space-y-2">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Beyond this window</span>
+            <span className="text-xs text-muted-foreground">
+              {beyond.weeks.reduce((n, w) => n + w.tripCount, 0) + beyond.overflowCount} trips · next action per week
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+            {beyond.weeks.map(w => (
+              <div key={w.startMs} className="border rounded-md px-3 py-2.5">
+                <div className="text-[11px] font-semibold text-foreground">
+                  {new Date(w.startMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {' – '}
+                  {new Date(w.endMs - 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  <span className="text-muted-foreground font-medium"> · {w.tripCount} trip{w.tripCount === 1 ? '' : 's'}</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {w.soonest
+                    ? <>Soonest: {w.soonest.title} · {w.soonest.tripNumber} {w.soonest.route} · {w.soonest.dueLabel}</>
+                    : 'Nothing due yet'}
+                  {w.untouchedCount > 0 ? ` · ${w.untouchedCount} untouched` : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+          {onOpenHorizon && (
+            <button onClick={onOpenHorizon} className="text-xs font-medium text-[var(--gfo-info,#2F80ED)] hover:underline">
+              Open the Horizon for the full forward picture →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Legend */}
       <div className="px-5 py-2.5 border-t bg-muted/30 flex flex-wrap gap-x-4 gap-y-1">

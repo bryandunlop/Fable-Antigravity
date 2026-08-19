@@ -93,6 +93,7 @@ import { PassengerProvider } from './components/passengers/PassengerContext';
 import FlightAttendantFlights from './components/inflight/FlightAttendantFlights';
 import ItineraryBuilderV2 from './components/ItineraryBuilderV2';
 import SchedulingCommandCenter from './components/scheduling-command/SchedulingCommandCenter';
+import SchedulingWall from './components/scheduling-command/SchedulingWall';
 import PassengerCurrencyDashboard from './components/passenger-currency/PassengerCurrencyDashboard';
 
 import ForeFlightSyncProvider from './components/ForeFlightSyncProvider';
@@ -244,12 +245,22 @@ export default function App() {
 
                     {/* D88 hangar TV walls — read-only displays, full-bleed without the sidebar
                         chrome, same placement rationale as ramp mode above. Sibling of D87's
-                        /scheduling-wall; a shared /wall family lives in components/wall/. */}
+                        /scheduling-wall below; a shared /wall family lives in components/wall/. */}
                     <Route path="/wall/ops" element={
                       !isAuthenticated ? <Navigate to="/login" replace /> : <OpsWall />
                     } />
                     <Route path="/wall/maintenance" element={
                       !isAuthenticated ? <Navigate to="/login" replace /> : <MaintenanceWall />
+                    } />
+
+                    {/* D87 scheduling wall — read-only TV mode for the ops area. Out here with
+                        ramp mode so it renders full-bleed without the sidebar chrome. */}
+                    <Route path="/scheduling-wall" element={
+                      !isAuthenticated ? <Navigate to="/login" replace /> : (
+                        <SchedulingWorkspaceProvider>
+                          <SchedulingWall />
+                        </SchedulingWorkspaceProvider>
+                      )
                     } />
 
                     {/* Login Route — lands each role at its workspace front door */}
