@@ -132,129 +132,6 @@ function NextLegDialog({
   );
 }
 
-// ─── Trip Complete Dialog ───────────────────────────────────────────────────
-
-function TripCompleteDialog({
-  open,
-  onClose,
-  trip,
-  belowPar,
-  onStartReplenish,
-  onStartInspection,
-}: {
-  open: boolean;
-  onClose: () => void;
-  trip: Trip;
-  belowPar: BelowParRow[];
-  onStartReplenish: () => void;
-  onStartInspection: () => void;
-}) {
-  const totalUsed = trip.legs.reduce(
-    (sum, l) => sum + l.usageLog.reduce((s, e) => s + e.qtyUsed, 0), 0
-  );
-
-  return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-            Trip Complete — What's Next?
-          </DialogTitle>
-          <DialogDescription>Choose what happens to the remaining stock now the trip has closed.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 py-2">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-muted-foreground text-xs">Aircraft</p>
-              <p className="font-mono font-bold">{trip.tailNumber}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Legs Flown</p>
-              <p className="font-bold">{trip.legs.length}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Total Items Used</p>
-              <p className="font-bold">{totalUsed}</p>
-            </div>
-            {trip.tripName && (
-              <div>
-                <p className="text-muted-foreground text-xs">Trip</p>
-                <p className="font-medium truncate">{trip.tripName}</p>
-              </div>
-            )}
-          </div>
-
-          {/* The ledger, filtered — the argument for which button to press (D86).
-              The old dialog offered Inspection and Restock as bare choices and
-              let the crew guess which the aircraft needed. */}
-          {belowPar.length > 0 ? (
-            <div className="rounded-md border border-border overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 bg-muted/60 border-b border-border">
-                <span className="text-xs font-semibold uppercase tracking-wide text-primary">
-                  Below par on arrival
-                </span>
-                <span className="text-xs text-muted-foreground">{belowPar.length} lines</span>
-              </div>
-              <div className="max-h-40 overflow-y-auto">
-                {belowPar.slice(0, 8).map(row => (
-                  <div
-                    key={row.item.id}
-                    className="flex items-center gap-3 px-3 py-1.5 border-b border-border/60 last:border-0"
-                  >
-                    <span className="flex-1 min-w-0 text-sm truncate">{row.item.itemName}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {row.onBoard}/{row.par}
-                    </span>
-                    <span
-                      className={cn(
-                        'w-16 text-right text-xs font-semibold tabular-nums',
-                        row.onBoard <= 0 ? 'text-destructive' : 'text-amber-600 dark:text-amber-400',
-                      )}
-                    >
-                      short {row.short}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {belowPar.length > 8 && (
-                <p className="px-3 py-1.5 text-xs text-muted-foreground bg-muted/40 border-t border-border">
-                  and {belowPar.length - 8} more
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Everything came back at or above par — nothing to restock.
-            </p>
-          )}
-        </div>
-        <DialogFooter className="flex-col gap-2">
-          {belowPar.length > 0 ? (
-            <Button onClick={onStartReplenish} className="w-full">
-              <Package className="mr-2 h-4 w-4" />
-              Restock {belowPar.length} line{belowPar.length === 1 ? '' : 's'}
-            </Button>
-          ) : (
-            <Button onClick={onStartReplenish} variant="outline" className="w-full">
-              <Package className="mr-2 h-4 w-4" />
-              Restock Aircraft
-            </Button>
-          )}
-          <Button onClick={onStartInspection} variant="outline" className="w-full">
-            <ClipboardCheck className="mr-2 h-4 w-4" />
-            Start Inspection
-            <span className="ml-1 text-xs text-muted-foreground">full count</span>
-          </Button>
-          <Button variant="ghost" onClick={onClose} className="w-full text-muted-foreground">
-            Done
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ─── Confirm Complete Dialog ─────────────────────────────────────────────────
 
 function ConfirmCompleteDialog({
@@ -356,7 +233,6 @@ function TripViewInner({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedCompartment, setSelectedCompartment] = useState<string | null>(null);
   const [showNextLeg, setShowNextLeg] = useState(false);
-  const [showTripComplete, setShowTripComplete] = useState(false);
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showManageQuickAdd, setShowManageQuickAdd] = useState(false);
@@ -599,17 +475,71 @@ function TripViewInner({
         >
           <ChevronLeft size={16} /> Fleet
         </button>
-        <div className="text-center py-12 space-y-4">
+        <div className="text-center py-8 space-y-3">
           <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
           <h1 className="text-2xl font-bold">Trip Complete</h1>
           <p className="text-muted-foreground">
             {trip.tailNumber} · {trip.legs.length} legs · {trip.tripName || 'Unnamed Trip'}
           </p>
+        </div>
+
+        {/* What the aircraft is short — the argument for what to do next (D86).
+            This screen used to offer one green Restock button and no reason to
+            press it. */}
+        {belowPar.length > 0 ? (
+          <Card className="max-w-xl mx-auto overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 bg-muted/60 border-b border-border">
+              <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+                Below par on arrival
+              </span>
+              <span className="text-xs text-muted-foreground">{belowPar.length} lines</span>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {belowPar.map(row => (
+                <div
+                  key={row.item.id}
+                  className="flex items-center gap-3 px-4 py-2 border-b border-border/60 last:border-0"
+                >
+                  <span className="flex-1 min-w-0 text-sm truncate text-left">{row.item.itemName}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {row.onBoard}/{row.par}
+                  </span>
+                  <span
+                    className={cn(
+                      'w-20 text-right text-xs font-semibold tabular-nums',
+                      row.onBoard <= 0 ? 'text-destructive' : 'text-amber-600 dark:text-amber-400',
+                    )}
+                  >
+                    short {row.short}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : (
+          <p className="text-center text-sm text-muted-foreground">
+            Everything came back at or above par — nothing to restock.
+          </p>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-xl mx-auto">
           <Button
             onClick={() => navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`)}
-            className="bg-emerald-600 hover:bg-emerald-500"
+            className={cn('flex-1', belowPar.length === 0 && 'sm:flex-none')}
+            variant={belowPar.length > 0 ? 'default' : 'outline'}
           >
-            Restock Aircraft
+            <Package className="mr-2 h-4 w-4" />
+            {belowPar.length > 0
+              ? `Restock ${belowPar.length} line${belowPar.length === 1 ? '' : 's'}`
+              : 'Restock Aircraft'}
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => navigate(`/inventory-v2/inspection?tail=${trip.tailNumber}`)}
+          >
+            <ClipboardCheck className="mr-2 h-4 w-4" />
+            Start Inspection
           </Button>
         </div>
       </div>
@@ -778,23 +708,13 @@ function TripViewInner({
         label: 'Undo',
         onClick: () => {
           dispatch({ type: 'REOPEN_TRIP', payload: tripId });
-          setShowTripComplete(false);
         },
       },
     });
 
-    setShowTripComplete(true);
   }
 
-  function handleStartReplenish() {
-    setShowTripComplete(false);
-    navigate(`/inventory-v2/replenish?tail=${trip.tailNumber}`);
-  }
 
-  function handleStartInspection() {
-    setShowTripComplete(false);
-    navigate(`/inventory-v2/inspection?tail=${trip.tailNumber}`);
-  }
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -1324,17 +1244,6 @@ function TripViewInner({
         trip={trip}
       />
 
-      <TripCompleteDialog
-        belowPar={belowPar}
-        open={showTripComplete}
-        onClose={() => {
-          setShowTripComplete(false);
-          navigate('/inventory-v2/trips');
-        }}
-        trip={trip}
-        onStartReplenish={handleStartReplenish}
-        onStartInspection={handleStartInspection}
-      />
 
       <ManageQuickAddDialog
         open={showManageQuickAdd}
