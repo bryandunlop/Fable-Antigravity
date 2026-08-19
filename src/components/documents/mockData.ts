@@ -14,15 +14,9 @@ import {
 } from './store/demoSeedBlob';
 import { stepFormToSections, type StepFormModel } from './engine/stepForm';
 import { applyComplianceRefs } from './engine/regCatalog';
-import { operatorTodayIso } from '../../lib/operatorDate';
+import { daysFromNow } from '../../lib/demoDates';
 
-function daysFromNow(n: number): string {
-  // Anchor seed dates to the operator calendar day (D24) so they agree with
-  // the app's effective/overdue comparisons near UTC midnight.
-  const d = new Date(`${operatorTodayIso()}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
+
 
 const SOP1_R1_CONTENT = `# Stabilized Approach Criteria
 
