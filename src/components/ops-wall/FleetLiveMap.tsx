@@ -20,6 +20,8 @@ interface FleetLiveMapProps {
   fleet: UnifiedFleetAircraft[];
   homeBase?: string;
   className?: string;
+  /** 'dark' pins the basemap dark regardless of app theme — for the fixed-palette TV walls (D88). */
+  theme?: 'auto' | 'dark';
 }
 
 interface Plotted {
@@ -100,7 +102,8 @@ function markerHtml(p: Plotted): string {
  * -> airport fallback) on a real basemap, draws in-flight legs, and fits the view
  * to wherever the aircraft actually are — so it scales itself as the fleet moves.
  */
-export default function FleetLiveMap({ fleet, homeBase = HOME_STATION, className = '' }: FleetLiveMapProps) {
+export default function FleetLiveMap({ fleet, homeBase = HOME_STATION, className = '', theme = 'auto' }: FleetLiveMapProps) {
+  const dark = () => theme === 'dark' || isDark();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
@@ -121,7 +124,7 @@ export default function FleetLiveMap({ fleet, homeBase = HOME_STATION, className
       fadeAnimation: false,
     }).setView([39.1, -84.4], 5);
 
-    const tile = L.tileLayer(isDark() ? TILES.dark : TILES.light, {
+    const tile = L.tileLayer(dark() ? TILES.dark : TILES.light, {
       attribution: TILE_ATTRIBUTION,
       maxZoom: 12,
     }).addTo(map);
@@ -135,7 +138,7 @@ export default function FleetLiveMap({ fleet, homeBase = HOME_STATION, className
     // Swap the basemap when the app theme flips.
     const observer = new MutationObserver(() => {
       if (!mapRef.current || !tileRef.current) return;
-      tileRef.current.setUrl(isDark() ? TILES.dark : TILES.light);
+      tileRef.current.setUrl(dark() ? TILES.dark : TILES.light);
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
