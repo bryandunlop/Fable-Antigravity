@@ -6,6 +6,8 @@
 import { useMemo, useState } from 'react';
 import { ClipboardCheck, CalendarClock, ChevronRight } from 'lucide-react';
 import InternalAuditManagement from '../InternalAuditManagement';
+import FRATReview from '../FRATReview';
+import GRATReview from '../GRATReview';
 import AuditDetailDrawer from '../audit/AuditDetailDrawer';
 import { useAudits, type Audit } from '../../contexts/AuditContext';
 
@@ -22,11 +24,32 @@ export function auditsForMe(all: Audit[]): Audit[] {
   return all.filter((a) => a.assignedTo && a.assignedTo !== 'Unassigned');
 }
 
-/** Operations → Audits: the full existing module, mounted as-is. */
+/** Assure (D85 · C7) — everything the safety manager does to check that the
+ *  system is working: the audit programme, and the FRAT/GRAT assessment
+ *  reviews.
+ *
+ *  Those two reviews used to sit under "Reviews" beside the waiver approvals,
+ *  which put two different jobs behind one label: approving a request is a
+ *  DECISION, reviewing a risk assessment is ASSURANCE. Splitting them is the
+ *  whole reason the console navigates by verb. */
 export function OperationsAudits() {
+  const [sub, setSub] = useState<'audits' | 'frat' | 'grat'>('audits');
+  const TABS: [typeof sub, string][] = [['audits', 'Audit programme'], ['frat', 'FRAT reviews'], ['grat', 'GRAT reviews']];
   return (
-    <div className="mt-2 -mx-6">
-      <InternalAuditManagement />
+    <div className="mt-3">
+      <div className="flex gap-2 flex-wrap mb-1">
+        {TABS.map(([key, label]) => (
+          <button key={key} onClick={() => setSub(key)}
+            className={`text-[14px] font-semibold px-4 py-2 min-h-[40px] rounded-full border transition-colors ${sub === key ? 'bg-secondary text-secondary-foreground border-secondary' : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/40'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="-mx-6 mt-1">
+        {sub === 'audits' && <InternalAuditManagement />}
+        {sub === 'frat' && <FRATReview />}
+        {sub === 'grat' && <GRATReview />}
+      </div>
     </div>
   );
 }

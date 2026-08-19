@@ -1,21 +1,28 @@
 import { useMemo, useState } from 'react';
-import { Check, X, MessageSquarePlus, Clock, ChevronRight, ChevronDown, ShieldCheck } from 'lucide-react';
+import { Check, X, Clock, ChevronRight, ChevronDown, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
-  useApprovalRequests, pendingForRoles, requestedByName, currentApproverRole, roleLabel,
+  useApprovalRequests, pendingForRoles, requestedByName, currentStep, roleLabel,
   type ApprovalRequest,
 } from '../safety-center/approvalRequests';
+import { ChainStrip } from '../safety-center/ChainStrip';
 import { resolveUserId } from '../../notifications/identity';
+import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { decideAndNotify } from './decide';
 import { timeAgo } from './format';
 
-const CURRENT_USER = { name: 'Capt. Dunlop' };
-
 interface Props { userRole: string; additionalRoles?: string[] }
 
-// Per-approver inbox (D39): each role sees the requests currently waiting on it,
-// plus the requests it filed. Approvals are actioned here, in the approver's own
-// workspace — not inside the safety console.
+// Per-approver inbox (D39). For a waiver this is the LINE MANAGER's screen — the
+// end of the chain, where the decision is actually made (D85). Two things follow
+// from that and shape the layout:
+//
+//  - It is read on a phone. A line manager approving a duty extension is not at
+//    a desk, so the primary action is full-width and thumb-height, and the
+//    chain and the recommendation are readable without expanding anything.
+//  - A denial ENDS the request. The requester gets nothing back but "declined"
+//    unless a reason travels with it, so a reason is required to deny.
+//    Approving stays one tap.
 export default function ApprovalsInbox({ userRole, additionalRoles = [] }: Props) {
   const roles = useMemo(() => [userRole, ...additionalRoles], [userRole, additionalRoles]);
   const { requests } = useApprovalRequests();
@@ -23,28 +30,33 @@ export default function ApprovalsInbox({ userRole, additionalRoles = [] }: Props
   // D85 — a step addressed to an individual leaves everyone else's inbox, so the
   // inbox is filtered by WHO is looking, not only by their roles.
   const viewerUserId = resolveUserId(userRole);
+  // The demo has no auth; resolve the acting persona's real name so "Requested
+  // by you" means the person on screen rather than a hardcoded pilot.
+  const viewerName = SYSTEM_USERS.find((u) => u.id === viewerUserId)?.name ?? 'You';
+
   const awaiting = pendingForRoles(requests, roles, viewerUserId);
-  const mine = requestedByName(requests, CURRENT_USER.name);
+  const mine = requestedByName(requests, viewerName);
 
   function decide(req: ApprovalRequest, decision: 'approve' | 'deny', comment?: string) {
-    // Shared decision path (D40): the Safety-Center waiver console actions
-    // through this same helper, so both surfaces walk the chain and notify
-    // identically.
+    // Shared decision path (D40): the Safety-Center Decide surface actions
+    // through this same helper, so both walk the chain and notify identically.
     decideAndNotify(req, decision, userRole, comment);
   }
 
   return (
-    <div className="max-w-[900px] mx-auto px-6 py-6">
+    <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-5 sm:py-6">
       <div className="flex items-center gap-2.5 mb-1">
         <ShieldCheck className="w-6 h-6 text-accent" />
         <h1 className="text-[22px] font-semibold tracking-tight m-0">Approvals</h1>
       </div>
-      <div className="text-[13.5px] text-muted-foreground mb-5">Requests waiting on you, and the ones you’ve filed. You’re acting as {roleLabel(userRole)}.</div>
+      <div className="text-[13.5px] text-muted-foreground mb-5">
+        Requests waiting on you, and the ones you’ve filed. You’re acting as {roleLabel(userRole)}.
+      </div>
 
       <SectionHeading>Awaiting your approval{awaiting.length > 0 ? ` · ${awaiting.length}` : ''}</SectionHeading>
       {awaiting.length === 0
         ? <Empty>Nothing needs your sign-off right now.</Empty>
-        : <div className="flex flex-col gap-3">{awaiting.map((r) => <AwaitingCard key={r.id} req={r} actingRole={userRole} onDecide={decide} />)}</div>}
+        : <div className="flex flex-col gap-3">{awaiting.map((r) => <AwaitingCard key={r.id} req={r} onDecide={decide} />)}</div>}
 
       <SectionHeading className="mt-8">Requested by you</SectionHeading>
       {mine.length === 0
@@ -54,85 +66,105 @@ export default function ApprovalsInbox({ userRole, additionalRoles = [] }: Props
   );
 }
 
-function AwaitingCard({ req, actingRole, onDecide }: { req: ApprovalRequest; actingRole: string; onDecide: (r: ApprovalRequest, d: 'approve' | 'deny', c?: string) => void }) {
+function AwaitingCard({ req, onDecide }: {
+  req: ApprovalRequest; onDecide: (r: ApprovalRequest, d: 'approve' | 'deny', c?: string) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [commenting, setCommenting] = useState(false);
-  const [comment, setComment] = useState('');
-  const stepNo = req.currentStep + 1;
+  const [note, setNote] = useState('');
+  const canDeny = note.trim().length > 0;
+
+  // What earlier steps said, with attribution — the "Safety says" the final
+  // approver is meant to read BEFORE deciding, so it is not behind a disclosure
+  // triangle.
+  const priorNotes = req.chain
+    .slice(0, req.currentStep)
+    .map((s, i) => ({ ...s, i }))
+    .filter((s) => s.status === 'approved' && s.comment);
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[15px] font-medium text-foreground">{req.subjectTitle}</div>
-          <div className="text-[12.5px] text-muted-foreground mt-0.5">{req.formLabel} · requested by {req.requestedByName} · {timeAgo(req.requestedAt)}</div>
+    <div className="bg-card border border-border rounded-lg overflow-hidden">
+      <div className="p-4 pb-3">
+        <div className="text-[16px] font-medium leading-snug">{req.subjectTitle}</div>
+        <div className="text-[12.5px] text-muted-foreground mt-1">
+          {req.formLabel} · {req.requestedByName} · {timeAgo(req.requestedAt)}
         </div>
-        <span className="text-[11px] bg-accent/10 text-accent px-2 py-1 rounded-md whitespace-nowrap shrink-0">Step {stepNo} of {req.chain.length}</span>
       </div>
 
-      {/* prior approvals in the chain */}
-      {req.chain.slice(0, req.currentStep).filter((s) => s.status === 'approved').map((s, i) => (
-        <div key={i} className="text-[12.5px] text-[color:var(--gfo-success)] mt-2 flex items-start gap-1.5">
-          <Check className="w-4 h-4 mt-px shrink-0" />
-          <span>{roleLabel(s.role)} approved{s.comment ? ` — “${s.comment}”` : ''}</span>
+      <div className="px-4 py-3 bg-muted/40 border-y border-border overflow-x-auto">
+        <ChainStrip req={req} />
+      </div>
+
+      {priorNotes.map((s) => (
+        <div key={s.i} className="px-4 pt-3">
+          <div className="gfo-eyebrow opacity-70">{roleLabel(s.role)} says</div>
+          <div className="text-[13.5px] leading-relaxed mt-1">{s.comment}</div>
+          <div className="text-[11.5px] text-muted-foreground mt-1">
+            {s.decidedByName}{s.decidedAt ? ` · ${new Date(s.decidedAt).toLocaleDateString()}` : ''}
+          </div>
         </div>
       ))}
 
-      <button onClick={() => setOpen((v) => !v)} className="mt-2.5 flex items-center gap-1 text-[13px] font-medium text-accent hover:underline">
-        {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />} {open ? 'Hide' : 'View'} request details
-      </button>
-      {open && (
-        <div className="mt-2 border border-border rounded-md divide-y divide-border">
-          {Object.entries(req.values).filter(([, v]) => (v || '').trim()).map(([id, v]) => (
-            <div key={id} className="px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">{req.fieldLabels[id] || id}</div>
-              <div className="text-[13.5px] text-foreground mt-0.5 whitespace-pre-wrap">{v}</div>
-            </div>
-          ))}
-          <div className="px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Approval chain</div>
-            <div className="text-[13px] text-foreground mt-0.5">{req.chain.map((s) => roleLabel(s.role)).join('  →  ')}</div>
+      <div className="px-4 pt-3">
+        <button onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1 text-[13px] font-medium text-accent hover:underline min-h-[36px]">
+          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          {open ? 'Hide' : 'View'} what they asked for
+        </button>
+        {open && (
+          <div className="mt-1 mb-1 border border-border rounded-lg divide-y divide-border">
+            {Object.entries(req.values).filter(([, v]) => (v || '').trim()).map(([id, v]) => (
+              <div key={id} className="px-3 py-2.5">
+                <div className="gfo-eyebrow opacity-70">{req.fieldLabels[id] || id}</div>
+                <div className="text-[13.5px] text-foreground mt-1 whitespace-pre-wrap">{v}</div>
+              </div>
+            ))}
           </div>
-        </div>
-      )}
-
-      {commenting && (
-        <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} autoFocus
-          placeholder="Add a note for the requester and next approver…"
-          className="w-full mt-3 bg-background border border-border rounded-md px-3 py-2 text-[13.5px] outline-none focus:border-accent" />
-      )}
-
-      <div className="flex flex-wrap gap-2 mt-3">
-        <Button onClick={() => onDecide(req, 'approve', commenting ? comment : undefined)} className="h-10 gap-1.5">
-          <Check className="w-4 h-4" /> Approve{commenting && comment.trim() ? ' with note' : ''}
-        </Button>
-        {!commenting && (
-          <Button variant="outline" onClick={() => setCommenting(true)} className="h-10 gap-1.5">
-            <MessageSquarePlus className="w-4 h-4" /> Add a comment
-          </Button>
         )}
-        <Button variant="outline" onClick={() => onDecide(req, 'deny', commenting ? comment : undefined)}
-          className="h-10 gap-1.5 text-[color:var(--gfo-error)] border-[color:var(--gfo-error)]/40 hover:bg-[color:var(--gfo-error)]/5">
-          <X className="w-4 h-4" /> Deny
+      </div>
+
+      <div className="p-4 pt-3 flex flex-col gap-2.5">
+        <label className="gfo-eyebrow opacity-70" htmlFor={`note-${req.id}`}>
+          Your note — required to decline
+        </label>
+        <textarea id={`note-${req.id}`} rows={2} value={note} onChange={(e) => setNote(e.target.value)}
+          placeholder="Anything the requester should know…"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-[14px] leading-relaxed outline-none focus:ring-2 focus:ring-accent resize-y" />
+
+        {/* Phone-first: the primary action is full-width and thumb-height. */}
+        <Button onClick={() => onDecide(req, 'approve', note.trim() || undefined)}
+          className="w-full h-12 text-[15px] font-semibold gap-2">
+          <Check className="w-[18px] h-[18px]" /> Approve
         </Button>
+        <button
+          onClick={() => canDeny && onDecide(req, 'deny', note.trim())}
+          disabled={!canDeny}
+          className="w-full h-11 rounded-md border text-[14px] font-medium flex items-center justify-center gap-2 transition-colors border-[color:var(--gfo-error-ink)] text-[color:var(--gfo-error-ink)] enabled:hover:bg-[color:var(--gfo-error)]/10 disabled:opacity-40 disabled:cursor-not-allowed">
+          <X className="w-4 h-4" /> Decline
+        </button>
+        {!canDeny && (
+          <div className="text-[11.5px] text-muted-foreground text-center -mt-1">
+            A decline needs a reason — the requester sees only what you write here.
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function MineRow({ req }: { req: ApprovalRequest }) {
+  const step = currentStep(req);
   const label =
-    req.status === 'approved' ? { text: 'Approved', tone: 'text-[color:var(--gfo-success)]', icon: <Check className="w-4 h-4" /> }
-      : req.status === 'denied' ? { text: 'Denied', tone: 'text-[color:var(--gfo-error)]', icon: <X className="w-4 h-4" /> }
-        : { text: `With ${roleLabel(currentApproverRole(req) || '')}`, tone: 'text-[color:var(--gfo-warning)]', icon: <Clock className="w-4 h-4" /> };
-  // The outcome you most want to see on your own request is the deciding
-  // approver's note — surface the last actioned step's comment (esp. a denial).
+    req.status === 'approved' ? { text: 'Approved', tone: 'text-[color:var(--gfo-success-ink)]', icon: <Check className="w-4 h-4" /> }
+      : req.status === 'denied' ? { text: 'Declined', tone: 'text-[color:var(--gfo-error-ink)]', icon: <X className="w-4 h-4" /> }
+        // Name the PERSON when the step is addressed to one — "With Lead Team"
+        // misdescribes who can act once only one of them can see it (D85).
+        : { text: `With ${step?.assigneeName ?? roleLabel(step?.role ?? '')}`, tone: 'text-[color:var(--gfo-warning-ink)]', icon: <Clock className="w-4 h-4" /> };
   const lastDecided = [...req.chain].reverse().find((s) => s.status !== 'pending');
   return (
     <div className="bg-card border border-border rounded-lg px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <div className="text-[14px] text-foreground truncate">{req.subjectTitle}</div>
+          <div className="text-[14px] text-foreground">{req.subjectTitle}</div>
           <div className="text-[12px] text-muted-foreground mt-0.5">{req.formLabel} · filed {timeAgo(req.requestedAt)}</div>
         </div>
         <span className={`text-[12.5px] font-medium flex items-center gap-1.5 whitespace-nowrap ${label.tone}`}>{label.icon}{label.text}</span>

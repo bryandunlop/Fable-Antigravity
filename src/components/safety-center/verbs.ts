@@ -3,10 +3,15 @@
 // The old console navigated by container — Inbox · Track · Reviews · Audits ·
 // Manage. This navigates by the job the safety manager is actually doing, and
 // each verb declares the SHAPE that job deserves: triage is spatial, so it gets
-// a board; a decision is one thing at a time, so it gets a queue. C3 wires the
-// navigation only — every verb still mounts the surface its old tab mounted, so
-// the rail can be judged before any shape work is paid for. C4 makes
-// `defaultShape` real.
+// a board; a decision is one thing at a time, so it gets a queue.
+//
+// The verbs are not a rename of the old tabs. Two of them cut across the old
+// containers on purpose:
+//   · Triage carries hazards AND ASAP reports. Both are reports; ASAP used to be
+//     reachable only from a sub-tab, so a manager had to remember to look.
+//   · Assure carries the audit programme AND the FRAT/GRAT reviews. Approving a
+//     request is a decision; reviewing a risk assessment is assurance. The old
+//     "Reviews" tab held both, which is the confusion this rework exists to end.
 
 import { Inbox, CircleCheck, Search, Wrench, ClipboardCheck, Megaphone, Archive } from 'lucide-react';
 import type { SafetyItem } from './types';
@@ -34,13 +39,13 @@ export interface VerbDef {
 export const VERBS: VerbDef[] = [
   { id: 'triage', label: 'Triage', group: 'daily', icon: Inbox,
     defaultShape: 'board', shapes: ['board', 'queue'],
-    blurb: 'Reports nobody has picked up yet' },
+    blurb: 'Hazards and ASAP reports nobody has picked up yet' },
   // Decide keeps a single shape until C5 replaces ReviewsArea with the real
   // review surface. Offering a Board toggle over four stacked consoles would be
   // a control with nothing behind it.
   { id: 'decide', label: 'Decide', group: 'daily', icon: CircleCheck,
     defaultShape: 'queue', shapes: ['queue'],
-    blurb: 'Requests waiting on your review' },
+    blurb: 'Waivers and approvals waiting on your review' },
   { id: 'investigate', label: 'Investigate', group: 'daily', icon: Search,
     defaultShape: 'board', shapes: ['board', 'queue'],
     blurb: 'Open cases being worked' },
@@ -49,7 +54,7 @@ export const VERBS: VerbDef[] = [
     blurb: 'Corrective actions in flight' },
   { id: 'assure', label: 'Assure', group: 'periodic', icon: ClipboardCheck,
     defaultShape: 'calendar', shapes: ['calendar'],
-    blurb: 'Audits and their findings' },
+    blurb: 'The audit programme, and FRAT / GRAT reviews' },
   { id: 'publish', label: 'Publish', group: 'periodic', icon: Megaphone,
     defaultShape: 'list', shapes: ['list'],
     blurb: 'Lessons, newsletters and recognitions' },

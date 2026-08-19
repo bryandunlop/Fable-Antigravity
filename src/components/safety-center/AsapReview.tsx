@@ -8,19 +8,42 @@ import { useAsapReports, type AsapReport, type AsapStatus } from './asapReports'
 const TONE: Record<AsapStatus, string> = { 'Open': 'sc-amber', 'Under review': 'sc-accent', 'Resolved': 'sc-green' };
 const FILTERS: (AsapStatus | 'All')[] = ['All', 'Open', 'Under review', 'Resolved'];
 
-export function AsapReview() {
+interface Props {
+  /** Controlled mode: the id whose sheet should be open. Used by the Triage and
+   *  Investigate boards, so an ASAP card opens THIS sheet — with its
+   *  confidentiality banner and de-identification step — rather than the generic
+   *  detail sheet, which has neither. */
+  selectedId?: string | null;
+  onSelectedIdChange?: (id: string | null) => void;
+  /** Render only the sheet. The board is already the list. */
+  hideList?: boolean;
+}
+
+export function AsapReview({ selectedId, onSelectedIdChange, hideList }: Props = {}) {
   const { reports, updateAsap } = useAsapReports();
   const [filter, setFilter] = useState<AsapStatus | 'All'>('All');
-  const [sel, setSel] = useState<AsapReport | null>(null);
+  const [ownSel, setOwnSel] = useState<AsapReport | null>(null);
   const [feedback, setFeedback] = useState('');
 
+  const controlled = selectedId !== undefined;
   const shown = filter === 'All' ? reports : reports.filter((r) => r.status === filter);
-  const current = sel ? reports.find((r) => r.id === sel.id) ?? sel : null;
+  const current = controlled
+    ? (selectedId ? reports.find((r) => r.id === selectedId) ?? null : null)
+    : (ownSel ? reports.find((r) => r.id === ownSel.id) ?? ownSel : null);
 
-  function openReport(r: AsapReport) { setSel(r); setFeedback(r.feedback ?? ''); }
+  function close() {
+    if (controlled) onSelectedIdChange?.(null);
+    else setOwnSel(null);
+  }
+  function openReport(r: AsapReport) {
+    setFeedback(r.feedback ?? '');
+    if (controlled) onSelectedIdChange?.(r.id);
+    else setOwnSel(r);
+  }
 
   return (
-    <div className="mt-4">
+    <div className={hideList ? '' : 'mt-4'}>
+      {!hideList && <>
       <div className="rounded-md px-3 py-2.5 text-[12.5px] leading-snug sc-accent mb-3 flex items-center gap-2">
         <Lock className="w-4 h-4 shrink-0" /> ASAP is confidential and non-punitive — reporter identity is never shown. De-identify before sharing any detail.
       </div>
@@ -46,8 +69,9 @@ export function AsapReview() {
           </button>
         ))}
       </div>
+      </>}
 
-      <Sheet open={!!current} onOpenChange={(v: boolean) => { if (!v) setSel(null); }}>
+      <Sheet open={!!current} onOpenChange={(v: boolean) => { if (!v) close(); }}>
         <SheetContent side="right" className="w-[460px] max-w-[92vw] p-0 flex flex-col gap-0">
           {current && (
             <>
@@ -87,7 +111,7 @@ export function AsapReview() {
 
               <div className="px-6 py-3.5 border-t border-border flex gap-2">
                 {current.status !== 'Under review' && <Button variant="outline" className="flex-1" onClick={() => updateAsap(current.id, { status: 'Under review' })}>Under review</Button>}
-                {current.status !== 'Resolved' && <Button className="flex-1" onClick={() => { updateAsap(current.id, { status: 'Resolved', feedback: feedback.trim() || undefined }); setSel(null); }}>Resolve</Button>}
+                {current.status !== 'Resolved' && <Button className="flex-1" onClick={() => { updateAsap(current.id, { status: 'Resolved', feedback: feedback.trim() || undefined }); close(); }}>Resolve</Button>}
                 {current.status === 'Resolved' && <Button variant="outline" className="flex-1" onClick={() => updateAsap(current.id, { status: 'Open' })}>Reopen</Button>}
               </div>
             </>
