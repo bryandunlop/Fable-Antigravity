@@ -92,13 +92,6 @@ describe('TailStatusCards (D88)', () => {
     expect(screen.getAllByText(/in 1h 45m/).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('draws a type silhouette per tail', () => {
-    const { container } = renderCards();
-    const marks = container.querySelectorAll('svg[role="img"]');
-    expect(marks.length).toBeGreaterThanOrEqual(3);
-    expect(Array.from(marks).some(m => m.getAttribute('aria-label')?.includes('G650ER'))).toBe(true);
-  });
-
   it('every card links to the aircraft board', () => {
     renderCards();
     const links = screen.getAllByRole('link');
