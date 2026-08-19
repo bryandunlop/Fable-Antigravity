@@ -84,8 +84,10 @@ describe('verbCounts', () => {
     expect(c.mitigate.tone).toBe('none');
   });
 
-  it('counts open ASAP reports without listing them anywhere shared', () => {
-    expect(verbCounts(input({ asapOpen: 2 })).asap).toEqual({ n: 2, tone: 'amber' });
+  it('shows NO number on ASAP while the programme is paused', () => {
+    // A count would nag a safety manager toward work whose outbound
+    // de-identification pipeline does not exist yet.
+    expect(verbCounts(input({ asapOpen: 2 })).asap).toEqual({ tone: 'none' });
   });
 
   it('carries no number on Publish or Records — they are places, not queues', () => {

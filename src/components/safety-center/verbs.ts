@@ -52,9 +52,15 @@ export const VERBS: VerbDef[] = [
   // ASAP is its own verb because it is its own LEGAL regime, not because it is
   // another kind of report. It never appears on a shared board: the narrative is
   // raw crew testimony until a third-party service de-identifies it.
+  //
+  // PAUSED (Bryan, 2026-08-19). The programme is waiting on the outbound
+  // integration that sends a submission to that third party; until it exists,
+  // what is here is a shell. It therefore carries NO COUNT — a number would nag
+  // a safety manager toward work whose pipeline is not built — and the surface
+  // says plainly that it is paused rather than looking finished.
   { id: 'asap', label: 'ASAP', group: 'daily', icon: Lock,
     defaultShape: 'list', shapes: ['list'],
-    blurb: 'Confidential crew reports — de-identified before anyone else sees them' },
+    blurb: 'Confidential crew reports — paused pending the de-identification service' },
   { id: 'decide', label: 'Decide', group: 'daily', icon: CircleCheck,
     defaultShape: 'queue', shapes: ['queue'],
     blurb: 'Waivers and approvals waiting on your review' },
@@ -104,7 +110,8 @@ export interface VerbCountInput {
   pendingApprovals: number;
   /** Audits not yet Complete. */
   auditsOpen: number;
-  /** ASAP reports not yet Resolved. Counted, never listed on a shared surface. */
+  /** ASAP reports not yet Resolved. Held for when the programme un-pauses; the
+   *  rail deliberately shows no number while it is paused. */
   asapOpen: number;
 }
 
@@ -126,7 +133,8 @@ export function verbCounts(input: VerbCountInput): Record<VerbId, VerbCount> {
 
   return {
     triage: { n: input.move.length, tone: input.move.length > 0 ? 'amber' : 'none' },
-    asap: { n: input.asapOpen, tone: input.asapOpen > 0 ? 'amber' : 'none' },
+    // No number while the programme is paused — see the VERBS entry.
+    asap: { tone: 'none' },
     decide: { n: input.pendingApprovals, tone: input.pendingApprovals > 0 ? 'amber' : 'none' },
     investigate: { n: investigating.length, tone: tone(investigating) },
     mitigate: { n: mitigating.length, tone: tone(mitigating) },
