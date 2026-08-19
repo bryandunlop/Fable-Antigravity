@@ -92,5 +92,5 @@ export function useUnifiedFleetStatus() {
     [fleet]
   );
 
-  return { fleet, dispatchable, inFlight, satcomLoading: loading, satcomError: error, isRefreshing };
+  return { fleet, dispatchable, inFlight, satcomLoading: loading, satcomError: error, isRefreshing, lastUpdate };
 }

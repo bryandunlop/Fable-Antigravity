@@ -5,6 +5,7 @@ import { HOME_STATION } from '../../config/station';
 import { lookupAirport } from '../../services/airportCoords';
 import StationWeatherStrip from '../ops-wall/StationWeatherStrip';
 import { RAG_DOT } from '../ops-wall/ragColors';
+import AircraftSilhouette from '../ui/AircraftSilhouette';
 import WallChrome, { useWallClock } from './WallChrome';
 import { hhmmToMinutes, legBlockPct, pctOnAxis } from './wallTime';
 
@@ -20,9 +21,15 @@ function LaneLabel({ ac }: { ac: UnifiedFleetAircraft }) {
   const { status } = ac.airworthiness;
   return (
     <div className="flex w-[170px] shrink-0 flex-col">
-      <span className={`font-mono text-2xl font-bold ${status === 'RED' ? 'text-white/50' : ''}`}>
-        {ac.tailNumber}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className={`font-mono text-2xl font-bold ${status === 'RED' ? 'text-white/50' : ''}`}>
+          {ac.tailNumber}
+        </span>
+        <AircraftSilhouette
+          type={ac.model.replace('Gulfstream ', '')}
+          className={`h-5 w-auto ${status === 'RED' ? 'text-white/25' : 'text-white/40'}`}
+        />
+      </div>
       {status === 'RED' ? (
         <span className="text-sm font-semibold text-[#EF3340]">GROUNDED</span>
       ) : status === 'AMBER' ? (
@@ -80,7 +87,7 @@ function Lane({ ac, legs }: { ac: UnifiedFleetAircraft; legs: TodayLeg[] }) {
             }`}
             style={{ left: `${block.leftPct}%`, width: `${Math.max(block.widthPct, 6)}%` }}
           >
-            {leg.depIata} → {leg.arrIata}
+            {leg.depIata} → {leg.arrIata} · {leg.pax} pax
           </div>
         );
       })}

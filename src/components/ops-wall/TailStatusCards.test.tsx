@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import TailStatusCards from './TailStatusCards';
 import type { UnifiedFleetAircraft } from '../hooks/useUnifiedFleetStatus';
+import type { TodayLeg } from '../../services/todaysOpsMock';
 
 function tail(p: Partial<UnifiedFleetAircraft>): UnifiedFleetAircraft {
   return {
@@ -42,10 +43,20 @@ const FLEET: UnifiedFleetAircraft[] = [
   }),
 ];
 
+const LEGS: TodayLeg[] = [
+  {
+    id: 'L1', flightNumber: 'PG330', tail: 'N1PG', depIcao: 'KLUK', arrIcao: 'KMIA',
+    depIata: 'LUK', arrIata: 'MIA', schedDep: '15:45', schedArr: '18:20', eta: '18:20',
+    etaStatus: 'on-time', status: 'Scheduled', pax: 6,
+  },
+];
+// 18:00Z on a summer day = 14:00 ET, so the 15:45 departure is 1h 45m out.
+const NOW = new Date('2026-08-19T18:00:00Z');
+
 function renderCards() {
   return render(
     <MemoryRouter>
-      <TailStatusCards fleet={FLEET} />
+      <TailStatusCards fleet={FLEET} legs={LEGS} now={NOW} />
     </MemoryRouter>,
   );
 }
@@ -73,6 +84,19 @@ describe('TailStatusCards (D88)', () => {
   it('GREEN card reads clean', () => {
     renderCards();
     expect(screen.getByText(/No open defects/)).toBeInTheDocument();
+  });
+
+  it('shows the next scheduled leg with a departure countdown', () => {
+    renderCards();
+    expect(screen.getAllByText(/Next: LUK–MIA 15:45 ET/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/in 1h 45m/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('draws a type silhouette per tail', () => {
+    const { container } = renderCards();
+    const marks = container.querySelectorAll('svg[role="img"]');
+    expect(marks.length).toBeGreaterThanOrEqual(3);
+    expect(Array.from(marks).some(m => m.getAttribute('aria-label')?.includes('G650ER'))).toBe(true);
   });
 
   it('every card links to the aircraft board', () => {

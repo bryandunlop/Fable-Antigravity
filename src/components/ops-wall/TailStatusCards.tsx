@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { Plane } from 'lucide-react';
 import type { UnifiedFleetAircraft } from '../hooks/useUnifiedFleetStatus';
 import { RAG_DOT } from './ragColors';
+import AircraftSilhouette from '../ui/AircraftSilhouette';
+import { formatUntilEt } from '../../services/etClock';
+import type { TodayLeg } from '../../services/todaysOpsMock';
 
 /**
  * The landing page's per-tail status rail — D88 (adopted from the canvas's Option B).
@@ -76,7 +79,22 @@ function CardFooter({ ac }: { ac: UnifiedFleetAircraft }) {
   return <p className="border-t border-border pt-1.5 text-[10px] text-muted-foreground/70">No open defects</p>;
 }
 
-export default function TailStatusCards({ fleet }: { fleet: UnifiedFleetAircraft[] }) {
+export default function TailStatusCards({
+  fleet,
+  legs = [],
+  now = new Date(),
+}: {
+  fleet: UnifiedFleetAircraft[];
+  /** Today's legs, so a card can show what this tail does next. */
+  legs?: TodayLeg[];
+  now?: Date;
+}) {
+  /** The next leg still ahead for a tail, by scheduled departure. */
+  const nextLegFor = (tail: string): TodayLeg | undefined =>
+    legs
+      .filter(l => l.tail === tail && l.status === 'Scheduled')
+      .sort((a, b) => a.schedDep.localeCompare(b.schedDep))[0];
+
   return (
     <>
       {/* Cards — sm and up */}
@@ -92,6 +110,11 @@ export default function TailStatusCards({ fleet }: { fleet: UnifiedFleetAircraft
               <span className="font-mono text-[15px] font-bold">{ac.tailNumber}</span>
               <span className="text-[10px] text-muted-foreground">{shortType(ac.model)}</span>
             </div>
+            <AircraftSilhouette
+              type={shortType(ac.model)}
+              className="h-6 w-auto self-start text-muted-foreground/45"
+              title={`${ac.tailNumber} — ${shortType(ac.model)}`}
+            />
             <span
               className="text-[11px] font-semibold tracking-wide"
               style={{ color: STATUS_TEXT[ac.airworthiness.status] }}
@@ -102,6 +125,17 @@ export default function TailStatusCards({ fleet }: { fleet: UnifiedFleetAircraft
               {ac.flightStatus === 'in-flight' && <Plane className="h-3 w-3 shrink-0 text-primary" aria-hidden />}
               <span className="truncate">{whereLine(ac)}</span>
             </p>
+            {(() => {
+              const next = nextLegFor(ac.tailNumber);
+              if (!next) return null;
+              const countdown = formatUntilEt(next.schedDep, now);
+              return (
+                <p className="truncate text-[11px] text-muted-foreground">
+                  Next: {next.depIata}&ndash;{next.arrIata} {next.schedDep} ET
+                  {countdown && <span className="text-foreground/70"> &middot; {countdown}</span>}
+                </p>
+              );
+            })()}
             <CardFooter ac={ac} />
           </Link>
         ))}
