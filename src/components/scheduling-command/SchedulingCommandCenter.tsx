@@ -262,7 +262,7 @@ export default function SchedulingCommandCenter({
         />
       )}
       {onLensSurface && lens === 'board' && (
-        <PlanBoard trips={filteredTrips} nowMs={nowMs} serviceability={fleetServiceability} onTripClick={t => openTrip(t.id)} />
+        <PlanBoard trips={filteredTrips} nowMs={nowMs} serviceability={fleetServiceability} onTripClick={t => openTrip(t.id)} onOpenHorizon={() => setLens('horizon')} />
       )}
       {onLensSurface && lens === 'calendar' && (
         <CalendarView trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
