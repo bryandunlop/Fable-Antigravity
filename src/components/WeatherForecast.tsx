@@ -8,6 +8,8 @@ import { WeatherDemoChip } from './WeatherDemoChip';
 interface WeatherForecastProps {
   /** ICAO identifier. Pass explicitly — see src/config/station.ts. */
   icaoId: string;
+  /** Days shown (D88: the landing page shows 5 to save space). The parser caps at 7. */
+  maxDays?: number;
 }
 
 /**
@@ -25,7 +27,7 @@ interface WeatherForecastProps {
  * token derived off the forecast text, so the glyph and the tooltip can't
  * contradict each other. See weatherConditions.ts.
  */
-export default function WeatherForecast({ icaoId }: WeatherForecastProps) {
+export default function WeatherForecast({ icaoId, maxDays = 7 }: WeatherForecastProps) {
   const [result, setResult] = useState<ForecastResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -39,14 +41,14 @@ export default function WeatherForecast({ icaoId }: WeatherForecastProps) {
     load();
   }, [load]);
 
-  const periods = result?.periods ?? [];
+  const periods = (result?.periods ?? []).slice(0, maxDays);
   const hasError = !!result?.error;
 
   return (
     <div className="border-t border-border/50 pt-3 mt-3">
       <div className="flex items-baseline justify-between mb-2">
         <div className="flex items-baseline gap-2">
-          <div className="text-muted-foreground font-medium text-xs">7-DAY OUTLOOK</div>
+          <div className="text-muted-foreground font-medium text-xs">{maxDays}-DAY OUTLOOK</div>
           {/* Sits BESIDE the Q14 advisory rather than replacing it — they say
               different things ("this isn't aviation weather" vs "this isn't
               real weather") and the outlook can be demo while the METAR above

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Edit2, Plus, Trash2, User } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Edit2, Map, Plus, Trash2, User } from 'lucide-react';
 import { Button } from '../ui/button';
 import LinkFavicon from '../LinkFavicon';
 import QuickLinkEditor from '../QuickLinkEditor';
@@ -142,6 +143,18 @@ export default function QuickLinksBar({ userRole, className = '' }: QuickLinksBa
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {/* Fixed in-app tile, not user data — D88 moved the map off the landing
+            page, and this is the "view it if needed" path for every role. Kept
+            out of the editable localStorage set (which is external-URL-only) so
+            an edit can't delete the app's own route. */}
+        <Link
+          to="/fleet-map"
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-primary transition-colors hover:border-primary/30 hover:bg-secondary"
+        >
+          <Map className="h-4 w-4" aria-hidden />
+          Fleet map
+        </Link>
+
         {all.map(tile)}
 
         {isEditing && (
