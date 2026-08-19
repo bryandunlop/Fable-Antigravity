@@ -10,6 +10,8 @@ import { deriveServiceability } from './serviceability';
 export interface FleetOpsDeferralClock {
   category: MelCategory | null;
   repairDueDateUtc: string | null;
+  /** D24 — the IANA zone the PL-25 clock is anchored to; display renders the boundary through it. */
+  governingTimezone: string;
   /** Whole days between asOf and the due boundary (floor); null when the deferral has no date clock. */
   daysRemaining: number | null;
   /** The signed interval length in days when the clock is calendar-based; null otherwise. */
@@ -68,6 +70,7 @@ export function summarizeFleetOpsDetail(state: OpsState, asOfUtc: string): Fleet
         deferralClock = {
           category: governing.category,
           repairDueDateUtc: governing.repairDueDateUtc ?? null,
+          governingTimezone: governing.governingTimezone,
           daysRemaining: dueMs === null ? null : Math.floor((dueMs - asOfMs) / DAY_MS),
           intervalDays: governing.repairIntervalUnit === 'CALENDAR_DAY' ? governing.repairIntervalValue : null,
         };

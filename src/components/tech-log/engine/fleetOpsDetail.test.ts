@@ -53,6 +53,7 @@ describe('summarizeFleetOpsDetail', () => {
     expect(row.headline).toBe('Galley chiller');
     expect(row.deferralClock).not.toBeNull();
     expect(row.deferralClock!.category).toBe('C');
+    expect(row.deferralClock!.governingTimezone).toBe('America/New_York');
     expect(row.deferralClock!.daysRemaining).toBe(6);
     expect(row.deferralClock!.intervalDays).toBe(10);
   });

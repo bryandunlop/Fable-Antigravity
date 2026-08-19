@@ -5,6 +5,7 @@ import { HOME_STATION } from '../../config/station';
 import FleetMapPanel from '../ops-wall/FleetMapPanel';
 import { RAG_DOT } from '../ops-wall/ragColors';
 import WallChrome, { useWallClock } from './WallChrome';
+import { formatRegulatoryDeadline } from '../tech-log/util/displayZone';
 
 /**
  * /wall/maintenance — the hangar's maintenance TV (D88).
@@ -20,14 +21,6 @@ import WallChrome, { useWallClock } from './WallChrome';
  * MEL clock presentation follows the house contract (DeferralDueLine): the bar
  * owns remaining time, the text owns the due date — never both in words.
  */
-
-function dueLabel(repairDueDateUtc: string | null): string | null {
-  if (!repairDueDateUtc) return null;
-  const d = new Date(repairDueDateUtc);
-  const day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' });
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' });
-  return `expires ${day} ${time} ET`;
-}
 
 function MovementRow({ leg, big = false }: { leg: TodayLeg; big?: boolean }) {
   const arrived = leg.status === 'In Flight' || leg.status === 'Departed';
@@ -119,7 +112,11 @@ export function MaintenanceWallView({
                     <div className="h-full bg-[#F1B434]" style={{ width: `${pct}%` }} />
                   </div>
                   {clock?.repairDueDateUtc && (
-                    <span className="shrink-0 text-lg font-semibold text-[#F1B434]">{dueLabel(clock.repairDueDateUtc)}</span>
+                    <span className="shrink-0 text-lg font-semibold text-[#F1B434]">
+                      {/* House deadline idiom (LG-195): a midnight boundary reads as the previous
+                          day at 23:59 — PL-25's own phrasing — via formatRegulatoryDeadline. */}
+                      expires {formatRegulatoryDeadline(clock.repairDueDateUtc, 'GOVERNING', clock.governingTimezone)}
+                    </span>
                   )}
                 </div>
               </div>

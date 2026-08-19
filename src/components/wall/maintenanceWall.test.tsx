@@ -30,6 +30,7 @@ function tail(p: {
         p.status === 'AMBER'
           ? {
               category: 'C', repairDueDateUtc: '2026-08-26T03:59:00Z',
+              governingTimezone: 'America/New_York',
               daysRemaining: p.daysRemaining ?? 6, intervalDays: 10,
             }
           : null,
@@ -63,7 +64,9 @@ describe('MaintenanceWallView (D88)', () => {
 
   it('MEL clock text owns the due date; the bar owns remaining (house contract)', () => {
     render(<MaintenanceWallView fleet={DIRTY_FLEET} legs={TODAY_LEGS} />);
-    expect(screen.getByText(/expires .*ET/)).toBeInTheDocument();
+    // House idiom: the due boundary reads through the governing zone with a DST-correct
+    // label — 2026-08-26T03:59Z is Aug 25, 23:59 EDT.
+    expect(screen.getByText(/expires Aug 25, 2026 · 23:59 EDT/)).toBeInTheDocument();
     expect(screen.queryByText(/days left/)).not.toBeInTheDocument();
   });
 
