@@ -26,8 +26,7 @@ import { getOnBoardQty } from '../tripMath';
 import { buildLedgerRows, groupByCompartment, groupByCategory } from '../tripLedger';
 import { LedgerRow, LedgerHeader, LedgerSectionHeader } from '../shared/LedgerRow';
 import { selectLoggableItems } from '../loggableItems';
-import { TripLoadExtras } from './TripLoadExtras';
-import { TripRestoreStock } from './TripRestoreStock';
+import { AddStockSheet, type StockSource } from './AddStockSheet';
 
 // ─── Next Leg Dialog ────────────────────────────────────────────────────────
 
@@ -305,7 +304,11 @@ function TripViewInner({
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showManageQuickAdd, setShowManageQuickAdd] = useState(false);
-  const [screen, setScreen] = useState<'trip' | 'load-extras' | 'restore-stock'>('trip');
+  const [screen, setScreen] = useState<'trip' | 'add-stock'>('trip');
+  // Which side of the source switch the sheet opens on. Both entry points reach
+  // the same sheet — "Pull from Commissary" and "Restore Stock" were never two
+  // jobs, only two defaults (D86).
+  const [stockSource, setStockSource] = useState<StockSource>('commissary');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const undoToastRef = useRef<string | number | undefined>(undefined);
@@ -666,12 +669,16 @@ function TripViewInner({
   // ─── Render ───────────────────────────────────────────────────────────────
 
   // Sub-screen renders
-  if (screen === 'load-extras') {
-    return <TripLoadExtras trip={trip} onBack={() => setScreen('trip')} />;
-  }
-
-  if (screen === 'restore-stock' && activeLeg) {
-    return <TripRestoreStock trip={trip} leg={activeLeg} onBack={() => setScreen('trip')} />;
+  if (screen === 'add-stock') {
+    return (
+      <AddStockSheet
+        trip={trip}
+        leg={activeLeg}
+        lens={view === 'category' ? 'category' : 'compartment'}
+        initialSource={stockSource}
+        onBack={() => setScreen('trip')}
+      />
+    );
   }
 
   return (
@@ -695,7 +702,7 @@ function TripViewInner({
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5"
-                onClick={() => setScreen('load-extras')}
+                onClick={() => { setStockSource('commissary'); setScreen('add-stock'); }}
               >
                 <Package size={14} />
                 <span className="hidden sm:inline">Pull from Commissary</span>
@@ -1059,7 +1066,7 @@ function TripViewInner({
                   variant="ghost"
                   size="sm"
                   className="flex-1 h-10 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setScreen('restore-stock')}
+                  onClick={() => { setStockSource('road'); setScreen('add-stock'); }}
                 >
                   <Package className="mr-1.5 h-3.5 w-3.5" />
                   Restore Stock
@@ -1075,7 +1082,7 @@ function TripViewInner({
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => setScreen('load-extras')}
+                    onClick={() => { setStockSource('commissary'); setScreen('add-stock'); }}
                   >
                     <Package className="mr-2 h-4 w-4" />
                     Pull from Commissary
