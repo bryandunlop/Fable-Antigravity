@@ -57,6 +57,10 @@ export interface SafetyItem {
   /** Days in the current stage, as a NUMBER. `ageLabel` is display-only and
    *  cannot be grouped on, which is what a board needs to bucket by age. */
   ageDays?: number;
+  /** Days until the corrective action is due; negative once overdue. Absent
+   *  where the record carries no due date. Mitigate groups on this rather than
+   *  on age — how long a fix has been open says less than when it is owed. */
+  dueDays?: number;
   owner?: string;      // who holds the ball
   waitingText?: string;
   nextAction?: string;

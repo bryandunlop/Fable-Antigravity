@@ -6,8 +6,8 @@
 import { useMemo, useState } from 'react';
 import { ClipboardCheck, CalendarClock, ChevronRight } from 'lucide-react';
 import InternalAuditManagement from '../InternalAuditManagement';
-import FRATReview from '../FRATReview';
 import GRATReview from '../GRATReview';
+import { FratSeen } from './FratSeen';
 import AuditDetailDrawer from '../audit/AuditDetailDrawer';
 import { useAudits, type Audit } from '../../contexts/AuditContext';
 
@@ -24,17 +24,22 @@ export function auditsForMe(all: Audit[]): Audit[] {
   return all.filter((a) => a.assignedTo && a.assignedTo !== 'Unassigned');
 }
 
-/** Assure (D85 · C7) — everything the safety manager does to check that the
- *  system is working: the audit programme, and the FRAT/GRAT assessment
- *  reviews.
+/** Assure (D85) — everything the safety manager does to check that the system is
+ *  working: the audit programme, and the crews' risk assessments.
  *
- *  Those two reviews used to sit under "Reviews" beside the waiver approvals,
- *  which put two different jobs behind one label: approving a request is a
- *  DECISION, reviewing a risk assessment is ASSURANCE. Splitting them is the
- *  whole reason the console navigates by verb. */
-export function OperationsAudits() {
+ *  These used to sit under "Reviews" beside the waiver approvals, which put two
+ *  different jobs behind one label: approving a request is a DECISION, seeing a
+ *  crew's risk assessment is ASSURANCE.
+ *
+ *  The FRAT tab is an ATTESTATION, not a review (Bryan, 2026-08-19: "the crew are
+ *  the only ones who really interact with the frat. The Safety Manager just marks
+ *  them complete after the flight to show that they saw it"). The full
+ *  approve/reject console it replaced described a job nobody does; it still lives
+ *  at /safety/frat-review. GRAT keeps its console for now — nobody has said
+ *  whether it works the same way. */
+export function OperationsAudits({ actorName = 'Safety' }: { actorName?: string } = {}) {
   const [sub, setSub] = useState<'audits' | 'frat' | 'grat'>('audits');
-  const TABS: [typeof sub, string][] = [['audits', 'Audit programme'], ['frat', 'FRAT reviews'], ['grat', 'GRAT reviews']];
+  const TABS: [typeof sub, string][] = [['audits', 'Audit programme'], ['frat', 'FRAT — seen'], ['grat', 'GRAT reviews']];
   return (
     <div className="mt-3">
       <div className="flex gap-2 flex-wrap mb-1">
@@ -45,11 +50,14 @@ export function OperationsAudits() {
           </button>
         ))}
       </div>
-      <div className="-mx-6 mt-1">
-        {sub === 'audits' && <InternalAuditManagement />}
-        {sub === 'frat' && <FRATReview />}
-        {sub === 'grat' && <GRATReview />}
-      </div>
+      {sub === 'frat'
+        ? <FratSeen actorName={actorName} />
+        : (
+          <div className="-mx-6 mt-1">
+            {sub === 'audits' && <InternalAuditManagement />}
+            {sub === 'grat' && <GRATReview />}
+          </div>
+        )}
     </div>
   );
 }

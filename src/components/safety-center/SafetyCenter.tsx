@@ -431,10 +431,10 @@ export default function SafetyCenter({ userRole, additionalRoles = [] }: Props) 
               : <CaseQueue items={atPhase(model.ops.track, 1)} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
                   emptyBig="Nothing under investigation." emptySmall="No case is at that stage right now." />)}
             {verb === 'mitigate' && (shape === 'board'
-              ? <CaseBoard items={atPhase(model.ops.track, 2)} onOpen={open} />
+              ? <CaseBoard items={atPhase(model.ops.track, 2)} onOpen={open} grouping={verbDef('mitigate').boardGrouping} />
               : <CaseQueue items={atPhase(model.ops.track, 2)} doneSet={doneSet} onToggle={toggleDone} onOpen={open}
                   emptyBig="No mitigations in flight." emptySmall="Nothing is waiting on a corrective action." />)}
-            {verb === 'assure' && <OperationsAudits />}
+            {verb === 'assure' && <OperationsAudits actorName={CURRENT_USER.name} />}
             {verb === 'publish' && <PublishedArea view="ops" reports={model.published} />}
             {verb === 'records' && <RecordsArea submissions={model.submissions} onOpen={open} />}
           </div>

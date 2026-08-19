@@ -35,6 +35,11 @@ export interface VerbDef {
   shapes: Shape[];
   /** `daily` verbs sit above the rule, `periodic` below it. */
   group: 'daily' | 'periodic';
+  /** What the board's columns mean. Age is right for work that has not been
+   *  picked up; DUE is right for work that has been, because a corrective action
+   *  is governed by when it is owed, not by how long it has been open
+   *  (Bryan, 2026-08-19). */
+  boardGrouping?: 'age' | 'due';
 }
 
 export const VERBS: VerbDef[] = [
@@ -57,8 +62,8 @@ export const VERBS: VerbDef[] = [
     defaultShape: 'board', shapes: ['board', 'queue'],
     blurb: 'Open cases being worked' },
   { id: 'mitigate', label: 'Mitigate', group: 'daily', icon: Wrench,
-    defaultShape: 'queue', shapes: ['queue', 'board'],
-    blurb: 'Corrective actions in flight' },
+    defaultShape: 'queue', shapes: ['queue', 'board'], boardGrouping: 'due',
+    blurb: 'Corrective actions in flight, by when they are due' },
   { id: 'assure', label: 'Assure', group: 'periodic', icon: ClipboardCheck,
     defaultShape: 'calendar', shapes: ['calendar'],
     blurb: 'The audit programme, and FRAT / GRAT reviews' },
