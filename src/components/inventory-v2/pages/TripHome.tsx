@@ -23,7 +23,8 @@ import type { InventoryItemV2, UsageLogEntry, Trip, TripLeg, LegPhase, TripViewM
 import QuickTapView from '../shared/QuickTapView';
 import ManageQuickAddDialog from '../shared/ManageQuickAddDialog';
 import { getOnBoardQty } from '../tripMath';
-import { buildLedgerRows, groupByCompartment, groupByCategory } from '../tripLedger';
+import { buildLedgerRows, groupByCompartment, groupByCategory, belowParRows } from '../tripLedger';
+import type { BelowParRow } from '../tripLedger';
 import { LedgerRow, LedgerHeader, LedgerSectionHeader } from '../shared/LedgerRow';
 import { selectLoggableItems } from '../loggableItems';
 import { AddStockSheet, type StockSource } from './AddStockSheet';
@@ -137,12 +138,14 @@ function TripCompleteDialog({
   open,
   onClose,
   trip,
+  belowPar,
   onStartReplenish,
   onStartInspection,
 }: {
   open: boolean;
   onClose: () => void;
   trip: Trip;
+  belowPar: BelowParRow[];
   onStartReplenish: () => void;
   onStartInspection: () => void;
 }) {
@@ -181,15 +184,67 @@ function TripCompleteDialog({
               </div>
             )}
           </div>
+
+          {/* The ledger, filtered — the argument for which button to press (D86).
+              The old dialog offered Inspection and Restock as bare choices and
+              let the crew guess which the aircraft needed. */}
+          {belowPar.length > 0 ? (
+            <div className="rounded-md border border-border overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 bg-muted/60 border-b border-border">
+                <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+                  Below par on arrival
+                </span>
+                <span className="text-xs text-muted-foreground">{belowPar.length} lines</span>
+              </div>
+              <div className="max-h-40 overflow-y-auto">
+                {belowPar.slice(0, 8).map(row => (
+                  <div
+                    key={row.item.id}
+                    className="flex items-center gap-3 px-3 py-1.5 border-b border-border/60 last:border-0"
+                  >
+                    <span className="flex-1 min-w-0 text-sm truncate">{row.item.itemName}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {row.onBoard}/{row.par}
+                    </span>
+                    <span
+                      className={cn(
+                        'w-16 text-right text-xs font-semibold tabular-nums',
+                        row.onBoard <= 0 ? 'text-destructive' : 'text-amber-600 dark:text-amber-400',
+                      )}
+                    >
+                      short {row.short}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {belowPar.length > 8 && (
+                <p className="px-3 py-1.5 text-xs text-muted-foreground bg-muted/40 border-t border-border">
+                  and {belowPar.length - 8} more
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Everything came back at or above par — nothing to restock.
+            </p>
+          )}
         </div>
         <DialogFooter className="flex-col gap-2">
-          <Button onClick={onStartInspection} className="w-full bg-blue-600 hover:bg-blue-500">
+          {belowPar.length > 0 ? (
+            <Button onClick={onStartReplenish} className="w-full">
+              <Package className="mr-2 h-4 w-4" />
+              Restock {belowPar.length} line{belowPar.length === 1 ? '' : 's'}
+            </Button>
+          ) : (
+            <Button onClick={onStartReplenish} variant="outline" className="w-full">
+              <Package className="mr-2 h-4 w-4" />
+              Restock Aircraft
+            </Button>
+          )}
+          <Button onClick={onStartInspection} variant="outline" className="w-full">
             <ClipboardCheck className="mr-2 h-4 w-4" />
             Start Inspection
-          </Button>
-          <Button onClick={onStartReplenish} variant="outline" className="w-full">
-            <Package className="mr-2 h-4 w-4" />
-            Restock Aircraft
+            <span className="ml-1 text-xs text-muted-foreground">full count</span>
           </Button>
           <Button variant="ghost" onClick={onClose} className="w-full text-muted-foreground">
             Done
@@ -511,6 +566,14 @@ function TripViewInner({
   const favoriteRows = useMemo(
     () => ledgerRows.filter(r => isFavorite(r.item.id)),
     [ledgerRows, isFavorite],
+  );
+
+  // What the aircraft is short when the trip closes — computed over the WHOLE
+  // stocked list, not the search-narrowed one, so a stray search cannot shrink
+  // the restock list.
+  const belowPar = useMemo(
+    () => belowParRows(buildLedgerRows({ items: state.items, trip, leg: activeLeg, aircraftType })),
+    [state.items, trip, activeLeg, aircraftType],
   );
 
   // ─── Grocery list item count ──────────────────────────────────────────────
@@ -1262,6 +1325,7 @@ function TripViewInner({
       />
 
       <TripCompleteDialog
+        belowPar={belowPar}
         open={showTripComplete}
         onClose={() => {
           setShowTripComplete(false);
