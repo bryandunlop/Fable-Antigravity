@@ -68,6 +68,7 @@ export function reconcileTrip(
       toUpdate.push({
         ...live,
         status: 'cancelled',
+        reflag: undefined, // a dead task carries no advisory — nothing left to dismiss or redo
         auditTrail: [...live.auditTrail, { atUtc: nowUtc, actor, action: 'cancelled', detail: 'no longer applies' }],
       });
       continue;

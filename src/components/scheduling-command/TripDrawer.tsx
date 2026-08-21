@@ -89,6 +89,14 @@ export function TripDrawer({
     () => (trip ? buildChecklistJourney(trip.legs, instances, new Date(nowUtc()).getTime()) : null),
     [trip, instances, nowUtc],
   );
+
+  // A focused task hidden inside a collapsed cleared-ledge opens its section first —
+  // otherwise the flash effect's getElementById finds nothing and fails silently.
+  useEffect(() => {
+    if (!open || !focusTaskId || !journey) return;
+    const holder = journey.sections.find(sec => sec.cleared.some(t => t.id === focusTaskId));
+    if (holder) setOpenLedges(prev => (prev.has(holder.key) ? prev : new Set(prev).add(holder.key)));
+  }, [open, focusTaskId, journey]);
   const blockedIds = useMemo(() => new Set(instances.filter(i => i.status === 'blocked').map(i => i.id)), [instances]);
 
   async function handleAction(instanceId: string, action: TaskAction) {
@@ -130,7 +138,7 @@ export function TripDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-6">
+      <SheetContent side="right" className="w-full sm:max-w-2xl xl:max-w-4xl overflow-y-auto p-6">
         {/* Above the loading branch on purpose (LG-30). Radix asserts a Title on the
             dialog at MOUNT, and the drawer mounts before the trip resolves — a Title
             that lives only in the loaded branch is a console error on every open.

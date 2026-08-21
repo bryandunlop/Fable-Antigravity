@@ -105,3 +105,17 @@ describe('reconcileTrip', () => {
     expect(c?.auditTrail.at(-1)).toMatchObject({ action: 'cancelled', detail: 'no longer applies' });
   });
 });
+
+describe('D89 follow-ups (review catches)', () => {
+  it('cancelling a leg clears a prior advisory reflag — no Dismiss/Redo on dead work', () => {
+    const flagged = inst({
+      taskDefId: 'ppr', legId: 'L1', airportRole: 'arrival',
+      status: 'done', completedBy: 'x', completedAtUtc: NOW,
+      reflag: { change: 'legScheduleChange' },
+    });
+    const plan = reconcileTrip([flagged], [], NO_CHANGE, defs([def('ppr', ['legScheduleChange'])]), 'system', NOW);
+    const cancelled = plan.toUpdate.find((i) => i.taskDefId === 'ppr');
+    expect(cancelled?.status).toBe('cancelled');
+    expect(cancelled?.reflag).toBeUndefined();
+  });
+});

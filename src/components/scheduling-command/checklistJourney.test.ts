@@ -64,3 +64,13 @@ describe('buildChecklistJourney', () => {
     expect(j.sections[0].open).toHaveLength(1);
   });
 });
+
+describe('D89 review catches', () => {
+  const legs2 = [leg({ id: 'L1', sequence: 1 })];
+  it('a cancelled task never lands in flagged, even if a stale reflag survived', () => {
+    const zombie = inst({ legId: 'L1', status: 'cancelled', reflag: { change: 'legScheduleChange' } });
+    const j = buildChecklistJourney(legs2, [zombie], NOW);
+    expect(j.sections[0].flagged).toHaveLength(0);
+    expect(j.sections[0].cleared.map(x => x.id)).toEqual([zombie.id]);
+  });
+});

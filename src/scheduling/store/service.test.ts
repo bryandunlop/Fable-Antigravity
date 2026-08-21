@@ -125,6 +125,20 @@ describe('SchedulingService', () => {
     expect(stored?.reflag).toEqual({ change: 'passengerChange' });
   });
 
+  it('an advisory reflag does not resurrect an acked downstream handoff event (D89 review catch)', async () => {
+    const { store, service } = svc();
+    await store.saveTemplate(paxTpl);
+    const { instances } = await service.createTripMirror(trip, NOW);
+    const pax = instances.find((i) => i.taskDefId === 'pax')!;
+    await service.applyAction(pax.id, { kind: 'ack' }, 'p', NOW);
+    await service.applyAction(pax.id, { kind: 'complete' }, 's', NOW);
+    const [handoff] = await store.listEventsForTarget({ kind: 'role', value: 'pilot' });
+    await store.saveEvent({ ...handoff, ackState: 'acked' }); // pilot has seen and acked it
+    await service.updateTrip(addPax(trip), NOW);
+    const after = await store.listEventsForTarget({ kind: 'role', value: 'pilot' });
+    expect(after.find((e) => e.id === handoff.id)?.ackState).toBe('acked'); // the clear stands — so does the ack
+  });
+
   it('updateTrip leaves a completed task done when the change does not re-trigger it', async () => {
     const { store, service } = svc();
     await store.saveTemplate({ ...paxTpl, taskDefinitions: [{ ...paxTpl.taskDefinitions[0], reTriggerOn: [] }] });

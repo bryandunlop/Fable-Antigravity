@@ -56,8 +56,8 @@ export function buildChecklistJourney(
       departureIcao: leg?.departureIcao, arrivalIcao: leg?.arrivalIcao,
       departureTimeUtc: leg?.departureTimeUtc, paxCount: leg?.paxCount,
       open: xs.filter(t => !isSettled(t)).sort((a, b) => dueMs(a) - dueMs(b)),
-      flagged: settled.filter(t => t.reflag).sort((a, b) => clearedMs(a) - clearedMs(b)),
-      cleared: settled.filter(t => !t.reflag).sort((a, b) => clearedMs(a) - clearedMs(b)),
+      flagged: settled.filter(t => t.reflag && t.status !== 'cancelled').sort((a, b) => clearedMs(a) - clearedMs(b)),
+      cleared: settled.filter(t => !t.reflag || t.status === 'cancelled').sort((a, b) => clearedMs(a) - clearedMs(b)),
     };
   };
 
