@@ -20,6 +20,16 @@ export interface PassengerPhoto {
   addedAtUtc: string;
 }
 
+/** Cabin settings a crew member records for a passenger. Named rather than inline so
+ * the trip-side editor can type a draft of it. */
+export interface PassengerComfort {
+  temperature?: string;
+  seating?: string;
+  tvPreference?: string;
+  lighting?: string;
+  specialRequests?: string;
+}
+
 export interface Passenger {
   id: string;
   name: string;
@@ -45,13 +55,7 @@ export interface Passenger {
   food: string[];
   /** Foods/things the passenger dislikes (a preference, not a medical allergy). */
   dislikes?: string[];
-  passengerComfort: {
-    temperature?: string;
-    seating?: string;
-    tvPreference?: string;
-    lighting?: string;
-    specialRequests?: string;
-  };
+  passengerComfort: PassengerComfort;
   additionalNotes: string;
   flightAttendantNotes?: string;
   photos?: PassengerPhoto[];
