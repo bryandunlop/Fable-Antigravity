@@ -55,7 +55,21 @@ describe('applyTaskAction §7', () => {
   });
 });
 
-describe('applyTaskAction reopen (Phase 2)', () => {
+describe('applyTaskAction clearReflag (D89)', () => {
+  it('dismisses an advisory flag without touching completion', () => {
+    const start = t({
+      status: 'done', completedBy: 's', completedAtUtc: NOW,
+      reflag: { change: 'passengerChange' },
+    });
+    const out = applyTaskAction(start, { kind: 'clearReflag' }, 's', NOW);
+    expect(out.reflag).toBeUndefined();
+    expect(out.status).toBe('done');
+    expect(out.completedBy).toBe('s');
+    expect(out.auditTrail[out.auditTrail.length - 1]).toMatchObject({ action: 'reflag:dismissed' });
+  });
+});
+
+describe('applyTaskAction reopen (Phase 2 — explicit human action; reconcile no longer calls it, D89)', () => {
   it('reopens a completed+acked task: resets status/ack/completion, sets reflag, refreshes due', () => {
     const done = t({
       requiresAck: true, ackState: 'acked', ackedBy: 'p', ackedAtUtc: NOW,

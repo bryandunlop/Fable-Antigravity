@@ -59,7 +59,10 @@ export class SchedulingService {
     if (plan.toCreate.length) await this.store.saveInstances(plan.toCreate);
     for (const u of plan.toUpdate) {
       await this.store.updateInstance(u);
-      if (!u.reflag) continue; // only a reopened (re-flagged) task re-surfaces downstream
+      // Only a task that actually came back OPEN re-surfaces downstream. An ADVISORY reflag
+      // (D89) keeps status done/acked — resurrecting the pilot's acked handoff event for it
+      // would contradict the flag's own promise that the clear stands.
+      if (!u.reflag || u.status !== 'open') continue;
       if (u.handoffTarget) await this.store.saveEvent(this.handoffEvent(u, nowUtc));
       if (u.escalation) {
         const evs = await this.store.listEventsForTarget({ kind: 'role', value: u.escalation.notifyRole });
