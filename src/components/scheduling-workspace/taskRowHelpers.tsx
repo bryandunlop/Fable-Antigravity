@@ -38,17 +38,6 @@ export function StatusBadge({ status }: { status: TaskInstance['status'] }) {
   return <span className={`status-badge ${statusBadgeClassName(status)}`}>{statusLabel(status)}</span>;
 }
 
-// Why a completed task got re-opened when the trip changed under it (Phase 2 re-flag).
-const RETRIGGER_LABEL: Record<string, string> = {
-  passengerChange: 'passenger changed',
-  legScheduleChange: 'schedule changed',
-  aircraftChange: 'aircraft changed',
-};
-export function ReflagBadge({ reflag }: { reflag: TaskInstance['reflag'] }) {
-  if (!reflag) return null;
-  return <span className="status-badge status-warning">Re-opened · {RETRIGGER_LABEL[reflag.change] ?? reflag.change}</span>;
-}
-
 /** For a per-airport instance, a short "KBOS arrival" suffix; null for trip-level tasks. */
 export function airportLabel(inst: Pick<TaskInstance, 'airportIcao' | 'airportRole'>): string | null {
   if (!inst.airportIcao) return null;
@@ -147,16 +136,3 @@ export function TaskActionButtons({ instance, onAction, disabled }: TaskActionBu
   );
 }
 
-// Groups task instances by category, sorts each group's rows by `order`, and returns groups
-// sorted alphabetically by category name. Shared by RunBoardPanel and TripsPanel, which both
-// render a per-category checklist.
-export function groupByCategory(instances: TaskInstance[]): Array<[string, TaskInstance[]]> {
-  const byCategory = new Map<string, TaskInstance[]>();
-  for (const inst of instances) {
-    const list = byCategory.get(inst.category) ?? [];
-    list.push(inst);
-    byCategory.set(inst.category, list);
-  }
-  for (const list of byCategory.values()) list.sort((a, b) => a.order - b.order);
-  return Array.from(byCategory.entries()).sort(([a], [b]) => a.localeCompare(b));
-}

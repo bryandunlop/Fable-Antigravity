@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Inbox, Briefcase } from 'lucide-react';
+import { AlertTriangle, Briefcase, CheckCircle2, ChevronDown, ChevronRight, Clock, Inbox } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
-import { Progress } from '../ui/progress';
 import { TripIdentityLine } from './TripIdentity';
 import { TaskActionButtons } from '../scheduling-workspace/taskRowHelpers';
 import type { TaskAction } from '../../scheduling/engine/tasks';
@@ -10,7 +9,10 @@ import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
 import { HORIZON_WINDOWS, type HorizonBand, type HorizonModel, type HorizonRow } from './horizonSelectors';
 
 const DAY_MS = 86400000;
-const PREVIEW = 6;
+// Work-ahead rule (D87 amendment, Bryan 2026-08-19): schedulers clear work AHEAD of due dates, so
+// the near bands never truncate — an expander would hide exactly the rows they came to clear.
+// Only next-week previews; Later stays collapsed to per-tail chips.
+const NEXT_WEEK_PREVIEW = 6;
 
 const fmtDay = (ms: number) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -33,6 +35,8 @@ function bandLabel(band: HorizonBand, nowMs: number, horizonDays: number): { lab
   }
 }
 
+/** Row on a diet: dot · identity (compact) · what's next. Readiness and trip number live in the
+ * drawer — the status dot plus the action chip carry the row's whole signal. */
 function Row({ row, nowMs, onOpenTrip }: { row: HorizonRow; nowMs: number; onOpenTrip: (id: string, taskId?: string) => void }) {
   const { trip, soonest, countInWindow, quiet } = row;
   const status = deriveTripStatus(trip, nowMs);
@@ -40,14 +44,10 @@ function Row({ row, nowMs, onOpenTrip }: { row: HorizonRow; nowMs: number; onOpe
   return (
     <button
       onClick={() => onOpenTrip(trip.id, soonest?.key)}
-      className={`w-full grid grid-cols-[10px_minmax(0,1.4fr)_8rem_minmax(0,1fr)] items-center gap-3 px-3.5 py-2 border-t text-left hover:bg-accent transition-colors ${quiet ? 'bg-muted/30' : 'bg-background'}`}
+      className={`w-full grid grid-cols-[10px_minmax(0,1.4fr)_minmax(0,1fr)] items-center gap-3 px-3.5 py-1.5 border-t text-left hover:bg-accent transition-colors ${quiet ? 'bg-muted/30' : 'bg-background'}`}
     >
       <span className={`w-2 h-2 rounded-full ${style.dot}`} title={style.label} />
-      <TripIdentityLine trip={trip} />
-      <span className="flex items-center gap-2">
-        <Progress value={trip.readinessScore} className="h-1 flex-1" />
-        <span className="text-[11px] font-medium text-muted-foreground w-8 text-right">{trip.readinessScore}%</span>
-      </span>
+      <TripIdentityLine trip={trip} compact />
       {trip.criticalBlocker ? (
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--gfo-error,#EF3340)] min-w-0">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -75,18 +75,19 @@ function Band({ band, rows, nowMs, horizonDays, laterByTail, onOpenTrip }: {
   laterByTail?: { tail: string; count: number }[];
   onOpenTrip: (id: string, taskId?: string) => void;
 }) {
-  // Later starts collapsed to per-tail chips; the near bands preview a handful of rows.
   const [expanded, setExpanded] = useState(false);
   const { label, range } = bandLabel(band, nowMs, horizonDays);
   const loud = rows.filter(r => !r.quiet).length;
 
+  // Near bands are the working set — never truncated (work-ahead rule above).
   const collapsedLater = band === 'later' && !expanded;
-  const shown = collapsedLater ? [] : expanded ? rows : rows.slice(0, PREVIEW);
+  const preview = band === 'next-week' && !expanded ? rows.slice(0, NEXT_WEEK_PREVIEW) : rows;
+  const shown = collapsedLater ? [] : preview;
   const hidden = rows.length - shown.length;
 
   return (
     <div>
-      <div className="flex items-baseline gap-2.5 px-3.5 pt-4 pb-1.5">
+      <div className="flex items-baseline gap-2.5 px-3.5 pt-3.5 pb-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
         <span className="text-xs text-muted-foreground">
           {range} · {rows.length} trip{rows.length === 1 ? '' : 's'}
@@ -122,9 +123,9 @@ function Band({ band, rows, nowMs, horizonDays, laterByTail, onOpenTrip }: {
 
 /**
  * Horizon — the command center's home lens (D87): one forward time spine keyed by when work is
- * due. Today is its own band; quiet trips band by departure and stay muted; Later collapses to
- * per-tail chips. The overdue strip lives in the SHELL so it persists across every lens.
- * Clicking a row opens the trip drawer focused on its soonest action.
+ * due. Due dates ORDER the spine; they never gate visibility — the whole window is the worklist
+ * (schedulers clear ahead). The office card folds to one line until worked. The overdue strip
+ * and serviceability alerts live in the SHELL's attention band.
  */
 export function HorizonView({ model, officeToday, nowMs, horizonDays, onOpenTrip, onOfficeAction }: {
   model: HorizonModel;
@@ -134,24 +135,38 @@ export function HorizonView({ model, officeToday, nowMs, horizonDays, onOpenTrip
   onOpenTrip: (tripId: string, taskId?: string) => void;
   onOfficeAction: (task: BoardTask, action: TaskAction) => void;
 }) {
+  const [officeOpen, setOfficeOpen] = useState(false);
   const total = (['today', 'this-week', 'next-week', 'later'] as const).reduce((n, b) => n + model.bands[b].length, 0);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       {officeToday.length > 0 && (
         <Card>
-          <CardContent className="px-4 py-3">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Office · due today</span>
-            </div>
-            {officeToday.map(task => (
-              <div key={task.id} className="flex items-center gap-3 py-1.5 border-t first:border-t-0">
-                <span className="text-sm flex-1 min-w-0 truncate">{task.title}</span>
-                <TaskActionButtons instance={task} onAction={a => onOfficeAction(task, a)} />
-              </div>
-            ))}
-          </CardContent>
+          <button
+            onClick={() => setOfficeOpen(v => !v)}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-accent transition-colors rounded-xl"
+          >
+            <Briefcase className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs min-w-0 truncate">
+              <span className="font-semibold">Office</span>{' '}
+              <span className="text-muted-foreground">
+                {officeToday.length} due today · next: {officeToday[0].title}
+              </span>
+            </span>
+            <span className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--gfo-info,#2F80ED)] shrink-0">
+              Work the list {officeOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </span>
+          </button>
+          {officeOpen && (
+            <CardContent className="px-4 pb-3 pt-0">
+              {officeToday.map(task => (
+                <div key={task.id} className="flex items-center gap-3 py-1.5 border-t">
+                  <span className="text-sm flex-1 min-w-0 truncate">{task.title}</span>
+                  <TaskActionButtons instance={task} onAction={a => onOfficeAction(task, a)} />
+                </div>
+              ))}
+            </CardContent>
+          )}
         </Card>
       )}
 
