@@ -8,7 +8,8 @@ export type TaskAction =
   | { kind: 'ack' }
   | { kind: 'markNa' }
   | { kind: 'note'; text: string }
-  | { kind: 'reopen'; change: ReTrigger; detail?: string; newEtdUtc?: string; newDueAtUtc?: string };
+  | { kind: 'reopen'; change: ReTrigger; detail?: string; newEtdUtc?: string; newDueAtUtc?: string }
+  | { kind: 'clearReflag' };
 
 function withAudit(inst: TaskInstance, entry: AuditEntry): TaskInstance {
   return { ...inst, auditTrail: [...inst.auditTrail, entry] };
@@ -44,6 +45,10 @@ export function applyTaskAction(
       return withAudit({ ...instance, status: 'n_a' }, audit('status:n_a'));
     case 'note':
       return withAudit({ ...instance, notes: action.text }, audit('note', action.text));
+    case 'clearReflag':
+      // Dismiss an ADVISORY re-trigger flag (D89) — the scheduler judged the cleared work still
+      // stands under the changed trip. Completion is untouched by design.
+      return withAudit({ ...instance, reflag: undefined }, audit('reflag:dismissed'));
     case 'reopen':
       // A completed/acked task whose trip changed underneath it. Reset completion + ack (which
       // re-arms computeEscalations), refresh the ETD/due anchor, and flag it for the badge.

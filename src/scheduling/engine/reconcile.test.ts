@@ -21,7 +21,7 @@ const defs = (arr: TaskDefinition[]) => new Map(arr.map((d) => [d.id, d]));
 const NO_CHANGE: TripDiff = { aircraftChanged: false, legChanges: {} };
 
 describe('reconcileTrip', () => {
-  it('re-opens a completed task on passenger add; a non-re-triggering task stays done', () => {
+  it('FLAGS a completed task on passenger add (advisory, D89); a non-re-triggering task stays done', () => {
     const existing = [
       inst({ taskDefId: 'pax', status: 'done', completedBy: 'x', completedAtUtc: NOW }),
       inst({ taskDefId: 'catering', status: 'done', completedBy: 'x', completedAtUtc: NOW }),
@@ -31,19 +31,20 @@ describe('reconcileTrip', () => {
     const plan = reconcileTrip(existing, desired, diff, defs([def('pax', ['passengerChange']), def('catering')]), 'system', NOW);
 
     const pax = plan.toUpdate.find((i) => i.taskDefId === 'pax');
-    expect(pax?.status).toBe('open');
+    expect(pax?.status).toBe('done');           // advisory: cleared work stays cleared
+    expect(pax?.completedBy).toBe('x');         // completion is never wiped by a trip change
     expect(pax?.reflag).toEqual({ change: 'passengerChange' });
     expect(plan.toUpdate.some((i) => i.taskDefId === 'catering')).toBe(false); // untouched
   });
 
-  it('re-opens a leg task on reschedule and refreshes its dueAtUtc to the desired value', () => {
+  it('flags a completed leg task on reschedule and refreshes its dueAtUtc to the desired value', () => {
     const existing = [inst({ taskDefId: 'ppr', legId: 'L1', airportRole: 'arrival', status: 'done', completedBy: 'x', dueAtUtc: '2026-07-09T16:00:00.000Z' })];
     const desired = [inst({ taskDefId: 'ppr', legId: 'L1', airportRole: 'arrival', dueAtUtc: '2026-07-11T16:00:00.000Z', etdUtc: '2026-07-12T16:00:00.000Z' })];
     const diff: TripDiff = { aircraftChanged: false, legChanges: { L1: { rescheduled: true, paxDelta: 0 } } };
     const plan = reconcileTrip(existing, desired, diff, defs([def('ppr', ['legScheduleChange'])]), 'system', NOW);
 
     const ppr = plan.toUpdate.find((i) => i.taskDefId === 'ppr');
-    expect(ppr?.status).toBe('open');
+    expect(ppr?.status).toBe('done');           // advisory (D89)
     expect(ppr?.reflag).toEqual({ change: 'legScheduleChange' });
     expect(ppr?.dueAtUtc).toBe('2026-07-11T16:00:00.000Z');
   });
@@ -102,5 +103,19 @@ describe('reconcileTrip', () => {
     expect(c?.status).toBe('cancelled');
     expect(c?.completedBy).toBe('x'); // history preserved
     expect(c?.auditTrail.at(-1)).toMatchObject({ action: 'cancelled', detail: 'no longer applies' });
+  });
+});
+
+describe('D89 follow-ups (review catches)', () => {
+  it('cancelling a leg clears a prior advisory reflag — no Dismiss/Redo on dead work', () => {
+    const flagged = inst({
+      taskDefId: 'ppr', legId: 'L1', airportRole: 'arrival',
+      status: 'done', completedBy: 'x', completedAtUtc: NOW,
+      reflag: { change: 'legScheduleChange' },
+    });
+    const plan = reconcileTrip([flagged], [], NO_CHANGE, defs([def('ppr', ['legScheduleChange'])]), 'system', NOW);
+    const cancelled = plan.toUpdate.find((i) => i.taskDefId === 'ppr');
+    expect(cancelled?.status).toBe('cancelled');
+    expect(cancelled?.reflag).toBeUndefined();
   });
 });
