@@ -5,11 +5,12 @@ import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import {
   Users, ShieldAlert, Utensils, ChevronRight, ChevronLeft, Clock, Truck, Phone,
-  List, GalleryHorizontal, UserPlus,
+  List, GalleryHorizontal, UserPlus, Pencil,
 } from 'lucide-react';
 import { usePassengers } from '../passengers/PassengerContext';
 import type { Passenger } from '../passengers/passengerData';
 import PassengerProfilePanel from '../passengers/PassengerProfilePanel';
+import PassengerProfileEditor from '../passengers/PassengerProfileEditor';
 import { tripWindow } from './engine/menuPlan';
 import { buildFaTrips } from './faTrips';
 import type { FaCateringOrder, FaTrip } from './faTrips';
@@ -196,7 +197,7 @@ function GuestRow({ guest, showLegs, onOpen }: {
 function GuestDeck({ guests, showLegs, onOpen }: {
   guests: RosterGuest[];
   showLegs: boolean;
-  onOpen: (g: RosterGuest) => void;
+  onOpen: (g: RosterGuest, mode?: 'read' | 'edit') => void;
 }) {
   const [i, setI] = useState(0);
   // Clamp rather than reset: changing the leg filter shortens the deck, and snapping
@@ -237,7 +238,8 @@ function GuestDeck({ guests, showLegs, onOpen }: {
             <p className="text-sm text-muted-foreground mt-3">No profile yet — nothing recorded beyond the booking.</p>
           )}
 
-          <Button variant="outline" className="w-full h-11 mt-4" onClick={() => onOpen(g)}>
+          <Button variant="outline" className="w-full h-11 mt-4"
+            onClick={() => onOpen(g, hasProfileContent(p) ? 'read' : 'edit')}>
             {hasProfileContent(p) ? 'Open profile' : <><UserPlus className="w-4 h-4" /> Start a profile</>}
           </Button>
         </CardContent>
@@ -288,7 +290,7 @@ function TripRoster({ trip, passengers, now, onOpenGuest }: {
   trip: FaTrip;
   passengers: Passenger[];
   now: Date;
-  onOpenGuest: (g: RosterGuest) => void;
+  onOpenGuest: (g: RosterGuest, mode?: 'read' | 'edit') => void;
 }) {
   const [legFilter, setLegFilter] = useState<number | null>(null);
   const [view, setView] = useState<'list' | 'deck'>(() => {
@@ -381,6 +383,9 @@ export default function FlightAttendantFlights() {
   const now = useMemo(() => new Date(), []);
   const trips = useMemo(() => buildFaTrips(now), [now]);
   const [openGuest, setOpenGuest] = useState<RosterGuest | null>(null);
+  const [editing, setEditing] = useState(false);
+
+  const open = (g: RosterGuest, mode: 'read' | 'edit' = 'read') => { setOpenGuest(g); setEditing(mode === 'edit'); };
 
   // No padding of our own: Navigation's <main> already pads (p-6 pb-20 md:pb-6).
   return (
@@ -391,31 +396,53 @@ export default function FlightAttendantFlights() {
       </div>
 
       {trips.map((trip) => (
-        <TripRoster key={trip.id} trip={trip} passengers={passengers} now={now} onOpenGuest={setOpenGuest} />
+        <TripRoster key={trip.id} trip={trip} passengers={passengers} now={now} onOpenGuest={open} />
       ))}
 
       {/* A centred modal, not a side sheet: used one-handed on an iPhone and two-handed
           on an iPad, where a right-edge panel is the far corner of the screen. */}
-      <Dialog open={!!openGuest} onOpenChange={(o: boolean) => { if (!o) setOpenGuest(null); }}>
+      <Dialog open={!!openGuest} onOpenChange={(o: boolean) => { if (!o) { setOpenGuest(null); setEditing(false); } }}>
         <DialogContent className="sm:max-w-xl">
           {openGuest && (
             <>
-              <DialogHeader className={openGuest.passenger ? 'sr-only' : undefined}>
-                <DialogTitle className={openGuest.passenger ? undefined : 'text-lg'}>
-                  {openGuest.passenger ? 'Passenger profile' : openGuest.displayName}
+              <DialogHeader className={openGuest.passenger && !editing ? 'sr-only' : undefined}>
+                <DialogTitle className={openGuest.passenger && !editing ? undefined : 'text-lg'}>
+                  {editing
+                    ? (hasProfileContent(openGuest.passenger) ? `Editing ${openGuest.displayName}` : `New profile — ${openGuest.displayName}`)
+                    : openGuest.passenger ? 'Passenger profile' : openGuest.displayName}
                 </DialogTitle>
                 <DialogDescription>
-                  {openGuest.passenger
-                    ? `${openGuest.passenger.name} · ${openGuest.passenger.role}`
-                    : 'On the manifest, with no passenger record behind the booking id.'}
+                  {editing
+                    ? 'Preferences and cabin notes. Allergies come from the booking and are locked.'
+                    : openGuest.passenger
+                      ? `${openGuest.passenger.name} · ${openGuest.passenger.role}`
+                      : 'On the manifest, with no passenger record behind the booking id.'}
                 </DialogDescription>
               </DialogHeader>
 
-              {openGuest.passenger
-                ? <PassengerProfilePanel passenger={openGuest.passenger} />
-                : <DietaryBand guest={openGuest} className="mt-2" />}
+              {editing ? (
+                <PassengerProfileEditor
+                  passenger={openGuest.passenger}
+                  manifestId={openGuest.id}
+                  displayName={openGuest.displayName}
+                  onDone={() => { setEditing(false); setOpenGuest(null); }}
+                />
+              ) : (
+                <>
+                  {openGuest.passenger
+                    ? <PassengerProfilePanel passenger={openGuest.passenger} />
+                    : <DietaryBand guest={openGuest} className="mt-2" />}
 
-              <Button variant="outline" className="w-full h-12" onClick={() => setOpenGuest(null)}>Close</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1 h-12" onClick={() => { setOpenGuest(null); setEditing(false); }}>Close</Button>
+                    <Button className="flex-1 h-12" onClick={() => setEditing(true)}>
+                      {hasProfileContent(openGuest.passenger)
+                        ? <><Pencil className="w-4 h-4" /> Edit</>
+                        : <><UserPlus className="w-4 h-4" /> Start a profile</>}
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </DialogContent>
