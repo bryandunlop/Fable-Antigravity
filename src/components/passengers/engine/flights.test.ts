@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  getFlightPassengers, flightAllergyAlerts, countCriticalAllergies, addPhotoTo, removePhotoFrom,
+  getFlightPassengers, resolveTripGuests, dietaryState, flightAllergyAlerts, countCriticalAllergies,
+  addPhotoTo, removePhotoFrom,
 } from './flights';
 import type { Passenger, PassengerPhoto } from '../passengerData';
 
@@ -16,8 +17,54 @@ const B = pax('PAX002', 'Sarah');
 const C = pax('PAX003', 'Michael', [{ allergen: 'Shellfish', severity: 'Mild' }]);
 const ALL = [A, B, C];
 
+describe('resolveTripGuests', () => {
+  // The whole point: an id with no record is a GUEST WE KNOW NOTHING ABOUT, not an
+  // absent guest. Dropping it understates the manifest — on a screen whose job is
+  // "who is on board", a silently shorter list is the worst failure available.
+  it('keeps every id, in order, with null for the ones it cannot resolve', () => {
+    const guests = resolveTripGuests(['PAX003', 'NOPE', 'PAX001'], ALL);
+    expect(guests.map((g) => g.id)).toEqual(['PAX003', 'NOPE', 'PAX001']);
+    expect(guests.map((g) => g.passenger?.name ?? null)).toEqual(['Michael', null, 'Robert']);
+  });
+  it('does not shrink the count when nothing resolves', () => {
+    expect(resolveTripGuests(['GHOST1', 'GHOST2'], ALL)).toHaveLength(2);
+  });
+  it('returns empty for no ids', () => {
+    expect(resolveTripGuests([], ALL)).toEqual([]);
+  });
+});
+
+describe('dietaryState', () => {
+  it('is ALLERGIES when a structured allergen is recorded', () => {
+    expect(dietaryState({ id: 'PAX001', passenger: A })).toBe('ALLERGIES');
+  });
+  it('is FLAGGED_NO_DETAIL when the booking flag is set but no allergen is named', () => {
+    expect(dietaryState({ id: 'x', passenger: { ...B, allergyFlagged: true } })).toBe('FLAGGED_NO_DETAIL');
+  });
+  it('prefers named allergens over the bare flag', () => {
+    expect(dietaryState({ id: 'x', passenger: { ...A, allergyFlagged: true } })).toBe('ALLERGIES');
+  });
+  it('is CONFIRMED_NONE only when someone asked and dated it', () => {
+    expect(dietaryState({ id: 'x', passenger: { ...B, dietaryConfirmedAtUtc: '2026-08-12T00:00:00Z' } }))
+      .toBe('CONFIRMED_NONE');
+  });
+  it('never lets a confirmation date outrank a recorded allergen', () => {
+    expect(dietaryState({ id: 'x', passenger: { ...A, dietaryConfirmedAtUtc: '2026-08-12T00:00:00Z' } }))
+      .toBe('ALLERGIES');
+  });
+  it('is NONE_ON_FILE for an empty record — an empty array is not a confirmation', () => {
+    expect(dietaryState({ id: 'PAX002', passenger: B })).toBe('NONE_ON_FILE');
+  });
+  it('is NONE_ON_FILE for a guest with no record at all', () => {
+    expect(dietaryState({ id: 'GHOST', passenger: null })).toBe('NONE_ON_FILE');
+  });
+});
+
 describe('getFlightPassengers', () => {
-  it('resolves ids in order and skips unknowns', () => {
+  // Deliberately lossy, and now derived from resolveTripGuests: this one answers
+  // "which records do we have", so callers that need the full manifest must use
+  // resolveTripGuests instead.
+  it('drops unknown ids by design, keeping order', () => {
     expect(getFlightPassengers(['PAX003', 'PAX001', 'NOPE'], ALL).map((p) => p.name)).toEqual(['Michael', 'Robert']);
   });
   it('returns empty for no ids', () => {

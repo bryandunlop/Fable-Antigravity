@@ -81,7 +81,10 @@ export function buildFaTrips(now: Date): FaTrip[] {
           destination: 'KLAX',
           departureUtc: at(now, 1, 9),
           arrivalUtc: at(now, 1, 15),
-          passengerIds: ['PAX001', 'PAX003', 'PAX005'],
+          // Five booked: two profiles, two booking stubs, and one id with no record
+          // at all. The dangling id is deliberate — it is what a stale manifest looks
+          // like, and the roster must still show five.
+          passengerIds: ['PAX001', 'PAX003', 'PAX007', 'PAX008', 'PAX-9902'],
           catering: {
             caterer: 'Air Culinaire Worldwide — Teterboro',
             contactPerson: 'Dana Reyes',

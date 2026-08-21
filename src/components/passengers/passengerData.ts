@@ -30,6 +30,16 @@ export interface Passenger {
   };
   role: string;
   allergies: PassengerAllergy[];
+  /** myairops' Booking API carries an allergy FLAG on the passenger, not a structured
+   *  allergen list. True means the booking said "has allergies" without giving us
+   *  anything a galley can act on. Distinct from `allergies` having entries: most
+   *  passengers a year arrive this way, with a flag and nothing else. */
+  allergyFlagged?: boolean;
+  /** When someone last asked this passenger about allergies and recorded the answer.
+   *  ABSENT MEANS NOBODY ASKED, which is not the same as "no allergies" — an empty
+   *  `allergies` array cannot tell those two apart on its own, and rendering the
+   *  empty case as safe is how a screen lies. Only a dated confirmation earns green. */
+  dietaryConfirmedAtUtc?: string;
   birthday: string;
   beverage: string[];
   food: string[];
@@ -75,6 +85,7 @@ export const SEED_PASSENGERS: Passenger[] = [
     info: { email: 'sarah.chen@techcorp.com', phone: '+1 (555) 987-6543' },
     role: 'CEO',
     allergies: [],
+    dietaryConfirmedAtUtc: '2026-08-04T00:00:00Z',
     birthday: '1985-08-22',
     beverage: ['Green tea', 'Kombucha', 'Sparkling water', 'Oat milk latte'],
     food: ['Vegetarian meals', 'Quinoa bowls', 'Mediterranean salads', 'Fresh fruit', 'Japanese cuisine', 'Plant-based options'],
@@ -147,6 +158,7 @@ export const SEED_PASSENGERS: Passenger[] = [
     info: { email: 'p.alvarez@email.com', phone: '+1 (555) 456-1230' },
     role: 'Board Member',
     allergies: [],
+    dietaryConfirmedAtUtc: '2026-08-12T00:00:00Z',
     birthday: '1968-11-28',
     beverage: ['Cabernet Sauvignon', 'Sparkling water', 'Chamomile tea'],
     food: ['Mediterranean cuisine', 'Grilled fish', 'Fresh vegetables', 'Dark chocolate'],
@@ -156,5 +168,34 @@ export const SEED_PASSENGERS: Passenger[] = [
       specialRequests: 'Prefers a blanket at cruise altitude, sparkling water on arrival',
     },
     additionalNotes: 'Long-serving board member. Warm and gracious; enjoys light conversation and Mediterranean fare.',
+  },
+  {
+    // A booking stub, not a profile. This is the shape roughly 950 of the ~1,000
+    // passengers a year arrive in: a name, a flag, and nothing a galley can act on.
+    id: 'PAX007',
+    name: 'Helen Marchetti',
+    info: {},
+    role: 'Guest',
+    allergies: [],
+    allergyFlagged: true,
+    birthday: '',
+    beverage: [],
+    food: [],
+    passengerComfort: {},
+    additionalNotes: '',
+  },
+  {
+    // The same stub without the flag — the neutral state. No colour, because nobody
+    // has asked; not green, because we do not know.
+    id: 'PAX008',
+    name: 'Aditya Rao',
+    info: {},
+    role: 'Guest',
+    allergies: [],
+    birthday: '',
+    beverage: [],
+    food: [],
+    passengerComfort: {},
+    additionalNotes: '',
   },
 ];
