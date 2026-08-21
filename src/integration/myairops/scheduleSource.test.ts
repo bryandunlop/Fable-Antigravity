@@ -20,7 +20,10 @@ describe('loadMyairopsTripMirrors', () => {
     expect(r.primary?.leg.departureIcao).toBe('KLUK');
     expect(r.primary?.leg.arrivalIcao).toBe('KTEB');
     expect(r.alternate).toMatchObject({ kind: 'next_departure' });
-    expect(r.alternate?.leg.arrivalIcao).toBe('KLUK');
+    // MAO-7315 is a four-leg northeast day, so the next departure is leg 2 out to Boston — not the
+    // ride home, which is now leg 4.
+    expect(r.alternate?.leg.departureIcao).toBe('KTEB');
+    expect(r.alternate?.leg.arrivalIcao).toBe('KBOS');
   });
 
   it('leaves the days-out scenario tails unresolvable, so nothing is silently invented', () => {

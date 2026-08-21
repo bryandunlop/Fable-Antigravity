@@ -6,6 +6,7 @@ import { getDefaultState } from '../tech-log/mockData/scenarios';
 import { selectPilotFlights } from './selectors';
 import { groupTripsByHorizon } from './myFlights';
 import { deriveDayOfQueue, beforePushProgress } from './dayOfQueue';
+import { deriveDayTimeline, legsRemaining } from './dayTimeline';
 import { derivePaneMode } from './paneMode';
 import { completedVisibleItems } from './tripPrep';
 
@@ -43,7 +44,8 @@ describe('the first flight in the pilot Flight Hub is demo-ready', () => {
   it('has a tech-log mirror, so the hub opens on a real board rather than "0 legs"', () => {
     const tlTrip = getDefaultState().trips.find((t) => t.tripNumber === 'MAO-7315');
     const legs = tlTrip?.legs ?? [];
-    expect(legs).toHaveLength(2);
+    // A four-leg northeast day: one flown, three still to fly, so "your day" has something to show.
+    expect(legs).toHaveLength(4);
     // Leg 1 flown and fully worked; leg 2 is the one still to fly.
     expect(legs[0].fratStatus).toBe('COMPLETED');
     expect(legs[0].fuelRequestId).toBeTruthy();
@@ -57,11 +59,18 @@ describe('the first flight in the pilot Flight Hub is demo-ready', () => {
     expect(derivePaneMode(tlTrip.legs ?? [], now).auto).toBe('day-of');
 
     const queue = deriveDayOfQueue(tlTrip, ac, now);
-    // A resumable FRAT draft and an airport review — two things to click, neither of them a
-    // missed boundary (nothing 'locked', which would read as the demo having gone wrong).
-    expect(queue.map((q) => q.kind).sort()).toEqual(['airport', 'frat']);
+    // Work spread down the legs ahead, with a resumable FRAT draft on the next one. Nothing
+    // 'locked': a missed boundary reads as the demo having gone wrong rather than as work to do.
+    expect(queue.length).toBeGreaterThan(2);
     expect(queue.some((q) => q.state === 'locked')).toBe(false);
     expect(queue.find((q) => q.kind === 'frat')?.state).toBe('draft');
+
+    // The day timeline is what the pane renders: legs interleaved with the ground time between
+    // them, and exactly one entry marking where the day has got to.
+    const day = deriveDayTimeline(tlTrip, ac, now);
+    expect(legsRemaining(day)).toBe(3);
+    expect(day.filter((e) => e.state === 'current')).toHaveLength(1);
+    expect(day.some((e) => e.kind === 'ground')).toBe(true);
 
     expect(beforePushProgress(tlTrip, ac, now).total).toBeGreaterThan(0);
   });
