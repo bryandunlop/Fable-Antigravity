@@ -2,9 +2,10 @@ import React from 'react';
 import { Badge } from '../ui/badge';
 import {
   ShieldAlert, ThumbsDown, Utensils, Coffee, FileText, Cake, Mail, Phone, MapPin,
-  Thermometer, Armchair, Tv, Lightbulb, Sparkles,
+  Thermometer, Armchair, Tv, Lightbulb, Sparkles, AlertTriangle,
 } from 'lucide-react';
 import type { Passenger, PassengerAllergy } from './passengerData';
+import { conflictingItems } from './engine/profileEdits';
 
 // Two categories only: allergies (medical) are red, dislikes (preference) are yellow.
 // Kept identical to the flight-attendant leg view so a badge means the same thing in
@@ -70,6 +71,26 @@ export default function PassengerProfilePanel({
   ];
   const hasComfort = comfortLines.some(([, v]) => v) || !!comfort.specialRequests;
 
+  // A favourite that names something on this person's allergy list is worse than no
+  // favourite — it invites someone to serve the thing that hurts them. The editor
+  // already flags it; this is the surface a crew member actually reads before service.
+  const allergens = passenger.allergies.map((a) => a.allergen);
+  const foodConflicts = conflictingItems(passenger.food, allergens);
+  const drinkConflicts = conflictingItems(passenger.beverage, allergens);
+  const conflicts = [...foodConflicts, ...drinkConflicts];
+
+  const prefList = (items: string[], bad: string[]) =>
+    items.length === 0 ? <p className="text-sm">—</p> : (
+      <p className="text-sm">
+        {items.map((x, i) => (
+          <React.Fragment key={x}>
+            {i > 0 && ', '}
+            <span className={bad.includes(x) ? 'line-through text-red-700 dark:text-red-300 font-medium' : undefined}>{x}</span>
+          </React.Fragment>
+        ))}
+      </p>
+    );
+
   return (
     <div className="space-y-5">
       <div>
@@ -96,7 +117,18 @@ export default function PassengerProfilePanel({
 
       <Section title="Allergies" icon={ShieldAlert}>
         {passenger.allergies.length === 0 ? (
-          <p className="text-sm text-emerald-700 dark:text-emerald-300">No allergies on file.</p>
+          // An empty array is not a confirmation. Green is earned only by someone
+          // asking and recording the date — otherwise this contradicted the trip
+          // roster, which says "no allergy information on file" for the same person.
+          passenger.dietaryConfirmedAtUtc ? (
+            <p className="text-sm text-emerald-700 dark:text-emerald-300">
+              No allergies — confirmed {new Date(passenger.dietaryConfirmedAtUtc).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })}.
+            </p>
+          ) : passenger.allergyFlagged ? (
+            <p className="text-sm text-red-700 dark:text-red-300">Allergies flagged on the booking — no allergen named, no severity.</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No allergy information on file — nobody has recorded an answer.</p>
+          )
         ) : (
           <div className="space-y-2">
             {passenger.allergies.map((a, i) => (
@@ -115,6 +147,17 @@ export default function PassengerProfilePanel({
         )}
       </Section>
 
+      {conflicts.length > 0 && (
+        <p className="rounded-lg border-2 border-red-300 dark:border-red-400/50 px-3 py-2 text-xs flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-700 dark:text-red-300" />
+          <span>
+            <span className="font-semibold text-red-800 dark:text-red-200">{conflicts.join(', ')}</span>{' '}
+            {conflicts.length === 1 ? 'is' : 'are'} recorded as a favourite and also named on this
+            passenger’s allergy list. Do not serve on the strength of this record — get it corrected.
+          </span>
+        </p>
+      )}
+
       {dislikes.length > 0 && (
         <Section title="Dislikes" icon={ThumbsDown}>
           <div className="flex flex-wrap gap-1.5">
@@ -127,10 +170,10 @@ export default function PassengerProfilePanel({
 
       <div className="grid sm:grid-cols-2 gap-4">
         <Section title="Food" icon={Utensils}>
-          <p className="text-sm">{passenger.food.length ? passenger.food.join(', ') : '—'}</p>
+          {prefList(passenger.food, foodConflicts)}
         </Section>
         <Section title="Beverage" icon={Coffee}>
-          <p className="text-sm">{passenger.beverage.length ? passenger.beverage.join(', ') : '—'}</p>
+          {prefList(passenger.beverage, drinkConflicts)}
         </Section>
       </div>
 

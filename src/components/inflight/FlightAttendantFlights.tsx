@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import {
   Users, ShieldAlert, Utensils, ChevronRight, ChevronLeft, Clock, Truck, Phone,
-  List, GalleryHorizontal, UserPlus, Pencil,
+  List, GalleryHorizontal, UserPlus, Pencil, ChevronDown,
 } from 'lucide-react';
 import { usePassengers } from '../passengers/PassengerContext';
 import type { Passenger } from '../passengers/passengerData';
@@ -15,6 +15,7 @@ import { tripWindow } from './engine/menuPlan';
 import { buildFaTrips } from './faTrips';
 import type { FaCateringOrder, FaTrip } from './faTrips';
 import { rosterFor, summarise, splitAllergens, legByNumber, bandKind, hasProfileContent } from './faTripRoster';
+import { conflictingItems } from '../passengers/engine/profileEdits';
 import type { RosterGuest } from './faTripRoster';
 
 // This screen is a BRIEFING: who is on the trip, and what they cannot eat. It does not
@@ -106,11 +107,28 @@ function DietaryBand({ guest, className = '' }: { guest: RosterGuest; className?
   );
 }
 
-/** A one-line taste of the profile, or an honest blank. Never invented, never padded. */
-function preferenceLine(p: Passenger | null): string {
-  if (!p) return '';
-  const bits = [p.food.slice(0, 3).join(', '), p.beverage.slice(0, 2).join(', ')].filter(Boolean);
-  return bits.join(' · ');
+/** A one-line taste of the profile, or an honest blank. Never invented, never padded.
+ *  Conflicting entries are struck through rather than dropped — hiding one would make
+ *  the record look clean while the contradiction stayed in it. */
+function PreferenceLine({ p }: { p: Passenger | null }) {
+  if (!p) return null;
+  const shown = [...p.food.slice(0, 3), ...p.beverage.slice(0, 2)];
+  if (shown.length === 0) return null;
+  const bad = conflictingItems(shown, p.allergies.map((a) => a.allergen));
+  return (
+    <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">
+      {shown.map((x, i) => (
+        <React.Fragment key={x}>
+          {i > 0 && ' · '}
+          <span className={bad.includes(x) ? 'line-through text-red-700 dark:text-red-300 font-medium' : undefined}>{x}</span>
+        </React.Fragment>
+      ))}
+    </p>
+  );
+}
+
+function hasPreferences(p: Passenger | null): boolean {
+  return Boolean(p && (p.food.length > 0 || p.beverage.length > 0));
 }
 
 function LegTabs({ trip, value, onChange }: {
@@ -170,7 +188,6 @@ function GuestRow({ guest, showLegs, onOpen }: {
   showLegs: boolean;
   onOpen: () => void;
 }) {
-  const pref = preferenceLine(guest.passenger);
   return (
     <button
       onClick={onOpen}
@@ -185,8 +202,8 @@ function GuestRow({ guest, showLegs, onOpen }: {
         </div>
         {guest.passenger && <p className="text-xs text-muted-foreground mt-0.5">{guest.passenger.role}</p>}
         <DietaryBand guest={guest} className="mt-1.5" />
-        {pref
-          ? <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{pref}</p>
+        {hasPreferences(guest.passenger)
+          ? <PreferenceLine p={guest.passenger} />
           : <p className="text-xs text-muted-foreground mt-1.5">No profile yet.</p>}
       </div>
       <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
@@ -207,14 +224,25 @@ function GuestDeck({ guests, showLegs, onOpen }: {
   if (!g) return null;
 
   const p = g.passenger;
-  const chips = (label: string, items: string[]) => items.length > 0 && (
-    <div className="mt-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <div className="flex flex-wrap gap-1 mt-1.5">
-        {items.map((x) => <span key={x} className="rounded border bg-muted/40 px-2 py-1 text-xs">{x}</span>)}
+  const allergens = p?.allergies.map((a) => a.allergen) ?? [];
+  const chips = (label: string, items: string[]) => {
+    if (items.length === 0) return false;
+    const bad = conflictingItems(items, allergens);
+    return (
+      <div className="mt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {items.map((x) => (
+            <span key={x} className={`rounded border px-2 py-1 text-xs ${
+              bad.includes(x)
+                ? 'border-red-300 bg-red-50 text-red-900 line-through dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-100'
+                : 'bg-muted/40'
+            }`}>{x}</span>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div>
@@ -286,12 +314,17 @@ function CateringReference({ order }: { order: FaCateringOrder }) {
   );
 }
 
-function TripRoster({ trip, passengers, now, onOpenGuest }: {
+function TripRoster({ trip, passengers, now, defaultOpen, onOpenGuest }: {
   trip: FaTrip;
   passengers: Passenger[];
   now: Date;
+  /** The nearest trip opens; later ones start collapsed to a summary row. An FA has a
+   *  handful of trips ahead and cares about the next one — but the later ones have to
+   *  be reachable, and stacking three full rosters is four screens of scroll. */
+  defaultOpen: boolean;
   onOpenGuest: (g: RosterGuest, mode?: 'read' | 'edit') => void;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [legFilter, setLegFilter] = useState<number | null>(null);
   const [view, setView] = useState<'list' | 'deck'>(() => {
     try { return localStorage.getItem(VIEW_KEY) === 'deck' ? 'deck' : 'list'; } catch { return 'list'; }
@@ -303,6 +336,9 @@ function TripRoster({ trip, passengers, now, onOpenGuest }: {
 
   const guests = useMemo(() => rosterFor(trip, passengers, legFilter), [trip, passengers, legFilter]);
   const summary = useMemo(() => summarise(guests), [guests]);
+  // Trip-wide, regardless of the leg filter — a collapsed card has to say something
+  // useful about the whole trip, not about whichever leg was last selected.
+  const tripSummary = useMemo(() => summarise(rosterFor(trip, passengers, null)), [trip, passengers]);
   const leg = legByNumber(trip, legFilter);
   const window = tripWindow(trip);
   const foodAllergens = splitAllergens(summary.allergens).food;
@@ -316,10 +352,17 @@ function TripRoster({ trip, passengers, now, onOpenGuest }: {
             the right-hand cluster is ~170pt of a 327pt row, which leaves the title no
             room to be a title. */}
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-base sm:text-lg font-semibold truncate">{trip.tripNumber}</h2>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="flex items-center gap-2 min-w-0 flex-1 text-left -my-1 py-1 rounded hover:bg-muted/60"
+          >
+            <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform duration-fast ease-gfo ${open ? '' : '-rotate-90'}`} />
+            <h2 className="text-base sm:text-lg font-semibold truncate">{trip.tripNumber}</h2>
+          </button>
           <div className="flex items-center gap-2 shrink-0">
             <Badge variant="secondary">{untilDeparture(trip.legs[0]?.departureUtc ?? '', now)}</Badge>
-            <ViewToggle value={view} onChange={setViewPersisted} />
+            {open && <ViewToggle value={view} onChange={setViewPersisted} />}
           </div>
         </div>
         <p className="text-sm text-muted-foreground">{trip.tripName}</p>
@@ -327,12 +370,28 @@ function TripRoster({ trip, passengers, now, onOpenGuest }: {
           {trip.tail} · {trip.aircraftType}
           {window && <> · {fmtDate(window.startUtc)} – {fmtDate(window.endUtc)}</>}
         </p>
+        {!open && (
+          <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>{tripSummary.total} guest{tripSummary.total === 1 ? '' : 's'}</span>
+            <span>{trip.legs.length} leg{trip.legs.length === 1 ? '' : 's'}</span>
+            {(tripSummary.allergens.length > 0 || tripSummary.flaggedNoDetail > 0) && (
+              <span className="text-red-700 dark:text-red-300 font-medium flex items-center gap-1">
+                <ShieldAlert className="w-3 h-3 shrink-0" />
+                {tripSummary.allergens.length > 0
+                  ? splitAllergens(tripSummary.allergens).food.join(', ') || 'allergies on board'
+                  : 'allergies flagged'}
+              </span>
+            )}
+          </p>
+        )}
+      </CardHeader>
+
+      {open && (
+      <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
           <Users className="w-3 h-3 shrink-0" /><span className="truncate">{trip.cabinCrew.join(', ')}</span>
         </p>
-      </CardHeader>
 
-      <CardContent className="space-y-3">
         <LegTabs trip={trip} value={legFilter} onChange={setLegFilter} />
 
         {leg && (
@@ -374,6 +433,7 @@ function TripRoster({ trip, passengers, now, onOpenGuest }: {
 
         {leg?.catering && <CateringReference order={leg.catering} />}
       </CardContent>
+      )}
     </Card>
   );
 }
@@ -392,11 +452,15 @@ export default function FlightAttendantFlights() {
     <div className="max-w-3xl mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Upcoming trips</h1>
-        <p className="text-sm text-muted-foreground mt-1">Who is on board, and what they cannot eat.</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Who is on board, and what they cannot eat.
+          {trips.length > 1 && <> {trips.length} trips assigned — later ones are folded.</>}
+        </p>
       </div>
 
-      {trips.map((trip) => (
-        <TripRoster key={trip.id} trip={trip} passengers={passengers} now={now} onOpenGuest={open} />
+      {trips.map((trip, i) => (
+        <TripRoster key={trip.id} trip={trip} passengers={passengers} now={now}
+          defaultOpen={i === 0} onOpenGuest={open} />
       ))}
 
       {/* A centred modal, not a side sheet: used one-handed on an iPhone and two-handed
