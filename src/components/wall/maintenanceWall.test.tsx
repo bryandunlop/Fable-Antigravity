@@ -86,8 +86,11 @@ describe('OpsWallView (D88)', () => {
     expect(screen.getByText('GROUNDED')).toBeInTheDocument();
     expect(screen.getByText(/maintenance release required before dispatch/)).toBeInTheDocument();
     // N5PG (AMBER) flies today, so its lane shows the flight block and the MEL
-    // note lives in the lane label.
-    expect(screen.getByText(/MEL C · 6d left/)).toBeInTheDocument();
+    // note lives in the lane label — which states the DUE DATE, not a countdown
+    // (Bryan 2026-08-19: the wall follows the act-from convention).
+    // 2026-08-26T03:59Z is Aug 25, 23:59 EDT.
+    expect(screen.getByText(/MEL C · Aug 25 · 23:59 EDT/)).toBeInTheDocument();
+    expect(screen.queryByText(/d left/)).not.toBeInTheDocument();
     expect(screen.getByText(/LUK → MIA · 4 pax/)).toBeInTheDocument();
     expect(screen.getByText('CREW DUTY')).toBeInTheDocument();
     expect(screen.getByText('NOW')).toBeInTheDocument();

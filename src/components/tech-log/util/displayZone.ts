@@ -67,9 +67,30 @@ export function formatRegulatoryCompact(iso: string, mode: DisplayZoneMode, gove
  * NOT for CAMP coming-due dates — those are calendar days (due DURING that day), a different
  * convention that formatRegulatoryCompact already renders correctly. */
 export function formatRegulatoryDeadline(iso: string, mode: DisplayZoneMode, governingZone: string, device?: string): string {
+  const f = deadlineParts(iso, mode, governingZone, device);
+  return `${f.date} · ${f.time} ${f.zoneLabel}`;
+}
+
+/**
+ * The same END boundary for a surface with no room for a year — a hangar-TV lane label.
+ * Identical day-shift to formatRegulatoryDeadline (that is the whole reason this exists rather
+ * than callers slicing the long string or reformatting the raw instant, either of which would
+ * quietly reintroduce LG-195's day-late read). Drops ONLY the year.
+ */
+export function formatRegulatoryDeadlineShort(iso: string, mode: DisplayZoneMode, governingZone: string, device?: string): string {
+  const f = deadlineParts(iso, mode, governingZone, device);
+  // "Aug 18, 2026" -> "Aug 18". The year is the only thing a tight surface may drop; the
+  // day and time carry the regulatory meaning.
+  return `${f.date.replace(/,\s*\d{4}$/, '')} · ${f.time} ${f.zoneLabel}`;
+}
+
+/**
+ * An END boundary resolved to the parts that should be DISPLAYED: a midnight boundary becomes
+ * the previous day at 23:59 (PL-25's idiom), everything else passes through untouched.
+ */
+function deadlineParts(iso: string, mode: DisplayZoneMode, governingZone: string, device?: string): FormattedInstant {
   const f = formatRegulatoryInstant(iso, mode, governingZone, device);
-  if (f.time !== '00:00') return `${f.date} · ${f.time} ${f.zoneLabel}`;
+  if (f.time !== '00:00') return f;
   const lastMinute = new Date(new Date(iso).getTime() - 60_000).toISOString();
-  const p = formatRegulatoryInstant(lastMinute, mode, governingZone, device);
-  return `${p.date} · ${p.time} ${p.zoneLabel}`;
+  return formatRegulatoryInstant(lastMinute, mode, governingZone, device);
 }

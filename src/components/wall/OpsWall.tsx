@@ -7,11 +7,19 @@ import StationWeatherStrip from '../ops-wall/StationWeatherStrip';
 import { RAG_DOT } from '../ops-wall/ragColors';
 import WallChrome, { useWallClock } from './WallChrome';
 import { hhmmToMinutes, legBlockPct, pctOnAxis } from './wallTime';
+import { formatRegulatoryDeadline, formatRegulatoryDeadlineShort } from '../tech-log/util/displayZone';
 
 /**
  * /wall/ops — the hangar/ops-room TV (D88, promoted from the design canvas's
  * Option C): the whole day as one swimlane board per tail, with a NOW line.
  * Read-only, room-distance type, fixed dark palette (see WallChrome).
+ *
+ * MEL clocks here state the DUE DATE, not remaining days — Bryan 2026-08-19,
+ * correcting the earlier grouping of this wall with the landing cards. The
+ * landing tail cards deliberately still say "6 of 10d left": a card is glanced
+ * at by someone asking "how long have I got", while this wall is read by the
+ * people who schedule the repair. Both forms are the house contract applied to
+ * a different job; what neither may do is print the same figure twice.
  */
 
 const AXIS_LABELS = ['0600', '0800', '1000', '1200', '1400', '1600', '1800', '2000', '2200'];
@@ -28,8 +36,12 @@ function LaneLabel({ ac }: { ac: UnifiedFleetAircraft }) {
       ) : status === 'AMBER' ? (
         <span className="text-sm font-semibold text-[#F1B434]">
           MEL{ac.airworthiness.deferralClock?.category ? ` ${ac.airworthiness.deferralClock.category}` : ''}
-          {ac.airworthiness.deferralClock?.daysRemaining != null
-            ? ` · ${ac.airworthiness.deferralClock.daysRemaining}d left`
+          {ac.airworthiness.deferralClock?.repairDueDateUtc
+            ? ` · ${formatRegulatoryDeadlineShort(
+                ac.airworthiness.deferralClock.repairDueDateUtc,
+                'GOVERNING',
+                ac.airworthiness.deferralClock.governingTimezone,
+              )}`
             : ''}
         </span>
       ) : (
@@ -59,8 +71,12 @@ function Lane({ ac, legs }: { ac: UnifiedFleetAircraft; legs: TodayLeg[] }) {
       <div className="relative h-full rounded-md bg-white/[0.04]">
         <span className="absolute left-5 top-1/2 -translate-y-1/2 text-[15px] text-[#F1B434]">
           MEL{deferralClock?.category ? ` Cat ${deferralClock.category}` : ''} · {headline ?? 'deferred item'}
-          {deferralClock?.daysRemaining != null && deferralClock.intervalDays != null
-            ? ` · ${deferralClock.daysRemaining} of ${deferralClock.intervalDays} days left`
+          {deferralClock?.repairDueDateUtc
+            ? ` · due ${formatRegulatoryDeadline(
+                deferralClock.repairDueDateUtc,
+                'GOVERNING',
+                deferralClock.governingTimezone,
+              )}`
             : ''}
         </span>
       </div>
