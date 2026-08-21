@@ -138,7 +138,7 @@ export function TripDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl xl:max-w-4xl overflow-y-auto p-6">
+      <SheetContent side="right" className="w-full sm:max-w-2xl xl:max-w-5xl overflow-y-auto p-6">
         {/* Above the loading branch on purpose (LG-30). Radix asserts a Title on the
             dialog at MOUNT, and the drawer mounts before the trip resolves — a Title
             that lives only in the loaded branch is a console error on every open.
@@ -172,6 +172,8 @@ export function TripDrawer({
 
             <Separator />
 
+            <div className="space-y-5 xl:space-y-0 xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-6 xl:items-start">
+            <aside className="space-y-4 xl:col-start-2 xl:row-start-1 xl:sticky xl:top-0">
             {/* Legs */}
             <div>
               <h3 className="text-sm font-semibold mb-2">Legs</h3>
@@ -185,7 +187,7 @@ export function TripDrawer({
             </div>
 
             {/* Preflight bridge */}
-            <div className="flex items-center justify-between gap-3 border rounded-md p-3">
+            <div className="flex items-center justify-between gap-3 border rounded-md p-3 flex-wrap">
               <div className="text-sm">
                 <div className="font-medium">Crew preflight</div>
                 <div className="text-xs text-muted-foreground">
@@ -202,8 +204,10 @@ export function TripDrawer({
                 </Button>
               )}
             </div>
+            </aside>
 
-            <Separator />
+            <div className="xl:col-start-1 xl:row-start-1">
+            <Separator className="xl:hidden mb-5" />
 
             {/* Checklist — THE checklist for THIS trip, as a journey (D87/LG-259): whole-trip
                 work, then each leg in flight order, a NOW line moving through it, cleared work
@@ -242,6 +246,8 @@ export function TripDrawer({
                   </div>
                 ))
               )}
+            </div>
+            </div>
             </div>
           </div>
         )}
