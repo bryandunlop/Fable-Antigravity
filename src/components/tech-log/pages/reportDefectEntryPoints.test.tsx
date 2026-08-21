@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -64,9 +64,13 @@ describe('report-defect entry points', () => {
 
     // LG-154 — Correct now lives in the row's overflow menu; superseding a signed defect is an
     // exception path, not one of the two live dispositions.
-    const more = screen.getAllByRole('button', { name: /more actions/i });
-    expect(more.length).toBeGreaterThan(0);
-    await userEvent.click(more[0]);
+    //
+    // Scoped to a NAMED defect rather than `more[0]`. Positional targeting made this test a hostage
+    // of seed ordering: rebalancing the demo fleet on 2026-08-21 moved a different defect into the
+    // first row and this failed for a reason that had nothing to do with what it asserts. d-n1pg is
+    // the fleet's open AOG squawk, so it always offers the correction path.
+    const row = screen.getByText(/Left main landing gear unsafe indication/i).closest('div[class*="rounded"]')!;
+    await userEvent.click(within(row as HTMLElement).getByRole('button', { name: /more actions/i }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /correct/i }));
 
     expect(screen.getByText(/correct defect/i)).toBeInTheDocument();

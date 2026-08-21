@@ -64,15 +64,34 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   const personnel = SEED_PERSONNEL;
   const pilot = personnel.find(p => p.oid === 'USR001')!;
   const dom = personnel.find(p => p.oid === 'USR002')!;
+  // Hoisted: the N2PG rectification below signs a release, and the historical ledger further down
+  // re-uses the same two people rather than resolving them twice.
+  const tech = personnel.find(p => p.oid === 'USR008')!;      // Tom Parker (A&P)
+  const chiefInsp = personnel.find(p => p.oid === 'USR010')!; // Amanda Brooks (IA, RII)
 
   const signatures: Signature[] = [];
   const defects: Defect[] = [];
   const deferrals: Deferral[] = [];
+  // Hoisted with the rest: the N2PG rectification below signs a release before the historical
+  // ledger section that used to declare this.
+  const releases: MaintenanceRelease[] = [];
 
-  // --- N1PG: RED (open, untriaged airworthiness defect) ---
-  // D57: the symptom prose used to read "GEAR amber CAS during climb" — an annunciation buried in
+  // --- N1PG: RED — the fleet's ONE aircraft on the ground, and the FIR §8 nudge tail ---
+  // D57: the symptom prose used to read "GEAR ... CAS during climb" — an annunciation buried in
   // free text where nothing could read it. Split: narrative in `symptom`, annunciation structured.
-  const sigN1 = makeSignature({ id: 'sig-seed-d-n1pg', signedEntity: 'DEFECT', signedEntityId: 'd-n1pg', signer: pilot, intentStatement: 'seed', signedAtUtc: iso(3 * H) });
+  //
+  // This tail carries the FIR §8 "Open an FIR?" nudge as of 2026-08-21 (Bryan's call: the demo fleet
+  // had three tails RED at once and needed a range). It fires through the DOWNTIME path, not the
+  // immediate-escalation one — `buildDefectFirSuggestions` nudges on any grounding OPEN defect once
+  // downtime crosses 24 h, and this aeroplane has been AOG overnight waiting on an uplock sensor.
+  // That is why the timeline below is seeded ~29 h back rather than ~3 h: shorten it under 24 h and
+  // the nudge goes quiet (fir/engine/suggestions.test.ts drives this real builder to keep it honest).
+  //
+  // The CAS stays AMBER deliberately. It used to be the RED-CAS fast path that fired the nudge, but
+  // the D60 knowledge article TK-901 is written around an amber GEAR UNSAFE that clears on a recycle,
+  // and casKnowledgeSeeds.test.ts pins the record and the catalogue to agree. Downtime is the honest
+  // trigger here anyway: an aeroplane down more than a day is an irregularity whatever it annunciated.
+  const sigN1 = makeSignature({ id: 'sig-seed-d-n1pg', signedEntity: 'DEFECT', signedEntityId: 'd-n1pg', signer: pilot, intentStatement: 'seed', signedAtUtc: iso(1 * D + 5 * H) });
   signatures.push(sigN1);
   defects.push({
     id: 'd-n1pg', aircraftId: 'ac-n1pg', source: 'PIREP', ataChapter: '32',
@@ -85,7 +104,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     cmcFaultCode: '32-31-14',
     status: 'OPEN', reportedByOid: pilot.oid,
     // D56: noticed ~45 min before it was written up.
-    occurredAtUtc: iso(3 * H + 45 * 60000), reportedAtUtc: iso(3 * H), signatureId: sigN1.id,
+    occurredAtUtc: iso(1 * D + 5 * H + 45 * 60000), reportedAtUtc: iso(1 * D + 5 * H), signatureId: sigN1.id,
   });
 
   // --- N6PG: AMBER (active deferral mid-clock; Cat C, no (M)/placard -> straight to ACTIVE) ---
@@ -176,9 +195,10 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       repairDueDateUtc: dueN7.repairDueDateUtc, usageDueThreshold: dueN7.usageDueThreshold,
       repairIntervalUnit: dueN7.repairIntervalUnit, repairIntervalValue: dueN7.repairIntervalValue,
       restrictionText: melCrew.provisos ?? 'Operate per MEL provisos.',
-      // The ONLY outstanding limb is the crew action. That is the modal D59 case (182 of 984 seeded
+      // The ONLY outstanding limb was the crew action. That is the modal D59 case (182 of 984 seeded
       // items) and the one the gate was written for: before D59 this deferral went straight to
       // ACTIVE and the aircraft was dispatchable with a mandatory crew action nobody had performed.
+      //
       placardRequired: false, mProcedureRequired: false, placardInstalled: false,
       crewActionRequired: true,
       placardLocation: melCrew.placardLocation, extensionUsed: false, riiRequired: false,
@@ -230,29 +250,44 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     }
   }
 
-  // --- N2PG: RED (fresh, un-reported AOG — no FIR yet, so the FIR §8 "Open an FIR?" nudge fires) ---
-  const discN2 = iso(6 * H);
+  // --- N2PG: GREEN — the rectification arc, reported -> inspected -> released ---
+  // Until 2026-08-21 this tail was a second open AOG, which (with N1PG and N7PG) left one flyable
+  // aeroplane in a six-tail demo fleet. Bryan's call: the demo needs a RANGE, so the chip-detector
+  // finding is now closed out the way a real one is — borescope, findings within limits, filter
+  // cleaned, ground run, signed release. The CAS annunciation stays on the record (D57) because the
+  // journey log has to show what the crew actually saw, and `casColor` on a RECTIFIED defect is
+  // inert: the FIR escalation path only reads OPEN, grounding defects, which is why that demo moved
+  // to d-n1pg above rather than being deleted.
+  const discN2 = iso(2 * D + 6 * H);
+  const clearedN2 = iso(1 * D + 2 * H);
   const sigN2 = makeSignature({ id: 'sig-seed-d-n2pg', signedEntity: 'DEFECT', signedEntityId: 'd-n2pg', signer: pilot, intentStatement: 'seed', signedAtUtc: discN2 });
-  signatures.push(sigN2);
+  const sigRelN2 = makeSignature({ id: 'sig-seed-rel-n2pg', signedEntity: 'CRS', signedEntityId: 'rel-d-n2pg', signer: tech, intentStatement: 'seed', signedAtUtc: clearedN2 });
+  signatures.push(sigN2, sigRelN2);
   defects.push({
     id: 'd-n2pg', aircraftId: 'ac-n2pg', source: 'PIREP', ataChapter: '79',
     description: 'No. 2 engine magnetic chip detector warning — metal found on inspection, borescope required.',
-    // D57: was the free-text symptom "R ENG CHIP CAS in cruise". The RED here is LOAD-BEARING, not
-    // decoration: this defect is ~6 h old, far short of the 24 h downtime threshold, so the FIR
-    // "Open an FIR?" nudge fires only via the immediate-escalation path, which reads `casColor`.
-    // Move the RED to a rectified or non-grounding defect and the demo above goes quiet.
     symptom: 'In cruise at FL410; no other indications.',
     casMessage: 'R ENG CHIP', casColor: 'RED', airworthinessAffecting: true,
-    status: 'OPEN', reportedByOid: pilot.oid,
-    occurredAtUtc: iso(6 * H + 30 * 60000), reportedAtUtc: discN2, signatureId: sigN2.id,
+    status: 'RECTIFIED', reportedByOid: pilot.oid,
+    rectificationText: 'Borescope inspection of No. 2 engine gas path — no distress found; chip detector and filter cleaned and reinstalled, ground run and repeat check normal.',
+    clearedByOid: tech.oid, clearedTsUtc: clearedN2,
+    occurredAtUtc: iso(2 * D + 6.5 * H), reportedAtUtc: discN2, signatureId: sigN2.id,
+  });
+  releases.push({
+    id: 'rel-d-n2pg', aircraftId: 'ac-n2pg', signoffType: 'DEFECT_RECTIFICATION', linkedDefectId: 'd-n2pg',
+    isGatingDischarge: true,
+    workDescription: 'No. 2 engine chip detector — borescope inspection, detector and filter cleaned, ground run normal.',
+    completionDateUtc: clearedN2,
+    returnToServiceStatement: 'Work performed and inspected; aircraft approved for return to service (14 CFR 91.417).',
+    certifyingTechOid: tech.oid, apCertificateNumber: tech.apCertificateNumber ?? '', riiRequired: false,
+    pdfBlobUri: 'blob://mygfo-worm/crs/rel-d-n2pg.pdf', signatureId: sigRelN2.id,
   });
 
   // ── Historical ledger (for Journey Log realism + Phase-4 analytics). None of this changes the
   //    current serviceability colors: flights don't affect status, and the extra defects are all
   //    RECTIFIED (cleared) so they leave no open grounding condition. ──
   const fo = personnel.find(p => p.oid === 'USR007')!;     // FO Emily Chen
-  const tech = personnel.find(p => p.oid === 'USR008')!;   // Tom Parker (A&P)
-  const chiefInsp = personnel.find(p => p.oid === 'USR010')!; // Amanda Brooks (IA, RII)
+  // `tech` and `chiefInsp` are hoisted to the top of this builder — the N2PG release needs them.
 
   const flightLogs: FlightLog[] = [];
   const seedFlight = (i: number, acId: string, daysAgo: number, ftHours: number, opts: Partial<FlightLog> = {}) => {
@@ -289,7 +324,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   seedFlight(10, 'ac-n6pg', 7, 2.7);
 
   // Historical RECTIFIED defects (+ their releases) — fuel for defect-trend / MTBUR / dispatch reliability.
-  const releases: MaintenanceRelease[] = [];
+  // (`releases` is declared with the other collections at the top of this builder.)
   const histDefect = (
     i: number, acId: string, ata: string, daysAgo: number, desc: string, work: string,
     cas: Pick<Defect, 'casMessage' | 'casColor' | 'casObserved'> = {}, signer = tech,
@@ -379,7 +414,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
   workCards.push({
     id: 'wc-3', cardNumber: 'WC-1015', aircraftId: 'ac-n1pg', title: 'LMLG unsafe indication — troubleshoot & repair',
     ataChapter: '32', description: 'Corrective — intermittent gear-unsafe indication on retraction.', source: 'MANUAL', headerStatusCode: 1,
-    scheduled: false, riiRequired: false, linkedDefectId: 'd-n1pg', createdAtUtc: iso(2.5 * H), status: 'IN_WORK',
+    scheduled: false, riiRequired: false, linkedDefectId: 'd-n1pg', createdAtUtc: iso(1 * D + 4.5 * H), status: 'IN_WORK',
     // LG-98/99 on a LIVE card: editable on screen, and the linked defect (d-n1pg) carries the
     // pilot's single intake code '32-31-14', which is deliberately NOT in this list — `pilotHint`
     // (WorkCardDetail) suppresses itself once the code is already on the card, so seeding it here
@@ -397,20 +432,20 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     // D61 — the live AOG card opens with a diagnosis span, so the first thing a demo viewer sees is
     // that "how long to work out what was wrong" is a real, separately answerable number.
     statusTags: [
-      { tag: 'DIAGNOSING', atUtc: iso(2.5 * H), byOid: tech.oid, note: 'MAU fault history + harness continuity on the aircraft' },
-      { tag: 'IN_WORK', atUtc: iso(1.5 * H), byOid: tech.oid },
-      { tag: 'WAITING_PARTS', atUtc: iso(1 * H), byOid: tech.oid, note: 'POO — LMLG uplock proximity sensor from Gulfstream Savannah, ETA tomorrow 10:00', partsOrderId: 'po-wc3-1' },
+      { tag: 'DIAGNOSING', atUtc: iso(1 * D + 4.5 * H), byOid: tech.oid, note: 'MAU fault history + harness continuity on the aircraft' },
+      { tag: 'IN_WORK', atUtc: iso(1 * D + 3.5 * H), byOid: tech.oid },
+      { tag: 'WAITING_PARTS', atUtc: iso(1 * D + 3 * H), byOid: tech.oid, note: 'POO — LMLG uplock proximity sensor from Gulfstream Savannah, ETA this morning 10:00', partsOrderId: 'po-wc3-1' },
     ],
     // LG-100 — the structured order behind that POO note. Deliberately still OPEN so the metrics
     // page shows an "and counting" lead time as well as delivered ones.
     partsOrders: [{
       id: 'po-wc3-1', description: 'LMLG uplock proximity sensor', partNumber: '1159SCB412-3',
-      vendor: 'Gulfstream', orderedAtUtc: iso(1 * H), note: 'AOG desk — promised ETA tomorrow 10:00',
+      vendor: 'Gulfstream', orderedAtUtc: iso(1 * D + 3 * H), note: 'AOG desk — promised ETA this morning 10:00',
     }],
   });
   laborEntries.push(
-    { id: 'lb-3', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 1.5, dateUtc: iso(1 * H), description: 'Fault isolation — MAU history + harness continuity', category: 'TROUBLESHOOTING', note: 'Intermittent only under gear load; 1.5 h isolating to the uplock prox sensor with tech ops on the line' },
-    { id: 'lb-4', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 0.5, dateUtc: iso(1 * H), description: 'Sourced replacement sensor, raised purchase order', category: 'PARTS_ORDERING' },
+    { id: 'lb-3', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 1.5, dateUtc: iso(1 * D + 3 * H), description: 'Fault isolation — MAU history + harness continuity', category: 'TROUBLESHOOTING', note: 'Intermittent only under gear load; 1.5 h isolating to the uplock prox sensor with tech ops on the line' },
+    { id: 'lb-4', workCardId: 'wc-3', techOid: tech.oid, techName: tech.displayName, hours: 0.5, dateUtc: iso(1 * D + 3 * H), description: 'Sourced replacement sensor, raised purchase order', category: 'PARTS_ORDERING' },
   );
 
   /**
