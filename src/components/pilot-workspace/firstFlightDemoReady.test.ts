@@ -42,10 +42,11 @@ describe('the first flight in the pilot Flight Hub is demo-ready', () => {
 
   it('has a tech-log mirror, so the hub opens on a real board rather than "0 legs"', () => {
     const tlTrip = getDefaultState().trips.find((t) => t.tripNumber === 'MAO-7315');
-    expect(tlTrip?.legs).toHaveLength(2);
+    const legs = tlTrip?.legs ?? [];
+    expect(legs).toHaveLength(2);
     // Leg 1 flown and fully worked; leg 2 is the one still to fly.
-    expect(tlTrip!.legs[0].fratStatus).toBe('COMPLETED');
-    expect(tlTrip!.legs[0].fuelRequestId).toBeTruthy();
+    expect(legs[0].fratStatus).toBe('COMPLETED');
+    expect(legs[0].fuelRequestId).toBeTruthy();
   });
 
   it('opens on the day-of pane with clickable work still owed', () => {
@@ -53,14 +54,14 @@ describe('the first flight in the pilot Flight Hub is demo-ready', () => {
     const tlTrip = state.trips.find((t) => t.tripNumber === 'MAO-7315')!;
     const ac = state.aircraft.find((a) => a.id === tlTrip.aircraftId);
 
-    expect(derivePaneMode(tlTrip.legs, now).auto).toBe('day-of');
+    expect(derivePaneMode(tlTrip.legs ?? [], now).auto).toBe('day-of');
 
     const queue = deriveDayOfQueue(tlTrip, ac, now);
     // A resumable FRAT draft and an airport review — two things to click, neither of them a
     // missed boundary (nothing 'locked', which would read as the demo having gone wrong).
     expect(queue.map((q) => q.kind).sort()).toEqual(['airport', 'frat']);
     expect(queue.some((q) => q.state === 'locked')).toBe(false);
-    expect(queue.find((q) => q.kind === 'frat')!.state).toBe('draft');
+    expect(queue.find((q) => q.kind === 'frat')?.state).toBe('draft');
 
     expect(beforePushProgress(tlTrip, ac, now).total).toBeGreaterThan(0);
   });
