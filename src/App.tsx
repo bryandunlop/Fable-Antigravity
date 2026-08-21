@@ -30,7 +30,7 @@ import ScheduleCalendar from './components/ScheduleCalendar';
 import { DocumentHub } from './components/documents/pages/DocumentHub';
 import { DocReader } from './components/documents/pages/DocReader';
 import { DocWorkbench } from './components/documents/pages/DocWorkbench';
-import LeadDashboard from './components/LeadDashboard';
+import LeadDashboard from './components/lead/LeadDashboard';
 import ManagerInsights from './components/ManagerInsights';
 import AirportServicesDatabase from './components/AirportServicesDatabase';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
@@ -415,7 +415,9 @@ export default function App() {
                                   path="/lead-dashboard"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['lead', 'admin']}>
-                                      <LeadDashboard />
+                                      <SchedulingWorkspaceProvider>
+                                        <LeadDashboard userRole={userRole} additionalRoles={additionalRoles} />
+                                      </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }
                                 />

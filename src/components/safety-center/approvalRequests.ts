@@ -323,6 +323,20 @@ const SEED: ApprovalRequest[] = [
     ],
     currentStep: 1, status: 'pending',
   },
+  {
+    id: 'AR-2026-003', formKind: 'waiver', formLabel: 'Waiver',
+    subjectTitle: 'Contaminated-runway policy exception — KASE',
+    values: { request: 'Operate KASE with braking action MEDIUM reported, below the ops-manual GOOD floor', justification: 'PIREPs trending better than the field report; alternate plus fuel filed. Chief Pilot concurrence attached.' },
+    fieldLabels: { request: 'What are you requesting?', justification: 'Reason / justification' },
+    requestedByRole: 'pilot', requestedByName: 'Captain John Smith', requestedAt: '2026-07-19T15:20:00Z',
+    chain: [
+      { role: 'safety', status: 'approved', decidedByName: 'J. Kerr (Safety)', decidedAt: '2026-07-20T10:05:00Z', comment: 'Mitigations adequate; forwarding to the lead on call.' },
+      // Named to David Brown (USR004) — the default lead persona — so the demo
+      // shows the approvals lane populated without switching to Priya Raman.
+      { role: 'lead', status: 'pending', assigneeUserId: 'USR004', assigneeName: 'David Brown' },
+    ],
+    currentStep: 1, status: 'pending',
+  },
 ];
 
 type Listener = () => void;

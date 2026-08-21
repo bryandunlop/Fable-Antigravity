@@ -71,6 +71,7 @@ export const FRONT_DOORS: Record<string, string> = {
   'maintenance-coordinator': '/tech-log',
   'dom': '/tech-log',
   'maintenance-workflow': '/maintenance-workflow',
+  'lead': '/lead-dashboard',
 };
 
 // Sidebar domains open by default on first visit (everything else starts collapsed).

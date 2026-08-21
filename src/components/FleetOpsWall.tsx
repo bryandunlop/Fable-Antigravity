@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useUnifiedFleetStatus } from './hooks/useUnifiedFleetStatus';
+import { useOpsClock } from './hooks/useOpsClock';
 import { FirLeadershipChip } from './fir/components/FirLeadershipChip';
 import DailyFlightsWidget from './DailyFlightsWidget';
 import TailStatusCards from './ops-wall/TailStatusCards';
@@ -20,30 +21,6 @@ function greeting(hour: number): string {
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
-}
-
-/** UTC alongside Eastern — the operator reference zone the MEL clock is anchored to (D24). */
-function useOpsClock(): string {
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const utc = now.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  });
-  const eastern = now.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'America/New_York',
-  });
-
-  return `${utc}Z · ${eastern} ET`;
 }
 
 /**
