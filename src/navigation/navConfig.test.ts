@@ -190,7 +190,8 @@ describe('front doors', () => {
   // A pilot opens the app on the Dashboard, not the Flight Hub (Bryan, 2026-08-21). Absence from
   // this map IS the behaviour — App.tsx falls back to '/' — so nothing else would catch a
   // re-added entry.
-  it('leave pilots on the Dashboard', () => {
+  it('leave pilots and chief pilots on the Dashboard', () => {
     expect(FRONT_DOORS['pilot']).toBeUndefined();
+    expect(FRONT_DOORS['chief-pilot']).toBeUndefined();
   });
 });
