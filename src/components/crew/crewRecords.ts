@@ -17,6 +17,9 @@ export interface CrewRecord {
   /** Duty hours used in the current duty period vs the applicable limit. */
   dutyHoursUsed: number;
   dutyLimitHours: number;
+  /** Rolling 30-day flight hours vs the applicable limit. */
+  flightHours30d: number;
+  flightHoursLimit30d: number;
   /** ISO UTC expiry instants, derived from `now` at read time. */
   currencyExpiresUtc: string;
   medicalExpiresUtc: string | null; // FAs carry no medical in the demo
@@ -57,6 +60,8 @@ export function getCrewRecords(nowUtc: string = new Date().toISOString()): CrewR
       role: 'PIC',
       dutyHoursUsed: 8.5,
       dutyLimitHours: 14,
+      flightHours30d: 62,
+      flightHoursLimit30d: 100,
       currencyExpiresUtc: inDays(now, 24), // inside the 60-day watch window
       medicalExpiresUtc: inDays(now, 140),
       trainingDueUtc: inDays(now, 210),
@@ -68,6 +73,8 @@ export function getCrewRecords(nowUtc: string = new Date().toISOString()): CrewR
       role: 'SIC',
       dutyHoursUsed: 0,
       dutyLimitHours: 14,
+      flightHours30d: 55,
+      flightHoursLimit30d: 100,
       currencyExpiresUtc: inDays(now, 150),
       medicalExpiresUtc: inDays(now, 45), // inside the 60-day watch window
       trainingDueUtc: inDays(now, 90),
@@ -79,6 +86,8 @@ export function getCrewRecords(nowUtc: string = new Date().toISOString()): CrewR
       role: 'FA',
       dutyHoursUsed: 7,
       dutyLimitHours: 14,
+      flightHours30d: 58,
+      flightHoursLimit30d: 120,
       currencyExpiresUtc: inDays(now, 200),
       medicalExpiresUtc: null,
       trainingDueUtc: inDays(now, 31), // inside the 60-day watch window
@@ -90,6 +99,8 @@ export function getCrewRecords(nowUtc: string = new Date().toISOString()): CrewR
       role: 'FA',
       dutyHoursUsed: 0,
       dutyLimitHours: 14,
+      flightHours30d: 42,
+      flightHoursLimit30d: 120,
       currencyExpiresUtc: inDays(now, 300),
       medicalExpiresUtc: null,
       trainingDueUtc: inDays(now, 180),

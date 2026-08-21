@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Separator } from './ui/separator';
+import { getCrewRecords } from './crew/crewRecords';
 import {
     ArrowLeft,
     BarChart3,
@@ -77,16 +78,26 @@ export default function ManagerInsights() {
 
     // ─── CREW MANAGEMENT DATA ─────────────────────────────────
 
-    const crewMembers = [
-        { name: 'Capt. John Smith', role: 'PIC', status: 'On Duty', dutyHrs: 8.5, maxDuty: 14, flightHrs30d: 62, maxFlight: 100, currencyExpires: '2025-06-15', medical: '2025-08-20', training: 'Current' },
-        { name: 'FO Sarah Wilson', role: 'SIC', status: 'Available', dutyHrs: 0, maxDuty: 14, flightHrs30d: 55, maxFlight: 100, currencyExpires: '2025-04-10', medical: '2025-07-15', training: 'Current' },
-        { name: 'Capt. Mike Johnson', role: 'PIC', status: 'On Duty', dutyHrs: 6.2, maxDuty: 14, flightHrs30d: 71, maxFlight: 100, currencyExpires: '2025-09-22', medical: '2025-11-01', training: 'Due Mar 15' },
-        { name: 'FO Tom Anderson', role: 'SIC', status: 'Rest', dutyHrs: 0, maxDuty: 14, flightHrs30d: 48, maxFlight: 100, currencyExpires: '2025-05-30', medical: '2025-09-10', training: 'Current' },
-        { name: 'Capt. David Brown', role: 'PIC', status: 'Available', dutyHrs: 0, maxDuty: 14, flightHrs30d: 38, maxFlight: 100, currencyExpires: '2025-07-01', medical: '2025-12-20', training: 'Current' },
-        { name: 'FO Emily Johnson', role: 'SIC', status: 'Vacation', dutyHrs: 0, maxDuty: 14, flightHrs30d: 0, maxFlight: 100, currencyExpires: '2025-03-28', medical: '2025-06-10', training: 'Current' },
-        { name: 'Emily Davis', role: 'FA', status: 'On Duty', dutyHrs: 7.0, maxDuty: 14, flightHrs30d: 58, maxFlight: 120, currencyExpires: '2025-08-15', medical: 'N/A', training: 'Current' },
-        { name: 'Lisa Martinez', role: 'FA', status: 'Available', dutyHrs: 0, maxDuty: 14, flightHrs30d: 42, maxFlight: 120, currencyExpires: '2025-05-20', medical: 'N/A', training: 'Due Apr 1' },
-    ];
+    // Shared crew-readiness source (src/components/crew/crewRecords.ts) mapped to
+    // this page's existing row shape — data swap only, no layout change.
+    const crewMembers = getCrewRecords().map(r => {
+        const trainingDue = new Date(r.trainingDueUtc);
+        const trainingSoon = trainingDue.getTime() - Date.now() < 60 * 86_400_000;
+        return {
+            name: r.name,
+            role: r.role,
+            status: r.dutyHoursUsed > 0 ? 'On Duty' : 'Available',
+            dutyHrs: r.dutyHoursUsed,
+            maxDuty: r.dutyLimitHours,
+            flightHrs30d: r.flightHours30d,
+            maxFlight: r.flightHoursLimit30d,
+            currencyExpires: r.currencyExpiresUtc.slice(0, 10),
+            medical: r.medicalExpiresUtc ? r.medicalExpiresUtc.slice(0, 10) : 'N/A',
+            training: trainingSoon
+                ? `Due ${trainingDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`
+                : 'Current',
+        };
+    });
 
     const expiringCerts = crewMembers.filter(c => {
         const expDate = new Date(c.currencyExpires);

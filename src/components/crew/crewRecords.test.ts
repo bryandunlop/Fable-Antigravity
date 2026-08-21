@@ -12,6 +12,8 @@ function record(overrides: Partial<CrewRecord>): CrewRecord {
     role: 'PIC',
     dutyHoursUsed: 0,
     dutyLimitHours: 14,
+    flightHours30d: 0,
+    flightHoursLimit30d: 100,
     currencyExpiresUtc: '2099-01-01T00:00:00.000Z',
     medicalExpiresUtc: null,
     trainingDueUtc: '2099-01-01T00:00:00.000Z',
