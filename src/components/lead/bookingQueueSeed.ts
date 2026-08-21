@@ -48,6 +48,8 @@ export interface TrackedPassenger {
   email: string;
   phone: string;
   preferences: string;
+  /** Next booked leg for this principal, when one exists; derived relative to now. */
+  nextFlight: { route: string; departureUtc: string } | null;
 }
 
 function iso(baseMs: number, offsetMs: number): string {
@@ -119,17 +121,23 @@ export function getOnTimeLegStats(): OnTimeLegStats {
 }
 
 /** Passenger ids tracked by default on the Lead brief. */
-export const DEFAULT_TRACKED_PASSENGER_IDS = ['PAX001', 'PAX003', 'PAX007'];
+export const DEFAULT_TRACKED_PASSENGER_IDS = ['PAX001', 'PAX003', 'PAX007', 'PAX012', 'PAX018'];
 
 /**
- * The VIP passenger register — moved here from the old LeadDashboard.tsx private
- * literal so any surface (brief, booking portal, manifests) reads the same people.
+ * The principal register — moved here from the old LeadDashboard.tsx private
+ * literal so any surface (brief, booking portal, manifests) reads the same
+ * people. Next-flight lines are derived relative to now so they never go stale.
  */
-export function getTrackedPassengers(): TrackedPassenger[] {
+export function getTrackedPassengers(nowUtc: string = new Date().toISOString()): TrackedPassenger[] {
+  const now = Date.parse(nowUtc);
   return [
-    { id: 'PAX001', name: 'Robert Johnson', role: 'Board Chairman', category: 'BOD', email: 'robert.johnson@email.com', phone: '+1 (555) 123-4567', preferences: 'Window seat, sparkling water, WSJ' },
-    { id: 'PAX003', name: 'Michael Chen', role: 'CEO', category: 'C-Suite', email: 'michael.chen@email.com', phone: '+1 (555) 234-5678', preferences: 'Quiet cabin, green tea, no shellfish' },
-    { id: 'PAX007', name: 'Jennifer Martinez', role: 'CFO', category: 'C-Suite', email: 'jennifer.martinez@email.com', phone: '+1 (555) 345-6789', preferences: 'Aisle seat, diet coke, Financial Times' },
-    { id: 'PAX012', name: 'David Thompson', role: 'Board Member', category: 'BOD', email: 'david.thompson@email.com', phone: '+1 (555) 456-7890', preferences: 'Rear cabin, bourbon, privacy' },
+    { id: 'PAX001', name: 'Robert Johnson', role: 'Board Chairman', category: 'BOD', email: 'robert.johnson@email.com', phone: '+1 (555) 123-4567', preferences: 'Window seat, sparkling water, WSJ', nextFlight: { route: 'KLUK → KTEB', departureUtc: iso(now, 2 * DAY_MS) } },
+    { id: 'PAX003', name: 'Michael Chen', role: 'CEO', category: 'C-Suite', email: 'michael.chen@email.com', phone: '+1 (555) 234-5678', preferences: 'Quiet cabin, green tea, no shellfish', nextFlight: { route: 'KLUK → SBGR', departureUtc: iso(now, 9 * DAY_MS) } },
+    { id: 'PAX007', name: 'Jennifer Martinez', role: 'CFO', category: 'C-Suite', email: 'jennifer.martinez@email.com', phone: '+1 (555) 345-6789', preferences: 'Aisle seat, diet coke, Financial Times', nextFlight: { route: 'KLUK → LSGG', departureUtc: iso(now, 14 * DAY_MS) } },
+    { id: 'PAX012', name: 'David Thompson', role: 'Board Member', category: 'BOD', email: 'david.thompson@email.com', phone: '+1 (555) 456-7890', preferences: 'Rear cabin, bourbon, privacy', nextFlight: null },
+    { id: 'PAX015', name: 'Susan Whitfield', role: 'Board Member', category: 'BOD', email: 'susan.whitfield@email.com', phone: '+1 (555) 567-8901', preferences: 'Forward cabin, still water, no photography', nextFlight: { route: 'KLUK → KSFO', departureUtc: iso(now, 5 * DAY_MS) } },
+    { id: 'PAX018', name: 'Carlos Mendes', role: 'COO', category: 'C-Suite', email: 'carlos.mendes@email.com', phone: '+1 (555) 678-9012', preferences: 'Working cabin setup, espresso, early boarding', nextFlight: { route: 'KLUK → EGLL', departureUtc: iso(now, 6 * DAY_MS) } },
+    { id: 'PAX021', name: 'Katherine O’Leary', role: 'CHRO', category: 'C-Suite', email: 'katherine.oleary@email.com', phone: '+1 (555) 789-0123', preferences: 'Aisle seat, herbal tea, vegetarian', nextFlight: null },
+    { id: 'PAX024', name: 'Thomas Gruber', role: 'General Counsel', category: 'C-Suite', email: 'thomas.gruber@email.com', phone: '+1 (555) 890-1234', preferences: 'Privacy divider, sparkling water, document security case', nextFlight: null },
   ];
 }

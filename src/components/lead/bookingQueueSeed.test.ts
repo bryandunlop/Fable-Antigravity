@@ -64,12 +64,35 @@ describe('bookingQueueSeed', () => {
   });
 
   it('tracked passengers include the three named principals, default-tracked', () => {
-    const pax = getTrackedPassengers();
+    const pax = getTrackedPassengers(NOW);
     const byName = Object.fromEntries(pax.map(p => [p.name, p]));
     expect(byName['Robert Johnson'].role).toBe('Board Chairman');
     expect(byName['Jennifer Martinez'].role).toBe('CFO');
     expect(byName['Michael Chen'].role).toBe('CEO');
     const ids = new Set(pax.map(p => p.id));
     for (const id of DEFAULT_TRACKED_PASSENGER_IDS) expect(ids).toContain(id);
+  });
+
+  it('the register carries 8 principals with 5-6 tracked by default', () => {
+    expect(getTrackedPassengers(NOW).length).toBe(8);
+    expect(DEFAULT_TRACKED_PASSENGER_IDS.length).toBeGreaterThanOrEqual(5);
+    expect(DEFAULT_TRACKED_PASSENGER_IDS.length).toBeLessThanOrEqual(6);
+  });
+
+  it('next-flight lines derive from now — upcoming, no hardcoded years', () => {
+    const later = '2031-03-05T12:00:00.000Z';
+    const shift = Date.parse(later) - Date.parse(NOW);
+    const a = getTrackedPassengers(NOW);
+    const b = getTrackedPassengers(later);
+    expect(a.some(p => p.nextFlight !== null)).toBe(true);
+    for (let i = 0; i < a.length; i++) {
+      const fa = a[i].nextFlight;
+      const fb = b[i].nextFlight;
+      expect(fb === null).toBe(fa === null);
+      if (fa && fb) {
+        expect(Date.parse(fa.departureUtc)).toBeGreaterThan(Date.parse(NOW));
+        expect(Date.parse(fb.departureUtc) - Date.parse(fa.departureUtc)).toBe(shift);
+      }
+    }
   });
 });

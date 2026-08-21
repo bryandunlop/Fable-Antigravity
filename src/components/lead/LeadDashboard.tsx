@@ -23,7 +23,6 @@ import {
   DEFAULT_TRACKED_PASSENGER_IDS,
   type TrackedPassenger,
 } from './bookingQueueSeed';
-import { getCrewRecords, expiringWithinDays, dutyHeadroom } from '../crew/crewRecords';
 import { getApprovalRequests, pendingForRoles } from '../safety-center/approvalRequests';
 import { actingUser } from '../safety-center/actingUser';
 import { readFirState, firInProgressSummary } from '../fir/engine/select';
@@ -42,7 +41,15 @@ function daysSince(iso: string, nowMs: number): number {
   return Math.max(0, Math.floor((nowMs - Date.parse(iso)) / 86_400_000));
 }
 
-const EXPIRY_KIND_LABEL = { currency: 'Currency', medical: 'Medical', training: 'Training' } as const;
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
 
 /**
  * The Lead brief — a decision-first replacement for the old wall-of-mock
@@ -91,10 +98,6 @@ export default function LeadDashboard({
     return buildWaitingOnYou({ approvals, firsInReview: firs });
   }, [roles, viewerUserId, now]);
 
-  const crew = useMemo(() => getCrewRecords(now), [now]);
-  const expiring = useMemo(() => expiringWithinDays(crew, 60, now), [crew, now]);
-  const tightestCrew = dutyHeadroom(crew).filter(h => h.dutyHoursUsed > 0)[0];
-
   const firSummary = useMemo(() => firInProgressSummary(readFirState(localStorage).firs), [now]);
   const openSafetyCases = safety.ops.move.length + safety.ops.track.length;
   const asapUnderReview = asap.reports.filter(r => r.status === 'Under review').length;
@@ -109,9 +112,12 @@ export default function LeadDashboard({
   const monthName = new Date(nowMs).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
 
   // ── Tracked passengers (behavior carried over from the old page) ──
-  const passengers = useMemo(() => getTrackedPassengers(), []);
+  const passengers = useMemo(() => getTrackedPassengers(now), [now]);
   const [trackedIds, setTrackedIds] = useState<string[]>(DEFAULT_TRACKED_PASSENGER_IDS);
+  const [showAllPax, setShowAllPax] = useState(false);
   const [detailsPax, setDetailsPax] = useState<TrackedPassenger | null>(null);
+  const trackedPax = passengers.filter(p => trackedIds.includes(p.id));
+  const untrackedPax = passengers.filter(p => !trackedIds.includes(p.id));
 
   useEffect(() => {
     if (detailsPax) {
@@ -235,52 +241,7 @@ export default function LeadDashboard({
         </GfoPanel>
       </div>
 
-      {/* ── People readiness + Safety picture ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <GfoPanel title="People readiness">
-          <p className="text-sm text-muted-foreground">
-            {tightestCrew
-              ? `Tightest duty headroom today: ${tightestCrew.name} — ${tightestCrew.headroomHours} h left of ${tightestCrew.dutyLimitHours} h.`
-              : 'No crew on duty right now.'}
-          </p>
-          <ul className="mt-3 space-y-1.5">
-            {expiring.map(item => (
-              <li key={`${item.record.id}-${item.kind}`} className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="min-w-0 truncate text-primary">{item.record.name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">{EXPIRY_KIND_LABEL[item.kind]}</span>
-                <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                  {new Date(item.expiresUtc).toLocaleDateString('en-US', { month: 'short', day: '2-digit', timeZone: 'UTC' })}
-                  {' · '}{item.daysUntil}d
-                </span>
-              </li>
-            ))}
-            {expiring.length === 0 && (
-              <li className="text-sm text-muted-foreground">Nothing expires in the next 60 days.</li>
-            )}
-          </ul>
-          <p className="mt-3 border-t border-border pt-2 text-xs text-muted-foreground">
-            Expiries within 60 days, from the shared crew readiness record.
-          </p>
-        </GfoPanel>
-
-        <GfoPanel title="Safety picture">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <span className="gfo-numeric text-4xl text-primary">{safetyTotal}</span>
-              <div className="space-y-0.5 pt-1 text-sm text-muted-foreground">
-                <div>{firSummary.count} FIR in progress</div>
-                <div>{openSafetyCases} open safety cases</div>
-                <div>{asapUnderReview} ASAP under review</div>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate('/safety')}>
-              Safety Center
-            </Button>
-          </div>
-        </GfoPanel>
-      </div>
-
-      {/* ── Today's flights + Tracked passengers ── */}
+      {/* ── Today's flights + Safety picture ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <GfoPanel title="Today's flights" className="lg:col-span-2">
           {legs.length === 0 ? (
@@ -311,20 +272,56 @@ export default function LeadDashboard({
           )}
         </GfoPanel>
 
-        <GfoPanel title="Tracked passengers">
-          <ul className="space-y-2">
-            {passengers.map(pax => {
-              const isTracked = trackedIds.includes(pax.id);
-              return (
-                <li
-                  key={pax.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card p-2.5"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-primary">{pax.name}</div>
-                    <div className="text-xs text-muted-foreground">{pax.role} · {pax.category}</div>
+        <GfoPanel title="Safety picture">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <span className="gfo-numeric text-4xl text-primary">{safetyTotal}</span>
+              <div className="space-y-0.5 pt-1 text-sm text-muted-foreground">
+                <div>{firSummary.count} FIR in progress</div>
+                <div>{openSafetyCases} open safety cases</div>
+                <div>{asapUnderReview} ASAP under review</div>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/safety')}>
+              Safety Center
+            </Button>
+          </div>
+        </GfoPanel>
+      </div>
+
+      {/* ── Tracked passengers (full width) ── */}
+      <GfoPanel
+        title="Tracked passengers"
+        action={
+          untrackedPax.length > 0 && (
+            <button
+              onClick={() => setShowAllPax(v => !v)}
+              className="text-xs text-muted-foreground hover:text-primary hover:underline"
+            >
+              {showAllPax ? 'Show tracked only' : `+${untrackedPax.length} more principals`}
+            </button>
+          )
+        }
+      >
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {(showAllPax ? [...trackedPax, ...untrackedPax] : trackedPax).map(pax => {
+            const isTracked = trackedIds.includes(pax.id);
+            return (
+              <li
+                key={pax.id}
+                className="rounded-lg border border-border bg-card p-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-primary ring-2 ring-gfo-sunrise">
+                      {initials(pax.name)}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-primary">{pax.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">{pax.role}</div>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex shrink-0 items-center gap-0.5">
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDetailsPax(pax)}>
                       <Eye className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
@@ -336,12 +333,25 @@ export default function LeadDashboard({
                       )}
                     </Button>
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-        </GfoPanel>
-      </div>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {pax.nextFlight ? (
+                    <>
+                      {pax.nextFlight.route}
+                      {' · '}
+                      <span className="font-mono tabular-nums">
+                        {new Date(pax.nextFlight.departureUtc).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                      </span>
+                    </>
+                  ) : (
+                    'No upcoming flight'
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </GfoPanel>
 
       {/* ── Month stat cards ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
