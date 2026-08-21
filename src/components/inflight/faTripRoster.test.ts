@@ -1,0 +1,145 @@
+import { describe, it, expect } from 'vitest';
+import { rosterFor, summarise, splitAllergens, isFoodAllergen, legByNumber, bandKind, hasProfileContent } from './faTripRoster';
+import type { Passenger } from '../passengers/passengerData';
+import type { FaTrip } from './faTrips';
+
+function pax(id: string, name: string, extra: Partial<Passenger> = {}): Passenger {
+  return {
+    id, name, info: {}, role: 'Guest', allergies: [], birthday: '',
+    beverage: [], food: [], passengerComfort: {}, additionalNotes: '', ...extra,
+  };
+}
+
+const ROBERT = pax('P1', 'Robert', { allergies: [{ allergen: 'Shellfish', severity: 'Critical' }] });
+const HELEN = pax('P2', 'Helen', { allergyFlagged: true });
+const PATRICIA = pax('P3', 'Patricia', { dietaryConfirmedAtUtc: '2026-08-12T00:00:00Z' });
+const DB = [ROBERT, HELEN, PATRICIA];
+
+const TRIP: FaTrip = {
+  id: 'T1', tripNumber: 'TRP-1', tripName: 'Test', tail: 'N1PG', aircraftType: 'G650ER', cabinCrew: ['You'],
+  legs: [
+    { id: 'L1', legNumber: 1, flightNumber: 'PG1', origin: 'KTEB', destination: 'KLAX',
+      departureUtc: '2026-08-21T09:00:00Z', arrivalUtc: '2026-08-21T15:00:00Z',
+      passengerIds: ['P1', 'P2', 'GHOST'] },
+    { id: 'L2', legNumber: 2, flightNumber: 'PG2', origin: 'KLAX', destination: 'KTEB',
+      departureUtc: '2026-08-23T09:00:00Z', arrivalUtc: '2026-08-23T15:00:00Z',
+      passengerIds: ['P1', 'P3'] },
+  ],
+};
+
+describe('rosterFor', () => {
+  it('lists each person once across the whole trip, with the legs they fly', () => {
+    const r = rosterFor(TRIP, DB, null);
+    expect(r.map((g) => g.id)).toEqual(['P1', 'P2', 'GHOST', 'P3']);
+    expect(r.find((g) => g.id === 'P1')!.legNumbers).toEqual([1, 2]);
+    expect(r.find((g) => g.id === 'P3')!.legNumbers).toEqual([2]);
+  });
+
+  it('narrows to one leg without losing anybody on it', () => {
+    expect(rosterFor(TRIP, DB, 1).map((g) => g.id)).toEqual(['P1', 'P2', 'GHOST']);
+    expect(rosterFor(TRIP, DB, 2).map((g) => g.id)).toEqual(['P1', 'P3']);
+  });
+
+  it('keeps a manifest id with no record, and still gives it a name to print', () => {
+    const ghost = rosterFor(TRIP, DB, 1).find((g) => g.id === 'GHOST')!;
+    expect(ghost.passenger).toBeNull();
+    expect(ghost.state).toBe('NONE_ON_FILE');
+    expect(ghost.displayName).toContain('GHOST');
+    expect(ghost.displayName.trim()).not.toBe('');
+  });
+
+  it('does not double-count someone booked on the same leg twice', () => {
+    const dup = { ...TRIP, legs: [{ ...TRIP.legs[0], passengerIds: ['P1', 'P1'] }] };
+    const r = rosterFor(dup, DB, null);
+    expect(r).toHaveLength(1);
+    expect(r[0].legNumbers).toEqual([1]);
+  });
+});
+
+describe('summarise', () => {
+  it('counts each dietary state and names the allergens once', () => {
+    const s = summarise(rosterFor(TRIP, DB, null));
+    expect(s.allergens).toEqual(['Shellfish']);
+    expect(s.flaggedNoDetail).toBe(1);
+    expect(s.noInfo).toBe(1);
+    expect(s.confirmedNone).toBe(1);
+    expect(s.total).toBe(4);
+  });
+
+  it('totals every guest, so the roster can say what it does not cover', () => {
+    const s = summarise(rosterFor(TRIP, DB, 1));
+    expect(s.total).toBe(3);
+    expect(s.flaggedNoDetail + s.noInfo).toBe(2);
+  });
+});
+
+describe('splitAllergens', () => {
+  it('keeps non-food allergens out of the food list without discarding them', () => {
+    const { food, nonFood } = splitAllergens(['Shellfish', 'Bee stings', 'Latex', 'Peanuts']);
+    expect(food).toEqual(['Shellfish', 'Peanuts']);
+    expect(nonFood).toEqual(['Bee stings', 'Latex']);
+  });
+  it('matches case- and space-insensitively', () => {
+    expect(isFoodAllergen('  LATEX ')).toBe(false);
+    expect(isFoodAllergen('Gluten')).toBe(true);
+  });
+});
+
+describe('legByNumber', () => {
+  it('resolves a leg, and returns undefined for the whole-trip filter', () => {
+    expect(legByNumber(TRIP, 2)?.flightNumber).toBe('PG2');
+    expect(legByNumber(TRIP, null)).toBeUndefined();
+  });
+});
+
+describe('bandKind', () => {
+  const g = (p: Passenger | null, id = 'x') =>
+    ({ id, passenger: p, legNumbers: [1], displayName: p?.name ?? id,
+       state: p === null ? 'NONE_ON_FILE' as const
+            : p.allergies.length ? 'ALLERGIES' as const
+            : p.allergyFlagged ? 'FLAGGED_NO_DETAIL' as const
+            : p.dietaryConfirmedAtUtc ? 'CONFIRMED_NONE' as const
+            : 'NONE_ON_FILE' as const });
+
+  it('is ALLERGY when at least one allergen is food', () => {
+    expect(bandKind(g(pax('a', 'A', { allergies: [{ allergen: 'Shellfish', severity: 'Critical' }] })))).toBe('ALLERGY');
+  });
+
+  it('is ALLERGY when food and non-food are mixed — the food one still governs', () => {
+    expect(bandKind(g(pax('a', 'A', {
+      allergies: [{ allergen: 'Latex', severity: 'Mild' }, { allergen: 'Peanuts', severity: 'Critical' }],
+    })))).toBe('ALLERGY');
+  });
+
+  it('is CABIN_ONLY when every recorded allergen is non-food', () => {
+    // Emily Watson's real shape: bee stings and latex. A red food band here is the
+    // dilution this screen exists to remove; "no information" would be a lie.
+    expect(bandKind(g(pax('a', 'A', {
+      allergies: [{ allergen: 'Bee stings', severity: 'Moderate' }, { allergen: 'Latex', severity: 'Mild' }],
+    })))).toBe('CABIN_ONLY');
+  });
+
+  it('keeps FLAGGED, CONFIRMED_NONE and NO_INFO intact', () => {
+    expect(bandKind(g(pax('a', 'A', { allergyFlagged: true })))).toBe('FLAGGED');
+    expect(bandKind(g(pax('a', 'A', { dietaryConfirmedAtUtc: '2026-08-12T00:00:00Z' })))).toBe('CONFIRMED_NONE');
+    expect(bandKind(g(pax('a', 'A')))).toBe('NO_INFO');
+    expect(bandKind(g(null, 'GHOST'))).toBe('NO_INFO');
+  });
+});
+
+describe('hasProfileContent', () => {
+  it('is false for a booking stub — a name and a flag is not a profile', () => {
+    expect(hasProfileContent(pax('a', 'Helen', { allergyFlagged: true }))).toBe(false);
+  });
+  it('is false when there is no record at all', () => {
+    expect(hasProfileContent(null)).toBe(false);
+  });
+  it('is true once anyone has written something a crew member would read', () => {
+    expect(hasProfileContent(pax('a', 'A', { food: ['Wagyu'] }))).toBe(true);
+    expect(hasProfileContent(pax('a', 'A', { additionalNotes: 'Boards last.' }))).toBe(true);
+    expect(hasProfileContent(pax('a', 'A', { passengerComfort: { temperature: '72°F' } }))).toBe(true);
+  });
+  it('ignores whitespace-only fields', () => {
+    expect(hasProfileContent(pax('a', 'A', { additionalNotes: '   ', passengerComfort: { seating: ' ' } }))).toBe(false);
+  });
+});
