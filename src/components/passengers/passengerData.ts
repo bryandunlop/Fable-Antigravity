@@ -30,6 +30,16 @@ export interface Passenger {
   };
   role: string;
   allergies: PassengerAllergy[];
+  /** myairops' Booking API carries an allergy FLAG on the passenger, not a structured
+   *  allergen list. True means the booking said "has allergies" without giving us
+   *  anything a galley can act on. Distinct from `allergies` having entries: most
+   *  passengers a year arrive this way, with a flag and nothing else. */
+  allergyFlagged?: boolean;
+  /** When someone last asked this passenger about allergies and recorded the answer.
+   *  ABSENT MEANS NOBODY ASKED, which is not the same as "no allergies" — an empty
+   *  `allergies` array cannot tell those two apart on its own, and rendering the
+   *  empty case as safe is how a screen lies. Only a dated confirmation earns green. */
+  dietaryConfirmedAtUtc?: string;
   birthday: string;
   beverage: string[];
   food: string[];
