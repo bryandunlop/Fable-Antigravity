@@ -81,6 +81,12 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   const tlTrip = state.trips.find((x) => x.tripNumber === trip.tripNumber) ?? null;
   const tlAc = state.aircraft.find((a) => a.tailNumber === trip.tail);
   const legs = tlTrip?.legs ?? [];
+  // The preflight legs and the SCHEDULING legs are not the same list: scheduling has the itinerary
+  // from the moment the trip is mirrored, preflight only once it is released to the crew. The header
+  // counts what the trip actually has, so a not-yet-released trip reads "2 legs · not released"
+  // rather than "0 legs", which looked like the itinerary had been lost.
+  const scheduledLegCount = trip.legs?.length ?? 0;
+  const legCount = legs.length || scheduledLegCount;
 
   const now = nowUtc();
   // `?leg` is gone with the leg stepper (D84 slice 3): neither pane has a "selected leg" any more.
@@ -149,7 +155,7 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         <div className="min-w-0">
           <div className="text-lg font-semibold leading-tight">{trip.tripNumber} · {trip.tail} · {trip.aircraftType}</div>
           <div className="text-xs text-muted-foreground">
-            {trip.tripType} · {legs.length} legs
+            {trip.tripType} · {legCount} {legCount === 1 ? 'leg' : 'legs'}
             {/* In prep the matrix IS the work, so its own count is the honest one — the day-of
                 module roll-up counts things the prep pane does not show. */}
             {paneMode.mode === 'prep'
@@ -178,6 +184,7 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
         <>
           <PrepMatrix
             rows={prepRows}
+            scheduledLegCount={scheduledLegCount}
             onOpenFrat={(id) => setParam('frat', id)}
             onOpenAirport={(id) => setParam('airport', id)}
             onOpenFuel={(id) => setParam('fuel', id)}

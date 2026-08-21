@@ -43,7 +43,7 @@ export function AirportInfoPanel({
         <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Airport information</div>
         {reviewed
           ? <span className="text-xs text-muted-foreground">Reviewed</span>
-          : onMarkReviewed && <Button size="sm" variant="outline" onClick={onMarkReviewed}>Mark reviewed</Button>}
+          : onMarkReviewed && <Button type="button" size="sm" variant="outline" onClick={onMarkReviewed}>Mark reviewed</Button>}
       </div>
       <div className="grid grid-cols-1 border-t md:grid-cols-2 md:divide-x">
         <AirportCard role="Departure" icao={departureIcao} info={airportInfo(departureIcao)} />

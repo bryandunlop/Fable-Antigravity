@@ -61,17 +61,28 @@ function FuelCellBody({ cell, onOpen }: { cell: PrepCell; onOpen: () => void }) 
  * Reading a column here is the pass.
  */
 export function PrepMatrix({
-  rows, onOpenFrat, onOpenAirport, onOpenFuel,
+  rows, scheduledLegCount = 0, onOpenFrat, onOpenAirport, onOpenFuel,
 }: {
   rows: PrepRow[];
+  /** Legs on the SCHEDULING record, which exist well before the trip is released to preflight.
+   *  Empty rows with a non-zero count here means "not released yet", not "no legs". */
+  scheduledLegCount?: number;
   onOpenFrat: (legId: string) => void;
   onOpenAirport: (legId: string) => void;
   onOpenFuel: (legId: string) => void;
 }) {
   if (rows.length === 0) {
+    // Two different situations, and conflating them was a small lie with a big read: a trip that
+    // scheduling has fully planned showed "No legs on this trip yet", which looks like the itinerary
+    // was lost rather than like prep has not opened.
     return (
       <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-        No legs on this trip yet — nothing to prep until scheduling releases it.
+        {scheduledLegCount > 0 ? (
+          <>Scheduling has {scheduledLegCount} {scheduledLegCount === 1 ? 'leg' : 'legs'} planned.
+            {' '}Your preflight opens when the trip is released to the crew.</>
+        ) : (
+          <>No legs on this trip yet — nothing to prep until scheduling releases it.</>
+        )}
       </div>
     );
   }
