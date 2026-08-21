@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ExternalLink, Send } from 'lucide-react';
+import { CheckCheck, ChevronDown, ChevronRight, ExternalLink, Flag, RotateCcw, Send } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { Separator } from '../ui/separator';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
-import { StatusBadge, AckBadge, TaskActionButtons, formatDueTime, groupByCategory } from '../scheduling-workspace/taskRowHelpers';
+import { StatusBadge, AckBadge, TaskActionButtons, formatDueTime } from '../scheduling-workspace/taskRowHelpers';
 import { useRehydrateTechLog } from '../tech-log/TechLogContext';
 import { releaseSchedulingTripToPreflight, readPreflightSummary } from '../tech-log/bridge';
 import type { TripRecord } from '../../scheduling/store';
 import type { TaskInstance, TaskAction, Readiness } from '../../scheduling/engine';
 import { boardTripOf } from './adapter';
 import { TripIdentityHeader } from './TripIdentity';
+import { buildChecklistJourney, type JourneySection } from './checklistJourney';
+import type { ReTrigger } from '../../scheduling/engine';
 
 function readinessBadgeClassName(state: Readiness['state']): string {
   switch (state) {
@@ -48,6 +50,7 @@ export function TripDrawer({
   const [trip, setTrip] = useState<TripRecord | null>(null);
   const [instances, setInstances] = useState<TaskInstance[]>([]);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
+  const [openLedges, setOpenLedges] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!tripId || !open) return;
@@ -82,7 +85,10 @@ export function TripDrawer({
 
   const identity = useMemo(() => (trip ? boardTripOf(trip, instances) : null), [trip, instances]);
   const preflight = useMemo(() => (trip ? readPreflightSummary(trip.tripNumber) : null), [trip, tick]);
-  const grouped = useMemo(() => groupByCategory(instances), [instances]);
+  const journey = useMemo(
+    () => (trip ? buildChecklistJourney(trip.legs, instances, new Date(nowUtc()).getTime()) : null),
+    [trip, instances, nowUtc],
+  );
   const blockedIds = useMemo(() => new Set(instances.filter(i => i.status === 'blocked').map(i => i.id)), [instances]);
 
   async function handleAction(instanceId: string, action: TaskAction) {
@@ -191,45 +197,40 @@ export function TripDrawer({
 
             <Separator />
 
-            {/* Checklist — THE checklist for THIS trip */}
-            <div className="space-y-5">
+            {/* Checklist — THE checklist for THIS trip, as a journey (D87/LG-259): whole-trip
+                work, then each leg in flight order, a NOW line moving through it, cleared work
+                folded to a ledge, and D89 advisory flags always visible but never demanding. */}
+            <div className="space-y-4">
               <h3 className="text-sm font-semibold">
                 Trip checklist
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  {instances.length} items · every item below belongs to {identity.route} ({trip.tripNumber})
+                  {instances.length} items · time-ordered · every item belongs to {identity.route} ({trip.tripNumber})
                 </span>
               </h3>
-              {instances.length === 0 ? (
+              {(!journey || journey.sections.length === 0) ? (
                 <p className="text-sm text-muted-foreground">No checklist instantiated for this trip type.</p>
               ) : (
-                grouped.map(([category, rows]) => (
-                  <div key={category} className="space-y-2">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {category.replace(/-/g, ' ')}
-                    </h4>
-                    <div className="space-y-2">
-                      {rows.map(inst => (
-                        <div
-                          key={inst.id}
-                          id={`drawer-task-${inst.id}`}
-                          className={`flex items-center justify-between gap-4 border rounded-md p-3 transition-shadow ${blockedIds.has(inst.id) ? 'border-[var(--gfo-error,#EF3340)]/40 bg-[var(--gfo-error,#EF3340)]/5' : ''}`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium text-foreground">{inst.title}</span>
-                              <StatusBadge status={inst.status} />
-                              {inst.requiresAck && <AckBadge ackState={inst.ackState} />}
-                            </div>
-                            <div className="text-xs mt-1 text-muted-foreground">
-                              Owner: {inst.ownerRole} · Due {formatDueTime(inst.dueAtUtc)}
-                              {inst.handoffTarget && ` · Hands off to ${inst.handoffTarget.value}`}
-                              {inst.notes && ` · "${inst.notes}"`}
-                            </div>
-                          </div>
-                          <TaskActionButtons instance={inst} onAction={a => handleAction(inst.id, a)} />
-                        </div>
-                      ))}
-                    </div>
+                journey.sections.map((section, idx) => (
+                  <div key={section.key}>
+                    <JourneySectionBlock
+                      section={section}
+                      ledgeOpen={openLedges.has(section.key)}
+                      onToggleLedge={() => setOpenLedges(prev => {
+                        const next = new Set(prev);
+                        next.has(section.key) ? next.delete(section.key) : next.add(section.key);
+                        return next;
+                      })}
+                      onAction={handleAction}
+                    />
+                    {journey.nowAfterIndex === idx && idx < journey.sections.length - 1 && (
+                      <div className="flex items-center gap-2.5 my-4" aria-label="Current time position">
+                        <div className="flex-1 h-0.5 bg-[var(--gfo-midnight,#142D7E)] rounded" />
+                        <span className="text-[10px] font-bold tracking-widest text-[var(--gfo-midnight,#142D7E)]">
+                          NOW · {new Date(nowUtc()).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
+                        </span>
+                        <div className="flex-1 h-0.5 bg-[var(--gfo-midnight,#142D7E)] rounded" />
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -238,5 +239,124 @@ export function TripDrawer({
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+const REFLAG_LABEL: Record<ReTrigger, string> = {
+  legScheduleChange: 'Schedule moved since cleared',
+  aircraftChange: 'Tail changed since cleared',
+  passengerChange: 'Pax changed since cleared',
+};
+
+function CategoryChip({ category }: { category: string }) {
+  return (
+    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+      {category.replace(/-/g, ' ')}
+    </span>
+  );
+}
+
+function TaskRow({ inst, onAction }: { inst: TaskInstance; onAction: (id: string, a: TaskAction) => void }) {
+  const blocked = inst.status === 'blocked';
+  return (
+    <div
+      id={`drawer-task-${inst.id}`}
+      className={`flex items-center justify-between gap-4 border rounded-md p-3 transition-shadow ${blocked ? 'border-[var(--gfo-error,#EF3340)]/40 bg-[var(--gfo-error,#EF3340)]/5' : ''}`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-foreground">{inst.title}</span>
+          <CategoryChip category={inst.category} />
+          <StatusBadge status={inst.status} />
+          {inst.requiresAck && <AckBadge ackState={inst.ackState} />}
+        </div>
+        <div className="text-xs mt-1 text-muted-foreground">
+          Owner: {inst.ownerRole} · Due {formatDueTime(inst.dueAtUtc)}
+          {inst.handoffTarget && ` · Hands off to ${inst.handoffTarget.value}`}
+          {inst.notes && ` · "${inst.notes}"`}
+        </div>
+      </div>
+      <TaskActionButtons instance={inst} onAction={a => onAction(inst.id, a)} />
+    </div>
+  );
+}
+
+/** A settled task carrying a D89 ADVISORY flag: visible, amber, never demanding. The scheduler
+ * dismisses it (the clear still stands) or explicitly redoes the task — their judgment. */
+function FlaggedRow({ inst, onAction }: { inst: TaskInstance; onAction: (id: string, a: TaskAction) => void }) {
+  const change = inst.reflag!.change;
+  return (
+    <div
+      id={`drawer-task-${inst.id}`}
+      className="flex items-center justify-between gap-4 border rounded-md p-3 border-[var(--gfo-warning,#F1B434)]/60 bg-[var(--gfo-warning,#F1B434)]/5"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-foreground">{inst.title}</span>
+          <CategoryChip category={inst.category} />
+          <StatusBadge status={inst.status} />
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase text-[#92650a] bg-[var(--gfo-warning,#F1B434)]/20 rounded-full px-2 py-0.5">
+            <Flag className="h-2.5 w-2.5" /> {REFLAG_LABEL[change]}
+          </span>
+        </div>
+        <div className="text-xs mt-1 text-muted-foreground">
+          Cleared {inst.completedAtUtc ? formatDueTime(inst.completedAtUtc) : 'earlier'} · advisory — the clear stands unless you say otherwise
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Button size="sm" variant="outline" onClick={() => onAction(inst.id, { kind: 'clearReflag' })}>
+          <CheckCheck className="h-3.5 w-3.5 mr-1" /> Dismiss
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onAction(inst.id, { kind: 'reopen', change, detail: 'scheduler chose to redo' })}>
+          <RotateCcw className="h-3.5 w-3.5 mr-1" /> Redo
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function JourneySectionBlock({ section, ledgeOpen, onToggleLedge, onAction }: {
+  section: JourneySection;
+  ledgeOpen: boolean;
+  onToggleLedge: () => void;
+  onAction: (id: string, a: TaskAction) => void;
+}) {
+  const done = section.cleared.length;
+  const allSettled = section.open.length === 0 && section.flagged.length === 0;
+  return (
+    <div className="relative pl-6">
+      {/* the rail */}
+      <div className="absolute left-[7px] top-1 bottom-1 w-0.5 bg-muted rounded" />
+      <span className={`absolute left-0 top-0.5 w-3.5 h-3.5 rounded-full border-2 box-border bg-background ${allSettled ? 'border-[var(--gfo-success,#00B140)] bg-[var(--gfo-success,#00B140)]' : 'border-[var(--gfo-midnight,#142D7E)]'}`} />
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-sm font-semibold">
+          {section.kind === 'trip' ? 'Whole trip' : `Leg ${section.sequence} · ${section.departureIcao} → ${section.arrivalIcao}`}
+        </span>
+        {section.kind === 'leg' && section.departureTimeUtc && (
+          <span className="text-xs text-muted-foreground">
+            dep {formatDueTime(section.departureTimeUtc)}{typeof section.paxCount === 'number' ? ` · ${section.paxCount} pax` : ''}
+          </span>
+        )}
+      </div>
+      <div className="space-y-2">
+        {done > 0 && (
+          <button
+            onClick={onToggleLedge}
+            className="w-full flex items-center gap-2 border border-dashed rounded-md px-3 py-1.5 text-left hover:bg-accent transition-colors"
+          >
+            <CheckCheck className="h-3.5 w-3.5 text-[var(--gfo-success,#00B140)] shrink-0" />
+            <span className="text-xs text-muted-foreground truncate">
+              {done} cleared — {section.cleared.slice(0, 3).map(t => t.title).join(', ')}{done > 3 ? `, +${done - 3} more` : ''}
+            </span>
+            {ledgeOpen
+              ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
+              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />}
+          </button>
+        )}
+        {ledgeOpen && section.cleared.map(inst => <TaskRow key={inst.id} inst={inst} onAction={onAction} />)}
+        {section.flagged.map(inst => <FlaggedRow key={inst.id} inst={inst} onAction={onAction} />)}
+        {section.open.map(inst => <TaskRow key={inst.id} inst={inst} onAction={onAction} />)}
+      </div>
+    </div>
   );
 }
