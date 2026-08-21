@@ -352,7 +352,7 @@ export default function LeadDashboard({
       {/* ── Month stat cards ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <GfoStatCard
-          label={`Fleet hours · ${monthName}`}
+          label="Airframe hours · fleet total"
           value={fleetHours.toLocaleString('en-US', { maximumFractionDigits: 1 })}
           unit="h"
         />
