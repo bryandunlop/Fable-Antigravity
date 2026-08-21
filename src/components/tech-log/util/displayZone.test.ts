@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatRegulatoryInstant, formatRegulatoryCompact, formatRegulatoryDeadline } from './displayZone';
+import { formatRegulatoryInstant, formatRegulatoryCompact, formatRegulatoryDeadline, formatRegulatoryDeadlineShort } from './displayZone';
 
 // D24 display layer: a stored UTC instant is the SAME absolute moment everywhere; only the lens
 // changes. Default lens = the deferral's own governing zone (clean regulatory boundary), with
@@ -93,5 +93,25 @@ describe('formatRegulatoryDeadline (LG-195 — an END boundary must never read a
   it('honors an overridden governing zone (D24 per-deferral override), not a fixed Eastern anchor', () => {
     expect(formatRegulatoryDeadline('2026-01-30T06:00:00.000Z', 'GOVERNING', 'America/Chicago'))
       .toBe('Jan 29, 2026 · 23:59 CST');
+  });
+});
+
+
+describe('formatRegulatoryDeadlineShort (tight surfaces — a TV lane label)', () => {
+  it('keeps the LG-195 day-shift, drops only the year', () => {
+    // Same instant as the full-form test above: Aug 19 00:00 EDT is Aug 18 · 23:59.
+    expect(formatRegulatoryDeadlineShort('2026-08-19T04:00:00.000Z', 'GOVERNING', 'America/New_York'))
+      .toBe('Aug 18 · 23:59 EDT');
+  });
+
+  it('never renders the raw next-day date — the whole point of the short form existing', () => {
+    const out = formatRegulatoryDeadlineShort('2026-02-06T05:00:00.000Z', 'GOVERNING', 'America/New_York');
+    expect(out).toBe('Feb 5 · 23:59 EST');
+    expect(out).not.toContain('Feb 6');
+  });
+
+  it('keeps a non-midnight boundary as-is, minus the year', () => {
+    expect(formatRegulatoryDeadlineShort('2026-08-19T18:30:00.000Z', 'GOVERNING', 'America/New_York'))
+      .toBe('Aug 19 · 14:30 EDT');
   });
 });
