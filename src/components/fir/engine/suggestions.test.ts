@@ -90,34 +90,49 @@ describe('buildDefectFirSuggestions', () => {
 /**
  * The seeded demo world has to actually produce the nudge its own comment promises.
  *
- * `scenarios.ts` seeds N2PG as a fresh un-reported AOG "so the FIR §8 'Open an FIR?' nudge fires".
- * That defect is ~6 h old — nowhere near the 24 h downtime threshold — so it can only fire through
- * the immediate-escalation path. That path used to read `severity === 'CRITICAL'`; D55 deleted
- * severity and it was re-pointed at `casColor === 'RED'`, at which point nothing wrote `casColor`
- * and the seed comment quietly became false. This test is what keeps it honest: it drives the real
- * seed builder rather than a fixture, so removing the RED CAS from `d-n2pg` — or moving it onto a
- * rectified or non-grounding defect — fails here.
+ * It used to be N2PG: a ~6 h old AOG firing through the immediate-escalation path, which reads
+ * `casColor === 'RED'`. On 2026-08-21 the demo fleet was rebalanced (three tails sat RED at once,
+ * leaving one flyable aeroplane) and N2PG was rectified, so the nudge moved to **N1PG** and now
+ * fires through the **downtime** path instead: N1PG has been AOG ~29 h waiting on an uplock sensor,
+ * past the 24 h threshold.
+ *
+ * Why not simply move the RED CAS across: N1PG annunciates GEAR UNSAFE, and the D60 knowledge
+ * article TK-901 is written around that being AMBER — `casKnowledgeSeeds.test.ts` pins the record
+ * and the catalogue to agree, and it caught the attempt. Downtime is the better trigger anyway.
+ *
+ * This test still drives the real seed builder rather than a fixture, so pulling N1PG's timeline
+ * back under 24 h — or rectifying it — fails here.
  */
-describe('the seeded demo world fires the FIR nudge on N2PG', () => {
+describe('the seeded demo world fires the FIR nudge on N1PG', () => {
   const state = getDefaultState();
   const now = new Date().toISOString();
   const seedSlice: TechLogEvidenceSlice = {
     defects: state.defects, workCards: state.workCards, laborEntries: state.laborEntries,
   };
 
-  it('d-n2pg carries the RED CAS the escalation path reads', () => {
-    const d = state.defects.find(x => x.id === 'd-n2pg')!;
-    expect(d.casColor).toBe('RED');
+  it('d-n1pg is still an OPEN grounding defect — the nudge reads nothing else', () => {
+    const d = state.defects.find(x => x.id === 'd-n1pg')!;
     expect(d.status).toBe('OPEN');
     expect(d.airworthinessAffecting).not.toBe(false); // still grounding
   });
 
-  it('suggests an AOG FIR for d-n2pg on fresh seeds, well inside the downtime threshold', () => {
+  it('d-n1pg is seeded past the 24 h downtime threshold', () => {
+    const d = state.defects.find(x => x.id === 'd-n1pg')!;
+    const hours = (Date.parse(now) - Date.parse(d.reportedAtUtc)) / 3_600_000;
+    expect(hours).toBeGreaterThan(DEFAULT_FIR_SUGGESTION_CONFIG.downtimeHours);
+  });
+
+  it('suggests an AOG FIR for d-n1pg on fresh seeds, via the downtime path', () => {
     const out = buildDefectFirSuggestions(seedSlice, [], [], DEFAULT_FIR_SUGGESTION_CONFIG, now);
-    const n2 = out.find(s => s.defectId === 'd-n2pg');
-    expect(n2).toBeDefined();
-    expect(n2!.category).toBe('AOG');
-    expect(n2!.reason).toMatch(/critical/i); // the fast path, not the 24 h downtime path
-    expect(n2!.anchor).toEqual({ kind: 'DEFECT', refId: 'd-n2pg' });
+    const n1 = out.find(s => s.defectId === 'd-n1pg');
+    expect(n1).toBeDefined();
+    expect(n1!.category).toBe('AOG');
+    expect(n1!.reason).toMatch(/grounded/i); // the downtime path, not the RED-CAS fast path
+    expect(n1!.anchor).toEqual({ kind: 'DEFECT', refId: 'd-n1pg' });
+  });
+
+  it('the rectified N2PG chip-detector defect does NOT suggest an FIR', () => {
+    const out = buildDefectFirSuggestions(seedSlice, [], [], DEFAULT_FIR_SUGGESTION_CONFIG, now);
+    expect(out.find(s => s.defectId === 'd-n2pg')).toBeUndefined();
   });
 });
