@@ -111,7 +111,7 @@ describe('SchedulingService', () => {
   const addPax = (t: TripRecord, n = 1): TripRecord =>
     ({ ...t, legs: [{ ...t.legs[0], paxCount: t.legs[0].paxCount + n }] });
 
-  it('updateTrip re-opens a completed pax task when a passenger is added', async () => {
+  it('updateTrip FLAGS a completed pax task when a passenger is added (advisory, D89)', async () => {
     const { store, service } = svc();
     await store.saveTemplate(paxTpl);
     const { instances } = await service.createTripMirror(trip, NOW);
@@ -121,7 +121,7 @@ describe('SchedulingService', () => {
     const { updated } = await service.updateTrip(addPax(trip), NOW);
     expect(updated.find((i) => i.taskDefId === 'pax')?.reflag).toEqual({ change: 'passengerChange' });
     const stored = await store.getInstance(pax.id);
-    expect(stored?.status).toBe('open');
+    expect(stored?.status).toBe('done');        // advisory: the clear survives the change
     expect(stored?.reflag).toEqual({ change: 'passengerChange' });
   });
 
@@ -136,7 +136,7 @@ describe('SchedulingService', () => {
     expect((await store.getInstance(pax.id))?.status).toBe('done');
   });
 
-  it('a reopened task can re-escalate (stale escalation event cleared on reopen)', async () => {
+  it('an advisory reflag does NOT re-arm escalation (D89 — no demanded rework)', async () => {
     const { store, service } = svc();
     await store.saveTemplate(paxTpl);
     const { instances } = await service.createTripMirror(trip, NOW);
@@ -146,7 +146,7 @@ describe('SchedulingService', () => {
     await service.applyAction(pax.id, { kind: 'ack' }, 'p', NOW);
     await service.applyAction(pax.id, { kind: 'complete' }, 's', NOW);
     await service.updateTrip(addPax(trip, 2), NOW);
-    expect((await service.runEscalations(late)).length).toBe(1); // re-fires
+    expect((await service.runEscalations(late)).length).toBe(0); // stays settled — flag is advisory
   });
 
   it.each(['domestic', 'international', 'dca_dassp'] as const)(

@@ -100,10 +100,17 @@ export function reconcileTrip(
     const completed = live.status === 'done' || live.ackState === 'acked';
 
     if (change && completed) {
-      toUpdate.push(applyTaskAction(live, {
-        kind: 'reopen', change, detail: reopenDetail(change),
-        newEtdUtc: desiredInst.etdUtc, newDueAtUtc: desiredInst.dueAtUtc,
-      }, actor, nowUtc));
+      // ADVISORY reflag (D89): a trip change never un-completes cleared work. Stamp the flag,
+      // refresh the timing anchors so the badge states the truth, and leave completion (and the
+      // escalation ladder) alone — the scheduler dismisses or re-does at their judgment. The
+      // explicit human 'reopen' action still exists; reconcile just no longer wields it.
+      toUpdate.push({
+        ...live,
+        etdUtc: desiredInst.etdUtc,
+        dueAtUtc: desiredInst.dueAtUtc,
+        reflag: { change },
+        auditTrail: [...live.auditTrail, { atUtc: nowUtc, actor, action: `reflagged:${change}`, detail: reopenDetail(change) }],
+      });
     } else if (
       ACTIONABLE.has(live.status)
       && (live.etdUtc !== desiredInst.etdUtc || live.dueAtUtc !== desiredInst.dueAtUtc)
