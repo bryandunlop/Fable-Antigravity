@@ -64,7 +64,9 @@ export interface NavEntry {
 
 // Where each role lands right after login. Everyone else lands on '/' (Dashboard).
 export const FRONT_DOORS: Record<string, string> = {
-  'pilot': '/pilot-workspace',
+  // Pilots deliberately have NO entry here: they land on '/' (Dashboard). The Flight Hub is where
+  // a pilot works, but it is not the first thing they should see on opening the app — the dashboard
+  // is the across-the-day picture, and Flight Hub is one tap from it in the sidebar.
   'chief-pilot': '/pilot-workspace',
   'scheduling': '/scheduling-command',
   'maintenance': '/tech-log',

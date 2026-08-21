@@ -682,6 +682,41 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       ],
       createdByOid: pilot.oid, createdAtUtc: iso(0),
     },
+    // Released-to-preflight mirror of the myairops booking fixture MAO-7315 (N2PG, KLUK–KTEB–KLUK
+    // day turn). This is the FIRST card in the pilot's Flight Hub — it is the only trip in progress,
+    // so it pins to the top of My Flights — and without this mirror it opened on "0 legs · not
+    // released to preflight", i.e. the demo's front door was its emptiest screen.
+    //
+    // Times mirror fixtures/bookingTrips.ts MAO-7315 exactly: leg 1 departed 4h ago and landed 2h
+    // ago; leg 2 departs in 3h. Inside the T-4h commit window, so the hub opens on the DAY-OF pane
+    // with a live queue rather than the prep matrix.
+    //
+    // Deliberately left with two open items on the flying leg — a saved FRAT draft to resume and an
+    // airport review to acknowledge — so the walkthrough has something to click that visibly moves
+    // "0 of 2 before push" to 2 of 2 and turns the readiness dot green. Leg 1 is fully worked, so
+    // the same board also shows what a finished leg looks like.
+    {
+      id: 'trip-7315', tripNumber: 'MAO-7315', aircraftId: 'ac-n2pg', name: 'KLUK–KTEB–KLUK day turn', status: 'OPEN',
+      flightLogIds: [],
+      legs: [
+        {
+          id: 'leg-7315a', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'KTEB',
+          departureTimeUtc: new Date(nowMs - 4 * H).toISOString(), arrivalTimeUtc: new Date(nowMs - 2 * H).toISOString(),
+          fratStatus: 'COMPLETED', fratScore: 12, airportReviewed: true,
+          fuelRequestId: 'fr-seed-7315', plannedFuelLb: 19500,
+          fuelFinalizedByOid: pilot.oid, fuelFinalizedAtUtc: iso(6 * H),
+        },
+        {
+          id: 'leg-7315b', sequence: 2, departureIcao: 'KTEB', arrivalIcao: 'KLUK',
+          departureTimeUtc: new Date(nowMs + 3 * H).toISOString(), arrivalTimeUtc: new Date(nowMs + 5 * H).toISOString(),
+          fratStatus: 'IN_PROGRESS', airportReviewed: false,
+          // A partial matrix on purpose: mergeFratSelections falls back per cell, so this resumes
+          // cleanly whatever the live FRAT template's shape is.
+          fratDraft: { selections: [[false, true], [true]], mitigationNotes: 'TEB departure — expect ground delay, briefed alternate KLGA.', savedAtUtc: iso(1 * H) },
+        },
+      ],
+      createdByOid: pilot.oid, createdAtUtc: iso(8 * H),
+    },
     // Future legs for the D28 planning-calendar flight overlay. The N2PG KDAL day trip deliberately
     // lands INSIDE the 12-month-package window (+10d→+14d) so the aircraft-away warning demos.
     {
