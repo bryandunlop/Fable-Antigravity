@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -15,6 +15,8 @@ import { tripWindow } from './engine/menuPlan';
 import { buildFaTrips } from './faTrips';
 import type { FaCateringOrder, FaTrip } from './faTrips';
 import { rosterFor, summarise, splitAllergens, legByNumber, bandKind, hasProfileContent } from './faTripRoster';
+import TripPickerSheet from './TripPickerSheet';
+import { tripSpan } from './tripCalendar';
 import { conflictingItems } from '../passengers/engine/profileEdits';
 import type { RosterGuest } from './faTripRoster';
 
@@ -314,83 +316,37 @@ function CateringReference({ order }: { order: FaCateringOrder }) {
   );
 }
 
-function TripRoster({ trip, passengers, now, defaultOpen, onOpenGuest }: {
+function TripRoster({ trip, passengers, now, view, onViewChange, onOpenGuest }: {
   trip: FaTrip;
   passengers: Passenger[];
   now: Date;
-  /** The nearest trip opens; later ones start collapsed to a summary row. An FA has a
-   *  handful of trips ahead and cares about the next one — but the later ones have to
-   *  be reachable, and stacking three full rosters is four screens of scroll. */
-  defaultOpen: boolean;
+  view: 'list' | 'deck';
+  onViewChange: (v: 'list' | 'deck') => void;
   onOpenGuest: (g: RosterGuest, mode?: 'read' | 'edit') => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   const [legFilter, setLegFilter] = useState<number | null>(null);
-  const [view, setView] = useState<'list' | 'deck'>(() => {
-    try { return localStorage.getItem(VIEW_KEY) === 'deck' ? 'deck' : 'list'; } catch { return 'list'; }
-  });
-  const setViewPersisted = (v: 'list' | 'deck') => {
-    setView(v);
-    try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode — the toggle still works, it just forgets */ }
-  };
+
+  // The leg filter belongs to the trip, not to the screen: carrying "Leg 3" across a
+  // switch to a two-leg trip would show an empty roster and look like a bug.
+  const tripId = trip.id;
+  const [lastTrip, setLastTrip] = useState(tripId);
+  if (lastTrip !== tripId) { setLastTrip(tripId); setLegFilter(null); }
 
   const guests = useMemo(() => rosterFor(trip, passengers, legFilter), [trip, passengers, legFilter]);
   const summary = useMemo(() => summarise(guests), [guests]);
-  // Trip-wide, regardless of the leg filter — a collapsed card has to say something
-  // useful about the whole trip, not about whichever leg was last selected.
-  const tripSummary = useMemo(() => summarise(rosterFor(trip, passengers, null)), [trip, passengers]);
   const leg = legByNumber(trip, legFilter);
-  const window = tripWindow(trip);
   const foodAllergens = splitAllergens(summary.allergens).food;
   const uncovered = summary.flaggedNoDetail + summary.noInfo;
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        {/* Trip number, countdown and the view toggle share the top line; the trip NAME
-            gets its own. Run together they wrapped to four lines on a 375pt phone —
-            the right-hand cluster is ~170pt of a 327pt row, which leaves the title no
-            room to be a title. */}
+      <CardContent className="space-y-3 pt-6">
         <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            className="flex items-center gap-2 min-w-0 flex-1 text-left -my-1 py-1 rounded hover:bg-muted/60"
-          >
-            <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform duration-fast ease-gfo ${open ? '' : '-rotate-90'}`} />
-            <h2 className="text-base sm:text-lg font-semibold truncate">{trip.tripNumber}</h2>
-          </button>
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge variant="secondary">{untilDeparture(trip.legs[0]?.departureUtc ?? '', now)}</Badge>
-            {open && <ViewToggle value={view} onChange={setViewPersisted} />}
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">{trip.tripName}</p>
-        <p className="text-xs text-muted-foreground">
-          {trip.tail} · {trip.aircraftType}
-          {window && <> · {fmtDate(window.startUtc)} – {fmtDate(window.endUtc)}</>}
-        </p>
-        {!open && (
-          <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>{tripSummary.total} guest{tripSummary.total === 1 ? '' : 's'}</span>
-            <span>{trip.legs.length} leg{trip.legs.length === 1 ? '' : 's'}</span>
-            {(tripSummary.allergens.length > 0 || tripSummary.flaggedNoDetail > 0) && (
-              <span className="text-red-700 dark:text-red-300 font-medium flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3 shrink-0" />
-                {tripSummary.allergens.length > 0
-                  ? splitAllergens(tripSummary.allergens).food.join(', ') || 'allergies on board'
-                  : 'allergies flagged'}
-              </span>
-            )}
+          <p className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+            <Users className="w-3 h-3 shrink-0" /><span className="truncate">{trip.cabinCrew.join(', ')}</span>
           </p>
-        )}
-      </CardHeader>
-
-      {open && (
-      <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
-          <Users className="w-3 h-3 shrink-0" /><span className="truncate">{trip.cabinCrew.join(', ')}</span>
-        </p>
+          <ViewToggle value={view} onChange={onViewChange} />
+        </div>
 
         <LegTabs trip={trip} value={legFilter} onChange={setLegFilter} />
 
@@ -433,8 +389,39 @@ function TripRoster({ trip, passengers, now, defaultOpen, onOpenGuest }: {
 
         {leg?.catering && <CateringReference order={leg.catering} />}
       </CardContent>
-      )}
     </Card>
+  );
+}
+
+/** The trip identity IS the page title, and it is the switcher. Nothing permanent is
+ *  spent on navigation: the roster starts about 60px down instead of 500, and the
+ *  trips she is not looking at cost nothing until she asks for them. */
+function TripHeader({ trip, now, onOpenPicker }: {
+  trip: FaTrip;
+  now: Date;
+  onOpenPicker: () => void;
+}) {
+  const span = tripSpan(trip);
+  const range = span
+    ? `${span.start.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${span.end.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`
+    : '';
+  return (
+    <div>
+      <button
+        onClick={onOpenPicker}
+        style={{ width: '100%' }}
+        aria-haspopup="dialog"
+        className="flex-1 min-w-0 text-left -my-1 py-1 px-1 -mx-1 rounded hover:bg-muted active:bg-muted"
+      >
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span className="text-xl font-bold truncate">{trip.tripName}</span>
+          <ChevronDown className="w-4 h-4 shrink-0 text-primary" />
+        </span>
+        <span className="block text-xs text-muted-foreground mt-0.5 truncate">
+          {trip.tripNumber} · {trip.tail} · {range} · {untilDeparture(trip.legs[0]?.departureUtc ?? '', now)}
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -442,26 +429,48 @@ export default function FlightAttendantFlights() {
   const { passengers } = usePassengers();
   const now = useMemo(() => new Date(), []);
   const trips = useMemo(() => buildFaTrips(now), [now]);
+
+  const [selectedId, setSelectedId] = useState(() => trips[0]?.id ?? '');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [openGuest, setOpenGuest] = useState<RosterGuest | null>(null);
   const [editing, setEditing] = useState(false);
+  const [view, setView] = useState<'list' | 'deck'>(() => {
+    try { return localStorage.getItem(VIEW_KEY) === 'deck' ? 'deck' : 'list'; } catch { return 'list'; }
+  });
+  const setViewPersisted = (v: 'list' | 'deck') => {
+    setView(v);
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode — the toggle still works, it just forgets */ }
+  };
 
   const open = (g: RosterGuest, mode: 'read' | 'edit' = 'read') => { setOpenGuest(g); setEditing(mode === 'edit'); };
+  const trip = trips.find((t) => t.id === selectedId) ?? trips[0];
+
+  if (!trip) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-2xl font-bold">Upcoming trips</h1>
+        <p className="text-sm text-muted-foreground mt-1">No trips assigned.</p>
+      </div>
+    );
+  }
 
   // No padding of our own: Navigation's <main> already pads (p-6 pb-20 md:pb-6).
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold">Upcoming trips</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Who is on board, and what they cannot eat.
-          {trips.length > 1 && <> {trips.length} trips assigned — later ones are folded.</>}
-        </p>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-4">
+      <TripHeader trip={trip} now={now} onOpenPicker={() => setPickerOpen(true)} />
 
-      {trips.map((trip, i) => (
-        <TripRoster key={trip.id} trip={trip} passengers={passengers} now={now}
-          defaultOpen={i === 0} onOpenGuest={open} />
-      ))}
+      <TripRoster trip={trip} passengers={passengers} now={now}
+        view={view} onViewChange={setViewPersisted} onOpenGuest={open} />
+
+      <TripPickerSheet
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        trips={trips}
+        passengers={passengers}
+        now={now}
+        selectedId={trip.id}
+        onSelect={setSelectedId}
+      />
 
       {/* A centred modal, not a side sheet: used one-handed on an iPhone and two-handed
           on an iPad, where a right-edge panel is the far corner of the screen. */}
