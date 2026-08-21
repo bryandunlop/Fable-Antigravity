@@ -682,8 +682,8 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
       ],
       createdByOid: pilot.oid, createdAtUtc: iso(0),
     },
-    // Released-to-preflight mirror of the myairops booking fixture MAO-7315 (N2PG, KLUK–KTEB–KLUK
-    // day turn). This is the FIRST card in the pilot's Flight Hub — it is the only trip in progress,
+    // Released-to-preflight mirror of the myairops booking fixture MAO-7315 (N2PG, a four-leg
+    // KLUK–KTEB–KBOS–KLGA–KLUK northeast day). This is the FIRST card in the pilot's Flight Hub — it is the only trip in progress,
     // so it pins to the top of My Flights — and without this mirror it opened on "0 legs · not
     // released to preflight", i.e. the demo's front door was its emptiest screen.
     //
@@ -696,7 +696,7 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
     // "0 of 2 before push" to 2 of 2 and turns the readiness dot green. Leg 1 is fully worked, so
     // the same board also shows what a finished leg looks like.
     {
-      id: 'trip-7315', tripNumber: 'MAO-7315', aircraftId: 'ac-n2pg', name: 'KLUK–KTEB–KLUK day turn', status: 'OPEN',
+      id: 'trip-7315', tripNumber: 'MAO-7315', aircraftId: 'ac-n2pg', name: 'Northeast day — KLUK–KTEB–KBOS–KLGA–KLUK', status: 'OPEN',
       flightLogIds: [],
       legs: [
         {
@@ -707,12 +707,22 @@ export function getDefaultState(referenceNowMs: number = Date.now()): TechLogSta
           fuelFinalizedByOid: pilot.oid, fuelFinalizedAtUtc: iso(6 * H),
         },
         {
-          id: 'leg-7315b', sequence: 2, departureIcao: 'KTEB', arrivalIcao: 'KLUK',
-          departureTimeUtc: new Date(nowMs + 3 * H).toISOString(), arrivalTimeUtc: new Date(nowMs + 5 * H).toISOString(),
+          id: 'leg-7315b', sequence: 2, departureIcao: 'KTEB', arrivalIcao: 'KBOS',
+          departureTimeUtc: new Date(nowMs + 3 * H).toISOString(), arrivalTimeUtc: new Date(nowMs + 3 * H + 55 * 60000).toISOString(),
           fratStatus: 'IN_PROGRESS', airportReviewed: false,
           // A partial matrix on purpose: mergeFratSelections falls back per cell, so this resumes
           // cleanly whatever the live FRAT template's shape is.
-          fratDraft: { selections: [[false, true], [true]], mitigationNotes: 'TEB departure — expect ground delay, briefed alternate KLGA.', savedAtUtc: iso(1 * H) },
+          fratDraft: { selections: [[false, true], [true]], mitigationNotes: 'TEB departure — expect ground delay, briefed alternate KHPN.', savedAtUtc: iso(1 * H) },
+        },
+        {
+          id: 'leg-7315c', sequence: 3, departureIcao: 'KBOS', arrivalIcao: 'KLGA',
+          departureTimeUtc: new Date(nowMs + 5.5 * H).toISOString(), arrivalTimeUtc: new Date(nowMs + 5.5 * H + 50 * 60000).toISOString(),
+          fratStatus: 'NOT_STARTED', airportReviewed: true,
+        },
+        {
+          id: 'leg-7315d', sequence: 4, departureIcao: 'KLGA', arrivalIcao: 'KLUK',
+          departureTimeUtc: new Date(nowMs + 8 * H).toISOString(), arrivalTimeUtc: new Date(nowMs + 8 * H + 105 * 60000).toISOString(),
+          fratStatus: 'NOT_STARTED', airportReviewed: false,
         },
       ],
       createdByOid: pilot.oid, createdAtUtc: iso(8 * H),

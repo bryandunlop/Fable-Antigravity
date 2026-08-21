@@ -1,11 +1,10 @@
-import { Shield, MapPin, Fuel, Lock, Check } from 'lucide-react';
 import type { QueueItem } from '../dayOfQueue';
 import { formatCountdown } from '../dayOfQueue';
+import type { TimelineEntry } from '../dayTimeline';
+import { DayTimeline } from './DayTimeline';
 import type { CustodyState } from '../../tech-log/engine/custody';
 
 const zulu = (iso: string) => `${iso.slice(11, 16)}Z`;
-
-const KIND_ICON = { frat: Shield, airport: MapPin, fuel: Fuel } as const;
 
 // Serviceability keeps the brand RAG tokens — never Tailwind's own greens (LG-158/D33).
 const SV_DOT: Record<string, string> = {
@@ -13,20 +12,6 @@ const SV_DOT: Record<string, string> = {
   AMBER: 'bg-[var(--gfo-warning)]',
   RED: 'bg-[var(--gfo-error)]',
 };
-
-function queueLabel(i: QueueItem): { title: string; sub: string; action: string } {
-  switch (i.kind) {
-    case 'frat':
-      return { title: `FRAT — leg ${i.legSequence}`, sub: i.state === 'draft' ? 'Draft saved, not submitted' : 'Not started',
-        action: i.state === 'draft' ? 'Resume' : 'Start' };
-    case 'airport':
-      return { title: `Airport review — ${i.departureIcao}, ${i.arrivalIcao}`, sub: 'Not reviewed', action: 'Open' };
-    case 'fuel':
-      return i.state === 'locked'
-        ? { title: `Fuel — ${i.departureIcao} farm`, sub: `Request closed ${zulu(i.dueUtc)} — not submitted`, action: '' }
-        : { title: `Fuel — ${i.departureIcao} farm`, sub: `Locks ${zulu(i.dueUtc)}`, action: 'Submit' };
-  }
-}
 
 /**
  * The day-of pane (D84 slice 3), replacing the four-module board inside T-4h.
@@ -37,7 +22,7 @@ function queueLabel(i: QueueItem): { title: string; sub: string; action: string 
  * out which mattered next.
  */
 export function DayOfPane({
-  nowUtc, nextDepartureUtc, route, legSequence, legCount, paxCount, progress, queue,
+  nowUtc, nextDepartureUtc, route, legSequence, legCount, paxCount, progress, timeline,
   serviceability, custody, deferralCount, onOpenHandover, onOpenItem,
 }: {
   nowUtc: string;
@@ -47,7 +32,8 @@ export function DayOfPane({
   legCount: number;
   paxCount?: number;
   progress: { done: number; total: number };
-  queue: QueueItem[];
+  /** The day in clock order (`dayTimeline`), which carries the outstanding queue inside it. */
+  timeline: TimelineEntry[];
   serviceability: 'GREEN' | 'AMBER' | 'RED';
   custody?: CustodyState;
   deferralCount: number;
@@ -146,47 +132,12 @@ export function DayOfPane({
         </section>
       )}
 
-      {/* Everything still owed, by its own clock. */}
-      <section className="rounded-lg border border-border bg-card">
-        <div className="flex items-baseline justify-between gap-2 border-b border-border px-4 py-2.5">
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">By the clock</span>
-          <span className="text-xs text-muted-foreground">{queue.length} open</span>
-        </div>
-        {queue.length === 0 ? (
-          <p className="flex items-center gap-2 px-4 py-4 text-sm text-[var(--gfo-success-ink)]">
-            <Check className="h-4 w-4" aria-hidden /> Nothing outstanding for the legs ahead.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {queue.map((i) => {
-              const Icon = KIND_ICON[i.kind];
-              const { title, sub, action } = queueLabel(i);
-              const late = i.state === 'locked';
-              return (
-                <li key={i.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className={`w-[78px] shrink-0 text-right text-sm font-semibold tabular-nums ${
-                    late ? 'text-[var(--gfo-error-ink)]' : 'text-foreground'}`}>
-                    {formatCountdown(nowUtc, i.dueUtc)}
-                  </span>
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium leading-tight">{title}</span>
-                    <span className="block text-xs text-muted-foreground">{sub}</span>
-                  </span>
-                  {action
-                    ? <button onClick={() => onOpenItem(i)}
-                        className="min-h-[38px] shrink-0 rounded-full border border-border px-3.5 py-1.5 text-xs font-medium duration-fast hover:bg-accent">
-                        {action}
-                      </button>
-                    : <span className="inline-flex shrink-0 items-center gap-1.5 px-2 text-xs text-muted-foreground">
-                        <Lock className="h-3.5 w-3.5" aria-hidden /> Locked
-                      </span>}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      {/* The day in clock order. This was a flat "by the clock" list of outstanding items, which is
+          the right instrument right up to the moment the PIC signs — and the wrong one immediately
+          after, when the list empties and a pilot with three legs still to fly is left looking at
+          "Nothing outstanding". The items did not go away; they moved onto the legs they belong to.
+          (Bryan, 2026-08-21) */}
+      <DayTimeline nowUtc={nowUtc} entries={timeline} onOpenItem={onOpenItem} />
     </div>
   );
 }

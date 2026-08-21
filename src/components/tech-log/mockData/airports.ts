@@ -33,6 +33,24 @@ const AIRPORTS: Record<string, AirportInfo> = {
     approaches: [{ runway: '06', type: 'ILS', glidepath: 3.0 }],
     fbo: 'Signature Flight Support', jetA: true, deice: true, limitations: 'Noise curfew 2300–0600L',
   },
+  KBOS: {
+    icao: 'KBOS', name: 'Boston Logan', elevationFt: 20, mountainous: false,
+    runways: [{ id: '04R/22L', ldaFt: 10083, widthFt: 150 }, { id: '15R/33L', ldaFt: 10005, widthFt: 150 }],
+    approaches: [{ runway: '04R', type: 'ILS', glidepath: 3.0 }, { runway: '33L', type: 'RNAV(GPS)', glidepath: 3.0 }],
+    fbo: 'Signature Flight Support', jetA: true, deice: true, limitations: 'PPR for GA parking · slot-controlled peak hours',
+  },
+  KLGA: {
+    icao: 'KLGA', name: 'New York LaGuardia', elevationFt: 21, mountainous: false,
+    runways: [{ id: '04/22', ldaFt: 7003, widthFt: 150 }, { id: '13/31', ldaFt: 7001, widthFt: 150 }],
+    approaches: [{ runway: '04', type: 'ILS', glidepath: 3.0 }, { runway: '13', type: 'RNAV(GPS)', glidepath: 3.1 }],
+    fbo: 'Sheltair', jetA: true, deice: true, limitations: 'Slot-controlled (ARO reservation required) · GA parking limited',
+  },
+  KDCA: {
+    icao: 'KDCA', name: 'Ronald Reagan Washington National', elevationFt: 15, mountainous: false,
+    runways: [{ id: '01/19', ldaFt: 7169, widthFt: 150 }, { id: '15/33', ldaFt: 5204, widthFt: 150 }],
+    approaches: [{ runway: '01', type: 'RNAV(GPS)', glidepath: 3.0 }, { runway: '19', type: 'ILS', glidepath: 3.0 }],
+    fbo: 'Signature Flight Support', jetA: true, deice: true, limitations: 'DASSP required · armed security officer · SFRA procedures',
+  },
 };
 
 export function airportInfo(icao: string): AirportInfo | undefined {
