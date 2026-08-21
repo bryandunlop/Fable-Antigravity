@@ -98,7 +98,7 @@ export default function LeadDashboard({
   const expiring = useMemo(() => expiringWithinDays(crew, 60, now), [crew, now]);
   const tightestCrew = dutyHeadroom(crew).filter(h => h.dutyHoursUsed > 0)[0];
 
-  const firSummary = useMemo(() => firInProgressSummary(readFirState(localStorage).firs), []);
+  const firSummary = useMemo(() => firInProgressSummary(readFirState(localStorage).firs), [now]);
   const openSafetyCases = safety.ops.move.length + safety.ops.track.length;
   const asapUnderReview = asap.reports.filter(r => r.status === 'Under review').length;
   const safetyTotal = firSummary.count + openSafetyCases + asapUnderReview;

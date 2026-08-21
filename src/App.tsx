@@ -549,7 +549,7 @@ export default function App() {
                                 <Route
                                   path="/scheduling-command"
                                   element={
-                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'lead', 'admin']}>
                                       <SchedulingWorkspaceProvider>
                                         <SchedulingCommandCenter userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>
