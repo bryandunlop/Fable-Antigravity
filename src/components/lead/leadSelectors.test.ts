@@ -157,31 +157,29 @@ describe('fleetExceptions', () => {
 });
 
 describe('buildWaitingOnYou', () => {
-  it('merges the three sources oldest-first with typed navigation targets', () => {
+  it('merges approvals and FIR gates oldest-first with typed navigation targets', () => {
     const items = buildWaitingOnYou({
-      pendingRequests: [
-        { id: 'REQ-1', route: 'KLUK → LSGG', requestedByName: 'Jennifer Martinez', requestedAtUtc: '2026-08-18T10:00:00.000Z' },
-      ],
       approvals: [
-        { id: 'AR-1', subjectTitle: 'Waiver — runway length', formLabel: 'Waiver', requestedAt: '2026-08-17T09:00:00.000Z' },
+        { id: 'AR-1', subjectTitle: 'Waiver — runway length', formLabel: 'Waiver', requestedAt: '2026-08-18T09:00:00.000Z' },
+        { id: 'AR-2', subjectTitle: 'Waiver — duty extension', formLabel: 'Waiver', requestedAt: '2026-08-17T09:00:00.000Z' },
       ],
       firsInReview: [
         { id: 'fir-1', ref: 'FIR-2026-004', title: 'Diversion into KCVG', openedAtUtc: '2026-08-19T01:00:00.000Z' },
       ],
     });
-    expect(items.map(i => i.kind)).toEqual(['approval', 'trip-request', 'fir']);
+    expect(items.map(i => i.kind)).toEqual(['approval', 'approval', 'fir']);
+    expect(items[0].id).toBe('AR-2');
     expect(items[0].target).toBe('/approvals');
-    expect(items[1].target).toBe('/scheduling-command');
     expect(items[2].target).toBe('/fir/fir-1');
     expect(items.map(i => i.sinceUtc)).toEqual([
       '2026-08-17T09:00:00.000Z',
-      '2026-08-18T10:00:00.000Z',
+      '2026-08-18T09:00:00.000Z',
       '2026-08-19T01:00:00.000Z',
     ]);
   });
 
   it('returns empty for empty inputs', () => {
-    expect(buildWaitingOnYou({ pendingRequests: [], approvals: [], firsInReview: [] })).toEqual([]);
+    expect(buildWaitingOnYou({ approvals: [], firsInReview: [] })).toEqual([]);
   });
 });
 

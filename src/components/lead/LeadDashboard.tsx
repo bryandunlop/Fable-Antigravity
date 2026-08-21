@@ -18,8 +18,6 @@ import {
   tripsFlownThisMonth,
 } from './leadSelectors';
 import {
-  getPendingTripRequests,
-  getTurndownsThisMonth,
   getOnTimeLegStats,
   getTrackedPassengers,
   DEFAULT_TRACKED_PASSENGER_IDS,
@@ -85,14 +83,13 @@ export default function LeadDashboard({
   const tightDay = week.find(d => d.oversubscribed);
   const legs = useMemo(() => todaysLegs(trips, now), [trips, now]);
 
-  const pendingRequests = useMemo(() => getPendingTripRequests(now), [now]);
-  const turndowns = useMemo(() => getTurndownsThisMonth(now), [now]);
+  // Trip requests stay off this queue — approving them is scheduling's job.
   const roles = useMemo(() => [userRole, ...additionalRoles], [userRole, additionalRoles]);
   const waiting = useMemo(() => {
     const approvals = pendingForRoles(getApprovalRequests(), roles, viewerUserId);
     const firs = readFirState(localStorage).firs.filter(f => f.status === 'IN_REVIEW');
-    return buildWaitingOnYou({ pendingRequests, approvals, firsInReview: firs });
-  }, [roles, viewerUserId, pendingRequests]);
+    return buildWaitingOnYou({ approvals, firsInReview: firs });
+  }, [roles, viewerUserId, now]);
 
   const crew = useMemo(() => getCrewRecords(now), [now]);
   const expiring = useMemo(() => expiringWithinDays(crew, 60, now), [crew, now]);
@@ -225,7 +222,7 @@ export default function LeadDashboard({
                     className="w-full rounded-lg border border-border bg-card p-2.5 text-left shadow-sm transition-shadow hover:shadow-md"
                   >
                     <div className="gfo-eyebrow text-muted-foreground">
-                      {item.kind === 'trip-request' ? 'Trip request' : item.kind === 'approval' ? 'Approval' : 'FIR publish gate'}
+                      {item.kind === 'approval' ? 'Approval' : 'FIR publish gate'}
                       {' · '}waiting {daysSince(item.sinceUtc, nowMs)}d
                     </div>
                     <div className="mt-0.5 text-sm font-medium text-primary">{item.title}</div>
@@ -235,9 +232,6 @@ export default function LeadDashboard({
               ))}
             </ul>
           )}
-          <p className="mt-3 border-t border-border pt-2 text-xs text-muted-foreground">
-            {turndowns.length} turndowns this month · {turndowns.filter(t => t.reason === 'availability').length} for availability
-          </p>
         </GfoPanel>
       </div>
 
@@ -356,11 +350,7 @@ export default function LeadDashboard({
           value={fleetHours.toLocaleString('en-US', { maximumFractionDigits: 1 })}
           unit="h"
         />
-        <GfoStatCard
-          label={`Trips flown · ${monthName}`}
-          value={flownThisMonth}
-          trend={{ direction: 'flat', label: `${turndowns.length} turndowns`, tone: 'neutral' }}
-        />
+        <GfoStatCard label={`Trips flown · ${monthName}`} value={flownThisMonth} />
         <GfoStatCard
           label="Legs on time"
           value={`${onTime.onTimeLegs}/${onTime.totalLegs}`}

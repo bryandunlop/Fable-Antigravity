@@ -119,12 +119,6 @@ export function fleetExceptions(fleet: FleetExceptionSource[]): FleetExceptionPi
 // ── Waiting on you ──────────────────────────────────────────────────────────
 
 /** Structural subsets so callers pass real records and tests pass stubs. */
-export interface WaitingTripRequestSource {
-  id: string;
-  route: string;
-  requestedByName: string;
-  requestedAtUtc: string;
-}
 export interface WaitingApprovalSource {
   id: string;
   subjectTitle: string;
@@ -138,7 +132,9 @@ export interface WaitingFirSource {
   openedAtUtc: string;
 }
 
-export type WaitingKind = 'trip-request' | 'approval' | 'fir';
+// Trip requests deliberately do NOT appear here — approving them is scheduling's
+// job, not the lead team's (Bryan, 2026-08-20 review).
+export type WaitingKind = 'approval' | 'fir';
 
 export interface WaitingItem {
   id: string;
@@ -151,19 +147,10 @@ export interface WaitingItem {
 
 /** One merged decision queue, oldest first — the longest-waiting item on top. */
 export function buildWaitingOnYou(input: {
-  pendingRequests: WaitingTripRequestSource[];
   approvals: WaitingApprovalSource[];
   firsInReview: WaitingFirSource[];
 }): WaitingItem[] {
   const items: WaitingItem[] = [
-    ...input.pendingRequests.map(r => ({
-      id: r.id,
-      kind: 'trip-request' as const,
-      title: r.route,
-      detail: `Trip request — ${r.requestedByName}`,
-      sinceUtc: r.requestedAtUtc,
-      target: '/scheduling-command',
-    })),
     ...input.approvals.map(a => ({
       id: a.id,
       kind: 'approval' as const,
