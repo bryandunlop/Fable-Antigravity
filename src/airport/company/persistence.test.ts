@@ -2,16 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { memoryStorage } from '../../notifications/storage';
 import { PersistentCompanyAirportPageStore } from './persistence';
+import { emptyPageContent } from './pageStore';
 import type { CompanyAirportPageContent } from './pageStore';
 
-const blank: CompanyAirportPageContent = {
-  ppr: null,
-  curfew: null,
-  opsNotes: null,
-  fboPreference: null,
-  rampHandlingLimits: null,
-  referenceAnnotations: [],
-};
+const blank: CompanyAirportPageContent = emptyPageContent();
 
 function content(overrides: Partial<CompanyAirportPageContent>): CompanyAirportPageContent {
   return { ...blank, ...overrides };

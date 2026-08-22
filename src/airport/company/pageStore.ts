@@ -43,7 +43,93 @@ export interface CompanyAirportPageContent {
   opsNotes: string | null;
   fboPreference: string | null;
   rampHandlingLimits: string | null;
+  /**
+   * "What we do here" — the one sentence the team wants read first (D96).
+   *
+   * Rendered in the airport header and on every search card, under BOTH lenses,
+   * because the recommendation is the same fact whichever job you came for: it
+   * names the handler AND where maintenance goes. It is the honest successor to
+   * the legacy page's `suggestedSupport`, which was a free-text field nobody
+   * could tell the age of.
+   */
+  teamRecommendation: string | null;
+  /** Can an aircraft be worked where it stands? (D96) */
+  onFieldCapability: string | null;
+  /** Who travels to it, from where, and how long that takes. (D96) */
+  mobileResponse: string | null;
+  /** Local independent shops — usually the "some hands, no CRS" answer. (D96) */
+  localIndependent: string | null;
+  /** Our own technicians: based here, or how far away. (D96) */
+  companySupport: string | null;
+  /** Parts and the AOG desk that serves this station. (D96) */
+  partsAndAog: string | null;
+  /** GPU, air start, hangar, tow — what the ramp can actually give you. (D96) */
+  groundKit: string | null;
+  /** Who to phone. Free text; holds names and numbers of people outside the company. (D96) */
+  stationContacts: string | null;
   referenceAnnotations: ReferenceAnnotation[];
+}
+
+/**
+ * The station-support fields (D96), which behave differently from the five that
+ * came before them: a technician writes one and it publishes immediately, with
+ * no approver in the path.
+ *
+ * Bryan, 2026-08-22: *"techs can input. nobody needs to approve. it keeps a
+ * record of what was changed and by who though."* What replaces approval is
+ * attribution plus a cadence — every version names its author, and an unchecked
+ * field surfaces on the review list by itself.
+ *
+ * Kept as an explicit set rather than "anything not in the original five" so the
+ * split is testable and so a field added later does not silently inherit the
+ * relaxed path. `saveSupportField` refuses anything not listed here, which is
+ * what stops a curfew or a PPR being written straight past its approvers.
+ */
+export type SupportField =
+  | 'teamRecommendation'
+  | 'onFieldCapability'
+  | 'mobileResponse'
+  | 'localIndependent'
+  | 'companySupport'
+  | 'partsAndAog'
+  | 'groundKit'
+  | 'stationContacts';
+
+export const SUPPORT_FIELDS: readonly SupportField[] = [
+  'teamRecommendation',
+  'onFieldCapability',
+  'mobileResponse',
+  'localIndependent',
+  'companySupport',
+  'partsAndAog',
+  'groundKit',
+  'stationContacts',
+];
+
+const SUPPORT_FIELD_SET: ReadonlySet<string> = new Set(SUPPORT_FIELDS);
+
+export function isSupportField(field: string): field is SupportField {
+  return SUPPORT_FIELD_SET.has(field);
+}
+
+/** An empty page — every field absent. The base a first save builds on. */
+export function emptyPageContent(): CompanyAirportPageContent {
+  return {
+    ppr: null,
+    curfew: null,
+    opsNotes: null,
+    fboPreference: null,
+    rampHandlingLimits: null,
+    teamRecommendation: null,
+    onFieldCapability: null,
+    mobileResponse: null,
+    localIndependent: null,
+    companySupport: null,
+    partsAndAog: null,
+    groundKit: null,
+    stationContacts: null,
+    referenceAnnotations: [],
+  };
 }
 
 /**
@@ -55,7 +141,8 @@ export type ConfirmableField =
   | 'curfew'
   | 'opsNotes'
   | 'fboPreference'
-  | 'rampHandlingLimits';
+  | 'rampHandlingLimits'
+  | SupportField;
 
 export const CONFIRMABLE_FIELDS: readonly ConfirmableField[] = [
   'ppr',
@@ -63,10 +150,11 @@ export const CONFIRMABLE_FIELDS: readonly ConfirmableField[] = [
   'opsNotes',
   'fboPreference',
   'rampHandlingLimits',
+  ...SUPPORT_FIELDS,
 ];
 
 /** Where an explicit confirmation came from. A publish is synthesised, never stored. */
-export type ConfirmationSource = 'officer' | 'crew' | 'debrief';
+export type ConfirmationSource = 'officer' | 'crew' | 'debrief' | 'maintenance';
 
 /**
  * "This fact was checked and is still true on date X" (D54) — distinct from a
@@ -137,6 +225,51 @@ export interface ConfirmFieldRequest {
   note?: string;
 }
 
+/**
+ * One technician's edit to one support field (D96).
+ *
+ * Deliberately a single field rather than a content draft: a tech fixing the
+ * mobile-response number should not be able to clobber the ground-kit note some
+ * other tech wrote while they had the page open. The compare-and-swap is on the
+ * page as a whole (it has to be — the store versions pages, not fields), so a
+ * concurrent edit still fails loudly rather than merging silently.
+ */
+export interface SaveSupportFieldRequest {
+  icao: string;
+  field: SupportField;
+  /** null clears the field. Clearing publishes but records no confirmation. */
+  value: string | null;
+  savedBy: string;
+  /** How the author knows. Optional, and the thing the next reader actually reads. */
+  note?: string;
+  /**
+   * The version the author was looking at. Omit only when no page exists yet.
+   * Same CAS contract as `publish` — see `PublishRequest.basedOnVersion`.
+   */
+  basedOnVersion?: number;
+}
+
+/**
+ * A save publishes and confirms in one act, so callers get both back. The
+ * confirmation is null when the save cleared the field: there is then no fact to
+ * attest, and confirming one would age on the review list as if there were.
+ */
+export interface SaveSupportFieldResult {
+  version: CompanyAirportPageVersion;
+  confirmation: FieldConfirmation | null;
+}
+
+export class NotASupportFieldError extends Error {
+  constructor(readonly field: string) {
+    super(
+      `Cannot save ${field} directly: it is not a station-support field. ` +
+        'PPR, curfews, ops notes, FBO preference and ramp limits keep their ' +
+        'propose/approve/publish path (D46); only the D96 support fields save direct.',
+    );
+    this.name = 'NotASupportFieldError';
+  }
+}
+
 export class NothingToConfirmError extends Error {
   constructor(
     readonly icao: string,
@@ -166,6 +299,8 @@ export class StaleBaseVersionError extends Error {
 
 export interface CompanyAirportPageStore {
   publish(request: PublishRequest): CompanyAirportPageVersion;
+  /** Write one station-support field with no approver in the path (D96). */
+  saveSupportField(request: SaveSupportFieldRequest): SaveSupportFieldResult;
   acknowledge(request: AcknowledgeRequest): AirportReviewAcknowledgement;
   confirm(request: ConfirmFieldRequest): FieldConfirmation;
   getLatest(icao: string): CompanyAirportPageVersion | null;
@@ -192,7 +327,20 @@ function freezeContent(content: CompanyAirportPageContent): CompanyAirportPageCo
     opsNotes: content.opsNotes,
     fboPreference: content.fboPreference,
     rampHandlingLimits: content.rampHandlingLimits,
-    referenceAnnotations: content.referenceAnnotations.map((annotation) => ({ ...annotation })),
+    // Blobs written before D96 carry none of the support fields. Normalising the
+    // absent ones to null here — rather than letting `undefined` through — keeps
+    // "field has no value" a single condition everywhere downstream.
+    teamRecommendation: content.teamRecommendation ?? null,
+    onFieldCapability: content.onFieldCapability ?? null,
+    mobileResponse: content.mobileResponse ?? null,
+    localIndependent: content.localIndependent ?? null,
+    companySupport: content.companySupport ?? null,
+    partsAndAog: content.partsAndAog ?? null,
+    groundKit: content.groundKit ?? null,
+    stationContacts: content.stationContacts ?? null,
+    referenceAnnotations: (content.referenceAnnotations ?? []).map((annotation) => ({
+      ...annotation,
+    })),
   };
 }
 
@@ -253,6 +401,38 @@ export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore 
 
     this.versions.push(version);
     return copyVersion(version);
+  }
+
+  saveSupportField(request: SaveSupportFieldRequest): SaveSupportFieldResult {
+    if (!isSupportField(request.field)) {
+      throw new NotASupportFieldError(request.field);
+    }
+
+    const current = this.getLatest(request.icao);
+    const version = this.publish({
+      icao: request.icao,
+      // Spread the CURRENT content, not a caller-supplied draft: the caller only
+      // ever names one field, so nothing they were not looking at can move.
+      content: { ...(current?.content ?? emptyPageContent()), [request.field]: request.value },
+      publishedBy: request.savedBy,
+      basedOnVersion: request.basedOnVersion,
+    });
+
+    // Publishing a value is already a confirmation (see confirmations.ts), but
+    // recording an explicit one carries the author's note and the source, which
+    // is what the change record shows and what a synthesised publish cannot.
+    const confirmation =
+      request.value === null
+        ? null
+        : this.confirm({
+            icao: request.icao,
+            field: request.field,
+            confirmedBy: request.savedBy,
+            source: 'maintenance',
+            note: request.note,
+          });
+
+    return { version, confirmation };
   }
 
   acknowledge(request: AcknowledgeRequest): AirportReviewAcknowledgement {

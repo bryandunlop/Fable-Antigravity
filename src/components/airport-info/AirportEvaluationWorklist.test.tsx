@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
+import { emptyPageContent } from '../../airport/company/pageStore';
 import AirportEvaluationWorklist from './AirportEvaluationWorklist';
 import { CompanyAirportProvider, useCompanyAirport } from './CompanyAirportContext';
 
@@ -14,14 +15,7 @@ import { CompanyAirportProvider, useCompanyAirport } from './CompanyAirportConte
  * worklist is exercised end to end here.
  */
 
-const EMPTY = {
-  ppr: null,
-  curfew: null,
-  opsNotes: null,
-  fboPreference: null,
-  rampHandlingLimits: null,
-  referenceAnnotations: [],
-};
+const EMPTY = emptyPageContent();
 
 /**
  * Seeds the store through the public API, from inside the provider. In an effect

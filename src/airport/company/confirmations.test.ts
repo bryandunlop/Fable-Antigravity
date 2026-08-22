@@ -11,20 +11,14 @@ import {
   type FieldConfirmation,
 } from './confirmations';
 import {
+  emptyPageContent,
   InMemoryCompanyAirportPageStore,
   type CompanyAirportPageContent,
   type CompanyAirportPageVersion,
   type StoreClock,
 } from './pageStore';
 
-const EMPTY: CompanyAirportPageContent = {
-  ppr: null,
-  curfew: null,
-  opsNotes: null,
-  fboPreference: null,
-  rampHandlingLimits: null,
-  referenceAnnotations: [],
-};
+const EMPTY: CompanyAirportPageContent = emptyPageContent();
 
 /** A clock the test drives, so nothing depends on wall time. */
 function ctx(start = '2026-01-01T12:00:00.000Z') {
