@@ -32,7 +32,6 @@ import { DocReader } from './components/documents/pages/DocReader';
 import { DocWorkbench } from './components/documents/pages/DocWorkbench';
 import LeadDashboard from './components/lead/LeadDashboard';
 import ManagerInsights from './components/ManagerInsights';
-import AirportServicesDatabase from './components/AirportServicesDatabase';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
 import VacationRequest from './components/VacationRequest';
@@ -322,7 +321,7 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/airport-evaluations" element={<AirportsShell userRole={userRole} additionalRoles={additionalRoles}><AirportInformation currentUserOid={userRole} /></AirportsShell>} />
+                                <Route path="/airport-evaluations" element={<AirportsShell userRole={userRole} additionalRoles={additionalRoles}><AirportInformation currentUserOid={userRole} userRole={userRole} additionalRoles={additionalRoles} /></AirportsShell>} />
                                 <Route
                                   path="/airport-evaluations/flags"
                                   element={
@@ -451,7 +450,11 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/airport-services" element={<AirportServicesDatabase />} />
+                                {/* D96: the legacy Airport Services Database folded into the
+                                    airport record as station-support fields. The component is
+                                    de-routed, not deleted — the same reversible move the
+                                    duplicate maintenance screens got. Bookmarks still resolve. */}
+                                <Route path="/airport-services" element={<Navigate to="/airport-evaluations" replace />} />
                                 <Route path="/maintenance-dashboard" element={<MaintenanceDashboard />} />
                                 <Route path="/vacation-request" element={<VacationRequest userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/fuel-farm" element={<FuelFarmTracker />} />

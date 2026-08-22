@@ -21,6 +21,9 @@ import { AirportFlags } from './AirportFlags';
 import { useCompanyAirport } from './CompanyAirportContext';
 import { NotPublished, ProvenanceChip } from './ProvenanceChip';
 import { RunwayDiagram } from './RunwayDiagram';
+import { LensSwitch } from './LensSwitch';
+import { CrewSupportStrip, StationSupportCard, TeamRecommendation } from './StationSupport';
+import type { AirportLens } from '../../airport/lens';
 
 interface AirportReferenceDetailProps {
   airport: AirportRecord;
@@ -33,6 +36,13 @@ interface AirportReferenceDetailProps {
   onSubmitCorrection?: () => void;
   /** Whose read receipt an acknowledgement records (D47). Real identity lands with auth. */
   currentUserOid?: string;
+  /**
+   * Which job the reader came here for (D96). Promotes different facts; hides
+   * nothing. Owned by the directory so the choice survives back-and-forth
+   * between the list and a record.
+   */
+  lens?: AirportLens;
+  onLensChange?: (lens: AirportLens) => void;
 }
 
 /**
@@ -413,6 +423,8 @@ export default function AirportReferenceDetail({
   onBack,
   onSubmitCorrection,
   currentUserOid = 'demo-user',
+  lens = 'pilot',
+  onLensChange,
 }: AirportReferenceDetailProps) {
   const company = useCompanyAirport();
   const icao = airport.icaoId ?? airport.id;
@@ -435,6 +447,10 @@ export default function AirportReferenceDetail({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to airports
         </Button>
+
+        {onLensChange ? (
+          <LensSwitch value={lens} onChange={onLensChange} className="mb-4" />
+        ) : null}
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -468,6 +484,11 @@ export default function AirportReferenceDetail({
                 .filter(Boolean)
                 .join(' · ')}
             </p>
+            {/* Read first, by everyone — so it sits with the airport's identity
+                rather than inside whichever card happens to own the field. */}
+            <div className="mt-3 max-w-2xl">
+              <TeamRecommendation icao={airport.icaoId ?? airport.id} />
+            </div>
           </div>
 
           <div className="flex flex-col items-end gap-2">
@@ -486,6 +507,13 @@ export default function AirportReferenceDetail({
       </div>
 
       <AirportGlance airport={airport} />
+
+      {lens === 'pilot' ? (
+        <CrewSupportStrip
+          icao={icao}
+          onOpenMaintenance={() => onLensChange?.('maintenance')}
+        />
+      ) : null}
 
       <AirportFlags airport={airport} />
 
@@ -617,6 +645,13 @@ export default function AirportReferenceDetail({
         currentUserOid={currentUserOid}
         nasrCycleEffDate={airport.effectiveDate}
       />
+
+      {/* Under the maintenance lens the full support card is the point of the
+          page, so it renders in full. A crew gets the same facts in one strip —
+          the SAME fields, not a summary written twice — plus the way across. */}
+      {lens === 'maintenance' ? (
+        <StationSupportCard icao={icao} currentUserOid={currentUserOid} editable />
+      ) : null}
     </div>
   );
 }

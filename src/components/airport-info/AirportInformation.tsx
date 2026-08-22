@@ -9,6 +9,9 @@ import { Input } from '../ui/input';
 import { ProvenanceChip } from './ProvenanceChip';
 import { ProposeChangeDialog } from './ProposeChangeDialog';
 import AirportReferenceDetail from './AirportReferenceDetail';
+import { LensSwitch } from './LensSwitch';
+import { SupportCardFact, TeamRecommendation } from './StationSupport';
+import { defaultLensForRole, type AirportLens } from '../../airport/lens';
 
 /**
  * Airport Information — the reference layer on real FAA NASR data (D45, D48).
@@ -23,11 +26,21 @@ const PAGE_SIZE = 40;
 interface AirportInformationProps {
   /** Who is proposing. Real identity lands with auth; the demo role switcher supplies it today. */
   currentUserOid?: string;
+  /** Picks the opening lens (D96). It is a default, never a gate — both lenses stay reachable. */
+  userRole?: string;
+  additionalRoles?: string[];
 }
 
 export default function AirportInformation({
   currentUserOid = 'demo-user',
+  userRole,
+  additionalRoles = [],
 }: AirportInformationProps) {
+  // Initialised from role once rather than derived every render: a technician
+  // who switches to the crew view must stay there while they browse.
+  const [lens, setLens] = useState<AirportLens>(() =>
+    defaultLensForRole(userRole, additionalRoles),
+  );
   const [proposing, setProposing] = useState(false);
   const [indexLoaded, setIndexLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -86,6 +99,8 @@ export default function AirportInformation({
           onBack={() => setSelected(null)}
           onSubmitCorrection={() => setProposing(true)}
           currentUserOid={currentUserOid}
+          lens={lens}
+          onLensChange={setLens}
         />
         <ProposeChangeDialog
           icao={selected.icaoId ?? selected.id}
@@ -140,15 +155,18 @@ export default function AirportInformation({
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by ICAO, FAA identifier, name or city — KTEB, ASE, Aspen"
-          className="pl-9"
-          disabled={!indexLoaded}
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[18rem] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by ICAO, FAA identifier, name or city — KTEB, ASE, Aspen"
+            className="pl-9"
+            disabled={!indexLoaded}
+          />
+        </div>
+        <LensSwitch value={lens} onChange={setLens} />
       </div>
 
       {!indexLoaded ? (
@@ -191,14 +209,23 @@ export default function AirportInformation({
                       {[entry.city, entry.stateCode].filter(Boolean).join(', ')}
                     </p>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="flex items-center justify-end gap-1 text-sm tabular-nums">
-                      <Plane className="h-3.5 w-3.5 text-muted-foreground" />
-                      {entry.longestRunwayFt.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">longest ft</p>
+                  <div className="shrink-0">
+                    {lens === 'maintenance' ? (
+                      <SupportCardFact icao={entry.icaoId ?? entry.id} />
+                    ) : (
+                      <div className="text-right">
+                        <p className="flex items-center justify-end gap-1 text-sm tabular-nums">
+                          <Plane className="h-3.5 w-3.5 text-muted-foreground" />
+                          {entry.longestRunwayFt.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">longest ft</p>
+                      </div>
+                    )}
                   </div>
                 </div>
+                {/* The team's recommendation rides every search result, both
+                    lenses — it is the answer most searches are really after. */}
+                <TeamRecommendation icao={entry.icaoId ?? entry.id} compact />
                 {loadingAirport === entry.id ? (
                   <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
