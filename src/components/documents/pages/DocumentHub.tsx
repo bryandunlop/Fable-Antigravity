@@ -31,6 +31,7 @@ import { CabinKnowledgePanel } from '../components/CabinKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
 import { DocumentRegistry } from './DocumentRegistry';
 import { AmendmentInboxPanel } from '../components/AmendmentInboxPanel';
+import { SearchPanel } from '../components/SearchPanel';
 import { outstandingWork } from '../engine/amendments';
 import { ComplianceMatrix } from '../components/ComplianceMatrix';
 import { DocEditorDialog } from '../components/DocEditorDialog';
@@ -186,6 +187,9 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
               <Badge variant="secondary" className="ml-1 px-1.5 text-[10px]">{myOutstanding.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="search" className="gap-1.5">
+            <Search className="h-4 w-4" /> Search
+          </TabsTrigger>
           <TabsTrigger value="library" className="gap-1.5">
             <Library className="h-4 w-4" /> Library
           </TabsTrigger>
@@ -238,6 +242,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
         <TabsContent value="my-reads" className="mt-4">
           <RequiredReadsList userRole={userRole} />
+        </TabsContent>
+
+        <TabsContent value="search" className="mt-4">
+          <SearchPanel userRole={userRole} additionalRoles={additionalRoles} />
         </TabsContent>
 
         <TabsContent value="library" className="mt-4 space-y-4">
