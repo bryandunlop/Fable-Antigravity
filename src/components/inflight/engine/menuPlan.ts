@@ -3,10 +3,13 @@
 // The menu plan is the "everything I need to order food for this leg" roll-up: every
 // allergy on board in one list (not scattered per-passenger badge), plus the dislike /
 // food / beverage tallies an FA would otherwise assemble by opening each profile.
-import type { Passenger, PassengerAllergy } from '../../passengers/passengerData';
+import type { AllergySeverity, Passenger, PassengerAllergy } from '../../passengers/passengerData';
 import type { FaLeg, FaTrip } from '../faTrips';
 
-const SEVERITY_RANK: Record<PassengerAllergy['severity'], number> = { Critical: 0, Moderate: 1, Mild: 2 };
+const SEVERITY_RANK: Record<AllergySeverity, number> = { Critical: 0, Moderate: 1, Mild: 2 };
+/** Unrecorded severity sorts last rather than crashing the lookup — and never
+ *  pretends to be Mild, which would be a downgrade nobody authored. */
+const rank = (s?: AllergySeverity): number => (s ? SEVERITY_RANK[s] : 3);
 
 /** One passenger's stake in an allergen — kept per-carrier so the reaction and the
  * medication stay attached to the person who needs them, not merged away. */
@@ -69,12 +72,12 @@ export function legMenuPlan(passengers: Passenger[]): LegMenuPlan {
         byAllergen.set(a.allergen, { allergen: a.allergen, severity: a.severity, carriers: [carrier] });
       } else {
         existing.carriers.push(carrier);
-        if (SEVERITY_RANK[a.severity] < SEVERITY_RANK[existing.severity]) existing.severity = a.severity;
+        if (rank(a.severity) < rank(existing.severity)) existing.severity = a.severity;
       }
     }
   }
   const allergens = [...byAllergen.values()].sort(
-    (x, y) => SEVERITY_RANK[x.severity] - SEVERITY_RANK[y.severity],
+    (x, y) => rank(x.severity) - rank(y.severity),
   );
 
   return {

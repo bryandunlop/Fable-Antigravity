@@ -61,7 +61,7 @@ export default function LegBrief({ leg, guests, onOpenGuest }: {
 }) {
   const roll = allergenRollup(guests);
   const notKnown = roll.flagged.length + roll.unknown.length;
-  const nothingToAvoid = roll.food.length === 0 && roll.flagged.length === 0;
+  const nothingToAvoid = roll.food.length === 0 && roll.flagged.length === 0 && roll.needsMapping.length === 0;
 
   return (
     <div>
@@ -89,6 +89,29 @@ export default function LegBrief({ leg, guests, onOpenGuest }: {
         </Section>
       ) : (
         <Section title="Cannot serve on this leg" tone="danger">
+          {/* Unmapped prose leads the section. myairops sends dietary detail as free
+              text somebody has to read; until they have, we cannot say what is safe —
+              and a guest whose source text CHANGED under an old mapping is worse than
+              one never mapped, because a stale allergen list looks settled. */}
+          {roll.needsMapping.map((g) => {
+            const note = g.passenger?.sourceNote?.dietary ?? '';
+            const stale = Boolean(g.passenger?.mappedFromNote);
+            return (
+              <Row key={g.id}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[17px] font-semibold text-red-700 dark:text-red-300">
+                    {stale ? 'Changed since it was mapped' : 'Not yet mapped'} — {g.displayName}
+                  </p>
+                  <p className="text-sm mt-1 italic">“{note}”</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stale
+                      ? 'The booking desk edited this after the allergens were recorded. Read it again before you plan.'
+                      : 'Straight from the booking. Somebody has to turn it into allergens.'}
+                  </p>
+                </div>
+              </Row>
+            );
+          })}
           {roll.food.map((a) => (
             <Row key={a.allergen}>
               <div className="flex-1 min-w-0">
@@ -148,10 +171,12 @@ export default function LegBrief({ leg, guests, onOpenGuest }: {
                 {t && <p className="text-xs text-muted-foreground mt-0.5 truncate">{t}</p>}
               </div>
               <span className={`text-xs shrink-0 ${
-                g.state === 'ALLERGIES' || g.state === 'FLAGGED_NO_DETAIL' ? 'text-red-700 dark:text-red-300 font-medium'
+                g.state === 'ALLERGIES' || g.state === 'FLAGGED_NO_DETAIL' || g.state === 'NEEDS_MAPPING'
+                  ? 'text-red-700 dark:text-red-300 font-medium'
                 : g.state === 'CONFIRMED_NONE' ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'
               }`}>
                 {g.state === 'ALLERGIES' ? g.passenger!.allergies.map((a) => a.allergen).join(', ')
+                  : g.state === 'NEEDS_MAPPING' ? 'Needs mapping'
                   : g.state === 'FLAGGED_NO_DETAIL' ? 'Flagged'
                   : g.state === 'CONFIRMED_NONE' ? 'Clear' : 'Not asked'}
               </span>

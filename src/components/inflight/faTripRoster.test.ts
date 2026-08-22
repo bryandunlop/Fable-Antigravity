@@ -199,3 +199,72 @@ describe('allergenRollup', () => {
     expect(r).toMatchObject({ food: [], cabin: [], flagged: [], unknown: [] });
   });
 });
+
+describe('allergenRollup · needs mapping', () => {
+  const g = (id: string, name: string, p: Passenger | null, state: RosterGuestState) =>
+    ({ id, passenger: p, legNumbers: [1], displayName: name, state });
+
+  it('gives unmapped prose its own bucket instead of dropping the guest', () => {
+    // Before NEEDS_MAPPING existed this state fell through the switch and the guest
+    // vanished from every bucket — the worst outcome for the most urgent case.
+    const unmapped = pax('P9', 'Helen', {
+      allergyFlagged: true,
+      sourceNote: { dietary: 'severe nut allergy', seenAtUtc: '2026-08-20T00:00:00Z' },
+    });
+    const r = allergenRollup([g('P9', 'Helen', unmapped, 'NEEDS_MAPPING')]);
+    expect(r.needsMapping.map((x) => x.displayName)).toEqual(['Helen']);
+    expect(r.food).toEqual([]);
+    expect(r.flagged).toEqual([]);
+    expect(r.unknown).toEqual([]);
+  });
+
+  it('keeps a mapped guest out of the mapping bucket', () => {
+    const mapped = pax('P1', 'Robert', {
+      allergies: [{ allergen: 'Shellfish', severity: 'Critical' }],
+      sourceNote: { dietary: 'no shellfish', seenAtUtc: '2026-08-20T00:00:00Z' },
+      mappedFromNote: 'no shellfish',
+    });
+    const r = allergenRollup([g('P1', 'Robert', mapped, 'ALLERGIES')]);
+    expect(r.needsMapping).toEqual([]);
+    expect(r.food.map((x) => x.allergen)).toEqual(['Shellfish']);
+  });
+});
+
+describe('allergenRollup · a stale mapping still contributes', () => {
+  const g = (id: string, name: string, p: Passenger | null, state: RosterGuestState) =>
+    ({ id, passenger: p, legNumbers: [1], displayName: name, state });
+
+  const stale = pax('P1', 'Robert', {
+    allergies: [{ allergen: 'Shellfish' }, { allergen: 'Tree nuts' }],
+    sourceNote: { dietary: 'shellfish and tree nuts. Now also dairy-free.', seenAtUtc: '2026-08-21T00:00:00Z' },
+    mappedFromNote: 'shellfish and tree nuts.',
+  });
+
+  it('keeps the already-mapped allergens named, and flags the guest as well', () => {
+    // A stale note means there may be MORE, not that shellfish stopped being true.
+    // Dropping it would remove an allergen from the leg because someone typed a sentence.
+    const r = allergenRollup([g('P1', 'Robert', stale, 'NEEDS_MAPPING')]);
+    expect(r.food.map((x) => x.allergen).sort()).toEqual(['Shellfish', 'Tree nuts']);
+    expect(r.food[0].carriers).toEqual(['Robert']);
+    expect(r.needsMapping.map((x) => x.displayName)).toEqual(['Robert']);
+  });
+
+  it('does not double-name a carrier who also appears via another guest', () => {
+    const other = pax('P2', 'Helen', { allergies: [{ allergen: 'Shellfish' }] });
+    const r = allergenRollup([
+      g('P1', 'Robert', stale, 'NEEDS_MAPPING'),
+      g('P2', 'Helen', other, 'ALLERGIES'),
+    ]);
+    const shellfish = r.food.find((x) => x.allergen === 'Shellfish')!;
+    expect(shellfish.carriers).toEqual(['Robert', 'Helen']);
+  });
+
+  it('adds nothing to the list for an unmapped guest with no allergens yet', () => {
+    const unmapped = pax('P3', 'Aditya', {
+      sourceNote: { dietary: 'no idea yet', seenAtUtc: '2026-08-21T00:00:00Z' },
+    });
+    const r = allergenRollup([g('P3', 'Aditya', unmapped, 'NEEDS_MAPPING')]);
+    expect(r.food).toEqual([]);
+    expect(r.needsMapping).toHaveLength(1);
+  });
+});

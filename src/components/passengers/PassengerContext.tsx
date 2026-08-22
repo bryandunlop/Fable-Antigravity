@@ -5,7 +5,7 @@ import { addPhotoTo, removePhotoFrom } from './engine/flights';
 
 export const STORAGE_KEY = 'passengers-state';
 export const VERSION_KEY = 'passengers-data-version';
-export const DATA_VERSION = '2026-08-20-v3';
+export const DATA_VERSION = '2026-08-22-v4';
 
 interface PassengersState {
   passengers: Passenger[];

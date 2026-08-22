@@ -130,7 +130,7 @@ export default function FlightAttendantFlights() {
                 </DialogTitle>
                 <DialogDescription>
                   {editing
-                    ? 'Preferences and cabin notes. Allergies come from the booking and are locked.'
+                    ? 'Map the booking note into allergens, and record what you learn about them.'
                     : openGuest.passenger
                       ? `${openGuest.passenger.name} · ${openGuest.passenger.role}`
                       : 'On the manifest, with no passenger record behind the booking id.'}

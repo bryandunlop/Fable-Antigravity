@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  getFlightPassengers, resolveTripGuests, dietaryState, flightAllergyAlerts, countCriticalAllergies,
-  addPhotoTo, removePhotoFrom,
+  getFlightPassengers, resolveTripGuests, dietaryState, needsMapping, flightAllergyAlerts,
+  countCriticalAllergies, addPhotoTo, removePhotoFrom,
 } from './flights';
 import type { Passenger, PassengerPhoto } from '../passengerData';
 
@@ -103,5 +103,66 @@ describe('photo helpers', () => {
     const withPhoto = addPhotoTo(B, photo);
     expect(removePhotoFrom(withPhoto, 'ph1').photos).toEqual([]);
     expect(removePhotoFrom(withPhoto, 'other').photos).toHaveLength(1);
+  });
+});
+
+describe('needsMapping / NEEDS_MAPPING', () => {
+  // myairops gives hasAllergy plus a free-text DietaryAllergens note (CRM schema,
+  // confirmed 2026-08-22). Somebody has to read the prose and turn it into allergens.
+  const withNote = (note: string, extra: Partial<Passenger> = {}): Passenger => ({
+    ...pax('P9', 'Guest'), allergyFlagged: true,
+    sourceNote: { dietary: note, seenAtUtc: '2026-08-20T00:00:00Z' }, ...extra,
+  });
+
+  it('needs mapping when there is prose and nobody has mapped it', () => {
+    const p = withNote('severe nut allergy, also no shellfish please');
+    expect(needsMapping(p)).toBe(true);
+    expect(dietaryState({ id: 'P9', passenger: p })).toBe('NEEDS_MAPPING');
+  });
+
+  it('is settled once the mapping records the text it came from', () => {
+    const p = withNote('no shellfish', {
+      allergies: [{ allergen: 'Shellfish', severity: 'Critical' }],
+      mappedFromNote: 'no shellfish',
+    });
+    expect(needsMapping(p)).toBe(false);
+    expect(dietaryState({ id: 'P9', passenger: p })).toBe('ALLERGIES');
+  });
+
+  it('needs mapping AGAIN when the source text changes underneath it', () => {
+    // The mapping is not merely incomplete now — it may be WRONG, so it must not
+    // stand as settled.
+    const p = withNote('no shellfish AND no peanuts', {
+      allergies: [{ allergen: 'Shellfish', severity: 'Critical' }],
+      mappedFromNote: 'no shellfish',
+    });
+    expect(needsMapping(p)).toBe(true);
+    expect(dietaryState({ id: 'P9', passenger: p })).toBe('NEEDS_MAPPING');
+  });
+
+  it('ignores whitespace-only differences', () => {
+    const p = withNote('  no shellfish  ', {
+      allergies: [{ allergen: 'Shellfish', severity: 'Critical' }],
+      mappedFromNote: 'no shellfish',
+    });
+    expect(needsMapping(p)).toBe(false);
+  });
+
+  it('is not mapping work when the flag is set but no prose came with it', () => {
+    // Nothing to read — this one needs asking the passenger, not interpreting.
+    const p = { ...pax('P9', 'Guest'), allergyFlagged: true };
+    expect(needsMapping(p)).toBe(false);
+    expect(dietaryState({ id: 'P9', passenger: p })).toBe('FLAGGED_NO_DETAIL');
+  });
+
+  it('is not mapping work when there is no note at all', () => {
+    expect(needsMapping(pax('P9', 'Guest'))).toBe(false);
+  });
+
+  it('outranks a confirmation date', () => {
+    const p = withNote('actually she is allergic to dairy', {
+      dietaryConfirmedAtUtc: '2026-08-12T00:00:00Z',
+    });
+    expect(dietaryState({ id: 'P9', passenger: p })).toBe('NEEDS_MAPPING');
   });
 });
