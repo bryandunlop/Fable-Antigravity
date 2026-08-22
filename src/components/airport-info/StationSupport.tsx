@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { AlertTriangle, Check, Pencil, Wrench } from 'lucide-react';
 
 import { FIELD_LABEL } from '../../airport/company/confirmations';
-import { SUPPORT_FIELDS, type SupportField } from '../../airport/company/pageStore';
+import {
+  SUPPORT_FIELDS,
+  type ConfirmableField,
+  type SupportField,
+} from '../../airport/company/pageStore';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Textarea } from '../ui/textarea';
@@ -27,7 +31,12 @@ import { ProvenanceChip } from './ProvenanceChip';
  * flagged in D96 for a later call.
  */
 
-const HINTS: Record<SupportField, string> = {
+export const HINTS: Record<ConfirmableField, string> = {
+  ppr: 'Prior permission or slots — who to call, how far ahead.',
+  curfew: 'Local restrictions on movement times, and who can waive them.',
+  opsNotes: 'Anything a crew should know that no dataset carries.',
+  fboPreference: 'Which handler we use, and why.',
+  rampHandlingLimits: 'Weight, span, parking or handling constraints we operate to.',
   teamRecommendation: 'One sentence, read first, by everyone. Name the handler and say where maintenance goes.',
   onFieldCapability: 'Can an aircraft be worked where it stands? Name the station and what it is rated for.',
   mobileResponse: 'Who travels to it, from where, and how long that actually takes.',
@@ -67,7 +76,7 @@ function formatDate(iso: string): string {
  * the card — a warning read once and scrolled past does not travel with the
  * value it is about (D54).
  */
-function Freshness({
+export function Freshness({
   by,
   atUtc,
   via,
@@ -86,7 +95,7 @@ function Freshness({
   );
 }
 
-function FieldEditor({
+export function FieldEditor({
   icao,
   field,
   current,
@@ -95,7 +104,7 @@ function FieldEditor({
   onDone,
 }: {
   icao: string;
-  field: SupportField;
+  field: ConfirmableField;
   current: string | null;
   basedOnVersion: number | undefined;
   savedBy: string;
@@ -108,7 +117,7 @@ function FieldEditor({
 
   const save = () => {
     try {
-      company.saveSupportField({
+      company.saveField({
         icao,
         field,
         // An emptied box means "we no longer assert anything here", which is a
@@ -172,7 +181,7 @@ interface StationSupportCardProps {
 
 export function StationSupportCard({ icao, currentUserOid, editable }: StationSupportCardProps) {
   const company = useCompanyAirport();
-  const [editing, setEditing] = useState<SupportField | null>(null);
+  const [editing, setEditing] = useState<ConfirmableField | null>(null);
 
   const published = company.getLatest(icao);
   const states = new Map(company.confirmationStates(icao).map((state) => [state.field, state]));

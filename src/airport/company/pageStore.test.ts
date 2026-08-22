@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   emptyPageContent,
   InMemoryCompanyAirportPageStore,
-  NotASupportFieldError,
+  NotAnEditableFieldError,
   StaleBaseVersionError,
   type CompanyAirportPageContent,
 } from './pageStore';
@@ -268,9 +268,9 @@ describe('InMemoryCompanyAirportPageStore', () => {
     });
   });
 
-  describe('saveSupportField (D96)', () => {
+  describe('saveField (D96)', () => {
     it('creates the page when none exists, and confirms the field it wrote', () => {
-      const { version, confirmation } = store.saveSupportField({
+      const { version, confirmation } = store.saveField({
         icao: 'KASE',
         field: 'onFieldCapability',
         value: 'None. No Part 145 station on the field is rated for our airframe class.',
@@ -296,7 +296,7 @@ describe('InMemoryCompanyAirportPageStore', () => {
         publishedBy: 'evaluator-1',
       });
 
-      const { version } = store.saveSupportField({
+      const { version } = store.saveField({
         icao: 'KASE',
         field: 'mobileResponse',
         value: 'Dispatched from KDEN, 3.5 hr road.',
@@ -309,22 +309,36 @@ describe('InMemoryCompanyAirportPageStore', () => {
       expect(version.content.mobileResponse).toBe('Dispatched from KDEN, 3.5 hr road.');
     });
 
-    it('refuses a field that is not a station-support field', () => {
-      // The whole point of the split: a curfew must not reach the page without
-      // passing its approvers, however the caller spells the request.
+    it('writes the five older company-page fields direct as well', () => {
+      // 2026-08-22: one card, one rule. A curfew used to be refused here and
+      // sent round the approval route; it now saves like anything else.
+      const { version, confirmation } = store.saveField({
+        icao: 'KASE',
+        field: 'curfew',
+        value: '2300-0700 local.',
+        savedBy: 'tech-1',
+      });
+
+      expect(version.content.curfew).toBe('2300-0700 local.');
+      expect(confirmation?.field).toBe('curfew');
+    });
+
+    it('refuses reference annotations, which are not a text field', () => {
+      // An annotation contradicts published FAA data. That is a different act
+      // from writing down what we do, and it keeps its reviewer.
       expect(() =>
-        store.saveSupportField({
+        store.saveField({
           icao: 'KASE',
-          field: 'curfew' as never,
-          value: 'no curfew, honest',
+          field: 'referenceAnnotations' as never,
+          value: 'the FAA is wrong about this',
           savedBy: 'tech-1',
         }),
-      ).toThrow(NotASupportFieldError);
+      ).toThrow(NotAnEditableFieldError);
       expect(store.getLatest('KASE')).toBeNull();
     });
 
     it('rejects a save drafted against a stale version, and writes nothing', () => {
-      store.saveSupportField({
+      store.saveField({
         icao: 'KASE',
         field: 'groundKit',
         value: 'GPU yes, hangar no',
@@ -332,7 +346,7 @@ describe('InMemoryCompanyAirportPageStore', () => {
       });
 
       expect(() =>
-        store.saveSupportField({
+        store.saveField({
           icao: 'KASE',
           field: 'partsAndAog',
           value: 'AOG desk [TBC]',
@@ -347,14 +361,14 @@ describe('InMemoryCompanyAirportPageStore', () => {
     });
 
     it('publishes but records no confirmation when the save clears the field', () => {
-      store.saveSupportField({
+      store.saveField({
         icao: 'KASE',
         field: 'localIndependent',
         value: 'Two A&Ps, piston only.',
         savedBy: 'tech-1',
       });
 
-      const { version, confirmation } = store.saveSupportField({
+      const { version, confirmation } = store.saveField({
         icao: 'KASE',
         field: 'localIndependent',
         value: null,

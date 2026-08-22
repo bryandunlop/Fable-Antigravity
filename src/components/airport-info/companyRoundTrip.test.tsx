@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, it } from 'vitest';
@@ -85,9 +85,13 @@ function Harness({ reviewerOid = 'evaluator-1' }: { reviewerOid?: string }) {
 
 async function proposeOpsNote(user: ReturnType<typeof userEvent.setup>, text: string) {
   await user.click(screen.getByRole('button', { name: /propose a change/i }));
-  await user.type(screen.getByLabelText(/operations notes/i), text);
-  await user.type(screen.getByLabelText(/reason for the change/i), 'Confirmed with airport ops.');
-  await user.click(screen.getByRole('button', { name: /submit for review/i }));
+  // Scoped to the dialog: since the company card gained its own in-place editor
+  // (2026-08-22) the page carries a second control matching /operations notes/,
+  // and an unscoped query would pick whichever the DOM happened to yield first.
+  const dialog = within(screen.getByRole('dialog'));
+  await user.type(dialog.getByLabelText(/operations notes/i), text);
+  await user.type(dialog.getByLabelText(/reason for the change/i), 'Confirmed with airport ops.');
+  await user.click(dialog.getByRole('button', { name: /submit for review/i }));
 }
 
 describe('company page round trip', () => {
