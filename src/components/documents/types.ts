@@ -3,6 +3,7 @@
 // requirement is a property of the published revision; a DocAcknowledgment is
 // scoped to (doc, revision, user) so publishing a new revision re-arms it.
 import type { Signature, AircraftType, CasColor } from '../tech-log/types';
+import type { DocAmendment, ExternalAlert, AmendmentResolution } from './engine/amendments';
 import type { BulletinImage, BulletinVideo, BulletinLink } from '../bulletins/types';
 
 export type AckLevel = 'none' | 'initials' | 'signature';
@@ -298,6 +299,19 @@ export interface DocRevision {
   images?: BulletinImage[];
   videos?: BulletinVideo[];
   links?: BulletinLink[];
+  /**
+   * TL-46 — what this revision changes in OTHER documents.
+   *
+   * A bulletin that amends a manual declares it here, so the claim rides the
+   * four-eyes draft → approve → publish path as ordinary revision content. The
+   * amended manual is never edited and its content digest never moves: an
+   * amendment is a pointer beside it, not a mutation of it.
+   *
+   * Deliberately absent from `canonicalizeSections` — this is a relation between
+   * documents, not section content, and it must not perturb the digest of the
+   * revision that carries it.
+   */
+  amendments?: DocAmendment[];
 }
 
 export interface DocAcknowledgment {
@@ -428,4 +442,19 @@ export interface DocumentsState {
    * and is not ours to widen from a documents screen.
    */
   cabinSections?: string[];
+  /**
+   * TL-46 — regulatory-watch alerts raised outside myGFO.
+   *
+   * D93 splits by change type: myGFO takes day-to-day authoring, Nimbl keeps the
+   * regulatory watch. Their alerts therefore arrive as WORK, not as content — they
+   * share the amendment inbox with our own bulletins because both answer the same
+   * question: what has the manual not yet absorbed?
+   *
+   * Optional because state persisted by an earlier build has neither field. Read
+   * sites default to `[]` rather than the loader back-filling them, so a stored
+   * state object is never rewritten just by being opened.
+   */
+  externalAlerts?: ExternalAlert[];
+  /** What has been folded in or dismissed, and by whom. A dismissal keeps its reason. */
+  amendmentResolutions?: AmendmentResolution[];
 }

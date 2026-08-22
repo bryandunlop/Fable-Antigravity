@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FileLock2, FilePlus2, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
+import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FileLock2, FilePlus2, Inbox, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -30,6 +30,8 @@ import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
 import { CabinKnowledgePanel } from '../components/CabinKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
 import { DocumentRegistry } from './DocumentRegistry';
+import { AmendmentInboxPanel } from '../components/AmendmentInboxPanel';
+import { outstandingWork } from '../engine/amendments';
 import { ComplianceMatrix } from '../components/ComplianceMatrix';
 import { DocEditorDialog } from '../components/DocEditorDialog';
 import { docxToImport } from '../engine/docxImport';
@@ -99,6 +101,12 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
     [state.docs, state.revisions, state.acknowledgments, universe],
   );
 
+  const outstanding = outstandingWork(
+    state.revisions,
+    state.externalAlerts ?? [],
+    state.amendmentResolutions ?? [],
+    operatorTodayIso(),
+  ).length;
   const reviewDue = docsDueForReview(state.docs, todayIso).length;
   const openSugs = openSuggestions(state.suggestions).length;
   const ownsDocs = state.docs.some((d) => d.ownerUserId === userId);
@@ -195,6 +203,14 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
           {manager && (
             <TabsTrigger value="coverage" className="gap-1.5">
               <ShieldCheck className="h-4 w-4" /> Reg coverage
+            </TabsTrigger>
+          )}
+          {manager && (
+            <TabsTrigger value="amendments" className="gap-1.5">
+              <Inbox className="h-4 w-4" /> Amendments
+              {outstanding > 0 && (
+                <Badge variant="secondary" className="ml-1 px-1.5 text-[10px]">{outstanding}</Badge>
+              )}
             </TabsTrigger>
           )}
           {manager && (
@@ -341,6 +357,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
         <TabsContent value="sources" className="mt-4">
           <DocumentRegistry userRole={userRole} additionalRoles={additionalRoles} />
+        </TabsContent>
+
+        <TabsContent value="amendments" className="mt-4">
+          <AmendmentInboxPanel userRole={userRole} />
         </TabsContent>
 
         <TabsContent value="approvals" className="mt-4">

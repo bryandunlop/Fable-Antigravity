@@ -4,6 +4,9 @@ import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, 
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
+import { AmendedSection } from '../components/AmendedSection';
+import { AmendmentStrip } from '../components/AmendmentStrip';
+import { amendmentsForSection, amendmentsInForce } from '../engine/amendments';
 import { RevisionMedia } from '../components/RevisionMedia';
 import { DiffedContent } from '../components/DiffedContent';
 import { useDocuments } from '../DocumentsContext';
@@ -259,6 +262,13 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
         </div>
       )}
 
+      {rev && !isReceived(rev) && (
+        <AmendmentStrip
+          amendments={amendmentsInForce(doc.id, state.revisions, state.amendmentResolutions ?? [])}
+          sections={rev.sections}
+        />
+      )}
+
       {rev ? (
         <GfoPanel>
           <article ref={articleRef} className="prose-bulletin">
@@ -269,7 +279,21 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
                 {showingDiff && diff ? (
                   <DiffedContent diff={diff} renderBlockGutter={renderBlockGutter} />
                 ) : (
-                  <SectionedContent sections={rev.sections} renderBlockGutter={renderBlockGutter} />
+                  <SectionedContent
+                    sections={rev.sections}
+                    renderBlockGutter={renderBlockGutter}
+                    renderSection={(section, defaultBody) => {
+                      const ams = amendmentsForSection(section.id, state.revisions, state.amendmentResolutions ?? []);
+                      if (ams.length === 0) return defaultBody;
+                      return (
+                        <AmendedSection
+                          amendments={ams}
+                          revisions={state.revisions}
+                          defaultBody={defaultBody}
+                        />
+                      );
+                    }}
+                  />
                 )}
                 <RevisionMedia rev={rev} />
               </>

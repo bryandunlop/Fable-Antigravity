@@ -55,15 +55,38 @@ export function BlockBody({ block, stepNumber }: { block: DocBlock; stepNumber?:
 export function SectionedContent({
   sections,
   renderBlockGutter,
+  renderSection,
 }: {
   sections: DocSection[];
   renderBlockGutter?: (blockId: string) => ReactNode;
+  /**
+   * Wrap or replace one section's body. Receives the section and the content that
+   * would otherwise render, so a caller can show something else and still offer the
+   * original — which is exactly what an amended section does (TL-46): the bulletin's
+   * governing text reads first, and the manual's own wording is what the chip expands
+   * to reveal.
+   *
+   * Heading rendering stays here so an amended section keeps the same number and title
+   * as every other one. Only the body is the caller's business.
+   */
+  renderSection?: (section: DocSection, defaultBody: ReactNode) => ReactNode;
 }) {
   return (
     <>
       {sections.map((section) => {
         // Per section, so two task cards in one document each start at 1.
         const steps = stepNumbers(section.blocks);
+        const body = section.blocks.map((block) => (
+          <div
+            key={block.id}
+            data-block-id={block.id}
+            className={renderBlockGutter ? 'group relative pr-10' : undefined}
+          >
+            <BlockBody block={block} stepNumber={steps.get(block.id)} />
+            <ComplianceBadges refs={block.complianceRefs} />
+            {renderBlockGutter?.(block.id)}
+          </div>
+        ));
         return (
           <section key={section.id} data-section-id={section.id}>
             {(section.title || section.number) &&
@@ -72,17 +95,7 @@ export function SectionedContent({
               ) : (
                 <h2>{section.number ? `${section.number} ` : ''}{section.title}</h2>
               ))}
-            {section.blocks.map((block) => (
-              <div
-                key={block.id}
-                data-block-id={block.id}
-                className={renderBlockGutter ? 'group relative pr-10' : undefined}
-              >
-                <BlockBody block={block} stepNumber={steps.get(block.id)} />
-                <ComplianceBadges refs={block.complianceRefs} />
-                {renderBlockGutter?.(block.id)}
-              </div>
-            ))}
+            {renderSection ? renderSection(section, body) : body}
           </section>
         );
       })}

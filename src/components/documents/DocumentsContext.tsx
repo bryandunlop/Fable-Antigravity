@@ -12,6 +12,7 @@ import type {
 } from './types';
 import type { Signature } from '../tech-log/types';
 import { classFor, docReaderPath, docManagePath } from './classes';
+import type { AmendmentResolution } from './engine/amendments';
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision, nextRevisionId, nextRevisionLabel } from './engine/revisions';
 import { inFlightRevision } from './engine/workbench';
@@ -162,6 +163,7 @@ export type DocumentsAction =
   | { type: 'CREATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'WITHDRAW_DRAFT'; payload: { revisionId: string; reason: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string } }
+  | { type: 'RESOLVE_AMENDMENT'; payload: { resolution: AmendmentResolution } }
   | { type: 'SUBMIT_FOR_APPROVAL'; payload: { revisionId: string; atUtc: string } }
   | {
       type: 'DECIDE_APPROVAL';
@@ -362,6 +364,14 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         ...state,
         revisions: state.revisions.map((r) => (r.id === rev.id ? { ...rev, status: 'draft' } : r)),
       };
+    }
+    case 'RESOLVE_AMENDMENT': {
+      const { resolution } = action.payload;
+      const existing = state.amendmentResolutions ?? [];
+      // Resolving twice is a no-op, not a second record. The first resolution owns
+      // the reason and the date; a duplicate would only obscure who actually acted.
+      if (existing.some((r) => r.amendmentId === resolution.amendmentId)) return state;
+      return { ...state, amendmentResolutions: [...existing, resolution] };
     }
     case 'WITHDRAW_DRAFT': {
       // C7 withdrawal ceremony: withdraw is a *tombstone*, not a hard delete — the
@@ -879,6 +889,8 @@ interface Ctx {
   createDraft: (revision: DocRevision, actorRoles: string[]) => void;
   updateDraft: (revision: DocRevision, userRole: string, additionalRoles?: string[]) => void;
   withdrawDraft: (revisionId: string, reason: string, userRole: string, additionalRoles?: string[]) => void;
+  /** TL-46 — fold an amendment into its target, or set it aside with a reason. */
+  resolveAmendment: (amendmentId: string, resolution: Omit<AmendmentResolution, 'amendmentId'>) => void;
   submitForApproval: (revisionId: string) => void;
   decideApproval: (input: {
     revisionId: string;
@@ -1193,6 +1205,9 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
         type: 'WITHDRAW_DRAFT',
         payload: { revisionId, reason, byUserId: userId, byName: userName, byRoles: [userRole, ...additionalRoles], atUtc: nowUtc() },
       });
+    }, []),
+    resolveAmendment: useCallback<Ctx['resolveAmendment']>((amendmentId, resolution) => {
+      dispatch({ type: 'RESOLVE_AMENDMENT', payload: { resolution: { ...resolution, amendmentId } } });
     }, []),
     submitForApproval,
     decideApproval,
