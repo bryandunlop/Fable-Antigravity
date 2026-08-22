@@ -17,7 +17,7 @@ import {
   MapPin, MapPinCheck, Monitor, Package, PackagePlus, Plane, PlaneTakeoff, Route,
   Send, Settings, Shield, ShieldCheck, Sliders, Sparkles, Target, Timer, Upload,
   BadgeCheck, BookUser, PlaneLanding, Radar, SearchCheck, Stamp,
-  UserCheck, Users, Utensils, Warehouse, Wrench,
+  Ticket, UserCheck, Users, Utensils, Warehouse, Wrench,
 } from 'lucide-react';
 
 export type Domain =
@@ -157,7 +157,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // Booking portal (PR #31 / [[LG-125]]): the EA-facing front door for trip requests. The rest of
   // that branch's nav diff was a stale fork of main and was dropped in the merge — this entry is the
   // only thing it actually added here.
-  { path: '/booking-portal', label: 'Booking Portal', domain: 'scheduling', icon: Send, primary: true, keywords: ['booking', 'empty seats', 'trip request', 'ea', 'watches', 'fleet hold'], roles: ['admin-assistant', 'scheduling', 'admin', 'lead'] },
+  { path: '/booking-portal', label: 'Booking Portal', domain: 'scheduling', icon: Ticket, primary: true, keywords: ['booking', 'empty seats', 'trip request', 'ea', 'watches', 'fleet hold'], roles: ['admin-assistant', 'scheduling', 'admin', 'lead'] },
   { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', railLabel: 'Sched Board', domain: 'scheduling', icon: LayoutDashboard, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: Route, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: ClipboardType, primary: false, roles: ['scheduling', 'admin'] },
