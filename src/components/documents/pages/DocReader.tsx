@@ -7,6 +7,8 @@ import { SectionedContent } from '../components/SectionedContent';
 import { AmendedSection } from '../components/AmendedSection';
 import { AmendmentStrip } from '../components/AmendmentStrip';
 import { RetirementBanner } from '../components/RetirementBanner';
+import { AddNoteBar, BlockAnnotations, OrphanedNotes } from '../components/AnnotationLayer';
+import { annotationsForBlock, orphanedAnnotations, resolveAnnotations } from '../engine/annotations';
 import { amendmentsForSection, amendmentsInForce } from '../engine/amendments';
 import { amendedExport } from '../engine/exportAmendments';
 import { RevisionMedia } from '../components/RevisionMedia';
@@ -69,6 +71,16 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const changeCount = diff ? diff.counts.total : 0;
   const showingDiff = !!(diff?.hasChanges && showChanges);
   const { userId } = identityFor(userRole);
+
+  // Phase 4 — this reader's own notes, re-anchored against the revision on screen.
+  const myNotes = useMemo(() => {
+    if (!rev || !doc) return [];
+    const mine = (state.annotations ?? []).filter((a) => a.docId === doc.id && a.userId === userId);
+    return resolveAnnotations(mine, rev);
+  }, [state.annotations, doc, rev, userId]);
+  const orphans = useMemo(() => orphanedAnnotations(myNotes), [myNotes]);
+
+
   const byBlock = useMemo(() => openSuggestionsByBlock(state.suggestions), [state.suggestions]);
 
   const gotoChange = (dir: 1 | -1) => {
@@ -272,6 +284,8 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
 
       <RetirementBanner doc={doc} />
 
+      <OrphanedNotes orphans={orphans} userRole={userRole} />
+
       {rev && !isReceived(rev) && (
         <AmendmentStrip
           amendments={amendmentsInForce(doc.id, state.revisions, state.amendmentResolutions ?? [])}
@@ -286,12 +300,20 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               <ReceivedRevisionView doc={doc} rev={rev} />
             ) : (
               <>
+                {!showingDiff && (
+                  <AddNoteBar docId={doc.id} rev={rev} userRole={userRole} articleRef={articleRef} />
+                )}
                 {showingDiff && diff ? (
                   <DiffedContent diff={diff} renderBlockGutter={renderBlockGutter} />
                 ) : (
                   <SectionedContent
                     sections={rev.sections}
-                    renderBlockGutter={renderBlockGutter}
+                    renderBlockGutter={(blockId) => (
+                      <>
+                        {renderBlockGutter?.(blockId)}
+                        <BlockAnnotations notes={annotationsForBlock(myNotes, blockId)} userRole={userRole} />
+                      </>
+                    )}
                     renderSection={(section, defaultBody) => {
                       const ams = amendmentsForSection(section.id, state.revisions, state.amendmentResolutions ?? []);
                       if (ams.length === 0) return defaultBody;

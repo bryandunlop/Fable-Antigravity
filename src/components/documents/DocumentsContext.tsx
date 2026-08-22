@@ -14,6 +14,8 @@ import type {
 import type { Signature } from '../tech-log/types';
 import { classFor, docReaderPath, docManagePath } from './classes';
 import type { AmendmentResolution } from './engine/amendments';
+import type { DocAnnotation } from './engine/annotations';
+import { makeAnnotation } from './engine/annotations';
 import { applyRetirements } from './engine/retirement';
 
 /**
@@ -182,6 +184,8 @@ export type DocumentsAction =
   | { type: 'UPDATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'WITHDRAW_DRAFT'; payload: { revisionId: string; reason: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string } }
   | { type: 'RESOLVE_AMENDMENT'; payload: { resolution: AmendmentResolution } }
+  | { type: 'ADD_ANNOTATION'; payload: { annotation: DocAnnotation } }
+  | { type: 'DELETE_ANNOTATION'; payload: { id: string; userId: string } }
   | { type: 'FOLD_AMENDMENT_INTO_DRAFT'; payload: { amendmentId: string; targetDocId: string; targetSectionId?: string; replacementBlocks: DocBlock[]; sourceDocId: string; byUserId: string; byName: string; atUtc: string; today: string; newRevisionSeed: { id: string; revision: string; effectiveDate: string } } }
   | { type: 'SUBMIT_FOR_APPROVAL'; payload: { revisionId: string; atUtc: string } }
   | {
@@ -467,6 +471,26 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
               },
             ],
       };
+    }
+    case 'ADD_ANNOTATION': {
+      const { annotation } = action.payload;
+      if (!annotation.quote.trim()) {
+        warnNoop('an annotation must mark some text');
+        return state;
+      }
+      return { ...state, annotations: [...(state.annotations ?? []), annotation] };
+    }
+    case 'DELETE_ANNOTATION': {
+      const { id, userId } = action.payload;
+      const existing = state.annotations ?? [];
+      const target = existing.find((a) => a.id === id);
+      // Your notes are yours. Nobody deletes somebody else's marks, not even an
+      // admin — there is no shared state here to administer.
+      if (!target || target.userId !== userId) {
+        warnNoop('an annotation can only be removed by the person who made it');
+        return state;
+      }
+      return { ...state, annotations: existing.filter((a) => a.id !== id) };
     }
     case 'RESOLVE_AMENDMENT': {
       const { resolution } = action.payload;
@@ -994,6 +1018,19 @@ interface Ctx {
   withdrawDraft: (revisionId: string, reason: string, userRole: string, additionalRoles?: string[]) => void;
   /** TL-46 — fold an amendment into its target, or set it aside with a reason. */
   resolveAmendment: (amendmentId: string, resolution: Omit<AmendmentResolution, 'amendmentId'>) => void;
+  /** Phase 4 — mark text in a block with a personal note. */
+  addAnnotation: (input: {
+    docId: string;
+    rev: DocRevision;
+    blockId: string;
+    blockText: string;
+    start: number;
+    end: number;
+    note: string;
+    userRole: string;
+  }) => void;
+  /** Remove one of your own notes. */
+  deleteAnnotation: (id: string, userRole: string) => void;
   /** TL-46 — stage an amendment's governing wording into the target's working draft. Returns the draft's id. */
   foldAmendmentIntoDraft: (
     amendment: { id: string; targetDocId: string; targetSectionId?: string; sourceDocId: string },
@@ -1359,6 +1396,29 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'RESOLVE_AMENDMENT', payload: { resolution: { ...resolution, amendmentId } } });
     }, []),
     foldAmendmentIntoDraft,
+    addAnnotation: useCallback<Ctx['addAnnotation']>((input) => {
+      const { userId } = identityFor(input.userRole);
+      dispatch({
+        type: 'ADD_ANNOTATION',
+        payload: {
+          annotation: makeAnnotation({
+            id: localId('ann'),
+            docId: input.docId,
+            userId,
+            rev: input.rev,
+            blockId: input.blockId,
+            blockText: input.blockText,
+            start: input.start,
+            end: input.end,
+            note: input.note,
+            nowUtc: nowUtc(),
+          }),
+        },
+      });
+    }, []),
+    deleteAnnotation: useCallback<Ctx['deleteAnnotation']>((id, userRole) => {
+      dispatch({ type: 'DELETE_ANNOTATION', payload: { id, userId: identityFor(userRole).userId } });
+    }, []),
     submitForApproval,
     decideApproval,
     publishDirect: useCallback((revisionId, actorRoles) => {
