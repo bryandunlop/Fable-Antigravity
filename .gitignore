@@ -52,3 +52,9 @@ temp_*.tsx
 
 # Accidental git-directory snapshots
 _git/
+
+# Training-guide screenshots — regenerable via docs/training/generator/annotate.mjs
+# and already embedded in the committed .docx files.
+docs/training/generator/shots/
+docs/training/generator/annotated/
+docs/training/screenshots/
