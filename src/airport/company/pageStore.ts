@@ -71,19 +71,12 @@ export interface CompanyAirportPageContent {
 }
 
 /**
- * The station-support fields (D96), which behave differently from the five that
- * came before them: a technician writes one and it publishes immediately, with
- * no approver in the path.
+ * The station-support fields (D96) — the seven that replaced the legacy page's
+ * star ratings, plus the recommendation that sits above them.
  *
- * Bryan, 2026-08-22: *"techs can input. nobody needs to approve. it keeps a
- * record of what was changed and by who though."* What replaces approval is
- * attribution plus a cadence — every version names its author, and an unchecked
- * field surfaces on the review list by itself.
- *
- * Kept as an explicit set rather than "anything not in the original five" so the
- * split is testable and so a field added later does not silently inherit the
- * relaxed path. `saveSupportField` refuses anything not listed here, which is
- * what stops a curfew or a PPR being written straight past its approvers.
+ * They are grouped for the UI's benefit (they render as one card, in this
+ * order). They are no longer a permissions boundary: as of 2026-08-22 EVERY
+ * company-page field saves direct, support or not. See EDITABLE_FIELDS.
  */
 export type SupportField =
   | 'teamRecommendation'
@@ -152,6 +145,36 @@ export const CONFIRMABLE_FIELDS: readonly ConfirmableField[] = [
   'rampHandlingLimits',
   ...SUPPORT_FIELDS,
 ];
+
+/**
+ * Every company-page field a person may write directly — which, since
+ * 2026-08-22, is every text field on the page (Bryan: *"let the five older
+ * fields save direct too"*).
+ *
+ * D96 originally relaxed only the seven station-support fields and left PPR,
+ * curfew, ops notes, FBO preference and ramp limits on D46's
+ * propose/approve/publish route. One card then behaved two ways depending on
+ * which half of it you clicked, which is not a rule anyone could hold in their
+ * head. It is now one rule: write it, it publishes, your name is on it.
+ *
+ * KNOWN AND ACCEPTED: `requiredApprovals` classes ppr, curfew and
+ * rampHandlingLimits as SAFETY fields needing the chief pilot, on the reasoning
+ * that a wrong assertion there is the one most likely to put an aircraft
+ * somewhere it should not be. That gate no longer stands in the way of a direct
+ * save. It still governs the proposal route, which is deliberately kept alive
+ * as an opt-in second pair of eyes rather than deleted.
+ *
+ * `referenceAnnotations` is NOT here and must not be. An annotation contradicts
+ * published FAA data — a different act from writing down what we do, and the
+ * one place a reviewer still earns their keep.
+ */
+export const EDITABLE_FIELDS: readonly ConfirmableField[] = CONFIRMABLE_FIELDS;
+
+const EDITABLE_FIELD_SET: ReadonlySet<string> = new Set(EDITABLE_FIELDS);
+
+export function isEditableField(field: string): field is ConfirmableField {
+  return EDITABLE_FIELD_SET.has(field);
+}
 
 /** Where an explicit confirmation came from. A publish is synthesised, never stored. */
 export type ConfirmationSource = 'officer' | 'crew' | 'debrief' | 'maintenance';
@@ -226,22 +249,24 @@ export interface ConfirmFieldRequest {
 }
 
 /**
- * One technician's edit to one support field (D96).
+ * One person's edit to one company-page field.
  *
- * Deliberately a single field rather than a content draft: a tech fixing the
- * mobile-response number should not be able to clobber the ground-kit note some
- * other tech wrote while they had the page open. The compare-and-swap is on the
- * page as a whole (it has to be — the store versions pages, not fields), so a
- * concurrent edit still fails loudly rather than merging silently.
+ * Deliberately a single field rather than a content draft: someone fixing the
+ * mobile-response number should not be able to clobber the ground-kit note
+ * another person wrote while they had the page open. The compare-and-swap is on
+ * the page as a whole (it has to be — the store versions pages, not fields), so
+ * a concurrent edit still fails loudly rather than merging silently.
  */
-export interface SaveSupportFieldRequest {
+export interface SaveFieldRequest {
   icao: string;
-  field: SupportField;
+  field: ConfirmableField;
   /** null clears the field. Clearing publishes but records no confirmation. */
   value: string | null;
   savedBy: string;
   /** How the author knows. Optional, and the thing the next reader actually reads. */
   note?: string;
+  /** Who is writing, in the confirmation's terms. Defaults to maintenance. */
+  source?: ConfirmationSource;
   /**
    * The version the author was looking at. Omit only when no page exists yet.
    * Same CAS contract as `publish` — see `PublishRequest.basedOnVersion`.
@@ -254,19 +279,19 @@ export interface SaveSupportFieldRequest {
  * confirmation is null when the save cleared the field: there is then no fact to
  * attest, and confirming one would age on the review list as if there were.
  */
-export interface SaveSupportFieldResult {
+export interface SaveFieldResult {
   version: CompanyAirportPageVersion;
   confirmation: FieldConfirmation | null;
 }
 
-export class NotASupportFieldError extends Error {
+export class NotAnEditableFieldError extends Error {
   constructor(readonly field: string) {
     super(
-      `Cannot save ${field} directly: it is not a station-support field. ` +
-        'PPR, curfews, ops notes, FBO preference and ramp limits keep their ' +
-        'propose/approve/publish path (D46); only the D96 support fields save direct.',
+      `Cannot save ${field} directly: it is not a company-page text field. ` +
+        'Reference annotations contradict published FAA data and keep the ' +
+        'propose/approve/publish path (D46).',
     );
-    this.name = 'NotASupportFieldError';
+    this.name = 'NotAnEditableFieldError';
   }
 }
 
@@ -299,8 +324,8 @@ export class StaleBaseVersionError extends Error {
 
 export interface CompanyAirportPageStore {
   publish(request: PublishRequest): CompanyAirportPageVersion;
-  /** Write one station-support field with no approver in the path (D96). */
-  saveSupportField(request: SaveSupportFieldRequest): SaveSupportFieldResult;
+  /** Write one company-page field with no approver in the path (D96). */
+  saveField(request: SaveFieldRequest): SaveFieldResult;
   acknowledge(request: AcknowledgeRequest): AirportReviewAcknowledgement;
   confirm(request: ConfirmFieldRequest): FieldConfirmation;
   getLatest(icao: string): CompanyAirportPageVersion | null;
@@ -403,9 +428,9 @@ export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore 
     return copyVersion(version);
   }
 
-  saveSupportField(request: SaveSupportFieldRequest): SaveSupportFieldResult {
-    if (!isSupportField(request.field)) {
-      throw new NotASupportFieldError(request.field);
+  saveField(request: SaveFieldRequest): SaveFieldResult {
+    if (!isEditableField(request.field)) {
+      throw new NotAnEditableFieldError(request.field);
     }
 
     const current = this.getLatest(request.icao);
@@ -428,7 +453,7 @@ export class InMemoryCompanyAirportPageStore implements CompanyAirportPageStore 
             icao: request.icao,
             field: request.field,
             confirmedBy: request.savedBy,
-            source: 'maintenance',
+            source: request.source ?? 'maintenance',
             note: request.note,
           });
 

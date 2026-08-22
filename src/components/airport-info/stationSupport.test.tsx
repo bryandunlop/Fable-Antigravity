@@ -109,7 +109,7 @@ describe('station support on the airport record (D96)', () => {
     render(
       <Harness
         seed={(company) => {
-          company.saveSupportField({
+          company.saveField({
             icao: 'KASE',
             field: 'onFieldCapability',
             value: 'None. No station on the field is rated for our airframe class.',
@@ -148,7 +148,7 @@ describe('station support on the airport record (D96)', () => {
     render(
       <Harness
         seed={(company) => {
-          company.saveSupportField({
+          company.saveField({
             icao: 'KASE',
             field: 'teamRecommendation',
             value: 'Book the handler and expect a tow. Maintenance goes to KDEN.',
@@ -170,7 +170,7 @@ describe('station support on the airport record (D96)', () => {
         seed={(company) => {
           // Mobile response written, on-field capability still blank — the exact
           // state that produced a strip contradicting itself in the browser.
-          company.saveSupportField({
+          company.saveField({
             icao: 'KASE',
             field: 'mobileResponse',
             value: 'Dispatched from KDEN, 3.5 hr road.',
@@ -185,11 +185,35 @@ describe('station support on the airport record (D96)', () => {
     expect(screen.getByText(/Nothing recorded about on-field capability/)).toBeInTheDocument();
   });
 
+  it('saves a curfew direct, the same way a support field saves', async () => {
+    // 2026-08-22: one card, one rule. This used to route to the chief pilot.
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(await screen.findByRole('button', { name: /Edit Curfew/i }));
+    await user.type(screen.getByLabelText(/Curfew value/i), '2300-0700 local.');
+    await user.click(screen.getByRole('button', { name: /^Save$/ }));
+
+    await waitFor(() => expect(screen.getByText('2300-0700 local.')).toBeInTheDocument());
+  });
+
+  it('gives every company field a way to be started, written or not', async () => {
+    // A blank field with no row has no pencil, so it can never be started —
+    // the trap teamRecommendation shipped with. Every field renders a control.
+    render(<Harness />);
+
+    for (const label of ['PPR', 'Curfew', 'Ramp and handling limits', 'Preferred FBO / handler', 'Operations notes']) {
+      expect(
+        await screen.findByRole('button', { name: new RegExp(`Edit ${label}`, 'i') }),
+      ).toBeInTheDocument();
+    }
+  });
+
   it('offers no editing affordance on the crew lens', async () => {
     render(
       <Harness
         seed={(company) => {
-          company.saveSupportField({
+          company.saveField({
             icao: 'KASE',
             field: 'groundKit',
             value: 'GPU yes, air start no, hangar no.',
