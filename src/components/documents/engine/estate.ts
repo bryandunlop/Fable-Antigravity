@@ -38,6 +38,8 @@ export type EstateVerdict = 'document' | 'record' | 'report';
 export type EstateHome =
   | 'document-centre' // a class on the documents engine
   | 'other-module' // somewhere else in myGFO, with its own machinery
+  | 'nimbl' // the incumbent vendor — authored by them, delivered as PDF, read-and-initial in their system
+  | 'sharepoint' // Bryan 2026-08-21: "most of the scattered stuff"
   | 'outside-mygfo' // deliberately not ours (an OEM holds it)
   | 'nowhere'; // no home at all — exists on paper, in a drive, or in someone's head
 
@@ -94,7 +96,12 @@ export function verdictLabel(verdict: EstateVerdict): string {
  */
 export function isMisplaced(entry: EstateEntry): boolean {
   if (entry.verdict !== 'document') return false;
-  return entry.home === 'other-module' || entry.home === 'nowhere';
+  return (
+    entry.home === 'other-module' ||
+    entry.home === 'nowhere' ||
+    entry.home === 'nimbl' ||
+    entry.home === 'sharepoint'
+  );
 }
 
 /** This row cannot be trusted until a human answers something about it. */
@@ -128,6 +135,9 @@ export function estateGaps(entries: EstateEntry[]): { misplaced: number; needsBr
 }
 
 const UNKNOWN_OWNER = 'unknown';
+
+/** Everything Bryan confirmed in the 2026-08-21 document-centre session. */
+const CONF = 'Bryan, 2026-08-21';
 
 export const ESTATE: EstateEntry[] = [
   // ── In the document centre ────────────────────────────────────────────────
@@ -185,7 +195,7 @@ export const ESTATE: EstateEntry[] = [
     offline: true,
     owner: UNKNOWN_OWNER,
     usage: 'unknown',
-    note: 'Class exists. Which manuals GFO actually holds — GOM, GMM, SMS, IPM — has never been enumerated.',
+    note: 'Class exists and is empty. The real manuals live in Nimbl — see the separate row. Which manuals GFO holds has still never been enumerated.',
   },
   {
     id: 'received-document',
@@ -269,7 +279,7 @@ export const ESTATE: EstateEntry[] = [
     offline: true,
     owner: UNKNOWN_OWNER,
     usage: 'unknown',
-    note: 'The demo seeds RCV-001 at rev 15. In reality GFO holds neither the MEL nor the LOA in myGFO — TL-25. D8 says myGFO hosts it; AC 91-67A §5.4 requires it onboard.',
+    note: 'Demo seeds RCV-001 at rev 15. GFO\u2019s real MEL lives outside Nimbl and outside myGFO (Bryan, 2026-08-21) \u2014 LG-267. D94 proposes one source, two views: the document a crew reads and the MelItem rows a deferral binds to are the same record.',
   },
   {
     id: 'fsdo-loa',
@@ -306,9 +316,10 @@ export const ESTATE: EstateEntry[] = [
     controlled: 'unknown',
     acknowledged: false,
     offline: false,
-    owner: UNKNOWN_OWNER,
-    usage: 'unknown',
-    note: 'Pilot currency exists with nothing behind it. Whether GFO holds its own training content is unasked.',
+    owner: 'Training',
+    usage: 'confirmed',
+    confirmedBy: CONF,
+    note: 'Training authors its own material (Bryan, 2026-08-21) and the G800 will generate more. Pilot currency exists with nothing behind it.',
   },
   {
     id: 'emergency-response-plan',
@@ -335,6 +346,65 @@ export const ESTATE: EstateEntry[] = [
     owner: UNKNOWN_OWNER,
     usage: 'unknown',
     note: 'Candidate only. Included so the question gets asked rather than assumed away.',
+  },
+
+  // ── Nimbl — the incumbent (Bryan, 2026-08-21) ─────────────────────────────
+  {
+    id: 'nimbl-gom',
+    name: 'GOM / company operations manual',
+    verdict: 'document',
+    home: 'nimbl',
+    homeDetail: 'Nimbl — authored by them, delivered as PDF',
+    controlled: true,
+    acknowledged: true,
+    offline: 'unknown',
+    owner: 'Nimbl (officially); GFO writes the substance',
+    usage: 'confirmed',
+    confirmedBy: CONF,
+    note: 'GFO already writes the changes and tells Nimbl to make them. That round trip is the latency (D93). Read-and-initial happens in Nimbl. Annual revision cycle.',
+  },
+  {
+    id: 'nimbl-adjacent',
+    name: 'IOPM, SAFA, ERP, RVSM, EFVS, HAZMAT',
+    verdict: 'document',
+    home: 'nimbl',
+    homeDetail: 'Nimbl — vendor-authored compliance documents',
+    controlled: true,
+    acknowledged: true,
+    offline: 'unknown',
+    owner: 'Nimbl',
+    usage: 'unknown',
+    note: 'Breadth a replacement takes on. Whether GFO holds all of these, and on which Nimbl tier, is unconfirmed — the tier decides whether Sky Brief reg-monitoring is included at all (LG-266).',
+  },
+
+  // ── The G800 content wave (Bryan, 2026-08-21) ─────────────────────────────
+  {
+    id: 'callouts-and-flows',
+    name: 'Callouts and flows',
+    verdict: 'document',
+    home: 'nowhere',
+    homeDetail: 'Standards and Training issue these; no home in myGFO',
+    controlled: 'unknown',
+    acknowledged: 'unknown',
+    offline: false,
+    owner: 'Standards / Training',
+    usage: 'confirmed',
+    confirmedBy: CONF,
+    note: 'Pilots only. Bryan: "its own thing" — neither prose nor checklist, so it needs its own class and probably its own authoring surface. The G800 will generate a new set.',
+  },
+  {
+    id: 'fa-procedures',
+    name: 'Flight attendant procedures',
+    verdict: 'document',
+    home: 'nowhere',
+    homeDetail: 'Changes with each type; no home today',
+    controlled: 'unknown',
+    acknowledged: 'unknown',
+    offline: false,
+    owner: 'Cabin',
+    usage: 'confirmed',
+    confirmedBy: CONF,
+    note: 'Distinct from Cabin Knowledge (D75), which is know-how rather than procedure. The G800 brings its own set.',
   },
 
   // ── Deliberately outside myGFO ────────────────────────────────────────────

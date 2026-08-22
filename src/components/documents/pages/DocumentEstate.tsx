@@ -41,6 +41,8 @@ function TriCell({ value }: { value: Tri }) {
 const HOME_LABEL: Record<EstateEntry['home'], string> = {
   'document-centre': 'Document centre',
   'other-module': 'Another module',
+  nimbl: 'Nimbl',
+  sharepoint: 'SharePoint',
   'outside-mygfo': 'Outside myGFO',
   nowhere: 'No home',
 };
