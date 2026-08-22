@@ -52,6 +52,14 @@ export const FIELD_LABEL: Record<ConfirmableField, string> = {
   opsNotes: 'Ops notes',
   fboPreference: 'FBO preference',
   rampHandlingLimits: 'Ramp & handling limits',
+  teamRecommendation: 'What we do here',
+  onFieldCapability: 'On-field capability',
+  mobileResponse: 'Mobile response',
+  localIndependent: 'Local independent',
+  companySupport: 'Company support',
+  partsAndAog: 'Parts and AOG',
+  groundKit: 'Ground kit',
+  stationContacts: 'Station contacts',
 };
 
 /**
@@ -68,6 +76,17 @@ export const DEFAULT_CADENCE_DAYS: Record<ConfirmableField, number> = {
   opsNotes: 180,
   fboPreference: 90,
   rampHandlingLimits: 365,
+  // Station support (D96), same footing: product defaults chosen from how fast
+  // each fact moves, NOT policy. A provider's phone list turns over far faster
+  // than what a ramp can physically give you.
+  teamRecommendation: 180,
+  onFieldCapability: 180,
+  mobileResponse: 180,
+  localIndependent: 365,
+  companySupport: 365,
+  partsAndAog: 180,
+  groundKit: 365,
+  stationContacts: 90,
 };
 
 /** How long before the due date a field starts warning. Matches the documents engine. */

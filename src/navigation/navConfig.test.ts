@@ -73,6 +73,10 @@ const KNOWN_UNREGISTERED = [
   // deliberately unregistered, because a manifest entry would put the second door back.
   '/procedural-bulletins',
   '/flight-operations-bulletins',
+  // D96 redirect stub — the Airport Services Database folded into the airport
+  // record as station-support fields. Routed so bookmarks resolve, deliberately
+  // unregistered, because a manifest entry would put the second door back.
+  '/airport-services',
 ];
 
 describe('route audit — every App.tsx route is manifest-covered or enumerated debt', () => {

@@ -3,19 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { buildOfficerWorklist } from './worklist';
 import { ProposalWorkflow } from './proposals';
 import {
+  emptyPageContent,
   InMemoryCompanyAirportPageStore,
   type CompanyAirportPageContent,
   type StoreClock,
 } from './pageStore';
 
-const EMPTY: CompanyAirportPageContent = {
-  ppr: null,
-  curfew: null,
-  opsNotes: null,
-  fboPreference: null,
-  rampHandlingLimits: null,
-  referenceAnnotations: [],
-};
+const EMPTY: CompanyAirportPageContent = emptyPageContent();
 
 function ctx(start = '2026-01-01T12:00:00.000Z') {
   let at = start;

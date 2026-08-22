@@ -207,7 +207,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/turndown-reports', label: 'Turndown Reports', domain: 'maintenance', icon: FileWarning, primary: false, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
   { path: '/turndown-form', label: 'Turndown Form', domain: 'maintenance', icon: ClipboardList, primary: false, roles: ['maintenance', 'maintenance-coordinator'] },
   { path: '/car-tracking', label: 'Vehicles', domain: 'maintenance', icon: Car, primary: false, keywords: ['car tracking', 'rental'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-  { path: '/airport-services', label: 'Airport Services', domain: 'maintenance', icon: Building2, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/fuel-farm', label: 'Fuel Farm Tracker', domain: 'maintenance', icon: Fuel, primary: false, roles: ['maintenance', 'maintenance-coordinator', 'dom'] },
   { path: '/grat/standalone', label: 'GRAT', domain: 'maintenance', icon: HardHat, primary: false, keywords: ['standalone', 'ground risk assessment'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/aircraft-cleaning', label: 'Aircraft Cleaning', domain: 'maintenance', icon: Sparkles, primary: false, roles: ['pilot', 'maintenance', 'maintenance-coordinator', 'dom'] },

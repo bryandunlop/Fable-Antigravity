@@ -19,6 +19,7 @@
  */
 
 import { requiredApprovals, type ApproverRole } from './approvalRouting';
+import { emptyPageContent } from './pageStore';
 import type {
   CompanyAirportPageContent,
   CompanyAirportPageStore,
@@ -123,14 +124,7 @@ function copy(proposal: CompanyAirportProposal): CompanyAirportProposal {
   };
 }
 
-const EMPTY_CONTENT: CompanyAirportPageContent = {
-  ppr: null,
-  curfew: null,
-  opsNotes: null,
-  fboPreference: null,
-  rampHandlingLimits: null,
-  referenceAnnotations: [],
-};
+const EMPTY_CONTENT: CompanyAirportPageContent = emptyPageContent();
 
 export class ProposalWorkflow {
   private readonly proposals: CompanyAirportProposal[] = [];

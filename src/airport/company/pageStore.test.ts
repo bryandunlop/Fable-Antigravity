@@ -1,19 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  emptyPageContent,
   InMemoryCompanyAirportPageStore,
+  NotASupportFieldError,
   StaleBaseVersionError,
   type CompanyAirportPageContent,
 } from './pageStore';
 
-const blankContent: CompanyAirportPageContent = {
-  ppr: null,
-  curfew: null,
-  opsNotes: null,
-  fboPreference: null,
-  rampHandlingLimits: null,
-  referenceAnnotations: [],
-};
+const blankContent: CompanyAirportPageContent = emptyPageContent();
 
 function content(overrides: Partial<CompanyAirportPageContent>): CompanyAirportPageContent {
   return { ...blankContent, ...overrides };
@@ -270,6 +265,108 @@ describe('InMemoryCompanyAirportPageStore', () => {
       expect(() =>
         store.acknowledge({ icao: 'KKKK', crewOid: 'crew-1', nasrCycleEffDate: '2026-07-09' }),
       ).toThrow(/no published company page/i);
+    });
+  });
+
+  describe('saveSupportField (D96)', () => {
+    it('creates the page when none exists, and confirms the field it wrote', () => {
+      const { version, confirmation } = store.saveSupportField({
+        icao: 'KASE',
+        field: 'onFieldCapability',
+        value: 'None. No Part 145 station on the field is rated for our airframe class.',
+        savedBy: 'tech-1',
+        note: 'Phoned the airport manager.',
+      });
+
+      expect(version.version).toBe(1);
+      expect(version.content.onFieldCapability).toMatch(/^None\./);
+      expect(version.publishedBy).toBe('tech-1');
+      expect(confirmation?.field).toBe('onFieldCapability');
+      expect(confirmation?.confirmedBy).toBe('tech-1');
+      expect(confirmation?.source).toBe('maintenance');
+      expect(confirmation?.note).toBe('Phoned the airport manager.');
+      // The confirmation must pin the version it wrote, not the one before it.
+      expect(confirmation?.versionIdSeen).toBe(version.id);
+    });
+
+    it('leaves every other field exactly as it was', () => {
+      store.publish({
+        icao: 'KASE',
+        content: content({ curfew: '2300-0700 local', groundKit: 'GPU yes, no air start' }),
+        publishedBy: 'evaluator-1',
+      });
+
+      const { version } = store.saveSupportField({
+        icao: 'KASE',
+        field: 'mobileResponse',
+        value: 'Dispatched from KDEN, 3.5 hr road.',
+        savedBy: 'tech-1',
+        basedOnVersion: 1,
+      });
+
+      expect(version.content.curfew).toBe('2300-0700 local');
+      expect(version.content.groundKit).toBe('GPU yes, no air start');
+      expect(version.content.mobileResponse).toBe('Dispatched from KDEN, 3.5 hr road.');
+    });
+
+    it('refuses a field that is not a station-support field', () => {
+      // The whole point of the split: a curfew must not reach the page without
+      // passing its approvers, however the caller spells the request.
+      expect(() =>
+        store.saveSupportField({
+          icao: 'KASE',
+          field: 'curfew' as never,
+          value: 'no curfew, honest',
+          savedBy: 'tech-1',
+        }),
+      ).toThrow(NotASupportFieldError);
+      expect(store.getLatest('KASE')).toBeNull();
+    });
+
+    it('rejects a save drafted against a stale version, and writes nothing', () => {
+      store.saveSupportField({
+        icao: 'KASE',
+        field: 'groundKit',
+        value: 'GPU yes, hangar no',
+        savedBy: 'tech-1',
+      });
+
+      expect(() =>
+        store.saveSupportField({
+          icao: 'KASE',
+          field: 'partsAndAog',
+          value: 'AOG desk [TBC]',
+          savedBy: 'tech-2',
+          // tech-2 was looking at the page before tech-1 saved.
+          basedOnVersion: undefined,
+        }),
+      ).toThrow(StaleBaseVersionError);
+
+      expect(store.versionsFor('KASE')).toHaveLength(1);
+      expect(store.confirmationsFor('KASE')).toHaveLength(1);
+    });
+
+    it('publishes but records no confirmation when the save clears the field', () => {
+      store.saveSupportField({
+        icao: 'KASE',
+        field: 'localIndependent',
+        value: 'Two A&Ps, piston only.',
+        savedBy: 'tech-1',
+      });
+
+      const { version, confirmation } = store.saveSupportField({
+        icao: 'KASE',
+        field: 'localIndependent',
+        value: null,
+        savedBy: 'tech-1',
+        basedOnVersion: 1,
+      });
+
+      expect(version.content.localIndependent).toBeNull();
+      // Confirming an empty field would assert that nothing is still nothing,
+      // and would then age on the review list as if it were a fact.
+      expect(confirmation).toBeNull();
+      expect(store.confirmationsFor('KASE')).toHaveLength(1);
     });
   });
 
