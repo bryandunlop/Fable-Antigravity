@@ -17,6 +17,7 @@ import { InFlightBadges } from '../components/InFlightBadges';
 import { SuggestionTriageList } from '../components/SuggestionTriageList';
 import { WorkingDraftPanel } from '../components/WorkingDraftPanel';
 import { ApprovalQueuePanel } from '../components/ApprovalQueuePanel';
+import { EffectivePagesPanel } from '../components/EffectivePagesPanel';
 import { ReviewPanel } from '../components/ReviewPanel';
 import { ComplianceRoster } from '../components/ComplianceRoster';
 import { RevisionTimeline } from '../components/RevisionTimeline';
@@ -150,6 +151,7 @@ export function DocWorkbench({ userRole, additionalRoles = [] }: { userRole: str
 
         <TabsContent value="review" className="mt-4 space-y-4">
           <ReviewPanel doc={doc} userRole={userRole} additionalRoles={additionalRoles} />
+          <EffectivePagesPanel doc={doc} />
           {rev && rev.requireAcknowledgment && rev.ackLevel !== 'none' && (
             <GfoPanel title="Read receipts" action={<Users className="h-4 w-4 text-muted-foreground" />}>
               <ComplianceRoster
