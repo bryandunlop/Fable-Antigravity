@@ -6,7 +6,10 @@ export type AllergySeverity = 'Critical' | 'Moderate' | 'Mild';
 
 export interface PassengerAllergy {
   allergen: string;
-  severity: AllergySeverity;
+  /** OPTIONAL because nothing upstream records it. myairops gives free text; a mapping
+   *  made from that text has no severity, and inventing one would be worse than the
+   *  absence. Legacy seed rows keep theirs; the screens no longer rank by it. */
+  severity?: AllergySeverity;
   reaction?: string;
   medication?: string;
 }
@@ -30,6 +33,26 @@ export interface PassengerComfort {
   specialRequests?: string;
 }
 
+/** What myairops last told us, verbatim.
+ *
+ * Confirmed against the CRM OpenAPI schema (2026-08-22): a passenger carries
+ * `hasAllergy: boolean` plus `PassengerNoteModel { note, noteType }`, where
+ * `PassengerNoteType` is one of `DietaryAllergens | GroundTransport | Preferences`.
+ * The dietary detail is therefore FREE TEXT written by whoever took the booking — not
+ * a structured allergen list — so a human has to read it and map it.
+ *
+ * Never edited in myGFO: it is somebody else's record, kept so we can tell when it
+ * changes underneath a mapping. myGFO is the source of truth for the mapping itself
+ * (Bryan, 2026-08-22), and eventually for the profile outright. */
+export interface PassengerSourceNote {
+  /** myairops PassengerNote of type DietaryAllergens. */
+  dietary?: string;
+  /** myairops PassengerNote of type Preferences. Deliberately NOT auto-imported —
+   *  a change is flagged and a human re-enters it. */
+  preferences?: string;
+  seenAtUtc: string;
+}
+
 export interface Passenger {
   id: string;
   name: string;
@@ -50,6 +73,13 @@ export interface Passenger {
    *  `allergies` array cannot tell those two apart on its own, and rendering the
    *  empty case as safe is how a screen lies. Only a dated confirmation earns green. */
   dietaryConfirmedAtUtc?: string;
+  /** Last seen myairops text. See PassengerSourceNote. */
+  sourceNote?: PassengerSourceNote;
+  /** The exact DietaryAllergens text that `allergies` were mapped from. When this stops
+   *  matching `sourceNote.dietary`, the mapping is stale and the guest needs re-mapping:
+   *  a frozen picture that has diverged from reality must say so, never quietly stand. */
+  mappedFromNote?: string;
+  mappedAtUtc?: string;
   birthday: string;
   beverage: string[];
   food: string[];
@@ -71,6 +101,15 @@ export const SEED_PASSENGERS: Passenger[] = [
       { allergen: 'Shellfish', severity: 'Critical', reaction: 'Anaphylaxis', medication: 'EpiPen - seat pocket' },
       { allergen: 'Tree nuts', severity: 'Moderate', reaction: 'Hives, swelling', medication: 'Benadryl' },
     ],
+    // Mapped in July, and the booking desk has since added dairy. The mapping is not
+    // merely incomplete, it is now WRONG — so the screen must stop presenting it as
+    // settled rather than quietly serving a stale list.
+    sourceNote: {
+      dietary: 'Shellfish (anaphylactic, EpiPen) and tree nuts. Now also dairy-free.',
+      seenAtUtc: '2026-08-21T00:00:00Z',
+    },
+    mappedFromNote: 'Shellfish (anaphylactic, EpiPen) and tree nuts.',
+    mappedAtUtc: '2026-07-14T00:00:00Z',
     birthday: '1975-03-15',
     beverage: ['Dom Pérignon', 'Macallan 18', 'Perrier', 'Espresso'],
     food: ['Wagyu Beef', 'Lobster Thermidor', 'Truffle Pasta', 'Aged Ribeye', 'French cuisine', 'Italian cuisine'],
@@ -182,6 +221,12 @@ export const SEED_PASSENGERS: Passenger[] = [
     role: 'Guest',
     allergies: [],
     allergyFlagged: true,
+    // Unmapped prose, exactly as a booking agent would type it: an allergen the
+    // galley must act on and a preference, run together in one sentence.
+    sourceNote: {
+      dietary: 'Severe shellfish allergy — carries an EpiPen. Also no coriander.',
+      seenAtUtc: '2026-08-19T00:00:00Z',
+    },
     birthday: '',
     beverage: [],
     food: [],

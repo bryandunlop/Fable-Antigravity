@@ -5,13 +5,22 @@
 // Database is a separate destination nobody opens after a flight, which is why most
 // guests never get a profile at all.
 //
-// WHAT THIS DELIBERATELY CANNOT TOUCH: `allergies` and `allergyFlagged`. They come from
-// the booking, myairops is pull-only, and letting the crew overwrite a source we do not
-// own would put a local edit and an upstream record silently out of step. The editor
-// shows them behind a lock with a "report a discrepancy" route instead.
+// ALLERGENS ARE EDITABLE HERE, and that reverses an earlier decision. They were locked
+// on the reasoning that "myairops owns them". It does not: the CRM schema gives
+// `hasAllergy: boolean` plus a free-text `DietaryAllergens` note, so the upstream record
+// is PROSE. Turning that prose into allergens is a judgement only a person can make, and
+// per Bryan (2026-08-22) the flight attendants make it — myGFO is the source of truth for
+// the mapping, and eventually for the profile outright. Locking the field blocked the
+// actual work.
+//
+// What stays read-only is the SOURCE TEXT. We keep the exact words a mapping was made
+// from so that when the booking desk edits them, the mapping can be re-flagged instead
+// of quietly standing while reality has moved.
 import type { Passenger, PassengerComfort } from '../passengerData';
 
 export interface ProfileDraft {
+  /** Allergen names only — no severity, because nothing records one. */
+  allergens: string[];
   food: string[];
   beverage: string[];
   dislikes: string[];
@@ -25,6 +34,7 @@ export interface ProfileDraft {
 
 export function draftFrom(p: Passenger | null): ProfileDraft {
   return {
+    allergens: (p?.allergies ?? []).map((a) => a.allergen),
     food: [...(p?.food ?? [])],
     beverage: [...(p?.beverage ?? [])],
     dislikes: [...(p?.dislikes ?? [])],
@@ -122,6 +132,7 @@ function sameList(a: string[], b: string[]): boolean {
 }
 
 export function isDirty(draft: ProfileDraft, original: ProfileDraft): boolean {
+  if (!sameList(draft.allergens, original.allergens)) return true;
   if (!sameList(draft.food, original.food)) return true;
   if (!sameList(draft.beverage, original.beverage)) return true;
   if (!sameList(draft.dislikes, original.dislikes)) return true;
@@ -134,9 +145,22 @@ export function isDirty(draft: ProfileDraft, original: ProfileDraft): boolean {
 
 /** Fold a draft back onto a record, immutably. Everything not in the draft — id, name,
  *  role, allergies, the booking flag — is carried through untouched. */
-export function applyDraft(p: Passenger, draft: ProfileDraft): Passenger {
+/** Fold a draft back onto a record, immutably.
+ *
+ *  `mappedFromNote` is stamped with the source text the person was looking at while they
+ *  mapped — not with "now". That is what makes a later upstream edit detectable at all;
+ *  stamping a timestamp alone would tell you when, but never that the words changed. */
+export function applyDraft(p: Passenger, draft: ProfileDraft, mappedAtUtc?: string): Passenger {
+  const allergensChanged = !sameList(draft.allergens, (p.allergies ?? []).map((a) => a.allergen));
+  const sourceText = p.sourceNote?.dietary?.trim();
   return {
     ...p,
+    // Existing entries keep their reaction/medication detail; only genuinely new
+    // allergens arrive bare, because a mapping from prose has nothing else to give.
+    allergies: draft.allergens.map((name) => p.allergies.find((a) => a.allergen === name) ?? { allergen: name }),
+    ...(sourceText && (allergensChanged || !p.mappedFromNote)
+      ? { mappedFromNote: sourceText, mappedAtUtc: mappedAtUtc ?? p.mappedAtUtc }
+      : {}),
     food: [...draft.food],
     beverage: [...draft.beverage],
     dislikes: [...draft.dislikes],
