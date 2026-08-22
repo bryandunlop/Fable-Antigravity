@@ -21,6 +21,7 @@ import LegDetail from './pages/LegDetail';
 import AdminFleet from './pages/AdminFleet';
 import AdminPersonnel from './pages/AdminPersonnel';
 import AdminMel from './pages/AdminMel';
+import AdminMelImport from './pages/AdminMelImport';
 import AdminChecklists from './pages/AdminChecklists';
 import AuditTrail from './pages/AuditTrail';
 import Aog from './pages/Aog';
@@ -66,6 +67,7 @@ export default function TechLogRoutes() {
         <Route path="admin/fleet" element={<AdminFleet />} />
         <Route path="admin/personnel" element={<AdminPersonnel />} />
         <Route path="admin/mel" element={<AdminMel />} />
+        <Route path="admin/mel/import" element={<AdminMelImport />} />
         <Route path="admin/checklists" element={<AdminChecklists />} />
         <Route path="*" element={<Navigate to="/tech-log" replace />} />
       </Routes>

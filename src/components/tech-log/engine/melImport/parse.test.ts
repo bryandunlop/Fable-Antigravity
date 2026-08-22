@@ -219,7 +219,7 @@ describe('parseMelDocument — against a real page of the approved G500 MEL', ()
 
   it('parses the page clean', () => {
     expect(warnings).toEqual([]);
-    expect(revision).toBe('1');
+    expect(revision).toBe('Rev 1');
     expect(effectiveDate).toBe('2025-09-03');
   });
 
@@ -250,5 +250,41 @@ describe('parseMelDocument — against a real page of the approved G500 MEL', ()
     expect(items.find(i => i.itemNumber === 'N100-2')?.provisos).toBe(
       'May be worn, torn, or frayed as long as the item is otherwise serviceable.',
     );
+  });
+});
+
+describe('a MEL revises page by page', () => {
+  const page = (rev: string, date: string, item: string, name: string) => [
+    `Aircraft: G-500   Revision No: ${rev}   Date: ${date}   Page N-1`,
+    'CABIN ITEMS (200)',
+    NEF_HDR,
+    nef(item, name, 'Worn.'),
+  ];
+
+  it('identifies the document by its latest revision, not the last one it happened to read', () => {
+    // The real G650ER R1 carries 426 pages at Revision 1 and 24 still at Original. Reading
+    // "the last revision line seen" reported Rev 1 through pdftotext and Original through
+    // pdf.js — same document, two answers.
+    const { revision, effectiveDate } = parseMelDocument(
+      [
+        ...page('1', '04-27-26', 'N200-1', 'Seat trim'),
+        ...page('Original', '06-26-23', 'N200-2', 'Carpet'),
+      ],
+      'G500',
+    );
+    expect(revision).toBe('Rev 1');
+    expect(effectiveDate).toBe('2026-04-27');
+  });
+
+  it('gives each item the revision printed on its own page', () => {
+    const { items } = parseMelDocument(
+      [
+        ...page('1', '04-27-26', 'N200-1', 'Seat trim'),
+        ...page('Original', '06-26-23', 'N200-2', 'Carpet'),
+      ],
+      'G500',
+    );
+    expect(items.find(i => i.itemNumber === 'N200-1')?.mmelRevision).toBe('Rev 1');
+    expect(items.find(i => i.itemNumber === 'N200-2')?.mmelRevision).toBe('Original');
   });
 });

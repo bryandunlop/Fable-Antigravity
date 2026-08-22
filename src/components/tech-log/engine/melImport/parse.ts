@@ -21,7 +21,15 @@ export interface ParseResult {
   items: MelItem[];
   /** Any entry here blocks the import (D95). Never advisory. */
   warnings: string[];
-  /** Revision identity read from the document body — never from the filename (D95). */
+  /**
+   * The document's own revision identity, read from the body and never the filename (D95).
+   *
+   * A MEL revises PAGE BY PAGE: the G650ER R1 carries 426 pages at "Revision 1, 04-27-26"
+   * and 24 still at "Original, 06-26-23". So the document's identity is the LATEST revision
+   * it contains, while each item keeps the revision of the page it was printed on. Reading
+   * "the last revision line seen" instead gave whichever page the extractor happened to end
+   * on — Rev 1 through pdftotext, Original through pdf.js, from the same document.
+   */
   revision: string | null;
   effectiveDate: string | null;
 }
@@ -64,6 +72,15 @@ function unwrap(text: string): string {
   return text.replace(/(\w)- (?=\w)/g, '$1-');
 }
 
+/**
+ * Join the lines of a prose field into one string.
+ *
+ * Runs of spaces INSIDE a line are collapsed — a deviation from the Python extractor, and
+ * the reason for it is the diff. `pdftotext` and pdf.js disagree on how wide the gap after
+ * a list marker is ("1. ADS" vs "1.  ADS"), so nine G650ER items read as content changes
+ * on a re-import of the very same document. Nothing in a proviso turns on how many spaces
+ * follow "c)", and a diff that cries wolf about spacing is a diff nobody reads.
+ */
 function tidy(lines: string[]): string {
   const out: string[] = [];
   let buf: string[] = [];
@@ -75,7 +92,7 @@ function tidy(lines: string[]): string {
     }
   }
   if (buf.length) out.push(buf.join(' '));
-  return out.join(' ').trim();
+  return out.join(' ').replace(/\s{2,}/g, ' ').trim();
 }
 
 function titleCase(s: string): string {
@@ -409,6 +426,18 @@ function toNefMelItem(it: RawNef, actype: AircraftType): MelItem {
 
 // ── Document ─────────────────────────────────────────────────────────────────
 
+/** The revision a document is identified by: the one with the latest effective date. */
+function latestRevision(items: MelItem[]): { revision: string | null; effectiveDate: string | null } {
+  let best: MelItem | null = null;
+  for (const it of items) {
+    if (!it.effectiveDate) continue;
+    if (!best || it.effectiveDate > best.effectiveDate) best = it;
+  }
+  return best
+    ? { revision: best.mmelRevision, effectiveDate: best.effectiveDate }
+    : { revision: null, effectiveDate: null };
+}
+
 export function parseMelDocument(lines: string[], actype: AircraftType): ParseResult {
   const cas = parseCas(lines, actype);
   const nef = parseNef(lines, actype);
@@ -460,10 +489,5 @@ export function parseMelDocument(lines: string[], actype: AircraftType): ParseRe
     );
   }
 
-  return {
-    items,
-    warnings,
-    revision: cas.rev ?? nef.rev,
-    effectiveDate: cas.eff ?? nef.eff,
-  };
+  return { items, warnings, ...latestRevision(items) };
 }

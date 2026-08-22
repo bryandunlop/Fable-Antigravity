@@ -3,6 +3,7 @@
 // the reducer in TechLogContext.tsx is the sole caller and the final authority — pages never apply
 // these mutations directly, only PROPOSE_CHANGE.
 import type { Aircraft, MelItem, Personnel, PendingApproval } from '../types';
+import { applyMelImport } from './melImport/apply';
 
 /** A proposer may never decide their own proposal — checked here as defense-in-depth even though the
  * UI already hides the approve/reject buttons for the proposer (never trust a single call site). */
@@ -34,5 +35,24 @@ export function applyApproval(tables: ReferenceTables, pending: PendingApproval)
     }
     case 'MEL_ITEM_APPROVAL':
       return { ...tables, melItems: tables.melItems.map(m => (m.id === pending.melItemId ? { ...m, approvalState: 'APPROVED' } : m)) };
+    // D95 — a whole approved D195 revision. The payload was frozen when the document was
+    // attested; nothing is re-derived here, so the approver's signature and what gets
+    // written cannot drift apart.
+    case 'MEL_REVISION_IMPORT':
+      return {
+        ...tables,
+        melItems: applyMelImport({
+          melItems: tables.melItems,
+          aircraftType: pending.aircraftType,
+          sections: pending.sections,
+          payload: {
+            added: pending.added,
+            changed: pending.changed,
+            removedIds: pending.removedIds,
+            unchangedCount: pending.unchangedCount,
+            stamps: pending.stamps,
+          },
+        }),
+      };
   }
 }

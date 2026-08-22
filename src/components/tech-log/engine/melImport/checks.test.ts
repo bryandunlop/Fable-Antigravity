@@ -190,3 +190,73 @@ describe('item-gap is scoped to NEF, where contiguity is actually a property', (
     expect(r.checks.map(c => c.id)).toEqual(['item-gap']);
   });
 });
+
+describe('withdrawn items that an aircraft is still flying on', () => {
+  it('asks about a removed item that has a live deferral against it', () => {
+    const current = [item({ id: 'gone', itemNumber: 'N100-9', title: 'Foot Rests' })];
+    const r = checkImport({
+      lines: [footer('G-500')],
+      parsed: parsed([item({ id: 'p1', itemNumber: 'N100-1' })]),
+      selectedType: 'G500',
+      currentCatalog: current,
+      melItemIdsWithLiveDeferrals: ['gone'],
+    });
+    const c = r.checks.find(x => x.id === 'withdrawn-in-use');
+    expect(c?.severity).toBe('CONFIRM');
+    expect(c?.detail).toContain('N100-9');
+    // It must never silently block an approved revision from being loaded.
+    expect(r.blocked).toBe(false);
+  });
+
+  it('stays quiet when the withdrawn item is not deferred anywhere', () => {
+    const r = checkImport({
+      lines: [footer('G-500')],
+      parsed: parsed([item({ id: 'p1', itemNumber: 'N100-1' })]),
+      selectedType: 'G500',
+      currentCatalog: [item({ id: 'gone', itemNumber: 'N100-9' })],
+    });
+    expect(r.checks.find(x => x.id === 'withdrawn-in-use')).toBeUndefined();
+  });
+});
+
+describe('cosmetic spacing is not a MEL change', () => {
+  it('does not report a proviso as changed when only its spacing moved', () => {
+    // pdftotext and pdf.js disagree on the gap after a list marker; nine real G650ER items
+    // read as changed on a re-import of the identical document before this.
+    const d = diffCatalog(
+      [item({ id: 'a', itemNumber: 'N100-1', provisos: 'a) One,  b)  Two' })],
+      [item({ id: 'a', itemNumber: 'N100-1', provisos: 'a) One, b) Two' })],
+      'G500',
+    );
+    expect(d.changed).toEqual([]);
+    expect(d.unchanged).toBe(1);
+  });
+
+  it('still reports a real wording change', () => {
+    const d = diffCatalog(
+      [item({ id: 'a', itemNumber: 'N100-1', provisos: 'a) One, b) Three' })],
+      [item({ id: 'a', itemNumber: 'N100-1', provisos: 'a) One, b) Two' })],
+      'G500',
+    );
+    expect(d.changed[0].fields).toEqual(['provisos']);
+  });
+});
+
+describe('what the document says about itself is reported back', () => {
+  it('reports the aircraft the document names, not the one that was selected', () => {
+    // The panel heading claims these fields are read from the document; showing the
+    // operator's own selection back to them under that heading would be a lie.
+    const r = checkImport({
+      lines: [footer('G650ER')],
+      parsed: parsed([item()]),
+      selectedType: 'G650ER',
+      currentCatalog: [],
+    });
+    expect(r.detectedAircraft).toEqual(['G650ER']);
+  });
+
+  it('reports none when the document names no aircraft it recognises', () => {
+    const r = checkImport({ lines: ['no footer here'], parsed: parsed([item()]), selectedType: 'G500', currentCatalog: [] });
+    expect(r.detectedAircraft).toEqual([]);
+  });
+});

@@ -61,6 +61,7 @@ export const GROUPS_MAINT: NavGroup[] = [
       { label: 'Fleet admin', to: '/tech-log/admin/fleet' },
       { label: 'Personnel', to: '/tech-log/admin/personnel' },
       { label: 'MEL admin', to: '/tech-log/admin/mel' },
+      { label: 'Import MEL revision', to: '/tech-log/admin/mel/import' },
       { label: 'Checklists', to: '/tech-log/admin/checklists' },
       { label: 'Integration', to: '/tech-log/integration' },
     ],

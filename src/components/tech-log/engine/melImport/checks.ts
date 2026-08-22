@@ -76,8 +76,20 @@ const CONTENT_FIELDS = [
   'crewActionRequired', 'repairIntervalUnit', 'repairIntervalValue', 'melSection',
 ] as const satisfies readonly (keyof MelItem)[];
 
+/**
+ * Whitespace-insensitive for text fields. Two extractions of one document can space a
+ * proviso differently without a word of it changing; reporting that as a MEL change would
+ * put phantom rows in front of an approver, which is exactly how a check stops being read.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (typeof a === 'string' && typeof b === 'string') {
+    return a.replace(/\s+/g, ' ').trim() === b.replace(/\s+/g, ' ').trim();
+  }
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
 function changedFields(before: MelItem, after: MelItem): string[] {
-  return CONTENT_FIELDS.filter(f => JSON.stringify(before[f] ?? null) !== JSON.stringify(after[f] ?? null));
+  return CONTENT_FIELDS.filter(f => !sameValue(before[f], after[f]));
 }
 
 function section(item: MelItem): MelSection {
@@ -177,6 +189,11 @@ export interface CheckImportInput {
   parsed: ParseResult;
   selectedType: AircraftType;
   currentCatalog: MelItem[];
+  /**
+   * MEL item ids carrying a deferral that is currently ACTIVE or PENDING_PLACARD. Only used
+   * to warn when this revision withdraws one of them.
+   */
+  melItemIdsWithLiveDeferrals?: string[];
 }
 
 export interface CheckImportResult {
@@ -184,6 +201,8 @@ export interface CheckImportResult {
   diff: CatalogDiff;
   /** True if any BLOCK check fired. The import cannot proceed. */
   blocked: boolean;
+  /** The aircraft type(s) the document names in its own footers. Empty if it names none. */
+  detectedAircraft: AircraftType[];
 }
 
 export function checkImport({
@@ -191,6 +210,7 @@ export function checkImport({
   parsed,
   selectedType,
   currentCatalog,
+  melItemIdsWithLiveDeferrals = [],
 }: CheckImportInput): CheckImportResult {
   const checks: ImportCheck[] = [];
 
@@ -270,5 +290,28 @@ export function checkImport({
 
   const diff = diffCatalog(parsed.items, currentCatalog, selectedType);
 
-  return { checks, diff, blocked: checks.some(c => c.severity === 'BLOCK') };
+  // An aircraft may be flying right now on relief this revision withdraws. The signed
+  // deferral itself is safe — it snapshotted its item and governing revision at signing —
+  // but whether that aircraft may keep dispatching on withdrawn relief is a judgement
+  // nobody has made yet, so it is surfaced rather than decided. Never a silent import.
+  const live = new Set(melItemIdsWithLiveDeferrals);
+  const withdrawnInUse = diff.removed.filter(m => live.has(m.id));
+  if (withdrawnInUse.length) {
+    checks.push({
+      id: 'withdrawn-in-use',
+      severity: 'CONFIRM',
+      title: `${withdrawnInUse.length} item(s) this revision withdraws have a live deferral against them`,
+      detail:
+        `${withdrawnInUse.map(m => m.subItemNumber).join(', ')} — an aircraft is currently ` +
+        `dispatching on relief this revision removes. The signed deferral keeps reading ` +
+        `correctly, but whether it may stand is a maintenance decision, not an import one.`,
+    });
+  }
+
+  return {
+    checks,
+    diff,
+    blocked: checks.some(c => c.severity === 'BLOCK'),
+    detectedAircraft: [...found],
+  };
 }
