@@ -4,6 +4,7 @@
 // scoped to (doc, revision, user) so publishing a new revision re-arms it.
 import type { Signature, AircraftType, CasColor } from '../tech-log/types';
 import type { DocAmendment, ExternalAlert, AmendmentResolution } from './engine/amendments';
+import type { DocRetirement } from './engine/retirement';
 import type { BulletinImage, BulletinVideo, BulletinLink } from '../bulletins/types';
 
 export type AckLevel = 'none' | 'initials' | 'signature';
@@ -205,6 +206,16 @@ export interface Doc {
   tags: string[];
   isPinned: boolean;
   isArchived: boolean;
+  /**
+   * TL-46 — set when this document's content was folded into another and it is no
+   * longer the operative instruction.
+   *
+   * Distinct from `isArchived`, which is a person choosing to hide something.
+   * Retirement is the system recording that the content moved, and it carries a
+   * pointer to where. The document stays readable and its acknowledgements stand —
+   * it is a record of what crews were told, not clutter.
+   */
+  retirement?: DocRetirement;
   /** Per-doc override of the class default review cycle. */
   reviewCycleDays?: number;
   /** ISO date; staleness / overdue-for-review derives from this. */

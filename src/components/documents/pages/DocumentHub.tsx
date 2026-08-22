@@ -115,7 +115,7 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
   const allLibraryDocs = state.docs.filter((d) => LIBRARY_CLASSES.includes(d.classId));
 
   const libraryDocs = allLibraryDocs
-    .filter((d) => showArchived || !d.isArchived)
+    .filter((d) => showArchived || (!d.isArchived && !d.retirement))
     .filter((d) => classFilter === 'all' || d.classId === classFilter)
     .filter((d) => matchesYear(d, state.revisions, yearFilter))
     .filter((d) => {
@@ -313,6 +313,11 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
                                 {!rev && <p className="mt-0.5 text-xs text-muted-foreground">No published revision yet</p>}
                               </div>
                               {doc.isArchived && <Badge variant="outline" className="shrink-0 text-[10px]">Archived</Badge>}
+                              {doc.retirement && (
+                                <Badge variant="outline" className="shrink-0 border-accent/40 text-[10px] text-accent">
+                                  Retired into {doc.retirement.intoDocId}
+                                </Badge>
+                              )}
                               {manager && (
                                 <InFlightBadges
                                   doc={doc}

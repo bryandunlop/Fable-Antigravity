@@ -63,7 +63,10 @@ export function unacknowledgedRequiredReads(
   userId: string,
 ): RequiredRead[] {
   return docs
-    .filter((d) => !d.isArchived && isTargetRole(d, userRole))
+    // A retired bulletin is a record of what crews were told, not a live read.
+    // Chasing someone to acknowledge guidance that now lives in the manual would
+    // be asking them to read the same thing twice (TL-46).
+    .filter((d) => !d.isArchived && !d.retirement && isTargetRole(d, userRole))
     .map((doc) => ({ doc, rev: currentRevision(doc.id, revisions) }))
     .filter(
       (x): x is RequiredRead =>

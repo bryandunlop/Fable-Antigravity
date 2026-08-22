@@ -6,6 +6,7 @@ import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
 import { AmendedSection } from '../components/AmendedSection';
 import { AmendmentStrip } from '../components/AmendmentStrip';
+import { RetirementBanner } from '../components/RetirementBanner';
 import { amendmentsForSection, amendmentsInForce } from '../engine/amendments';
 import { amendedExport } from '../engine/exportAmendments';
 import { RevisionMedia } from '../components/RevisionMedia';
@@ -268,6 +269,8 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
           <p className="text-sm text-amber-900/90 dark:text-amber-200/90">{rev.changeSummary}</p>
         </div>
       )}
+
+      <RetirementBanner doc={doc} />
 
       {rev && !isReceived(rev) && (
         <AmendmentStrip

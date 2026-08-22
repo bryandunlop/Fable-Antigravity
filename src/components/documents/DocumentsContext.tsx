@@ -14,6 +14,23 @@ import type {
 import type { Signature } from '../tech-log/types';
 import { classFor, docReaderPath, docManagePath } from './classes';
 import type { AmendmentResolution } from './engine/amendments';
+import { applyRetirements } from './engine/retirement';
+
+/**
+ * TL-46 — publishing a revision can retire the bulletins it absorbed.
+ *
+ * Sits beside `applyPublish` rather than inside it: publishing and retiring are
+ * different concerns, and folding retirement into the publish primitive would
+ * mean every one of its five call sites had to carry resolutions it does not
+ * otherwise need.
+ */
+function withRetirements(
+  published: { docs: Doc[]; revisions: DocRevision[] },
+  resolutions: AmendmentResolution[] | undefined,
+  todayIso: string,
+): Doc[] {
+  return applyRetirements(published.docs, published.revisions, resolutions ?? [], todayIso);
+}
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision, nextRevisionId, nextRevisionLabel } from './engine/revisions';
 import { inFlightRevision, workingDraft } from './engine/workbench';
@@ -579,7 +596,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         return { ...state, revisions: decided };
       }
       const published = applyPublish({ docs: state.docs, revisions: decided }, rev.id, p.atUtc, p.today);
-      return { ...state, ...published };
+      return { ...state, ...published, docs: withRetirements(published, state.amendmentResolutions, p.today) };
     }
     case 'PUBLISH_DIRECT': {
       const p = action.payload;
@@ -602,7 +619,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         return state;
       }
       const published = applyPublish({ docs: state.docs, revisions: state.revisions }, rev.id, p.atUtc, p.today);
-      return { ...state, ...published };
+      return { ...state, ...published, docs: withRetirements(published, state.amendmentResolutions, p.today) };
     }
     case 'ACKNOWLEDGE': {
       const { ack, signature } = action.payload;
