@@ -12,7 +12,7 @@ The eTechLog / AOG / maintenance job-card module of **myGFO** — an Azure PWA (
 ## NEVER (hard stops)
 - **NEVER** issue UPDATE or DELETE against an append-only ledger table. Corrections are **superseding inserts** only. If a task seems to require editing a signed record, stop and surface it — do not work around immutability.
 - **NEVER** push, write, or POST anything to CAMP using **production** credentials during development or testing. **All CAMP calls use the sandbox** (see Sandbox rule). Production CAMP writes a real squawk into a real aircraft's airworthiness record.
-- **NEVER** write anything back to **myairops**. It is pull-only. There is no write path.
+- **NEVER** write anything back to **myairops**. It is pull-only. There is no write path. (The vendor APIs *do* publish one — 100 of 176 captured operations mutate vendor state — and the planned booking portal will need it. That conflict is Open Question 5, not a licence to write: `src/integration/myairops/capability.ts` refuses every mutating call and ships with zero grants.)
 - **NEVER** put secrets (CAMP API user/pass, webhook secrets, OData token, connection strings) in code, config files, or commits. They live in **Azure Key Vault**, accessed via **managed identity**.
 - **NEVER** log raw request bodies, full signed payloads, the CAMP security key, webhook secrets, or PII. Log identifiers + outcomes only.
 - **NEVER** allow a Certificate of Release to Service (CRS) sign-off to commit if the signer has no **A&P certificate number** on file (14 CFR 91.417 requirement).
@@ -131,5 +131,7 @@ From the CAMP vendor docs. Define these as an enum with explicit handling; do no
 2. **myairops OData** — entity/field names, OData version (v2 vs v4), and auth method are TBC against the live connection. Blocks Phase 2 pre-population.
 3. **RII ATA-chapter list** — the DOM must supply the operator-defined required-inspection-item list before RII enforcement is meaningful.
 4. **Pilot-signing step-up** — confirm whether crew acceptance needs biometric/PIN re-confirm or whether the authenticated session suffices (`Signing__RequireStepUpForPilot`).
+5. **myairops write-back for the booking portal** — the planned booking portal and passenger app require writing to myairops (a seat booking is `POST /api/TripLegs/{id}/passengerbookings`), which **directly conflicts with the NEVER rule above**. The rule is not worked around: `src/integration/myairops/capability.ts` refuses every mutating call and ships with zero grants. Amending the rule is a deliberate decision, and it is blocked on ASK 1 (can myairops issue scoped/read-only keys? today one `x-api-key` grants full read *and* write per API) and ASK 8 (is there a sandbox tenant?) in `docs/vendor/myairops-integration-asks.md`. Do not add a write grant until both are answered.
+6. **myairops passenger PII residency** — whether passenger passport/visa/allergy data from CRM is mirrored into myGFO or read through on demand. Default until decided: **read through, mirror nothing**. Blocks the passenger app's identity model. See `docs/booking-portal/architecture.md`.
 
 When one of these is answered, update this file and the build spec rather than scattering the decision across code.
