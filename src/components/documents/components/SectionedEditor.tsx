@@ -14,7 +14,7 @@ export function SectionedEditor({ sections, onChange }: { sections: DocSection[]
   return (
     <div className="space-y-4">
       {sections.map((section, si) => (
-        <div key={section.id} className="rounded-lg border border-border bg-muted/20 p-3">
+        <div key={section.id} data-section-id={section.id} className="rounded-lg border border-border bg-muted/20 p-3">
           <div className="mb-2 flex items-center gap-2">
             <Input
               value={section.number}

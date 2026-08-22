@@ -76,7 +76,7 @@ export function overallCompliance(
   let read = 0;
   let total = 0;
   for (const doc of docs) {
-    if (doc.isArchived) continue;
+    if (doc.isArchived || doc.retirement) continue;
     const rev = currentRevision(doc.id, revisions);
     if (!rev || !rev.requireAcknowledgment || rev.ackLevel === 'none') continue;
     const roster = rosterFor(rev, readersFor(doc, roleUniverse), acks);
@@ -103,7 +103,7 @@ export function overdueChaseList(
 ): ChaseRow[] {
   const rows: ChaseRow[] = [];
   for (const doc of docs) {
-    if (doc.isArchived) continue;
+    if (doc.isArchived || doc.retirement) continue;
     const rev = currentRevision(doc.id, revisions);
     if (!rev || !rev.requireAcknowledgment || rev.ackLevel === 'none') continue;
     if (!rev.ackDueDate || !isOverdue(rev, todayIso)) continue;
@@ -140,7 +140,7 @@ export function complianceCsvRows(
 ): string[][] {
   const rows: string[][] = [];
   for (const doc of docs) {
-    if (doc.isArchived) continue;
+    if (doc.isArchived || doc.retirement) continue;
     const rev = currentRevision(doc.id, revisions);
     if (!rev || !rev.requireAcknowledgment || rev.ackLevel === 'none') continue;
     const readers = readersFor(doc, roleUniverse);

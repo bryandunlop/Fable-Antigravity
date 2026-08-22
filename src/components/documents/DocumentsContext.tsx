@@ -8,13 +8,32 @@ import type {
   DocSuggestionReply,
   DocReviewRecord,
   DocSource,
+  DocBlock,
   DocumentsState,
 } from './types';
 import type { Signature } from '../tech-log/types';
 import { classFor, docReaderPath, docManagePath } from './classes';
+import type { AmendmentResolution } from './engine/amendments';
+import { applyRetirements } from './engine/retirement';
+
+/**
+ * TL-46 — publishing a revision can retire the bulletins it absorbed.
+ *
+ * Sits beside `applyPublish` rather than inside it: publishing and retiring are
+ * different concerns, and folding retirement into the publish primitive would
+ * mean every one of its five call sites had to carry resolutions it does not
+ * otherwise need.
+ */
+function withRetirements(
+  published: { docs: Doc[]; revisions: DocRevision[] },
+  resolutions: AmendmentResolution[] | undefined,
+  todayIso: string,
+): Doc[] {
+  return applyRetirements(published.docs, published.revisions, resolutions ?? [], todayIso);
+}
 import { getSeedState } from './mockData';
 import { applyPublish, promoteScheduled, currentRevision, nextRevisionId, nextRevisionLabel } from './engine/revisions';
-import { inFlightRevision } from './engine/workbench';
+import { inFlightRevision, workingDraft } from './engine/workbench';
 import {
   cabinSections, canManageCabinSections, validateCabinSections, docsInCabinSection, applyCabinSections,
   CABIN_SECTION_MANAGER_ROLES,
@@ -162,6 +181,8 @@ export type DocumentsAction =
   | { type: 'CREATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'UPDATE_DRAFT'; payload: { revision: DocRevision; actorRoles: string[] } }
   | { type: 'WITHDRAW_DRAFT'; payload: { revisionId: string; reason: string; byUserId: string; byName: string; byRoles: string[]; atUtc: string } }
+  | { type: 'RESOLVE_AMENDMENT'; payload: { resolution: AmendmentResolution } }
+  | { type: 'FOLD_AMENDMENT_INTO_DRAFT'; payload: { amendmentId: string; targetDocId: string; targetSectionId?: string; replacementBlocks: DocBlock[]; sourceDocId: string; byUserId: string; byName: string; atUtc: string; today: string; newRevisionSeed: { id: string; revision: string; effectiveDate: string } } }
   | { type: 'SUBMIT_FOR_APPROVAL'; payload: { revisionId: string; atUtc: string } }
   | {
       type: 'DECIDE_APPROVAL';
@@ -363,6 +384,98 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         revisions: state.revisions.map((r) => (r.id === rev.id ? { ...rev, status: 'draft' } : r)),
       };
     }
+    case 'FOLD_AMENDMENT_INTO_DRAFT': {
+      const p = action.payload;
+      // Reuse the single working draft if one is open (D82) — folding a second
+      // amendment must not fork the document into two competing drafts.
+      const inFlight = workingDraft(p.targetDocId, state.revisions);
+      const base = inFlight ?? currentRevision(p.targetDocId, state.revisions);
+      if (!base) {
+        warnNoop(`doc ${p.targetDocId} has no published revision to revise`);
+        return state;
+      }
+      const creating = !inFlight;
+      if (creating && state.revisions.some((r) => r.id === p.newRevisionSeed.id)) {
+        warnNoop(`revision ${p.newRevisionSeed.id} already exists`);
+        return state;
+      }
+
+      const sections = structuredClone(base.sections);
+      const target = sections.find((sec) => sec.id === p.targetSectionId);
+      if (!target) {
+        // A document-wide amendment, or a section that has since been removed.
+        // Both are real; neither has a paragraph to replace, so the fold-in has
+        // to be done by hand rather than guessed at.
+        warnNoop(`amendment ${p.amendmentId} names no section that exists in ${p.targetDocId}`);
+        return state;
+      }
+      // The bulletin's blocks are COPIED into the draft here, and that is correct:
+      // from this point the manual owns the wording and can edit it before
+      // publishing. Up to now it was a pointer precisely so nothing could drift;
+      // the copy happens at the moment authorship transfers.
+      target.blocks = structuredClone(p.replacementBlocks).map((b, i) => ({
+        ...b,
+        id: `${target.id}::b${i}`,
+      }));
+
+      const summary = `Folded in ${p.sourceDocId} at ${target.number || target.title}.`;
+      const revision: DocRevision = creating
+        ? {
+            ...structuredClone(base),
+            id: p.newRevisionSeed.id,
+            revision: p.newRevisionSeed.revision,
+            effectiveDate: p.newRevisionSeed.effectiveDate,
+            status: 'draft',
+            authorUserId: p.byUserId,
+            authorName: p.byName,
+            sections,
+            changeSummary: summary,
+            mockChecksum: checksumForSections(sections),
+            // A fold-in draft carries no amendments of its own — those belong to
+            // whatever document it amends, and this one amends nothing.
+            amendments: undefined,
+            submittedAtUtc: undefined,
+            decidedAtUtc: undefined,
+            decidedByUserId: undefined,
+            decidedByName: undefined,
+            rejectionReason: undefined,
+            publishedAtUtc: undefined,
+          }
+        : {
+            ...base,
+            status: 'draft',
+            sections,
+            changeSummary: base.changeSummary ? `${base.changeSummary} ${summary}` : summary,
+            mockChecksum: checksumForSections(sections),
+          };
+
+      const existing = state.amendmentResolutions ?? [];
+      return {
+        ...state,
+        revisions: creating
+          ? [...state.revisions, revision]
+          : state.revisions.map((r) => (r.id === revision.id ? revision : r)),
+        amendmentResolutions: existing.some((r) => r.amendmentId === p.amendmentId)
+          ? existing
+          : [
+              ...existing,
+              {
+                amendmentId: p.amendmentId,
+                resolvedInRevisionId: revision.id,
+                resolvedBy: p.byName,
+                resolvedOn: p.today,
+              },
+            ],
+      };
+    }
+    case 'RESOLVE_AMENDMENT': {
+      const { resolution } = action.payload;
+      const existing = state.amendmentResolutions ?? [];
+      // Resolving twice is a no-op, not a second record. The first resolution owns
+      // the reason and the date; a duplicate would only obscure who actually acted.
+      if (existing.some((r) => r.amendmentId === resolution.amendmentId)) return state;
+      return { ...state, amendmentResolutions: [...existing, resolution] };
+    }
     case 'WITHDRAW_DRAFT': {
       // C7 withdrawal ceremony: withdraw is a *tombstone*, not a hard delete — the
       // revision is retained with status 'withdrawn' + who/when/reason, and the doc is
@@ -483,7 +596,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         return { ...state, revisions: decided };
       }
       const published = applyPublish({ docs: state.docs, revisions: decided }, rev.id, p.atUtc, p.today);
-      return { ...state, ...published };
+      return { ...state, ...published, docs: withRetirements(published, state.amendmentResolutions, p.today) };
     }
     case 'PUBLISH_DIRECT': {
       const p = action.payload;
@@ -506,7 +619,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         return state;
       }
       const published = applyPublish({ docs: state.docs, revisions: state.revisions }, rev.id, p.atUtc, p.today);
-      return { ...state, ...published };
+      return { ...state, ...published, docs: withRetirements(published, state.amendmentResolutions, p.today) };
     }
     case 'ACKNOWLEDGE': {
       const { ack, signature } = action.payload;
@@ -879,6 +992,14 @@ interface Ctx {
   createDraft: (revision: DocRevision, actorRoles: string[]) => void;
   updateDraft: (revision: DocRevision, userRole: string, additionalRoles?: string[]) => void;
   withdrawDraft: (revisionId: string, reason: string, userRole: string, additionalRoles?: string[]) => void;
+  /** TL-46 — fold an amendment into its target, or set it aside with a reason. */
+  resolveAmendment: (amendmentId: string, resolution: Omit<AmendmentResolution, 'amendmentId'>) => void;
+  /** TL-46 — stage an amendment's governing wording into the target's working draft. Returns the draft's id. */
+  foldAmendmentIntoDraft: (
+    amendment: { id: string; targetDocId: string; targetSectionId?: string; sourceDocId: string },
+    replacementBlocks: DocBlock[],
+    userRole: string,
+  ) => string | undefined;
   submitForApproval: (revisionId: string) => void;
   decideApproval: (input: {
     revisionId: string;
@@ -1137,6 +1258,46 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     [state],
   );
 
+  /**
+   * Stage an amendment's governing wording into the target document's working
+   * draft, and record the fold-in against the amendment.
+   *
+   * The id is returned so the caller can navigate straight to the draft. Opening
+   * the draft is the point: a button that silently marks something "done" without
+   * showing the author the revision they now have to finish is how a queue empties
+   * while the manual stays unchanged.
+   */
+  const foldAmendmentIntoDraft = useCallback<Ctx['foldAmendmentIntoDraft']>(
+    (amendment, replacementBlocks, userRole) => {
+      const { userId, userName } = identityFor(userRole);
+      const inFlight = workingDraft(amendment.targetDocId, state.revisions);
+      const base = inFlight ?? currentRevision(amendment.targetDocId, state.revisions);
+      if (!base) return undefined;
+      const seedId = inFlight?.id ?? nextRevisionId(amendment.targetDocId, state.revisions);
+      dispatch({
+        type: 'FOLD_AMENDMENT_INTO_DRAFT',
+        payload: {
+          amendmentId: amendment.id,
+          targetDocId: amendment.targetDocId,
+          targetSectionId: amendment.targetSectionId,
+          replacementBlocks,
+          sourceDocId: amendment.sourceDocId,
+          byUserId: userId,
+          byName: userName,
+          atUtc: nowUtc(),
+          today: todayIso(),
+          newRevisionSeed: {
+            id: seedId,
+            revision: nextRevisionLabel(base.revision, 'minor'),
+            effectiveDate: todayIso(),
+          },
+        },
+      });
+      return seedId;
+    },
+    [state],
+  );
+
   const ingestReceivedRevision = useCallback<Ctx['ingestReceivedRevision']>((revision, userRole, additionalRoles = []) => {
     dispatch({ type: 'INGEST_RECEIVED_REVISION', payload: { revision, actorRoles: [userRole, ...additionalRoles] } });
   }, []);
@@ -1194,6 +1355,10 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
         payload: { revisionId, reason, byUserId: userId, byName: userName, byRoles: [userRole, ...additionalRoles], atUtc: nowUtc() },
       });
     }, []),
+    resolveAmendment: useCallback<Ctx['resolveAmendment']>((amendmentId, resolution) => {
+      dispatch({ type: 'RESOLVE_AMENDMENT', payload: { resolution: { ...resolution, amendmentId } } });
+    }, []),
+    foldAmendmentIntoDraft,
     submitForApproval,
     decideApproval,
     publishDirect: useCallback((revisionId, actorRoles) => {

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Send, Save, Undo2, Sparkles } from 'lucide-react';
 import { Button } from '../../ui/button';
@@ -35,6 +36,37 @@ export function WorkingDraftPanel({
   const draft = workingDraft(doc.id, state.revisions);
 
   const [sections, setSections] = useState<DocSection[]>(draft?.sections ?? []);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [params] = useSearchParams();
+  const focusSection = params.get('section');
+
+  /**
+   * TL-46 — arrive at the section that was just folded in, not at the top.
+   *
+   * The GOM is long. Landing an author on page one after they clicked "Fold in"
+   * makes them hunt for the paragraph the system already knows about, which is
+   * the friction this whole feature exists to remove.
+   *
+   * Depends on `sections` so it runs once the draft's content is actually in the
+   * DOM — the node does not exist on the first paint after a fold-in creates the
+   * draft. The highlight is accent blue to match the amendment language
+   * everywhere else, and clears itself rather than lingering as a false selection.
+   *
+   * Scroll is INSTANT, not smooth. `behavior: 'smooth'` was verified to do nothing
+   * at all in at least one browser (scroll position stayed at 0 where the default
+   * moved correctly), which would have made this feature silently do nothing.
+   * Instant is also the better feel: you pressed a button to get somewhere, so
+   * animating 2000px past everything in between is delay, not polish.
+   */
+  useEffect(() => {
+    if (!focusSection) return;
+    const el = editorRef.current?.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(focusSection)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.classList.add('ring-2', 'ring-accent');
+    const t = window.setTimeout(() => el.classList.remove('ring-2', 'ring-accent'), 2000);
+    return () => window.clearTimeout(t);
+  }, [focusSection, sections]);
   const [summary, setSummary] = useState(draft?.changeSummary ?? '');
   const [dirty, setDirty] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
@@ -157,10 +189,12 @@ export function WorkingDraftPanel({
         />
       </div>
 
-      <SectionedEditor
-        sections={sections}
-        onChange={(next) => { setSections(next); setDirty(true); }}
-      />
+      <div ref={editorRef}>
+        <SectionedEditor
+          sections={sections}
+          onChange={(next) => { setSections(next); setDirty(true); }}
+        />
+      </div>
 
       {withdrawing && (
         <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
