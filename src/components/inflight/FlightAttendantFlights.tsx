@@ -1,429 +1,23 @@
-import React, { useMemo, useState } from 'react';
-import { Card, CardContent } from '../ui/card';
-import { Badge } from '../ui/badge';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
-import {
-  Users, ShieldAlert, Utensils, ChevronRight, ChevronLeft, Clock, Truck, Phone,
-  List, GalleryHorizontal, UserPlus, Pencil, ChevronDown,
-} from 'lucide-react';
+import { UserPlus, Pencil, ChevronDown } from 'lucide-react';
 import { usePassengers } from '../passengers/PassengerContext';
 import type { Passenger } from '../passengers/passengerData';
 import PassengerProfilePanel from '../passengers/PassengerProfilePanel';
 import PassengerProfileEditor from '../passengers/PassengerProfileEditor';
-import { tripWindow } from './engine/menuPlan';
 import { buildFaTrips } from './faTrips';
-import type { FaCateringOrder, FaTrip } from './faTrips';
-import { rosterFor, summarise, splitAllergens, legByNumber, bandKind, hasProfileContent } from './faTripRoster';
-import TripPickerSheet from './TripPickerSheet';
-import { tripSpan } from './tripCalendar';
-import { conflictingItems } from '../passengers/engine/profileEdits';
+import { rosterFor, hasProfileContent } from './faTripRoster';
 import type { RosterGuest } from './faTripRoster';
+import LegBrief from './LegBrief';
+import TripPickerSheet from './TripPickerSheet';
 
-// This screen is a BRIEFING: who is on the trip, and what they cannot eat. It does not
-// build menus and does not place orders — GFO has no such capability, so catering is
-// reference only (who, phone, when, where) and carries no status ladder or deadline.
+// The page IS the leg. You swipe between legs; there are no leg tabs, no list/deck
+// toggle and no whole-trip roll-up, because a service is planned per leg — different
+// people get on and off, and each leg has its own caterer.
 //
-// THREE COLOURS, NO SEVERITY, NO YELLOW (Bryan, 2026-08-20). Nothing upstream records
-// critical/moderate, so every allergy gets one red weight and says so out loud. Green is
-// earned only by a dated confirmation. Everything else is neutral — not green, so absence
-// never reads as safe; not an alarm either, because roughly nineteen guests in twenty
-// arrive with no record and an alarm on almost every row teaches the crew to stop looking.
-
-const VIEW_KEY = 'fa-trip-view';
-
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-}
-function fmtDay(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
-/** Human countdown to a departure. Past departures read "departed". */
-function untilDeparture(iso: string, now: Date): string {
-  if (!iso) return '';
-  const mins = Math.round((new Date(iso).getTime() - now.getTime()) / 60000);
-  if (mins <= 0) return 'departed';
-  if (mins < 60) return `in ${mins} m`;
-  if (mins < 48 * 60) return `in ${Math.round(mins / 60)} h`;
-  return `in ${Math.round(mins / (60 * 24))} d`;
-}
-
-/** The one place a dietary state becomes pixels. Every surface on this screen renders
- *  through it so a colour cannot come to mean two things in two components. */
-function DietaryBand({ guest, className = '' }: { guest: RosterGuest; className?: string }) {
-  const base = `rounded border px-2 py-1.5 text-xs leading-snug ${className}`;
-  const red = `${base} border-red-200 bg-red-50 text-red-900 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-100`;
-  const neutral = `${base} bg-muted/40 text-muted-foreground`;
-  const kind = bandKind(guest);
-
-  if (kind === 'ALLERGY') {
-    const { food, nonFood } = splitAllergens(guest.passenger!.allergies.map((a) => a.allergen));
-    return (
-      <div className={red}>
-        <p className="font-semibold">Allergies: {food.join(', ')}</p>
-        <p className="mt-0.5">No severity is recorded — treat as serious.</p>
-        {nonFood.length > 0 && (
-          // Named, not dropped: real allergies, just not the galley's problem, and
-          // mixing them into a food list dilutes the list that matters.
-          <p className="mt-0.5 opacity-80">Cabin, not catering: {nonFood.join(', ')}.</p>
-        )}
-      </div>
-    );
-  }
-
-  if (kind === 'FLAGGED') {
-    return (
-      <div className={red}>
-        <p className="font-semibold">Allergies flagged — no detail on the booking</p>
-        <p className="mt-0.5">No allergen named and no severity. Ask before service.</p>
-      </div>
-    );
-  }
-
-  if (kind === 'CABIN_ONLY') {
-    const { nonFood } = splitAllergens(guest.passenger!.allergies.map((a) => a.allergen));
-    return (
-      <div className={neutral}>
-        <p className="font-medium">Nothing recorded for the galley</p>
-        <p className="mt-0.5">Cabin, not catering: {nonFood.join(', ')}.</p>
-      </div>
-    );
-  }
-
-  if (kind === 'CONFIRMED_NONE') {
-    return (
-      <div className={`${base} border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/40 dark:bg-emerald-950/40 dark:text-emerald-100`}>
-        <p className="font-semibold">No allergies — confirmed {fmtDay(guest.passenger!.dietaryConfirmedAtUtc!)}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={neutral}>
-      <p className="font-medium">No allergy information on file</p>
-      {!guest.passenger && <p className="mt-0.5">No passenger record for this booking id.</p>}
-    </div>
-  );
-}
-
-/** A one-line taste of the profile, or an honest blank. Never invented, never padded.
- *  Conflicting entries are struck through rather than dropped — hiding one would make
- *  the record look clean while the contradiction stayed in it. */
-function PreferenceLine({ p }: { p: Passenger | null }) {
-  if (!p) return null;
-  const shown = [...p.food.slice(0, 3), ...p.beverage.slice(0, 2)];
-  if (shown.length === 0) return null;
-  const bad = conflictingItems(shown, p.allergies.map((a) => a.allergen));
-  return (
-    <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">
-      {shown.map((x, i) => (
-        <React.Fragment key={x}>
-          {i > 0 && ' · '}
-          <span className={bad.includes(x) ? 'line-through text-red-700 dark:text-red-300 font-medium' : undefined}>{x}</span>
-        </React.Fragment>
-      ))}
-    </p>
-  );
-}
-
-function hasPreferences(p: Passenger | null): boolean {
-  return Boolean(p && (p.food.length > 0 || p.beverage.length > 0));
-}
-
-function LegTabs({ trip, value, onChange }: {
-  trip: FaTrip;
-  value: number | null;
-  onChange: (v: number | null) => void;
-}) {
-  const cell = (label: string, count: number, active: boolean, onClick: () => void) => (
-    <button
-      key={label}
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex-1 min-w-0 min-h-11 rounded-md px-1 flex flex-col items-center justify-center text-xs transition-colors duration-fast ease-gfo ${
-        active ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:bg-muted'
-      }`}
-    >
-      <span className="truncate max-w-full">{label}</span>
-      <span className="text-[11px] opacity-80">{count}</span>
-    </button>
-  );
-
-  const allCount = new Set(trip.legs.flatMap((l) => l.passengerIds)).size;
-
-  return (
-    <div className="rounded-lg border bg-card p-1 flex gap-0.5" role="group" aria-label="Filter by leg">
-      {cell('All', allCount, value === null, () => onChange(null))}
-      {trip.legs.map((l) =>
-        cell(`Leg ${l.legNumber}`, l.passengerIds.length, value === l.legNumber, () => onChange(l.legNumber)),
-      )}
-    </div>
-  );
-}
-
-function ViewToggle({ value, onChange }: { value: 'list' | 'deck'; onChange: (v: 'list' | 'deck') => void }) {
-  const btn = (v: 'list' | 'deck', Icon: React.ElementType, label: string) => (
-    <button
-      onClick={() => onChange(v)}
-      aria-label={label}
-      aria-pressed={value === v}
-      className={`w-10 h-8 flex items-center justify-center transition-colors duration-fast ease-gfo ${
-        value === v ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-      }`}
-    >
-      <Icon className="w-4 h-4" />
-    </button>
-  );
-  return (
-    <div className="flex rounded-md border overflow-hidden shrink-0 divide-x">
-      {btn('list', List, 'List view')}
-      {btn('deck', GalleryHorizontal, 'Card view')}
-    </div>
-  );
-}
-
-function GuestRow({ guest, showLegs, onOpen }: {
-  guest: RosterGuest;
-  showLegs: boolean;
-  onOpen: () => void;
-}) {
-  return (
-    <button
-      onClick={onOpen}
-      className="w-full text-left px-3 py-3 min-h-[52px] flex items-start gap-3 hover:bg-muted active:bg-muted"
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="font-medium text-sm">{guest.displayName}</span>
-          {showLegs && guest.legNumbers.map((n) => (
-            <Badge key={n} variant="outline" className="text-[11px] px-1.5 py-0">L{n}</Badge>
-          ))}
-        </div>
-        {guest.passenger && <p className="text-xs text-muted-foreground mt-0.5">{guest.passenger.role}</p>}
-        <DietaryBand guest={guest} className="mt-1.5" />
-        {hasPreferences(guest.passenger)
-          ? <PreferenceLine p={guest.passenger} />
-          : <p className="text-xs text-muted-foreground mt-1.5">No profile yet.</p>}
-      </div>
-      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
-    </button>
-  );
-}
-
-function GuestDeck({ guests, showLegs, onOpen }: {
-  guests: RosterGuest[];
-  showLegs: boolean;
-  onOpen: (g: RosterGuest, mode?: 'read' | 'edit') => void;
-}) {
-  const [i, setI] = useState(0);
-  // Clamp rather than reset: changing the leg filter shortens the deck, and snapping
-  // back to the first card every time would lose the reader's place on a re-render.
-  const idx = Math.min(i, Math.max(guests.length - 1, 0));
-  const g = guests[idx];
-  if (!g) return null;
-
-  const p = g.passenger;
-  const allergens = p?.allergies.map((a) => a.allergen) ?? [];
-  const chips = (label: string, items: string[]) => {
-    if (items.length === 0) return false;
-    const bad = conflictingItems(items, allergens);
-    return (
-      <div className="mt-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-        <div className="flex flex-wrap gap-1 mt-1.5">
-          {items.map((x) => (
-            <span key={x} className={`rounded border px-2 py-1 text-xs ${
-              bad.includes(x)
-                ? 'border-red-300 bg-red-50 text-red-900 line-through dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-100'
-                : 'bg-muted/40'
-            }`}>{x}</span>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div>
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <h3 className="text-lg font-semibold">{g.displayName}</h3>
-            {showLegs && g.legNumbers.map((n) => <Badge key={n} variant="outline" className="text-[11px] px-1.5 py-0">L{n}</Badge>)}
-          </div>
-          {p && <p className="text-xs text-muted-foreground mt-0.5">{p.role}</p>}
-
-          <DietaryBand guest={g} className="mt-3" />
-
-          {hasProfileContent(p) ? (
-            <>
-              {chips('Food', p!.food)}
-              {chips('Drink', p!.beverage)}
-              {chips('Avoid', p!.dislikes ?? [])}
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground mt-3">No profile yet — nothing recorded beyond the booking.</p>
-          )}
-
-          <Button variant="outline" className="w-full h-11 mt-4"
-            onClick={() => onOpen(g, hasProfileContent(p) ? 'read' : 'edit')}>
-            {hasProfileContent(p) ? 'Open profile' : <><UserPlus className="w-4 h-4" /> Start a profile</>}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <div className="flex items-center justify-center gap-4 mt-3">
-        <Button variant="outline" size="icon" className="rounded-full h-11 w-11"
-          aria-label="Previous guest" disabled={idx === 0} onClick={() => setI(idx - 1)}>
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1} of {guests.length}</span>
-        <Button variant="outline" size="icon" className="rounded-full h-11 w-11"
-          aria-label="Next guest" disabled={idx >= guests.length - 1} onClick={() => setI(idx + 1)}>
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/** Catering, reference only. Nothing here can be changed from this screen, so nothing
- *  here is dressed as an action: no status chip, no cut-off, no ordering language. */
-function CateringReference({ order }: { order: FaCateringOrder }) {
-  return (
-    <div className="rounded-lg border bg-card p-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-        <Utensils className="w-3.5 h-3.5" /> Catering — for reference
-      </p>
-      <p className="text-sm font-semibold mt-1.5">{order.caterer}</p>
-      <dl className="mt-2 space-y-1 text-xs">
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted-foreground flex items-center gap-1 shrink-0"><Truck className="w-3 h-3" />Arrives</dt>
-          <dd className="text-right m-0">{fmtTime(order.deliveryUtc)} · {order.deliveryLocation}</dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted-foreground flex items-center gap-1 shrink-0"><Phone className="w-3 h-3" />Contact</dt>
-          <dd className="text-right m-0">
-            {order.contactPerson} ·{' '}
-            <a className="text-blue-700 dark:text-blue-300 hover:underline" href={`tel:${order.phone.replace(/[^+\d]/g, '')}`}>{order.phone}</a>
-          </dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-function TripRoster({ trip, passengers, now, view, onViewChange, onOpenGuest }: {
-  trip: FaTrip;
-  passengers: Passenger[];
-  now: Date;
-  view: 'list' | 'deck';
-  onViewChange: (v: 'list' | 'deck') => void;
-  onOpenGuest: (g: RosterGuest, mode?: 'read' | 'edit') => void;
-}) {
-  const [legFilter, setLegFilter] = useState<number | null>(null);
-
-  // The leg filter belongs to the trip, not to the screen: carrying "Leg 3" across a
-  // switch to a two-leg trip would show an empty roster and look like a bug.
-  const tripId = trip.id;
-  const [lastTrip, setLastTrip] = useState(tripId);
-  if (lastTrip !== tripId) { setLastTrip(tripId); setLegFilter(null); }
-
-  const guests = useMemo(() => rosterFor(trip, passengers, legFilter), [trip, passengers, legFilter]);
-  const summary = useMemo(() => summarise(guests), [guests]);
-  const leg = legByNumber(trip, legFilter);
-  const foodAllergens = splitAllergens(summary.allergens).food;
-  const uncovered = summary.flaggedNoDetail + summary.noInfo;
-
-  return (
-    <Card>
-      <CardContent className="space-y-3 pt-6">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
-            <Users className="w-3 h-3 shrink-0" /><span className="truncate">{trip.cabinCrew.join(', ')}</span>
-          </p>
-          <ViewToggle value={view} onChange={onViewChange} />
-        </div>
-
-        <LegTabs trip={trip} value={legFilter} onChange={setLegFilter} />
-
-        {leg && (
-          <p className="text-xs text-muted-foreground">
-            {leg.flightNumber} · {leg.origin} → {leg.destination} · {fmtDate(leg.departureUtc)} ·{' '}
-            {fmtTime(leg.departureUtc)}–{fmtTime(leg.arrivalUtc)} · {untilDeparture(leg.departureUtc, now)}
-          </p>
-        )}
-
-        {/* One attention band, and it states its own coverage: a no-list that does not
-            say how much of the manifest it missed invites being read as complete. */}
-        {(foodAllergens.length > 0 || summary.flaggedNoDetail > 0) && (
-          <div className="rounded-lg border border-red-200 bg-red-50 text-red-900 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-100 px-3 py-2 text-sm">
-            <p className="flex items-start gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                {foodAllergens.length > 0
-                  ? <><span className="font-semibold">Allergies {legFilter === null ? 'on this trip' : 'on this leg'}:</span> {foodAllergens.join(' · ')}</>
-                  : <span className="font-semibold">One guest is flagged with allergies and no detail.</span>}
-              </span>
-            </p>
-            {uncovered > 0 && (
-              <p className="text-xs mt-1.5">
-                Covers {summary.total - uncovered} of {summary.total} guests — {uncovered} with nothing usable on file.
-              </p>
-            )}
-          </div>
-        )}
-
-        {view === 'list' ? (
-          <div className="border rounded-lg divide-y overflow-hidden bg-card">
-            {guests.map((g) => (
-              <GuestRow key={g.id} guest={g} showLegs={legFilter === null} onOpen={() => onOpenGuest(g)} />
-            ))}
-          </div>
-        ) : (
-          <GuestDeck guests={guests} showLegs={legFilter === null} onOpen={onOpenGuest} />
-        )}
-
-        {leg?.catering && <CateringReference order={leg.catering} />}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** The trip identity IS the page title, and it is the switcher. Nothing permanent is
- *  spent on navigation: the roster starts about 60px down instead of 500, and the
- *  trips she is not looking at cost nothing until she asks for them. */
-function TripHeader({ trip, now, onOpenPicker }: {
-  trip: FaTrip;
-  now: Date;
-  onOpenPicker: () => void;
-}) {
-  const span = tripSpan(trip);
-  const range = span
-    ? `${span.start.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${span.end.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`
-    : '';
-  return (
-    <div>
-      <button
-        onClick={onOpenPicker}
-        style={{ width: '100%' }}
-        aria-haspopup="dialog"
-        className="flex-1 min-w-0 text-left -my-1 py-1 px-1 -mx-1 rounded hover:bg-muted active:bg-muted"
-      >
-        <span className="flex items-center gap-1.5 min-w-0">
-          <span className="text-xl font-bold truncate">{trip.tripName}</span>
-          <ChevronDown className="w-4 h-4 shrink-0 text-primary" />
-        </span>
-        <span className="block text-xs text-muted-foreground mt-0.5 truncate">
-          {trip.tripNumber} · {trip.tail} · {range} · {untilDeparture(trip.legs[0]?.departureUtc ?? '', now)}
-        </span>
-      </button>
-    </div>
-  );
-}
+// Trip switching lives behind one control in the top bar, which opens the picker sheet
+// (list or calendar). That is the only navigation on the screen.
 
 export default function FlightAttendantFlights() {
   const { passengers } = usePassengers();
@@ -434,33 +28,85 @@ export default function FlightAttendantFlights() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openGuest, setOpenGuest] = useState<RosterGuest | null>(null);
   const [editing, setEditing] = useState(false);
-  const [view, setView] = useState<'list' | 'deck'>(() => {
-    try { return localStorage.getItem(VIEW_KEY) === 'deck' ? 'deck' : 'list'; } catch { return 'list'; }
-  });
-  const setViewPersisted = (v: 'list' | 'deck') => {
-    setView(v);
-    try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode — the toggle still works, it just forgets */ }
-  };
+  const [page, setPage] = useState(0);
+  const scroller = useRef<HTMLDivElement>(null);
 
-  const open = (g: RosterGuest, mode: 'read' | 'edit' = 'read') => { setOpenGuest(g); setEditing(mode === 'edit'); };
   const trip = trips.find((t) => t.id === selectedId) ?? trips[0];
+
+  // A new trip starts at its first leg. Without this the pager keeps the old scroll
+  // offset and lands you on leg 3 of a two-leg trip, showing nothing.
+  useEffect(() => {
+    setPage(0);
+    if (scroller.current) scroller.current.scrollTo({ left: 0, behavior: 'auto' });
+  }, [selectedId]);
+
+  const openProfile = (g: RosterGuest, mode: 'read' | 'edit' = 'read') => { setOpenGuest(g); setEditing(mode === 'edit'); };
+
+  const goTo = (i: number) => {
+    const el = scroller.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'auto' });
+    setPage(i);
+  };
 
   if (!trip) {
     return (
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold">Upcoming trips</h1>
         <p className="text-sm text-muted-foreground mt-1">No trips assigned.</p>
       </div>
     );
   }
 
-  // No padding of our own: Navigation's <main> already pads (p-6 pb-20 md:pb-6).
-  return (
-    <div className="max-w-3xl mx-auto space-y-4">
-      <TripHeader trip={trip} now={now} onOpenPicker={() => setPickerOpen(true)} />
+  const legs = trip.legs;
 
-      <TripRoster trip={trip} passengers={passengers} now={now}
-        view={view} onViewChange={setViewPersisted} onOpenGuest={open} />
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight truncate">{trip.tripName}</h1>
+          <p className="text-xs text-muted-foreground truncate">{trip.tail} · {trip.cabinCrew.join(', ')}</p>
+        </div>
+        <Button variant="ghost" className="shrink-0 text-primary" onClick={() => setPickerOpen(true)} aria-haspopup="dialog">
+          Switch <ChevronDown className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {legs.length > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-3" role="tablist" aria-label="Legs">
+          {legs.map((leg, i) => (
+            <button
+              key={leg.id}
+              role="tab"
+              onClick={() => goTo(i)}
+              aria-label={`Leg ${leg.legNumber}: ${leg.origin} to ${leg.destination}`}
+              aria-selected={i === page}
+              className={`h-2 rounded-full transition-all duration-fast ease-gfo ${
+                i === page ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Horizontal paging with CSS scroll-snap: the swipe is the browser's own, so it
+          keeps native momentum and rubber-banding instead of a hand-rolled drag. */}
+      <div
+        ref={scroller}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const i = Math.round(el.scrollLeft / Math.max(el.clientWidth, 1));
+          if (i !== page) setPage(i);
+        }}
+        className="mt-3 flex overflow-x-auto snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        aria-label={`${legs.length} legs, swipe to move between them`}
+      >
+        {legs.map((leg) => (
+          <div key={leg.id} className="w-full shrink-0 snap-start">
+            <LegBrief leg={leg} guests={rosterFor(trip, passengers, leg.legNumber)} onOpenGuest={openProfile} />
+          </div>
+        ))}
+      </div>
 
       <TripPickerSheet
         open={pickerOpen}
@@ -472,8 +118,6 @@ export default function FlightAttendantFlights() {
         onSelect={setSelectedId}
       />
 
-      {/* A centred modal, not a side sheet: used one-handed on an iPhone and two-handed
-          on an iPad, where a right-edge panel is the far corner of the screen. */}
       <Dialog open={!!openGuest} onOpenChange={(o: boolean) => { if (!o) { setOpenGuest(null); setEditing(false); } }}>
         <DialogContent className="sm:max-w-xl">
           {openGuest && (
@@ -504,7 +148,7 @@ export default function FlightAttendantFlights() {
                 <>
                   {openGuest.passenger
                     ? <PassengerProfilePanel passenger={openGuest.passenger} />
-                    : <DietaryBand guest={openGuest} className="mt-2" />}
+                    : <p className="text-sm text-muted-foreground">No allergy information on file, and no passenger record behind this booking id.</p>}
 
                   <div className="flex gap-2">
                     <Button variant="outline" className="flex-1 h-12" onClick={() => { setOpenGuest(null); setEditing(false); }}>Close</Button>
