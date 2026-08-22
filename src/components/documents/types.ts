@@ -5,6 +5,7 @@
 import type { Signature, AircraftType, CasColor } from '../tech-log/types';
 import type { DocAmendment, ExternalAlert, AmendmentResolution } from './engine/amendments';
 import type { DocRetirement } from './engine/retirement';
+import type { DocAnnotation } from './engine/annotations';
 import type { BulletinImage, BulletinVideo, BulletinLink } from '../bulletins/types';
 
 export type AckLevel = 'none' | 'initials' | 'signature';
@@ -468,4 +469,12 @@ export interface DocumentsState {
   externalAlerts?: ExternalAlert[];
   /** What has been folded in or dismissed, and by whom. A dismissal keeps its reason. */
   amendmentResolutions?: AmendmentResolution[];
+  /**
+   * Phase 4 — personal notes on documents.
+   *
+   * Their own store, keyed by block id. They are not blocks, never enter a
+   * revision, and cannot perturb a content digest. One person's notes are never
+   * visible to anyone else.
+   */
+  annotations?: DocAnnotation[];
 }
