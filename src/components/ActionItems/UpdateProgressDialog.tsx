@@ -77,7 +77,7 @@ export default function UpdateProgressDialog({
               <p className="text-sm text-muted-foreground">{selectedItem.description}</p>
               <div className="flex items-center gap-2 mt-2">
                 <Badge variant="outline" className="text-xs">
-                  {selectedItem.module}
+                  {selectedItem.department}
                 </Badge>
                 <Badge className={`text-xs ${
                   selectedItem.priority === 'Critical' ? 'bg-red-100 text-red-800' :

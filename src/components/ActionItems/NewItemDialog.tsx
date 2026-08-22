@@ -5,9 +5,9 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Plus, X, Loader2, Target, Wrench, Shield, Users, Building } from 'lucide-react';
+import { Plus, X, Loader2, Target, Wrench, Shield, Users, Building, Calendar } from 'lucide-react';
 import { NewItemForm } from './types';
-import { MODULE_OPTIONS, PRIORITY_OPTIONS } from './constants';
+import { DEPARTMENT_OPTIONS, PRIORITY_OPTIONS, CHECK_IN_CADENCE_OPTIONS } from './constants';
 
 interface NewItemDialogProps {
   isOpen: boolean;
@@ -51,13 +51,15 @@ export default function NewItemDialog({
     });
   };
 
-  const getModuleIcon = (module: string) => {
-    switch (module) {
+  const getDepartmentIcon = (department: string) => {
+    switch (department) {
       case 'Flight Operations': return <Target className="w-4 h-4" />;
       case 'Maintenance': return <Wrench className="w-4 h-4" />;
       case 'Safety': return <Shield className="w-4 h-4" />;
       case 'Passenger Services': return <Users className="w-4 h-4" />;
       case 'Ground Operations': return <Building className="w-4 h-4" />;
+      case 'Scheduling': return <Calendar className="w-4 h-4" />;
+      case 'Lead Team': return <Users className="w-4 h-4" />;
       default: return <Target className="w-4 h-4" />;
     }
   };
@@ -102,18 +104,18 @@ export default function NewItemDialog({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="module" className="text-sm font-medium mb-2 block">
-                  Module
+                <Label htmlFor="department" className="text-sm font-medium mb-2 block">
+                  Department
                 </Label>
-                <Select value={newItemForm.module} onValueChange={(value) => setNewItemForm({...newItemForm, module: value})}>
+                <Select value={newItemForm.department} onValueChange={(value: string) => setNewItemForm({...newItemForm, department: value})}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select module" />
+                    <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MODULE_OPTIONS.map((option) => (
+                    {DEPARTMENT_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         <div className="flex items-center gap-2">
-                          {getModuleIcon(option.value)}
+                          {getDepartmentIcon(option.value)}
                           {option.label}
                         </div>
                       </SelectItem>
@@ -150,6 +152,31 @@ export default function NewItemDialog({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Automatic status collection — the lead team sets the rhythm once and
+              each contributor is asked on schedule, instead of being chased. */}
+          <div>
+            <Label htmlFor="check-in-cadence" className="text-sm font-medium mb-2 block">
+              Status check-in cadence
+            </Label>
+            <Select
+              value={newItemForm.checkInCadence}
+              onValueChange={(value: string) => setNewItemForm({ ...newItemForm, checkInCadence: value as NewItemForm['checkInCadence'] })}
+            >
+              <SelectTrigger id="check-in-cadence">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CHECK_IN_CADENCE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-2">
+              Each contributor gets a status-update task on this rhythm. Their answers roll up to the
+              Rolling Action Items list.
+            </p>
           </div>
 
           {/* Sections */}

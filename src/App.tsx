@@ -53,7 +53,9 @@ import PostFlightChecklist from './components/PostFlightChecklist';
 import TurndownForm from './components/TurndownForm';
 import TurndownReports from './components/TurndownReports';
 import SchedulingDashboard from './components/SchedulingDashboard';
-import CriticalFunctionsPlan from './components/CriticalFunctionsPlan';
+import CriticalBusinessFunctions from './components/CriticalBusinessFunctions';
+import RollingActionItems from './components/RollingActionItems';
+import SuggestionBox from './components/SuggestionBox';
 import PilotCurrency from './components/PilotCurrency';
 import PassengerForms from './components/PassengerForms';
 import PublicPassengerForm from './components/PublicPassengerForm';
@@ -136,6 +138,7 @@ import MWShiftHandover from './components/maintenance-workflow/ShiftHandover';
 import MWPredictiveAnalytics from './components/maintenance-workflow/PredictiveAnalytics';
 import MaintenanceTurnoverForm from './components/MaintenanceTurnoverForm';
 import { AuditProvider } from './contexts/AuditContext';
+import { ActionItemProvider } from './contexts/ActionItemContext';
 
 // Inventory V2
 import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Context';
@@ -190,6 +193,11 @@ export default function App() {
       <MaintenanceProvider>
           <HazardProvider>
             <AuditProvider>
+              {/* One store behind Tasks & Action Items and the lead team's Rolling
+                  Action Items list — they are two views of the same projects, and
+                  a provider mounted per-subtree would make an item raised in one
+                  invisible in the other. */}
+              <ActionItemProvider>
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
                 <DocumentsProvider>
@@ -583,7 +591,13 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/critical-functions" element={<CriticalFunctionsPlan />} />
+                                {/* The old /critical-functions page carried all three as tabs.
+                                    Rolling Action Items has to hold 20+ projects for a VP's
+                                    admin, which does not fit in a third of a screen — so each
+                                    is now its own space. */}
+                                <Route path="/critical-functions" element={<CriticalBusinessFunctions />} />
+                                <Route path="/rolling-action-items" element={<RollingActionItems />} />
+                                <Route path="/suggestion-box" element={<SuggestionBox />} />
                                 <Route path="/parts-inventory" element={<PartsInventory />} />
                                 <Route path="/passenger-forms" element={<PassengerForms />} />
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
@@ -710,6 +724,7 @@ export default function App() {
                 </DocumentsProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
+              </ActionItemProvider>
             </AuditProvider>
           </HazardProvider>
         </MaintenanceProvider>
