@@ -523,8 +523,8 @@ export default function AircraftDetail() {
             </CardHeader>
             <CardContent className="space-y-3">
               {board.blockers.length === 0 && (
-                {/* Ink tokens, not the fill tokens — this is TEXT on a light surface, and the
-                    fills are tuned for dots and chips. NOT_ASSESSED stays neutral on purpose. */}
+                // Ink tokens, not the fill tokens: this is TEXT on a light surface, and the fills
+                // are tuned for dots and chips. NOT_ASSESSED stays neutral on purpose.
                 <div className={cn(
                   'flex items-center gap-1.5 text-sm',
                   sv.status === 'NOT_ASSESSED' ? 'text-muted-foreground'
