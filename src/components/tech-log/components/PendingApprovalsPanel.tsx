@@ -34,6 +34,12 @@ export function PendingApprovalsPanel({ kinds }: { kinds: PendingApproval['kind'
               <div>
                 <div className="font-medium">{p.summary}</div>
                 {p.kind === 'MEL_TYPE_ACTIVATION' && <div className="text-xs text-muted-foreground">FSDO LOA: {p.evidenceRef}</div>}
+                {p.kind === 'MEL_REVISION_IMPORT' && (
+                  <div className="text-xs text-muted-foreground">
+                    {p.fileName} · FSDO LOA: {p.evidenceRef}
+                    {p.acknowledged.length > 0 && ` · proposer cleared: ${p.acknowledged.join(', ')}`}
+                  </div>
+                )}
                 <div className="text-xs text-muted-foreground">Proposed {new Date(p.proposedAtUtc).toLocaleString()}</div>
               </div>
               {isSelf ? (

@@ -186,6 +186,7 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
           case 'AIRCRAFT_EDIT': return pending.after.id;
           case 'PERSONNEL_EDIT': return pending.after.oid;
           case 'MEL_ITEM_APPROVAL': return pending.melItemId;
+          case 'MEL_REVISION_IMPORT': return `${pending.aircraftType}-${pending.revision}`;
         }
       })();
       const audit: AuditEntry = {

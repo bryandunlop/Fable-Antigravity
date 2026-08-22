@@ -91,7 +91,7 @@ export const VERSION_KEY = 'tech-log-data-version';
  * step checklist has nowhere left to render. Reseeding is what makes a returning user's demo
  * coherent, and it is also what puts the seeded NEF deferral in front of them.
  */
-export const DATA_VERSION = '2026-07-31-v22';
+export const DATA_VERSION = '2026-08-22-v23';
 
 /**
  * Actions whose result must be durable the instant they are dispatched: every action that appends a
