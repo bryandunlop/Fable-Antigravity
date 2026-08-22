@@ -1089,6 +1089,35 @@ export type PendingApproval = PendingApprovalBase &
     | { kind: 'PERSONNEL_EDIT'; before: Personnel; after: Personnel }
     | { kind: 'MEL_TYPE_ACTIVATION'; aircraftId: string; aircraftType: AircraftType; melItemIds: string[]; evidenceRef: string }
     | { kind: 'MEL_ITEM_APPROVAL'; melItemId: string; evidenceRef: string }
+    | {
+        /**
+         * D95 — a whole approved D195 revision, uploaded as the PDF and parsed in-app. The
+         * four-eyes unit is the DOCUMENT: the proposer attests that this file is the approved
+         * MEL and names its LOA; a separate approver signs. Nobody reviews 495 rows, so the
+         * payload carries exactly what will be written, decided at proposal time and frozen
+         * here — never re-derived at approval time from a catalog that may have moved.
+         */
+        kind: 'MEL_REVISION_IMPORT';
+        aircraftType: AircraftType;
+        revision: string;
+        effectiveDate: string;
+        /** FSDO LOA reference — the evidence link the CLAUDE.md approval rule requires. */
+        evidenceRef: string;
+        fileName: string;
+        /** The sections this document contained. Anything else is left untouched. */
+        sections: MelSection[];
+        added: MelItem[];
+        /** Content replacements, already carrying the existing catalog row's id. */
+        changed: MelItem[];
+        /** Withdrawn by this revision — marked SUPERSEDED, never deleted, so signed deferrals
+         * against them still resolve while no new deferral can cite them. */
+        removedIds: string[];
+        unchangedCount: number;
+        /** Revision stamps for rows this document contained without changing their content. */
+        stamps: { subItemNumber: string; mmelRevision: string; effectiveDate: string }[];
+        /** Ids of the CONFIRM-severity checks the proposer cleared explicitly. */
+        acknowledged: string[];
+      }
   );
 
 // ── Phase-2 integration correlation (OFF-ledger, per spec §18.1) ──

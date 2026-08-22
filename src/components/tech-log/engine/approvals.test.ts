@@ -54,3 +54,54 @@ describe('applyApproval', () => {
     expect(result.personnel).toBe(tables.personnel);
   });
 });
+
+describe('MEL_REVISION_IMPORT (D95)', () => {
+  const nef = (n: string, over: Partial<MelItem> = {}): MelItem => ({
+    id: n, aircraftType: 'G650ER', mmelRevision: 'Original', effectiveDate: '2023-06-26',
+    approvalState: 'APPROVED', ataReference: '25', itemNumber: n, subItemNumber: n,
+    title: n, category: null, numberInstalled: null, numberRequired: null, melSection: 'NEF', ...over,
+  });
+
+  const importTables: ReferenceTables = {
+    aircraft: [aircraft],
+    personnel: [personnel],
+    melItems: [nef('N100-1'), nef('N100-2'), nef('N100-3'), melA],
+  };
+
+  const pending: PendingApproval = {
+    id: 'appr-imp', kind: 'MEL_REVISION_IMPORT', aircraftType: 'G650ER',
+    revision: 'Rev 1', effectiveDate: '2026-04-27', evidenceRef: 'LOA-91.213-2026-0042',
+    fileName: 'G650ER MEL R1.pdf', sections: ['NEF'],
+    added: [nef('N100-9', { mmelRevision: 'Rev 1', effectiveDate: '2026-04-27' })],
+    changed: [nef('N100-2', { title: 'Carpet and underlay', mmelRevision: 'Rev 1', effectiveDate: '2026-04-27' })],
+    removedIds: ['N100-3'],
+    unchangedCount: 1,
+    stamps: [{ subItemNumber: 'N100-1', mmelRevision: 'Rev 1', effectiveDate: '2026-04-27' }],
+    acknowledged: [],
+    summary: 's', proposedByOid: 'USR002', proposedAtUtc: 't', status: 'PENDING',
+  };
+
+  const applied = applyApproval(importTables, pending);
+  const find = (id: string) => applied.melItems.find(m => m.id === id)!;
+
+  it('adds, replaces and stamps in one approval', () => {
+    expect(find('N100-9')).toBeDefined();
+    expect(find('N100-2').title).toBe('Carpet and underlay');
+    expect(find('N100-1').mmelRevision).toBe('Rev 1');
+  });
+
+  it('supersedes a withdrawn item instead of deleting it', () => {
+    // A deferral signed against it must still resolve; only APPROVED items are offered
+    // for a new deferral, so nobody can cite it again.
+    expect(find('N100-3').approvalState).toBe('SUPERSEDED');
+    expect(applied.melItems.filter(m => m.id === 'N100-3')).toHaveLength(1);
+  });
+
+  it('leaves another fleet type untouched', () => {
+    expect(find('mel1')).toEqual(melA);
+  });
+
+  it('cannot be approved by whoever proposed it', () => {
+    expect(isSelfApproval(pending, 'USR002')).toBe(true);
+  });
+});
