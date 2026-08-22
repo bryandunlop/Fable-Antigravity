@@ -1,12 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Radar, ScrollText } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { PenLine, Radar, ScrollText } from 'lucide-react';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { GfoEmptyState } from '../../gfo';
 import { useDocuments } from '../DocumentsContext';
 import { docReaderPath, docManagePath } from '../classes';
-import { outstandingWork, type OutstandingItem } from '../engine/amendments';
+import {
+  amendmentsInForce,
+  outstandingWork,
+  replacementSection,
+  type OutstandingItem,
+} from '../engine/amendments';
 import { operatorTodayIso, formatDateOnly } from '../../../lib/operatorDate';
 
 /**
@@ -42,12 +47,15 @@ function SourceBadge({ item }: { item: OutstandingItem }) {
 
 function Row({
   item,
-  onResolve,
+  onFoldIn,
+  onDismiss,
 }: {
   item: OutstandingItem;
-  onResolve: (item: OutstandingItem, dismissed: boolean) => void;
+  onFoldIn: (item: OutstandingItem) => void;
+  onDismiss: (item: OutstandingItem) => void;
 }) {
   const ageing = item.daysOutstanding >= AGEING_DAYS;
+  const folding = item.state === 'folding';
 
   return (
     <li className="flex gap-3 border-b border-border py-4 last:border-b-0">
@@ -59,9 +67,14 @@ function Row({
         <div className="flex flex-wrap items-center gap-1.5">
           <SourceBadge item={item} />
           <span className="text-sm font-semibold">{item.title}</span>
-          {ageing && (
+          {ageing && !folding && (
             <Badge variant="outline" className="border-chart-3/50 px-1.5 text-[10px] text-chart-3">
               {item.daysOutstanding} days outstanding
+            </Badge>
+          )}
+          {folding && (
+            <Badge variant="outline" className="gap-1 border-accent/50 px-1.5 text-[10px] text-accent">
+              <PenLine className="h-3 w-3" /> Folding in — draft open
             </Badge>
           )}
         </div>
@@ -82,19 +95,22 @@ function Row({
         </p>
       </div>
       <div className="flex shrink-0 flex-col gap-1.5">
-        <Button size="sm" onClick={() => onResolve(item, false)}>
-          Fold in
+        <Button size="sm" variant={folding ? 'outline' : 'default'} onClick={() => onFoldIn(item)}>
+          {folding ? 'Open draft' : 'Fold in'}
         </Button>
-        <Button size="sm" variant="outline" onClick={() => onResolve(item, true)}>
-          {item.source === 'external' ? 'Not ours' : 'Dismiss'}
-        </Button>
+        {!folding && (
+          <Button size="sm" variant="outline" onClick={() => onDismiss(item)}>
+            {item.source === 'external' ? 'Not ours' : 'Dismiss'}
+          </Button>
+        )}
       </div>
     </li>
   );
 }
 
 export function AmendmentInboxPanel({ userRole }: { userRole: string }) {
-  const { state, resolveAmendment } = useDocuments();
+  const { state, resolveAmendment, foldAmendmentIntoDraft } = useDocuments();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<'all' | 'bulletin' | 'external'>('all');
   const today = operatorTodayIso();
 
@@ -112,23 +128,51 @@ export function AmendmentInboxPanel({ userRole }: { userRole: string }) {
   const shown = filter === 'all' ? all : all.filter((i) => i.source === filter);
   const ageing = all.filter((i) => i.daysOutstanding >= AGEING_DAYS).length;
 
-  const onResolve = (item: OutstandingItem, dismissed: boolean) => {
-    const note = dismissed
-      ? window.prompt(
-          item.source === 'external'
-            ? 'Why is this not ours? (recorded against the alert)'
-            : 'Why is this being dismissed? (recorded against the amendment)',
-        )
-      : null;
+  const onDismiss = (item: OutstandingItem) => {
+    const note = window.prompt(
+      item.source === 'external'
+        ? 'Why is this not ours? (recorded against the alert)'
+        : 'Why is this being dismissed? (recorded against the amendment)',
+    );
     // A dismissal with no reason is exactly the silent disappearance this queue
     // exists to prevent, so cancelling the prompt cancels the action.
-    if (dismissed && !note?.trim()) return;
+    if (!note?.trim()) return;
     resolveAmendment(item.id, {
       resolvedInRevisionId: '',
       resolvedBy: userRole,
       resolvedOn: today,
-      note: note?.trim() || undefined,
+      note: note.trim(),
     });
+  };
+
+  /**
+   * Fold in: stage the governing wording into the target's working draft and go
+   * there. The amendment does NOT leave the queue yet — it reads "folding in"
+   * until that draft publishes, because until then the manual still says the old
+   * thing.
+   */
+  const onFoldIn = (item: OutstandingItem) => {
+    if (item.state === 'folding') {
+      navigate(docManagePath(item.targetDocIds[0], { tab: 'draft' }));
+      return;
+    }
+    const targetDocId = item.targetDocIds[0];
+    const am = amendmentsInForce(targetDocId, state.revisions, state.amendmentResolutions ?? []).find(
+      (a) => a.id === item.id,
+    );
+    // An external alert has no governing wording of its own — nothing has been
+    // published. It opens the draft for the author to write the change themselves.
+    const blocks = am ? replacementSection(am, state.revisions)?.blocks : undefined;
+    if (!am || !blocks?.length || !item.targetSectionId) {
+      navigate(docManagePath(targetDocId, { tab: 'draft' }));
+      return;
+    }
+    const draftId = foldAmendmentIntoDraft(
+      { id: am.id, targetDocId, targetSectionId: item.targetSectionId, sourceDocId: am.sourceDocId },
+      blocks,
+      userRole,
+    );
+    if (draftId) navigate(docManagePath(targetDocId, { tab: 'draft' }));
   };
 
   if (all.length === 0) {
@@ -174,16 +218,14 @@ export function AmendmentInboxPanel({ userRole }: { userRole: string }) {
 
       <ul>
         {shown.map((item) => (
-          <Row key={item.id} item={item} onResolve={onResolve} />
+          <Row key={item.id} item={item} onFoldIn={onFoldIn} onDismiss={onDismiss} />
         ))}
       </ul>
 
       <p className="pt-1 text-xs text-muted-foreground">
-        Folding in opens the target document&rsquo;s{' '}
-        <Link to={docManagePath(all[0].targetDocIds[0], { tab: 'draft' })} className="text-accent hover:underline">
-          working draft
-        </Link>{' '}
-        — the amendment leaves this queue when that revision publishes.
+        Folding in stages the governing wording into the target&rsquo;s working draft and opens it. The
+        amendment stays here, marked <em>folding in</em>, until that revision publishes — because until
+        then the manual still says the old thing.
       </p>
     </div>
   );

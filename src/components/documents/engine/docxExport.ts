@@ -9,6 +9,7 @@ import {
 } from 'docx';
 import type { Doc, DocRevision, DocBlock } from '../types';
 import { stepNumbers, stepBody } from './blocks';
+import { amendmentNoteLine, type AmendedExport } from './exportAmendments';
 import { formatDateOnly } from '../../../lib/operatorDate';
 
 /** Machine-readable, human-invisible block-ID marker. */
@@ -81,12 +82,50 @@ export function blockToDocx(block: DocBlock, stepNumber?: number): (Paragraph | 
 }
 
 /** Build the watermarked, ID-embedded review .docx as a Blob. */
-export function buildReviewDocx(doc: Doc, rev: DocRevision): Promise<Blob> {
+/**
+ * TL-46 — amendments in force are rendered INTO the file.
+ *
+ * A reader can expand a chip; a .docx in someone's inbox cannot. So the governing
+ * wording is substituted in place, and a front-matter block lists what amended
+ * what. Passing no `amendments` keeps the previous behaviour exactly.
+ */
+export function buildReviewDocx(
+  doc: Doc,
+  rev: DocRevision,
+  amendments?: AmendedExport,
+): Promise<Blob> {
+  const sections = amendments?.sections ?? rev.sections;
+  const notes = amendments?.notes ?? [];
   const children: (Paragraph | Table)[] = [
     new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(doc.title)] }),
     new Paragraph({ children: [new TextRun({ text: `${doc.id} · Revision ${rev.revision} · effective ${formatDateOnly(rev.effectiveDate)}`, color: '666666', size: 18 })] }),
     new Paragraph({ children: [new TextRun({ text: `Review copy — edit with tracked changes ON; do not remove the hidden block markers. sha256 ${rev.mockChecksum.slice(0, 12)}…`, italics: true, color: '999999', size: 16 })] }),
-    ...rev.sections.flatMap((s) => {
+    ...(notes.length > 0
+      ? [
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun('Amendments in force')],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'The sections below carry the amended wording. This document has not yet been revised to absorb them.',
+                italics: true,
+                color: '666666',
+                size: 18,
+              }),
+            ],
+          }),
+          ...notes.map(
+            (n) =>
+              new Paragraph({
+                bullet: { level: 0 },
+                children: [new TextRun({ text: amendmentNoteLine(n, formatDateOnly), size: 20 })],
+              }),
+          ),
+        ]
+      : []),
+    ...sections.flatMap((s) => {
       // NOT `flatMap(blockToDocx)`: flatMap passes the array index as the second argument, which
       // would land in `stepNumber` and number steps by block position instead of step position.
       const steps = stepNumbers(s.blocks);

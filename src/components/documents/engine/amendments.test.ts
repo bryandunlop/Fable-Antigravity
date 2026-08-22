@@ -79,7 +79,7 @@ describe('amendmentsInForce', () => {
     expect(amendmentsInForce('SOP-004', [amending()], [])).toEqual([]);
   });
 
-  it('drops an amendment once it has been folded in', () => {
+  it('drops an amendment once the revision that folded it in has PUBLISHED', () => {
     const resolutions: AmendmentResolution[] = [
       {
         amendmentId: 'PB-014-r1::am0',
@@ -88,7 +88,8 @@ describe('amendmentsInForce', () => {
         resolvedOn: '2026-08-20',
       },
     ];
-    expect(amendmentsInForce('GOM-001', [amending()], resolutions)).toEqual([]);
+    const published = rev({ id: 'GOM-001-r15', docId: 'GOM-001', status: 'published' });
+    expect(amendmentsInForce('GOM-001', [amending(), published], resolutions)).toEqual([]);
   });
 });
 
@@ -152,11 +153,12 @@ describe('outstandingWork — the inbox', () => {
   });
 
   it('excludes anything already resolved, from either source', () => {
+    const published = rev({ id: 'GOM-001-r15', docId: 'GOM-001', status: 'published' });
     const resolutions: AmendmentResolution[] = [
-      { amendmentId: 'PB-014-r1::am0', resolvedInRevisionId: 'r', resolvedBy: 'U', resolvedOn: TODAY },
+      { amendmentId: 'PB-014-r1::am0', resolvedInRevisionId: 'GOM-001-r15', resolvedBy: 'U', resolvedOn: TODAY },
       { amendmentId: 'ALERT-001', resolvedInRevisionId: '', resolvedBy: 'U', resolvedOn: TODAY, note: 'Nimbl authors the IOPM — not ours.' },
     ];
-    expect(outstandingWork([amending()], [alert()], resolutions, TODAY)).toEqual([]);
+    expect(outstandingWork([amending(), published], [alert()], resolutions, TODAY)).toEqual([]);
   });
 
   it('carries the target document so a row can say what it affects', () => {
@@ -235,5 +237,60 @@ describe('replacementSection', () => {
     const [am] = amendmentsInForce('GOM-001', revisions, []);
     const withdrawn = [{ ...revisions[0], status: 'withdrawn' as const }];
     expect(replacementSection(am, withdrawn)).toBeUndefined();
+  });
+});
+
+describe('resolution is not final until the draft publishes', () => {
+  const draftRev = (status: DocRevision['status']) =>
+    rev({ id: 'GOM-001-r15', docId: 'GOM-001', status, effectiveDate: '2026-09-01' });
+
+  const folded: AmendmentResolution[] = [
+    {
+      amendmentId: 'PB-014-r1::am0',
+      resolvedInRevisionId: 'GOM-001-r15',
+      resolvedBy: 'Chief Pilot',
+      resolvedOn: TODAY,
+    },
+  ];
+
+  it('stays IN FORCE while the folding draft is unpublished', () => {
+    // The manual has not changed yet. Hiding the amendment now would tell a crew
+    // the wording is fixed while the section they read still says the old thing.
+    for (const status of ['draft', 'pending-approval', 'approved'] as const) {
+      const revisions = [amending(), draftRev(status)];
+      expect(amendmentsInForce('GOM-001', revisions, folded)).toHaveLength(1);
+    }
+  });
+
+  it('leaves once that draft is published', () => {
+    const revisions = [amending(), draftRev('published')];
+    expect(amendmentsInForce('GOM-001', revisions, folded)).toEqual([]);
+  });
+
+  it('a dismissal resolves immediately — there is no revision to wait for', () => {
+    const dismissed: AmendmentResolution[] = [
+      { amendmentId: 'PB-014-r1::am0', resolvedInRevisionId: '', resolvedBy: 'U', resolvedOn: TODAY, note: 'Not ours.' },
+    ];
+    expect(amendmentsInForce('GOM-001', [amending()], dismissed)).toEqual([]);
+  });
+
+  it('an inbox row reports that a fold-in is under way', () => {
+    const revisions = [amending(), draftRev('draft')];
+    const [item] = outstandingWork(revisions, [], folded, TODAY);
+    expect(item.state).toBe('folding');
+    expect(item.foldingIntoRevisionId).toBe('GOM-001-r15');
+  });
+
+  it('an untouched row reports as open', () => {
+    expect(outstandingWork([amending()], [], [], TODAY)[0].state).toBe('open');
+  });
+
+  it('a resolution naming a revision that does not exist does not hide the amendment', () => {
+    // Defensive: a stale or hand-written resolution must never make a live
+    // amendment disappear from a manual.
+    const ghost: AmendmentResolution[] = [
+      { amendmentId: 'PB-014-r1::am0', resolvedInRevisionId: 'GOM-001-r99', resolvedBy: 'U', resolvedOn: TODAY },
+    ];
+    expect(amendmentsInForce('GOM-001', [amending()], ghost)).toHaveLength(1);
   });
 });

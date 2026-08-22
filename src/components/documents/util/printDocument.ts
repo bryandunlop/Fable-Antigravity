@@ -5,10 +5,11 @@
 import type { Doc, DocRevision } from '../types';
 import { classFor } from '../classes';
 import { sectionsToHtml, escapeHtml } from '../engine/exportHtml';
+import { amendmentNoteLine, type AmendedExport } from '../engine/exportAmendments';
 import { operatorTodayIso, formatDateOnly } from '../../../lib/operatorDate';
 
 /** Returns false if the browser blocked the pop-up (caller shows a toast). */
-export function printDocument(doc: Doc, rev: DocRevision): boolean {
+export function printDocument(doc: Doc, rev: DocRevision, amendments?: AmendedExport): boolean {
   const w = window.open('', '_blank', 'width=880,height=1040');
   if (!w) return false;
 
@@ -17,7 +18,17 @@ export function printDocument(doc: Doc, rev: DocRevision): boolean {
   // printed copy is the one that ends up in a binder.
   const eff = formatDateOnly(rev.effectiveDate);
   const printed = formatDateOnly(operatorTodayIso());
-  const body = sectionsToHtml(rev.sections);
+  // TL-46 — print what governs. A printed copy cannot expand a chip, so the
+  // amended wording is substituted in place and listed up front.
+  const body = sectionsToHtml(amendments?.sections ?? rev.sections);
+  const notes = amendments?.notes ?? [];
+  const amendmentBlock = notes.length
+    ? `<div class="amd">
+        <p class="amd-h">Amendments in force</p>
+        <p class="amd-note">The sections below carry the amended wording. This document has not yet been revised to absorb them.</p>
+        <ul>${notes.map((n) => `<li>${escapeHtml(amendmentNoteLine(n, formatDateOnly))}</li>`).join('')}</ul>
+      </div>`
+    : '';
 
   w.document.write(`<!doctype html><html><head><meta charset="utf-8" />
 <title>${escapeHtml(doc.title)} — ${escapeHtml(doc.id)} rev ${escapeHtml(rev.revision)}</title>
@@ -50,6 +61,10 @@ export function printDocument(doc: Doc, rev: DocRevision): boolean {
   .callout-caution { border-left-color:#d97706; background:#fffbeb; }
   .callout-warning { border-left-color:#ea580c; background:#fff7ed; }
   .callout-k { font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin:0 0 4px; color:#555; }
+  .amd { border:1px solid #0096FC; border-left-width:4px; background:#f2f9ff; border-radius:4px; padding:12px 16px; margin:16px 0 20px; }
+  .amd-h { font-size:11px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:#00205B; margin:0 0 4px; }
+  .amd-note { font-size:11px; color:#555; margin:0 0 8px; font-style:italic; }
+  .amd ul { margin:0 0 0 18px; font-size:12px; line-height:1.5; }
   .ft { margin-top:26px; border-top:1px solid #ddd; padding-top:10px; font-size:10px; color:#888; }
   @media print { body { padding:0 12px; } .noprint { display:none; } .wm span { color:rgba(0,32,91,0.05); } }
   .noprint { margin-bottom:16px; }
@@ -66,6 +81,7 @@ export function printDocument(doc: Doc, rev: DocRevision): boolean {
     <h1>${escapeHtml(doc.title)}</h1>
     <div class="meta">${escapeHtml(doc.id)} &middot; Revision ${escapeHtml(rev.revision)} &middot; effective ${escapeHtml(eff)} &middot; printed ${escapeHtml(printed)}</div>
     <div class="chk">sha256 ${escapeHtml(rev.mockChecksum.slice(0, 16))}…</div>
+    ${amendmentBlock}
     ${body}
     <div class="ft">
       Uncontrolled when printed — verify against the current published revision in myGFO before use.

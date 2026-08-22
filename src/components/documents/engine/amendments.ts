@@ -92,12 +92,50 @@ function governs(rev: DocRevision): boolean {
   return rev.status === 'published';
 }
 
-function isResolvedIn(id: string, resolutions: AmendmentResolution[]): boolean {
-  return resolutions.some((r) => r.amendmentId === id);
+/** Where an amendment has got to. */
+export type AmendmentState = 'open' | 'folding' | 'resolved';
+
+/**
+ * Folding in is not finished until the draft that absorbs it PUBLISHES.
+ *
+ * Treating the click as the end would drop the amendment from the manual the
+ * moment someone opened a draft — telling a crew the wording is fixed while the
+ * section they read still says the old thing. So a fold-in that names a revision
+ * only resolves once that revision is published; until then the amendment stays
+ * in force and the inbox row reads `folding`.
+ *
+ * A DISMISSAL names no revision and resolves immediately — there is nothing to
+ * wait for. It carries its reason instead (see `AmendmentResolution`).
+ */
+export function amendmentState(
+  id: string,
+  resolutions: AmendmentResolution[],
+  revisions: DocRevision[],
+): AmendmentState {
+  const r = resolutions.find((x) => x.amendmentId === id);
+  if (!r) return 'open';
+  if (!r.resolvedInRevisionId) return 'resolved';
+  const target = revisions.find((rev) => rev.id === r.resolvedInRevisionId);
+  // A resolution naming a revision that does not exist must never hide a live
+  // amendment — a stale record should fail open, not silently suppress.
+  if (!target) return 'open';
+  return governs(target) ? 'resolved' : 'folding';
 }
 
-export function isResolved(id: string, resolutions: AmendmentResolution[]): boolean {
-  return isResolvedIn(id, resolutions);
+function isResolvedIn(
+  id: string,
+  resolutions: AmendmentResolution[],
+  revisions: DocRevision[],
+): boolean {
+  return amendmentState(id, resolutions, revisions) === 'resolved';
+}
+
+export function isResolved(
+  id: string,
+  resolutions: AmendmentResolution[],
+  revisions: DocRevision[] = [],
+): boolean {
+  return isResolvedIn(id, resolutions, revisions);
 }
 
 export function resolutionFor(
@@ -118,7 +156,7 @@ export function amendmentsInForce(
     if (!governs(rev)) continue;
     for (const am of rev.amendments ?? []) {
       if (am.targetDocId !== targetDocId) continue;
-      if (isResolvedIn(am.id, resolutions)) continue;
+      if (isResolvedIn(am.id, resolutions, revisions)) continue;
       out.push({
         ...am,
         sourceDocId: rev.docId,
@@ -197,6 +235,9 @@ export interface OutstandingItem {
   since: string;
   daysOutstanding: number;
   ownerUserId?: string;
+  state: AmendmentState;
+  /** Set while `state` is 'folding' — the unpublished revision absorbing it. */
+  foldingIntoRevisionId?: string;
 }
 
 /**
@@ -221,7 +262,7 @@ export function outstandingWork(
   for (const rev of revisions) {
     if (!governs(rev)) continue;
     for (const am of rev.amendments ?? []) {
-      if (isResolvedIn(am.id, resolutions)) continue;
+      if (isResolvedIn(am.id, resolutions, revisions)) continue;
       items.push({
         id: am.id,
         source: 'bulletin',
@@ -232,12 +273,14 @@ export function outstandingWork(
         targetSectionId: am.targetSectionId,
         since: rev.effectiveDate,
         daysOutstanding: daysOutstanding(rev.effectiveDate, todayIso),
+        state: amendmentState(am.id, resolutions, revisions),
+        foldingIntoRevisionId: resolutions.find((r) => r.amendmentId === am.id)?.resolvedInRevisionId || undefined,
       });
     }
   }
 
   for (const al of alerts) {
-    if (isResolvedIn(al.id, resolutions)) continue;
+    if (isResolvedIn(al.id, resolutions, revisions)) continue;
     items.push({
       id: al.id,
       source: 'external',
@@ -251,6 +294,8 @@ export function outstandingWork(
       since: al.receivedOn,
       daysOutstanding: daysOutstanding(al.receivedOn, todayIso),
       ownerUserId: al.ownerUserId,
+      state: amendmentState(al.id, resolutions, revisions),
+      foldingIntoRevisionId: resolutions.find((r) => r.amendmentId === al.id)?.resolvedInRevisionId || undefined,
     });
   }
 

@@ -7,6 +7,7 @@ import { SectionedContent } from '../components/SectionedContent';
 import { AmendedSection } from '../components/AmendedSection';
 import { AmendmentStrip } from '../components/AmendmentStrip';
 import { amendmentsForSection, amendmentsInForce } from '../engine/amendments';
+import { amendedExport } from '../engine/exportAmendments';
 import { RevisionMedia } from '../components/RevisionMedia';
 import { DiffedContent } from '../components/DiffedContent';
 import { useDocuments } from '../DocumentsContext';
@@ -58,6 +59,12 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const allRevs = doc ? revisionsFor(doc.id, state.revisions) : [];
   const priorRev = doc && rev ? priorPublishedRevision(doc.id, state.revisions) : undefined;
   const diff = useMemo(() => (rev && priorRev ? diffRevisions(priorRev, rev) : null), [rev, priorRev]);
+  // TL-46 — what an exported copy should actually contain. A file cannot expand a
+  // chip, so amendments are resolved into the sections before they leave myGFO.
+  const exportView = useMemo(
+    () => (doc && rev ? amendedExport(doc.id, rev, state.revisions, state.amendmentResolutions ?? []) : undefined),
+    [doc, rev, state.revisions, state.amendmentResolutions],
+  );
   const changeCount = diff ? diff.counts.total : 0;
   const showingDiff = !!(diff?.hasChanges && showChanges);
   const { userId } = identityFor(userRole);
@@ -175,7 +182,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
             <Button
               size="sm"
               variant="outline"
-              onClick={() => { if (!printDocument(doc, rev)) toast.error('Allow pop-ups to export the PDF.'); }}
+              onClick={() => { if (!printDocument(doc, rev, exportView)) toast.error('Allow pop-ups to export the PDF.'); }}
             >
               <Printer className="mr-1.5 h-4 w-4" /> Export PDF
             </Button>
@@ -186,7 +193,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               variant="outline"
               onClick={async () => {
                 try {
-                  const blob = await buildReviewDocx(doc, rev);
+                  const blob = await buildReviewDocx(doc, rev, exportView);
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
