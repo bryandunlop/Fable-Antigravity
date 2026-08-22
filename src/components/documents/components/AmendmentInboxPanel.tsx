@@ -153,7 +153,7 @@ export function AmendmentInboxPanel({ userRole }: { userRole: string }) {
    */
   const onFoldIn = (item: OutstandingItem) => {
     if (item.state === 'folding') {
-      navigate(docManagePath(item.targetDocIds[0], { tab: 'draft' }));
+      navigate(docManagePath(item.targetDocIds[0], { tab: 'draft', section: item.targetSectionId }));
       return;
     }
     const targetDocId = item.targetDocIds[0];
@@ -164,7 +164,9 @@ export function AmendmentInboxPanel({ userRole }: { userRole: string }) {
     // published. It opens the draft for the author to write the change themselves.
     const blocks = am ? replacementSection(am, state.revisions)?.blocks : undefined;
     if (!am || !blocks?.length || !item.targetSectionId) {
-      navigate(docManagePath(targetDocId, { tab: 'draft' }));
+      // No wording to stage — open the draft so the author writes it themselves,
+      // still at the right section where we know which one it is.
+      navigate(docManagePath(targetDocId, { tab: 'draft', section: item.targetSectionId }));
       return;
     }
     const draftId = foldAmendmentIntoDraft(
@@ -172,7 +174,7 @@ export function AmendmentInboxPanel({ userRole }: { userRole: string }) {
       blocks,
       userRole,
     );
-    if (draftId) navigate(docManagePath(targetDocId, { tab: 'draft' }));
+    if (draftId) navigate(docManagePath(targetDocId, { tab: 'draft', section: item.targetSectionId }));
   };
 
   if (all.length === 0) {

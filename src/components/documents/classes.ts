@@ -67,11 +67,17 @@ export function docReaderPath(docId: string): string {
  * `tab` / `suggestion` let a cross-document queue land on the actual work. */
 export function docManagePath(
   docId: string,
-  opts: { tab?: 'suggestions' | 'draft' | 'approval' | 'review' | 'history'; suggestion?: string } = {},
+  opts: {
+    tab?: 'suggestions' | 'draft' | 'approval' | 'review' | 'history';
+    suggestion?: string;
+    /** Scroll the draft editor to this section on arrival (TL-46 fold-in). */
+    section?: string;
+  } = {},
 ): string {
   const q = new URLSearchParams();
   if (opts.tab) q.set('tab', opts.tab);
   if (opts.suggestion) q.set('suggestion', opts.suggestion);
+  if (opts.section) q.set('section', opts.section);
   const qs = q.toString();
   return `/documents/${docId}/manage${qs ? `?${qs}` : ''}`;
 }
