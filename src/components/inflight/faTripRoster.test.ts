@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { rosterFor, summarise, splitAllergens, isFoodAllergen, legByNumber, bandKind, hasProfileContent } from './faTripRoster';
+import { rosterFor, summarise, splitAllergens, isFoodAllergen, legByNumber, bandKind, hasProfileContent, allergenRollup } from './faTripRoster';
+import type { DietaryState as RosterGuestState } from '../passengers/engine/flights';
 import type { Passenger } from '../passengers/passengerData';
 import type { FaTrip } from './faTrips';
 
@@ -141,5 +142,60 @@ describe('hasProfileContent', () => {
   });
   it('ignores whitespace-only fields', () => {
     expect(hasProfileContent(pax('a', 'A', { additionalNotes: '   ', passengerComfort: { seating: ' ' } }))).toBe(false);
+  });
+});
+
+describe('allergenRollup', () => {
+  const g = (id: string, name: string, p: Passenger | null, state: RosterGuestState) =>
+    ({ id, passenger: p, legNumbers: [1], displayName: name, state });
+
+  const robert = pax('P1', 'Robert', { allergies: [{ allergen: 'Shellfish', severity: 'Critical' }, { allergen: 'Tree nuts', severity: 'Moderate' }] });
+  const michael = pax('P2', 'Michael', { allergies: [{ allergen: 'Peanuts', severity: 'Critical' }] });
+  const helenAlso = pax('P3', 'Helen', { allergies: [{ allergen: 'Shellfish', severity: 'Mild' }] });
+  const emily = pax('P4', 'Emily', { allergies: [{ allergen: 'Bee stings', severity: 'Moderate' }] });
+
+  const guests = [
+    g('P1', 'Robert', robert, 'ALLERGIES'),
+    g('P2', 'Michael', michael, 'ALLERGIES'),
+    g('P3', 'Helen', helenAlso, 'ALLERGIES'),
+    g('P4', 'Emily', emily, 'ALLERGIES'),
+    g('P5', 'Flagged one', pax('P5', 'Flagged one', { allergyFlagged: true }), 'FLAGGED_NO_DETAIL'),
+    g('GHOST', 'Unnamed guest · GHOST', null, 'NONE_ON_FILE'),
+    g('P7', 'Clear one', pax('P7', 'Clear one', { dietaryConfirmedAtUtc: '2026-08-12T00:00:00Z' }), 'CONFIRMED_NONE'),
+  ];
+
+  it('groups by allergen and names everyone who carries it', () => {
+    const r = allergenRollup(guests);
+    expect(r.food.map((x) => x.allergen)).toEqual(['Shellfish', 'Peanuts', 'Tree nuts']);
+    expect(r.food[0].carriers).toEqual(['Robert', 'Helen']);
+  });
+
+  it('puts the most-carried allergen first', () => {
+    expect(allergenRollup(guests).food[0].allergen).toBe('Shellfish');
+  });
+
+  it('keeps non-food allergens out of the cook-around list without losing them', () => {
+    const r = allergenRollup(guests);
+    expect(r.food.map((x) => x.allergen)).not.toContain('Bee stings');
+    expect(r.cabin.map((x) => x.allergen)).toEqual(['Bee stings']);
+  });
+
+  it('counts the two kinds of not-knowing separately', () => {
+    const r = allergenRollup(guests);
+    expect(r.flagged.map((x) => x.displayName)).toEqual(['Flagged one']);
+    expect(r.unknown.map((x) => x.displayName)).toEqual(['Unnamed guest · GHOST']);
+  });
+
+  it('leaves a confirmed-clear guest out of every bucket', () => {
+    const r = allergenRollup(guests);
+    const named = [...r.food, ...r.cabin].flatMap((x) => x.carriers);
+    expect(named).not.toContain('Clear one');
+    expect(r.flagged).toHaveLength(1);
+    expect(r.unknown).toHaveLength(1);
+  });
+
+  it('is empty all round for a leg with nothing recorded', () => {
+    const r = allergenRollup([g('P7', 'Clear one', pax('P7', 'Clear one', { dietaryConfirmedAtUtc: '2026-08-12T00:00:00Z' }), 'CONFIRMED_NONE')]);
+    expect(r).toMatchObject({ food: [], cabin: [], flagged: [], unknown: [] });
   });
 });
