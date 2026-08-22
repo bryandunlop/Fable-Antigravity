@@ -8,8 +8,8 @@ import type {
   CompanyAirportPageVersion,
   ConfirmFieldRequest,
   FieldConfirmation,
-  SaveSupportFieldRequest,
-  SaveSupportFieldResult,
+  SaveFieldRequest,
+  SaveFieldResult,
 } from '../../airport/company/pageStore';
 import { confirmationStates, type FieldConfirmationState } from '../../airport/company/confirmations';
 import { buildOfficerWorklist, type OfficerWorklist } from '../../airport/company/worklist';
@@ -119,7 +119,7 @@ interface CompanyAirportApi {
    * Write one station-support field (D96). Publishes and confirms in one act,
    * with no approver in the path — see SUPPORT_FIELDS for why that is safe.
    */
-  saveSupportField(request: SaveSupportFieldRequest): SaveSupportFieldResult;
+  saveField(request: SaveFieldRequest): SaveFieldResult;
   /** Every published version for an airport, oldest first — the change record. */
   versionsFor(icao: string): CompanyAirportPageVersion[];
   /** Every explicit confirmation for an airport, for the change record's notes. */
@@ -193,8 +193,8 @@ export function CompanyAirportProvider({ children }: { children: React.ReactNode
         commit();
         return version;
       },
-      saveSupportField: (request) => {
-        const result = pages.saveSupportField(request);
+      saveField: (request) => {
+        const result = pages.saveField(request);
         // The store persists itself; this is only to re-render every reader.
         commit();
         return result;
