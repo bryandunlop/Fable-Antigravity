@@ -38,8 +38,13 @@ const HINTS: Record<SupportField, string> = {
   stationContacts: 'Who to phone, and which number is the out-of-hours one.',
 };
 
-/** The order a technician reads them in: capability first, logistics after. */
+/**
+ * The order a technician reads them in: the recommendation first (it is the one
+ * everybody reads, so it must be authorable from the same place), then
+ * capability, then logistics.
+ */
 const ORDER: SupportField[] = [
+  'teamRecommendation',
   'onFieldCapability',
   'mobileResponse',
   'localIndependent',
@@ -189,13 +194,18 @@ export function StationSupportCard({ icao, currentUserOid, editable }: StationSu
 
       <div className="grid gap-4 md:grid-cols-2">
         {ORDER.map((field) => {
+          // The recommendation reads across the whole card: it is a sentence,
+          // not a fact in a column, and it renders full width in the header too.
           const value = published?.content[field] ?? null;
           const state = states.get(field);
 
           if (editing === field) {
             return (
-              <FieldEditor
+              <div
                 key={field}
+                className={field === 'teamRecommendation' ? 'md:col-span-2' : undefined}
+              >
+              <FieldEditor
                 icao={icao}
                 field={field}
                 current={value}
@@ -203,11 +213,12 @@ export function StationSupportCard({ icao, currentUserOid, editable }: StationSu
                 savedBy={currentUserOid}
                 onDone={() => setEditing(null)}
               />
+              </div>
             );
           }
 
           return (
-            <div key={field}>
+            <div key={field} className={field === 'teamRecommendation' ? 'md:col-span-2' : undefined}>
               <div className="mb-1 flex items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">{FIELD_LABEL[field]}</p>
                 {editable ? (
@@ -273,8 +284,17 @@ export function CrewSupportStrip({
           <Wrench className="h-4 w-4" />
           Maintenance support here
         </p>
+        {/* Three states, not two. Browser-verified 2026-08-22: with a mobile
+            response written but on-field capability still blank, a two-state
+            version headlined "nobody has written what maintenance is available"
+            directly above the line somebody had just written. Absence of the
+            on-field fact is not absence of the page. */}
         {onField ? (
           <p className="mt-1 font-medium">{onField}</p>
+        ) : mobile ? (
+          <p className="mt-1 font-medium">
+            Nothing recorded about on-field capability. Assume none until it is.
+          </p>
         ) : (
           <p className="mt-1 font-medium">
             Nobody has written what maintenance is available at this airport. Assume none.
@@ -358,12 +378,18 @@ export function SupportCardFact({ icao }: { icao: string }) {
   const summary = company.confirmationStates(icao);
   const overdue = summary.filter((state) => state.status === 'overdue');
 
+  // Full width beneath the identity, not beside it. Sat in the card's right
+  // column it stole enough width to truncate the airport NAME — the one thing a
+  // search result must never lose.
   return (
-    <div className="max-w-[15rem] text-right">
-      <p className={`text-sm font-medium ${onField ? '' : 'text-muted-foreground'}`}>
-        {onField ?? 'Nothing written — assume no support'}
+    <div className="mt-2 border-t pt-2">
+      {/* Same three states as the crew strip, and for the same reason: a card
+          headlined "nothing written" above a line somebody had written is the
+          bug this shape exists to prevent. */}
+      <p className={`line-clamp-2 text-sm ${onField ? 'font-medium' : 'text-muted-foreground'}`}>
+        {onField ?? (mobile ? 'No on-field capability recorded' : 'Nothing written — assume no support')}
       </p>
-      {mobile ? <p className="mt-0.5 text-xs text-muted-foreground">{mobile}</p> : null}
+      {mobile ? <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{mobile}</p> : null}
       {overdue.length ? (
         <p className="mt-1 text-xs font-medium text-destructive">
           {overdue.length} {overdue.length === 1 ? 'fact' : 'facts'} overdue

@@ -209,23 +209,20 @@ export default function AirportInformation({
                       {[entry.city, entry.stateCode].filter(Boolean).join(', ')}
                     </p>
                   </div>
-                  <div className="shrink-0">
-                    {lens === 'maintenance' ? (
-                      <SupportCardFact icao={entry.icaoId ?? entry.id} />
-                    ) : (
-                      <div className="text-right">
-                        <p className="flex items-center justify-end gap-1 text-sm tabular-nums">
-                          <Plane className="h-3.5 w-3.5 text-muted-foreground" />
-                          {entry.longestRunwayFt.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-muted-foreground">longest ft</p>
-                      </div>
-                    )}
+                  <div className="shrink-0 text-right">
+                    <p className="flex items-center justify-end gap-1 text-sm tabular-nums">
+                      <Plane className="h-3.5 w-3.5 text-muted-foreground" />
+                      {entry.longestRunwayFt.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">longest ft</p>
                   </div>
                 </div>
                 {/* The team's recommendation rides every search result, both
                     lenses — it is the answer most searches are really after. */}
-                <TeamRecommendation icao={entry.icaoId ?? entry.id} compact />
+                <div className="mt-2">
+                  <TeamRecommendation icao={entry.icaoId ?? entry.id} compact />
+                </div>
+                {lens === 'maintenance' ? <SupportCardFact icao={entry.icaoId ?? entry.id} /> : null}
                 {loadingAirport === entry.id ? (
                   <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />

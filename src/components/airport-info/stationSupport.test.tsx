@@ -164,6 +164,27 @@ describe('station support on the airport record (D96)', () => {
     expect(screen.getByText(/What we do here —/)).toBeInTheDocument();
   });
 
+  it('does not claim nothing is written while showing something that is', async () => {
+    render(
+      <Harness
+        seed={(company) => {
+          // Mobile response written, on-field capability still blank — the exact
+          // state that produced a strip contradicting itself in the browser.
+          company.saveSupportField({
+            icao: 'KASE',
+            field: 'mobileResponse',
+            value: 'Dispatched from KDEN, 3.5 hr road.',
+            savedBy: 'dom-1',
+          });
+        }}
+      />,
+    );
+
+    expect(await screen.findByText(/Dispatched from KDEN/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nobody has written what maintenance is available/)).toBeNull();
+    expect(screen.getByText(/Nothing recorded about on-field capability/)).toBeInTheDocument();
+  });
+
   it('offers no editing affordance on the crew lens', async () => {
     render(
       <Harness
