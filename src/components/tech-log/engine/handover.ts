@@ -30,14 +30,52 @@ export function deferralsRequiringAck(
     .filter(d => Boolean(d.restrictionText || d.placardRequired || d.melOProcedure));
 }
 
-/** Dispatch acceptance gate (design §A): a RED aircraft cannot be accepted. */
+/**
+ * Dispatch acceptance gate (design §A): a RED aircraft cannot be accepted.
+ *
+ * LG-143 — nor can a PROVISIONAL one, and that limb is not a refinement of the RED test: it sits
+ * outside the serviceability projection entirely. `deriveServiceability` has no notion of
+ * `isProvisional`, so the G800 in onboarding — no defects, D195 MEL still PENDING_FSDO — read GREEN
+ * and passed this gate. The PIC was shown "Serviceable — no open items" and could sign acceptance,
+ * freezing `serviceability: 'GREEN'` into the signed FlightBriefing disclosure for an aircraft
+ * whose MEL the FSDO has not approved. Bryan ruled block-outright on 2026-07-31: myGFO has no
+ * dispatch answer for a tail in onboarding, and absence of an answer is never a green light.
+ */
+/**
+ * Briefing-preparation gate (LG-143). A tail in onboarding gets no briefing at all.
+ *
+ * Blocking only acceptance was not enough. `buildBriefingDisclosure` freezes
+ * `serviceability: deriveServiceability(...).status` — GREEN for a clean provisional tail — and the
+ * maintenance release signature covers that frozen disclosure. So a briefing that could never be
+ * accepted still produced a signed record, an on-screen readout and a PRINTED flight briefing all
+ * asserting "Serviceability: GREEN" for an aircraft whose D195 MEL the FSDO has not approved.
+ * Blocking the release end removes the record rather than re-labelling it.
+ *
+ * Bryan ruled block-release on 2026-07-31, after the acceptance-only ruling earlier that day.
+ */
+export function canPrepareBriefing(
+  aircraftId: string,
+  state: Pick<TechLogState, 'aircraft'>,
+): { ok: boolean; reason?: string } {
+  if (state.aircraft.find(a => a.id === aircraftId)?.isProvisional) {
+    return { ok: false, reason: 'Aircraft is in onboarding — its D195 MEL is pending FSDO approval, so no flight briefing can be prepared or released for it.' };
+  }
+  return { ok: true };
+}
+
 export function canAcceptDispatch(
   aircraftId: string,
   state: Parameters<typeof deriveServiceability>[1],
   asOfUtc: string,
 ): { ok: boolean; reason?: string } {
-  if (deriveServiceability(aircraftId, state, asOfUtc).status === 'RED') {
-    return { ok: false, reason: 'Aircraft is RED — resolve or defer the grounding item before acceptance (a special flight permit is out of scope).' };
+  /* An ALLOW-list, not a deny-list. `!== 'RED'` was the original shape and it is what let a
+     provisional tail through: any state that is not RED read as acceptable, so a status the
+     projection had never heard of at the time (NOT_ASSESSED) would have been admitted silently.
+     Naming the states that pass means a future member of the union is refused by default. */
+  const status = deriveServiceability(aircraftId, state, asOfUtc).status;
+  if (status === 'GREEN' || status === 'AMBER') return { ok: true };
+  if (status === 'NOT_ASSESSED') {
+    return { ok: false, reason: 'Aircraft is in onboarding — its D195 MEL is pending FSDO approval, so dispatch cannot be accepted against it.' };
   }
-  return { ok: true };
+  return { ok: false, reason: 'Aircraft is RED — resolve or defer the grounding item before acceptance (a special flight permit is out of scope).' };
 }

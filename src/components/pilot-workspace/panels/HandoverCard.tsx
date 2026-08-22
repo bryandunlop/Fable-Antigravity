@@ -1,6 +1,7 @@
 import { useTechLog } from '../../tech-log/TechLogContext';
 import { deriveServiceability } from '../../tech-log/engine/serviceability';
 import { deriveCustody, type CustodyState } from '../../tech-log/engine/custody';
+import type { Serviceability } from '../../tech-log/types';
 import type { TripRecord } from '../../../scheduling/store/types';
 
 /**
@@ -9,11 +10,17 @@ import type { TripRecord } from '../../../scheduling/store/types';
  * app. The brand tokens are P&G PMS 354 / 143 / 032 and are the same values behind
  * ServiceabilityChip's `status-*` classes. D33: brand tokens are imported, never copied —
  * and never approximated by whatever the utility framework ships.
+ *
+ * Typed to the union, not Record<string, …> (LG-143) — a loose key type is how a status this
+ * map has never heard of renders as no dot at all instead of failing to compile. NOT_ASSESSED
+ * is deliberately neutral: a tail whose D195 MEL is unapproved has no dispatch state to show,
+ * and painting it any RAG colour would assert one.
  */
-const SV_DOT: Record<string, string> = {
+const SV_DOT: Record<Serviceability, string> = {
   GREEN: 'bg-[var(--gfo-success,#00B140)]',
   AMBER: 'bg-[var(--gfo-warning,#F1B434)]',
   RED: 'bg-[var(--gfo-error,#EF3340)]',
+  NOT_ASSESSED: 'bg-muted-foreground',
 };
 
 // Pilot-framed custody (first person) on the P&G-blue axis — distinct from the third-person CustodyChip.
@@ -41,8 +48,12 @@ export function HandoverCard({ trip, onOpenHandover }: { trip: TripRecord; onOpe
   const custody = deriveCustody(ac.id, state, now).state;
   const c = CUSTODY[custody];
   const deferrals = state.deferrals.filter((d) => d.aircraftId === ac.id && d.status === 'ACTIVE');
+  /* LG-143 — this card told the PIC "Serviceable · no deferrals" under a green dot for the tail in
+     onboarding, because the projection handed it GREEN. It now returns NOT_ASSESSED, so this reads
+     the answer rather than re-deriving it from isProvisional. */
   const svText =
-    sv === 'RED' ? 'Unserviceable — grounded'
+    sv === 'NOT_ASSESSED' ? 'In onboarding — D195 MEL pending FSDO approval'
+    : sv === 'RED' ? 'Unserviceable — grounded'
     : sv === 'AMBER' ? `Serviceable · ${deferrals.length} deferral${deferrals.length === 1 ? '' : 's'}`
     : 'Serviceable · no deferrals';
 

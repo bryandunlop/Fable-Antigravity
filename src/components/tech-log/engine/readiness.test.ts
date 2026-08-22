@@ -93,4 +93,27 @@ describe('deriveTripReadiness §9', () => {
     const r = deriveTripReadiness(trip([leg()]), { ...clean, deferrals: [ackDeferral({ restrictionText: undefined })], melItems: [mel()], briefings: [] }, NOW);
     expect(r.state).toBe('READY');
   });
+
+  /**
+   * LG-143 — trip readiness must agree with the dispatch-acceptance gate.
+   *
+   * A clean provisional tail reads GREEN from deriveServiceability (which knows nothing of
+   * isProvisional), so a trip against the G800 in onboarding showed a green "Ready" chip on every
+   * pilot surface — Trips, LegDetail, MyFlights, FlightHub — throughout trip planning, and the
+   * first sign of trouble was the PIC hitting canAcceptDispatch's block at the briefing.
+   */
+  it('RED: a provisional aircraft is never trip-ready, however clean the trip is (LG-143)', () => {
+    const prov: Aircraft = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
+    const t: Trip = { ...trip([leg()]), aircraftId: 'ac2' };
+
+    const r = deriveTripReadiness(t, { aircraft: [ac, prov], defects: [], deferrals: [] }, NOW);
+    expect(r.state).toBe('RED');
+    expect(r.blocker).toMatch(/MEL/);
+  });
+
+  it('READY still holds for the same trip on a non-provisional tail', () => {
+    const prov: Aircraft = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
+    const r = deriveTripReadiness(trip([leg()]), { aircraft: [ac, prov], defects: [], deferrals: [] }, NOW);
+    expect(r.state).toBe('READY');
+  });
 });

@@ -523,11 +523,15 @@
   .status-warning { background-color: rgba(241, 180, 52, 0.15); color: #8A5F00; border-color: rgba(241, 180, 52, 0.40); }
   .status-error   { background-color: rgba(239, 51, 64, 0.10); color: #A31017; border-color: rgba(239, 51, 64, 0.30); }
   .status-info    { background-color: rgba(0, 150, 252, 0.10); color: #0058A3; border-color: rgba(0, 150, 252, 0.30); }
+  /* LG-143 — "not assessed" wears no colour from the RAG axis, because it is the absence of an
+     answer rather than a fourth answer. */
+  .status-neutral { background-color: rgba(100, 100, 100, 0.10); color: #4A4A4A; border-color: rgba(100, 100, 100, 0.30); }
 
   .dark .status-success { background-color: rgba(0, 177, 64, 0.22); color: #7BE3A3; border-color: rgba(0, 177, 64, 0.35); }
   .dark .status-warning { background-color: rgba(241, 180, 52, 0.20); color: #EDD9A9; border-color: rgba(241, 180, 52, 0.40); }
   .dark .status-error   { background-color: rgba(239, 51, 64, 0.22); color: #F09595; border-color: rgba(239, 51, 64, 0.40); }
   .dark .status-info    { background-color: rgba(0, 150, 252, 0.18); color: #7FCCFE; border-color: rgba(0, 150, 252, 0.40); }
+  .dark .status-neutral { background-color: rgba(160, 160, 160, 0.18); color: #C9C9C9; border-color: rgba(160, 160, 160, 0.35); }
 }
 
 @layer components {

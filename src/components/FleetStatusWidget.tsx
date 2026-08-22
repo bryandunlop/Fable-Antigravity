@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { Link } from 'react-router-dom';
 import { useUnifiedFleetStatus } from './hooks/useUnifiedFleetStatus';
 import { ServiceabilityChip } from './tech-log/components/ServiceabilityChip';
+import type { Serviceability } from './tech-log/types';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -23,10 +25,15 @@ interface FleetStatusWidgetProps {
   transparent?: boolean;
 }
 
-const RAG_DOT: Record<string, string> = {
+/* Typed Record<Serviceability, …> rather than Record<string, …> on purpose (LG-143): the loose key
+   type is what let this map silently return undefined for a status it had never heard of. The
+   whole point of NOT_ASSESSED being in the union is that maps like this fail to compile until they
+   answer for it. */
+const RAG_DOT: Record<Serviceability, string> = {
   GREEN: 'var(--gfo-success, #00B140)',
   AMBER: 'var(--gfo-warning, #F1B434)',
   RED: 'var(--gfo-error, #EF3340)',
+  NOT_ASSESSED: 'var(--muted-foreground)',
 };
 
 // Display-only fuel override (demo affordance until the fuel-request spine lands).
@@ -89,8 +96,12 @@ export default function FleetStatusWidget({
           {fleet.map(ac => {
             const fuel = overrides[ac.tailNumber] !== undefined ? overrides[ac.tailNumber] : ac.fuelRemaining;
             const aw = ac.airworthiness;
-            const reason =
-              aw.status === 'RED'
+            /* LG-143 — this widget showed a green chip and dot with no caveat at all for the tail
+               in onboarding, because the projection handed it GREEN. It now says NOT_ASSESSED and
+               the chip renders "Provisional"; only the reason line is widget-specific. */
+            const reason = aw.status === 'NOT_ASSESSED'
+              ? 'MEL pending FSDO approval'
+              : aw.status === 'RED'
                 ? `${aw.openAffectingDefects} open defect${aw.openAffectingDefects === 1 ? '' : 's'}`
                 : aw.status === 'AMBER'
                   ? `${aw.activeDeferrals} active deferral${aw.activeDeferrals === 1 ? '' : 's'}`

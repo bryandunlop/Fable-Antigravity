@@ -71,6 +71,8 @@ const RULE_TEXT: Record<number, string> = {
   3: 'An expired dispatch-gating recurring check',
   4: 'At least one active MEL deferral in force',
   5: 'No open defects and no active deferrals',
+  // LG-143 — rule 6 is the projection declining to answer, not a sixth way to be dispatchable.
+  6: 'Deferrals cannot be raised while the D195 MEL is pending FSDO approval',
 };
 
 const CHECK_BADGE: Record<string, 'secondary' | 'destructive' | 'outline'> = { CURRENT: 'secondary', DUE_SOON: 'outline', EXPIRED: 'destructive', NEVER_DONE: 'destructive' };
@@ -424,7 +426,7 @@ export default function AircraftDetail() {
       banner={
         <AircraftBanner
           aircraft={ac}
-          status={ac.isProvisional ? null : sv.status}
+          status={sv.status}
           custody={custody.state}
           governing={governingSentence(board, ac.tailNumber)}
           rule={RULE_TEXT[sv.governingRule]}
@@ -506,6 +508,8 @@ export default function AircraftDetail() {
                 <Wrench className="h-4 w-4" />
                 {board.blockers.length > 0
                   ? `Stands between ${ac.tailNumber} and dispatch (${board.blockers.length})`
+                  : sv.status === 'NOT_ASSESSED'
+                  ? `Nothing recorded against ${ac.tailNumber}`
                   : `Nothing is holding ${ac.tailNumber} on the ground`}
               </CardTitle>
               {/* One canonical entry point per persona (LG-207): pilots already have "Report
@@ -519,9 +523,26 @@ export default function AircraftDetail() {
             </CardHeader>
             <CardContent className="space-y-3">
               {board.blockers.length === 0 && (
-                <div className={cn('flex items-center gap-1.5 text-sm', sv.status === 'GREEN' ? 'text-[var(--gfo-success-ink,#00803A)]' : 'text-[var(--gfo-warning-ink,#8A6200)]')}>
+                {/* Ink tokens, not the fill tokens — this is TEXT on a light surface, and the
+                    fills are tuned for dots and chips. NOT_ASSESSED stays neutral on purpose. */}
+                <div className={cn(
+                  'flex items-center gap-1.5 text-sm',
+                  sv.status === 'NOT_ASSESSED' ? 'text-muted-foreground'
+                  : sv.status === 'GREEN' ? 'text-[var(--gfo-success-ink,#00803A)]'
+                  : 'text-[var(--gfo-warning-ink,#8A6200)]',
+                )}>
                   <CheckCircle2 className="h-4 w-4" />
-                  {sv.status === 'GREEN'
+                  {/* LG-143 — the empty board asserted dispatchability, the same claim the banner
+                      used to make. An empty board on a tail in onboarding means only that nothing
+                      is recorded against it.
+
+                      Deliberately "not assessed" rather than "cannot dispatch": that an aircraft in
+                      onboarding may not fly AT ALL is a regulatory claim nobody here has confirmed.
+                      What IS confirmed is that its MEL is unapproved, so nothing can be deferred
+                      and myGFO has no dispatch answer to give. */}
+                  {sv.status === 'NOT_ASSESSED'
+                    ? `No open maintenance recorded against ${ac.tailNumber} — but no dispatch state is assessed until its D195 MEL is approved.`
+                    : sv.status === 'GREEN'
                     ? `No open maintenance — ${ac.tailNumber} is dispatchable.`
                     : 'Dispatchable under restriction — see the deferrals in force below.'}
                 </div>

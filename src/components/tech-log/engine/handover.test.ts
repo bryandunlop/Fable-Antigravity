@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deferralsRequiringAck, canAcceptDispatch } from './handover';
+import { deferralsRequiringAck, canAcceptDispatch, canPrepareBriefing } from './handover';
 import type { Aircraft, Defect, Deferral, MelItem } from '../types';
 
 const NOW = '2026-06-22T00:00:00Z';
@@ -71,5 +71,58 @@ describe('canAcceptDispatch', () => {
   });
   it('allows AMBER (active deferral covers the defect)', () => {
     expect(canAcceptDispatch('ac1', { aircraft: [ac], defects: [open({ status: 'DEFERRED' })], deferrals: [deferral()] }, NOW).ok).toBe(true);
+  });
+
+  /**
+   * LG-143 — a provisional tail cannot be accepted, whatever its RAG state says.
+   *
+   * This is a GATE, not copy. `deriveServiceability` has no notion of `isProvisional`, so the G800
+   * in onboarding — no defects, D195 MEL still PENDING_FSDO — read GREEN and passed this gate. The
+   * PIC was shown "Serviceable — no open items" and could sign acceptance, freezing
+   * `serviceability: 'GREEN'` into the signed FlightBriefing disclosure for an aircraft whose MEL
+   * the FSDO has not approved.
+   *
+   * Bryan ruled block-outright on 2026-07-31, the conservative reading: myGFO has no dispatch
+   * answer for a tail in onboarding, and the default-RED invariant says absence of an answer is
+   * never a green light.
+   */
+  it('blocks a provisional aircraft even when it is otherwise clean (LG-143)', () => {
+    const prov = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
+    const r = canAcceptDispatch('ac2', { aircraft: [ac, prov], defects: [], deferrals: [] }, NOW);
+
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/MEL/);
+  });
+
+  it('the provisional block is about the aircraft, not the defects — it holds with a clean board (control)', () => {
+    const prov = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
+    // Same state that returns ok for the non-provisional tail in the sibling test above.
+    expect(canAcceptDispatch('ac1', { aircraft: [ac, prov], defects: [], deferrals: [] }, NOW).ok).toBe(true);
+    expect(canAcceptDispatch('ac2', { aircraft: [ac, prov], defects: [], deferrals: [] }, NOW).ok).toBe(false);
+  });
+});
+
+/**
+ * LG-143 — blocking acceptance alone left the signed record behind.
+ *
+ * `buildBriefingDisclosure` freezes `serviceability` from the projection, which reads GREEN for a
+ * clean provisional tail, and the maintenance release signature covers that frozen disclosure. So a
+ * briefing nobody could ever accept still produced a signed record, an on-screen readout and a
+ * printed flight briefing all saying "Serviceability: GREEN" for an aircraft whose D195 MEL the
+ * FSDO has not approved. Bryan ruled block-release, 2026-07-31.
+ */
+describe('canPrepareBriefing (LG-143)', () => {
+  const prov = { ...ac, id: 'ac2', tailNumber: 'N3PG', isProvisional: true };
+
+  it('blocks preparing or releasing a briefing on a provisional aircraft', () => {
+    const r = canPrepareBriefing('ac2', { aircraft: [ac, prov] });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/MEL/);
+  });
+
+  it('leaves an ordinary aircraft alone', () => {
+    const r = canPrepareBriefing('ac1', { aircraft: [ac, prov] });
+    expect(r.ok).toBe(true);
+    expect(r.reason).toBeUndefined();
   });
 });

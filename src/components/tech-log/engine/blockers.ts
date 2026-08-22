@@ -242,7 +242,17 @@ export function buildBlockers(aircraftId: string, state: Slice, asOfUtc: string)
 /** One sentence naming the condition that governs the tail right now. */
 export function governingSentence(board: BlockerBoard, tailNumber: string): string {
   const g = [...board.blockers, ...board.restrictions].find(r => r.governing);
-  if (board.status === 'GREEN') return `${tailNumber} is serviceable — no open defects and no active deferrals.`;
+  /* LG-143 — the projection says NOT_ASSESSED for a tail in onboarding, so this reads the answer
+     rather than re-deriving it. "No open defects" is true of such a tail, but "serviceable" is not
+     something myGFO may say about it: its D195 MEL is PENDING_FSDO and nothing can be deferred
+     against it. Note this is the CLEAN case only — a provisional tail with an open defect is RED
+     by rule 1 and still names its defect below, because a defect is a defect. */
+  if (board.status === 'NOT_ASSESSED') {
+    return `${tailNumber} is in onboarding — no open defects, but no dispatch state is assessed until its D195 MEL is approved.`;
+  }
+  if (board.status === 'GREEN') {
+    return `${tailNumber} is serviceable — no open defects and no active deferrals.`;
+  }
   if (!g) {
     return board.status === 'RED'
       ? `${tailNumber} is grounded.`

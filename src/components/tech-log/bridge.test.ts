@@ -322,7 +322,22 @@ describe('summarizeFleetServiceability', () => {
   it('covers every aircraft in the fleet', () => {
     const state = getDefaultState();
     const svc = summarizeFleetServiceability(state, new Date().toISOString());
-    for (const ac of state.aircraft) expect(svc[ac.tailNumber]).toMatch(/^(GREEN|AMBER|RED)$/);
+    // NOT_ASSESSED (LG-143) is a real member of the union — the G800 in onboarding reports it.
+    for (const ac of state.aircraft) expect(svc[ac.tailNumber]).toMatch(/^(GREEN|AMBER|RED|NOT_ASSESSED)$/);
+  });
+
+  /**
+   * LG-143 — this bridge is what every surface OUTSIDE the tech-log module reads (the dashboard
+   * fleet widget, /aircraft). It used to hand them GREEN for the provisional G800, which is how
+   * the same overclaim kept reappearing in modules nobody thought to check.
+   */
+  it('reports the provisional tail as NOT_ASSESSED, never GREEN', () => {
+    const state = getDefaultState();
+    const svc = summarizeFleetServiceability(state, new Date().toISOString());
+    const prov = state.aircraft.find(a => a.isProvisional)!;
+
+    expect(prov).toBeDefined();
+    expect(svc[prov.tailNumber]).toBe('NOT_ASSESSED');
   });
 });
 
