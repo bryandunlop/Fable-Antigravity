@@ -3,14 +3,17 @@ import { formatCountdown } from '../dayOfQueue';
 import type { TimelineEntry } from '../dayTimeline';
 import { DayTimeline } from './DayTimeline';
 import type { CustodyState } from '../../tech-log/engine/custody';
+import type { Serviceability } from '../../tech-log/types';
 
 const zulu = (iso: string) => `${iso.slice(11, 16)}Z`;
 
 // Serviceability keeps the brand RAG tokens — never Tailwind's own greens (LG-158/D33).
-const SV_DOT: Record<string, string> = {
+const SV_DOT: Record<Serviceability, string> = {
   GREEN: 'bg-[var(--gfo-success)]',
   AMBER: 'bg-[var(--gfo-warning)]',
   RED: 'bg-[var(--gfo-error)]',
+  // Neutral on purpose — a tail with no assessed dispatch state must not be painted as if it had one.
+  NOT_ASSESSED: 'bg-muted-foreground',
 };
 
 /**
@@ -34,7 +37,7 @@ export function DayOfPane({
   progress: { done: number; total: number };
   /** The day in clock order (`dayTimeline`), which carries the outstanding queue inside it. */
   timeline: TimelineEntry[];
-  serviceability: 'GREEN' | 'AMBER' | 'RED';
+  serviceability: Serviceability;
   custody?: CustodyState;
   deferralCount: number;
   onOpenHandover: () => void;
@@ -91,11 +94,16 @@ export function DayOfPane({
         <div className="mt-3.5 border-t border-white/[0.18] pt-2.5 text-xs">
           <span className="inline-flex items-center gap-2">
             <span className={`h-2 w-2 shrink-0 rounded-full ${SV_DOT[serviceability]}`} aria-hidden />
+            {/* NOT_ASSESSED must never fall through to "Serviceable" (LG-143): a tail whose D195 MEL
+                is unapproved has no dispatch state, and saying it is serviceable is a claim myGFO
+                is not entitled to make. */}
             {grounded
               ? 'Unserviceable — grounded'
-              : deferralCount > 0
-                ? `Serviceable · ${deferralCount} deferral${deferralCount === 1 ? '' : 's'}`
-                : 'Serviceable · no deferrals'}
+              : serviceability === 'NOT_ASSESSED'
+                ? 'No dispatch state assessed — D195 MEL not yet approved'
+                : deferralCount > 0
+                  ? `Serviceable · ${deferralCount} deferral${deferralCount === 1 ? '' : 's'}`
+                  : 'Serviceable · no deferrals'}
           </span>
         </div>
       </section>
