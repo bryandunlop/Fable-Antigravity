@@ -110,6 +110,22 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               <Link to="/ops" className="font-medium text-foreground transition-colors hover:text-gfo-sunrise-deep dark:hover:text-gfo-sunrise">
                 Bryan Dunlop
               </Link>
+              {/* And the quiet door to /worklog. Same posture as /ops: personal
+                  project plumbing, not product, so it lives on the login screen
+                  rather than anywhere in the authenticated app.
+
+                  It is here because "no link anywhere" turned out to have a
+                  cost. Anything that lands on / — a home-screen icon made
+                  before the scoped manifest existed, an SSO round trip that
+                  drops the path — bounces to this screen, and from here the
+                  only way back to the log was to retype the URL. */}
+              <span aria-hidden className="mx-1.5 opacity-40">·</span>
+              <Link
+                to="/worklog"
+                className="font-medium text-foreground transition-colors hover:text-gfo-sunrise-deep dark:hover:text-gfo-sunrise"
+              >
+                Hours
+              </Link>
             </p>
           </div>
         </div>

@@ -58,6 +58,7 @@ import PilotCurrency from './components/PilotCurrency';
 import PassengerForms from './components/PassengerForms';
 import PublicPassengerForm from './components/PublicPassengerForm';
 import OpsBoardPage from './components/ops/OpsBoardPage';
+import WorkLogPage from './components/worklog/WorkLogPage';
 import AirportEvaluation from './components/AirportEvaluation';
 import AirportEvaluations from './components/AirportEvaluations';
 import AirportInformation from './components/airport-info/AirportInformation';
@@ -223,6 +224,10 @@ export default function App() {
                         login-footer credit (design §7). Public outer route so the pre-login
                         door works; the demo's real gate is Vercel SSO. */}
                     <Route path="/ops" element={<OpsBoardPage />} />
+                    {/* Personal effort tracker — not product. Outside the shell on
+                        purpose: no nav entry, no role gate, no flight-ops import.
+                        Registered hidden in NAV_ENTRIES so the route audit sees it. */}
+                    <Route path="/worklog" element={<WorkLogPage />} />
                     <Route
                       path="/commissary-kiosk"
                       element={

@@ -1,0 +1,13 @@
+{
+    "name": "Work Log",
+    "short_name": "Work Log",
+    "description": "Personal effort tracker — hours on myGFO by fiscal year",
+    "start_url": "/worklog",
+    "scope": "/worklog",
+    "display": "standalone",
+    "background_color": "#0D1F5C",
+    "theme_color": "#142D7E",
+    "icons": [
+        { "src": "/favicon.png", "sizes": "800x800", "type": "image/png" }
+    ]
+}

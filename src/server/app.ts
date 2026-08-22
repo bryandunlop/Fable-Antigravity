@@ -17,6 +17,7 @@ import { pickRestockRoute } from './routes/pick-restock';
 import { requestsRoute } from './routes/requests';
 import { activityRoute } from './routes/activity';
 import { storageLocationsRoute } from './routes/storage-locations';
+import { worklogRoute } from './routes/worklog';
 import { weatherRoute, forecastRoute } from './routes/weather';
 
 type Env = { Variables: { db: Db } };
@@ -54,6 +55,8 @@ const dbRoutes = {
   '/requests': requestsRoute,
   '/activity': activityRoute,
   '/storage-locations': storageLocationsRoute,
+  // Personal effort log — shares the database, touches no product table.
+  '/worklog': worklogRoute,
 } as const;
 
 const withDb: MiddlewareHandler<Env> = async (c, next) => {
