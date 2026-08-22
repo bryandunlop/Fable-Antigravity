@@ -17,7 +17,7 @@ import {
   MapPin, MapPinCheck, Monitor, Package, PackagePlus, Plane, PlaneTakeoff, Route,
   Send, Settings, Shield, ShieldCheck, Sliders, Sparkles, Target, Timer, Upload,
   BadgeCheck, BookUser, PlaneLanding, Radar, SearchCheck, Stamp,
-  Mail, Ticket, UserCheck, Users, Utensils, Warehouse, Wrench,
+  Mail, Repeat, Ticket, UserCheck, Users, Utensils, Warehouse, Wrench,
 } from 'lucide-react';
 
 export type Domain =
@@ -240,7 +240,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/live-metrics', label: 'Live Metrics', domain: 'admin', icon: Activity, primary: true, keywords: ['kpi'], roles: ['lead', 'admin'] },
   { path: '/critical-functions', label: 'Critical Business Functions', domain: 'admin', icon: ShieldCheck, primary: true, keywords: ['critical function', 'backup role', 'continuity'], roles: ['lead', 'admin', 'vp'] },
   // The VP's admin lives here — 20+ projects chased on the leadership's behalf.
-  { path: '/rolling-action-items', label: 'Rolling Action Items', railLabel: 'Rolling Items', domain: 'admin', icon: Target, primary: true, keywords: ['project', 'projects', 'status', 'check-in', 'chase', 'stalled', 'rolling'], roles: ['lead', 'admin', 'vp', 'admin-assistant'] },
+  { path: '/rolling-action-items', label: 'Rolling Action Items', railLabel: 'Rolling Items', domain: 'admin', icon: Repeat, primary: true, keywords: ['project', 'projects', 'status', 'check-in', 'chase', 'stalled', 'rolling'], roles: ['lead', 'admin', 'vp', 'admin-assistant'] },
   { path: '/suggestion-box', label: 'Suggestion Box', domain: 'admin', icon: Mail, primary: true, keywords: ['suggestion', 'idea', 'feedback'], roles: ['lead', 'admin', 'vp', 'admin-assistant'] },
   { path: '/admin/airport-evaluation-officer', label: 'Airport Evaluation Officer', railLabel: 'Airport Officer', domain: 'admin', icon: BadgeCheck, primary: false, roles: ['airport-evaluator', 'admin'] },
   { path: '/foreflight-test-upload', label: 'ForeFlight Test Upload', domain: 'admin', icon: Upload, primary: false, keywords: ['foreflight'], roles: ['admin'] },
