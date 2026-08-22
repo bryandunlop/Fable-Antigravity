@@ -1,5 +1,5 @@
 {
-  "src/components/ActionItems/NewItemDialog.tsx: TS7006: Parameter 'value' implicitly has an 'any' type.": 2,
+  "src/components/ActionItems/NewItemDialog.tsx: TS7006: Parameter 'value' implicitly has an 'any' type.": 1,
   "src/components/ActionItems/UpdateProgressDialog.tsx: TS7006: Parameter 'value' implicitly has an 'any' type.": 1,
   "src/components/ASAPReport.tsx: TS7006: Parameter 'checked' implicitly has an 'any' type.": 4,
   "src/components/ASAPReport.tsx: TS7006: Parameter 'value' implicitly has an 'any' type.": 2,
