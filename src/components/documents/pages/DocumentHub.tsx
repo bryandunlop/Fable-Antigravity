@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FileLock2, FilePlus2, Inbox, Library, Lightbulb, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
+import { BarChart3, BedDouble, BookOpenCheck, CheckSquare, FileLock2, FilePlus2, Inbox, Library, Lightbulb, Map, MessageSquareText, Pin, Search, Upload, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -30,6 +30,7 @@ import { TribalKnowledgePanel } from '../components/TribalKnowledgePanel';
 import { CabinKnowledgePanel } from '../components/CabinKnowledgePanel';
 import { ComplianceDashboard } from './ComplianceDashboard';
 import { DocumentRegistry } from './DocumentRegistry';
+import { DocumentEstate } from './DocumentEstate';
 import { AmendmentInboxPanel } from '../components/AmendmentInboxPanel';
 import { SearchPanel } from '../components/SearchPanel';
 import { outstandingWork } from '../engine/amendments';
@@ -222,6 +223,11 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
               <FileLock2 className="h-4 w-4" /> Sources
             </TabsTrigger>
           )}
+          {manager && (
+            <TabsTrigger value="estate" className="gap-1.5">
+              <Map className="h-4 w-4" /> Estate
+            </TabsTrigger>
+          )}
           {pendingApprovals.length > 0 || manager ? (
             <TabsTrigger value="approvals" className="gap-1.5">
               <CheckSquare className="h-4 w-4" /> Approvals
@@ -374,6 +380,10 @@ export function DocumentHub({ userRole, additionalRoles = [] }: { userRole: stri
 
         <TabsContent value="amendments" className="mt-4">
           <AmendmentInboxPanel userRole={userRole} />
+        </TabsContent>
+
+        <TabsContent value="estate" className="mt-4">
+          <DocumentEstate />
         </TabsContent>
 
         <TabsContent value="approvals" className="mt-4">
