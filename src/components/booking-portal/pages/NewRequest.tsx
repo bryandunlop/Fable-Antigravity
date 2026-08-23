@@ -10,6 +10,8 @@ import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { PortalShell } from '../components/PortalShell';
 import { Chip, SectionLabel, purposeLabel } from '../components/portalUi';
+import { QuotePanel, savingsAvailable } from '../components/QuotePanel';
+import { GFO_RATE_CARD, daysUntil, quoteRequest } from '../engine/quote';
 import { usePortal } from '../BookingPortalContext';
 import type { Purpose, RequestLeg } from '../types';
 import { cn } from '../../ui/utils';
@@ -66,6 +68,33 @@ export default function NewRequest() {
     () => legs.reduce((sum, l) => sum + estimate(l.from, l.to).minutes, 0),
     [legs],
   );
+
+  // Quoted against a fixed "today" rather than the live clock, so the estimate an
+  // EA is looking at does not silently change underneath them mid-edit.
+  const asOf = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const quote = useMemo(
+    () =>
+      quoteRequest(
+        legs.map((l) => ({
+          estMinutes: estimate(l.from, l.to).minutes,
+          date: l.date,
+          flexHours: l.flexHours,
+          purposes: l.passengerIds.map((pid) => l.purposes[pid] ?? 'business'),
+          sharedRepositioning: false,
+        })),
+        asOf,
+      ),
+    [legs, asOf],
+  );
+  const savings = useMemo(() => {
+    const leadDays = legs.length ? daysUntil(asOf, [...legs].map((l) => l.date).sort()[0]) : 0;
+    return savingsAvailable(quote, {
+      leadDays,
+      earlyBookingDays: GFO_RATE_CARD.earlyBookingDays,
+      allFlexed: legs.length > 0 && legs.every((l) => l.flexHours >= GFO_RATE_CARD.flexThresholdHours),
+      anySharedRepo: false,
+    });
+  }, [quote, legs, asOf]);
 
   const updateLeg = (i: number, patch: Partial<DraftLeg>) =>
     setLegs((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -148,7 +177,7 @@ export default function NewRequest() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 pt-0">
-                  <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2.5" data-tour={i === 0 ? 'leg-fields' : undefined}>
                     <input aria-label={`Leg ${i + 1} from`} className={cn(field, 'w-24 uppercase')} value={leg.from} onChange={(e) => updateLeg(i, { from: e.target.value.toUpperCase() })} />
                     <span className="text-muted-foreground">→</span>
                     <input aria-label={`Leg ${i + 1} to`} className={cn(field, 'w-24 uppercase')} value={leg.to} onChange={(e) => updateLeg(i, { to: e.target.value.toUpperCase() })} />
@@ -166,7 +195,7 @@ export default function NewRequest() {
                     </label>
                   </div>
 
-                  <div className="rounded-lg border">
+                  <div className="rounded-lg border" data-tour={i === 0 ? 'manifest' : undefined}>
                     <p className="border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                       Manifest — leg {i + 1}
                     </p>
@@ -265,6 +294,8 @@ export default function NewRequest() {
             </CardContent>
           </Card>
 
+          <QuotePanel quote={quote} savings={savings} />
+
           <Card>
             <CardHeader className="py-4"><CardTitle className="text-base">Planning estimate</CardTitle></CardHeader>
             <CardContent className="space-y-3 pt-0">
@@ -273,7 +304,7 @@ export default function NewRequest() {
                 {' '}total flight time · {legs.length} leg{legs.length === 1 ? '' : 's'}
               </p>
               <p className="text-xs text-muted-foreground">
-                Estimate only — scheduling assigns aircraft and final times.
+                Estimate only — scheduling assigns aircraft and final times, and the cost estimate moves with them.
               </p>
               <Button className="w-full" disabled={!canSubmit} onClick={submit}>Submit request</Button>
             </CardContent>
