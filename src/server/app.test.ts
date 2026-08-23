@@ -15,12 +15,26 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { app } from './app';
 
 const originalUrl = process.env.DATABASE_URL;
+const realFetch = globalThis.fetch;
 
 beforeEach(() => {
   delete process.env.DATABASE_URL;
+  // The two proxy tests below reach routes that call live upstream weather
+  // APIs. Upstream success has never been the point — the assertion is only
+  // that the body does not mention DATABASE_URL — but a real fetch that hangs
+  // blows vitest's 5s timeout and fails the run for a reason unrelated to what
+  // is under test. CI flaked exactly that way on 2026-08-04 while the same
+  // commit passed locally. Failing the upstream call immediately keeps every
+  // assertion identical and makes the outcome deterministic.
+  //
+  // Hono's app.request() builds a Request directly and does not go through
+  // global fetch, so this replaces ONLY the routes' own outbound calls.
+  globalThis.fetch = (() =>
+    Promise.reject(new Error('upstream weather API not called in tests'))) as typeof fetch;
 });
 
 afterEach(() => {
+  globalThis.fetch = realFetch;
   if (originalUrl === undefined) delete process.env.DATABASE_URL;
   else process.env.DATABASE_URL = originalUrl;
 });

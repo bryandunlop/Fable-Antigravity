@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Progress } from './ui/progress';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -48,12 +48,28 @@ import AuditDetailDrawer from './audit/AuditDetailDrawer';
 
 // Import existing types and utilities from ActionItems
 import { ActionItemsProps, ActionItem, NewItemForm } from './ActionItems/types';
-import { MOCK_ACTION_ITEMS } from './ActionItems/constants';
 import { getBorderColor, formatDate, getUserActionItems, getStats } from './ActionItems/utils';
+import { getOutstandingCheckIns } from './ActionItems/checkIn';
+import { useActionItems } from '../contexts/ActionItemContext';
+import { getCurrentPerson, isSamePerson, seesEveryProject } from '../lib/currentUser';
 
 // Import Action Item dialogs
 import DetailsDialog from './ActionItems/DetailsDialog';
 import UpdateProgressDialog from './ActionItems/UpdateProgressDialog';
+import NewItemDialog from './ActionItems/NewItemDialog';
+
+/** A derived check-in task carries the project + window it answers. */
+type CheckInTask = ActionItem & { checkInFor: { itemId: string; dueOn: string; contributorId: string } };
+
+const EMPTY_NEW_ITEM_FORM: NewItemForm = {
+  title: '',
+  description: '',
+  department: 'Flight Operations',
+  priority: 'Medium',
+  dueDate: '',
+  sections: [''],
+  checkInCadence: 'none',
+};
 
 interface PersonalTask {
   id: string;
@@ -93,7 +109,20 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
 
+  // Shared action-item store — the same projects the lead team's Rolling Action
+  // Items list reads, so an item raised here shows up there and vice versa.
+  const { actionItems: projectActionItems, addActionItem, recordCheckIn } = useActionItems();
+
   // Action Items states
+  const [isNewActionItemDialogOpen, setIsNewActionItemDialogOpen] = useState(false);
+  const [newItemForm, setNewItemForm] = useState<NewItemForm>(EMPTY_NEW_ITEM_FORM);
+  const [isCreatingActionItem, setIsCreatingActionItem] = useState(false);
+
+  // Scheduled check-in states
+  const [checkInTask, setCheckInTask] = useState<CheckInTask | null>(null);
+  const [checkInProgress, setCheckInProgress] = useState('0');
+  const [checkInNote, setCheckInNote] = useState('');
+
   const [selectedActionItem, setSelectedActionItem] = useState<ActionItem | null>(null);
   const [isActionItemDialogOpen, setIsActionItemDialogOpen] = useState(false);
   const [isUpdateProgressDialogOpen, setIsUpdateProgressDialogOpen] = useState(false);
@@ -244,7 +273,8 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
           assignedDate: audit.scheduledDate || new Date().toISOString().split('T')[0],
           dueDate: audit.dueDate || new Date().toISOString().split('T')[0],
           assignedBy: 'Safety Manager',
-          module: 'Audit',
+          department: 'Safety',
+          source: 'audit' as const,
           contributors: [
             { id: 'auditor', name: audit.assignedTo, role: audit.assignedRole || 'Auditor', avatar: audit.assignedTo.split(' ').map((n: string) => n[0]).join('') }
           ],
@@ -290,7 +320,8 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
             assignedDate: hazard.reportedDate,
             dueDate: '2025-02-28', // Placeholder logic 
             assignedBy: 'Safety Manager',
-            module: 'Safety Management',
+            department: 'Safety',
+            source: 'hazard' as const,
             contributors: [],
             sections: [
               { name: 'Root Cause Analysis', status: 'pending' },
@@ -316,7 +347,8 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
           assignedDate: hazard.reportedDate,
           dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
           assignedBy: 'Safety Manager',
-          module: 'Safety Management',
+          department: 'Safety',
+          source: 'hazard' as const,
           contributors: [],
           sections: [
             { name: 'Review Plan', status: 'pending' },
@@ -345,7 +377,8 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
             assignedDate: hazard.reportedDate,
             dueDate: '2025-03-15', // Fallback 
             assignedBy: hazard.mitigationAssignments?.processOwner?.[0]?.value || 'Process Owner',
-            module: 'Safety Management',
+            department: 'Safety',
+            source: 'hazard' as const,
             contributors: [],
             sections: [
               { name: 'Implementation', status: 'in-progress' },
@@ -371,7 +404,8 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
           assignedDate: hazard.reportedDate,
           dueDate: new Date().toISOString().split('T')[0],
           assignedBy: 'Safety Manager',
-          module: 'Safety Management',
+          department: 'Safety',
+          source: 'hazard' as const,
           contributors: [],
           sections: [],
           sectionsComplete: 0,
@@ -416,7 +450,8 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
           assignedDate: waiver.date,
           dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
           assignedBy: waiver.requestor,
-          module: 'Waiver Approval',
+          department: 'Safety',
+          source: 'waiver' as const,
           contributors: [
             { id: 'c1', name: waiver.requestor, role: 'Requestor', avatar: waiver.requestor.split(' ').map(n => n[0]).join('') },
             { id: 'c2', name: 'Safety Manager', role: 'Reviewer', avatar: 'SM' }
@@ -462,7 +497,8 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
           assignedDate: waiver.date,
           dueDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
           assignedBy: waiver.forwardedBy,
-          module: 'Waiver Approval',
+          department: 'Safety',
+          source: 'waiver' as const,
           contributors: [
             { id: 'c1', name: waiver.requestor, role: 'Requestor', avatar: waiver.requestor.split(' ').map(n => n[0]).join('') },
             { id: 'c2', name: waiver.forwardedBy.split(' (')[0], role: 'Safety Manager', avatar: 'TA' }
@@ -493,7 +529,7 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
   const applyWaiverDecisions = (items: ActionItem[]): ActionItem[] => {
     return items.map(item => {
       const decision = waiverDecisions[item.id];
-      if (!decision || item.module !== 'Waiver Approval') return item;
+      if (!decision || item.source !== 'waiver') return item;
 
       if (decision.decision === 'approved') {
         return {
@@ -529,13 +565,65 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
     });
   };
 
-  const userActionItems = applyWaiverDecisions([...getUserActionItems(MOCK_ACTION_ITEMS, userRole), ...getHazardTasks(), ...getWaiverApprovalTasks(), ...getAuditTasks()]);
+  /**
+   * Derive a task for every contributor who owes a status report on a lead-team
+   * project this cycle. This is the automatic half of the Rolling Action Items
+   * loop: the lead sets a cadence once, and the ask lands in each contributor's
+   * own list on schedule instead of the lead chasing people.
+   *
+   * Scoped to the signed-in person: a check-in is a personal obligation, and
+   * showing everyone's made the page a wall of other people's homework — 27
+   * status requests for one reader. Portfolio roles still see the lot, because
+   * chasing other people's reports is the job.
+   */
+  const getCheckInTasks = (): CheckInTask[] => {
+    const today = new Date().toISOString().split('T')[0];
+    const person = getCurrentPerson(userRole);
+    const seesAll = seesEveryProject(userRole);
+
+    return projectActionItems.flatMap(item => {
+      const outstanding = getOutstandingCheckIns(item, today);
+      if (!outstanding) return [];
+
+      const nudgedOn = item.checkIn?.lastNudgedOn;
+      const mine = seesAll
+        ? outstanding.contributors
+        : outstanding.contributors.filter(c => person && isSamePerson(c.name, person.name));
+
+      return mine.map(contributor => ({
+        id: `CheckIn-${item.id}-${outstanding.dueOn}-${contributor.id}`,
+        title: nudgedOn
+          ? `Status update requested: ${item.title}`
+          : `Status update due: ${item.title}`,
+        description: nudgedOn
+          ? `The lead team asked for an update on ${formatDate(nudgedOn)} — this project has gone quiet. Report progress and what changed.`
+          : `${contributor.name} owes a ${item.checkIn?.cadence} status report on this project. Report progress and what changed since the last check-in.`,
+        department: item.department,
+        source: 'check-in' as const,
+        assignedBy: item.assignedBy,
+        assignedDate: outstanding.dueOn,
+        dueDate: outstanding.dueOn,
+        // A lead reaching past the cadence is the strongest signal there is.
+        priority: nudgedOn ? 'Critical' : item.priority,
+        status: 'Pending',
+        progress: item.progress,
+        contributors: [contributor],
+        recentActivity: [],
+        sections: item.sections,
+        sectionsComplete: item.sectionsComplete,
+        totalSections: item.totalSections,
+        checkInFor: { itemId: item.id, dueOn: outstanding.dueOn, contributorId: contributor.id },
+      }));
+    });
+  };
+
+  const userActionItems = applyWaiverDecisions([...getUserActionItems(projectActionItems, userRole), ...getHazardTasks(), ...getWaiverApprovalTasks(), ...getAuditTasks(), ...getCheckInTasks()]);
   const actionItemsStats = getStats(userActionItems);
 
   // Surface pending waiver decisions as events (publish is idempotent by id)
   useEffect(() => {
     userActionItems
-      .filter(item => item.module === 'Waiver Approval' && item.status === 'Pending')
+      .filter(item => item.source === 'waiver' && item.status === 'Pending')
       .forEach(waiver => {
         eventStore.publish({
           id: `waiver-pending:${waiver.id}`,
@@ -701,6 +789,53 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
     });
   };
 
+  const handleCreateActionItem = () => {
+    if (!newItemForm.title.trim() || !newItemForm.description.trim()) return;
+
+    setIsCreatingActionItem(true);
+    const created = addActionItem(newItemForm, userRole === 'lead' ? 'Lead Team' : 'Administrator');
+    setIsCreatingActionItem(false);
+    setIsNewActionItemDialogOpen(false);
+    setNewItemForm(EMPTY_NEW_ITEM_FORM);
+
+    toast.success('Action Item Created', {
+      description:
+        created.checkIn?.cadence && created.checkIn.cadence !== 'none'
+          ? `"${created.title}" is on the Rolling Action Items list. Contributors will be asked for a ${created.checkIn.cadence} status update.`
+          : `"${created.title}" is now on the Rolling Action Items list.`,
+    });
+  };
+
+  const handleOpenCheckInDialog = (task: CheckInTask) => {
+    setCheckInTask(task);
+    setCheckInProgress(String(task.progress));
+    setCheckInNote('');
+  };
+
+  const handleSubmitCheckIn = () => {
+    if (!checkInTask) return;
+    if (!checkInNote.trim()) {
+      toast.error('Please describe what changed since the last check-in');
+      return;
+    }
+
+    const parsed = Number(checkInProgress);
+    const progress = Number.isFinite(parsed) ? Math.min(100, Math.max(0, Math.round(parsed))) : 0;
+
+    recordCheckIn(checkInTask.checkInFor.itemId, {
+      contributorId: checkInTask.checkInFor.contributorId,
+      dueOn: checkInTask.checkInFor.dueOn,
+      progress,
+      note: checkInNote.trim(),
+    });
+
+    setCheckInTask(null);
+    setCheckInNote('');
+    toast.success('Status Update Filed', {
+      description: 'The lead team sees this on the Rolling Action Items list.',
+    });
+  };
+
   const handleOpenActionItemProgressDialog = (actionItem: ActionItem) => {
     setUpdatingActionItem(actionItem);
     // Initialize the sections state for the dialog
@@ -833,7 +968,7 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
                 </Badge>
                 {isActionItem && (
                   <Badge variant="outline" className="bg-primary/10 text-primary text-xs">
-                    {(task as ActionItem).module === 'Waiver Approval' ? 'WAIVER APPROVAL' : 'ACTION ITEM'}
+                    {(task as ActionItem).source === 'waiver' ? 'WAIVER APPROVAL' : 'ACTION ITEM'}
                   </Badge>
                 )}
                 {!isActionItem && (
@@ -848,7 +983,7 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
               </div>
               <p className="text-muted-foreground mb-3">
                 {isActionItem
-                  ? `${(task as ActionItem).module} • Assigned by ${(task as ActionItem).assignedBy}`
+                  ? `${(task as ActionItem).department} • Assigned by ${(task as ActionItem).assignedBy}`
                   : `Personal Task • Created ${formatDate((task as PersonalTask).createdDate)}`
                 }
               </p>
@@ -952,7 +1087,7 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
                 View Details
               </Button>
               {/* Waiver items get "Make Decision", other items get "Update Progress" */}
-              {isActionItem && (task as ActionItem).module === 'Waiver Approval' ? (
+              {isActionItem && (task as ActionItem).source === 'waiver' ? (
                 waiverDecisions[(task as ActionItem).id] ? (
                   <Badge className={`text-sm py-1.5 px-3 ${waiverDecisions[(task as ActionItem).id].decision === 'approved' ? 'bg-green-600 text-white' :
                     waiverDecisions[(task as ActionItem).id].decision === 'denied' ? 'bg-red-600 text-white' :
@@ -977,6 +1112,15 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
                     Make Decision
                   </Button>
                 )
+              ) : isActionItem && (task as ActionItem).source === 'check-in' ? (
+                <Button
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                  onClick={() => handleOpenCheckInDialog(task as CheckInTask)}
+                >
+                  <Bell className="w-4 h-4 mr-2" />
+                  File Status Update
+                </Button>
               ) : (
                 <Button
                   size="sm"
@@ -1125,7 +1269,7 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
             <div className="flex items-center justify-between">
               <h2>Assigned Action Items</h2>
               {(userRole === 'lead' || userRole === 'admin') && (
-                <Button>
+                <Button onClick={() => setIsNewActionItemDialogOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create Action Item
                 </Button>
@@ -1407,6 +1551,68 @@ export default function UnifiedTasksActionItems({ userRole }: UnifiedTasksAction
       </Dialog>
 
       {/* Action Item Dialogs */}
+      <NewItemDialog
+        isOpen={isNewActionItemDialogOpen}
+        onClose={() => {
+          setIsNewActionItemDialogOpen(false);
+          setNewItemForm(EMPTY_NEW_ITEM_FORM);
+        }}
+        newItemForm={newItemForm}
+        setNewItemForm={setNewItemForm}
+        onSubmit={handleCreateActionItem}
+        isSubmitting={isCreatingActionItem}
+      />
+
+      {/* Scheduled check-in — one contributor's status report for this cycle */}
+      {checkInTask && (
+        <Dialog open onOpenChange={open => { if (!open) setCheckInTask(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>File Status Update</DialogTitle>
+              <DialogDescription>
+                {checkInTask.contributors[0]?.name}'s check-in for the cycle due {formatDate(checkInTask.checkInFor.dueOn)}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="check-in-progress" className="text-sm font-medium mb-2 block">
+                  Project progress (%)
+                </Label>
+                <Input
+                  id="check-in-progress"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={checkInProgress}
+                  onChange={e => setCheckInProgress(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="check-in-note" className="text-sm font-medium mb-2 block">
+                  What changed since the last check-in? <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="check-in-note"
+                  rows={4}
+                  placeholder="Progress, blockers, what's next..."
+                  value={checkInNote}
+                  onChange={e => setCheckInNote(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setCheckInTask(null)}>Cancel</Button>
+              <Button onClick={handleSubmitCheckIn} disabled={!checkInNote.trim()}>
+                <Bell className="w-4 h-4 mr-2" />
+                Submit Update
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {selectedActionItem && (
         <DetailsDialog
           item={selectedActionItem}

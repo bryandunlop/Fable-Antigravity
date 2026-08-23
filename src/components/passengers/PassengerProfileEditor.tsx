@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
-import { Info, Lock, Plus, X, AlertTriangle, Check } from 'lucide-react';
+import { Info, Plus, X, AlertTriangle, Check, Quote } from 'lucide-react';
 import { usePassengers } from './PassengerContext';
 import type { Passenger, PassengerComfort } from './passengerData';
 import {
@@ -11,8 +11,12 @@ import {
 import type { ProfileDraft } from './engine/profileEdits';
 
 // Editing a profile from the trip screen, because that is the only moment the crew is
-// actually with the passenger. Allergies are deliberately NOT editable here — see
-// engine/profileEdits.ts for why.
+// actually with the passenger.
+//
+// Allergens ARE editable, reversing an earlier decision. myairops sends dietary detail
+// as a free-text note, not a structured list, so turning it into allergens is a
+// judgement only a person can make — and the flight attendants make it. What is
+// read-only is the source text, shown above the field it feeds.
 
 function ChipGroup({ label, items, onAdd, onRemove, conflicts = [], placeholder }: {
   label: string;
@@ -96,20 +100,24 @@ export default function PassengerProfileEditor({ passenger, manifestId, displayN
   const original = useMemo(() => draftFrom(passenger), [passenger]);
   const [draft, setDraft] = useState<ProfileDraft>(original);
 
-  const allergens = passenger?.allergies.map((a) => a.allergen) ?? [];
+  const sourceNote = passenger?.sourceNote?.dietary?.trim() ?? '';
+  const stale = Boolean(sourceNote && passenger?.mappedFromNote && passenger.mappedFromNote.trim() !== sourceNote);
   const lockedFlag = Boolean(passenger?.allergyFlagged);
-  const foodConflicts = conflictingItems(draft.food, allergens);
-  const drinkConflicts = conflictingItems(draft.beverage, allergens);
+  // Conflicts read the DRAFT, so removing an allergen clears its warning immediately
+  // rather than after a save.
+  const foodConflicts = conflictingItems(draft.food, draft.allergens);
+  const drinkConflicts = conflictingItems(draft.beverage, draft.allergens);
   const dirty = isDirty(draft, original);
 
   const set = (patch: Partial<ProfileDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const setComfort = (k: keyof PassengerComfort, v: string) =>
     setDraft((d) => ({ ...d, passengerComfort: { ...d.passengerComfort, [k]: v } }));
 
-  const canConfirmNone = allergens.length === 0 && !lockedFlag;
+  const canConfirmNone = draft.allergens.length === 0 && !lockedFlag && !sourceNote;
 
   const save = () => {
-    if (passenger) updatePassenger(applyDraft(passenger, draft));
+    const stamp = new Date().toISOString();
+    if (passenger) updatePassenger(applyDraft(passenger, draft, stamp));
     else addPassenger(newPassengerFrom(manifestId, displayName, draft));
     onDone();
   };
@@ -123,21 +131,32 @@ export default function PassengerProfileEditor({ passenger, manifestId, displayN
         <span>Saves to <span className="font-semibold">{displayName}</span>’s profile everywhere — not just this trip.</span>
       </p>
 
-      <div className="rounded-lg border bg-muted/40 px-3 py-2">
-        <p className="text-sm font-semibold flex items-center gap-2">
-          <Lock className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-          {allergens.length > 0
-            ? `Allergies — ${allergens.join(', ')}`
-            : lockedFlag ? 'Allergies flagged — no detail'
-            : passenger ? 'No allergies recorded' : 'No allergy information on file'}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          {passenger ? 'Comes from the booking and cannot be changed here.' : 'Nothing came with this booking, and it cannot be entered here.'}{' '}
-          <button type="button" className="underline hover:text-foreground" onClick={() => window.alert(
-            'Raise it with scheduling so the booking is corrected upstream — myGFO reads myairops, it never writes back.',
-          )}>Report a discrepancy</button>
-        </p>
-      </div>
+      {sourceNote && (
+        <div className="rounded-lg border bg-muted/40 px-3 py-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Quote className="w-3 h-3" /> From the booking · myairops
+          </p>
+          <p className="text-sm mt-1.5 italic leading-snug">“{sourceNote}”</p>
+          {stale && (
+            <div className="mt-2 pt-2 border-t">
+              <p className="text-xs font-semibold text-red-700 dark:text-red-300">This changed after the allergens were recorded.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Mapped from: “{passenger!.mappedFromNote}”</p>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-2">Read-only — myairops is pull-only. Your mapping below is what myGFO uses.</p>
+        </div>
+      )}
+
+      <ChipGroup
+        label={sourceNote ? 'Allergies — map the note above' : 'Allergies'}
+        items={draft.allergens}
+        placeholder="Add an allergen"
+        onAdd={(v) => set({ allergens: addItem(draft.allergens, v) })}
+        onRemove={(v) => set({ allergens: removeItem(draft.allergens, v) })}
+      />
+      <p className="text-xs text-muted-foreground -mt-2">
+        No severity — nothing upstream records one, so every allergen is treated as serious.
+      </p>
 
       {canConfirmNone && (
         // The only route to the green state. An empty allergy list is not a confirmation,

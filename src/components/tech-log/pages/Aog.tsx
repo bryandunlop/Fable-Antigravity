@@ -55,7 +55,14 @@ export default function Aog() {
       <div className="mb-3"><FirSuggestions /></div>
 
       {aog.length === 0 && (
-        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">No aircraft are grounded — fleet is dispatchable.</CardContent></Card>
+        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">
+          {/* LG-143 — provisional tails are filtered out of this board (an aircraft in onboarding
+              is not an AOG event), so the empty state cannot claim the whole fleet is
+              dispatchable: the one tail it excluded is precisely the one that is not. */}
+          {state.aircraft.some(ac => ac.isProvisional)
+            ? 'No aircraft are grounded. Tails in onboarding are not shown here and are not dispatchable.'
+            : 'No aircraft are grounded — fleet is dispatchable.'}
+        </CardContent></Card>
       )}
       <div className="space-y-3">
         {aog.map(({ ac, driver, since, hours, esc, latestAck }) => (

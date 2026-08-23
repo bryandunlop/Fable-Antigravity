@@ -9,6 +9,7 @@ import { bulletinToDocAndRevision } from './engine/bulletinCompat';
 import { mockSha256 } from '../tech-log/engine/signing';
 import { sectionsFromMarkdown, checksumForSections, contentFieldsFromMarkdown } from './engine/blocks';
 import { receivedPlaceholderSections } from './engine/provenance';
+import type { ExternalAlert } from './engine/amendments';
 import {
   MEL_DEMO_BLOB_KEY, MEL_DEMO_BYTE_LENGTH, MEL_DEMO_FILENAME, MEL_DEMO_SHA256,
 } from './store/demoSeedBlob';
@@ -1197,6 +1198,92 @@ const SEED_SUGGESTIONS: DocSuggestion[] = [
 
 const SEED_SUGGESTION_REPLIES: DocSuggestionReply[] = [];
 
+
+/**
+ * TL-46 seeds — two bulletins that amend the GOM, and one Nimbl regulatory alert.
+ *
+ * Section ids are resolved by TITLE at seed time rather than hardcoded. A literal
+ * `GOM-3::3-4-weather-minimums` would rot silently the first time a heading is
+ * reworded, and a broken amendment anchor renders as nothing at all — the failure
+ * would be invisible rather than loud.
+ */
+function seedAmendments(docs: Doc[], revisions: DocRevision[]): void {
+  const findSection = (docId: string, titleFragment: string) => {
+    const rev = revisions.find((r) => r.docId === docId && r.status === 'published');
+    return rev?.sections.find((sec) =>
+      `${sec.number} ${sec.title}`.toLowerCase().includes(titleFragment.toLowerCase()),
+    );
+  };
+
+  const attach = (
+    bulletinId: string,
+    targetDocId: string,
+    titleFragment: string,
+    summary: string,
+    effectiveDaysAgo: number,
+    /** Which of the BULLETIN's own sections carries the governing wording. */
+    replacementFragment?: string,
+  ) => {
+    const bulletinRev = revisions.find((r) => r.docId === bulletinId && r.status === 'published');
+    const target = findSection(targetDocId, titleFragment);
+    if (!bulletinRev || !target) return;
+    // The legacy bulletin seeds carry hardcoded 2024 dates, which age the inbox to
+    // "659 days outstanding" — arithmetically correct and narratively useless. These
+    // two are re-dated so the amendment story reads plausibly. The wider staleness of
+    // the bulletin seeds is a separate demo-data problem, captured as LG-270.
+    bulletinRev.effectiveDate = daysFromNow(-effectiveDaysAgo);
+    bulletinRev.publishedAtUtc = `${bulletinRev.effectiveDate}T12:00:00.000Z`;
+    // Named explicitly, not guessed. "First section with blocks" picked FOB-001's
+    // *disclaimer* as the text that governs a manual paragraph, which is worse than
+    // showing nothing: the reader would take a caveat for a procedure.
+    const replacement = replacementFragment
+      ? bulletinRev.sections.find((sec) =>
+          sec.title.toLowerCase().includes(replacementFragment.toLowerCase()),
+        )
+      : undefined;
+    bulletinRev.amendments = [
+      {
+        id: `${bulletinRev.id}::am0`,
+        targetDocId,
+        targetSectionId: target.id,
+        summary,
+        replacementSectionId: replacement?.id,
+      },
+    ];
+  };
+
+  attach(
+    'FOB-001',
+    'GOM-3',
+    'Flight Planning',
+    'Chart currency is verified through the interim EFB workflow until the next GOM revision.',
+    104,
+    'Procedure',
+  );
+  attach(
+    'PB-001',
+    'GOM-3',
+    'Weather Minimums',
+    'Winter operations raise the alternate minima for contaminated runways.',
+    71,
+    'Takeoff Considerations',
+  );
+  void docs;
+}
+
+/** Nimbl regulatory-watch alerts (D93 — they keep the reg watch, we take day-to-day). */
+const SEED_EXTERNAL_ALERTS: ExternalAlert[] = [
+  {
+    id: 'ALERT-NAVCAN-001',
+    origin: 'Nimbl reg watch',
+    title: 'NAV CANADA — Gander OCA oceanic clearance wording',
+    receivedOn: daysFromNow(-8),
+    targetDocIds: ['GOM-3'],
+    summary:
+      'Clearance request phraseology changed. Nimbl revises the IOPM; §3.6 International Operations is ours.',
+  },
+];
+
 /** Default state: module seeds + the legacy bulletin seeds mapped into the unified model. */
 export function getSeedState(): DocumentsState {
   const bulletinDocs: Doc[] = [];
@@ -1206,14 +1293,19 @@ export function getSeedState(): DocumentsState {
     bulletinDocs.push(doc);
     bulletinRevs.push(rev);
   }
+  const docs = [...SEED_DOCS, ...CABIN_SEEDS.map(cabinSeedDoc), ...bulletinDocs];
+  const revisions = [...SEED_REVISIONS, ...CABIN_SEEDS.map(cabinSeedRevision), ...bulletinRevs];
+  seedAmendments(docs, revisions);
   return {
-    docs: [...SEED_DOCS, ...CABIN_SEEDS.map(cabinSeedDoc), ...bulletinDocs],
-    revisions: [...SEED_REVISIONS, ...CABIN_SEEDS.map(cabinSeedRevision), ...bulletinRevs],
+    docs,
+    revisions,
     acknowledgments: SEED_ACKS,
     comments: SEED_COMMENTS,
     suggestions: SEED_SUGGESTIONS,
     suggestionReplies: SEED_SUGGESTION_REPLIES,
     reviews: [],
     signatures: [seedSignature],
+    externalAlerts: SEED_EXTERNAL_ALERTS,
+    amendmentResolutions: [],
   };
 }

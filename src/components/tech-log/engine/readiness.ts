@@ -23,9 +23,15 @@ export function deriveTripReadiness(
   const verdict = (s: TripReadiness, extra: Partial<TripReadinessResult> = {}): TripReadinessResult =>
     ({ state: s, computedAtUtc: asOfUtc, ...extra });
 
-  // Highest precedence: aircraft serviceability.
-  if (deriveServiceability(trip.aircraftId, state, asOfUtc).status === 'RED') {
-    return verdict('RED', { blocker: 'Aircraft grounded (RED)' });
+  /* Highest precedence: aircraft serviceability — as an ALLOW-list. `=== 'RED'` let a tail with no
+     dispatch answer at all sail through as READY (LG-143): a clean provisional tail read GREEN, so
+     every pilot surface showed a green "Ready" chip until the PIC hit the acceptance block at the
+     briefing. Naming the states that may proceed means the next state added to the union blocks by
+     default instead of being silently waved past. */
+  const sv = deriveServiceability(trip.aircraftId, state, asOfUtc).status;
+  if (sv === 'RED') return verdict('RED', { blocker: 'Aircraft grounded (RED)' });
+  if (sv !== 'GREEN' && sv !== 'AMBER') {
+    return verdict('RED', { blocker: 'Aircraft in onboarding — D195 MEL pending FSDO approval' });
   }
 
   const aircraft = state.aircraft.find(a => a.id === trip.aircraftId);

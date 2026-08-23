@@ -7,8 +7,14 @@
 //             date (clockStart+10d ≈ now+7d16h..+8d16h) falls INSIDE the trip window
 //             -> deferral-expires-mid-trip alert
 //   MAO-7310  N5PG (GREEN seed)        +4d                     -> clean control
-//   MAO-7315  N2PG                     -4h .. +5h, mid-turn    -> the only trip inside the
-//             leg-resolution window: leg 1 landed 2h ago, leg 2 departs in 3h (D53)
+//   MAO-7315  N2PG                     -4h .. +9h35, mid-turn -> the only trip inside the
+//             leg-resolution window: leg 1 landed 2h ago, leg 2 departs in 3h (D53). A FOUR-leg
+//             northeast day (KLUK-KTEB-KBOS-KLGA-KLUK) rather than an out-and-back, because it
+//             pins to the top of the pilot's Flight Hub. Deliberately NOT routed via KDCA: a DCA
+//             leg reclassifies the whole trip as dca_dassp, and the flagship demo trip should be
+//             the ordinary domestic case — MAO-4519 already carries the DASSP scenario.
+//             pins to the top of the pilot's Flight Hub and the day timeline there has nothing to
+//             show on a trip whose only remaining leg is the one in the countdown.
 // Tails/types match the tech-log seed fleet (fleet.ts) — the tail is the join key.
 
 import type { BookingTripWithLegs, BookingTripPassenger } from '../bookingAdapter';
@@ -136,9 +142,23 @@ export function buildMyairopsBookingFixtures(nowUtcIso: string): MyairopsBooking
           {
             id: 90372, tripId: 7315,
             departureAirport: { id: 102, icao: 'KTEB', iata: 'TEB', name: 'Teterboro' },
+            arrivalAirport: { id: 103, icao: 'KBOS', iata: 'BOS', name: 'Boston Logan' },
+            departureDateTime: iso(3 * HOUR_MS), arrivalDateTime: iso(3 * HOUR_MS + 55 * 60_000),
+            adults: 4, children: 0, crew: 2, cabinCrew: 1, flyingTime: 55,
+          },
+          {
+            id: 90373, tripId: 7315,
+            departureAirport: { id: 103, icao: 'KBOS', iata: 'BOS', name: 'Boston Logan' },
+            arrivalAirport: { id: 104, icao: 'KLGA', iata: 'LGA', name: 'New York LaGuardia' },
+            departureDateTime: iso(5.5 * HOUR_MS), arrivalDateTime: iso(5.5 * HOUR_MS + 50 * 60_000),
+            adults: 4, children: 0, crew: 2, cabinCrew: 1, flyingTime: 50,
+          },
+          {
+            id: 90374, tripId: 7315,
+            departureAirport: { id: 104, icao: 'KLGA', iata: 'LGA', name: 'New York LaGuardia' },
             arrivalAirport: { id: 101, icao: 'KLUK', iata: 'LUK', name: 'Cincinnati Municipal Lunken' },
-            departureDateTime: iso(3 * HOUR_MS), arrivalDateTime: iso(5 * HOUR_MS),
-            adults: 4, children: 0, crew: 2, cabinCrew: 1, flyingTime: 120,
+            departureDateTime: iso(8 * HOUR_MS), arrivalDateTime: iso(8 * HOUR_MS + 105 * 60_000),
+            adults: 2, children: 0, crew: 2, cabinCrew: 1, flyingTime: 95,
           },
         ],
       } as BookingTripWithLegs,

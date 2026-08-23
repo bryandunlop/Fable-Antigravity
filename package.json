@@ -113,6 +113,10 @@
             "test": "vitest run",
             "test:watch": "vitest",
             "gen:myairops": "openapi-typescript src/integration/myairops/schemas/crm.json -o src/integration/myairops/gen/crm.ts && openapi-typescript src/integration/myairops/schemas/booking.json -o src/integration/myairops/gen/booking.ts && openapi-typescript src/integration/myairops/schemas/maintenance.json -o src/integration/myairops/gen/maintenance.ts",
-            "airport:build-bundle": "tsx scripts/build-airport-bundle.ts"
+            "gen:myairops-matrix": "tsx scripts/myairops-capability-matrix.ts",
+            "airport:build-bundle": "tsx scripts/build-airport-bundle.ts",
+            "worklog:derive": "tsx scripts/derive-work-sessions.ts --repos \".,../Antigravity-Aviation-Management-System,../myGFO-vault,../myGFO-iOS,../mygfo-ios-app,../antigravity-vault,../Aviationmanagementsystem\"",
+            "worklog:seed": "npm run worklog:derive -- --seed",
+            "worklog:bundle": "npm run worklog:derive -- --bundle"
       }
 }

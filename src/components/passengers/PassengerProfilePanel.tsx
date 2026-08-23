@@ -13,7 +13,7 @@ import { conflictingItems } from './engine/profileEdits';
 const ALLERGY_BADGE = 'bg-red-500 text-white border-red-600';
 const DISLIKE_BADGE = 'bg-yellow-400 text-yellow-950 border-yellow-500';
 
-const SEVERITY_STYLE: Record<PassengerAllergy['severity'], string> = {
+const SEVERITY_STYLE: Record<string, string> = {
   Critical: 'border-red-300 bg-red-50 text-red-900',
   Moderate: 'border-orange-300 bg-orange-50 text-orange-900',
   Mild: 'border-yellow-300 bg-yellow-50 text-yellow-900',
@@ -132,12 +132,12 @@ export default function PassengerProfilePanel({
         ) : (
           <div className="space-y-2">
             {passenger.allergies.map((a, i) => (
-              <div key={i} className={`rounded-lg border p-2.5 ${SEVERITY_STYLE[a.severity]}`}>
+              <div key={i} className={`rounded-lg border p-2.5 ${a.severity ? SEVERITY_STYLE[a.severity] : 'border-red-200 bg-red-50 text-red-900 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-100'}`}>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-sm">{a.allergen}</span>
-                  <Badge className={`text-xs ${a.severity === 'Critical' ? ALLERGY_BADGE : 'bg-white border-current text-current'}`}>
-                    {a.severity}
-                  </Badge>
+                  {a.severity
+                    ? <Badge className={`text-xs ${a.severity === 'Critical' ? ALLERGY_BADGE : 'bg-white border-current text-current'}`}>{a.severity}</Badge>
+                    : <span className="text-xs opacity-80">no severity recorded</span>}
                 </div>
                 {a.reaction && <p className="text-xs mt-1">Reaction: {a.reaction}</p>}
                 {a.medication && <p className="text-xs mt-0.5">Medication: {a.medication}</p>}

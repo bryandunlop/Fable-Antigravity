@@ -21,6 +21,8 @@ const RAIL: Record<Serviceability, string> = {
   GREEN: 'var(--gfo-success,#00B140)',
   AMBER: 'var(--gfo-warning,#F1B434)',
   RED: 'var(--gfo-error,#EF3340)',
+  // LG-143 — no rail colour for a tail with no dispatch answer to give.
+  NOT_ASSESSED: 'var(--border)',
 };
 
 function Vital({ label, value, tone }: { label: string; value: string; tone?: 'error' }) {
@@ -44,8 +46,12 @@ export function AircraftBanner({
   actions,
 }: {
   aircraft: Aircraft;
-  /** null for a provisional tail — it carries a Provisional badge instead of a RAG state. */
-  status: Serviceability | null;
+  /**
+   * Taken straight from the projection — including `NOT_ASSESSED`, which the chip renders as
+   * "Provisional". This used to be `Serviceability | null` with the page deciding when to pass
+   * null; the type carries that now, so there is no per-caller decision left to get wrong.
+   */
+  status: Serviceability;
   custody: CustodyState;
   governing: string;
   rule: string;
@@ -58,13 +64,13 @@ export function AircraftBanner({
     <div
       data-testid="aircraft-banner"
       className="mb-4 border border-l-[3px] bg-card p-4"
-      style={{ borderLeftColor: status ? RAIL[status] : 'var(--border)' }}
+      style={{ borderLeftColor: RAIL[status] }}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-semibold tracking-tight">{aircraft.tailNumber}</h1>
-            {status ? <ServiceabilityChip status={status} /> : <Badge variant="outline">Provisional</Badge>}
+            <ServiceabilityChip status={status} />
             <CustodyChip state={custody} />
           </div>
           <p className="mt-1.5 text-sm">{governing}</p>

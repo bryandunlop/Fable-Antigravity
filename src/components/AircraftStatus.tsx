@@ -72,8 +72,10 @@ export default function AircraftStatus() {
                     <CardDescription>{ac.model}</CardDescription>
                   </div>
                   <div className="flex flex-col items-end gap-1">
+                    {/* LG-143 — no isProvisional check here any more: the projection returns
+                        NOT_ASSESSED and the chip renders it as "Provisional". This card used to
+                        show a green "Serviceable" chip directly beside a Provisional badge. */}
                     <ServiceabilityChip status={aw.status} />
-                    {aw.isProvisional && <Badge variant="outline">Provisional</Badge>}
                   </div>
                 </div>
               </CardHeader>

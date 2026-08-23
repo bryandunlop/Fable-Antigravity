@@ -32,7 +32,6 @@ import { DocReader } from './components/documents/pages/DocReader';
 import { DocWorkbench } from './components/documents/pages/DocWorkbench';
 import LeadDashboard from './components/lead/LeadDashboard';
 import ManagerInsights from './components/ManagerInsights';
-import AirportServicesDatabase from './components/AirportServicesDatabase';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
 import VacationRequest from './components/VacationRequest';
@@ -53,11 +52,14 @@ import PostFlightChecklist from './components/PostFlightChecklist';
 import TurndownForm from './components/TurndownForm';
 import TurndownReports from './components/TurndownReports';
 import SchedulingDashboard from './components/SchedulingDashboard';
-import CriticalFunctionsPlan from './components/CriticalFunctionsPlan';
+import CriticalBusinessFunctions from './components/CriticalBusinessFunctions';
+import RollingActionItems from './components/RollingActionItems';
+import SuggestionBox from './components/SuggestionBox';
 import PilotCurrency from './components/PilotCurrency';
 import PassengerForms from './components/PassengerForms';
 import PublicPassengerForm from './components/PublicPassengerForm';
 import OpsBoardPage from './components/ops/OpsBoardPage';
+import WorkLogPage from './components/worklog/WorkLogPage';
 import AirportEvaluation from './components/AirportEvaluation';
 import AirportEvaluations from './components/AirportEvaluations';
 import AirportInformation from './components/airport-info/AirportInformation';
@@ -70,6 +72,7 @@ import UnifiedTasksActionItems from './components/UnifiedTasksActionItems';
 import LobbyDisplay from './components/LobbyDisplay';
 import UpcomingFlights from './components/UpcomingFlights';
 import TechLogRoutes from './components/tech-log/TechLogRoutes';
+import BookingPortalRoutes from './components/booking-portal/BookingPortalRoutes';
 import RampMode from './components/tech-log/pages/RampMode';
 import OpsWall from './components/wall/OpsWall';
 import MaintenanceWall from './components/wall/MaintenanceWall';
@@ -134,6 +137,7 @@ import MWShiftHandover from './components/maintenance-workflow/ShiftHandover';
 import MWPredictiveAnalytics from './components/maintenance-workflow/PredictiveAnalytics';
 import MaintenanceTurnoverForm from './components/MaintenanceTurnoverForm';
 import { AuditProvider } from './contexts/AuditContext';
+import { ActionItemProvider } from './contexts/ActionItemContext';
 
 // Inventory V2
 import { InventoryV2Provider } from './components/inventory-v2/InventoryV2Context';
@@ -188,6 +192,11 @@ export default function App() {
       <MaintenanceProvider>
           <HazardProvider>
             <AuditProvider>
+              {/* One store behind Tasks & Action Items and the lead team's Rolling
+                  Action Items list — they are two views of the same projects, and
+                  a provider mounted per-subtree would make an item raised in one
+                  invisible in the other. */}
+              <ActionItemProvider>
               <PassengerFormProvider>
                 <ForeFlightSyncProvider>
                 <DocumentsProvider>
@@ -223,6 +232,10 @@ export default function App() {
                         login-footer credit (design §7). Public outer route so the pre-login
                         door works; the demo's real gate is Vercel SSO. */}
                     <Route path="/ops" element={<OpsBoardPage />} />
+                    {/* Personal effort tracker — not product. Outside the shell on
+                        purpose: no nav entry, no role gate, no flight-ops import.
+                        Registered hidden in NAV_ENTRIES so the route audit sees it. */}
+                    <Route path="/worklog" element={<WorkLogPage />} />
                     <Route
                       path="/commissary-kiosk"
                       element={
@@ -308,7 +321,7 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/airport-evaluations" element={<AirportsShell userRole={userRole} additionalRoles={additionalRoles}><AirportInformation currentUserOid={userRole} /></AirportsShell>} />
+                                <Route path="/airport-evaluations" element={<AirportsShell userRole={userRole} additionalRoles={additionalRoles}><AirportInformation currentUserOid={userRole} userRole={userRole} additionalRoles={additionalRoles} /></AirportsShell>} />
                                 <Route
                                   path="/airport-evaluations/flags"
                                   element={
@@ -437,7 +450,11 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/airport-services" element={<AirportServicesDatabase />} />
+                                {/* D96: the legacy Airport Services Database folded into the
+                                    airport record as station-support fields. The component is
+                                    de-routed, not deleted — the same reversible move the
+                                    duplicate maintenance screens got. Bookmarks still resolve. */}
+                                <Route path="/airport-services" element={<Navigate to="/airport-evaluations" replace />} />
                                 <Route path="/maintenance-dashboard" element={<MaintenanceDashboard />} />
                                 <Route path="/vacation-request" element={<VacationRequest userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/fuel-farm" element={<FuelFarmTracker />} />
@@ -577,12 +594,26 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
-                                <Route path="/critical-functions" element={<CriticalFunctionsPlan />} />
+                                {/* The old /critical-functions page carried all three as tabs.
+                                    Rolling Action Items has to hold 20+ projects for a VP's
+                                    admin, which does not fit in a third of a screen — so each
+                                    is now its own space. */}
+                                <Route path="/critical-functions" element={<CriticalBusinessFunctions />} />
+                                <Route path="/rolling-action-items" element={<RollingActionItems />} />
+                                <Route path="/suggestion-box" element={<SuggestionBox />} />
                                 <Route path="/parts-inventory" element={<PartsInventory />} />
                                 <Route path="/passenger-forms" element={<PassengerForms />} />
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
                                 <Route path="/upcoming-flights" element={userRole === 'inflight' ? <FlightAttendantFlights /> : <UpcomingFlights userRole={userRole} />} />
                                 <Route path="/tech-log/*" element={<TechLogRoutes />} />
+                                <Route
+                                  path="/booking-portal/*"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'admin', 'lead']}>
+                                      <BookingPortalRoutes />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route path="/fir/*" element={<FirRoutes userRole={userRole} additionalRoles={additionalRoles} />} />
                                 <Route path="/asap-report" element={<ASAPReport userRole={userRole} />} />
                                 <Route
@@ -696,6 +727,7 @@ export default function App() {
                 </DocumentsProvider>
               </ForeFlightSyncProvider>
             </PassengerFormProvider>
+              </ActionItemProvider>
             </AuditProvider>
           </HazardProvider>
         </MaintenanceProvider>

@@ -129,3 +129,83 @@ export function hasProfileContent(p: Passenger | null): boolean {
     Object.values(c).some((v) => Boolean(v && String(v).trim()))
   );
 }
+
+export interface AllergenRow {
+  allergen: string;
+  /** Everyone on this leg who carries it. Names, not ids — the row is read aloud. */
+  carriers: string[];
+}
+
+export interface LegRollup {
+  /** Allergens a galley has to cook around, most-carried first. */
+  food: AllergenRow[];
+  /** Real allergies that are not the galley's problem. Named, never dropped. */
+  cabin: AllergenRow[];
+  /** myairops sent prose nobody has mapped yet, or changed it under an existing
+   *  mapping. The most urgent bucket: there IS detail, and it is unread. */
+  needsMapping: RosterGuest[];
+  /** Flagged on the booking with no allergen named — nothing to read, someone has
+   *  to ask. */
+  flagged: RosterGuest[];
+  /** Nothing on file at all — not the same as no allergies. */
+  unknown: RosterGuest[];
+}
+
+/** The leg's whole dietary picture, rolled up by ALLERGEN rather than by person.
+ *
+ * This is the reframe the screen is built on: a flight attendant planning a service
+ * does not walk a list of passengers looking each one up, she asks "what can never come
+ * aboard this leg". Rolling up by person repeated the same allergen across three rows
+ * and made the answer something you had to assemble yourself. */
+export function allergenRollup(guests: RosterGuest[]): LegRollup {
+  const byAllergen = new Map<string, AllergenRow>();
+  const needsMapping: RosterGuest[] = [];
+  const flagged: RosterGuest[] = [];
+  const unknown: RosterGuest[] = [];
+
+  for (const g of guests) {
+    switch (g.state) {
+      case 'NEEDS_MAPPING':
+        needsMapping.push(g);
+        // AND fold in whatever was already mapped. A stale mapping means there may be
+        // MORE, not that the known allergens stopped being true — dropping them would
+        // quietly remove "Shellfish" from the leg's list because a booking agent added
+        // a sentence about dairy. Belt and braces: the allergens stay named, and the
+        // guest is also flagged for re-reading.
+        for (const a of g.passenger?.allergies ?? []) {
+          const row = byAllergen.get(a.allergen);
+          if (row) { if (!row.carriers.includes(g.displayName)) row.carriers.push(g.displayName); }
+          else byAllergen.set(a.allergen, { allergen: a.allergen, carriers: [g.displayName] });
+        }
+        break;
+      case 'FLAGGED_NO_DETAIL':
+        flagged.push(g);
+        break;
+      case 'NONE_ON_FILE':
+        unknown.push(g);
+        break;
+      case 'ALLERGIES':
+        for (const a of g.passenger!.allergies) {
+          const row = byAllergen.get(a.allergen);
+          if (row) { if (!row.carriers.includes(g.displayName)) row.carriers.push(g.displayName); }
+          else byAllergen.set(a.allergen, { allergen: a.allergen, carriers: [g.displayName] });
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  const all = [...byAllergen.values()];
+  // Most-carried first, then alphabetical so the order is stable between renders.
+  const sort = (rows: AllergenRow[]) =>
+    rows.sort((a, b) => b.carriers.length - a.carriers.length || a.allergen.localeCompare(b.allergen));
+
+  return {
+    food: sort(all.filter((r) => isFoodAllergen(r.allergen))),
+    cabin: sort(all.filter((r) => !isFoodAllergen(r.allergen))),
+    needsMapping,
+    flagged,
+    unknown,
+  };
+}

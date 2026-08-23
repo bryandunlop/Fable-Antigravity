@@ -1,11 +1,11 @@
-import { ActionItem } from './types';
+import { ActionItem, CheckInCadence } from './types';
 
 export const MOCK_ACTION_ITEMS: ActionItem[] = [
   {
     id: 'ACTION001',
     title: 'Complete 100-hour inspection on N123AB',
     description: 'Comprehensive 100-hour inspection including engine, avionics, and structural checks',
-    module: 'Maintenance',
+    department: 'Maintenance',
     assignedBy: 'Chief Maintenance Officer',
     assignedDate: '2025-02-01',
     dueDate: '2025-02-15',
@@ -44,7 +44,7 @@ export const MOCK_ACTION_ITEMS: ActionItem[] = [
     id: 'ACTION002',
     title: 'Update passenger allergy database',
     description: 'Review and update allergy information for VIP passengers, ensure emergency protocols are current',
-    module: 'Passenger Services',
+    department: 'Passenger Services',
     assignedBy: 'Head of Passenger Services',
     assignedDate: '2025-02-02',
     dueDate: '2025-02-08',
@@ -82,7 +82,7 @@ export const MOCK_ACTION_ITEMS: ActionItem[] = [
     id: 'ACTION003',
     title: 'Safety audit for ground operations',
     description: 'Perform comprehensive safety audit of ground handling procedures and equipment',
-    module: 'Safety',
+    department: 'Safety',
     assignedBy: 'Safety Manager',
     assignedDate: '2025-01-28',
     dueDate: '2025-02-10',
@@ -119,14 +119,24 @@ export const MOCK_ACTION_ITEMS: ActionItem[] = [
   }
 ];
 
-export const MODULE_OPTIONS = [
+/** The departments that own work. Was MODULE_OPTIONS, which named the code, not the org. */
+export const DEPARTMENT_OPTIONS = [
   { value: 'Flight Operations', label: 'Flight Operations', icon: 'Target' },
   { value: 'Maintenance', label: 'Maintenance', icon: 'Wrench' },
   { value: 'Safety', label: 'Safety', icon: 'Shield' },
   { value: 'Passenger Services', label: 'Passenger Services', icon: 'Users' },
-  { value: 'Ground Operations', label: 'Ground Operations', icon: 'Building' }
+  { value: 'Ground Operations', label: 'Ground Operations', icon: 'Building' },
+  { value: 'Scheduling', label: 'Scheduling', icon: 'Calendar' },
+  { value: 'Lead Team', label: 'Lead Team', icon: 'Users' },
 ];
 
 export const PRIORITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
 export const STATUS_OPTIONS = ['pending', 'in-progress', 'completed'];
 export const ROLE_OPTIONS = ['Contributor', 'Reviewer', 'Observer'];
+
+export const CHECK_IN_CADENCE_OPTIONS: Array<{ value: CheckInCadence; label: string }> = [
+  { value: 'none', label: 'No scheduled check-ins' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every two weeks' },
+  { value: 'monthly', label: 'Monthly' },
+];

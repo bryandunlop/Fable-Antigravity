@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -21,6 +21,15 @@ import { AirportFlags } from './AirportFlags';
 import { useCompanyAirport } from './CompanyAirportContext';
 import { NotPublished, ProvenanceChip } from './ProvenanceChip';
 import { RunwayDiagram } from './RunwayDiagram';
+import { LensSwitch } from './LensSwitch';
+import {
+  CrewSupportStrip,
+  FieldEditor,
+  Freshness,
+  StationSupportCard,
+  TeamRecommendation,
+} from './StationSupport';
+import type { AirportLens } from '../../airport/lens';
 
 interface AirportReferenceDetailProps {
   airport: AirportRecord;
@@ -33,6 +42,13 @@ interface AirportReferenceDetailProps {
   onSubmitCorrection?: () => void;
   /** Whose read receipt an acknowledgement records (D47). Real identity lands with auth. */
   currentUserOid?: string;
+  /**
+   * Which job the reader came here for (D96). Promotes different facts; hides
+   * nothing. Owned by the directory so the choice survives back-and-forth
+   * between the list and a record.
+   */
+  lens?: AirportLens;
+  onLensChange?: (lens: AirportLens) => void;
 }
 
 /**
@@ -300,16 +316,13 @@ function CompanyPageCard({
   nasrCycleEffDate: string | null;
 }) {
   const company = useCompanyAirport();
+  const [editing, setEditing] = useState<ConfirmableField | null>(null);
   const published = company.getLatest(icao);
   const states = company.confirmationStates(icao);
   const stateFor = new Map(states.map((state) => [state.field, state]));
   const acknowledgements = company.acknowledgements(icao);
   const myAcknowledgement = acknowledgements.find(
     (a) => a.crewOid === currentUserOid && a.companyPageVersionId === published?.id,
-  );
-
-  const written = COMPANY_FIELDS.filter(
-    ({ key }) => typeof published?.content[key] === 'string' && published.content[key],
   );
 
   return (
@@ -329,44 +342,71 @@ function CompanyPageCard({
         </div>
       </div>
 
+      <p className="mb-4 text-sm text-muted-foreground">
+        Written by whoever last checked. A save publishes straight away and restarts that
+        field&rsquo;s clock — no approval step (2026-08-22).
+      </p>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* EVERY field renders, written or not. Showing only the written ones
+            meant a blank field had no row, so it had no pencil, so it could
+            never be started — the same trap teamRecommendation fell into. */}
+        {COMPANY_FIELDS.map(({ key, label }) => {
+          const field = key as ConfirmableField;
+          const value = (published?.content[key] as string | null) ?? null;
+          const state = stateFor.get(field);
+
+          if (editing === field) {
+            return (
+              <FieldEditor
+                key={key}
+                icao={icao}
+                field={field}
+                current={value}
+                basedOnVersion={published?.version}
+                savedBy={currentUserOid}
+                onDone={() => setEditing(null)}
+              />
+            );
+          }
+
+          return (
+            <div key={key}>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2"
+                  onClick={() => setEditing(field)}
+                  aria-label={`Edit ${label}`}
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {value ? (
+                <p className="whitespace-pre-wrap font-medium">{value}</p>
+              ) : (
+                <NotPublished what="Not written" />
+              )}
+              {/* The confirmation caveat sits with the fact it qualifies, not at
+                  the top of the page — a warning read once and scrolled past
+                  does not travel with the value it is about (D54). */}
+              {state?.lastConfirmed ? (
+                <Freshness
+                  by={state.lastConfirmed.via === 'publish' ? published?.publishedBy ?? 'the flight department' : state.lastConfirmed.by}
+                  atUtc={state.lastConfirmed.atUtc}
+                  via={state.lastConfirmed.via}
+                  overdue={state.status === 'overdue'}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
       {published ? (
         <>
-          <div className="grid gap-4 md:grid-cols-2">
-            {written.map(({ key, label }) => {
-              // The confirmation caveat sits with the fact it qualifies, not at
-              // the top of the page — a warning read once and scrolled past does
-              // not travel with the value it is about (D54).
-              const state = stateFor.get(key as ConfirmableField);
-              return (
-                <div key={key}>
-                  <p className="text-sm text-muted-foreground mb-1">{label}</p>
-                  <p className="whitespace-pre-wrap font-medium">
-                    {published.content[key] as string}
-                  </p>
-                  {state?.lastConfirmed ? (
-                    <p
-                      className={`mt-1 text-xs ${
-                        state.status === 'overdue'
-                          ? 'text-destructive'
-                          : 'text-muted-foreground'
-                      }`}
-                    >
-                      {state.lastConfirmed.via === 'publish'
-                        ? 'Written by the flight department'
-                        : `Confirmed by ${state.lastConfirmed.by}`}{' '}
-                      {new Date(state.lastConfirmed.atUtc).toLocaleDateString()}
-                      {state.status === 'overdue'
-                        ? ' — due for review, verify before you rely on it'
-                        : ''}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-          {written.length === 0 ? (
-            <NotPublished what="Published, but every field is empty" />
-          ) : null}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
             <p className="text-xs text-muted-foreground">
               Version {published.version}, published by {published.publishedBy} on{' '}
@@ -395,12 +435,12 @@ function CompanyPageCard({
           </p>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-4 border-t pt-3 text-sm text-muted-foreground">
           PPR, curfews, operations notes, FBO preference and handling limits are authored by the
           flight department — no vendor supplies them. Nothing has been published for this airport
           yet
           {canPropose
-            ? '; use “Propose a change” to start one.'
+            ? '; write one straight into the fields above, or use “Propose a change” if you want it checked first.'
             : ', and proposing changes is not available here.'}
         </p>
       )}
@@ -413,6 +453,8 @@ export default function AirportReferenceDetail({
   onBack,
   onSubmitCorrection,
   currentUserOid = 'demo-user',
+  lens = 'pilot',
+  onLensChange,
 }: AirportReferenceDetailProps) {
   const company = useCompanyAirport();
   const icao = airport.icaoId ?? airport.id;
@@ -435,6 +477,10 @@ export default function AirportReferenceDetail({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to airports
         </Button>
+
+        {onLensChange ? (
+          <LensSwitch value={lens} onChange={onLensChange} className="mb-4" />
+        ) : null}
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -468,14 +514,31 @@ export default function AirportReferenceDetail({
                 .filter(Boolean)
                 .join(' · ')}
             </p>
+            {/* Read first, by everyone — so it sits with the airport's identity
+                rather than inside whichever card happens to own the field. */}
+            <div className="mt-3 max-w-2xl">
+              <TeamRecommendation icao={airport.icaoId ?? airport.id} />
+            </div>
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            <Button onClick={onSubmitCorrection} disabled={!onSubmitCorrection}>
+            <Button
+              variant="outline"
+              onClick={onSubmitCorrection}
+              disabled={!onSubmitCorrection}
+            >
               <Edit className="mr-2 h-4 w-4" />
               Propose a change
             </Button>
-            {onSubmitCorrection ? null : (
+            {onSubmitCorrection ? (
+              // Demoted from primary, 2026-08-22: every field on the company
+              // card now edits in place, so review is the exception rather
+              // than the route. Kept, not deleted — someone unsure of a fact
+              // should still be able to ask before it reaches a crew.
+              <span className="max-w-[13rem] text-right text-xs text-muted-foreground">
+                Optional — fields edit in place. Use this to have someone check first.
+              </span>
+            ) : (
               <span className="text-xs text-muted-foreground">Not wired up yet</span>
             )}
             <span className="text-xs text-muted-foreground">
@@ -486,6 +549,13 @@ export default function AirportReferenceDetail({
       </div>
 
       <AirportGlance airport={airport} />
+
+      {lens === 'pilot' ? (
+        <CrewSupportStrip
+          icao={icao}
+          onOpenMaintenance={() => onLensChange?.('maintenance')}
+        />
+      ) : null}
 
       <AirportFlags airport={airport} />
 
@@ -617,6 +687,13 @@ export default function AirportReferenceDetail({
         currentUserOid={currentUserOid}
         nasrCycleEffDate={airport.effectiveDate}
       />
+
+      {/* Under the maintenance lens the full support card is the point of the
+          page, so it renders in full. A crew gets the same facts in one strip —
+          the SAME fields, not a summary written twice — plus the way across. */}
+      {lens === 'maintenance' ? (
+        <StationSupportCard icao={icao} currentUserOid={currentUserOid} editable />
+      ) : null}
     </div>
   );
 }

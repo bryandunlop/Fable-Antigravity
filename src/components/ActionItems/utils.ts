@@ -1,4 +1,5 @@
 import { ActionItem } from './types';
+import { getCurrentPerson, isSamePerson, seesEveryProject } from '../../lib/currentUser';
 
 export const getBorderColor = (priority: string): string => {
   switch (priority.toLowerCase()) {
@@ -18,18 +19,24 @@ export const formatDate = (dateString: string): string => {
   });
 };
 
+/**
+ * The projects a person should see: the ones they are on, plus everything if
+ * they hold a portfolio role.
+ *
+ * This used to be a hardcoded map of role to seeded IDs (`'pilot': ['ACTION003']`),
+ * which meant a project created today reached nobody but a lead — the "one list,
+ * two views" promise was true for leads and false for everyone else. Membership
+ * is the rule now, so a project reaches whoever is actually on it.
+ */
 export const getUserActionItems = (actionItems: ActionItem[], userRole: string): ActionItem[] => {
-  const roleMapping: Record<string, string[]> = {
-    'pilot': ['ACTION003'],
-    'maintenance': ['ACTION001'],
-    'inflight': ['ACTION002'],
-    'safety': ['ACTION003'],
-    'lead': actionItems.map(item => item.id),
-    'admin': actionItems.map(item => item.id)
-  };
+  if (seesEveryProject(userRole)) return actionItems;
 
-  const userItemIds = roleMapping[userRole] || [];
-  return actionItems.filter(item => userItemIds.includes(item.id));
+  const person = getCurrentPerson(userRole);
+  if (!person) return [];
+
+  return actionItems.filter(item =>
+    item.contributors.some(contributor => isSamePerson(contributor.name, person.name)),
+  );
 };
 
 export const getStats = (actionItems: ActionItem[]) => {

@@ -22,7 +22,9 @@ const WALL_STATUS: Record<TripDerivedStatus, { label: string; color: string }> =
   uninteracted: { label: 'UNTOUCHED', color: '#B9C2E0' },
 };
 
-const RAG_COLOR = { GREEN: '#00B140', AMBER: '#F1B434', RED: '#EF3340' } as const;
+// NOT_ASSESSED is neutral grey, never a RAG colour: a tail whose D195 MEL is unapproved has no
+// dispatch state, and painting it green or amber would assert one it does not have.
+const RAG_COLOR = { GREEN: '#00B140', AMBER: '#F1B434', RED: '#EF3340', NOT_ASSESSED: '#8A8A8A' } as const;
 const DAY_MS = 86400000;
 
 function useWallClock(): { time: string; date: string } {

@@ -17,7 +17,7 @@ import {
   MapPin, MapPinCheck, Monitor, Package, PackagePlus, Plane, PlaneTakeoff, Route,
   Send, Settings, Shield, ShieldCheck, Sliders, Sparkles, Target, Timer, Upload,
   BadgeCheck, BookUser, PlaneLanding, Radar, SearchCheck, Stamp,
-  UserCheck, Users, Utensils, Warehouse, Wrench,
+  Mail, Repeat, Ticket, UserCheck, Users, Utensils, Warehouse, Wrench,
 } from 'lucide-react';
 
 export type Domain =
@@ -88,6 +88,9 @@ export const DEFAULT_OPEN_DOMAINS: Record<string, Domain[]> = {
   'commissary-manager': ['inventory'],
   'admin': ['home'],
   'lead': ['home'],
+  // A VP and their admin come here to chase projects, so open Admin for them.
+  'vp': ['admin'],
+  'admin-assistant': ['admin'],
 };
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
@@ -154,6 +157,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/schedule', label: 'Schedule Calendar', domain: 'scheduling', icon: Calendar, primary: true, roles: ['pilot', 'admin'] },
   { path: '/crew-scheduling-workload', label: 'Crew Workload', domain: 'scheduling', icon: BookUser, primary: true, keywords: ['travel'], roles: ['scheduling', 'admin', 'lead'] },
   { path: '/vacation-request', label: 'Vacation Request', domain: 'scheduling', icon: CalendarDays, primary: true, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },
+  // Booking portal (PR #31 / [[LG-125]]): the EA-facing front door for trip requests. The rest of
+  // that branch's nav diff was a stale fork of main and was dropped in the merge — this entry is the
+  // only thing it actually added here.
+  { path: '/booking-portal', label: 'Booking Portal', domain: 'scheduling', icon: Ticket, primary: true, keywords: ['booking', 'empty seats', 'trip request', 'ea', 'watches', 'fleet hold'], roles: ['admin-assistant', 'scheduling', 'admin', 'lead'] },
   { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', railLabel: 'Sched Board', domain: 'scheduling', icon: LayoutDashboard, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: Route, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: ClipboardType, primary: false, roles: ['scheduling', 'admin'] },
@@ -200,7 +207,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/turndown-reports', label: 'Turndown Reports', domain: 'maintenance', icon: FileWarning, primary: false, roles: ['maintenance', 'admin', 'lead', 'maintenance-coordinator', 'dom'] },
   { path: '/turndown-form', label: 'Turndown Form', domain: 'maintenance', icon: ClipboardList, primary: false, roles: ['maintenance', 'maintenance-coordinator'] },
   { path: '/car-tracking', label: 'Vehicles', domain: 'maintenance', icon: Car, primary: false, keywords: ['car tracking', 'rental'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
-  { path: '/airport-services', label: 'Airport Services', domain: 'maintenance', icon: Building2, primary: false, roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/fuel-farm', label: 'Fuel Farm Tracker', domain: 'maintenance', icon: Fuel, primary: false, roles: ['maintenance', 'maintenance-coordinator', 'dom'] },
   { path: '/grat/standalone', label: 'GRAT', domain: 'maintenance', icon: HardHat, primary: false, keywords: ['standalone', 'ground risk assessment'], roles: ['maintenance', 'admin', 'maintenance-coordinator', 'dom'] },
   { path: '/aircraft-cleaning', label: 'Aircraft Cleaning', domain: 'maintenance', icon: Sparkles, primary: false, roles: ['pilot', 'maintenance', 'maintenance-coordinator', 'dom'] },
@@ -231,7 +237,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/lead-dashboard', label: 'Lead Dashboard', domain: 'admin', icon: Radar, primary: true, roles: ['lead', 'admin'] },
   { path: '/manager-insights', label: 'Manager Insights', domain: 'admin', icon: Layers, primary: true, roles: ['lead', 'admin'] },
   { path: '/live-metrics', label: 'Live Metrics', domain: 'admin', icon: Activity, primary: true, keywords: ['kpi'], roles: ['lead', 'admin'] },
-  { path: '/critical-functions', label: 'Critical Functions', domain: 'admin', icon: ShieldCheck, primary: true, roles: ['lead', 'admin'] },
+  { path: '/critical-functions', label: 'Critical Business Functions', domain: 'admin', icon: ShieldCheck, primary: true, keywords: ['critical function', 'backup role', 'continuity'], roles: ['lead', 'admin', 'vp'] },
+  // The VP's admin lives here — 20+ projects chased on the leadership's behalf.
+  { path: '/rolling-action-items', label: 'Rolling Action Items', railLabel: 'Rolling Items', domain: 'admin', icon: Repeat, primary: true, keywords: ['project', 'projects', 'status', 'check-in', 'chase', 'stalled', 'rolling'], roles: ['lead', 'admin', 'vp', 'admin-assistant'] },
+  { path: '/suggestion-box', label: 'Suggestion Box', domain: 'admin', icon: Mail, primary: true, keywords: ['suggestion', 'idea', 'feedback'], roles: ['lead', 'admin', 'vp', 'admin-assistant'] },
   { path: '/admin/airport-evaluation-officer', label: 'Airport Evaluation Officer', railLabel: 'Airport Officer', domain: 'admin', icon: BadgeCheck, primary: false, roles: ['airport-evaluator', 'admin'] },
   { path: '/foreflight-test-upload', label: 'ForeFlight Test Upload', domain: 'admin', icon: Upload, primary: false, keywords: ['foreflight'], roles: ['admin'] },
   { path: '/foreflight-diagnostics', label: 'ForeFlight Sync Diagnostics', railLabel: 'ForeFlight Sync', domain: 'admin', icon: Database, primary: false, keywords: ['foreflight', 'sync'], roles: ['admin'] },
@@ -240,6 +249,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // It sits OUTSIDE the authenticated shell (public outer route) so the door
   // works pre-login; exposure is bounded by Vercel SSO, the demo's real gate.
   { path: '/ops', label: 'Ops Ledger', domain: 'admin', icon: Activity, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
+  // Personal effort tracker, not product — hours worked on myGFO, by fiscal year.
+  // Listed ONLY so the reverse route audit can see that /worklog is a real path;
+  // hidden + sidebar:false + searchable:false means it renders no link anywhere,
+  // in any role. Nothing in flight ops reads it and it reads nothing from them.
+  { path: '/worklog', label: 'Work Log', domain: 'admin', icon: Activity, hidden: true, sidebar: false, searchable: false, roles: ['admin'] },
 ];
 
 /** Entries visible to a user, by role. Same semantics as Navigation.tsx filtering.

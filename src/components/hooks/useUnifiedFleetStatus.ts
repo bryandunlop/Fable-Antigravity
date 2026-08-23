@@ -83,8 +83,11 @@ export function useUnifiedFleetStatus() {
     });
   }, [airworthiness, aircraftPositions, aircraftStatuses]);
 
+  /* LG-143 — an ALLOW-list. `!== 'RED'` counted a tail in onboarding as dispatchable, because a
+     clean provisional tail read GREEN and "not RED" admits anything the projection has no answer
+     for. Counting only the states that ARE dispatchable keeps that true as the union grows. */
   const dispatchable = useMemo(
-    () => fleet.filter(a => a.airworthiness.status !== 'RED').length,
+    () => fleet.filter(a => a.airworthiness.status === 'GREEN' || a.airworthiness.status === 'AMBER').length,
     [fleet]
   );
   const inFlight = useMemo(

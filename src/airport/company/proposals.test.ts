@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { InMemoryCompanyAirportPageStore } from './pageStore';
+import { emptyPageContent, InMemoryCompanyAirportPageStore } from './pageStore';
 import {
   AlreadyDecidedError,
   NotApprovedError,
@@ -53,14 +53,7 @@ describe('ProposalWorkflow — submission', () => {
   it('records what it was drafted against, so a stale publish can be caught', () => {
     ctx.pages.publish({
       icao: 'KASE',
-      content: {
-        ppr: null,
-        curfew: null,
-        opsNotes: 'existing',
-        fboPreference: null,
-        rampHandlingLimits: null,
-        referenceAnnotations: [],
-      },
+      content: { ...emptyPageContent(), opsNotes: 'existing' },
       publishedBy: 'evaluator-1',
     });
 
@@ -242,14 +235,7 @@ describe('ProposalWorkflow — publish', () => {
   it('carries forward fields the proposal did not touch', () => {
     ctx.pages.publish({
       icao: 'KTEB',
-      content: {
-        ppr: 'PPR required',
-        curfew: null,
-        opsNotes: 'Existing note',
-        fboPreference: null,
-        rampHandlingLimits: null,
-        referenceAnnotations: [],
-      },
+      content: { ...emptyPageContent(), ppr: 'PPR required', opsNotes: 'Existing note' },
       publishedBy: 'evaluator-1',
     });
     const proposal = ctx.workflow.submit({

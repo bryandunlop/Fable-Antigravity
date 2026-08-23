@@ -100,6 +100,24 @@ describe('handoverModule (aircraft-keyed, independent of trip release)', () => {
     const defects = [{ id: 'd1', aircraftId: AC_ID, status: 'OPEN', airworthinessAffecting: true, ataChapter: '27' } as unknown as TechLogState['defects'][number]];
     expect(handoverModule(AC, state({ defects }), NOW)).toMatchObject({ tone: 'blocked', summary: 'grounded' });
   });
+
+  /**
+   * LG-143 — a clean provisional tail reads GREEN from deriveServiceability (which knows nothing of
+   * isProvisional), so this module fell straight through the RED test to the custody switch and
+   * told the PIC "ready to accept" about an aircraft they are now blocked from accepting.
+   */
+  it('is blocked when the aircraft is in onboarding, even with a briefing released to the crew (LG-143)', () => {
+    const prov = { ...AC, isProvisional: true } as Aircraft;
+    const briefings = [{ id: 'b1', aircraftId: AC_ID, status: 'RELEASED', releasedAtUtc: PAST } as FlightBriefing];
+
+    // Same briefing state that reads "ready to accept" for the non-provisional tail two tests
+    // above. The provisional case puts the tail in `state` too, because the module reads the
+    // serviceability PROJECTION rather than the passed row — one source of truth, so a caller
+    // cannot hand it an aircraft object that disagrees with the ledger.
+    expect(handoverModule(AC, state({ briefings }), NOW)).toMatchObject({ summary: 'ready to accept' });
+    expect(handoverModule(prov, state({ briefings, aircraft: [prov] }), NOW))
+      .toMatchObject({ tone: 'blocked', summary: 'in onboarding' });
+  });
 });
 
 describe('deriveTripModules / totalOutstanding', () => {

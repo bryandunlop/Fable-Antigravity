@@ -79,4 +79,33 @@ describe('aircraft workspace banner (D71)', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('N3PG');
     expect(screen.getAllByText('Provisional').length).toBeGreaterThan(0);
   });
+
+  /**
+   * LG-143 — the banner put "N3PG is serviceable" in the same line of sight as the Provisional
+   * badge and the pending-FSDO warning. Asserted here as well as in the engine test, because the
+   * page is where the contradiction was actually visible.
+   */
+  it('never calls a provisional tail serviceable (LG-143)', () => {
+    renderTail('N3PG');
+
+    const banner = within(screen.getByTestId('aircraft-banner'));
+    expect(banner.queryByText(/serviceable/i)).not.toBeInTheDocument();
+    expect(banner.getByText(/N3PG is in onboarding/i)).toBeInTheDocument();
+    expect(banner.getByText(/pending FSDO approval/i)).toBeInTheDocument();
+  });
+
+  /**
+   * The same claim, one card down. Fixing only the banner left the empty blocker board saying
+   * "N3PG is dispatchable" — so the page-wide assertion is the one that matters: nothing on this
+   * page may call a provisional tail dispatchable or serviceable.
+   */
+  it('nothing anywhere on a provisional tail page calls it dispatchable (LG-143)', () => {
+    renderTail('N3PG');
+
+    expect(screen.queryByText(/N3PG is dispatchable/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/N3PG is serviceable/i)).not.toBeInTheDocument();
+    // Both surfaces decline to assess rather than asserting the aircraft may not fly — that second
+    // claim is regulatory and unconfirmed (see the comment at the blocker-board copy).
+    expect(screen.getAllByText(/no dispatch state is assessed until its D195 MEL is approved/i).length).toBe(2);
+  });
 });

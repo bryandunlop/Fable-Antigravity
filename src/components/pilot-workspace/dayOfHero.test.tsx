@@ -18,7 +18,7 @@ const base = {
   legSequence: 1,
   legCount: 1,
   progress: { done: 0, total: 3 },
-  queue: [],
+  timeline: [],
   onOpenHandover: vi.fn(),
   onOpenItem: vi.fn(),
 };

@@ -120,3 +120,60 @@ describe('newPassengerFrom', () => {
     expect(p.food).toEqual(['Sushi']);
   });
 });
+
+describe('mapping allergens from the booking note', () => {
+  const withNote = (note: string, extra: Partial<Passenger> = {}): Passenger => ({
+    ...pax({ allergies: [] }),
+    sourceNote: { dietary: note, seenAtUtc: '2026-08-20T00:00:00Z' },
+    ...extra,
+  });
+
+  it('carries the existing allergens into the draft as plain names', () => {
+    expect(draftFrom(pax()).allergens).toEqual(['Shellfish']);
+  });
+
+  it('writes new allergens with no severity, because none was recorded', () => {
+    const p = withNote('severe nut allergy');
+    const out = applyDraft(p, { ...draftFrom(p), allergens: ['Tree nuts'] });
+    expect(out.allergies).toEqual([{ allergen: 'Tree nuts' }]);
+    expect(out.allergies[0].severity).toBeUndefined();
+  });
+
+  it('stamps the source text a mapping was made from', () => {
+    const p = withNote('no shellfish');
+    const out = applyDraft(p, { ...draftFrom(p), allergens: ['Shellfish'] }, '2026-08-22T00:00:00Z');
+    expect(out.mappedFromNote).toBe('no shellfish');
+    expect(out.mappedAtUtc).toBe('2026-08-22T00:00:00Z');
+  });
+
+  it('keeps reaction and medication on an allergen that was already there', () => {
+    const rich: Passenger = {
+      ...pax({ allergies: [{ allergen: 'Shellfish', severity: 'Critical', reaction: 'Anaphylaxis', medication: 'EpiPen' }] }),
+      sourceNote: { dietary: 'shellfish and now dairy', seenAtUtc: '2026-08-20T00:00:00Z' },
+    };
+    const out = applyDraft(rich, { ...draftFrom(rich), allergens: ['Shellfish', 'Dairy'] });
+    expect(out.allergies[0]).toMatchObject({ allergen: 'Shellfish', reaction: 'Anaphylaxis', medication: 'EpiPen' });
+    expect(out.allergies[1]).toEqual({ allergen: 'Dairy' });
+  });
+
+  it('re-stamps the source text after a re-map, which clears the stale flag', () => {
+    const stale = withNote('shellfish and now dairy', {
+      allergies: [{ allergen: 'Shellfish' }],
+      mappedFromNote: 'shellfish',
+    });
+    const out = applyDraft(stale, { ...draftFrom(stale), allergens: ['Shellfish', 'Dairy'] });
+    expect(out.mappedFromNote).toBe('shellfish and now dairy');
+  });
+
+  it('does not invent a mapping stamp for a passenger with no booking note', () => {
+    const p = pax({ allergies: [] });
+    const out = applyDraft(p, { ...draftFrom(p), allergens: ['Gluten'] });
+    expect(out.mappedFromNote).toBeUndefined();
+  });
+
+  it('counts an allergen change as dirty', () => {
+    const base = draftFrom(pax());
+    expect(isDirty({ ...base, allergens: ['Shellfish', 'Peanuts'] }, base)).toBe(true);
+    expect(isDirty({ ...base }, base)).toBe(false);
+  });
+});

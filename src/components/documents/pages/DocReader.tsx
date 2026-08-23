@@ -4,6 +4,13 @@ import { ArrowLeft, AlertTriangle, FilePlus2, MessageSquare, MessageSquarePlus, 
 import { Button } from '../../ui/button';
 import { GfoPanel, GfoEmptyState } from '../../gfo';
 import { SectionedContent } from '../components/SectionedContent';
+import { AmendedSection } from '../components/AmendedSection';
+import { AmendmentStrip } from '../components/AmendmentStrip';
+import { RetirementBanner } from '../components/RetirementBanner';
+import { AddNoteBar, BlockAnnotations, OrphanedNotes } from '../components/AnnotationLayer';
+import { annotationsForBlock, orphanedAnnotations, resolveAnnotations } from '../engine/annotations';
+import { amendmentsForSection, amendmentsInForce } from '../engine/amendments';
+import { amendedExport } from '../engine/exportAmendments';
 import { RevisionMedia } from '../components/RevisionMedia';
 import { DiffedContent } from '../components/DiffedContent';
 import { useDocuments } from '../DocumentsContext';
@@ -55,9 +62,25 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
   const allRevs = doc ? revisionsFor(doc.id, state.revisions) : [];
   const priorRev = doc && rev ? priorPublishedRevision(doc.id, state.revisions) : undefined;
   const diff = useMemo(() => (rev && priorRev ? diffRevisions(priorRev, rev) : null), [rev, priorRev]);
+  // TL-46 — what an exported copy should actually contain. A file cannot expand a
+  // chip, so amendments are resolved into the sections before they leave myGFO.
+  const exportView = useMemo(
+    () => (doc && rev ? amendedExport(doc.id, rev, state.revisions, state.amendmentResolutions ?? []) : undefined),
+    [doc, rev, state.revisions, state.amendmentResolutions],
+  );
   const changeCount = diff ? diff.counts.total : 0;
   const showingDiff = !!(diff?.hasChanges && showChanges);
   const { userId } = identityFor(userRole);
+
+  // Phase 4 — this reader's own notes, re-anchored against the revision on screen.
+  const myNotes = useMemo(() => {
+    if (!rev || !doc) return [];
+    const mine = (state.annotations ?? []).filter((a) => a.docId === doc.id && a.userId === userId);
+    return resolveAnnotations(mine, rev);
+  }, [state.annotations, doc, rev, userId]);
+  const orphans = useMemo(() => orphanedAnnotations(myNotes), [myNotes]);
+
+
   const byBlock = useMemo(() => openSuggestionsByBlock(state.suggestions), [state.suggestions]);
 
   const gotoChange = (dir: 1 | -1) => {
@@ -172,7 +195,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
             <Button
               size="sm"
               variant="outline"
-              onClick={() => { if (!printDocument(doc, rev)) toast.error('Allow pop-ups to export the PDF.'); }}
+              onClick={() => { if (!printDocument(doc, rev, exportView)) toast.error('Allow pop-ups to export the PDF.'); }}
             >
               <Printer className="mr-1.5 h-4 w-4" /> Export PDF
             </Button>
@@ -183,7 +206,7 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               variant="outline"
               onClick={async () => {
                 try {
-                  const blob = await buildReviewDocx(doc, rev);
+                  const blob = await buildReviewDocx(doc, rev, exportView);
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
@@ -259,6 +282,17 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
         </div>
       )}
 
+      <RetirementBanner doc={doc} />
+
+      <OrphanedNotes orphans={orphans} userRole={userRole} />
+
+      {rev && !isReceived(rev) && (
+        <AmendmentStrip
+          amendments={amendmentsInForce(doc.id, state.revisions, state.amendmentResolutions ?? [])}
+          sections={rev.sections}
+        />
+      )}
+
       {rev ? (
         <GfoPanel>
           <article ref={articleRef} className="prose-bulletin">
@@ -266,10 +300,32 @@ export function DocReader({ userRole, additionalRoles = [] }: { userRole: string
               <ReceivedRevisionView doc={doc} rev={rev} />
             ) : (
               <>
+                {!showingDiff && (
+                  <AddNoteBar docId={doc.id} rev={rev} userRole={userRole} articleRef={articleRef} />
+                )}
                 {showingDiff && diff ? (
                   <DiffedContent diff={diff} renderBlockGutter={renderBlockGutter} />
                 ) : (
-                  <SectionedContent sections={rev.sections} renderBlockGutter={renderBlockGutter} />
+                  <SectionedContent
+                    sections={rev.sections}
+                    renderBlockGutter={(blockId) => (
+                      <>
+                        {renderBlockGutter?.(blockId)}
+                        <BlockAnnotations notes={annotationsForBlock(myNotes, blockId)} userRole={userRole} />
+                      </>
+                    )}
+                    renderSection={(section, defaultBody) => {
+                      const ams = amendmentsForSection(section.id, state.revisions, state.amendmentResolutions ?? []);
+                      if (ams.length === 0) return defaultBody;
+                      return (
+                        <AmendedSection
+                          amendments={ams}
+                          revisions={state.revisions}
+                          defaultBody={defaultBody}
+                        />
+                      );
+                    }}
+                  />
                 )}
                 <RevisionMedia rev={rev} />
               </>

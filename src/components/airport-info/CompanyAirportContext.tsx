@@ -8,6 +8,8 @@ import type {
   CompanyAirportPageVersion,
   ConfirmFieldRequest,
   FieldConfirmation,
+  SaveFieldRequest,
+  SaveFieldResult,
 } from '../../airport/company/pageStore';
 import { confirmationStates, type FieldConfirmationState } from '../../airport/company/confirmations';
 import { buildOfficerWorklist, type OfficerWorklist } from '../../airport/company/worklist';
@@ -113,6 +115,15 @@ interface CompanyAirportApi {
   deleteRule(ruleId: string): void;
   /** Record that a field was checked and is still true (D54). */
   confirm(request: ConfirmFieldRequest): FieldConfirmation;
+  /**
+   * Write one station-support field (D96). Publishes and confirms in one act,
+   * with no approver in the path — see SUPPORT_FIELDS for why that is safe.
+   */
+  saveField(request: SaveFieldRequest): SaveFieldResult;
+  /** Every published version for an airport, oldest first — the change record. */
+  versionsFor(icao: string): CompanyAirportPageVersion[];
+  /** Every explicit confirmation for an airport, for the change record's notes. */
+  confirmationsFor(icao: string): FieldConfirmation[];
   /** Per-field confirmation state for an airport, derived — never stored. */
   confirmationStates(icao: string, todayIso?: string): FieldConfirmationState[];
   /** Record that a crew READ the current version. A read receipt, not a confirmation (D47). */
@@ -182,6 +193,14 @@ export function CompanyAirportProvider({ children }: { children: React.ReactNode
         commit();
         return version;
       },
+      saveField: (request) => {
+        const result = pages.saveField(request);
+        // The store persists itself; this is only to re-render every reader.
+        commit();
+        return result;
+      },
+      versionsFor: (icao) => pages.versionsFor(icao),
+      confirmationsFor: (icao) => pages.confirmationsFor(icao),
       awaiting: (role) => workflow.awaiting(role),
       readyToPublish: () => workflow.readyToPublish(),
       forAirport: (icao) => workflow.forAirport(icao),

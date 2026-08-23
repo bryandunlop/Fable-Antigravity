@@ -333,3 +333,33 @@ export const displaySettings = pgTable('display_settings', {
   hideItemNamesOnPhone: boolean('hide_item_names_on_phone').notNull().default(false),
   hideDescriptions: boolean('hide_descriptions').notNull().default(false),
 });
+
+// ─── Work Log ───────────────────────────────────────────────────────────────
+//
+// A personal effort tracker, not part of the product. It shares this database
+// because one already exists and already reaches the phone — and nothing else:
+// no foreign key points into it, none point out of it, and no product table
+// reads it. It can be dropped without touching a single flight-ops row.
+//
+// `category` and `source` are text rather than pgEnum deliberately. The
+// category list is a note-to-self about where time went and will keep growing;
+// making "vendor call" cost a migration means it simply never gets added. The
+// authoritative list lives in src/components/worklog/workLog.ts.
+
+export const workLogEntries = pgTable('work_log_entries', {
+  id: text('id').primaryKey(),
+  /** The calendar day the work counts against, 'YYYY-MM-DD'. Not an instant: */
+  /** commits in this repo span -0400 to +0200 and the day must not drift. */
+  localDate: text('local_date').notNull(),
+  minutes: integer('minutes').notNull(),
+  category: text('category').notNull(),
+  /** 'git' (derived from history), 'manual' (typed), 'timer' (stopwatch). */
+  source: text('source').notNull(),
+  note: text('note').notNull().default(''),
+  /** Present for derived and timed entries; null for a duration typed by hand. */
+  startedAt: text('started_at'),
+  endedAt: text('ended_at'),
+  commits: integer('commits'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});

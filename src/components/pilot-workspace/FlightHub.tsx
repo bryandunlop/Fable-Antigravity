@@ -23,7 +23,8 @@ import TripBriefPanel from './panels/TripBriefPanel';
 import { LegFuelSection } from './panels/LegFuelSection';
 import { LegFratSection } from './panels/LegFratSection';
 import { DayOfPane } from './panels/DayOfPane';
-import { deriveDayOfQueue, beforePushProgress, type QueueItem } from './dayOfQueue';
+import { beforePushProgress, type QueueItem } from './dayOfQueue';
+import { deriveDayTimeline } from './dayTimeline';
 import { PrepMatrix } from './panels/PrepMatrix';
 import { derivePrepRows, prepOutstanding, prepLocked } from './prepMatrix';
 import { derivePaneMode, nextDepartureUtc, type PaneMode } from './paneMode';
@@ -112,7 +113,7 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
   const rawMode = searchParams.get('mode');
   const paneMode = derivePaneMode(legs, now, rawMode === 'prep' || rawMode === 'day-of' ? rawMode : undefined);
   const prepRows = derivePrepRows(tlTrip, tlAc, now);
-  const queue = deriveDayOfQueue(tlTrip, tlAc, now);
+  const timeline = deriveDayTimeline(tlTrip, tlAc, now);
   const progress = beforePushProgress(tlTrip, tlAc, now);
   const nextDepUtc = nextDepartureUtc(legs, now);
   const nextLeg = legs.find((l) => l.departureTimeUtc === nextDepUtc);
@@ -209,7 +210,8 @@ export default function FlightHub({ trip, userRole }: { trip: TripRecord; userRo
           legSequence={nextLeg?.sequence}
           legCount={legs.length}
           progress={progress}
-          queue={queue}
+          paxCount={nextLeg ? trip.legs?.find((l) => l.departureTimeUtc.slice(0, 16) === nextLeg.departureTimeUtc.slice(0, 16))?.paxCount : undefined}
+          timeline={timeline}
           serviceability={svStatus}
           custody={custody}
           deferralCount={activeDeferrals}
