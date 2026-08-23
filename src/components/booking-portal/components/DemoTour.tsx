@@ -149,14 +149,57 @@ export const BOOKING_TOUR: TourStep[] = [
     ],
   },
   {
+    id: 'costmodel',
+    title: 'Underneath the rate card',
+    route: '/booking-portal/cost-model',
+    anchor: 'cost-provenance',
+    body: [
+      'Everything so far took the $10,000 hourly rate as given. This page asks where that number comes from — and it opens by separating what is actually known from what is a guess, because the guess carries the argument.',
+      'The framing matters more than any figure on it: these aircraft do not exist to make money, they exist to get used. A chargeback moves a dollar between two P&G cost centres and changes nothing at company level.',
+    ],
+    aside: 'Proof of concept. Nothing here is GFO’s accounting.',
+  },
+  {
+    id: 'realcost',
+    title: 'What an hour actually costs',
+    route: '/booking-portal/cost-model',
+    anchor: 'cost-headline',
+    body: [
+      'If most of the budget is fixed — aircraft, staff, hangar, paid whether anything flies — then one more flight hour costs the company far less than the rate charged for it.',
+      'At the default guess a requestor is asked for about two and a half times what flying actually costs. That is not a revenue policy; it is a deterrent, applied to the one activity the department exists to perform.',
+    ],
+  },
+  {
+    id: 'idle',
+    title: 'What an idle fleet costs',
+    route: '/booking-portal/cost-model',
+    anchor: 'cost-idle',
+    body: [
+      'Drag the demand shortfall and watch cost per hour delivered climb. Flying did not get more expensive — the same committed bill is spread across fewer trips.',
+      'This is the number to put in front of a VP, rather than block hours: an owned asset sitting still is money already spent that bought nothing.',
+    ],
+  },
+  {
+    id: 'sensitivity',
+    title: 'Does it hold if the guess is wrong?',
+    route: '/booking-portal/cost-model',
+    anchor: 'cost-sensitivity',
+    body: [
+      'The one question a proof of concept has to answer. The same calculation is run across every plausible fixed share, so you can see where the argument turns rather than being asked to trust it.',
+      'Above roughly two-thirds fixed, the rate is a genuine deterrent and there is something worth fixing. Below it, the rate is close to cost-reflective and there is nothing to remove — at half fixed, the rate IS cost.',
+    ],
+    aside: 'Drag "fixed share of cost" on the left and watch the whole page move with it.',
+  },
+  {
     id: 'wrap',
     title: 'What this demonstrates, and what is still open',
     route: '/booking-portal',
     body: [
       'A chargeback that a requestor can see, understand and act on — itemised, capped by the regulation, and reduced only by behaviour that costs the department nothing.',
-      'Three things are genuinely unresolved: whether the set half of the budget is defended when corporate cuts travel, whether the cost ceiling is tested per flight or in aggregate, and how much internal demand actually responds to price. The last one decides whether discounting is worth doing at all, and nobody has measured it.',
+      'What is genuinely unresolved is short. What is the real fixed share of cost — that decides whether any of this is worth pursuing. Is the set half of the budget defended when corporate cuts travel. And has anyone at GFO ever actually declined a trip because of the rate, which is the cheapest possible test of whether price changes behaviour here at all.',
+      'Three answers, none of which needs software, and this stops being a proof of concept.',
     ],
-    aside: 'Reasoning and the funding model: docs/CHARGEBACK_DEMAND_MODEL.md and the chargeback simulator.',
+    aside: 'Reasoning: docs/CHARGEBACK_DEMAND_MODEL.md in the Tech Log repo.',
   },
 ];
 
@@ -213,6 +256,18 @@ export function DemoTour({ steps = BOOKING_TOUR }: { steps?: TourStep[] }) {
   const stop = useCallback(() => {
     navigate(location.pathname, { replace: true });
   }, [navigate, location.pathname]);
+
+  // A step lives in the URL, so a link like ?tour=1&step=13 has to land on that
+  // step's PAGE too — not just show its narration over whatever page you were on.
+  // Without this the deep link renders the right text against the wrong screen and
+  // the spotlight has nothing to point at.
+  useEffect(() => {
+    if (!running) return;
+    const want = step?.route;
+    if (want && want !== location.pathname) {
+      navigate(`${want}?tour=1&step=${i}`, { replace: true });
+    }
+  }, [running, step, i, location.pathname, navigate]);
 
   useEffect(() => {
     if (!running) return;
