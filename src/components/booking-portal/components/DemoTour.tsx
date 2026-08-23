@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, PlayCircle, X } from 'lucide-react';
 import { Button } from '../../ui/button';
+import { usePortal } from '../BookingPortalContext';
 import { cn } from '../../ui/utils';
 
 export interface TourStep {
@@ -25,6 +26,12 @@ export interface TourStep {
   anchor?: string;
   /** Shown as a quiet aside — the "why", for a viewer who wants the reasoning. */
   aside?: string;
+  /**
+   * Step visits a lead-only surface. Dropped from the walkthrough for anyone who
+   * cannot open it — narrating a page the viewer will be refused is worse than
+   * not mentioning it, and it would leave the spotlight pointing at nothing.
+   */
+  leadOnly?: boolean;
 }
 
 export const BOOKING_TOUR: TourStep[] = [
@@ -150,6 +157,7 @@ export const BOOKING_TOUR: TourStep[] = [
   },
   {
     id: 'costmodel',
+    leadOnly: true,
     title: 'Underneath the rate card',
     route: '/booking-portal/cost-model',
     anchor: 'cost-provenance',
@@ -161,6 +169,7 @@ export const BOOKING_TOUR: TourStep[] = [
   },
   {
     id: 'realcost',
+    leadOnly: true,
     title: 'What an hour actually costs',
     route: '/booking-portal/cost-model',
     anchor: 'cost-headline',
@@ -171,6 +180,7 @@ export const BOOKING_TOUR: TourStep[] = [
   },
   {
     id: 'idle',
+    leadOnly: true,
     title: 'What an idle fleet costs',
     route: '/booking-portal/cost-model',
     anchor: 'cost-idle',
@@ -181,6 +191,7 @@ export const BOOKING_TOUR: TourStep[] = [
   },
   {
     id: 'sensitivity',
+    leadOnly: true,
     title: 'Does it hold if the guess is wrong?',
     route: '/booking-portal/cost-model',
     anchor: 'cost-sensitivity',
@@ -235,9 +246,16 @@ function useSpotlight(anchor: string | undefined, active: boolean) {
 // DemoTour renders inside PortalShell, which remounts on every route change, so a
 // useState index is destroyed the moment the tour navigates. Keeping it in the query
 // string also makes any step linkable — /booking-portal?tour=1&step=7.
-export function DemoTour({ steps = BOOKING_TOUR }: { steps?: TourStep[] }) {
+export function DemoTour({ steps: allSteps = BOOKING_TOUR }: { steps?: TourStep[] }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showCostModel } = usePortal();
+  // Filtering rather than skipping keeps "step 4 of 13" honest for an EA and
+  // "step 4 of 17" honest for a lead, instead of silently jumping a number.
+  const steps = useMemo(
+    () => allSteps.filter((s) => !s.leadOnly || showCostModel),
+    [allSteps, showCostModel],
+  );
   const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const running = params.get('tour') === '1';
   const i = Math.max(0, Math.min(steps.length - 1, Number(params.get('step') ?? '0') || 0));

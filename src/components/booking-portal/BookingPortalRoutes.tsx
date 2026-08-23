@@ -15,10 +15,23 @@ import Passengers from './pages/Passengers';
 import Watches from './pages/Watches';
 import InboxPage from './pages/InboxPage';
 import CostModel from './pages/CostModel';
+import CostModelDenied from './pages/CostModelDenied';
+import { usePortal } from './BookingPortalContext';
 
-export default function BookingPortalRoutes() {
+/** Gated inside the provider, so the check and the tab read the same source. */
+function CostModelGate() {
+  return usePortal().showCostModel ? <CostModel /> : <CostModelDenied />;
+}
+
+export default function BookingPortalRoutes({
+  userRole,
+  additionalRoles,
+}: {
+  userRole?: string;
+  additionalRoles?: string[];
+}) {
   return (
-    <BookingPortalProvider>
+    <BookingPortalProvider userRole={userRole} additionalRoles={additionalRoles}>
       <Routes>
         <Route path="/" element={<PortalHome />} />
         <Route path="trips" element={<Trips />} />
@@ -30,7 +43,7 @@ export default function BookingPortalRoutes() {
         <Route path="passengers" element={<Passengers />} />
         <Route path="watches" element={<Watches />} />
         <Route path="inbox" element={<InboxPage />} />
-        <Route path="cost-model" element={<CostModel />} />
+        <Route path="cost-model" element={<CostModelGate />} />
       </Routes>
     </BookingPortalProvider>
   );

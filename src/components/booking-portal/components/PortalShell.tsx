@@ -13,7 +13,7 @@ import { buildQueue } from '../engine/queueBands';
 import { EA_NAME, SCHEDULER_NAME } from '../mockData';
 import { cn } from '../../ui/utils';
 
-const TABS: { to: string; label: string; icon: React.ElementType; end?: boolean; schedulingOnly?: boolean }[] = [
+const TABS: { to: string; label: string; icon: React.ElementType; end?: boolean; schedulingOnly?: boolean; leadOnly?: boolean }[] = [
   { to: '/booking-portal', label: 'Home', icon: CalendarDays, end: true },
   { to: '/booking-portal/trips', label: 'Trips', icon: Ticket },
   { to: '/booking-portal/seats', label: 'Empty seats', icon: Plane },
@@ -22,7 +22,7 @@ const TABS: { to: string; label: string; icon: React.ElementType; end?: boolean;
   { to: '/booking-portal/passengers', label: 'Passengers', icon: Users },
   { to: '/booking-portal/watches', label: 'Watches', icon: CalendarDays },
   { to: '/booking-portal/inbox', label: 'Inbox', icon: InboxIcon },
-  { to: '/booking-portal/cost-model', label: 'Cost model', icon: Scale },
+  { to: '/booking-portal/cost-model', label: 'Cost model', icon: Scale, leadOnly: true },
 ];
 
 export function PortalShell({
@@ -36,7 +36,7 @@ export function PortalShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  const { state, dispatch } = usePortal();
+  const { state, dispatch, showCostModel } = usePortal();
   const unread = state.inbox.filter((n) => n.actionNeeded && !n.read).length;
   const queueCount = buildQueue(state.requests, state.seatAsks, Date.now()).counts.total;
 
@@ -80,7 +80,7 @@ export function PortalShell({
       </div>
 
       <nav className="flex flex-wrap items-center gap-1 border-b">
-        {TABS.filter((t) => !t.schedulingOnly || state.persona === 'scheduling').map((tab) => {
+        {TABS.filter((t) => (!t.schedulingOnly || state.persona === 'scheduling') && (!t.leadOnly || showCostModel)).map((tab) => {
           const Icon = tab.icon;
           const badge = tab.label === 'Inbox' ? unread : tab.label === 'Queue' ? queueCount : 0;
           return (

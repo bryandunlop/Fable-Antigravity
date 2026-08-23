@@ -232,14 +232,37 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
   }
 }
 
+/**
+ * The department's cost structure — budget, fixed cost, and the fact the rate sits
+ * well above what an hour really costs — is a leadership and finance conversation,
+ * not an operational one. Bryan's ruling, 2026-08-23: lead team only. The EA and
+ * scheduling personas price trips; they do not see what the department spends.
+ */
+export const COST_MODEL_ROLES = ['lead', 'admin'];
+
+export function canSeeCostModel(userRole?: string, additionalRoles: string[] = []): boolean {
+  return [userRole, ...additionalRoles].some((r) => !!r && COST_MODEL_ROLES.includes(r));
+}
+
 const PortalContext = createContext<{
   state: PortalState;
   dispatch: React.Dispatch<PortalAction>;
+  /** Whether this viewer may see the department's economics. */
+  showCostModel: boolean;
 } | null>(null);
 
-export function BookingPortalProvider({ children }: { children: ReactNode }) {
+export function BookingPortalProvider({
+  children,
+  userRole,
+  additionalRoles,
+}: {
+  children: ReactNode;
+  userRole?: string;
+  additionalRoles?: string[];
+}) {
   const [state, dispatch] = useReducer(portalReducer, undefined, initialPortalState);
-  const value = useMemo(() => ({ state, dispatch }), [state]);
+  const showCostModel = canSeeCostModel(userRole, additionalRoles);
+  const value = useMemo(() => ({ state, dispatch, showCostModel }), [state, showCostModel]);
   return <PortalContext.Provider value={value}>{children}</PortalContext.Provider>;
 }
 

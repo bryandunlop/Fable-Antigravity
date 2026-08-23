@@ -610,7 +610,7 @@ export default function App() {
                                   path="/booking-portal/*"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'admin', 'lead']}>
-                                      <BookingPortalRoutes />
+                                      <BookingPortalRoutes userRole={userRole} additionalRoles={additionalRoles} />
                                     </ProtectedRoute>
                                   }
                                 />
