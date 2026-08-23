@@ -14,6 +14,7 @@ import SchedulingQueue from './pages/SchedulingQueue';
 import Passengers from './pages/Passengers';
 import Watches from './pages/Watches';
 import InboxPage from './pages/InboxPage';
+import CostModel from './pages/CostModel';
 
 export default function BookingPortalRoutes() {
   return (
@@ -29,6 +30,7 @@ export default function BookingPortalRoutes() {
         <Route path="passengers" element={<Passengers />} />
         <Route path="watches" element={<Watches />} />
         <Route path="inbox" element={<InboxPage />} />
+        <Route path="cost-model" element={<CostModel />} />
       </Routes>
     </BookingPortalProvider>
   );

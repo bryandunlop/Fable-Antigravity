@@ -4,7 +4,7 @@
 import { type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  CalendarDays, ClipboardList, Inbox as InboxIcon, ListChecks, Plane, RotateCcw, Ticket, Users,
+  CalendarDays, ClipboardList, Inbox as InboxIcon, ListChecks, Plane, RotateCcw, Scale, Ticket, Users,
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { usePortal } from '../BookingPortalContext';
@@ -22,6 +22,7 @@ const TABS: { to: string; label: string; icon: React.ElementType; end?: boolean;
   { to: '/booking-portal/passengers', label: 'Passengers', icon: Users },
   { to: '/booking-portal/watches', label: 'Watches', icon: CalendarDays },
   { to: '/booking-portal/inbox', label: 'Inbox', icon: InboxIcon },
+  { to: '/booking-portal/cost-model', label: 'Cost model', icon: Scale },
 ];
 
 export function PortalShell({
