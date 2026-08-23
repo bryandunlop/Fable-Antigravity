@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { usePortal } from '../BookingPortalContext';
+import { DemoTour } from './DemoTour';
 import { buildQueue } from '../engine/queueBands';
 import { EA_NAME, SCHEDULER_NAME } from '../mockData';
 import { cn } from '../../ui/utils';
@@ -47,6 +48,7 @@ export function PortalShell({
           {meta && <p className="mt-0.5">{meta}</p>}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <DemoTour />
           {actions}
           <div className="flex overflow-hidden rounded-md border text-xs font-medium">
             <button
