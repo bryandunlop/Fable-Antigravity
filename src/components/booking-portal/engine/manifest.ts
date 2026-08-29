@@ -61,12 +61,19 @@ function firstDepartureMs(request: TripRequest): number | null {
 
 const isIntl = (icao: string) => !/^K[A-Z]{3}$/.test(icao);
 
-/** Travel window used to evaluate documents: first departure to last leg's date. */
-function travelWindow(request: TripRequest): { start: string; end: string } | null {
-  const first = request.legs[0];
-  const last = request.legs[request.legs.length - 1];
-  if (!first || !last) return null;
-  return { start: first.date, end: last.date };
+/**
+ * The window a person's documents are judged against: the legs THEY fly, not
+ * the trip's outer dates. A staffer who rides the outbound only should not be
+ * grounded because a passport lapses before a return they are not on.
+ */
+function travelWindowFor(request: TripRequest, passengerId: string): { start: string; end: string } | null {
+  const dates = request.legs
+    .filter((leg) => leg.passengers.some((p) => p.passengerId === passengerId))
+    .map((leg) => leg.date)
+    .filter(Boolean)
+    .sort();
+  if (dates.length === 0) return null;
+  return { start: dates[0], end: dates[dates.length - 1] };
 }
 
 /**
@@ -110,7 +117,6 @@ export function manifestState(
   const lockAtMs = departMs === null ? null : departMs - lockHours * HOUR_MS;
   const hoursToLock = lockAtMs === null ? Number.POSITIVE_INFINITY : (lockAtMs - nowMs) / HOUR_MS;
 
-  const window = travelWindow(request);
   const outstanding: Outstanding[] = [];
 
   for (const seat of named) {
@@ -131,8 +137,11 @@ export function manifestState(
       });
     }
 
-    // Documents are evaluated against the travel window, and a block is stated
-    // per leg: "cannot fly the return" is actionable, "invalid" is not.
+    // Documents are judged against the legs this person actually flies, and the
+    // block is stated per leg: "cannot fly the return" is actionable, "invalid"
+    // is not. No fallback to every leg — a document that is fine for the legs
+    // they are on is not a problem, and saying otherwise grounds them for free.
+    const window = travelWindowFor(request, person.id);
     if (window) {
       for (const doc of person.docs) {
         if (evaluateDoc(doc.expires, window.start, window.end) !== 'block') continue;
@@ -140,12 +149,13 @@ export function manifestState(
           .filter((leg) => leg.passengers.some((lp) => lp.passengerId === person.id))
           .filter((leg) => Date.parse(doc.expires) < Date.parse(leg.date))
           .map((leg) => leg.id);
+        if (blockedLegIds.length === 0) continue;
         outstanding.push({
           passengerId: person.id,
           name: person.name,
           kind: 'document',
           detail: `${doc.label} expires ${doc.expires}`,
-          blockedLegIds: blockedLegIds.length > 0 ? blockedLegIds : seat.legIds,
+          blockedLegIds,
         });
         break; // one document problem per person is enough to act on
       }

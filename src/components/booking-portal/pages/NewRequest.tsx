@@ -117,7 +117,10 @@ export default function NewRequest() {
           date: l.date,
           // Latitude given to scheduling is what the rate card rewards — an
           // arrive-by or flexible leg is worth more than a firm departure.
-          flexHours: latitudeHours(l.timing) / 2,
+          // latitudeHours is ALREADY on the rate card's scale; halving it here
+          // silently sank the default arrive-by leg below flexThresholdHours,
+          // so the credit the comment promises never fired.
+          flexHours: latitudeHours(l.timing),
           purposes: [principalId, ...l.extraPassengerIds].map((pid) => l.purposes[pid] ?? 'business'),
           sharedRepositioning: false,
         })),
@@ -130,7 +133,7 @@ export default function NewRequest() {
     return savingsAvailable(quote, {
       leadDays,
       earlyBookingDays: GFO_RATE_CARD.earlyBookingDays,
-      allFlexed: legs.length > 0 && legs.every((l) => latitudeHours(l.timing) / 2 >= GFO_RATE_CARD.flexThresholdHours),
+      allFlexed: legs.length > 0 && legs.every((l) => latitudeHours(l.timing) >= GFO_RATE_CARD.flexThresholdHours),
       anySharedRepo: false,
     });
   }, [quote, legs, asOf]);
@@ -164,7 +167,7 @@ export default function NewRequest() {
         // departLocal stays the expected departure so every existing reader
         // (itinerary, queue, calendar) keeps working; `timing` carries the truth.
         departLocal: derived ?? '08:00',
-        flexHours: l.timing.kind === 'depart' ? l.timing.flexHours : Math.round(latitudeHours(l.timing) / 2),
+        flexHours: l.timing.kind === 'depart' ? l.timing.flexHours : Math.round(latitudeHours(l.timing)),
         timing: l.timing,
         estMinutes: est.minutes,
         estNm: est.nm,

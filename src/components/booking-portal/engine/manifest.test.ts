@@ -152,6 +152,42 @@ describe('manifestState — who owes what', () => {
     expect(doc!.detail).toContain('Passport — USA');
   });
 
+  it('leaves a passenger alone when their document is fine for the legs THEY fly', () => {
+    // Two-leg trip; P2 is only on the early leg. Their passport expires between
+    // the two, so it is irrelevant to them — but the trip-wide window says
+    // "block", and the fallback used to ground them on a leg they can fly.
+    const r = request({
+      seatsHeld: 2,
+      legs: [
+        leg({ id: 'L1', date: '2026-09-05', passengers: [travelling] }),
+        leg({ id: 'L2', from: 'LSGG', to: 'KCVG', date: '2026-10-20', passengers: [{ passengerId: 'P1', purpose: 'business' }] }),
+      ],
+    });
+    const s = manifestState(
+      r,
+      [pax(), pax({ id: 'P2', name: 'K. Tanaka', docs: [{ id: 'D1', label: 'Passport', numberMasked: '•••1', expires: '2026-10-01' }] })],
+      NOW,
+    );
+    expect(s.outstanding.filter((o) => o.kind === 'document')).toHaveLength(0);
+  });
+
+  it('still blocks when the document lapses inside the legs that person flies', () => {
+    const r = request({
+      seatsHeld: 2,
+      legs: [
+        leg({ id: 'L1', date: '2026-09-05', passengers: [travelling] }),
+        leg({ id: 'L2', from: 'LSGG', to: 'KCVG', date: '2026-10-20', passengers: [travelling] }),
+      ],
+    });
+    const s = manifestState(
+      r,
+      [pax(), pax({ id: 'P2', name: 'K. Tanaka', docs: [{ id: 'D1', label: 'Passport', numberMasked: '•••1', expires: '2026-10-01' }] })],
+      NOW,
+    );
+    const doc = s.outstanding.find((o) => o.kind === 'document');
+    expect(doc?.blockedLegIds).toEqual(['L2']);
+  });
+
   it('reports one document problem per person, not one per document', () => {
     const r = request({ legs: [leg({ date: '2026-10-20', passengers: [travelling] })] });
     const s = manifestState(

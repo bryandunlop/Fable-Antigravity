@@ -42,7 +42,17 @@ export default function ManifestPage() {
 
   const request = state.requests.find((r) => r.id === id);
 
-  if (!request) {
+  // Both memos run unconditionally: react-router keeps this component instance
+  // mounted across :id changes, so a hook after an early return changes the hook
+  // COUNT between renders and React throws. Navigating from a good manifest to a
+  // dead one — a stale link, a superseded trip — was a hard crash.
+  const m = useMemo(
+    () => (request ? manifestState(request, state.passengers, Date.now()) : null),
+    [request, state.passengers],
+  );
+  const consequences = useMemo(() => (m ? consequencesOfSilence(m) : []), [m]);
+
+  if (!request || !m) {
     return (
       <PortalShell title="Manifest">
         <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">
@@ -52,8 +62,6 @@ export default function ManifestPage() {
     );
   }
 
-  const m = useMemo(() => manifestState(request, state.passengers, Date.now()), [request, state.passengers]);
-  const consequences = useMemo(() => consequencesOfSilence(m), [m]);
   const namedIds = new Set(m.named.map((s) => s.passengerId));
   const addable = state.passengers.filter((p) => !namedIds.has(p.id));
 
