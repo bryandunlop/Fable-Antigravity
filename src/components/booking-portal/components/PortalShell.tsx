@@ -36,9 +36,25 @@ export function PortalShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  const { state, dispatch, showCostModel } = usePortal();
+  const { state, dispatch, showCostModel, executiveScope } = usePortal();
   const unread = state.inbox.filter((n) => n.actionNeeded && !n.read).length;
   const queueCount = buildQueue(state.requests, state.seatAsks, Date.now()).counts.total;
+
+  // D99 — an executive visitor sees the request form as a page, not the portal:
+  // no tabs, no reset, and above all no persona switch (RequestDrawer gates its
+  // approve/decline on state.persona, which is demo chrome, not auth).
+  if (executiveScope) {
+    return (
+      <div className="space-y-4">
+        <div className="min-w-0">
+          <p className="gfo-eyebrow mb-1 text-muted-foreground">Booking Portal</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          {meta && <p className="mt-0.5">{meta}</p>}
+        </div>
+        <div>{children}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

@@ -31,6 +31,7 @@ import { DocumentHub } from './components/documents/pages/DocumentHub';
 import { DocReader } from './components/documents/pages/DocReader';
 import { DocWorkbench } from './components/documents/pages/DocWorkbench';
 import LeadDashboard from './components/lead/LeadDashboard';
+import ExecutiveDashboard from './components/executive/ExecutiveDashboard';
 import ManagerInsights from './components/ManagerInsights';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
@@ -434,6 +435,17 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
+                                {/* D99 — executive fleet week view (read-only; the one action is the ask-my-EA handoff) */}
+                                <Route
+                                  path="/executive"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['executive', 'admin']}>
+                                      <SchedulingWorkspaceProvider>
+                                        <ExecutiveDashboard userRole={userRole} />
+                                      </SchedulingWorkspaceProvider>
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route
                                   path="/manager-insights"
                                   element={
@@ -609,7 +621,9 @@ export default function App() {
                                 <Route
                                   path="/booking-portal/*"
                                   element={
-                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'admin', 'lead']}>
+                                    // 'executive' (D99): the fleet-week ask-my-EA handoff lands on the pre-filled
+                                    // request form; the request's completion work flows to the EA via the D77 rails.
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'admin', 'lead', 'executive']}>
                                       <BookingPortalRoutes userRole={userRole} additionalRoles={additionalRoles} />
                                     </ProtectedRoute>
                                   }

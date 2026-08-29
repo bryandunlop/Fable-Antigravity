@@ -3,7 +3,7 @@
 // leave the portal, which is acceptable for a shell whose whole job is to be
 // clicked through — the Reset button does the same on purpose.
 
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { BookingPortalProvider } from './BookingPortalContext';
 import PortalHome from './pages/PortalHome';
 import Trips from './pages/Trips';
@@ -23,6 +23,39 @@ function CostModelGate() {
   return usePortal().showCostModel ? <CostModel /> : <CostModelDenied />;
 }
 
+/**
+ * D99 — an executive visitor gets exactly one page: the new-request form the
+ * fleet-week handoff lands on. Every other portal path redirects there, so the
+ * un-role-gated persona switch and the scheduler surfaces are unreachable.
+ */
+function ScopedRoutes() {
+  if (usePortal().executiveScope) {
+    return (
+      <Routes>
+        <Route path="requests/new" element={<NewRequest />} />
+        {/* Absolute target: a relative "requests/new" resolves against the splat
+            and self-appends forever (…/queue/requests/new/requests/new/…). */}
+        <Route path="*" element={<Navigate to="/booking-portal/requests/new" replace />} />
+      </Routes>
+    );
+  }
+  return (
+    <Routes>
+      <Route path="/" element={<PortalHome />} />
+      <Route path="trips" element={<Trips />} />
+      <Route path="seats" element={<EmptySeats />} />
+      <Route path="requests" element={<Requests />} />
+      <Route path="requests/new" element={<NewRequest />} />
+      <Route path="requests/:id" element={<Requests />} />
+      <Route path="queue" element={<SchedulingQueue />} />
+      <Route path="passengers" element={<Passengers />} />
+      <Route path="watches" element={<Watches />} />
+      <Route path="inbox" element={<InboxPage />} />
+      <Route path="cost-model" element={<CostModelGate />} />
+    </Routes>
+  );
+}
+
 export default function BookingPortalRoutes({
   userRole,
   additionalRoles,
@@ -32,19 +65,7 @@ export default function BookingPortalRoutes({
 }) {
   return (
     <BookingPortalProvider userRole={userRole} additionalRoles={additionalRoles}>
-      <Routes>
-        <Route path="/" element={<PortalHome />} />
-        <Route path="trips" element={<Trips />} />
-        <Route path="seats" element={<EmptySeats />} />
-        <Route path="requests" element={<Requests />} />
-        <Route path="requests/new" element={<NewRequest />} />
-        <Route path="requests/:id" element={<Requests />} />
-        <Route path="queue" element={<SchedulingQueue />} />
-        <Route path="passengers" element={<Passengers />} />
-        <Route path="watches" element={<Watches />} />
-        <Route path="inbox" element={<InboxPage />} />
-        <Route path="cost-model" element={<CostModelGate />} />
-      </Routes>
+      <ScopedRoutes />
     </BookingPortalProvider>
   );
 }
