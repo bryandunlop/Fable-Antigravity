@@ -24,7 +24,9 @@ import type { Purpose, RequestLeg } from '../types';
 import { cn } from '../../ui/utils';
 
 const PURPOSES: Purpose[] = ['business', 'personal', 'entertainment', 'commuting'];
-const EXTRAS = ['Ground at destination', 'Pets', 'Extra baggage'];
+// Bryan cut 'Pets' on the design canvas (2026-08-29) — the department does not
+// carry them, so offering it invites a request nobody can fill.
+const EXTRAS = ['Ground at destination', 'Extra baggage'];
 
 const EST: Record<string, { minutes: number; nm: number }> = {
   'KCVG-KTEB': { minutes: 105, nm: 570 },
