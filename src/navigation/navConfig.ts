@@ -10,7 +10,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity, AlertOctagon, AlertTriangle, Archive, ArrowRightLeft, BarChart3,
-  Boxes, Building2, Calendar, CalendarCheck, CalendarDays, Car, ClipboardCheck,
+  Boxes, Building2, Calendar, CalendarCheck, CalendarDays, CalendarRange, Car, ClipboardCheck,
   ClipboardList, ClipboardPen, ClipboardType, Database, FileCheck, FileText,
   FileWarning, Flag,
   Fuel, Gauge, HardHat, Home, IdCard, Layers, LayoutDashboard, ListChecks,
@@ -74,6 +74,7 @@ export const FRONT_DOORS: Record<string, string> = {
   'dom': '/tech-log',
   'maintenance-workflow': '/maintenance-workflow',
   'lead': '/lead-dashboard',
+  'executive': '/executive',
 };
 
 // Sidebar domains open by default on first visit (everything else starts collapsed).
@@ -91,12 +92,15 @@ export const DEFAULT_OPEN_DOMAINS: Record<string, Domain[]> = {
   // A VP and their admin come here to chase projects, so open Admin for them.
   'vp': ['admin'],
   'admin-assistant': ['admin'],
+  'executive': ['home'],
 };
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
   // ── Home ──────────────────────────────────────────────────────────────────
   { path: '/', label: 'Dashboard', domain: 'home', icon: Home, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/tasks-action-items', label: 'My Tasks', domain: 'home', icon: Target, primary: true, keywords: ['action items'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
+  // D99 — the executive fleet week view: per-tail timeline (destinations + open days) with inline metrics.
+  { path: '/executive', label: 'Fleet Week', domain: 'home', icon: CalendarRange, primary: true, keywords: ['executive', 'availability', 'fleet', 'open days', 'week view'], roles: ['executive', 'admin'] },
   // Per-approver inbox (D39): requests awaiting your role's sign-off, plus what you filed.
   { path: '/approvals', label: 'Approvals', domain: 'home', icon: Stamp, primary: true, keywords: ['approve', 'waiver', 'sign-off', 'request'], roles: ['pilot', 'chief-pilot', 'inflight', 'fa-manager', 'maintenance', 'chief-inspector', 'shift-lead', 'safety', 'lead', 'scheduling', 'document-manager', 'admin', 'dom'] },
   // D66: Procedural Bulletins and Flight Ops Bulletins used to sit here and under

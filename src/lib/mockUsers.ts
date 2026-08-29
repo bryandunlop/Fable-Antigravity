@@ -140,6 +140,18 @@ export const SYSTEM_USERS = [
     lastLogin: '2025-02-02 11:30',
     department: 'Maintenance',
     hireDate: '2020-05-15'
+  },
+  // D99 — the executive persona. A principal, not an operator: reads the fleet
+  // week view, never works a queue. resolveUserId('executive') lands here.
+  {
+    id: 'USR017',
+    name: 'Victoria Hale',
+    email: 'v.hale@corp.com',
+    roles: ['executive'],
+    status: 'Active',
+    lastLogin: '2025-02-02 07:15',
+    department: 'Corporate',
+    hireDate: '2015-02-02'
   }
 ];
 
@@ -169,6 +181,8 @@ export const ROLE_CATEGORIES = {
     { value: 'procedural-specialist', label: 'Procedural Specialist', description: 'Procedural bulletin management' },
     { value: 'hr', label: 'HR', description: 'Human resources' },
     { value: 'admin', label: 'Administrator', description: 'System administration' },
+    // D99 — executives are internal platform users (D77 Q-D, resolved 2026-08-29).
+    { value: 'executive', label: 'Executive', description: 'Fleet visibility for principals' },
   ]
 };
 
