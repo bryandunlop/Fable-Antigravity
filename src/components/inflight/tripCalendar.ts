@@ -3,7 +3,15 @@
 // Trip dates in this app are built with local setHours(), so every comparison here is in
 // LOCAL calendar terms. Mixing in UTC would shift a trip a day either side of midnight,
 // which on a calendar is the difference between "I fly Saturday" and "I fly Sunday".
-import type { FaTrip } from './faTrips';
+// The minimum a thing needs to be drawn on this calendar. FaTrip satisfies it
+// structurally; the booking portal's itineraries are adapted to it (D100), so
+// one tested geometry engine serves both rather than each growing its own.
+export interface CalTrip {
+  id: string;
+  tripName: string;
+  tail: string;
+  legs: { departureUtc: string; arrivalUtc: string }[];
+}
 
 export interface CalDay {
   date: Date;
@@ -42,7 +50,7 @@ export function monthGrid(year: number, month: number, today: Date): CalDay[][] 
 }
 
 /** A trip's calendar span: first departure through last arrival, whole days. */
-export function tripSpan(trip: FaTrip): { start: Date; end: Date } | null {
+export function tripSpan(trip: CalTrip): { start: Date; end: Date } | null {
   if (trip.legs.length === 0) return null;
   let start = new Date(trip.legs[0].departureUtc);
   let end = new Date(trip.legs[0].arrivalUtc);
@@ -73,7 +81,7 @@ export interface TripSegment {
 /** The bars to draw on one week row. A trip that crosses a week boundary produces a
  *  segment in each week it touches, squared off where it continues — otherwise a
  *  five-day trip starting on a Saturday reads as two unrelated one-day trips. */
-export function segmentsForWeek(week: CalDay[], trips: FaTrip[]): TripSegment[] {
+export function segmentsForWeek(week: CalDay[], trips: CalTrip[]): TripSegment[] {
   const segments: TripSegment[] = [];
   const weekStart = week[0].date;
   const weekEnd = week[6].date;
@@ -100,7 +108,7 @@ export function segmentsForWeek(week: CalDay[], trips: FaTrip[]): TripSegment[] 
   return segments;
 }
 
-export function tripsInMonth(trips: FaTrip[], year: number, month: number): FaTrip[] {
+export function tripsInMonth<T extends CalTrip>(trips: T[], year: number, month: number): T[] {
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0);
   return trips.filter((t) => {
@@ -111,11 +119,11 @@ export function tripsInMonth(trips: FaTrip[], year: number, month: number): FaTr
 
 /** The first trip that starts after the given month — so an empty month can say where
  *  to look instead of being a dead end. */
-export function nextTripAfterMonth(trips: FaTrip[], year: number, month: number): FaTrip | null {
+export function nextTripAfterMonth<T extends CalTrip>(trips: T[], year: number, month: number): T | null {
   const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
   const later = trips
     .map((t) => ({ t, span: tripSpan(t) }))
-    .filter((x): x is { t: FaTrip; span: { start: Date; end: Date } } => !!x.span && x.span.start > monthEnd)
+    .filter((x): x is { t: T; span: { start: Date; end: Date } } => !!x.span && x.span.start > monthEnd)
     .sort((a, b) => a.span.start.getTime() - b.span.start.getTime());
   return later.length > 0 ? later[0].t : null;
 }
@@ -128,7 +136,7 @@ export function addMonths(year: number, month: number, delta: number): { year: n
 /** Segments for every week of a grid, with `showLabel` left true on only the widest
  * segment of each trip. Needs the whole month at once, which is why it is not something
  * `segmentsForWeek` can decide on its own. */
-export function monthSegments(weeks: CalDay[][], trips: FaTrip[]): TripSegment[][] {
+export function monthSegments(weeks: CalDay[][], trips: CalTrip[]): TripSegment[][] {
   const perWeek = weeks.map((w) => segmentsForWeek(w, trips));
   const widest = new Map<string, { width: number; seg: TripSegment }>();
 

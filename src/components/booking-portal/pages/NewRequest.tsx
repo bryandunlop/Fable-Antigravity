@@ -51,7 +51,16 @@ function emptyLeg(date: string): DraftLeg {
 export default function NewRequest() {
   const { state, dispatch } = usePortal();
   const navigate = useNavigate();
-  const location = useLocation() as { state?: { fromWatchId?: string; dates?: [string, string] } };
+  // `fromExecutive` is what D99's fleet-week "Ask my EA" button sends. It was
+  // declared nowhere, so the tail the executive actually pointed at was silently
+  // dropped and only the date survived (found in the D100 scan).
+  const location = useLocation() as {
+    state?: {
+      fromWatchId?: string;
+      dates?: [string, string];
+      fromExecutive?: { tail: string; dateUtc: string };
+    };
+  };
   const prefill = location.state;
 
   const inTwoWeeks = new Date();
@@ -147,6 +156,19 @@ export default function NewRequest() {
           <CardContent className="flex flex-wrap items-center gap-2 p-4 text-sm">
             <Chip tone="gold">Freed</Chip>
             <span className="text-muted-foreground">Pre-filled from your fleet-date hold — adjust and submit.</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {prefill?.fromExecutive && (
+        <Card className="mb-4 border-l-[3px] border-l-[var(--gfo-daylight,#0096FC)]">
+          <CardContent className="flex flex-wrap items-center gap-2 p-4 text-sm">
+            <Chip tone="info">From the fleet week</Chip>
+            <span className="text-muted-foreground">
+              An executive marked <span className="font-medium text-foreground">{prefill.fromExecutive.tail}</span> open on{' '}
+              <span className="font-medium text-foreground">{prefill.fromExecutive.dateUtc}</span> — the date is pre-filled.
+              Availability is not a hold; scheduling still confirms the tail.
+            </span>
           </CardContent>
         </Card>
       )}

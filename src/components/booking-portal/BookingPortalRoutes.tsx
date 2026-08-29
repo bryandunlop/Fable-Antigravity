@@ -7,6 +7,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { BookingPortalProvider } from './BookingPortalContext';
 import PortalHome from './pages/PortalHome';
 import Trips from './pages/Trips';
+import EaCommandCenter from './pages/EaCommandCenter';
 import EmptySeats from './pages/EmptySeats';
 import Requests from './pages/Requests';
 import NewRequest from './pages/NewRequest';
@@ -42,6 +43,8 @@ function ScopedRoutes() {
   return (
     <Routes>
       <Route path="/" element={<PortalHome />} />
+      {/* D100 — the EA's home: the month, with the selected trip always open beside it. */}
+      <Route path="my-flights" element={<EaCommandCenter />} />
       <Route path="trips" element={<Trips />} />
       <Route path="seats" element={<EmptySeats />} />
       <Route path="requests" element={<Requests />} />

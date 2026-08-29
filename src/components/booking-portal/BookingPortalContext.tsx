@@ -16,6 +16,8 @@ export type PortalAction =
   | { type: 'DECLINE_REQUEST'; id: string; reason: string }
   | { type: 'RESUBMIT_REQUEST'; id: string }
   | { type: 'POST_MESSAGE'; id: string; text: string }
+  | { type: 'REVISE_TRIP'; id: string; what: string }
+  | { type: 'MARK_TRIP_SEEN'; id: string }
   | { type: 'CREATE_WATCH'; kind: 'fleet' | 'route'; label: string; detail: string }
   | { type: 'CANCEL_WATCH'; id: string }
   | { type: 'SIMULATE_FREE'; id: string }
@@ -121,14 +123,44 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
 
     case 'POST_MESSAGE': {
       const author = state.persona === 'ea' ? `Dana (EA)` : SCHEDULER_NAME;
-      return updateRequest(state, action.id, (r) => ({
+      const next = updateRequest(state, action.id, (r) => ({
         ...r,
         messages: [
           ...r.messages,
-          { id: `M-${at}`, from: state.persona, author, at, text: action.text },
+          { id: `M-${at}-${r.messages.length}`, from: state.persona, author, at, text: action.text },
         ],
       }));
+      // D100 — a message raises an inbox item so the existing unread badge lights
+      // up. Only scheduling's replies need the EA to act; her own message is FYI
+      // on her own board.
+      const posted = next.requests.find((r) => r.id === action.id);
+      const route = posted ? routeLabel(posted) : action.id;
+      return {
+        ...next,
+        inbox: [
+          inboxItem('thread', `${author} on ${route}: ${action.text}`, state.persona === 'scheduling', at),
+          ...next.inbox,
+        ],
+      };
     }
+
+    // D100 — scheduling changed a confirmed trip. The stamp is what the "Revised"
+    // chip reads against the EA's own last-seen time; it is never cleared by
+    // scheduling, only out-aged by her opening the trip.
+    case 'REVISE_TRIP': {
+      const revised = updateRequest(state, action.id, (r) => ({ ...r, revisedAt: at }));
+      const changed = revised.requests.find((r) => r.id === action.id);
+      return {
+        ...revised,
+        inbox: [
+          inboxItem('reconfirm', `${changed ? routeLabel(changed) : action.id} was revised — ${action.what}`, true, at),
+          ...revised.inbox,
+        ],
+      };
+    }
+
+    case 'MARK_TRIP_SEEN':
+      return { ...state, tripSeenAt: { ...state.tripSeenAt, [action.id]: at } };
 
     case 'CREATE_WATCH':
       return {

@@ -4,7 +4,7 @@
 import { type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  CalendarDays, ClipboardList, Inbox as InboxIcon, ListChecks, Plane, RotateCcw, Scale, Ticket, Users,
+  CalendarDays, CalendarRange, ClipboardList, Inbox as InboxIcon, ListChecks, Plane, RotateCcw, Scale, Ticket, Users,
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { usePortal } from '../BookingPortalContext';
@@ -15,6 +15,8 @@ import { cn } from '../../ui/utils';
 
 const TABS: { to: string; label: string; icon: React.ElementType; end?: boolean; schedulingOnly?: boolean; leadOnly?: boolean }[] = [
   { to: '/booking-portal', label: 'Home', icon: CalendarDays, end: true },
+  // D100 — the EA's home: month calendar with the selected trip always open beside it.
+  { to: '/booking-portal/my-flights', label: 'My flights', icon: CalendarRange },
   { to: '/booking-portal/trips', label: 'Trips', icon: Ticket },
   { to: '/booking-portal/seats', label: 'Empty seats', icon: Plane },
   { to: '/booking-portal/requests', label: 'Requests', icon: ClipboardList },

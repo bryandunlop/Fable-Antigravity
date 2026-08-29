@@ -17,6 +17,7 @@ function state(partial: Partial<PortalState>): PortalState {
       { id: 'P2', name: 'K. Tanaka', kind: 'staff', docs: [], hasFlown: true },
     ],
     inbox: [],
+    tripSeenAt: {},
     nextRequestNumber: 1,
     ...partial,
   };

@@ -10,6 +10,7 @@ import { Badge } from '../../ui/badge';
 import { Separator } from '../../ui/separator';
 import { usePortal } from '../BookingPortalContext';
 import { RequestIdentityHeader } from './RequestIdentity';
+import { MessageThread } from './MessageThread';
 import { StatusLadder, purposeLabel } from './portalUi';
 import { totalEstMinutes } from '../engine/lifecycle';
 import { cn } from '../../ui/utils';
@@ -24,7 +25,6 @@ export function RequestDrawer({
   onOpenChange: (o: boolean) => void;
 }) {
   const { state, dispatch } = usePortal();
-  const [message, setMessage] = useState('');
   const [declineReason, setDeclineReason] = useState('');
   const [declining, setDeclining] = useState(false);
 
@@ -156,55 +156,7 @@ export function RequestDrawer({
 
           <Separator />
 
-          <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Message board — EA ↔ scheduling
-            </p>
-            <div className="flex flex-col gap-2.5">
-              {request.messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={cn(
-                    'max-w-[85%] rounded-lg border px-3 py-2 text-sm',
-                    m.from === 'ea' ? 'self-end border-transparent bg-[color-mix(in_srgb,var(--gfo-daylight,#0096FC)_10%,transparent)]' : 'bg-muted/50',
-                  )}
-                >
-                  <p className="mb-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {m.author} · {new Date(m.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                  {m.text}
-                </div>
-              ))}
-              {request.messages.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No messages yet — rejections, resubmits, and post-lockout changes all land here.
-                </p>
-              )}
-            </div>
-            <div className="mt-3 flex gap-2">
-              <input
-                aria-label="Write a message"
-                className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm"
-                placeholder={`Write as ${state.persona === 'ea' ? 'Dana (EA)' : 'scheduling'}…`}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && message.trim()) {
-                    dispatch({ type: 'POST_MESSAGE', id: request.id, text: message.trim() });
-                    setMessage('');
-                  }
-                }}
-              />
-              <Button
-                size="sm"
-                disabled={!message.trim()}
-                onClick={() => { dispatch({ type: 'POST_MESSAGE', id: request.id, text: message.trim() }); setMessage(''); }}
-              >
-                Send
-              </Button>
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">Principals see outcomes, not this thread.</p>
-          </div>
+          <MessageThread messages={request.messages} threadId={request.id} />
         </div>
       </SheetContent>
     </Sheet>

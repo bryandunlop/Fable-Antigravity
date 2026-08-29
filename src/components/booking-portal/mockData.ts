@@ -365,6 +365,7 @@ export function initialPortalState(): PortalState {
         actionNeeded: false,
       },
     ],
+    tripSeenAt: {},
     nextRequestNumber: 2052,
   };
 }

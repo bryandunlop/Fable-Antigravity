@@ -62,6 +62,9 @@ export interface TripRequest {
   messages: ThreadMessage[];
   /** set when a freed watch pre-filled this request */
   fromWatchId?: string;
+  /** D100 — when scheduling last changed this trip after confirmation. Drives the
+   *  "Revised" chip, compared against the EA's own last-seen time. */
+  revisedAt?: string;
 }
 
 export interface Flight {
@@ -138,6 +141,9 @@ export interface PortalState {
   watches: Watch[];
   passengers: Passenger[];
   inbox: InboxItem[];
+  /** D100 — when the EA last opened each trip, keyed by request id. "Revised" is
+   *  relative to the reader: a change she has already seen is not news. */
+  tripSeenAt: Record<string, string>;
   /** monotonically increasing counters for demo ids */
   nextRequestNumber: number;
 }
