@@ -113,6 +113,61 @@ describe('buildFleetWeek', () => {
   });
 });
 
+describe('buildFleetWeek — down and no-crew (D99 tightening)', () => {
+  it("renders a RED tail's unscheduled days as down with the grounding headline", () => {
+    const week = buildFleetWeek([], ['N1PG'], NOW, 14, {
+      tailStatus: { N1PG: 'RED' },
+      tailHeadline: { N1PG: 'Hydraulic leak — open defect' },
+    });
+    expect(week.rows[0].cells.every(c => c.kind === 'down')).toBe(true);
+    expect(week.rows[0].cells[0].label).toBe('Hydraulic leak — open defect');
+  });
+
+  it('a scheduled trip still shows on a RED tail — down only claims the unscheduled days', () => {
+    const t = trip([leg(atDay(1))], { startDate: atDay(1), endDate: atDay(1) });
+    const week = buildFleetWeek([t], ['N1PG'], NOW, 14, { tailStatus: { N1PG: 'RED' } });
+    expect(week.rows[0].cells[1].kind).toBe('trip');
+    expect(week.rows[0].cells[0].kind).toBe('down');
+  });
+
+  it('AMBER stays open — dispatchable is dispatchable', () => {
+    const week = buildFleetWeek([], ['N1PG'], NOW, 14, { tailStatus: { N1PG: 'AMBER' } });
+    expect(week.rows[0].cells.every(c => c.kind === 'open')).toBe(true);
+  });
+
+  it('marks other tails no-crew on a day whose flying commits every crew', () => {
+    const t1 = trip([leg(atDay(1))], { tail: 'N1PG', startDate: atDay(1), endDate: atDay(1) });
+    const t2 = trip([leg(atDay(1, 16), { departureIcao: 'KTEB', arrivalIcao: 'KPBI' })], {
+      tail: 'N2PG', startDate: atDay(1, 16), endDate: atDay(1, 18),
+    });
+    const week = buildFleetWeek([t1, t2], ['N1PG', 'N2PG', 'N3PG'], NOW, 14, { crewCapacity: 2 });
+    const n3 = week.rows[2];
+    expect(n3.cells[1].kind).toBe('no-crew');
+    expect(n3.cells[2].kind).toBe('open');
+  });
+
+  it('a mid-trip away day still holds its crew for the count', () => {
+    const t = trip(
+      [leg(atDay(1)), leg(atDay(3), { departureIcao: 'LSGG', arrivalIcao: 'KCVG' })],
+      { tail: 'N1PG', startDate: atDay(1), endDate: atDay(3) },
+    );
+    const week = buildFleetWeek([t], ['N1PG', 'N2PG'], NOW, 14, { crewCapacity: 1 });
+    expect(week.rows[1].cells[2].kind).toBe('no-crew');
+    expect(week.rows[1].cells[4].kind).toBe('open');
+  });
+
+  it('firstOpenSlot skips down and no-crew days', () => {
+    const t = trip([leg(atDay(0))], { tail: 'N2PG', startDate: atDay(0), endDate: atDay(0) });
+    const week = buildFleetWeek([t], ['N1PG', 'N2PG'], NOW, 14, {
+      tailStatus: { N1PG: 'RED' },
+      crewCapacity: 1,
+    });
+    // Day 0: N1PG down, N2PG on a trip that exhausts the single crew.
+    // Day 1: N1PG still down; N2PG unscheduled with the crew free.
+    expect(firstOpenSlot(week)).toEqual({ dateUtc: '2026-08-20', tail: 'N2PG' });
+  });
+});
+
 describe('tailDayStats', () => {
   it('counts open vs total tail-days', () => {
     const t = trip([leg(atDay(1))], { startDate: atDay(1), endDate: atDay(1) });

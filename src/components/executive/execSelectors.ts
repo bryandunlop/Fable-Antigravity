@@ -17,12 +17,15 @@ export interface FleetWeekDay {
   dateLabel: string;
 }
 
-export type FleetWeekCellKind = 'trip' | 'away' | 'open';
+export type FleetWeekCellKind = 'trip' | 'away' | 'down' | 'no-crew' | 'open';
 
 export interface FleetWeekCell {
   dateUtc: string;
   kind: FleetWeekCellKind;
-  /** 'KCVG → KTEB' on a departure day, 'away' mid-trip, null when open. */
+  /**
+   * 'KCVG → KTEB' on a departure day, 'away' mid-trip, the grounding headline
+   * on a 'down' day (or null), null when open / no-crew.
+   */
   label: string | null;
   tripId: string | null;
 }
@@ -47,18 +50,44 @@ function demandTrips(trips: TripRecord[]): TripRecord[] {
 }
 
 /**
+ * Crews the department can field at once, until a real roster model exists.
+ * The crewRecords seed is a readiness *sample* (1 PIC + 1 SIC), not the
+ * pilot roster, so fleet capacity cannot honestly be derived from it — this
+ * is a labeled demo constant instead. Real crew-availability integration is
+ * tracked as its own ledger row.
+ */
+export const DEMO_CREW_CAPACITY = 4;
+
+export interface FleetWeekOptions {
+  /** Current serviceability per tail (GREEN/AMBER/RED) — a RED tail's unscheduled days read 'down'. */
+  tailStatus?: Record<string, string>;
+  /** The grounding headline per tail, shown on 'down' cells. */
+  tailHeadline?: Record<string, string | null>;
+  /** Concurrent crews the department can field; a day that commits them all has no 'open' cells. */
+  crewCapacity?: number;
+}
+
+/**
  * A per-tail day grid over `days` UTC days starting today. A trip occupies its
  * tail from startDate through endDate inclusive; a day with a departing leg is
  * a 'trip' cell labeled first-departure → last-arrival for that day, a spanned
  * day with no departure is 'away'. Where two trips overlap on one tail-day the
  * earlier-starting trip keeps the cell — the grid shows occupancy, not conflict
  * (conflicts are scheduling's problem, not the executive's).
+ *
+ * An unoccupied tail-day is 'open' only when the plane is airworthy AND a crew
+ * is free (D99, tightened 2026-08-29): a currently-RED tail reads 'down' for
+ * the window (there is no estimated-return date to project against — the cell
+ * clears when the serviceability projection does), and a day whose flying
+ * trips already commit every crew reads 'no-crew'. Serviceability is the
+ * derived projection, never a stored flag.
  */
 export function buildFleetWeek(
   trips: TripRecord[],
   tails: string[],
   nowUtc: string,
   days = 14,
+  options: FleetWeekOptions = {},
 ): FleetWeek {
   const todayStartMs = Date.parse(`${utcDayKey(Date.parse(nowUtc))}T00:00:00.000Z`);
 
@@ -73,6 +102,25 @@ export function buildFleetWeek(
   const sorted = demandTrips(trips)
     .slice()
     .sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate));
+
+  // Crews committed per day: every demand trip whose span touches the day holds
+  // its crew for the whole span (the crew is wherever the plane is) — counted
+  // across ALL trips, including tails not on the roster passed in.
+  const crewsByDay = new Map<string, Set<string>>();
+  for (const t of sorted) {
+    const startMs = Date.parse(t.startDate);
+    const endMs = Date.parse(t.endDate);
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) continue;
+    for (let ms = Date.parse(`${utcDayKey(startMs)}T00:00:00.000Z`); ms <= endMs; ms += DAY_MS) {
+      const key = utcDayKey(ms);
+      let set = crewsByDay.get(key);
+      if (!set) crewsByDay.set(key, (set = new Set()));
+      set.add(t.id);
+    }
+  }
+  const crewCapacity = options.crewCapacity;
+  const crewExhausted = (dateUtc: string): boolean =>
+    crewCapacity !== undefined && (crewsByDay.get(dateUtc)?.size ?? 0) >= crewCapacity;
 
   const rows: FleetWeekRow[] = tails.map(tail => {
     const cells = new Map<string, FleetWeekCell>();
@@ -97,11 +145,17 @@ export function buildFleetWeek(
           : { dateUtc: key, kind: 'away', label: 'away', tripId: t.id });
       }
     }
+    const isDown = options.tailStatus?.[tail] === 'RED';
+    const headline = options.tailHeadline?.[tail] ?? null;
     return {
       tail,
-      cells: dayList.map(d =>
-        cells.get(d.dateUtc) ?? { dateUtc: d.dateUtc, kind: 'open', label: null, tripId: null },
-      ),
+      cells: dayList.map(d => {
+        const occupied = cells.get(d.dateUtc);
+        if (occupied) return occupied;
+        if (isDown) return { dateUtc: d.dateUtc, kind: 'down' as const, label: headline, tripId: null };
+        if (crewExhausted(d.dateUtc)) return { dateUtc: d.dateUtc, kind: 'no-crew' as const, label: null, tripId: null };
+        return { dateUtc: d.dateUtc, kind: 'open' as const, label: null, tripId: null };
+      }),
     };
   });
 

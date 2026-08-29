@@ -15,6 +15,7 @@ import {
   buildFleetWeek,
   tailDayStats,
   firstOpenSlot,
+  DEMO_CREW_CAPACITY,
   type FleetWeekCell,
 } from './execSelectors';
 
@@ -56,7 +57,15 @@ export default function ExecutiveDashboard({ userRole = 'executive' }: { userRol
 
   const now = nowUtc();
   const tails = useMemo(() => fleet.map(a => a.tailNumber), [fleet]);
-  const week = useMemo(() => buildFleetWeek(trips, tails, now), [trips, tails, now]);
+  const week = useMemo(
+    () =>
+      buildFleetWeek(trips, tails, now, 14, {
+        tailStatus: Object.fromEntries(fleet.map(a => [a.tailNumber, a.airworthiness.status])),
+        tailHeadline: Object.fromEntries(fleet.map(a => [a.tailNumber, a.airworthiness.headline ?? null])),
+        crewCapacity: DEMO_CREW_CAPACITY,
+      }),
+    [trips, tails, now, fleet],
+  );
   const stats = useMemo(() => tailDayStats(week), [week]);
   const nextOpen = useMemo(() => firstOpenSlot(week), [week]);
   const flownThisMonth = useMemo(() => tripsFlownThisMonth(trips, now), [trips, now]);
@@ -147,7 +156,7 @@ export default function ExecutiveDashboard({ userRole = 'executive' }: { userRol
           {stats.openTailDays} of {stats.totalTailDays} tail-days open in the next two weeks
           {' · '}{flownThisMonth} trips flown in {monthName}
           {' · '}{onTime.onTimeLegs}/{onTime.totalLegs} legs on time
-          {' · '}an open day is a plane you can have — tap it and your EA takes it from there.
+          {' · '}open means airworthy, unscheduled, and a crew is free — tap one and your EA takes it from there.
         </p>
       </GfoPanel>
     </div>
@@ -171,17 +180,42 @@ function FleetWeekRowCells({
         {ragColor && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ragColor }} />}
         {tail}
       </span>
-      {cells.map(cell =>
-        cell.kind === 'open' ? (
-          <button
-            key={cell.dateUtc}
-            onClick={() => onOpenDay(cell.dateUtc, tail)}
-            title={`Open — ask your EA to request ${tail} on ${cell.dateUtc}`}
-            className="min-h-9 rounded-md border border-dashed border-border text-[11px] text-muted-foreground/60 transition-colors hover:border-primary hover:text-primary"
-          >
-            open
-          </button>
-        ) : (
+      {cells.map(cell => {
+        if (cell.kind === 'open') {
+          return (
+            <button
+              key={cell.dateUtc}
+              onClick={() => onOpenDay(cell.dateUtc, tail)}
+              title={`Open — ask your EA to request ${tail} on ${cell.dateUtc}`}
+              className="min-h-9 rounded-md border border-dashed border-border text-[11px] text-muted-foreground/60 transition-colors hover:border-primary hover:text-primary"
+            >
+              open
+            </button>
+          );
+        }
+        if (cell.kind === 'down') {
+          return (
+            <span
+              key={cell.dateUtc}
+              title={cell.label ? `Grounded — ${cell.label}` : 'Grounded — down for maintenance'}
+              className="flex min-h-9 items-center justify-center truncate rounded-md bg-destructive/10 px-1 text-[11px] font-medium text-destructive"
+            >
+              down · maint
+            </span>
+          );
+        }
+        if (cell.kind === 'no-crew') {
+          return (
+            <span
+              key={cell.dateUtc}
+              title="No crew free — the day's flying already commits every crew"
+              className="flex min-h-9 items-center justify-center truncate rounded-md border border-dashed border-border/60 px-1 text-[11px] text-muted-foreground/50"
+            >
+              no crew
+            </span>
+          );
+        }
+        return (
           <span
             key={cell.dateUtc}
             title={cell.label ?? undefined}
@@ -191,8 +225,8 @@ function FleetWeekRowCells({
           >
             {cell.label}
           </span>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }

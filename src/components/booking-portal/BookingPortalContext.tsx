@@ -244,11 +244,28 @@ export function canSeeCostModel(userRole?: string, additionalRoles: string[] = [
   return [userRole, ...additionalRoles].some((r) => !!r && COST_MODEL_ROLES.includes(r));
 }
 
+/** Roles that operate the portal — everyone else who can reach it is a visitor. */
+export const PORTAL_OPERATOR_ROLES = ['admin-assistant', 'scheduling', 'admin', 'lead'];
+
+/**
+ * D99 — an executive reaches the portal only as the landing zone for the
+ * fleet-week ask-my-EA handoff. They get the request form and nothing else:
+ * no persona switch (the persona toggle is demo chrome, not auth — flipping
+ * it to 'scheduling' unlocks approve/decline), no queue, no other tabs. A
+ * user who ALSO holds an operator role is an operator, not a visitor.
+ */
+export function isExecutiveVisitor(userRole?: string, additionalRoles: string[] = []): boolean {
+  const roles = [userRole, ...additionalRoles].filter((r): r is string => !!r);
+  return roles.includes('executive') && !roles.some((r) => PORTAL_OPERATOR_ROLES.includes(r));
+}
+
 const PortalContext = createContext<{
   state: PortalState;
   dispatch: React.Dispatch<PortalAction>;
   /** Whether this viewer may see the department's economics. */
   showCostModel: boolean;
+  /** D99: viewer is an executive visitor — request form only, no portal chrome. */
+  executiveScope: boolean;
 } | null>(null);
 
 export function BookingPortalProvider({
@@ -262,7 +279,11 @@ export function BookingPortalProvider({
 }) {
   const [state, dispatch] = useReducer(portalReducer, undefined, initialPortalState);
   const showCostModel = canSeeCostModel(userRole, additionalRoles);
-  const value = useMemo(() => ({ state, dispatch, showCostModel }), [state, showCostModel]);
+  const executiveScope = isExecutiveVisitor(userRole, additionalRoles);
+  const value = useMemo(
+    () => ({ state, dispatch, showCostModel, executiveScope }),
+    [state, showCostModel, executiveScope],
+  );
   return <PortalContext.Provider value={value}>{children}</PortalContext.Provider>;
 }
 
