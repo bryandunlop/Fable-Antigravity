@@ -7,6 +7,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { BookingPortalProvider } from './BookingPortalContext';
 import PortalHome from './pages/PortalHome';
 import Trips from './pages/Trips';
+import ManifestPage from './pages/Manifest';
 import EmptySeats from './pages/EmptySeats';
 import Requests from './pages/Requests';
 import NewRequest from './pages/NewRequest';
@@ -43,6 +44,8 @@ function ScopedRoutes() {
     <Routes>
       <Route path="/" element={<PortalHome />} />
       <Route path="trips" element={<Trips />} />
+      {/* D100 — the manifest fills in over weeks; it gets its own screen per trip. */}
+      <Route path="trips/:id/manifest" element={<ManifestPage />} />
       <Route path="seats" element={<EmptySeats />} />
       <Route path="requests" element={<Requests />} />
       <Route path="requests/new" element={<NewRequest />} />

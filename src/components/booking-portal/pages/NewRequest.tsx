@@ -1,25 +1,31 @@
-// Frame B — new trip request. Per-leg manifest with a lead passenger, purpose
-// per passenger per leg (the SIFL/SEC capture), a planning estimate as legs are
-// built, and structured extras so the free-text note stays small.
+// Frame B — new trip request.
+//
+// Rebuilt on the D100 design pass (2026-08-29) around two things an EA actually
+// has at request time: the LEAD PASSENGER and roughly WHEN he needs to be
+// somewhere. Everything else — the rest of the party, their forms, the exact
+// departure — arrives later, so the page says so rather than demanding it. See
+// engine/legTiming (what's fixed) and engine/requestReadiness (why submit is off).
 
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plane, Plus } from 'lucide-react';
+import { CalendarDays, ChefHat, Plane, Plus, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { PortalShell } from '../components/PortalShell';
+import { TimingPicker } from '../components/TimingPicker';
 import { Chip, SectionLabel, purposeLabel } from '../components/portalUi';
 import { QuotePanel, savingsAvailable } from '../components/QuotePanel';
 import { GFO_RATE_CARD, daysUntil, quoteRequest } from '../engine/quote';
+import { expectedDeparture, latitudeHours, type LegTiming } from '../engine/legTiming';
+import { submitBlockers, clampSeats, type DraftLeg } from '../engine/requestReadiness';
 import { usePortal } from '../BookingPortalContext';
 import type { Purpose, RequestLeg } from '../types';
 import { cn } from '../../ui/utils';
 
 const PURPOSES: Purpose[] = ['business', 'personal', 'entertainment', 'commuting'];
-const EXTRAS = ['Catering — light', 'Ground at destination', 'Pets', 'Extra baggage'];
+const EXTRAS = ['Ground at destination', 'Pets', 'Extra baggage'];
 
-// Rough planning numbers per airport pair; anything unknown gets a generic figure.
 const EST: Record<string, { minutes: number; nm: number }> = {
   'KCVG-KTEB': { minutes: 105, nm: 570 },
   'KTEB-KCVG': { minutes: 125, nm: 570 },
@@ -29,29 +35,46 @@ const EST: Record<string, { minutes: number; nm: number }> = {
   'KCVG-EGGW': { minutes: 460, nm: 3400 },
 };
 
-interface DraftLeg {
-  from: string;
-  to: string;
-  date: string;
-  departLocal: string;
-  flexHours: number;
-  passengerIds: string[];
-  leadId: string;
-  purposes: Record<string, Purpose>;
-}
-
 function estimate(from: string, to: string) {
   return EST[`${from}-${to}`] ?? { minutes: 120, nm: 500 };
 }
 
 function emptyLeg(date: string): DraftLeg {
-  return { from: 'KCVG', to: 'KTEB', date, departLocal: '08:00', flexHours: 0, passengerIds: [], leadId: '', purposes: {} };
+  return {
+    from: 'KCVG',
+    to: 'KTEB',
+    date,
+    // Arrive-by is the default because it is usually the true constraint, and it
+    // hands scheduling the whole window rather than a time nobody asked for.
+    timing: { kind: 'arrive', arriveByLocal: '09:00' },
+    extraPassengerIds: [],
+    purposes: {},
+  };
+}
+
+/** The manifest due date the page promises: five days before the first departure. */
+const MANIFEST_PROMPT_DAYS = 5;
+
+function manifestPromptDate(firstLegDate: string): string | null {
+  const t = Date.parse(`${firstLegDate}T00:00:00`);
+  if (Number.isNaN(t)) return null;
+  return new Date(t - MANIFEST_PROMPT_DAYS * 86_400_000).toLocaleDateString('en-US', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
 }
 
 export default function NewRequest() {
   const { state, dispatch } = usePortal();
   const navigate = useNavigate();
-  const location = useLocation() as { state?: { fromWatchId?: string; dates?: [string, string] } };
+  // `fromExecutive` is what D99's fleet-week "Ask my EA" button sends; it was
+  // declared nowhere, so the tail the executive pointed at was silently dropped.
+  const location = useLocation() as {
+    state?: {
+      fromWatchId?: string;
+      dates?: [string, string];
+      fromExecutive?: { tail: string; dateUtc: string };
+    };
+  };
   const prefill = location.state;
 
   const inTwoWeeks = new Date();
@@ -60,17 +83,29 @@ export default function NewRequest() {
 
   const [legs, setLegs] = useState<DraftLeg[]>([emptyLeg(defaultDate)]);
   const [principalId, setPrincipalId] = useState('P-REYES');
+  const [seatsHeld, setSeatsHeld] = useState(2);
   const [extras, setExtras] = useState<string[]>([]);
   const [note, setNote] = useState('');
 
-  const bookable = state.passengers.filter((p) => p.kind !== 'principal' || p.eaLevel !== 'view');
+  const bookablePrincipals = state.passengers.filter((p) => p.kind === 'principal' && p.eaLevel !== 'view');
+  const addable = state.passengers.filter((p) => p.id !== principalId && (p.kind !== 'principal' || p.eaLevel !== 'view'));
+
+  const namedCount = useMemo(() => {
+    const ids = new Set<string>([principalId, ...legs.flatMap((l) => l.extraPassengerIds)]);
+    return ids.size;
+  }, [principalId, legs]);
+
+  const blockers = useMemo(
+    () => submitBlockers({ legs, leadPassengerId: principalId }, state.passengers),
+    [legs, principalId, state.passengers],
+  );
+
   const totalMinutes = useMemo(
     () => legs.reduce((sum, l) => sum + estimate(l.from, l.to).minutes, 0),
     [legs],
   );
 
-  // Quoted against a fixed "today" rather than the live clock, so the estimate an
-  // EA is looking at does not silently change underneath them mid-edit.
+  // Quoted against a fixed "today" so the estimate does not move mid-edit.
   const asOf = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const quote = useMemo(
     () =>
@@ -78,20 +113,22 @@ export default function NewRequest() {
         legs.map((l) => ({
           estMinutes: estimate(l.from, l.to).minutes,
           date: l.date,
-          flexHours: l.flexHours,
-          purposes: l.passengerIds.map((pid) => l.purposes[pid] ?? 'business'),
+          // Latitude given to scheduling is what the rate card rewards — an
+          // arrive-by or flexible leg is worth more than a firm departure.
+          flexHours: latitudeHours(l.timing) / 2,
+          purposes: [principalId, ...l.extraPassengerIds].map((pid) => l.purposes[pid] ?? 'business'),
           sharedRepositioning: false,
         })),
         asOf,
       ),
-    [legs, asOf],
+    [legs, principalId, asOf],
   );
   const savings = useMemo(() => {
     const leadDays = legs.length ? daysUntil(asOf, [...legs].map((l) => l.date).sort()[0]) : 0;
     return savingsAvailable(quote, {
       leadDays,
       earlyBookingDays: GFO_RATE_CARD.earlyBookingDays,
-      allFlexed: legs.length > 0 && legs.every((l) => l.flexHours >= GFO_RATE_CARD.flexThresholdHours),
+      allFlexed: legs.length > 0 && legs.every((l) => latitudeHours(l.timing) / 2 >= GFO_RATE_CARD.flexThresholdHours),
       anySharedRepo: false,
     });
   }, [quote, legs, asOf]);
@@ -99,54 +136,87 @@ export default function NewRequest() {
   const updateLeg = (i: number, patch: Partial<DraftLeg>) =>
     setLegs((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
 
-  const togglePassenger = (i: number, pid: string) =>
+  const toggleExtraPassenger = (i: number, pid: string) =>
     setLegs((prev) =>
       prev.map((l, j) => {
         if (j !== i) return l;
-        const on = l.passengerIds.includes(pid);
+        const on = l.extraPassengerIds.includes(pid);
         return {
           ...l,
-          passengerIds: on ? l.passengerIds.filter((x) => x !== pid) : [...l.passengerIds, pid],
-          leadId: on && l.leadId === pid ? '' : l.leadId || pid,
+          extraPassengerIds: on ? l.extraPassengerIds.filter((x) => x !== pid) : [...l.extraPassengerIds, pid],
           purposes: { ...l.purposes, [pid]: l.purposes[pid] ?? 'business' },
         };
       }),
     );
 
-  const canSubmit = legs.every((l) => l.from && l.to && l.date && l.passengerIds.length > 0);
-
   const submit = () => {
+    if (blockers.length > 0) return;
     const requestLegs: RequestLeg[] = legs.map((l, i) => {
       const est = estimate(l.from, l.to);
+      const derived = expectedDeparture(l.timing, est.minutes);
       return {
         id: `L-${Date.now()}-${i}`,
         from: l.from,
         to: l.to,
         date: l.date,
-        departLocal: l.departLocal,
-        flexHours: l.flexHours,
+        // departLocal stays the expected departure so every existing reader
+        // (itinerary, queue, calendar) keeps working; `timing` carries the truth.
+        departLocal: derived ?? '08:00',
+        flexHours: l.timing.kind === 'depart' ? l.timing.flexHours : Math.round(latitudeHours(l.timing) / 2),
+        timing: l.timing,
         estMinutes: est.minutes,
         estNm: est.nm,
-        passengers: l.passengerIds.map((pid) => ({
-          passengerId: pid,
-          lead: pid === l.leadId,
-          purpose: l.purposes[pid] ?? 'business',
-        })),
+        passengers: [
+          { passengerId: principalId, lead: true, purpose: l.purposes[principalId] ?? 'business' },
+          ...l.extraPassengerIds.map((pid) => ({ passengerId: pid, purpose: l.purposes[pid] ?? 'business' })),
+        ],
       };
     });
-    dispatch({ type: 'SUBMIT_REQUEST', legs: requestLegs, principalId, extras, note: note || undefined, fromWatchId: prefill?.fromWatchId });
+    dispatch({
+      type: 'SUBMIT_REQUEST',
+      legs: requestLegs,
+      principalId,
+      extras,
+      note: note || undefined,
+      fromWatchId: prefill?.fromWatchId,
+      seatsHeld: clampSeats(seatsHeld, namedCount),
+    });
     navigate('/booking-portal/requests');
   };
 
   const field = 'rounded-md border bg-background px-2.5 py-1.5 text-sm';
+  const leadPerson = state.passengers.find((p) => p.id === principalId);
+  const promptDate = legs[0] ? manifestPromptDate(legs[0].date) : null;
 
   return (
-    <PortalShell title="New trip request">
+    <PortalShell
+      title="New trip request"
+      meta={
+        leadPerson ? (
+          <span className="text-sm text-muted-foreground">
+            For {leadPerson.name} · tell scheduling what is fixed and what isn't
+          </span>
+        ) : undefined
+      }
+    >
       {prefill?.fromWatchId && (
         <Card className="mb-4 border-l-[3px] border-l-[var(--gfo-sunrise,#D1AC6B)]">
           <CardContent className="flex flex-wrap items-center gap-2 p-4 text-sm">
             <Chip tone="gold">Freed</Chip>
             <span className="text-muted-foreground">Pre-filled from your fleet-date hold — adjust and submit.</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {prefill?.fromExecutive && (
+        <Card className="mb-4 border-l-[3px] border-l-[var(--gfo-daylight,#0096FC)]">
+          <CardContent className="flex flex-wrap items-center gap-2 p-4 text-sm">
+            <Chip tone="info">From the fleet week</Chip>
+            <span className="text-muted-foreground">
+              An executive marked <span className="font-medium text-foreground">{prefill.fromExecutive.tail}</span> open
+              on <span className="font-medium text-foreground">{prefill.fromExecutive.dateUtc}</span> — the date is
+              pre-filled. Availability is not a hold; scheduling still confirms the tail.
+            </span>
           </CardContent>
         </Card>
       )}
@@ -182,55 +252,52 @@ export default function NewRequest() {
                     <span className="text-muted-foreground">→</span>
                     <input aria-label={`Leg ${i + 1} to`} className={cn(field, 'w-24 uppercase')} value={leg.to} onChange={(e) => updateLeg(i, { to: e.target.value.toUpperCase() })} />
                     <input aria-label={`Leg ${i + 1} date`} type="date" className={field} value={leg.date} onChange={(e) => updateLeg(i, { date: e.target.value })} />
-                    <input aria-label={`Leg ${i + 1} departure`} type="time" className={field} value={leg.departLocal} onChange={(e) => updateLeg(i, { departLocal: e.target.value })} />
-                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      flex ±
-                      <input
-                        aria-label={`Leg ${i + 1} flexibility hours`}
-                        type="number" min={0} max={12}
-                        className={cn(field, 'w-16')}
-                        value={leg.flexHours}
-                        onChange={(e) => updateLeg(i, { flexHours: Number(e.target.value) })}
-                      /> h
-                    </label>
                   </div>
 
+                  <TimingPicker
+                    legLabel={`leg-${i + 1}`}
+                    timing={leg.timing}
+                    onChange={(t: LegTiming) => updateLeg(i, { timing: t })}
+                    arrivalAirport={leg.to}
+                    estMinutes={est.minutes}
+                  />
+
+                  {/* Names beyond the lead — optional, and said to be optional. */}
                   <div className="rounded-lg border" data-tour={i === 0 ? 'manifest' : undefined}>
-                    <p className="border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                      Manifest — leg {i + 1}
-                    </p>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b bg-muted/50 px-3 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                        Anyone else on leg {i + 1}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Optional — names can follow later</p>
+                    </div>
                     <div className="divide-y">
-                      {bookable.map((p) => {
-                        const on = leg.passengerIds.includes(p.id);
+                      {addable.map((p) => {
+                        const on = leg.extraPassengerIds.includes(p.id);
+                        const purpose = leg.purposes[p.id] ?? 'business';
                         return (
                           <div key={p.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
                             <label className="flex w-44 items-center gap-2">
-                              <input type="checkbox" checked={on} onChange={() => togglePassenger(i, p.id)} />
+                              <input type="checkbox" checked={on} onChange={() => toggleExtraPassenger(i, p.id)} />
                               {p.name}
                               <span className="text-xs text-muted-foreground">{p.kind}</span>
                             </label>
                             {on && (
                               <>
-                                <Button
-                                  variant={leg.leadId === p.id ? 'secondary' : 'outline'}
-                                  size="sm"
-                                  className="h-7 text-[10px]"
-                                  onClick={() => updateLeg(i, { leadId: p.id })}
-                                >
-                                  {leg.leadId === p.id ? 'Lead' : 'Set lead'}
-                                </Button>
                                 <select
                                   aria-label={`${p.name} purpose leg ${i + 1}`}
                                   className={cn(field, 'py-1 text-xs')}
-                                  value={leg.purposes[p.id] ?? 'business'}
+                                  value={purpose}
                                   onChange={(e) => updateLeg(i, { purposes: { ...leg.purposes, [p.id]: e.target.value as Purpose } })}
                                 >
                                   {PURPOSES.map((pu) => <option key={pu} value={pu}>{purposeLabel(pu)}</option>)}
                                 </select>
-                                {(leg.purposes[p.id] === 'personal' || leg.purposes[p.id] === 'entertainment') && (
+                                {(purpose === 'personal' || purpose === 'entertainment') && (
                                   <Chip tone="flag">SIFL — imputed income, logged</Chip>
                                 )}
                               </>
+                            )}
+                            {!p.hasFlown && (
+                              <span className="text-xs text-muted-foreground">Never flown — travel form sends on submit</span>
                             )}
                           </div>
                         );
@@ -241,45 +308,50 @@ export default function NewRequest() {
               </Card>
             );
           })}
-          <Button
-            variant="outline"
-            className="self-start"
-            onClick={() => setLegs((p) => [...p, { ...emptyLeg(p[p.length - 1]?.date ?? defaultDate), from: p[p.length - 1]?.to ?? 'KTEB', to: p[0]?.from ?? 'KCVG' }])}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> Add leg
-          </Button>
-        </div>
 
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader className="py-4"><CardTitle className="text-base">Principal</CardTitle></CardHeader>
-            <CardContent className="pt-0">
-              <select aria-label="Principal" className={cn(field, 'w-full')} value={principalId} onChange={(e) => setPrincipalId(e.target.value)}>
-                {state.passengers.filter((p) => p.kind === 'principal' && p.eaLevel !== 'view').map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Your View-level principals can't be booked for — ask for Book access.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLegs((p) => [...p, { ...emptyLeg(p[p.length - 1]?.date ?? defaultDate), from: p[p.length - 1]?.to ?? 'KTEB', to: p[0]?.from ?? 'KCVG' }])}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Add a leg
+            </Button>
+          </div>
 
           <Card>
-            <CardHeader className="py-4"><CardTitle className="text-base">Extras</CardTitle></CardHeader>
+            <CardHeader className="py-4"><CardTitle className="text-base">Anything else scheduling should know</CardTitle></CardHeader>
             <CardContent className="space-y-3 pt-0">
-              <div className="flex flex-col gap-1.5 text-sm">
-                {EXTRAS.map((x) => (
-                  <label key={x} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={extras.includes(x)}
-                      onChange={() => setExtras((p) => (p.includes(x) ? p.filter((e) => e !== x) : [...p, x]))}
-                    />
-                    {x}
-                  </label>
-                ))}
+              {/* Catering is a choice with a price and its own clock, not a checkbox. */}
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
+                <ChefHat className="h-5 w-5 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">Catering — not chosen yet</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Set menus from $28 a head, orderable up to 24 h out — this can wait until you know who's on board.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" disabled title="Menus land in the next slice">Choose menus</Button>
               </div>
+
+              <div className="flex flex-wrap gap-1.5 text-sm">
+                {EXTRAS.map((x) => {
+                  const on = extras.includes(x);
+                  return (
+                    <button
+                      key={x}
+                      type="button"
+                      onClick={() => setExtras((p) => (p.includes(x) ? p.filter((e) => e !== x) : [...p, x]))}
+                      className={cn(
+                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                        on ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-primary',
+                      )}
+                    >
+                      {x}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div>
                 <SectionLabel>Note to scheduling</SectionLabel>
                 <textarea
@@ -293,6 +365,46 @@ export default function NewRequest() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* ── Decision rail ── */}
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader className="py-4"><CardTitle className="text-base">Who's flying</CardTitle></CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              <div>
+                <SectionLabel>Lead passenger</SectionLabel>
+                <select aria-label="Lead passenger" className={cn(field, 'w-full')} value={principalId} onChange={(e) => setPrincipalId(e.target.value)}>
+                  {bookablePrincipals.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  All scheduling needs today. Your View-level principals can't be booked for.
+                </p>
+              </div>
+
+              <div>
+                <SectionLabel>Seats to hold</SectionLabel>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setSeatsHeld((s) => clampSeats(s - 1, namedCount))}>−</Button>
+                  <span className="gfo-numeric w-10 text-center text-xl text-primary">{clampSeats(seatsHeld, namedCount)}</span>
+                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setSeatsHeld((s) => clampSeats(s + 1, namedCount))}>+</Button>
+                  <span className="text-xs text-muted-foreground">an estimate is fine</span>
+                </div>
+              </div>
+
+              {promptDate && (
+                <p className="flex items-start gap-1.5 border-t pt-3 text-xs text-muted-foreground">
+                  <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    We'll ask you again on <span className="font-medium text-foreground">{promptDate}</span>, five days
+                    out. New guests get a travel form, and we chase those for you.
+                  </span>
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           <QuotePanel quote={quote} savings={savings} />
 
@@ -302,11 +414,29 @@ export default function NewRequest() {
               <p className="text-sm">
                 <span className="font-semibold">{Math.floor(totalMinutes / 60)} h {totalMinutes % 60} m</span>
                 {' '}total flight time · {legs.length} leg{legs.length === 1 ? '' : 's'}
+                {' · '}{clampSeats(seatsHeld, namedCount)} seat{clampSeats(seatsHeld, namedCount) === 1 ? '' : 's'}
               </p>
-              <p className="text-xs text-muted-foreground">
-                Estimate only — scheduling assigns aircraft and final times, and the cost estimate moves with them.
-              </p>
-              <Button className="w-full" disabled={!canSubmit} onClick={submit}>Submit request</Button>
+
+              {blockers.length > 0 ? (
+                <div className="rounded-lg border border-[color-mix(in_srgb,var(--gfo-warning,#F1B434)_45%,transparent)] bg-[color-mix(in_srgb,var(--gfo-warning,#F1B434)_10%,transparent)] p-3">
+                  <p className="text-sm font-medium">
+                    {blockers.length === 1 ? 'One thing first' : `${blockers.length} things first`}
+                  </p>
+                  <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+                    {blockers.map((b, i) => <li key={`${b.code}-${b.passengerId ?? b.legIndex ?? i}`}>{b.message}</li>)}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Lead passenger named and the timing is stated. Everything else can follow.
+                </p>
+              )}
+
+              <Button className="w-full" disabled={blockers.length > 0} onClick={submit}>
+                <UserPlus className="mr-1.5 h-4 w-4" />
+                Send to scheduling
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">Decisions usually same day</p>
             </CardContent>
           </Card>
         </div>

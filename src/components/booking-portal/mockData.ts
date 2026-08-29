@@ -14,6 +14,8 @@ function isoAt(daysFromToday: number, time: string): string {
   return `${isoDate(daysFromToday)}T${time}:00Z`;
 }
 
+/** Matches the 'admin-assistant' persona in lib/mockUsers (USR018) — one person
+ *  across the login, the portal chrome and the request's `requestedBy`. */
 export const EA_NAME = 'Dana Whitfield';
 export const SCHEDULER_NAME = 'R. Calloway';
 
@@ -280,6 +282,9 @@ const confirmedRequest: TripRequest = {
   createdAt: isoAt(-16, '10:12'),
   extras: ['Catering — full', 'Ground at both ends'],
   note: 'Site visit; back the same evening.',
+  // Four seats asked for, three named — the ordinary state of a manifest weeks
+  // out, and what the manifest screen exists to work through (D100).
+  seatsHeld: 4,
   legs: [
     {
       id: 'L-6',
@@ -293,6 +298,9 @@ const confirmedRequest: TripRequest = {
       passengers: [
         { passengerId: 'P-OSEI', lead: true, purpose: 'business' },
         { passengerId: 'P-TANAKA', purpose: 'business' },
+        // A first-time guest whose travel form has not come back — the chase
+        // that is most of an EA's manifest work.
+        { passengerId: 'P-SREYES', purpose: 'business' },
       ],
     },
     {
