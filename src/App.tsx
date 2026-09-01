@@ -441,7 +441,7 @@ export default function App() {
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['executive', 'admin']}>
                                       <SchedulingWorkspaceProvider>
-                                        <ExecutiveDashboard userRole={userRole} />
+                                        <ExecutiveDashboard userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }

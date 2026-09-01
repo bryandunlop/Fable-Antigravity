@@ -152,6 +152,19 @@ export const SYSTEM_USERS = [
     lastLogin: '2025-02-02 07:15',
     department: 'Corporate',
     hireDate: '2015-02-02'
+  },
+  // Added AFTER Victoria Hale so resolveUserId('executive') still resolves to her. She is the
+  // plain executive; he holds the per-person 'full-schedule' grant, so the two side by side show
+  // exactly what that grant changes on the fleet week (Bryan, 2026-08-31).
+  {
+    id: 'USR018',
+    name: 'Gordon Reyes',
+    email: 'g.reyes@corp.com',
+    roles: ['executive', 'full-schedule'],
+    status: 'Active',
+    lastLogin: '2025-02-02 06:40',
+    department: 'Corporate',
+    hireDate: '2013-06-17'
   }
 ];
 
@@ -196,6 +209,7 @@ export const ADDITIONAL_ROLES = [
   { id: 'scheduling-manager', label: 'Scheduling Manager' },
   { id: 'lead-scheduler', label: 'Lead Scheduler' },
   { id: 'lead-fa', label: 'Lead Flight Attendant' },
+  { id: 'full-schedule', label: 'Full Schedule Access' },
   { id: 'standards', label: 'Standards' },
   { id: 'training', label: 'Training' },
   { id: 'reg-comp', label: 'Reg & Comp' },

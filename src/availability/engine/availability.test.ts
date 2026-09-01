@@ -239,6 +239,56 @@ describe('conflicts are collected, never promoted to verdicts', () => {
   });
 });
 
+describe('occupancy behaviours ported from execSelectors (regression)', () => {
+  it('labels a multi-leg day first-departure → last-arrival', () => {
+    const multi = trip({
+      legs: [
+        { id: 'l1', sequence: 1, departureIcao: 'KCVG', arrivalIcao: 'KTEB', departureTimeUtc: '2026-09-03T14:00:00.000Z', paxCount: 4 },
+        { id: 'l2', sequence: 2, departureIcao: 'KTEB', arrivalIcao: 'KBOS', departureTimeUtc: '2026-09-03T19:00:00.000Z', paxCount: 4 },
+      ],
+    });
+    expect(cellOn('2026-09-03', { trips: [multi] }).reason.detail).toContain('KCVG → KBOS');
+  });
+
+  it('shows a spanned day with no departure as away, not as a route', () => {
+    expect(cellOn('2026-09-04', { trips: [trip()] }).reason.detail).toContain('away');
+  });
+
+  it('clips a trip that began before the window without losing its in-window days', () => {
+    const early = trip({ startDate: '2026-08-28T00:00:00.000Z', endDate: '2026-09-02T00:00:00.000Z' });
+    expect(cellOn('2026-09-01', { trips: [early] }).state).toBe('committed');
+    expect(cellOn('2026-09-02', { trips: [early] }).state).toBe('committed');
+    expect(cellOn('2026-09-03', { trips: [early] }).state).toBe('available');
+  });
+
+  it('keeps the earlier-starting trip when two overlap one tail-day', () => {
+    const first = trip({ id: 'early', tripNumber: 'TRP-EARLY', startDate: '2026-09-02T00:00:00.000Z', endDate: '2026-09-04T00:00:00.000Z', legs: [] });
+    const second = trip({ id: 'late', tripNumber: 'TRP-LATE' });
+    expect(cellOn('2026-09-03', { trips: [second, first] }).reason.detail).toContain('TRP-EARLY');
+  });
+
+  it('AMBER stays available — dispatchable is dispatchable', () => {
+    expect(cellOn('2026-09-03', { tailStatus: { N1PG: 'AMBER' } }).state).toBe('available');
+  });
+
+  it('NOT_ASSESSED stays available — only RED grounds a tail here', () => {
+    expect(cellOn('2026-09-03', { tailStatus: { N1PG: 'NOT_ASSESSED' } }).state).toBe('available');
+  });
+
+  it('a mid-trip away day still holds its crew for the count', () => {
+    const c = cellOn('2026-09-04', {
+      trips: [trip()],
+      crewRoster: [pilot('P1', 'PIC'), pilot('S1', 'SIC')],
+    });
+    expect(c.crew.crewsCommitted).toBe(1);
+  });
+
+  it('firstAvailableSlot returns null when every tail-day is blocked', () => {
+    const blocked = buildFleetAvailability(input({ tailStatus: { N1PG: 'RED' } }), NOW, 7);
+    expect(firstAvailableSlot(blocked)).toBeNull();
+  });
+});
+
 describe('summaries', () => {
   it('counts only genuinely available tail-days', () => {
     const fleet = buildFleetAvailability(input({ downtime: [block()] }), NOW, 7);

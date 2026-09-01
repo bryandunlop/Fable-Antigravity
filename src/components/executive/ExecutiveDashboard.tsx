@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -6,18 +6,11 @@ import { GfoPageHeader, GfoPanel } from '../gfo';
 import { useOpsClock } from '../hooks/useOpsClock';
 import { useUnifiedFleetStatus } from '../hooks/useUnifiedFleetStatus';
 import { RAG_DOT } from '../ops-wall/ragColors';
-import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
 import { actingUser } from '../safety-center/actingUser';
-import type { TripRecord } from '../../scheduling/store/types';
 import { tripsFlownThisMonth } from '../lead/leadSelectors';
 import { getOnTimeLegStats } from '../lead/bookingQueueSeed';
-import {
-  buildFleetWeek,
-  tailDayStats,
-  firstOpenSlot,
-  DEMO_CREW_CAPACITY,
-  type FleetWeekCell,
-} from './execSelectors';
+import { useFleetAvailability } from '../hooks/useFleetAvailability';
+import { shortDate, type DisclosedCell } from '../../availability/engine/disclosure';
 
 function greetingFor(hour: number): string {
   if (hour < 12) return 'Good morning';
@@ -40,34 +33,21 @@ function dayLabelLong(dateUtc: string): string {
  * then flows to the EA/admin through the D77 task rails. No chargeback dollar
  * figures appear here while Q21 is open with counsel.
  */
-export default function ExecutiveDashboard({ userRole = 'executive' }: { userRole?: string }) {
+export default function ExecutiveDashboard({
+  userRole = 'executive',
+  additionalRoles = [],
+}: { userRole?: string; additionalRoles?: string[] }) {
   const navigate = useNavigate();
   const clock = useOpsClock();
   const { fleet, dispatchable, inFlight } = useUnifiedFleetStatus();
-  const { store, ready, tick, nowUtc } = useSchedulingWorkspace();
   const { name: viewerName } = actingUser(userRole);
 
-  const [trips, setTrips] = useState<TripRecord[]>([]);
-  useEffect(() => {
-    if (!ready) return;
-    let cancelled = false;
-    store.listTrips().then(rows => { if (!cancelled) setTrips(rows); });
-    return () => { cancelled = true; };
-  }, [store, ready, tick]);
+  // The whole availability picture — maintenance windows with a return date, crew coverage,
+  // committed trips and scheduling's holds — already disclosed for this viewer. An executive
+  // without the full-schedule grant physically cannot receive the operator detail here.
+  const { availability, audience, stats, nextOpen, nowUtc: now, trips } =
+    useFleetAvailability(userRole, additionalRoles, 14);
 
-  const now = nowUtc();
-  const tails = useMemo(() => fleet.map(a => a.tailNumber), [fleet]);
-  const week = useMemo(
-    () =>
-      buildFleetWeek(trips, tails, now, 14, {
-        tailStatus: Object.fromEntries(fleet.map(a => [a.tailNumber, a.airworthiness.status])),
-        tailHeadline: Object.fromEntries(fleet.map(a => [a.tailNumber, a.airworthiness.headline ?? null])),
-        crewCapacity: DEMO_CREW_CAPACITY,
-      }),
-    [trips, tails, now, fleet],
-  );
-  const stats = useMemo(() => tailDayStats(week), [week]);
-  const nextOpen = useMemo(() => firstOpenSlot(week), [week]);
   const flownThisMonth = useMemo(() => tripsFlownThisMonth(trips, now), [trips, now]);
   const onTime = getOnTimeLegStats();
   const monthName = new Date(Date.parse(now)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
@@ -129,15 +109,15 @@ export default function ExecutiveDashboard({ userRole = 'executive' }: { userRol
           <div className="min-w-[900px]">
             <div
               className="grid gap-1"
-              style={{ gridTemplateColumns: `88px repeat(${week.days.length}, minmax(0, 1fr))` }}
+              style={{ gridTemplateColumns: `88px repeat(${availability.days.length}, minmax(0, 1fr))` }}
             >
               <span />
-              {week.days.map(d => (
+              {availability.days.map(d => (
                 <span key={d.dateUtc} className="gfo-eyebrow text-center text-muted-foreground">
                   {d.dateLabel}
                 </span>
               ))}
-              {week.rows.map(row => {
+              {availability.rows.map(row => {
                 const ac = fleet.find(a => a.tailNumber === row.tail);
                 return (
                   <FleetWeekRowCells
@@ -145,6 +125,7 @@ export default function ExecutiveDashboard({ userRole = 'executive' }: { userRol
                     tail={row.tail}
                     ragColor={ac ? RAG_DOT[ac.airworthiness.status] : undefined}
                     cells={row.cells}
+                    showSchedule={audience !== 'executive'}
                     onOpenDay={askEa}
                   />
                 );
@@ -157,6 +138,7 @@ export default function ExecutiveDashboard({ userRole = 'executive' }: { userRol
           {' · '}{flownThisMonth} trips flown in {monthName}
           {' · '}{onTime.onTimeLegs}/{onTime.totalLegs} legs on time
           {' · '}open means airworthy, unscheduled, and a crew is free — tap one and your EA takes it from there.
+          {audience === 'executive-full' && ' · You have full schedule visibility.'}
         </p>
       </GfoPanel>
     </div>
@@ -167,11 +149,14 @@ function FleetWeekRowCells({
   tail,
   ragColor,
   cells,
+  showSchedule,
   onOpenDay,
 }: {
   tail: string;
   ragColor?: string;
-  cells: FleetWeekCell[];
+  cells: DisclosedCell[];
+  /** executive-full and operators see the route; a plain executive does not. */
+  showSchedule: boolean;
   onOpenDay: (dateUtc: string, tail: string) => void;
 }) {
   return (
@@ -181,7 +166,13 @@ function FleetWeekRowCells({
         {tail}
       </span>
       {cells.map(cell => {
-        if (cell.kind === 'open') {
+        // Every string below comes from the disclosed cell, which composed it from the reason
+        // CATEGORY and the return date. Nothing here reaches into the model — that is what stops
+        // a defect headline reaching an executive through a tooltip, which is exactly how the
+        // previous version of this grid leaked one.
+        const title = cell.label ?? undefined;
+
+        if (cell.state === 'available') {
           return (
             <button
               key={cell.dateUtc}
@@ -193,37 +184,62 @@ function FleetWeekRowCells({
             </button>
           );
         }
-        if (cell.kind === 'down') {
+
+        if (cell.category === 'maintenance') {
+          // The return date is the point of this cell. Without a block there is none, and saying
+          // so is the honest answer (LG-308) — and the prompt for scheduling to book one.
+          const hasEtr = Boolean(cell.untilUtc);
           return (
             <span
               key={cell.dateUtc}
-              title={cell.label ? `Grounded — ${cell.label}` : 'Grounded — down for maintenance'}
-              className="flex min-h-9 items-center justify-center truncate rounded-md bg-destructive/10 px-1 text-[11px] font-medium text-destructive"
+              title={title}
+              className={`flex min-h-9 flex-col items-center justify-center truncate rounded-md px-1 text-[11px] font-medium ${
+                hasEtr ? 'bg-destructive/10 text-destructive' : 'bg-destructive/15 text-destructive'
+              }`}
             >
-              down · maint
+              <span>maint</span>
+              <span className="truncate text-[10px] font-normal opacity-80">
+                {hasEtr ? `to ${shortDate(cell.untilUtc)}` : 'no return date'}
+              </span>
             </span>
           );
         }
-        if (cell.kind === 'no-crew') {
+
+        if (cell.category === 'held') {
           return (
             <span
               key={cell.dateUtc}
-              title="No crew free — the day's flying already commits every crew"
+              title={cell.publicLabel ?? title}
+              className="flex min-h-9 items-center justify-center truncate rounded-md bg-amber-500/10 px-1 text-[11px] font-medium text-amber-700 dark:text-amber-500"
+            >
+              held
+            </span>
+          );
+        }
+
+        if (cell.category === 'no-crew') {
+          return (
+            <span
+              key={cell.dateUtc}
+              title={title}
               className="flex min-h-9 items-center justify-center truncate rounded-md border border-dashed border-border/60 px-1 text-[11px] text-muted-foreground/50"
             >
               no crew
             </span>
           );
         }
+
+        // committed
+        const routeLabel = showSchedule ? cell.scheduleLabel : null;
         return (
           <span
             key={cell.dateUtc}
-            title={cell.label ?? undefined}
+            title={title}
             className={`flex min-h-9 items-center justify-center truncate rounded-md px-1 text-[11px] font-medium ${
-              cell.kind === 'trip' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              routeLabel ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
             }`}
           >
-            {cell.label}
+            {routeLabel ?? 'committed'}
           </span>
         );
       })}

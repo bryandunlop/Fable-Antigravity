@@ -244,6 +244,23 @@ export function canSeeCostModel(userRole?: string, additionalRoles: string[] = [
   return [userRole, ...additionalRoles].some((r) => !!r && COST_MODEL_ROLES.includes(r));
 }
 
+/**
+ * The per-person grant that unlocks the FULL schedule on availability surfaces.
+ *
+ * Bryan, 2026-08-31: "we should have a select view that we can enable for certain executives to
+ * see the full schedule." It is a role a named person is given, not a rank — a CEO does not get
+ * it automatically and an EA can be given it. Operators hold it implicitly.
+ *
+ * What it unlocks is the operating picture (every committed trip, every downtime window with its
+ * type and return date, hold labels) — NOT operator access. Defect text, work orders, vendors and
+ * crew names stay withheld; see src/availability/engine/disclosure.ts.
+ */
+export const FULL_SCHEDULE_ROLES = ['full-schedule', 'scheduling', 'admin', 'lead'];
+
+export function canSeeFullSchedule(userRole?: string, additionalRoles: string[] = []): boolean {
+  return [userRole, ...additionalRoles].some((r) => !!r && FULL_SCHEDULE_ROLES.includes(r));
+}
+
 /** Roles that operate the portal — everyone else who can reach it is a visitor. */
 export const PORTAL_OPERATOR_ROLES = ['admin-assistant', 'scheduling', 'admin', 'lead'];
 
