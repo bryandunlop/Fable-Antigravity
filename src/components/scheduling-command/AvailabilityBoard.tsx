@@ -27,6 +27,8 @@ function cellText(cell: TailDayAvailability): string {
     case 'committed': return 'trip';
     case 'held': return 'held';
     case 'no-crew': return 'no crew';
+    // Not a block — the roster for that day does not exist yet. Reads open, says why.
+    case 'not-yet-rostered': return 'open · unrostered';
   }
 }
 
