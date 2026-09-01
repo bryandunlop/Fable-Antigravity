@@ -4,7 +4,8 @@
 // ring scheduling about — times, tails, FBOs, ground, who is on which leg —
 // and say plainly when the manifest locks.
 
-import { Globe, MapPin, Plane, Ticket } from 'lucide-react';
+import { Globe, MapPin, Plane, Ticket, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
@@ -39,6 +40,7 @@ function LockoutLine({ it }: { it: Itinerary }) {
 }
 
 function ItineraryCard({ it }: { it: Itinerary }) {
+  const navigate = useNavigate();
   return (
     <Card>
       <CardHeader className="py-4">
@@ -105,6 +107,12 @@ function ItineraryCard({ it }: { it: Itinerary }) {
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <LockoutLine it={it} />
           <span className="flex gap-2">
+            {/* A trip itinerary owns its manifest; a claimed seat does not. */}
+            {it.kind === 'trip' && (
+              <Button variant="outline" size="sm" onClick={() => navigate(`/booking-portal/trips/${it.id}/manifest`)}>
+                <Users className="mr-1.5 h-3.5 w-3.5" /> Manifest
+              </Button>
+            )}
             <Button variant="outline" size="sm">Add to calendar</Button>
             <Button variant="outline" size="sm">Send itinerary</Button>
           </span>
