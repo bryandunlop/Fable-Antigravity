@@ -117,6 +117,28 @@ export default function EaHub() {
               )}
             </div>
 
+            {/* Scheduling has offered other days. Hers to answer — and answering must be
+                possible from the screen she lives in, or the counter is a dead end. */}
+            {selected.request.counter && !selected.request.counter.answeredAt && (
+              <div className="mb-3 rounded-md border px-3 py-2 text-sm">
+                <p>
+                  Scheduling suggests{' '}
+                  <span className="font-semibold">{selected.request.counter.dates.join(', ')}</span>
+                  {selected.request.counter.note && ` — ${selected.request.counter.note}`}
+                </p>
+                {state.persona !== 'scheduling' && (
+                  <div className="mt-2 flex gap-2">
+                    <Button size="sm" onClick={() => dispatch({ type: 'ANSWER_COUNTER', id: selected.id, accept: true })}>
+                      Take those days
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => dispatch({ type: 'ANSWER_COUNTER', id: selected.id, accept: false })}>
+                      Keep mine
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {selected.bumpLine && (
               <p className="mb-3 rounded-md border border-[color-mix(in_srgb,var(--gfo-gold,#C9A227)_55%,transparent)] bg-[color-mix(in_srgb,var(--gfo-gold,#C9A227)_8%,transparent)] px-3 py-2 text-sm">
                 {selected.bumpLine}

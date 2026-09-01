@@ -84,6 +84,22 @@ export interface Bump {
   reasonVisibleAt: string | null;
 }
 
+/**
+ * Scheduling proposing different days rather than saying no.
+ *
+ * Countering today is a decline plus a paragraph, which throws away the request and makes
+ * her start again. This keeps the request alive and hands HER the next move.
+ */
+export interface CounterOffer {
+  dates: string[];
+  note: string;
+  by: string;
+  atUtc: string;
+  /** Set when she answers. Until then the ball is hers. */
+  answeredAt?: string;
+  accepted?: boolean;
+}
+
 export interface TripRequest {
   id: string; // R-2047
   status: RequestStatus;
@@ -106,6 +122,14 @@ export interface TripRequest {
   requestedTail?: string;
   /** Set when a senior request took this one's place; reverts the status to pending. */
   bumpedBy?: Bump;
+  /**
+   * The aircraft scheduling actually put on this trip. Approving binds no aircraft on its
+   * own, so an approved request with no `assignedTail` is a promise with nothing behind it
+   * — see engine/owedAnswers.ts, which surfaces exactly that.
+   */
+  assignedTail?: string;
+  /** Scheduling's counter-proposal, alive until she answers it. */
+  counter?: CounterOffer;
   /** Seats the EA asked to hold. She usually knows the lead passenger and a
    *  rough headcount long before she knows the names, so this is the number the
    *  manifest is measured against — not `legs[].passengers.length`. */

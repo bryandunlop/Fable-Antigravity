@@ -18,6 +18,7 @@ import { PortalShell } from '../components/PortalShell';
 import { RequestDrawer } from '../components/RequestDrawer';
 import { RequestIdentityLine } from '../components/RequestIdentity';
 import { AsOf } from '../components/portalUi';
+import { OwedAnswers } from '../components/OwedAnswers';
 import { usePortal } from '../BookingPortalContext';
 import { buildQueue, overallRank, type QueueBand } from '../engine/queueBands';
 import type { TripRequest } from '../types';
@@ -74,6 +75,13 @@ export default function SchedulingQueue() {
       meta={<AsOf>{model.counts.total} decision{model.counts.total === 1 ? '' : 's'} waiting · daily clear 14:00 ET</AsOf>}
     >
       <div className="flex flex-col gap-4">
+        {/* Who owes the next move. A different question from "what is urgent", and the
+            one that catches requests where each side thinks the other is thinking. */}
+        <Card>
+          <CardHeader className="py-4"><CardTitle className="text-base">Owed answers</CardTitle></CardHeader>
+          <CardContent className="pt-0"><OwedAnswers nowMs={Date.now()} /></CardContent>
+        </Card>
+
         {/* Funnel over the queue — chips filter the bands below */}
         <Card>
           <CardContent className="flex flex-wrap items-center gap-2.5 p-4">

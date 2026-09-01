@@ -5,6 +5,7 @@
 import { createContext, useContext, useMemo, useReducer, type ReactNode } from 'react';
 import type { Persona, PortalState, Purpose, RequestLeg, TripRequest } from './types';
 import { canTransition, inboxItem, routeLabel } from './engine/lifecycle';
+import { isCoreTail } from '../../fleet/registry';
 import { initialPortalState, EA_NAME, EXECUTIVE_NAME, SCHEDULER_NAME } from './mockData';
 
 export type PortalAction =
@@ -26,6 +27,11 @@ export type PortalAction =
   | { type: 'BUMP_REQUEST'; id: string; authorizedBy: string; reason: string }
   /** Scheduling marks the call made, which is what makes the reason readable to her. */
   | { type: 'DISCLOSE_BUMP_REASON'; id: string }
+  // Approving binds no aircraft; this is the verb that does. Scheduling only.
+  | { type: 'ASSIGN_TAIL'; id: string; tail: string }
+  // Countering today is a decline plus a paragraph. This keeps the request alive.
+  | { type: 'COUNTER_OFFER'; id: string; dates: string[]; note: string }
+  | { type: 'ANSWER_COUNTER'; id: string; accept: boolean }
   | { type: 'POST_MESSAGE'; id: string; text: string }
   | { type: 'CREATE_WATCH'; kind: 'fleet' | 'route'; label: string; detail: string }
   | { type: 'CANCEL_WATCH'; id: string }
@@ -125,6 +131,58 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
       return updateRequest(state, action.id, (r) => ({
         ...r,
         bumpedBy: r.bumpedBy ? { ...r.bumpedBy, reasonVisibleAt: at } : undefined,
+      }));
+    }
+
+    case 'ASSIGN_TAIL': {
+      const target = state.requests.find((r) => r.id === action.id);
+      // Only real, bookable metal. A tail that is not one of the four cannot be assigned
+      // by mistyping it, and a provisional or demo tail is not fleet.
+      if (!target || !isCoreTail(action.tail)) return state;
+      const next = updateRequest(state, action.id, (r) => ({ ...r, assignedTail: action.tail }));
+      return {
+        ...next,
+        inbox: [inboxItem('decision', `${action.id} — aircraft assigned.`, false, at), ...next.inbox],
+      };
+    }
+
+    case 'COUNTER_OFFER': {
+      const target = state.requests.find((r) => r.id === action.id);
+      if (!target || action.dates.length === 0) return state;
+      // Deliberately NOT a decline: the request keeps its place, its thread and its id,
+      // and the next move is hers.
+      const next = updateRequest(state, action.id, (r) => ({
+        ...r,
+        counter: { dates: action.dates, note: action.note.trim(), by: SCHEDULER_NAME, atUtc: at },
+        messages: [
+          ...r.messages,
+          {
+            id: `M-${at}`,
+            from: 'scheduling' as const,
+            author: SCHEDULER_NAME,
+            at,
+            text: `Could you do ${action.dates.join(', ')}? ${action.note.trim()}`.trim(),
+          },
+        ],
+      }));
+      return {
+        ...next,
+        inbox: [inboxItem('decision', `${action.id} — scheduling has suggested other days.`, true, at), ...next.inbox],
+      };
+    }
+
+    case 'ANSWER_COUNTER': {
+      const target = state.requests.find((r) => r.id === action.id);
+      if (!target?.counter || target.counter.answeredAt) return state;
+      const dates = target.counter.dates;
+      return updateRequest(state, action.id, (r) => ({
+        ...r,
+        counter: r.counter ? { ...r.counter, answeredAt: at, accepted: action.accept } : undefined,
+        // Accepting moves the trip onto the offered days. Declining changes nothing about
+        // the trip — it just hands the next move back to scheduling.
+        legs: action.accept
+          ? r.legs.map((l, i) => ({ ...l, date: dates[Math.min(i, dates.length - 1)] }))
+          : r.legs,
       }));
     }
 
