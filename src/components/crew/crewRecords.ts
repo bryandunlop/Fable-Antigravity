@@ -33,6 +33,24 @@ export interface CrewExpiryItem {
   daysUntil: number;
 }
 
+export type CrewDayStatus = 'available' | 'leave' | 'training' | 'rest';
+
+/**
+ * One person's status on one UTC day. Absent = available, so only exceptions are stored.
+ *
+ * DEMO STAND-IN. There is no real roster feed: the myairops Schedule API holds crew duties but
+ * has no captured spec (unknown, not read-only), so nothing authoritative can back this yet.
+ * It exists so "no crew that day" is an explainable verdict rather than a flat capacity
+ * constant — it is not a duty-and-rest calculation and must never be read as one.
+ */
+export interface CrewDayCoverage {
+  crewId: string;
+  /** 'YYYY-MM-DD' (UTC). */
+  dateUtc: string;
+  status: CrewDayStatus;
+  note?: string;
+}
+
 export interface CrewHeadroom {
   id: string;
   name: string;
@@ -147,4 +165,76 @@ export function dutyHeadroom(records: CrewRecord[]): CrewHeadroom[] {
       headroomHours: r.dutyLimitHours - r.dutyHoursUsed,
     }))
     .sort((a, b) => a.headroomHours - b.headroomHours);
+}
+
+const DAY_KEY = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/**
+ * Roster-only pilots — flight crew who exist for scheduling purposes but have no login persona.
+ *
+ * getCrewRecords() is a readiness SAMPLE (one PIC, one SIC, two FAs) built to demo the expiry
+ * watch list. It cannot answer "how many crews can we field on Thursday", which is what the
+ * availability engine needs, so the roster extends it rather than replacing it: the four sampled
+ * ids stay first and unchanged, because PilotCurrency and CrewResourceManagement read them.
+ */
+const ROSTER_ONLY_PILOTS: Array<{ id: string; name: string; role: CrewRole; dutyHoursUsed: number; currencyDays: number; medicalDays: number; trainingDays: number }> = [
+  { id: 'CRW020', name: 'Capt. Ray Okafor', role: 'PIC', dutyHoursUsed: 3, currencyDays: 190, medicalDays: 220, trainingDays: 260 },
+  { id: 'CRW021', name: 'Capt. Nina Alvarez', role: 'PIC', dutyHoursUsed: 0, currencyDays: 95, medicalDays: 310, trainingDays: 120 },
+  { id: 'CRW022', name: 'Capt. Doug Feeney', role: 'PIC', dutyHoursUsed: 11, currencyDays: 240, medicalDays: 180, trainingDays: 330 },
+  { id: 'CRW023', name: 'FO Marcus Bell', role: 'SIC', dutyHoursUsed: 4, currencyDays: 170, medicalDays: 200, trainingDays: 150 },
+  { id: 'CRW024', name: 'FO Priya Nandan', role: 'SIC', dutyHoursUsed: 0, currencyDays: 130, medicalDays: 260, trainingDays: 240 },
+  { id: 'CRW025', name: 'FA Tomas Reyes', role: 'FA', dutyHoursUsed: 2, currencyDays: 280, medicalDays: 0, trainingDays: 190 },
+];
+
+/**
+ * The full flight-crew roster: the readiness sample plus the roster-only pilots.
+ * 4 PIC / 3 SIC / 3 FA — enough that losing one to leave visibly changes what the fleet can fly.
+ */
+export function getCrewRoster(nowUtc: string = new Date().toISOString()): CrewRecord[] {
+  const now = Date.parse(nowUtc);
+  return [
+    ...getCrewRecords(nowUtc),
+    ...ROSTER_ONLY_PILOTS.map(p => ({
+      id: p.id,
+      name: p.name,
+      role: p.role,
+      dutyHoursUsed: p.dutyHoursUsed,
+      dutyLimitHours: 14,
+      flightHours30d: 45,
+      flightHoursLimit30d: p.role === 'FA' ? 120 : 100,
+      currencyExpiresUtc: inDays(now, p.currencyDays),
+      medicalExpiresUtc: p.medicalDays === 0 ? null : inDays(now, p.medicalDays),
+      trainingDueUtc: inDays(now, p.trainingDays),
+    })),
+  ];
+}
+
+/**
+ * Seeded leave/training/rest, generated from fixed per-person offsets relative to `now` so the
+ * picture is deterministic for a pinned clock and never goes stale. Only exceptions are emitted.
+ */
+const COVERAGE_SEED: Array<{ crewId: string; startDay: number; lengthDays: number; status: CrewDayStatus; note: string }> = [
+  { crewId: 'CRW020', startDay: 2, lengthDays: 3, status: 'leave', note: 'Annual leave' },
+  { crewId: 'USR007', startDay: 4, lengthDays: 2, status: 'training', note: 'Recurrent sim — FlightSafety' },
+  { crewId: 'CRW024', startDay: 6, lengthDays: 2, status: 'leave', note: 'Annual leave' },
+  { crewId: 'CRW022', startDay: 9, lengthDays: 1, status: 'rest', note: 'Post-trip rest' },
+  { crewId: 'CRW023', startDay: 11, lengthDays: 3, status: 'training', note: 'Type rating renewal' },
+];
+
+export function getCrewDayCoverage(nowUtc: string, days = 14): CrewDayCoverage[] {
+  const todayStart = Date.parse(`${DAY_KEY(Date.parse(nowUtc))}T00:00:00.000Z`);
+  const out: CrewDayCoverage[] = [];
+  for (const seed of COVERAGE_SEED) {
+    for (let i = 0; i < seed.lengthDays; i += 1) {
+      const offset = seed.startDay + i;
+      if (offset < 0 || offset >= days) continue;
+      out.push({
+        crewId: seed.crewId,
+        dateUtc: DAY_KEY(todayStart + offset * DAY_MS),
+        status: seed.status,
+        note: seed.note,
+      });
+    }
+  }
+  return out;
 }
