@@ -99,7 +99,21 @@ function buildDays(nowUtc: string, days: number): AvailabilityDay[] {
   });
 }
 
-const NO_REASON: AvailabilityReason = { category: 'none', rank: 5, detail: '', untilUtc: null };
+/**
+ * The ladder, named once. Every rung lives here so the order is readable in one place and a new
+ * rung is an edit rather than a renumbering scattered across the file.
+ */
+export const RANK = {
+  MAINTENANCE_BLOCK: 0,
+  NOT_IN_SERVICE: 1,
+  MAINTENANCE_RED: 2,
+  COMMITTED: 3,
+  HELD: 4,
+  NO_CREW: 5,
+  NONE: 6,
+} as const;
+
+const NO_REASON: AvailabilityReason = { category: 'none', rank: RANK.NONE, detail: '', untilUtc: null };
 
 export function buildFleetAvailability(
   input: AvailabilityInput,
@@ -135,29 +149,43 @@ export function buildFleetAvailability(
         const block = covering[0];
         reasons.push({
           category: 'maintenance',
-          rank: 0,
+          rank: RANK.MAINTENANCE_BLOCK,
           detail: block.description ?? block.maintenanceType,
           untilUtc: returnToServiceUtc(input.downtime, tail, dateUtc),
           sourceRef: { kind: 'downtime', id: block.id },
         });
       }
 
-      // Rank 1 — RED with no block: unavailable, and honestly with no return date.
+      // Rank 1 — the aircraft is not in service at all. NOT_ASSESSED is what the §14.2
+      // projection returns for a provisional airframe (the G800 awaiting its FSDO LOA): its
+      // serviceability is unknown, not green, so it must never read bookable. It is not
+      // "maintenance" either — nothing is being fixed — so it gets its own category rather than
+      // borrowing a label that would misdescribe it to an executive.
+      if (input.tailStatus[tail] === 'NOT_ASSESSED') {
+        reasons.push({
+          category: 'not-in-service',
+          rank: RANK.NOT_IN_SERVICE,
+          detail: input.tailHeadline[tail] ?? 'Aircraft is not yet in service',
+          untilUtc: null,
+        });
+      }
+
+      // Rank 2 — RED with no block: unavailable, and honestly with no return date.
       if (covering.length === 0 && input.tailStatus[tail] === 'RED') {
         reasons.push({
           category: 'maintenance',
-          rank: 1,
+          rank: RANK.MAINTENANCE_RED,
           detail: input.tailHeadline[tail] ?? 'Aircraft is not airworthy',
           untilUtc: null,
         });
       }
 
-      // Rank 2 — a trip already holds the tail.
+      // Rank 3 — a trip already holds the tail.
       const occupied = tailOccupancy?.get(dateUtc);
       if (occupied) {
         reasons.push({
           category: 'committed',
-          rank: 2,
+          rank: RANK.COMMITTED,
           detail: occupied.label
             ? `${occupied.trip.tripNumber} · ${occupied.label}`
             : `${occupied.trip.tripNumber} · away`,
@@ -176,7 +204,7 @@ export function buildFleetAvailability(
         }
       }
 
-      // Rank 4 — no crew can be formed for the day. (Rank 3, held, is the overlay's.)
+      // Rank 5 — no crew can be formed for the day. (Rank 4, held, is the overlay's.)
       const cap = capacity.get(dateUtc);
       const crew = {
         crewsFormable: cap?.crewsFormable ?? 0,
@@ -186,7 +214,7 @@ export function buildFleetAvailability(
       if (!occupied && crew.crewsFree <= 0) {
         reasons.push({
           category: 'no-crew',
-          rank: 4,
+          rank: RANK.NO_CREW,
           detail: `${crew.crewsFormable} crew(s) formable, ${crew.crewsCommitted} committed`,
           untilUtc: null,
           sourceRef: { kind: 'crew', id: dateUtc },

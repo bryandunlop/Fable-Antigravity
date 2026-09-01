@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CrewRecord } from '../../components/crew/crewRecords';
 import type { TripRecord } from '../../scheduling/store/types';
 import type { MaintenanceDowntimeBlock, SchedulerOverlay } from '../types';
-import { allConflicts, buildFleetAvailability, firstAvailableSlot, tailDayStats, type AvailabilityInput } from './availability';
+import { RANK, allConflicts, buildFleetAvailability, firstAvailableSlot, tailDayStats, type AvailabilityInput } from './availability';
 
 const NOW = '2026-09-01T12:00:00.000Z';
 const TAILS = [{ tail: 'N1PG', type: 'G650ER' }];
@@ -87,11 +87,18 @@ describe('the ladder, rank by rank', () => {
     expect(c.reason.untilUtc).toBe('2026-09-05T18:00:00.000Z');
   });
 
-  it('rank 1 — RED with no block is maintenance with NO return date (LG-308)', () => {
+  it('rank 1 — a provisional airframe is not in service, and never reads bookable', () => {
+    const c = cellOn('2026-09-03', { tailStatus: { N1PG: 'NOT_ASSESSED' } });
+    expect(c.state).toBe('unavailable');
+    expect(c.reason.category).toBe('not-in-service');
+    expect(c.reason.rank).toBe(RANK.NOT_IN_SERVICE);
+  });
+
+  it('rank 2 — RED with no block is maintenance with NO return date (LG-308)', () => {
     const c = cellOn('2026-09-03', { tailStatus: { N1PG: 'RED' }, tailHeadline: { N1PG: 'gear actuator' } });
     expect(c.state).toBe('unavailable');
     expect(c.reason.category).toBe('maintenance');
-    expect(c.reason.rank).toBe(1);
+    expect(c.reason.rank).toBe(RANK.MAINTENANCE_RED);
     expect(c.reason.untilUtc).toBeNull();
   });
 
@@ -131,10 +138,23 @@ describe('the ladder, pair by pair — first match wins', () => {
     expect(c.conflicts.map(x => x.kind)).toContain('trip-in-downtime');
   });
 
-  it('RED-without-block (1) beats a trip (2)', () => {
+  it('RED-without-block (2) beats a trip (3)', () => {
     const c = cellOn('2026-09-03', { tailStatus: { N1PG: 'RED' }, trips: [trip()] });
-    expect(c.reason.rank).toBe(1);
+    expect(c.reason.rank).toBe(RANK.MAINTENANCE_RED);
     expect(c.state).toBe('unavailable');
+  });
+
+  it('not-in-service (1) beats everything below it, including a hold', () => {
+    const c = cellOn('2026-09-03', {
+      tailStatus: { N1PG: 'NOT_ASSESSED' }, trips: [trip()], overlays: [hold()],
+    });
+    expect(c.reason.category).toBe('not-in-service');
+    expect(c.state).toBe('unavailable');
+  });
+
+  it('a real downtime block (0) still outranks not-in-service', () => {
+    const c = cellOn('2026-09-03', { downtime: [block()], tailStatus: { N1PG: 'NOT_ASSESSED' } });
+    expect(c.reason.rank).toBe(RANK.MAINTENANCE_BLOCK);
   });
 
   it('a trip (2) beats a hold (3) — a hold never masks a real commitment', () => {
@@ -271,8 +291,13 @@ describe('occupancy behaviours ported from execSelectors (regression)', () => {
     expect(cellOn('2026-09-03', { tailStatus: { N1PG: 'AMBER' } }).state).toBe('available');
   });
 
-  it('NOT_ASSESSED stays available — only RED grounds a tail here', () => {
-    expect(cellOn('2026-09-03', { tailStatus: { N1PG: 'NOT_ASSESSED' } }).state).toBe('available');
+  it('NOT_ASSESSED does NOT stay available — a provisional airframe is not bookable', () => {
+    // This assertion is inverted from the execSelectors original, which let a provisional G800
+    // read 'open' on the executive grid. Caught in the browser, not by a test: the old grid only
+    // ever checked for RED. LG-143 had already ruled provisional out of `dispatchable`.
+    const c = cellOn('2026-09-03', { tailStatus: { N1PG: 'NOT_ASSESSED' } });
+    expect(c.state).toBe('unavailable');
+    expect(c.reason.category).toBe('not-in-service');
   });
 
   it('a mid-trip away day still holds its crew for the count', () => {

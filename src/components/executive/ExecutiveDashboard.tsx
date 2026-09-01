@@ -205,6 +205,18 @@ function FleetWeekRowCells({
           );
         }
 
+        if (cell.category === 'not-in-service') {
+          return (
+            <span
+              key={cell.dateUtc}
+              title={title}
+              className="flex min-h-9 items-center justify-center truncate rounded-md bg-muted px-1 text-[11px] font-medium text-muted-foreground/70"
+            >
+              not in svc
+            </span>
+          );
+        }
+
         if (cell.category === 'held') {
           return (
             <span
@@ -229,17 +241,20 @@ function FleetWeekRowCells({
           );
         }
 
-        // committed
-        const routeLabel = showSchedule ? cell.scheduleLabel : null;
+        // committed. The disclosed schedule label is 'TRP-001 · KCVG → KTEB'; at 14 columns only
+        // the route half fits, and a truncated trip number reads as noise rather than as
+        // information — so the route goes in the cell and the whole label in the tooltip.
+        const schedule = showSchedule ? cell.scheduleLabel : null;
+        const route = schedule ? (schedule.split(' · ').at(-1) ?? schedule) : null;
         return (
           <span
             key={cell.dateUtc}
-            title={title}
+            title={schedule ?? title}
             className={`flex min-h-9 items-center justify-center truncate rounded-md px-1 text-[11px] font-medium ${
-              routeLabel ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              route ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
             }`}
           >
-            {routeLabel ?? 'committed'}
+            {route ?? 'committed'}
           </span>
         );
       })}

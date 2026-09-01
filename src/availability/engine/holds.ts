@@ -16,7 +16,7 @@ import type {
 } from '../types';
 
 /** Where a hold sits on the ladder in engine/availability.ts. */
-const HOLD_RANK = 3;
+const HOLD_RANK = 4;
 
 /** Reason categories a release is permitted to clear. */
 const RELEASABLE = new Set<AvailabilityReason['category']>(['held', 'no-crew']);

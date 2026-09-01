@@ -16,7 +16,13 @@ export type AvailabilityState = 'available' | 'held' | 'committed' | 'unavailabl
  * Deliberately coarse: the disclosure boundary is enforced by building labels from
  * (category, untilUtc) rather than by passing a model string through.
  */
-export type ReasonCategory = 'maintenance' | 'no-crew' | 'committed' | 'held' | 'none';
+export type ReasonCategory =
+  | 'maintenance'
+  | 'not-in-service'
+  | 'no-crew'
+  | 'committed'
+  | 'held'
+  | 'none';
 
 export interface AvailabilityReason {
   category: ReasonCategory;

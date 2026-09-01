@@ -85,6 +85,8 @@ export function categoryLabel(category: ReasonCategory, untilUtc: string | null)
   switch (category) {
     case 'maintenance':
       return until ? `In maintenance until ${until}` : 'Unavailable — no return date set';
+    case 'not-in-service':
+      return 'Not yet in service';
     case 'no-crew':
       return 'No crew that day';
     case 'committed':
