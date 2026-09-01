@@ -6,6 +6,7 @@ import { useTechLog, useCurrentUser } from '../TechLogContext';
 import { deriveTripReadiness } from '../engine/readiness';
 import { requiresFuelFarmSubmission } from '../engine/fuel';
 import { AirportInfoPanel } from '../components/AirportInfoPanel';
+import { LegTimeStrip } from '../components/LegTimeStrip';
 import { TripReadinessChip } from '../components/TripReadinessChip';
 import { TechLogShell } from '../components/TechLogShell';
 import { Card, CardContent } from '../../ui/card';
@@ -99,6 +100,17 @@ export default function LegDetail() {
       status={<TripReadinessChip state={readiness.state} />}
       actions={<Button variant="outline" size="sm" onClick={() => navigate(`/tech-log/trips/${trip.id}`)}><ArrowLeft className="mr-1.5 h-4 w-4" /> Trip</Button>}
     >
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <LegTimeStrip
+            departureIcao={leg.departureIcao}
+            arrivalIcao={leg.arrivalIcao}
+            departureUtc={leg.departureTimeUtc}
+            arrivalUtc={leg.arrivalTimeUtc}
+          />
+        </CardContent>
+      </Card>
+
       {/* Airport information */}
       <Card className="mb-4">
         <CardContent className="p-0">

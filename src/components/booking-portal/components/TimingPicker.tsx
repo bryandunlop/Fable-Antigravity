@@ -5,7 +5,7 @@
 // form gave her no way to say it — she had to invent a departure time instead.
 
 import { Clock } from 'lucide-react';
-import { expectedDeparture, departsPreviousDay, type LegTiming } from '../engine/legTiming';
+import { deriveDeparture, type LegTiming } from '../engine/legTiming';
 import { cn } from '../../ui/utils';
 
 const field = 'rounded-md border bg-background px-2.5 py-1.5 text-sm';
@@ -13,18 +13,26 @@ const field = 'rounded-md border bg-background px-2.5 py-1.5 text-sm';
 export function TimingPicker({
   timing,
   onChange,
+  departureAirport,
   arrivalAirport,
+  date,
   estMinutes,
   legLabel,
 }: {
   timing: LegTiming;
   onChange: (t: LegTiming) => void;
+  departureAirport: string;
   arrivalAirport: string;
+  date: string;
   estMinutes: number;
   legLabel: string;
 }) {
-  const derived = timing.kind === 'arrive' ? expectedDeparture(timing, estMinutes) : null;
-  const prevDay = timing.kind === 'arrive' && departsPreviousDay(timing, estMinutes);
+  // Both fields and the date, so an arrive-by across zones subtracts on real instants rather
+  // than on the arrival's wall clock — five hours and a day out on a transatlantic leg (TL-47).
+  const dep =
+    timing.kind === 'arrive'
+      ? deriveDeparture(timing, estMinutes, { from: departureAirport, to: arrivalAirport, date })
+      : null;
 
   const row = (selected: boolean) =>
     cn(
@@ -108,11 +116,16 @@ export function TimingPicker({
         </label>
       </div>
 
-      {derived && (
+      {dep?.clock && (
         <p className="mt-2.5 flex items-center gap-1.5 text-xs text-[var(--gfo-daylight-deep,#0077CC)]">
           <Clock className="h-3.5 w-3.5" />
-          Scheduling will likely file a {derived} departure
-          {prevDay ? ' the evening before' : ''} — you'll see the real time when they confirm.
+          Scheduling will likely file a {dep.clock}
+          {dep.zoned && dep.zoneLabel ? ` ${dep.zoneLabel}` : ''} departure
+          {dep.previousDay ? ' the day before' : ''}
+          {dep.zoned
+            ? ` from ${departureAirport || 'the origin'}`
+            : ' — assuming one time zone, since we could not place both fields'}
+          {' '}— you'll see the real time when they confirm.
         </p>
       )}
     </div>

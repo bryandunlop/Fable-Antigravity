@@ -175,7 +175,10 @@ export default function NewRequest() {
     if (blockers.length > 0) return;
     const requestLegs: RequestLeg[] = legs.map((l, i) => {
       const est = estimate(l.from, l.to);
-      const derived = expectedDeparture(l.timing, est.minutes);
+      // With from/to/date, an arrive-by across zones resolves to the ORIGIN's clock. Without
+      // them this stored the arrival field's clock as the departure — and every downstream
+      // reader (itinerary, queue, calendar) then read it as local to the origin (TL-47).
+      const derived = expectedDeparture(l.timing, est.minutes, { from: l.from, to: l.to, date: l.date });
       return {
         id: `L-${Date.now()}-${i}`,
         from: l.from,
@@ -288,7 +291,9 @@ export default function NewRequest() {
                     legLabel={`leg-${i + 1}`}
                     timing={leg.timing}
                     onChange={(t: LegTiming) => updateLeg(i, { timing: t })}
+                    departureAirport={leg.from}
                     arrivalAirport={leg.to}
+                    date={leg.date}
                     estMinutes={est.minutes}
                   />
 
