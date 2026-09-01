@@ -2,6 +2,7 @@ import React from 'react';
 import { Sunrise, Sunset } from 'lucide-react';
 import { solarTimesFor } from '../../services/solarTimes';
 import { lookupAirport } from '../../services/airportCoords';
+import { zoneForAirport } from '../../services/airportZone';
 
 /**
  * Sunrise / sunset for a station, in that station's own local time.
@@ -15,38 +16,6 @@ import { lookupAirport } from '../../services/airportCoords';
  * Courtesy information, not a legal boundary: 14 CFR 1.1 night, §61.57(b)
  * currency and civil twilight are all different lines. See solarTimes.ts.
  */
-
-/**
- * IANA zone per station — one entry for every field in the airportCoords seed
- * table, and nothing else. Keeping the two lists in step is the point: a zone
- * without coordinates can't be plotted, and coordinates without a zone would
- * silently render sun times in the wrong clock. A station missing from either
- * renders no chip at all.
- */
-const STATION_ZONE: Record<string, string> = {
-  KLUK: 'America/New_York',
-  KTEB: 'America/New_York',
-  KJFK: 'America/New_York',
-  KLGA: 'America/New_York',
-  KEWR: 'America/New_York',
-  KMIA: 'America/New_York',
-  KOPF: 'America/New_York',
-  KATL: 'America/New_York',
-  KPHL: 'America/New_York',
-  KDCA: 'America/New_York',
-  KORD: 'America/Chicago',
-  KPHX: 'America/Phoenix',
-  KLAX: 'America/Los_Angeles',
-  KSFO: 'America/Los_Angeles',
-  KSAN: 'America/Los_Angeles',
-  KBUR: 'America/Los_Angeles',
-  KLGB: 'America/Los_Angeles',
-  MYNN: 'America/Nassau',
-  EGLL: 'Europe/London',
-  LFPG: 'Europe/Paris',
-  OMDB: 'Asia/Dubai',
-  RJTT: 'Asia/Tokyo',
-};
 
 function inZone(iso: string, zone: string): string {
   return new Date(iso).toLocaleTimeString('en-US', {
@@ -72,7 +41,7 @@ export default function SunTimesChip({
   className?: string;
 }) {
   const field = lookupAirport(station);
-  const zone = STATION_ZONE[station.toUpperCase()];
+  const zone = zoneForAirport(station);
   if (!field || !zone) return null;
 
   // Midday at the field, so the day the sun times describe is the field's day.
