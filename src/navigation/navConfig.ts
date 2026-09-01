@@ -75,6 +75,9 @@ export const FRONT_DOORS: Record<string, string> = {
   'maintenance-workflow': '/maintenance-workflow',
   'lead': '/lead-dashboard',
   'executive': '/executive',
+  // D100 — an executive administrator opens on the portal, because booking and
+  // managing her principal's travel IS her job, not a corner of it.
+  'admin-assistant': '/booking-portal',
 };
 
 // Sidebar domains open by default on first visit (everything else starts collapsed).
@@ -91,7 +94,8 @@ export const DEFAULT_OPEN_DOMAINS: Record<string, Domain[]> = {
   'lead': ['home'],
   // A VP and their admin come here to chase projects, so open Admin for them.
   'vp': ['admin'],
-  'admin-assistant': ['admin'],
+  // Her work is the portal, so open Scheduling rather than Admin (D100).
+  'admin-assistant': ['scheduling', 'admin'],
   'executive': ['home'],
 };
 
@@ -167,7 +171,8 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/booking-portal', label: 'Booking Portal', domain: 'scheduling', icon: Ticket, primary: true, keywords: ['booking', 'empty seats', 'trip request', 'ea', 'watches', 'fleet hold'], roles: ['admin-assistant', 'scheduling', 'admin', 'lead'] },
   { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', railLabel: 'Sched Board', domain: 'scheduling', icon: LayoutDashboard, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: Route, primary: false, roles: ['scheduling', 'admin'] },
-  { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: ClipboardType, primary: false, roles: ['scheduling', 'admin'] },
+  // D100 — chasing travel forms is the EA's own workload, so she gets the door.
+  { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: ClipboardType, primary: false, roles: ['scheduling', 'admin', 'admin-assistant'] },
   // Merged into Passenger Forms as its "Data Currency" tab (Bryan, 2026-08-08):
   // that page already carried Expiring Documents and Outdated Data, so this was
   // the same job behind a second door — and "Passenger Forms" was the name Bryan

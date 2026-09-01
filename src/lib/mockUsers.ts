@@ -152,6 +152,19 @@ export const SYSTEM_USERS = [
     lastLogin: '2025-02-02 07:15',
     department: 'Corporate',
     hireDate: '2015-02-02'
+  },
+  // D100 — the executive administrator: the EA who books and manages travel on a
+  // principal's behalf. Named to match the booking portal's own EA fixture
+  // (booking-portal/mockData EA_NAME) so one person runs through both.
+  {
+    id: 'USR018',
+    name: 'Dana Whitfield',
+    email: 'd.whitfield@corp.com',
+    roles: ['admin-assistant'],
+    status: 'Active',
+    lastLogin: '2025-02-02 08:05',
+    department: 'Corporate',
+    hireDate: '2019-06-03'
   }
 ];
 
@@ -183,6 +196,9 @@ export const ROLE_CATEGORIES = {
     { value: 'admin', label: 'Administrator', description: 'System administration' },
     // D99 — executives are internal platform users (D77 Q-D, resolved 2026-08-29).
     { value: 'executive', label: 'Executive', description: 'Fleet visibility for principals' },
+    // D100 — the EA who books and manages travel for a principal. The role id is
+    // 'admin-assistant', which the booking portal and D77 already speak.
+    { value: 'admin-assistant', label: 'Executive Administrator', description: 'Books and manages travel for a principal' },
   ]
 };
 
