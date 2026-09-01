@@ -20,6 +20,7 @@ export type ReasonCategory =
   | 'maintenance'
   | 'not-in-service'
   | 'no-crew'
+  | 'not-yet-rostered'
   | 'committed'
   | 'held'
   | 'none';

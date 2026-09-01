@@ -334,3 +334,61 @@ describe('summaries', () => {
     expect(buildFleetAvailability(args, NOW, 7)).toEqual(buildFleetAvailability(args, NOW, 7));
   });
 });
+
+/**
+ * The crew cliff (2026-09-01). Every pilot's currency and medical is seeded as a fixed offset
+ * from now and nobody ever renews one, so past roughly six months `lapsedBy` disqualified the
+ * entire roster and a healthy, unbooked, undamaged aeroplane read "unavailable — no crew".
+ * A planning view that shows late 2027 depends on this staying fixed.
+ */
+describe('far horizon — beyond the published crew roster', () => {
+  const FAR_DAYS = 300;
+
+  function farInput(over: Partial<AvailabilityInput> = {}): AvailabilityInput {
+    return input({ trips: [], downtime: [], crewCoverage: [], ...over });
+  }
+
+  it('does not ground a healthy unbooked tail 300 days out', () => {
+    const fleet = buildFleetAvailability(farInput(), NOW, FAR_DAYS);
+    const cells = fleet.rows[0].cells;
+    const last = cells[cells.length - 1];
+    expect(last.state).not.toBe('unavailable');
+    expect(last.reason.category).not.toBe('no-crew');
+  });
+
+  it('reports the far day as not-yet-rostered rather than crewless', () => {
+    const fleet = buildFleetAvailability(farInput(), NOW, FAR_DAYS);
+    const last = fleet.rows[0].cells[fleet.rows[0].cells.length - 1];
+    expect(last.reason.category).toBe('not-yet-rostered');
+    expect(last.state).toBe('available');
+  });
+
+  it('still says no-crew inside the roster horizon when the roster really is empty', () => {
+    const fleet = buildFleetAvailability(farInput({ crewRoster: [] }), NOW, 5);
+    expect(fleet.rows[0].cells[0].reason.category).toBe('no-crew');
+    expect(fleet.rows[0].cells[0].state).toBe('unavailable');
+  });
+
+  it('keeps maintenance winning over a not-yet-rostered day — a far block is still a block', () => {
+    const far = new Date(Date.parse(NOW) + 250 * 86_400_000).toISOString();
+    const farDay = far.slice(0, 10);
+    const fleet = buildFleetAvailability(
+      farInput({
+        downtime: [block({
+          scheduledStartUtc: `${farDay}T08:00:00.000Z`,
+          scheduledEndUtc: `${farDay}T18:00:00.000Z`,
+        })],
+      }),
+      NOW,
+      FAR_DAYS,
+    );
+    const cell = fleet.rows[0].cells.find(c => c.dateUtc === farDay);
+    expect(cell?.reason.category).toBe('maintenance');
+    expect(cell?.state).toBe('unavailable');
+  });
+
+  it('ranks not-yet-rostered below no-crew and above none', () => {
+    expect(RANK.NO_CREW).toBeLessThan(RANK.NOT_YET_ROSTERED);
+    expect(RANK.NOT_YET_ROSTERED).toBeLessThan(RANK.NONE);
+  });
+});

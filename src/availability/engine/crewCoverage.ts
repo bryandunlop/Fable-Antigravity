@@ -15,6 +15,22 @@ import type { TripRecord } from '../../scheduling/store/types';
 
 const DAY_MS = 86_400_000;
 
+/**
+ * How far ahead the crew roster is actually published.
+ *
+ * Beyond this, a pilot's currency, medical and duty state are NOT KNOWABLE — expiries get
+ * renewed, leave gets taken, recurrent gets scheduled. Treating a far-future expiry as a
+ * disqualification is what made the whole fleet read "no crew" past ~190 days: the fixtures
+ * seed every expiry as a fixed offset from now and nobody ever renews one, so the roster
+ * silently emptied itself and the engine answered a nine-month question with total confidence
+ * and no crew at all.
+ *
+ * PLACEHOLDER — 60 days is a stand-in for GFO's real roster publication horizon, which is a
+ * department policy nobody has given us yet. It is a parameter precisely so the real number
+ * can replace it without touching the ladder.
+ */
+export const CREW_ROSTER_HORIZON_DAYS = 60;
+
 export interface CrewDayCapacity {
   dateUtc: string;
   picAvailable: number;
@@ -25,6 +41,12 @@ export interface CrewDayCapacity {
   /** Never negative — an over-committed day has zero free, not minus one. */
   crewsFree: number;
   overCommitted: boolean;
+  /**
+   * False beyond CREW_ROSTER_HORIZON_DAYS — the roster for this day does not exist yet, so
+   * the counts above are "the roster as it stands today", not a verdict. Callers must render
+   * this as "not yet known", never as "no crew".
+   */
+  rostered: boolean;
 }
 
 export interface CrewAssignment {
@@ -55,6 +77,7 @@ export function crewCapacityByDay(
   nowUtc: string,
   days: number,
   assignments?: CrewAssignment[],
+  rosterHorizonDays: number = CREW_ROSTER_HORIZON_DAYS,
 ): CrewDayCapacity[] {
   const todayStartMs = Date.parse(`${utcDayKey(Date.parse(nowUtc))}T00:00:00.000Z`);
 
@@ -96,9 +119,15 @@ export function crewCapacityByDay(
       for (const crewId of assignedCrewByTrip.get(tripId) ?? []) flyingToday.add(crewId);
     }
 
+    // Past the published roster, currency/medical/duty are not facts about that day — they are
+    // facts about today projected forward, and projecting them forward is a lie. Only explicit
+    // coverage exceptions and real assignments still count out there.
+    const rostered = Math.round((dayStartMs - todayStartMs) / DAY_MS) < rosterHorizonDays;
+
     const free = roster.filter(r => {
       if (unavailableBy.get(r.id)?.has(dateUtc)) return false;
       if (flyingToday.has(r.id)) return false;
+      if (!rostered) return true;
       if (r.dutyHoursUsed >= r.dutyLimitHours) return false;
       if (lapsedBy(r.currencyExpiresUtc, dayStartMs)) return false;
       if (lapsedBy(r.medicalExpiresUtc, dayStartMs)) return false;
@@ -118,6 +147,7 @@ export function crewCapacityByDay(
       crewsCommitted,
       crewsFree: Math.max(0, crewsFormable - crewsCommitted),
       overCommitted: crewsCommitted > crewsFormable,
+      rostered,
     };
   });
 }

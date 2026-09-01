@@ -89,6 +89,8 @@ export function categoryLabel(category: ReasonCategory, untilUtc: string | null)
       return 'Not yet in service';
     case 'no-crew':
       return 'No crew that day';
+    case 'not-yet-rostered':
+      return 'Crew roster not published this far ahead';
     case 'committed':
       return until ? `Already committed until ${until}` : 'Already committed';
     case 'held':
