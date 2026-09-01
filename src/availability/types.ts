@@ -172,7 +172,7 @@ export interface SchedulerOverlay {
 export type ReleaseSuggestionTrigger =
   | 'downtime-ended-early'
   | 'hold-unclaimed'
-  | 'crew-recovered'
+  | 'crew-resolvable'
   | 'trip-cancelled';
 
 /** Computed, never stored. Scheduling approves or dismisses; nothing applies itself. */
