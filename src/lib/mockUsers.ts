@@ -209,6 +209,11 @@ export const ROLE_CATEGORIES = {
     { value: 'procedural-specialist', label: 'Procedural Specialist', description: 'Procedural bulletin management' },
     { value: 'hr', label: 'HR', description: 'Human resources' },
     { value: 'admin', label: 'Administrator', description: 'System administration' },
+  ],
+  // The principal and the person who books for them are one working pair, so
+  // they sit together in their own group rather than buried at the bottom of
+  // Management & Administration with HR and system admin.
+  'Executive Office': [
     // D99 — executives are internal platform users (D77 Q-D, resolved 2026-08-29).
     { value: 'executive', label: 'Executive', description: 'Fleet visibility for principals' },
     // D100 — the EA who books and manages travel for a principal. The role id is

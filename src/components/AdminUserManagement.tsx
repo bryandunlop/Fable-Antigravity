@@ -65,6 +65,7 @@ export default function AdminUserManagement() {
       case 'Maintenance': return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'Safety': return 'bg-red-100 text-red-800 border-red-200';
       case 'Management & Administration': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'Executive Office': return 'bg-amber-100 text-amber-800 border-amber-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
