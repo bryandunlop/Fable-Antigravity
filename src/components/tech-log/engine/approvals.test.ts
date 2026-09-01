@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isSelfApproval, applyApproval, type ReferenceTables } from './approvals';
+import { canDecideApproval, isSelfApproval, applyApproval, type ReferenceTables } from './approvals';
 import type { Aircraft, Personnel, MelItem, PendingApproval } from '../types';
 
 const aircraft: Aircraft = { id: 'ac1', tailNumber: 'N1PG', type: 'G800', serialNumber: '88041', status: 'PROVISIONAL', isProvisional: true, homeBase: 'KTEB', airframeTotalHours: 10, airframeTotalCycles: 5 };
@@ -16,6 +16,37 @@ describe('isSelfApproval', () => {
   it('is false when the decider differs from the proposer', () => {
     const pending: PendingApproval = { id: 'appr1', kind: 'AIRCRAFT_EDIT', before: aircraft, after: aircraft, summary: 's', proposedByOid: 'USR002', proposedAtUtc: 't', status: 'PENDING' };
     expect(isSelfApproval(pending, 'USR010')).toBe(false);
+  });
+});
+
+/**
+ * D23 — blocking self-approval was never enough on its own. These proposals set
+ * `apCertificateNumber`, `riiAuthorizedAta`, `isProvisional` and `approvalState`; whoever
+ * approves one can defeat the CRS-cert gate, the RII check and the provisional-MEL block.
+ * Until 2026-09-01 the reducer admitted ANY second person, because the role gate lived only
+ * in the panel that draws the buttons — which that panel documents as convenience.
+ */
+describe('canDecideApproval', () => {
+  const supervisor: Personnel = { ...personnel, oid: 'USR002', displayName: 'Sarah Wilson (DOM)', isSupervisor: true };
+  const ordinary: Personnel = { ...personnel, oid: 'USR008', isSupervisor: false };
+
+  it('admits a designated supervisor', () => {
+    expect(canDecideApproval(supervisor).ok).toBe(true);
+  });
+
+  it('refuses a second pair of eyes that is not a qualified pair', () => {
+    const verdict = canDecideApproval(ordinary);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.error).toMatch(/supervisor/i);
+  });
+
+  it('refuses a decider who is not on file as personnel at all', () => {
+    expect(canDecideApproval(undefined).ok).toBe(false);
+  });
+
+  it('refuses when isSupervisor is simply absent, rather than treating absence as permission', () => {
+    const { isSupervisor: _drop, ...withoutFlag } = supervisor;
+    expect(canDecideApproval(withoutFlag as Personnel).ok).toBe(false);
   });
 });
 

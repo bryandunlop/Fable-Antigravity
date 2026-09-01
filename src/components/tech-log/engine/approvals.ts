@@ -11,6 +11,31 @@ export function isSelfApproval(pending: PendingApproval, decidedByOid: string): 
   return pending.proposedByOid === decidedByOid;
 }
 
+/**
+ * WHO may decide — D23. Blocking self-approval was never enough on its own: these proposals set
+ * `apCertificateNumber`, `riiAuthorizedAta`, `isProvisional` and `approvalState`, and whoever can
+ * approve one can defeat the CRS-cert gate, the RII-authorisation check and the provisional-MEL
+ * block. Any second pair of eyes is not a second pair of *qualified* eyes.
+ *
+ * The gate lived only in the panel's `user.role === 'MAINTENANCE'` check, which the panel itself
+ * documents as convenience — so the reducer, the actual authority, admitted anyone.
+ *
+ * A decider must be a designated supervisor (DOM / Chief Inspector), the same `isSupervisor`
+ * flag `canSupersede` already trusts for corrections against signed records.
+ */
+export function canDecideApproval(decider: Personnel | undefined): { ok: boolean; error?: string } {
+  if (!decider) {
+    return { ok: false, error: 'The approver is not on file as personnel.' };
+  }
+  if (!decider.isSupervisor) {
+    return {
+      ok: false,
+      error: 'Only a designated supervisor (DOM / Chief Inspector) may approve a reference-data change.',
+    };
+  }
+  return { ok: true };
+}
+
 export interface ReferenceTables {
   aircraft: Aircraft[];
   personnel: Personnel[];

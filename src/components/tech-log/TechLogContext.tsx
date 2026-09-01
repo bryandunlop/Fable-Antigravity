@@ -6,7 +6,7 @@ import { loadPersistedTechLogState } from './bridge';
 import { SYSTEM_USERS } from '../../lib/mockUsers';
 import { wouldFork, buildSupersedeConflict } from './engine/supersede';
 import { canRecordPostflight } from './engine/custody';
-import { isSelfApproval, applyApproval } from './engine/approvals';
+import { isSelfApproval, canDecideApproval, applyApproval } from './engine/approvals';
 import { newId } from './util/id';
 import type { DisplayZoneMode } from './util/displayZone';
 import { STORAGE_KEY, isDurableAction, loadPersistedState, persistState, type StorageLike } from './persistence';
@@ -179,6 +179,10 @@ function reducer(state: TechLogState, action: TechLogAction): TechLogState {
       const { id, approve, decidedByOid, decidedAtUtc, rejectionReason } = action.payload;
       const pending = state.pendingApprovals.find(p => p.id === id && p.status === 'PENDING');
       if (!pending || isSelfApproval(pending, decidedByOid)) return state; // self-approval is never valid, defense-in-depth
+      // D23 — and it must be a QUALIFIED second pair of eyes. Approving one of these sets a cert
+      // number, an RII authorisation or a MEL approval state; the reducer is the authority, so the
+      // role check belongs here and not only in the panel that renders the buttons.
+      if (!canDecideApproval(state.personnel.find(p => p.oid === decidedByOid)).ok) return state;
       const decided: PendingApproval = { ...pending, status: approve ? 'APPROVED' : 'REJECTED', decidedByOid, decidedAtUtc, rejectionReason };
       const entityId = (() => {
         switch (pending.kind) {

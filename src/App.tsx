@@ -410,7 +410,19 @@ export default function App() {
                                 <Route path="/car-tracking" element={<CarTracking />} />
                                 <Route path="/passenger-database" element={<PassengerDatabase userRole={userRole} />} />
 
-                                <Route path="/admin" element={<AdminUserManagement />} />
+                                {/* Route-gated (2026-09-01). This screen edits users AND their roles,
+                                    and every authority gate in the app — four-eyes approval, supersede,
+                                    portal operator access — resolves to a role string or isSupervisor on
+                                    a person record. Ungated, it was the shortest path to granting yourself
+                                    the role that approves your own A&P certificate number. */}
+                                <Route
+                                  path="/admin"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin']}>
+                                      <AdminUserManagement />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route
                                   path="/admin/airport-evaluation-officer"
                                   element={
