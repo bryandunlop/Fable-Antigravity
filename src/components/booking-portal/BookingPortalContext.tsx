@@ -10,7 +10,13 @@ import { initialPortalState, EA_NAME, SCHEDULER_NAME } from './mockData';
 export type PortalAction =
   | { type: 'SET_PERSONA'; persona: Persona }
   | { type: 'RESET_DEMO' }
-  | { type: 'SUBMIT_REQUEST'; legs: RequestLeg[]; principalId: string; extras: string[]; note?: string; fromWatchId?: string; requestedTail?: string }
+  | { type: 'SUBMIT_REQUEST'; legs: RequestLeg[]; principalId: string; extras: string[]; note?: string; fromWatchId?: string; requestedTail?: string; seatsHeld?: number }
+  // D100 — the manifest fills in over weeks, so naming, dropping and releasing
+  // seats are first-class actions on a trip, not edits to a submitted form.
+  | { type: 'NAME_SEAT'; requestId: string; passengerId: string; purpose: Purpose; legIds?: string[] }
+  | { type: 'DROP_FROM_LEG'; requestId: string; passengerId: string; legId: string }
+  | { type: 'RELEASE_HELD_SEAT'; requestId: string }
+  | { type: 'CHASE_OUTSTANDING'; requestId: string; names: string[] }
   | { type: 'APPROVE_REQUEST'; id: string }
   | { type: 'CONFIRM_REQUEST'; id: string }
   | { type: 'DECLINE_REQUEST'; id: string; reason: string }
@@ -57,6 +63,7 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
         messages: [],
         fromWatchId: action.fromWatchId,
         requestedTail: action.requestedTail,
+        seatsHeld: action.seatsHeld,
       };
       return {
         ...state,
@@ -118,6 +125,51 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
         declineReason: undefined,
         createdAt: at,
       }));
+    }
+
+    // ── Manifest, filled in over weeks (D100) ────────────────────────────────
+    case 'NAME_SEAT': {
+      // A named passenger joins every leg unless the EA splits them out — the
+      // common case is "she's on the whole trip", and splitting is the exception.
+      return updateRequest(state, action.requestId, (r) => ({
+        ...r,
+        legs: r.legs.map((leg) => {
+          const wanted = action.legIds ? action.legIds.includes(leg.id) : true;
+          if (!wanted || leg.passengers.some((p) => p.passengerId === action.passengerId)) return leg;
+          return {
+            ...leg,
+            passengers: [...leg.passengers, { passengerId: action.passengerId, purpose: action.purpose }],
+          };
+        }),
+      }));
+    }
+
+    case 'DROP_FROM_LEG':
+      return updateRequest(state, action.requestId, (r) => ({
+        ...r,
+        legs: r.legs.map((leg) =>
+          leg.id === action.legId
+            ? { ...leg, passengers: leg.passengers.filter((p) => p.passengerId !== action.passengerId) }
+            : leg,
+        ),
+      }));
+
+    case 'RELEASE_HELD_SEAT':
+      // Giving a held seat back to the fleet. Never below the names already on
+      // the trip — releasing a seat someone occupies is a drop, not a release.
+      return updateRequest(state, action.requestId, (r) => {
+        const namedCount = new Set(r.legs.flatMap((l) => l.passengers.map((p) => p.passengerId))).size;
+        const held = r.seatsHeld ?? namedCount;
+        return { ...r, seatsHeld: Math.max(namedCount, held - 1) };
+      });
+
+    case 'CHASE_OUTSTANDING': {
+      if (action.names.length === 0) return state;
+      const who = action.names.join(' and ');
+      return {
+        ...state,
+        inbox: [inboxItem('form', `Reminder sent to ${who}.`, false, at), ...state.inbox],
+      };
     }
 
     case 'POST_MESSAGE': {

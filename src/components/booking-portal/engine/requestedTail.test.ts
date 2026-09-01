@@ -3,10 +3,19 @@ import { portalReducer } from '../BookingPortalContext';
 import { initialPortalState } from '../mockData';
 import type { RequestLeg } from '../types';
 
+// Written against the real RequestLeg, not cast past it: the D100 branch reshaped this type
+// (id/date/departLocal/flexHours/timing/passengers) while this test was on its own branch.
 const LEGS: RequestLeg[] = [{
-  from: 'KCVG', to: 'KTEB', dateLocal: '2026-09-02', timeLocal: '08:00',
-  estMinutes: 105, passengerIds: ['P-REYES'], leadId: 'P-REYES', purposes: {},
-} as RequestLeg];
+  id: 'L1',
+  from: 'KCVG',
+  to: 'KTEB',
+  date: '2026-09-02',
+  departLocal: '08:00',
+  flexHours: 0,
+  estMinutes: 105,
+  estNm: 480,
+  passengers: [{ passengerId: 'P-REYES', lead: true, purpose: 'business' }],
+}];
 
 function submit(over: { requestedTail?: string } = {}) {
   const state = portalReducer(initialPortalState(), {

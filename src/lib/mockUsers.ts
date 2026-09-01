@@ -153,11 +153,26 @@ export const SYSTEM_USERS = [
     department: 'Corporate',
     hireDate: '2015-02-02'
   },
+  // D100 — the executive administrator: the EA who books and manages travel on a
+  // principal's behalf. Named to match the booking portal's own EA fixture
+  // (booking-portal/mockData EA_NAME) so one person runs through both.
+  {
+    id: 'USR018',
+    name: 'Dana Whitfield',
+    email: 'd.whitfield@corp.com',
+    roles: ['admin-assistant'],
+    status: 'Active',
+    lastLogin: '2025-02-02 08:05',
+    department: 'Corporate',
+    hireDate: '2019-06-03'
+  },
   // Added AFTER Victoria Hale so resolveUserId('executive') still resolves to her. She is the
   // plain executive; he holds the per-person 'full-schedule' grant, so the two side by side show
   // exactly what that grant changes on the fleet week (Bryan, 2026-08-31).
+  // USR019, not USR018: the availability branch and the D100 booking branch each minted an
+  // USR018 in parallel. Dana shipped first, so she keeps the number (Bryan, 2026-08-31).
   {
-    id: 'USR018',
+    id: 'USR019',
     name: 'Gordon Reyes',
     email: 'g.reyes@corp.com',
     roles: ['executive', 'full-schedule'],
@@ -196,6 +211,9 @@ export const ROLE_CATEGORIES = {
     { value: 'admin', label: 'Administrator', description: 'System administration' },
     // D99 — executives are internal platform users (D77 Q-D, resolved 2026-08-29).
     { value: 'executive', label: 'Executive', description: 'Fleet visibility for principals' },
+    // D100 — the EA who books and manages travel for a principal. The role id is
+    // 'admin-assistant', which the booking portal and D77 already speak.
+    { value: 'admin-assistant', label: 'Executive Administrator', description: 'Books and manages travel for a principal' },
   ]
 };
 

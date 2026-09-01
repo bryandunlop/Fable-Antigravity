@@ -4,6 +4,10 @@
 // watch path Watching → Freed → Requested, seat path reuses the trip words.
 // Everything here runs on fixtures; no myairops call exists behind any of it.
 
+import type { LegTiming } from './engine/legTiming';
+
+export type { LegTiming };
+
 export type Persona = 'ea' | 'scheduling';
 
 export type Purpose = 'business' | 'personal' | 'entertainment' | 'commuting';
@@ -33,8 +37,13 @@ export interface RequestLeg {
   from: string;
   to: string;
   date: string; // ISO date
+  /** The expected departure. When `timing` is an arrive-by, this is DERIVED from
+   *  it (engine/legTiming) so every existing reader keeps working. */
   departLocal: string; // "08:00"
   flexHours: number; // 0 = firm
+  /** What is actually fixed about the timing — depart around, be there by, or
+   *  nothing firmer than the date. Absent on legacy legs, read as 'depart'. */
+  timing?: LegTiming;
   estMinutes: number;
   estNm: number;
   passengers: LegPassenger[];
@@ -68,6 +77,10 @@ export interface TripRequest {
    * floor between the two surfaces, so scheduling never learned which aircraft prompted the ask.
    */
   requestedTail?: string;
+  /** Seats the EA asked to hold. She usually knows the lead passenger and a
+   *  rough headcount long before she knows the names, so this is the number the
+   *  manifest is measured against — not `legs[].passengers.length`. */
+  seatsHeld?: number;
 }
 
 export interface Flight {
