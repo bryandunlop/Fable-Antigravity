@@ -8,6 +8,9 @@
 
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useFleetAvailability } from '../../hooks/useFleetAvailability';
+import { readAvailabilityForDates } from '../../../availability/source';
+import { datesForLegs, requestedTailStatus, summarizeByDay } from '../engine/requestAvailability';
 import { CalendarDays, ChefHat, Plane, Plus, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -68,12 +71,15 @@ function manifestPromptDate(firstLegDate: string): string | null {
 export default function NewRequest() {
   const { state, dispatch } = usePortal();
   const navigate = useNavigate();
-  // `fromExecutive` is what D99's fleet-week "Ask my EA" button sends; it was
-  // declared nowhere, so the tail the executive pointed at was silently dropped.
+  // `fromExecutive` is what D99's fleet-week "Ask my EA" button sends. It was declared nowhere and
+  // `dates` was typed as a 2-tuple while the fleet week sends a 1-tuple — so the tail an executive
+  // picked was silently dropped between the two surfaces. Both branches found this independently;
+  // this is the availability-branch fix, which also carries the tail into the request record
+  // as `requestedTail` rather than only rendering a banner (LG-311, D99/D100 reconcile).
   const location = useLocation() as {
     state?: {
       fromWatchId?: string;
-      dates?: [string, string];
+      dates?: string[];
       fromExecutive?: { tail: string; dateUtc: string };
     };
   };
@@ -81,13 +87,24 @@ export default function NewRequest() {
 
   const inTwoWeeks = new Date();
   inTwoWeeks.setDate(inTwoWeeks.getDate() + 14);
-  const defaultDate = prefill?.dates?.[0] ?? inTwoWeeks.toISOString().slice(0, 10);
+  const defaultDate =
+    prefill?.fromExecutive?.dateUtc ?? prefill?.dates?.[0] ?? inTwoWeeks.toISOString().slice(0, 10);
 
   const [legs, setLegs] = useState<DraftLeg[]>([emptyLeg(defaultDate)]);
   const [principalId, setPrincipalId] = useState('P-REYES');
   const [seatsHeld, setSeatsHeld] = useState(2);
   const [extras, setExtras] = useState<string[]>([]);
   const [note, setNote] = useState('');
+  const [requestedTail, setRequestedTail] = useState<string | null>(prefill?.fromExecutive?.tail ?? null);
+
+  // Advisory availability for the days being asked about. The audience comes from the hook, so an
+  // EA sees exactly the reason categories an executive would — never the defect behind them.
+  const { audience, nowUtc, trips } = useFleetAvailability(undefined, [], 1);
+  const legDates = useMemo(() => datesForLegs(legs), [legs]);
+  const availabilityLines = useMemo(
+    () => summarizeByDay(readAvailabilityForDates({ trips }, legDates, audience, nowUtc), legDates),
+    [trips, legDates, audience, nowUtc],
+  );
 
   const bookablePrincipals = state.passengers.filter((p) => p.kind === 'principal' && p.eaLevel !== 'view');
   const addable = state.passengers.filter((p) => p.id !== principalId && (p.kind !== 'principal' || p.eaLevel !== 'view'));
@@ -187,6 +204,7 @@ export default function NewRequest() {
       extras,
       note: note || undefined,
       fromWatchId: prefill?.fromWatchId,
+      requestedTail: requestedTail ?? undefined,
       seatsHeld: clampSeats(seatsHeld, namedCount),
     });
     navigate('/booking-portal/requests');
@@ -216,15 +234,22 @@ export default function NewRequest() {
         </Card>
       )}
 
-      {prefill?.fromExecutive && (
-        <Card className="mb-4 border-l-[3px] border-l-[var(--gfo-daylight,#0096FC)]">
+      {requestedTail && (
+        <Card className="mb-4 border-l-[3px] border-l-[var(--gfo-sunrise,#D1AC6B)]">
           <CardContent className="flex flex-wrap items-center gap-2 p-4 text-sm">
-            <Chip tone="info">From the fleet week</Chip>
+            <Chip tone="gold">{requestedTail}</Chip>
             <span className="text-muted-foreground">
-              An executive marked <span className="font-medium text-foreground">{prefill.fromExecutive.tail}</span> open
-              on <span className="font-medium text-foreground">{prefill.fromExecutive.dateUtc}</span> — the date is
-              pre-filled. Availability is not a hold; scheduling still confirms the tail.
+              Requested from your fleet view
+              {prefill?.fromExecutive?.dateUtc ? ` on ${prefill.fromExecutive.dateUtc}, and the date is pre-filled` : ''}.
+              Availability is not a hold; scheduling still assigns the aircraft.
             </span>
+            <button
+              type="button"
+              className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+              onClick={() => setRequestedTail(null)}
+            >
+              Remove
+            </button>
           </CardContent>
         </Card>
       )}
@@ -314,6 +339,11 @@ export default function NewRequest() {
                       })}
                     </div>
                   </div>
+
+                  <LegAvailability
+                    line={availabilityLines.find(l => l.dateUtc === leg.date) ?? null}
+                    requestedTail={requestedTailStatus(availabilityLines, requestedTail, leg.date)}
+                  />
                 </CardContent>
               </Card>
             );
@@ -452,5 +482,54 @@ export default function NewRequest() {
         </div>
       </div>
     </PortalShell>
+  );
+}
+
+/**
+ * The fleet picture for one leg's date, in the reason categories an executive sees.
+ *
+ * Advisory, never blocking: scheduling assigns the aircraft, and asking for a tight day is a
+ * legitimate ask. What this prevents is the EA finding out a week later.
+ */
+function LegAvailability({
+  line,
+  requestedTail,
+}: {
+  line: ReturnType<typeof summarizeByDay>[number] | null;
+  requestedTail: ReturnType<typeof requestedTailStatus>;
+}) {
+  if (!line || line.tails.length === 0) return null;
+
+  return (
+    <div className="mt-3 border-t pt-3 text-sm">
+      {requestedTail && !requestedTail.available && (
+        <p className="mb-1.5 flex flex-wrap items-center gap-1.5">
+          <Chip tone="gold">{requestedTail.tail}</Chip>
+          <span className="text-muted-foreground">{requestedTail.label} on this date.</span>
+        </p>
+      )}
+
+      {line.availableTails.length > 0 ? (
+        <p className="text-muted-foreground">
+          Free that day: <span className="text-foreground">{line.availableTails.join(', ')}</span>
+        </p>
+      ) : (
+        <p className="text-muted-foreground">
+          No aircraft is free that day — scheduling will look at moving something.
+        </p>
+      )}
+
+      <p className="mt-1 text-xs text-muted-foreground">
+        {line.tails
+          .filter(t => !t.available)
+          // Lower-case only the leading word so the sentence reads as a clause after the tail —
+          // lower-casing the whole label mangles the month in "In maintenance until 5 Sep".
+          .map(t => {
+            const label = t.label ?? 'Unavailable';
+            return `${t.tail} ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+          })
+          .join(' · ')}
+      </p>
+    </div>
   );
 }

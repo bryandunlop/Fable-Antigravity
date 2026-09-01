@@ -71,6 +71,12 @@ export interface TripRequest {
   messages: ThreadMessage[];
   /** set when a freed watch pre-filled this request */
   fromWatchId?: string;
+  /**
+   * The tail the executive was looking at on the fleet week when they asked (LG-311).
+   * A REQUEST, not an assignment — scheduling still decides. It was previously dropped on the
+   * floor between the two surfaces, so scheduling never learned which aircraft prompted the ask.
+   */
+  requestedTail?: string;
   /** Seats the EA asked to hold. She usually knows the lead passenger and a
    *  rough headcount long before she knows the names, so this is the number the
    *  manifest is measured against — not `legs[].passengers.length`. */

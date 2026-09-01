@@ -10,7 +10,7 @@ import { initialPortalState, EA_NAME, SCHEDULER_NAME } from './mockData';
 export type PortalAction =
   | { type: 'SET_PERSONA'; persona: Persona }
   | { type: 'RESET_DEMO' }
-  | { type: 'SUBMIT_REQUEST'; legs: RequestLeg[]; principalId: string; extras: string[]; note?: string; fromWatchId?: string; seatsHeld?: number }
+  | { type: 'SUBMIT_REQUEST'; legs: RequestLeg[]; principalId: string; extras: string[]; note?: string; fromWatchId?: string; requestedTail?: string; seatsHeld?: number }
   // D100 — the manifest fills in over weeks, so naming, dropping and releasing
   // seats are first-class actions on a trip, not edits to a submitted form.
   | { type: 'NAME_SEAT'; requestId: string; passengerId: string; purpose: Purpose; legIds?: string[] }
@@ -62,6 +62,7 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
         note: action.note,
         messages: [],
         fromWatchId: action.fromWatchId,
+        requestedTail: action.requestedTail,
         seatsHeld: action.seatsHeld,
       };
       return {
@@ -294,6 +295,23 @@ export const COST_MODEL_ROLES = ['lead', 'admin'];
 
 export function canSeeCostModel(userRole?: string, additionalRoles: string[] = []): boolean {
   return [userRole, ...additionalRoles].some((r) => !!r && COST_MODEL_ROLES.includes(r));
+}
+
+/**
+ * The per-person grant that unlocks the FULL schedule on availability surfaces.
+ *
+ * Bryan, 2026-08-31: "we should have a select view that we can enable for certain executives to
+ * see the full schedule." It is a role a named person is given, not a rank — a CEO does not get
+ * it automatically and an EA can be given it. Operators hold it implicitly.
+ *
+ * What it unlocks is the operating picture (every committed trip, every downtime window with its
+ * type and return date, hold labels) — NOT operator access. Defect text, work orders, vendors and
+ * crew names stay withheld; see src/availability/engine/disclosure.ts.
+ */
+export const FULL_SCHEDULE_ROLES = ['full-schedule', 'scheduling', 'admin', 'lead'];
+
+export function canSeeFullSchedule(userRole?: string, additionalRoles: string[] = []): boolean {
+  return [userRole, ...additionalRoles].some((r) => !!r && FULL_SCHEDULE_ROLES.includes(r));
 }
 
 /** Roles that operate the portal — everyone else who can reach it is a visitor. */

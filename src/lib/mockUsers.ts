@@ -165,6 +165,21 @@ export const SYSTEM_USERS = [
     lastLogin: '2025-02-02 08:05',
     department: 'Corporate',
     hireDate: '2019-06-03'
+  },
+  // Added AFTER Victoria Hale so resolveUserId('executive') still resolves to her. She is the
+  // plain executive; he holds the per-person 'full-schedule' grant, so the two side by side show
+  // exactly what that grant changes on the fleet week (Bryan, 2026-08-31).
+  // USR019, not USR018: the availability branch and the D100 booking branch each minted an
+  // USR018 in parallel. Dana shipped first, so she keeps the number (Bryan, 2026-08-31).
+  {
+    id: 'USR019',
+    name: 'Gordon Reyes',
+    email: 'g.reyes@corp.com',
+    roles: ['executive', 'full-schedule'],
+    status: 'Active',
+    lastLogin: '2025-02-02 06:40',
+    department: 'Corporate',
+    hireDate: '2013-06-17'
   }
 ];
 
@@ -212,6 +227,7 @@ export const ADDITIONAL_ROLES = [
   { id: 'scheduling-manager', label: 'Scheduling Manager' },
   { id: 'lead-scheduler', label: 'Lead Scheduler' },
   { id: 'lead-fa', label: 'Lead Flight Attendant' },
+  { id: 'full-schedule', label: 'Full Schedule Access' },
   { id: 'standards', label: 'Standards' },
   { id: 'training', label: 'Training' },
   { id: 'reg-comp', label: 'Reg & Comp' },

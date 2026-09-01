@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { GfoPageHeader, GfoPanel, GfoStatCard } from '../gfo';
 import { useOpsClock } from '../hooks/useOpsClock';
 import { useUnifiedFleetStatus } from '../hooks/useUnifiedFleetStatus';
+import { readFleetAvailability } from '../../availability/source';
+import { summarizeAvailability } from '../scheduling-command/availabilitySelectors';
 import { RAG_DOT } from '../ops-wall/ragColors';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
 import type { TripRecord } from '../../scheduling/store/types';
@@ -72,6 +74,8 @@ export default function LeadDashboard({
   const asap = useAsapReports();
   const safety = useSafetyModel(viewerName);
 
+  // Read-only for lead: the numbers, and the one prompt that needs scheduling to act. The
+  // controls live on scheduling's availability lens (Bryan, 2026-08-31).
   const [trips, setTrips] = useState<TripRecord[]>([]);
   useEffect(() => {
     if (!ready) return;
@@ -88,6 +92,10 @@ export default function LeadDashboard({
   const exceptions = useMemo(() => fleetExceptions(fleet), [fleet]);
   const week = useMemo(() => buildWeekAhead(trips, dispatchable, now), [trips, dispatchable, now]);
   const tightDay = week.find(d => d.oversubscribed);
+  const availabilitySummary = useMemo(
+    () => summarizeAvailability(readFleetAvailability({ trips }, now, 14)),
+    [trips, now],
+  );
   const legs = useMemo(() => todaysLegs(trips, now), [trips, now]);
 
   // Trip requests stay off this queue — approving them is scheduling's job.
@@ -214,6 +222,32 @@ export default function LeadDashboard({
               ? `${tightDay.dateLabel} is the tight day — ${tightDay.tripCount} trips against ${tightDay.tailsAvailable} dispatchable tails.`
               : 'Demand fits the dispatchable fleet on every day this week.'}
           </p>
+        </GfoPanel>
+
+        <GfoPanel title="Availability">
+          <dl className="space-y-2 text-sm">
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-muted-foreground">Open tail-days, next two weeks</dt>
+              <dd className="gfo-numeric text-xl text-primary">
+                {availabilitySummary.openTailDays}
+                <span className="text-sm text-muted-foreground"> / {availabilitySummary.totalTailDays}</span>
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-muted-foreground">Days with no crew</dt>
+              <dd className="gfo-numeric text-xl text-primary">{availabilitySummary.daysWithNoCrew}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-muted-foreground">Conflicts to resolve</dt>
+              <dd className="gfo-numeric text-xl text-primary">{availabilitySummary.conflictCount}</dd>
+            </div>
+          </dl>
+          {availabilitySummary.tailsDownWithoutEtr.length > 0 && (
+            <p className="mt-3 border-t border-border pt-3 text-sm text-muted-foreground">
+              {availabilitySummary.tailsDownWithoutEtr.join(', ')} grounded with no booked return —
+              every executive sees “no return date” until scheduling books a window.
+            </p>
+          )}
         </GfoPanel>
 
         <GfoPanel title="Waiting on you">
