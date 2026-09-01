@@ -56,6 +56,18 @@ const TRIP: TripRecord = {
   createdBy: 'test', createdAtUtc: NOW,
 };
 
+/**
+ * A trip booked INTO the maintenance window (BLOCK runs 5-7 Sep). This is the trip-in-downtime
+ * conflict the model already raises, and it is the case that makes the maintenance-day disclosure
+ * assertions non-vacuous: the committed reason stays in the stack while maintenance wins.
+ */
+const TRIP_IN_DOWNTIME: TripRecord = {
+  ...TRIP,
+  id: 't2', tripNumber: 'TRP-002',
+  startDate: '2026-09-05T00:00:00.000Z', endDate: '2026-09-06T00:00:00.000Z',
+  legs: [{ id: 'l2', sequence: 1, departureIcao: 'KCVG', arrivalIcao: 'KTEB', departureTimeUtc: '2026-09-05T14:00:00.000Z', paxCount: 4 }],
+};
+
 const HOLD: SchedulerOverlay = {
   id: 'ov-1', kind: 'hold', tail: 'N2PG',
   fromDateUtc: '2026-09-04', toDateUtc: '2026-09-05',
@@ -66,7 +78,7 @@ const HOLD: SchedulerOverlay = {
 /** A grid exercising every reason category at once. */
 const INPUT: AvailabilityInput = {
   tails: [{ tail: 'N1PG', type: 'G650ER' }, { tail: 'N2PG', type: 'G650ER' }, { tail: 'N5PG', type: 'G500' }],
-  trips: [TRIP],
+  trips: [TRIP, TRIP_IN_DOWNTIME],
   downtime: [BLOCK],
   crewRoster: [pilot('P1', 'PIC'), pilot('S1', 'SIC')],
   crewCoverage: [{ crewId: 'P1', dateUtc: '2026-09-09', status: 'leave', note: 'SENTINEL_CREW_LEAVE' }],
@@ -165,8 +177,25 @@ describe('what each audience does get', () => {
     expect(c.overlayNote).toBeUndefined();
   });
 
-  it('executive-full discloses no schedule text on a maintenance day', () => {
-    expect(discloseCell(maintenanceCell(), 'executive-full').scheduleLabel).toBeNull();
+  it('the maintenance cell really does have a trip underneath it — otherwise the next test is vacuous', () => {
+    const cell = maintenanceCell();
+    expect(cell.reason.category).toBe('maintenance');
+    expect(cell.reasons.some(r => r.category === 'committed')).toBe(true);
+    expect(cell.tripId).toBe('t2');
+    expect(cell.conflicts.map(c => c.kind)).toContain('trip-in-downtime');
+  });
+
+  it('executive-full discloses NO schedule text and NO trip id on a maintenance day', () => {
+    const disclosed = discloseCell(maintenanceCell(), 'executive-full');
+    expect(disclosed.scheduleLabel).toBeNull();
+    expect(disclosed.tripId).toBeNull();
+    expect(JSON.stringify(disclosed)).not.toContain('TRP-002');
+  });
+
+  it('operator still sees the trip underneath a maintenance day — that is the conflict to resolve', () => {
+    const disclosed = discloseCell(maintenanceCell(), 'operator');
+    expect(disclosed.reasons?.some(r => r.category === 'committed')).toBe(true);
+    expect(disclosed.conflicts?.map(c => c.kind)).toContain('trip-in-downtime');
   });
 
   it('operator sees the ranked stack, the conflicts and the crew counts', () => {

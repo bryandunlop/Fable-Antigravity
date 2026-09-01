@@ -101,13 +101,20 @@ export function categoryLabel(category: ReasonCategory, untilUtc: string | null)
 /**
  * The route line, for audiences allowed to see the schedule.
  *
- * Read off the COMMITTED reason's detail, which is composed in availability.ts from the trip
- * number and its ICAO pair — never from a defect. Anything else is withheld, so a maintenance
- * day discloses no text here even to executive-full.
+ * Gated on the WINNING reason, not on the presence of a committed entry anywhere in the stack.
+ * The distinction is load-bearing and was originally got wrong: a tail with a trip booked into a
+ * maintenance window keeps the committed reason in `reasons` (that is how the trip-in-downtime
+ * conflict is raised), so searching the whole stack attached a route and a trip id to a cell whose
+ * category said "maintenance". The doc comment above this function claimed that could not happen
+ * while the code did not check, and the test that was meant to cover it used a fixture where the
+ * trip and the block never overlapped — so it passed vacuously.
+ *
+ * The detail itself is composed in availability.ts from the trip number and its ICAO pair, never
+ * from a defect.
  */
 function scheduleLabelFor(cell: TailDayAvailability): string | null {
-  const committed = cell.reasons.find(r => r.category === 'committed');
-  return committed ? committed.detail : null;
+  if (cell.reason.category !== 'committed') return null;
+  return cell.reason.detail;
 }
 
 export function discloseCell(cell: TailDayAvailability, audience: Audience): DisclosedCell {
@@ -125,7 +132,9 @@ export function discloseCell(cell: TailDayAvailability, audience: Audience): Dis
   const withSchedule: DisclosedCell = {
     ...base,
     scheduleLabel: scheduleLabelFor(cell),
-    tripId: cell.tripId,
+    // Same gate as the label: a maintenance-categorised cell must not carry a trip id either,
+    // or the next consumer to render one re-opens the hole the label gate just closed.
+    tripId: cell.reason.category === 'committed' ? cell.tripId : null,
     publicLabel: cell.overlay?.publicLabel ?? null,
   };
 

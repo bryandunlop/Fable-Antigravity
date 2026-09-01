@@ -75,9 +75,11 @@ export function applyOverlay(
   }
 
   if (overlay.kind === 'hold') {
-    // A hold sits at rank 3, so it outranks a crew shortfall but never maintenance (0, 1) or a
-    // committed trip (2). Guarding on rank rather than on state is what keeps that true: holding
-    // a tail that is in the hangar must not repaint the cell as merely "held".
+    // A hold sits at HOLD_RANK, so it outranks a crew shortfall but never a booked downtime
+    // window, a not-in-service airframe, a RED tail or a committed trip — see the RANK table in
+    // engine/availability.ts, which is the authority. Guarding on rank rather than on state is
+    // what keeps that true: holding a tail that is in the hangar must not repaint the cell as
+    // merely "held".
     if (base.reason.rank <= HOLD_RANK) return { ...base, overlay: applied(overlay) };
     const reason: AvailabilityReason = {
       category: 'held',
