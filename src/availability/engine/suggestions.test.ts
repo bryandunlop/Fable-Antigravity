@@ -3,7 +3,7 @@ import type { CrewRecord } from '../../components/crew/crewRecords';
 import type { TripRecord } from '../../scheduling/store/types';
 import type { MaintenanceDowntimeBlock, SchedulerOverlay } from '../types';
 import { buildFleetAvailability, type AvailabilityInput } from './availability';
-import { deriveReleaseSuggestions, isDismissed, overlayFromSuggestion } from './suggestions';
+import { MAX_CREW_SUGGESTIONS, deriveReleaseSuggestions, isDismissed, overlayFromSuggestion } from './suggestions';
 
 const NOW = '2026-09-01T12:00:00.000Z';
 
@@ -143,7 +143,7 @@ describe('crew-resolvable', () => {
     });
     const found = s.filter(x => x.trigger === 'crew-resolvable');
     expect(found.length).toBeGreaterThan(0);
-    expect(found[0].rationale).toContain('committed');
+    expect(found[0].rationale).toContain('already flying');
   });
 
   it('does NOT fire when no crew can be formed at all — no approval can fix that', () => {
@@ -214,12 +214,36 @@ describe('dismissal and de-duplication', () => {
     expect(a.map(x => x.id)).toEqual(b.map(x => x.id));
   });
 
-  it('returns suggestions ordered by the start of their window', () => {
+  it('puts what CHANGED ahead of what is merely tight', () => {
+    // N1PG carries the block; N2PG is clear, so it is the tail the crew shortfall shows up on.
     const s = suggest({
-      downtime: [block({ actualEndUtc: '2026-09-05T10:00:00.000Z', scheduledEndUtc: '2026-09-09T00:00:00.000Z', scheduledStartUtc: '2026-09-05T00:00:00.000Z' })],
-      overlays: [hold()],
+      tails: [{ tail: 'N1PG', type: 'G650ER' }, { tail: 'N2PG', type: 'G650ER' }],
+      downtime: [block({ actualEndUtc: '2026-09-05T10:00:00.000Z', scheduledEndUtc: '2026-09-09T00:00:00.000Z' })],
+      crewRoster: [pilot('P1', 'PIC'), pilot('S1', 'SIC')],
+      trips: [trip({ id: 'a', tail: 'N9XX' }), trip({ id: 'b', tail: 'N8XX' })],
     });
-    expect(s.map(x => x.fromDateUtc)).toEqual([...s.map(x => x.fromDateUtc)].sort());
+    const first = s.findIndex(x => x.trigger === 'downtime-ended-early');
+    const firstCrew = s.findIndex(x => x.trigger === 'crew-resolvable');
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(firstCrew).toBeGreaterThan(first);
+  });
+
+  it('caps crew suggestions so rostering noise cannot bury a real signal', () => {
+    const many = suggest({
+      tails: Array.from({ length: 8 }, (_, i) => ({ tail: `N${i}XX`, type: 'G500' })),
+      crewRoster: [pilot('P1', 'PIC'), pilot('S1', 'SIC')],
+      trips: [trip({ id: 'a', tail: 'NAAA' }), trip({ id: 'b', tail: 'NBBB' })],
+    });
+    expect(many.filter(x => x.trigger === 'crew-resolvable').length).toBeLessThanOrEqual(MAX_CREW_SUGGESTIONS);
+  });
+
+  it('reads as English when more trips are flying than crews can be formed', () => {
+    const s = suggest({
+      crewRoster: [pilot('P1', 'PIC'), pilot('S1', 'SIC')],
+      trips: [trip({ id: 'a', tail: 'N9XX' }), trip({ id: 'b', tail: 'N8XX' })],
+    });
+    const crew = s.find(x => x.trigger === 'crew-resolvable');
+    expect(crew?.rationale).toBe('1 crew can be formed and 2 trips are already flying — reassignment could free this day.');
   });
 });
 

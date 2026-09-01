@@ -26,6 +26,29 @@ const DAY_MS = 86_400_000;
 /** How far ahead an unclaimed hold has to be before we suggest letting it go. */
 export const UNCLAIMED_HOLD_WINDOW_DAYS = 7;
 
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/**
+ * How many crew-resolvable suggestions to raise at once.
+ *
+ * Crew is a FLEET resource, so a single crewless day produces one suggestion per idle tail — five
+ * cards saying the same thing. They are also the weakest of the four triggers: nothing has
+ * happened, the day is simply tight. Capping them keeps a real signal (a window that ended early,
+ * a cancelled trip) from being buried under rostering noise; the board's own no-crew count already
+ * shows the full picture.
+ */
+export const MAX_CREW_SUGGESTIONS = 3;
+
+/** Highest-signal first: something CHANGED, before something is merely tight. */
+const TRIGGER_PRIORITY: Record<ReleaseSuggestion['trigger'], number> = {
+  'downtime-ended-early': 0,
+  'trip-cancelled': 1,
+  'hold-unclaimed': 2,
+  'crew-resolvable': 3,
+};
+
 /** Deterministic, so a dismissal keeps matching the suggestion it dismissed. */
 function suggestionId(trigger: string, tail: string, from: string, to: string): string {
   return `sug-${trigger}-${tail}-${from}-${to}`;
@@ -167,13 +190,14 @@ function crewResolvable(fleet: FleetAvailability): ReleaseSuggestion[] {
       const key = `${row.tail}-${cell.dateUtc}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      const { crewsFormable: formable, crewsCommitted: committed } = cell.crew;
       out.push({
         id: suggestionId('crew-resolvable', row.tail, cell.dateUtc, cell.dateUtc),
         tail: row.tail,
         fromDateUtc: cell.dateUtc,
         toDateUtc: cell.dateUtc,
         trigger: 'crew-resolvable',
-        rationale: `${cell.crew.crewsFormable} crew(s) can be formed but all ${cell.crew.crewsCommitted} are committed — reassignment could free this day.`,
+        rationale: `${plural(formable, 'crew', 'crews')} can be formed and ${plural(committed, 'trip is', 'trips are')} already flying — reassignment could free this day.`,
         proposedPublicLabel: 'Crew reassigned — day available',
       });
     }
@@ -243,7 +267,16 @@ export function deriveReleaseSuggestions(
     byId.set(s.id, s);
   }
 
-  return [...byId.values()].sort((a, b) => a.fromDateUtc.localeCompare(b.fromDateUtc));
+  const sorted = [...byId.values()].sort(
+    (a, b) =>
+      TRIGGER_PRIORITY[a.trigger] - TRIGGER_PRIORITY[b.trigger] ||
+      a.fromDateUtc.localeCompare(b.fromDateUtc) ||
+      a.tail.localeCompare(b.tail),
+  );
+
+  const crew = sorted.filter(s => s.trigger === 'crew-resolvable');
+  const rest = sorted.filter(s => s.trigger !== 'crew-resolvable');
+  return [...rest, ...crew.slice(0, MAX_CREW_SUGGESTIONS)];
 }
 
 /**

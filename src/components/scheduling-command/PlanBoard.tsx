@@ -5,6 +5,8 @@ import { Card } from '../ui/card';
 import { Progress } from '../ui/progress';
 import type { BoardTrip } from './adapter';
 import type { FleetServiceability } from '../tech-log/bridge';
+import type { MaintenanceDowntimeBlock } from '../../availability/types';
+import { effectiveWindow } from '../../availability/engine/downtime';
 import { fleetRowsFor } from './fleet';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
 import { TripIdentityLine } from './TripIdentity';
@@ -29,6 +31,7 @@ export function PlanBoard({
   trips,
   nowMs,
   serviceability,
+  downtime = [],
   onTripClick,
   onOpenHorizon,
 }: {
@@ -36,6 +39,13 @@ export function PlanBoard({
   nowMs: number;
   /** tail → tech-log derived GREEN/AMBER/RED; tails without a tech-log record get a hollow dot. */
   serviceability?: FleetServiceability;
+  /**
+   * Booked maintenance windows (LG-311). BoardBar has declared `kind: 'downtime'` as a reserved
+   * extension point since this board was built and never produced one; these are it. They ride the
+   * SAME lane packing as trips, so a trip booked into a maintenance window flags as a conflict
+   * through the existing math rather than through new code.
+   */
+  downtime?: MaintenanceDowntimeBlock[];
   onTripClick: (trip: BoardTrip) => void;
   /** Optional lens switch — the shelf's "full forward picture" link (D87). */
   onOpenHorizon?: () => void;
@@ -56,9 +66,26 @@ export function PlanBoard({
         return { trip: t, startMs, endMs: startMs + t.durationDays * DAY_MS };
       })
       .filter(b => barGeometry(b.startMs, b.trip.durationDays, window_) !== null);
-    const lanes = packLanes(bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })));
-    return { ac, bars, lanes };
-  }), [trips, window_]);
+
+    const downtimeBars = downtime
+      .filter(b => b.tail === ac.tail)
+      .map(block => {
+        const w = effectiveWindow(block);
+        if (!w) return null;
+        const durationDays = Math.max(1, Math.ceil((w.endMs - w.startMs) / DAY_MS));
+        const g = barGeometry(w.startMs, durationDays, window_);
+        return g ? { block, startMs: w.startMs, endMs: w.endMs, durationDays, g } : null;
+      })
+      .filter((b): b is NonNullable<typeof b> => b !== null);
+
+    // One packing over BOTH kinds: a trip overlapping a maintenance window lands in the same
+    // conflictIds set the board already renders, with no new conflict logic.
+    const lanes = packLanes([
+      ...bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })),
+      ...downtimeBars.map(b => ({ id: b.block.id, startMs: b.startMs, endMs: b.endMs })),
+    ]);
+    return { ac, bars, downtimeBars, lanes };
+  }), [trips, downtime, window_]);
 
   const conflictCount = rows.reduce((n, r) => n + r.lanes.conflictIds.size, 0);
 
@@ -127,7 +154,7 @@ export function PlanBoard({
           </div>
 
           {/* Tail rows */}
-          {rows.map(({ ac, bars, lanes }) => {
+          {rows.map(({ ac, bars, downtimeBars, lanes }) => {
             const rowH = ROW_PAD * 2 + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP;
             const svc = serviceability?.[ac.tail];
             return (
@@ -158,6 +185,36 @@ export function PlanBoard({
                     <div key={i} className={`absolute top-0 bottom-0 border-r border-border/40 ${c.isWeekend ? 'bg-muted/40' : ''}`} style={{ left: i * colW, width: colW }} />
                   ))}
                   {todayVisible && <div className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10" style={{ left: `${todayPct}%` }} />}
+
+                  {/* Maintenance windows — behind the trip bars, so a trip booked into one reads
+                      as sitting ON the hatched band rather than beside it. */}
+                  {downtimeBars.map(({ block, g }) => {
+                    const lane = lanes.laneOf.get(block.id) ?? 0;
+                    const conflicted = lanes.conflictIds.has(block.id);
+                    return (
+                      <HoverCard key={block.id} openDelay={150} closeDelay={50}>
+                        <HoverCardTrigger asChild>
+                          <div
+                            className={`absolute z-[4] flex items-center gap-1 overflow-hidden rounded-md border border-dashed border-[var(--gfo-error,#EF3340)] bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(239,51,64,0.18)_4px,rgba(239,51,64,0.18)_8px)] px-2 text-[11px] font-medium text-[var(--gfo-error,#EF3340)] ${conflicted ? 'ring-2 ring-[var(--gfo-error,#EF3340)] ring-offset-1' : ''}`}
+                            style={{ left: `${g.startPct}%`, width: `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (BAR_H + BAR_GAP), height: BAR_H }}
+                          >
+                            <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+                            {zoom === '2w' && <span className="truncate">{block.maintenanceType}</span>}
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-72 space-y-1 text-sm">
+                          <p className="font-semibold">{block.tail} · {block.maintenanceType}</p>
+                          <p className="text-muted-foreground">
+                            Back in service {new Date(block.actualEndUtc ?? block.scheduledEndUtc).toISOString().slice(0, 10)}
+                          </p>
+                          {block.description && <p className="text-muted-foreground">{block.description}</p>}
+                          <p className="text-xs text-muted-foreground">
+                            {[block.airportIcao, block.vendorName, block.woNumber].filter(Boolean).join(' · ')}
+                          </p>
+                        </HoverCardContent>
+                      </HoverCard>
+                    );
+                  })}
 
                   {/* Trip bars */}
                   {bars.map(({ trip, startMs }) => {
