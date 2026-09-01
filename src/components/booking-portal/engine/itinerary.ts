@@ -9,6 +9,7 @@
 
 import type { Flight, Passenger, PortalState, SeatAsk, TripRequest } from '../types';
 import { routeLabel } from './lifecycle';
+import { needsCustoms } from './missionProfile';
 
 export interface ItineraryLeg {
   id: string;
@@ -56,7 +57,9 @@ export const fboFor = (icao: string): string => FBO[icao] ?? `${icao} FBO`;
 /** Domestic manifests lock at 24 h, international at 72 h — APIS drives the longer one. */
 export const LOCKOUT_HOURS = { domestic: 24, international: 72 };
 
-const isIntl = (icao: string) => !/^K[A-Z]{3}$/.test(icao);
+// Customs, NOT "is it far" and NOT "is it over water" — see engine/missionProfile.ts.
+// The old test here was `!/^K[A-Z]{3}$/`, which called Honolulu international (it is a US
+// state, no customs) and had no way to express a Pacific crossing at all.
 
 function hoursUntil(dateIso: string, timeLocal: string, nowMs: number): number {
   const t = Date.parse(`${dateIso}T${timeLocal || '00:00'}:00Z`);
@@ -84,7 +87,7 @@ function itineraryOfRequest(request: TripRequest, passengers: Passenger[], nowMs
   const legs = legsOfRequest(request, passengers);
   const first = request.legs[0];
   const last = request.legs[request.legs.length - 1];
-  const international = request.legs.some((l) => isIntl(l.from) || isIntl(l.to));
+  const international = needsCustoms(request.legs).needsCustoms;
   return {
     id: request.id,
     kind: 'trip',
@@ -109,7 +112,7 @@ function itineraryOfSeat(
   nowMs: number,
 ): Itinerary {
   const passenger = passengers.find((p) => p.id === ask.passengerId);
-  const international = isIntl(flight.from) || isIntl(flight.to);
+  const international = needsCustoms([{ from: flight.from, to: flight.to }]).needsCustoms;
   return {
     id: ask.id,
     kind: 'seat',

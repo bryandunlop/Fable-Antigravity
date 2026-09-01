@@ -22,6 +22,9 @@ import { QuotePanel, savingsAvailable } from '../components/QuotePanel';
 import { GFO_RATE_CARD, daysUntil, quoteRequest } from '../engine/quote';
 import { expectedDeparture, latitudeHours, type LegTiming } from '../engine/legTiming';
 import { submitBlockers, clampSeats, type DraftLeg } from '../engine/requestReadiness';
+import { SeatsFit } from '../components/SeatsFit';
+import { suggestProfile } from '../engine/missionProfile';
+import type { MissionProfile } from '../../../fleet/capacity';
 import { usePortal } from '../BookingPortalContext';
 import type { Purpose, RequestLeg } from '../types';
 import { cn } from '../../ui/utils';
@@ -93,6 +96,9 @@ export default function NewRequest() {
   const [legs, setLegs] = useState<DraftLeg[]>([emptyLeg(defaultDate)]);
   const [principalId, setPrincipalId] = useState('P-REYES');
   const [seatsHeld, setSeatsHeld] = useState(2);
+  // Suggested from the route, overridable by her — and the override is remembered as an
+  // override, so a later leg edit does not silently undo a decision she made.
+  const [profileOverride, setProfileOverride] = useState<MissionProfile | null>(null);
   const [extras, setExtras] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [requestedTail, setRequestedTail] = useState<string | null>(prefill?.fromExecutive?.tail ?? null);
@@ -104,6 +110,11 @@ export default function NewRequest() {
   const availabilityLines = useMemo(
     () => summarizeByDay(readAvailabilityForDates({ trips }, legDates, audience, nowUtc), legDates),
     [trips, legDates, audience, nowUtc],
+  );
+
+  const profileSuggestion = useMemo(
+    () => suggestProfile(legs.map(l => ({ from: l.from, to: l.to, departLocal: l.departLocal }))),
+    [legs],
   );
 
   const bookablePrincipals = state.passengers.filter((p) => p.kind === 'principal' && p.eaLevel !== 'view');
@@ -433,6 +444,14 @@ export default function NewRequest() {
                   <span className="text-xs text-muted-foreground">an estimate is fine</span>
                 </div>
               </div>
+
+              <SeatsFit
+                seats={clampSeats(seatsHeld, namedCount)}
+                profile={profileOverride ?? profileSuggestion.profile}
+                suggestion={profileSuggestion}
+                overridden={profileOverride !== null}
+                onProfileChange={setProfileOverride}
+              />
 
               {promptDate && (
                 <p className="flex items-start gap-1.5 border-t pt-3 text-xs text-muted-foreground">

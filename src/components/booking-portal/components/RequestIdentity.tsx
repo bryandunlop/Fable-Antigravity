@@ -2,6 +2,7 @@
 // the same move TripIdentity makes for trips. Schedulers recognise a request
 // by ROUTE + DATES + WHO, so those lead; the request number is reference text.
 
+import { needsCustoms } from '../engine/missionProfile';
 import { Globe, MapPin } from 'lucide-react';
 import { Badge } from '../../ui/badge';
 import type { Passenger, TripRequest } from '../types';
@@ -19,7 +20,7 @@ function dateSpan(request: TripRequest): string {
 
 /** Any leg leaving the domestic pattern — the demo's stand-in for a real INTL check. */
 function isInternational(request: TripRequest): boolean {
-  return request.legs.some((l) => !/^K[A-Z]{3}$/.test(l.from) || !/^K[A-Z]{3}$/.test(l.to));
+  return needsCustoms(request.legs).needsCustoms;
 }
 
 export function TierBadge({ tier }: { tier: 1 | 2 | 3 }) {

@@ -7,6 +7,7 @@
 //
 // Pure: no React, no storage, and the clock is always passed in.
 
+import { needsCustoms } from './missionProfile';
 import type { Passenger, TripRequest } from '../types';
 import { evaluateDoc } from './docExpiry';
 import { LOCKOUT_HOURS } from './itinerary';
@@ -59,7 +60,7 @@ function firstDepartureMs(request: TripRequest): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-const isIntl = (icao: string) => !/^K[A-Z]{3}$/.test(icao);
+// See engine/missionProfile.ts — customs is its own question, not a proxy for distance.
 
 /**
  * The window a person's documents are judged against: the legs THEY fly, not
@@ -111,7 +112,7 @@ export function manifestState(
   }
   const named = Array.from(seats.values());
 
-  const international = request.legs.some((l) => isIntl(l.from) || isIntl(l.to));
+  const international = needsCustoms(request.legs).needsCustoms;
   const lockHours = international ? LOCKOUT_HOURS.international : LOCKOUT_HOURS.domestic;
   const departMs = firstDepartureMs(request);
   const lockAtMs = departMs === null ? null : departMs - lockHours * HOUR_MS;
