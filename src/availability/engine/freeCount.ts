@@ -123,3 +123,51 @@ export function averageFreePerDay(counts: DayFreeCount[]): number {
 /** True when any day in the range rests on an unpublished roster. */
 export const anyProvisional = (counts: DayFreeCount[]): boolean =>
   counts.some(c => c.confidence === 'provisional');
+
+/**
+ * How tight a set of days is, in plain English.
+ *
+ * THE one place scarcity is put into words. Her month and the executive's card both read
+ * this, so the two surfaces cannot say different things about the same week — which they
+ * would within a fortnight if each grew its own sentence.
+ *
+ * Says nothing about WHICH aeroplanes, ever: this text reaches an executive.
+ */
+export interface Scarcity {
+  /** The fewest free on any one of the days asked about — the binding day. */
+  fewestFree: number;
+  fleetSize: number;
+  /** True when the answer rests on days nobody has rostered yet. */
+  provisional: boolean;
+  line: string;
+}
+
+export function describeScarcity(counts: DayFreeCount[]): Scarcity {
+  const fleetSize = counts[0]?.fleetSize ?? CORE_FLEET_SIZE;
+  if (counts.length === 0) {
+    return { fewestFree: 0, fleetSize, provisional: false, line: 'No days chosen yet.' };
+  }
+
+  const fewestFree = Math.min(...counts.map(c => c.free));
+  const provisional = counts.some(c => c.confidence === 'provisional');
+  const days = counts.length === 1 ? 'that day' : 'those days';
+
+  const body =
+    fewestFree === 0
+      ? `Every aircraft is committed on at least one of ${days}. Scheduling will look at moving things.`
+      : fewestFree === fleetSize
+        ? `All ${fleetSize} aircraft are free across ${days}.`
+        : fewestFree === 1
+          ? `One aircraft free on the tightest of ${days}.`
+          : `${fewestFree} of ${fleetSize} aircraft free on the tightest of ${days}.`;
+
+  // Far out, nobody has built a crew roster yet. Saying so is the difference between a
+  // plan and a promise, and an executive is exactly the reader who will hear a promise.
+  return {
+    fewestFree,
+    fleetSize,
+    provisional,
+    line: provisional ? `${body} That far out the crew roster is not published, so this is a plan rather than a promise.` : body,
+  };
+}
+

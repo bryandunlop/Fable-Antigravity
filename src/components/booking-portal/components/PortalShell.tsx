@@ -10,12 +10,13 @@ import { Button } from '../../ui/button';
 import { usePortal } from '../BookingPortalContext';
 import { DemoTour } from './DemoTour';
 import { buildQueue } from '../engine/queueBands';
-import { EA_NAME, SCHEDULER_NAME } from '../mockData';
+import { EA_NAME, EXECUTIVE_NAME, SCHEDULER_NAME } from '../mockData';
 import { cn } from '../../ui/utils';
 
-const TABS: { to: string; label: string; icon: React.ElementType; end?: boolean; schedulingOnly?: boolean; leadOnly?: boolean }[] = [
+const TABS: { to: string; label: string; icon: React.ElementType; end?: boolean; schedulingOnly?: boolean; leadOnly?: boolean; executiveOnly?: boolean }[] = [
   { to: '/booking-portal', label: 'Home', icon: CalendarDays, end: true },
   { to: '/booking-portal/hub', label: 'Your months', icon: CalendarRange },
+  { to: '/booking-portal/mine', label: 'Your travel', icon: Ticket, executiveOnly: true },
   { to: '/booking-portal/trips', label: 'Trips', icon: Ticket },
   { to: '/booking-portal/seats', label: 'Empty seats', icon: Plane },
   { to: '/booking-portal/requests', label: 'Requests', icon: ClipboardList },
@@ -83,6 +84,13 @@ export function PortalShell({
             >
               {SCHEDULER_NAME} · Scheduling
             </button>
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'SET_PERSONA', persona: 'executive' })}
+              className={cn('px-3 py-1.5 transition-colors', state.persona === 'executive' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-accent')}
+            >
+              {EXECUTIVE_NAME} · Executive
+            </button>
           </div>
           <Button
             variant="ghost"
@@ -97,7 +105,7 @@ export function PortalShell({
       </div>
 
       <nav className="flex flex-wrap items-center gap-1 border-b">
-        {TABS.filter((t) => (!t.schedulingOnly || state.persona === 'scheduling') && (!t.leadOnly || showCostModel)).map((tab) => {
+        {TABS.filter((t) => (!t.schedulingOnly || state.persona === 'scheduling') && (!t.leadOnly || showCostModel) && (!t.executiveOnly || state.persona === 'executive')).map((tab) => {
           const Icon = tab.icon;
           const badge = tab.label === 'Inbox' ? unread : tab.label === 'Queue' ? queueCount : 0;
           return (

@@ -8,7 +8,12 @@ import type { LegTiming } from './engine/legTiming';
 
 export type { LegTiming };
 
-export type Persona = 'ea' | 'scheduling';
+/**
+ * The executive is a persona now (slice 5). He previously existed only as a `Passenger`
+ * row carrying HER authority over him, which meant the app had no way to render anything
+ * to him at all.
+ */
+export type Persona = 'ea' | 'scheduling' | 'executive';
 
 export type Purpose = 'business' | 'personal' | 'entertainment' | 'commuting';
 

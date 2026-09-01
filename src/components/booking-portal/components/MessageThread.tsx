@@ -64,7 +64,7 @@ export function MessageThread({
         <input
           aria-label="Write a message"
           className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm"
-          placeholder={`Write as ${state.persona === 'ea' ? 'Dana (EA)' : 'scheduling'}…`}
+          placeholder={`Write as ${state.persona === 'ea' ? 'Dana (EA)' : state.persona === 'executive' ? 'yourself' : 'scheduling'}…`}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') send(message); }}

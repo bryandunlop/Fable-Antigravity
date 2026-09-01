@@ -18,6 +18,9 @@ function isoAt(daysFromToday: number, time: string): string {
  *  across the login, the portal chrome and the request's `requestedBy`. */
 export const EA_NAME = 'Dana Whitfield';
 export const SCHEDULER_NAME = 'R. Calloway';
+/** The principal the executive persona reads as. His card shows HIS trips and no one else's. */
+export const EXECUTIVE_NAME = 'A. Reyes';
+export const EXECUTIVE_PRINCIPAL_ID = 'P-REYES';
 
 const passengers: Passenger[] = [
   {

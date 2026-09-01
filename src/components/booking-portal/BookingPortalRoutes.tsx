@@ -7,6 +7,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { BookingPortalProvider } from './BookingPortalContext';
 import PortalHome from './pages/PortalHome';
 import EaHub from './pages/EaHub';
+import ExecutiveCardPage from './pages/ExecutiveCard';
 import Trips from './pages/Trips';
 import ManifestPage from './pages/Manifest';
 import EmptySeats from './pages/EmptySeats';
@@ -46,6 +47,8 @@ function ScopedRoutes() {
       <Route path="/" element={<PortalHome />} />
       {/* The EA Booking Hub — her month. */}
       <Route path="hub" element={<EaHub />} />
+      {/* The executive's whole app: one card per trip. */}
+      <Route path="mine" element={<ExecutiveCardPage />} />
       <Route path="trips" element={<Trips />} />
       {/* D100 — the manifest fills in over weeks; it gets its own screen per trip. */}
       <Route path="trips/:id/manifest" element={<ManifestPage />} />

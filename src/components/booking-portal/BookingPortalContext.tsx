@@ -5,7 +5,7 @@
 import { createContext, useContext, useMemo, useReducer, type ReactNode } from 'react';
 import type { Persona, PortalState, Purpose, RequestLeg, TripRequest } from './types';
 import { canTransition, inboxItem, routeLabel } from './engine/lifecycle';
-import { initialPortalState, EA_NAME, SCHEDULER_NAME } from './mockData';
+import { initialPortalState, EA_NAME, EXECUTIVE_NAME, SCHEDULER_NAME } from './mockData';
 
 export type PortalAction =
   | { type: 'SET_PERSONA'; persona: Persona }
@@ -213,7 +213,10 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
     }
 
     case 'POST_MESSAGE': {
-      const author = state.persona === 'ea' ? `Dana (EA)` : SCHEDULER_NAME;
+      const author =
+        state.persona === 'ea' ? `${EA_NAME} (EA)`
+        : state.persona === 'executive' ? EXECUTIVE_NAME
+        : SCHEDULER_NAME;
       return updateRequest(state, action.id, (r) => ({
         ...r,
         messages: [
