@@ -8,6 +8,7 @@
 // Deliberately NOT a blocker: unnamed seats. Not knowing the full party is the
 // normal case, not an error.
 
+import { isInquiry } from './likeOneOfThese';
 import type { Passenger, Purpose } from '../types';
 import { evaluateDoc } from './docExpiry';
 import { isTimingComplete, type LegTiming } from './legTiming';
@@ -47,15 +48,20 @@ export function submitBlockers(
     blockers.push({ code: 'lead', message: 'Name the lead passenger — scheduling needs one person to plan around.' });
   }
 
+  // "Just hold some days" is a request with no route at all — an enquiry. It is NOT a
+  // half-finished trip, so it is not blocked on the airports and times it deliberately
+  // does not have. A PARTLY routed draft is still a mistake and still blocks.
+  const enquiry = isInquiry(draft);
+
   draft.legs.forEach((leg, i) => {
     const label = draft.legs.length > 1 ? `Leg ${i + 1}` : 'The leg';
-    if (!ICAO.test(leg.from) || !ICAO.test(leg.to)) {
+    if (!enquiry && (!ICAO.test(leg.from) || !ICAO.test(leg.to))) {
       blockers.push({ code: 'route', legIndex: i, message: `${label} needs both airports.` });
     }
     if (!leg.date) {
       blockers.push({ code: 'date', legIndex: i, message: `${label} needs a date.` });
     }
-    if (!isTimingComplete(leg.timing)) {
+    if (!enquiry && !isTimingComplete(leg.timing)) {
       blockers.push({ code: 'timing', legIndex: i, message: `${label} has an incomplete time.` });
     }
   });

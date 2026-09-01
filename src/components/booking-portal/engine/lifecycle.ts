@@ -2,6 +2,7 @@
 // The reducer in BookingPortalContext dispatches into these helpers so the
 // transition rules stay testable without React.
 
+import { inquiryLabel, isInquiry } from './likeOneOfThese';
 import type {
   InboxItem,
   PortalState,
@@ -57,6 +58,9 @@ export function nextRequestId(state: Pick<PortalState, 'nextRequestNumber'>): st
 export function routeLabel(request: TripRequest): string {
   const legs = request.legs;
   if (legs.length === 0) return '—';
+  // A request with no route is an enquiry ("just hold some days"), not a broken trip.
+  // It gets named after the thing it actually is: the days.
+  if (isInquiry(request)) return inquiryLabel(request);
   const first = legs[0];
   const last = legs[legs.length - 1];
   const isRoundTrip = legs.length > 1 && last.to === first.from;

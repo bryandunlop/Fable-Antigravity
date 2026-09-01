@@ -23,6 +23,8 @@ import { GFO_RATE_CARD, daysUntil, quoteRequest } from '../engine/quote';
 import { expectedDeparture, latitudeHours, type LegTiming } from '../engine/legTiming';
 import { submitBlockers, clampSeats, type DraftLeg } from '../engine/requestReadiness';
 import { SeatsFit } from '../components/SeatsFit';
+import { StartFromPast } from '../components/StartFromPast';
+import { cloneToDraft, holdDraft, isInquiry } from '../engine/likeOneOfThese';
 import { suggestProfile } from '../engine/missionProfile';
 import type { MissionProfile } from '../../../fleet/capacity';
 import { usePortal } from '../BookingPortalContext';
@@ -99,6 +101,9 @@ export default function NewRequest() {
   // Suggested from the route, overridable by her — and the override is remembered as an
   // override, so a later leg edit does not silently undo a decision she made.
   const [profileOverride, setProfileOverride] = useState<MissionProfile | null>(null);
+  /** True once she has picked a starting point or edited a leg — the opener steps aside. */
+  const [touched, setTouched] = useState(!!prefill);
+  const holdingDaysOnly = isInquiry({ legs });
   const [extras, setExtras] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [requestedTail, setRequestedTail] = useState<string | null>(prefill?.fromExecutive?.tail ?? null);
@@ -166,8 +171,10 @@ export default function NewRequest() {
     });
   }, [quote, legs, asOf]);
 
-  const updateLeg = (i: number, patch: Partial<DraftLeg>) =>
+  const updateLeg = (i: number, patch: Partial<DraftLeg>) => {
+    setTouched(true);
     setLegs((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  };
 
   const toggleExtraPassenger = (i: number, pid: string) =>
     setLegs((prev) =>
@@ -263,6 +270,25 @@ export default function NewRequest() {
             </button>
           </CardContent>
         </Card>
+      )}
+
+      {/* Her own past trips first — a new trip starts from something she has already
+          asked for, not from an empty form. Hidden once she has started editing, so it
+          does not sit there inviting her to throw her work away. */}
+      {!touched && (
+        <div className="mb-4">
+          <StartFromPast
+            requests={state.requests}
+            defaultDate={defaultDate}
+            onUsePast={(option, startDate) => {
+              setLegs(cloneToDraft(option.request, startDate));
+              setPrincipalId(option.request.principalId);
+              setSeatsHeld(option.request.seatsHeld ?? 2);
+              setTouched(true);
+            }}
+            onHoldDays={(dates) => { setLegs(holdDraft(dates)); setTouched(true); }}
+          />
+        </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
