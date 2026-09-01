@@ -152,6 +152,12 @@ export function RequestDrawer({
               {request.extras.length > 0 && ` · ${request.extras.join(' · ')}`}
             </p>
             {request.note && <p className="mt-1 text-xs italic text-muted-foreground">"{request.note}"</p>}
+            {request.requestedTail && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Asked for <span className="font-medium text-foreground">{request.requestedTail}</span> from the
+                fleet view — a request, not an assignment.
+              </p>
+            )}
           </div>
 
           <Separator />

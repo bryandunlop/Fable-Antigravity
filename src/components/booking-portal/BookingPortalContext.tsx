@@ -10,7 +10,7 @@ import { initialPortalState, EA_NAME, SCHEDULER_NAME } from './mockData';
 export type PortalAction =
   | { type: 'SET_PERSONA'; persona: Persona }
   | { type: 'RESET_DEMO' }
-  | { type: 'SUBMIT_REQUEST'; legs: RequestLeg[]; principalId: string; extras: string[]; note?: string; fromWatchId?: string }
+  | { type: 'SUBMIT_REQUEST'; legs: RequestLeg[]; principalId: string; extras: string[]; note?: string; fromWatchId?: string; requestedTail?: string }
   | { type: 'APPROVE_REQUEST'; id: string }
   | { type: 'CONFIRM_REQUEST'; id: string }
   | { type: 'DECLINE_REQUEST'; id: string; reason: string }
@@ -56,6 +56,7 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
         note: action.note,
         messages: [],
         fromWatchId: action.fromWatchId,
+        requestedTail: action.requestedTail,
       };
       return {
         ...state,

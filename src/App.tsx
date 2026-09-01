@@ -624,7 +624,13 @@ export default function App() {
                                     // 'executive' (D99): the fleet-week ask-my-EA handoff lands on the pre-filled
                                     // request form; the request's completion work flows to the EA via the D77 rails.
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'admin', 'lead', 'executive']}>
-                                      <BookingPortalRoutes userRole={userRole} additionalRoles={additionalRoles} />
+                                      {/* The request form reads live fleet availability for the dates being asked
+                                          about (LG-311), which needs the trips the workspace holds. The provider is
+                                          a module-level singleton with a one-shot seed, so mounting it here shares
+                                          the same store as /executive and /scheduling-command rather than a second one. */}
+                                      <SchedulingWorkspaceProvider>
+                                        <BookingPortalRoutes userRole={userRole} additionalRoles={additionalRoles} />
+                                      </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }
                                 />
