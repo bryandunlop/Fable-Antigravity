@@ -48,6 +48,18 @@ const SEED: AirportCoord[] = [
   { icao: 'LFPG', iata: 'CDG', lat: 49.0097, lon: 2.5479, name: 'Paris Charles de Gaulle' },
   { icao: 'OMDB', iata: 'DXB', lat: 25.2532, lon: 55.3657, name: 'Dubai' },
   { icao: 'RJTT', iata: 'HND', lat: 35.5494, lon: 139.7798, name: 'Tokyo Haneda' },
+  // Stations the demo data actually references but the table could not place, so every
+  // surface built on it — coordinates, sun times, and now field-local leg times — silently
+  // rendered a gap for them. KCVG is the booking portal's own default leg (LG-312).
+  { icao: 'KCVG', iata: 'CVG', lat: 39.0489, lon: -84.6678, name: 'Cincinnati/Northern Kentucky' },
+  { icao: 'KASE', iata: 'ASE', lat: 39.2232, lon: -106.8687, name: 'Aspen-Pitkin County' },
+  { icao: 'KHPN', iata: 'HPN', lat: 41.0670, lon: -73.7076, name: 'Westchester County' },
+  { icao: 'KBOS', iata: 'BOS', lat: 42.3656, lon: -71.0096, name: 'Boston Logan' },
+  { icao: 'KPBI', iata: 'PBI', lat: 26.6832, lon: -80.0956, name: 'Palm Beach International' },
+  { icao: 'KDAL', iata: 'DAL', lat: 32.8471, lon: -96.8518, name: 'Dallas Love Field' },
+  { icao: 'KAUS', iata: 'AUS', lat: 30.1975, lon: -97.6664, name: 'Austin-Bergstrom' },
+  { icao: 'EGGW', iata: 'LTN', lat: 51.8747, lon: -0.3683, name: 'London Luton' },
+  { icao: 'LSGG', iata: 'GVA', lat: 46.2381, lon: 6.1090, name: 'Geneva' },
 ];
 
 const BY_CODE = new Map<string, AirportCoord>();
