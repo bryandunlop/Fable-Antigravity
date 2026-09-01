@@ -211,6 +211,7 @@ export function buildFleetAvailability(
         crewsFormable: cap?.crewsFormable ?? 0,
         crewsCommitted: cap?.crewsCommitted ?? 0,
         crewsFree: cap?.crewsFree ?? 0,
+        rostered: cap?.rostered ?? false,
       };
       // Rank 6 — beyond the published roster there is no crew answer to give. This is NOT a
       // block: nothing known stands in the way, we simply cannot say yet. Saying "no crew" out

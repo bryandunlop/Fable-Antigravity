@@ -74,6 +74,13 @@ export interface CrewDaySummary {
   crewsFormable: number;
   crewsCommitted: number;
   crewsFree: number;
+  /**
+   * False beyond the published roster horizon. The counts above are then "the roster as it
+   * stands today", NOT a fact about that day — never render them as one. Reading a formable
+   * count for a day nine months out is the same overclaim as reading "no crew" for it, just
+   * pointing the other way.
+   */
+  rostered: boolean;
 }
 
 export interface TailDayAvailability {

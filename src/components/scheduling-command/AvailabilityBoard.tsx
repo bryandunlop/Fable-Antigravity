@@ -233,7 +233,9 @@ function BoardRow({
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Crew: {cell.crew.crewsFormable} formable · {cell.crew.crewsCommitted} committed
+                {cell.crew.rostered
+                  ? `Crew: ${cell.crew.crewsFormable} formable · ${cell.crew.crewsCommitted} committed`
+                  : 'Crew: roster not published this far ahead'}
               </p>
 
               {cell.overlay && (

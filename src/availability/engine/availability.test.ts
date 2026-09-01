@@ -387,6 +387,13 @@ describe('far horizon — beyond the published crew roster', () => {
     expect(cell?.state).toBe('unavailable');
   });
 
+  it('does not present a crew count as a fact about an unrostered day', () => {
+    const fleet = buildFleetAvailability(farInput(), NOW, FAR_DAYS);
+    const cells = fleet.rows[0].cells;
+    expect(cells[0].crew.rostered).toBe(true);
+    expect(cells[cells.length - 1].crew.rostered).toBe(false);
+  });
+
   it('ranks not-yet-rostered below no-crew and above none', () => {
     expect(RANK.NO_CREW).toBeLessThan(RANK.NOT_YET_ROSTERED);
     expect(RANK.NOT_YET_ROSTERED).toBeLessThan(RANK.NONE);
