@@ -194,9 +194,12 @@ const seedRequest: TripRequest = {
   ],
 };
 
+// Approved but not yet confirmed — the one state the bump exists for. Without a request
+// sitting here the whole "a senior person can take this slot" path is unreachable in the
+// demo, and an unreachable path is an unargued path.
 const secondRequest: TripRequest = {
   id: 'R-2050',
-  status: 'pending',
+  status: 'approved',
   tier: 2,
   principalId: 'P-LINDQVIST',
   requestedBy: 'J. Lindqvist',

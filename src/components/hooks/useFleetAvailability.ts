@@ -27,7 +27,7 @@ export function audienceFor(userRole?: string, additionalRoles: string[] = []): 
   return canSeeFullSchedule(userRole, additionalRoles) ? 'executive-full' : 'executive';
 }
 
-function useTrips(): TripRecord[] {
+export function useTrips(): TripRecord[] {
   const { store, ready, tick } = useSchedulingWorkspace();
   const [trips, setTrips] = useState<TripRecord[]>([]);
   useEffect(() => {

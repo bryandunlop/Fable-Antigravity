@@ -21,6 +21,11 @@ export type PortalAction =
   | { type: 'CONFIRM_REQUEST'; id: string }
   | { type: 'DECLINE_REQUEST'; id: string; reason: string }
   | { type: 'RESUBMIT_REQUEST'; id: string }
+  // A senior person taking an approved trip's place. Reverts it to pending — nothing was
+  // ever booked, so there is nothing to un-book. `authorizedBy` is a named human, always.
+  | { type: 'BUMP_REQUEST'; id: string; authorizedBy: string; reason: string }
+  /** Scheduling marks the call made, which is what makes the reason readable to her. */
+  | { type: 'DISCLOSE_BUMP_REASON'; id: string }
   | { type: 'POST_MESSAGE'; id: string; text: string }
   | { type: 'CREATE_WATCH'; kind: 'fleet' | 'route'; label: string; detail: string }
   | { type: 'CANCEL_WATCH'; id: string }
@@ -86,6 +91,41 @@ export function portalReducer(state: PortalState, action: PortalAction): PortalS
           ...next.inbox,
         ],
       };
+    }
+
+    case 'BUMP_REQUEST': {
+      const target = state.requests.find((r) => r.id === action.id);
+      if (!target || !canTransition(target.status, 'pending')) return state;
+      if (!action.authorizedBy.trim()) return state; // a bump with no name on it is not a bump
+      const next = updateRequest(state, action.id, (r) => ({
+        ...r,
+        status: 'pending',
+        bumpedBy: {
+          id: `B-${at}`,
+          authorizedBy: action.authorizedBy.trim(),
+          reason: action.reason.trim(),
+          atUtc: at,
+          // Deliberately null. She is told scheduling is working on it; the reason
+          // becomes readable only once a human has actually said it to her.
+          reasonVisibleAt: null,
+        },
+      }));
+      return {
+        ...next,
+        inbox: [
+          inboxItem('decision', `${action.id} — scheduling is working on this trip and will call you.`, true, at),
+          ...next.inbox,
+        ],
+      };
+    }
+
+    case 'DISCLOSE_BUMP_REASON': {
+      const target = state.requests.find((r) => r.id === action.id);
+      if (!target?.bumpedBy || target.bumpedBy.reasonVisibleAt) return state;
+      return updateRequest(state, action.id, (r) => ({
+        ...r,
+        bumpedBy: r.bumpedBy ? { ...r.bumpedBy, reasonVisibleAt: at } : undefined,
+      }));
     }
 
     case 'CONFIRM_REQUEST': {

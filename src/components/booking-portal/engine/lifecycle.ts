@@ -14,7 +14,10 @@ const TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
   draft: ['requested'],
   requested: ['pending'],
   pending: ['approved', 'declined'],
-  approved: ['confirmed'],
+  // approved -> pending is the BUMP, and nothing else: a senior request took this one's
+  // place in the queue. Nothing is booked until scheduling says so, so an approved trip
+  // losing its place is a legitimate move, not a corruption of the ladder.
+  approved: ['confirmed', 'pending'],
   confirmed: [],
   declined: ['draft'],
 };

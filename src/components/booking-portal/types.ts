@@ -57,6 +57,28 @@ export interface ThreadMessage {
   text: string;
 }
 
+/**
+ * A senior person taking an approved trip's place in the queue.
+ *
+ * Everyone sees the same four aeroplanes — capacity is never reserved by seniority,
+ * because hiding metal makes the fleet look smaller than it is to everyone who is not
+ * senior. Seniority wins the argument instead, out loud, with a named human on it.
+ */
+export interface Bump {
+  id: string;
+  /** A named human. Mandatory — "the system decided" is not an answer to give an EA. */
+  authorizedBy: string;
+  /** OPERATOR-ONLY until `reasonVisibleAt` is set. */
+  reason: string;
+  atUtc: string;
+  /**
+   * Set when the scheduler marks the call as made. Until then the losing side reads
+   * "Working — scheduling will call you": nobody should learn they were outranked from
+   * a colour changing on a web page.
+   */
+  reasonVisibleAt: string | null;
+}
+
 export interface TripRequest {
   id: string; // R-2047
   status: RequestStatus;
@@ -77,6 +99,8 @@ export interface TripRequest {
    * floor between the two surfaces, so scheduling never learned which aircraft prompted the ask.
    */
   requestedTail?: string;
+  /** Set when a senior request took this one's place; reverts the status to pending. */
+  bumpedBy?: Bump;
   /** Seats the EA asked to hold. She usually knows the lead passenger and a
    *  rough headcount long before she knows the names, so this is the number the
    *  manifest is measured against — not `legs[].passengers.length`. */
