@@ -1,7 +1,7 @@
 /**
  * Airport -> IANA time zone, derived from the field's coordinates.
  *
- * Before this module, the only zone table in the app was a 19-entry literal locked inside
+ * Before this module, the only zone table in the app was a 22-entry literal locked inside
  * `components/ops-wall/SunTimesChip.tsx` — invisible to every other surface, and hand-maintained
  * in step with `airportCoords`. Deriving the zone from lat/lon removes the second list entirely:
  * anything we can plot, we can clock. (LG-312)
@@ -25,8 +25,8 @@ import { lookupAirport, normalizeAirportCode } from './airportCoords';
  * Deliberately empty. A field whose published coordinates sit on the wrong side of a zone boundary
  * (they exist — border fields, and enclaves like the Arizona Navajo Nation) gets one line here with
  * a comment saying who confirmed it. An empty override table is the honest state: nothing has been
- * proven wrong yet. The coordinate lookup was verified against all 22 hand-curated stations the
- * app previously carried and matched every one — see `airportZone.test.ts`.
+ * proven wrong yet. The coordinate lookup was verified against all 22 stations of that deleted
+ * map — a 1:1 regression, every one matched — see `airportZone.test.ts`.
  */
 export const ZONE_OVERRIDES: Record<string, string> = {};
 
