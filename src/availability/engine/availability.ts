@@ -110,7 +110,8 @@ export const RANK = {
   COMMITTED: 3,
   HELD: 4,
   NO_CREW: 5,
-  NONE: 6,
+  NOT_YET_ROSTERED: 6,
+  NONE: 7,
 } as const;
 
 const NO_REASON: AvailabilityReason = { category: 'none', rank: RANK.NONE, detail: '', untilUtc: null };
@@ -211,7 +212,18 @@ export function buildFleetAvailability(
         crewsCommitted: cap?.crewsCommitted ?? 0,
         crewsFree: cap?.crewsFree ?? 0,
       };
-      if (!occupied && crew.crewsFree <= 0) {
+      // Rank 6 — beyond the published roster there is no crew answer to give. This is NOT a
+      // block: nothing known stands in the way, we simply cannot say yet. Saying "no crew" out
+      // here is the bug that made the far horizon read as a grounded fleet.
+      if (!occupied && cap && !cap.rostered) {
+        reasons.push({
+          category: 'not-yet-rostered',
+          rank: RANK.NOT_YET_ROSTERED,
+          detail: 'beyond the published crew roster',
+          untilUtc: null,
+          sourceRef: { kind: 'crew', id: dateUtc },
+        });
+      } else if (!occupied && crew.crewsFree <= 0) {
         reasons.push({
           category: 'no-crew',
           rank: RANK.NO_CREW,
@@ -250,7 +262,9 @@ export function buildFleetAvailability(
       const base: TailDayAvailability = {
         tail,
         dateUtc,
-        state: winner.category === 'none'
+        // 'not-yet-rostered' is an ABSENCE of knowledge, not a block, so it reads available —
+        // the reason rides along so the surface can say why it is provisional.
+        state: winner.category === 'none' || winner.category === 'not-yet-rostered'
           ? 'available'
           : winner.category === 'committed'
             ? 'committed'
