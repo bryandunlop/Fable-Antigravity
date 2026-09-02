@@ -40,7 +40,7 @@ describe('who gets it', () => {
 describe('the email reads the frozen sheet', () => {
   it('when/where, weather, crew and catering are auto blocks; aboard and safety are template words', () => {
     const e = renderEmail(buildSheet(trip(), CTX, T, SCHED), 'S. Reyes', DEFAULT_TEMPLATE, WX);
-    expect(e.subject).toBe('Your trip to Boeing Field, Wednesday, October 14');
+    expect(e.subject).toBe('Your trip to Seattle, Wednesday, October 14');
     const ids = e.blocks.map(b => b.id);
     expect(ids).toEqual(['when', 'weather', 'aboard', 'safety', 'crew', 'catering']);
     expect(e.blocks.find(b => b.id === 'when')!.text).toContain('30 minutes before 09:20 EDT');

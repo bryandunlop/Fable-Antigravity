@@ -16,6 +16,8 @@ import { documentsOf, type Actor, type Trip, type TripLeg } from './trip';
 
 export interface SheetEnd {
   icao: string | null;
+  /** The place as the EA said it — "Seattle", "Mehoopany plant". What a passenger reads. */
+  place: string;
   label: string;
   /** "09:20 EDT" at the field, or null when the field is unplaced. */
   wall: string | null;
@@ -91,8 +93,8 @@ export function sheetLeg(leg: TripLeg, n: number, trip: Trip, places: PlaceRecor
   return {
     n,
     date: leg.date,
-    from: { icao: fromIcao, label: leg.from.airport ? airportLabel(places, leg.from.airport) : leg.from.placeName, wall: wallLabel(depUtc, fromIcao), utc: depUtc },
-    to: { icao: toIcao, label: leg.to.airport ? airportLabel(places, leg.to.airport) : leg.to.placeName, wall: wallLabel(arrUtc, toIcao), utc: arrUtc },
+    from: { icao: fromIcao, place: leg.from.placeName, label: leg.from.airport ? airportLabel(places, leg.from.airport) : leg.from.placeName, wall: wallLabel(depUtc, fromIcao), utc: depUtc },
+    to: { icao: toIcao, place: leg.to.placeName, label: leg.to.airport ? airportLabel(places, leg.to.airport) : leg.to.placeName, wall: wallLabel(arrUtc, toIcao), utc: arrUtc },
     elapsedMinutes: lt?.elapsedMinutes ?? estimateMinutes(fromIcao, toIcao),
     dayShift: lt?.dayShift ?? null,
     aboard: trip.passengerNames,

@@ -83,7 +83,7 @@ export function recipientsFor(sheet: FrozenSheet, prefs: PassengerPref[]): strin
 
 export function renderEmail(sheet: FrozenSheet, to: string, template: EmailTemplate, weather: WeatherByIcao): RenderedEmail {
   const first = sheet.legs[0];
-  const destination = first?.to.label.split(' · ')[0] ?? 'your destination';
+  const destination = first?.to.place || first?.to.label.split(' · ')[0] || 'your destination';
   const subject = template.subject.replace('{{destination}}', destination).replace('{{date}}', first ? longDate(first.date + 'T00:00:00Z') : '');
 
   const blocks: RenderedBlock[] = [];
@@ -105,7 +105,7 @@ export function renderEmail(sheet: FrozenSheet, to: string, template: EmailTempl
           const w = l.to.icao ? weather[l.to.icao] : undefined;
           if (!w) return null;
           const temp = w.tempC === null ? '' : `, around ${Math.round(w.tempC)}°C`;
-          return `${l.to.label.split(' · ')[0]}: ${w.shortForecast.toLowerCase()}${temp}${w.precipProbability ? `, ${w.precipProbability}% chance of precipitation` : ''}.`;
+          return `${l.to.place || l.to.label.split(' · ')[0]}: ${w.shortForecast.toLowerCase()}${temp}${w.precipProbability ? `, ${w.precipProbability}% chance of precipitation` : ''}.`;
         }).filter((x): x is string => !!x);
         if (parts.length) blocks.push({ id: b.id, title: b.title, text: parts.join(' '), source: 'auto' });
         break;
