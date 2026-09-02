@@ -32,6 +32,7 @@ import { DocReader } from './components/documents/pages/DocReader';
 import { DocWorkbench } from './components/documents/pages/DocWorkbench';
 import LeadDashboard from './components/lead/LeadDashboard';
 import ExecutiveDashboard from './components/executive/ExecutiveDashboard';
+import SchedulePage from './components/schedule/SchedulePage';
 import ManagerInsights from './components/ManagerInsights';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
@@ -443,6 +444,17 @@ export default function App() {
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['lead', 'admin']}>
                                       <SchedulingWorkspaceProvider>
                                         <LeadDashboard userRole={userRole} additionalRoles={additionalRoles} />
+                                      </SchedulingWorkspaceProvider>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                {/* D104 — the schedule page: open-days count + fleet calendar, scheduling can block */}
+                                <Route
+                                  path="/fleet-schedule"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['executive', 'scheduling', 'lead', 'admin']}>
+                                      <SchedulingWorkspaceProvider>
+                                        <SchedulePage userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }

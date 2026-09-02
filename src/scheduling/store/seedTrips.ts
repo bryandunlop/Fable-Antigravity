@@ -25,6 +25,7 @@
 // readiness derivable — exactly as if a scheduler had mirrored it from myairops.
 // Stable trip ids keep re-seeding idempotent (safe under React StrictMode remounts).
 
+import { CORE_FLEET, FOREIGN_DEMO_TAIL } from '../../fleet/registry';
 import type { SchedulingService } from './service';
 import type { TripRecord, TripLegRecord } from './types';
 
@@ -102,7 +103,7 @@ export function buildDemoTrips(nowUtcIso: string): TripRecord[] {
       tripNumber: 'T-2026-0725',
       sourceSystem: 'myairops',
       sourceTripRef: 'MAO-4502',
-      tail: 'N650GS',
+      tail: FOREIGN_DEMO_TAIL,
       aircraftType: 'G650ER',
       tripType: 'international',
       priority: 'vip',
@@ -204,12 +205,10 @@ function mulberry32(seed: number): () => number {
 const pick = <T,>(arr: T[], rng: () => number): T => arr[Math.floor(rng() * arr.length)];
 const int = (min: number, max: number, rng: () => number) => min + Math.floor(rng() * (max - min + 1));
 
-const VOLUME_FLEET = [
-  { tail: 'N2PG', aircraftType: 'G650ER' },
-  { tail: 'N1PG', aircraftType: 'G650ER' },
-  { tail: 'N650GS', aircraftType: 'G650ER' },
-  { tail: 'N6PG', aircraftType: 'G500' },
-] as const;
+// Volume trips fly the real four (src/fleet/registry.ts). This list used to carry
+// N650GS, which is deliberately NOT fleet — see FOREIGN_DEMO_TAIL — so a quarter of the
+// generated schedule was flown by an aeroplane the company does not own.
+const VOLUME_FLEET = CORE_FLEET.map(a => ({ tail: a.tail, aircraftType: a.type }));
 const DOM_DESTS = ['KTEB', 'KPBI', 'KASE', 'KDAL', 'KMDW', 'KLAX', 'KMVY', 'KDEN'];
 const INTL_DESTS = ['EGLL', 'LFPG', 'LSGG', 'MYNN', 'EGGW'];
 const BLOCK_REASONS = ['FBO hangar waitlisted', 'Slot unconfirmed', 'Catering unconfirmed', 'Crew duty limit risk', 'Need pax passports'];
