@@ -95,7 +95,11 @@ export function workspaceSummary(
   // the other anything — it is the quiet state, not the default.
   const waitingOn: WaitingOn =
     !live ? (trip.status === 'draft' ? 'ea' : 'nobody')
-      : !trip.tail || changes > 0 || unresolvedGates.length > 0 || emailWaiting ? 'scheduling'
+      // `!trip.crew` belongs here for the same reason it earns a count on the Ops tab: assigning
+      // crew is a decision scheduling owes. Without it a tailed, crewless trip read as "Waiting on
+      // nobody · Aircraft on, crew set, everyone named" on a row that simultaneously said "No crew
+      // set" (fresh review, 2026-09-02).
+      : !trip.tail || !trip.crew || changes > 0 || unresolvedGates.length > 0 || emailWaiting ? 'scheduling'
         : questions > 0 || unnamed > 0 ? 'ea'
           : 'nobody';
 

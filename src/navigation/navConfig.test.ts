@@ -24,6 +24,12 @@ describe('route audit — every manifest path is registered in App.tsx', () => {
 // route fails the first assertion; registering one of these fails the second
 // until it's removed here.
 const KNOWN_UNREGISTERED = [
+  // RETIRED 2026-09-02 (D109 slice 5). The booking portal has no nav entry for any role — Bryan:
+  // "I dont think anyone should see the old booking portal." What remains at this path is the
+  // executive's new-request form, reached only from the fleet-week ask-my-EA handoff (D99), plus
+  // redirects that carry the old scheduling URLs to their new homes in the trips module. A nav
+  // entry would be a link to a page that redirects away from itself.
+  '/booking-portal/*',
   '/public/passenger-form', // public infra — deliberately outside the nav
   '/commissary-kiosk', // public infra — kiosk persona, no nav shell
   '/aircraft-cleaning/workflow/:id',

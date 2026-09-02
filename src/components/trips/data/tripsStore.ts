@@ -78,12 +78,15 @@ export function seedTrips(): Trip[] {
   });
   out = submitItinerary(out, EA, '2026-08-26T10:05:00.000Z');
   out = assignTail(out, 'N5PG', SCHED, '2026-08-26T14:00:00.000Z');
+  out = setCrew(out, { pic: 'Capt. Ray Okafor', sic: 'FO Marcus Bell', fa: null }, SCHED, '2026-08-27T08:00:00.000Z');
+  out = setPassengers(out, ['M. Osei', 'K. Tanaka'], EA, '2026-08-27T09:00:00.000Z');
   let back = createDraft({
     title: 'Boston — one way home', leadPassengerId: 'P-LINDQVIST', leadPassengerName: 'J. Lindqvist', seatsHeld: 3, by: EA, nowUtc: '2026-08-27T09:00:00.000Z',
     legs: [newLeg({ from: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBED' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(7), timing: { kind: 'depart', departLocal: '17:00', flexHours: 1 } })],
   });
   back = submitItinerary(back, EA, '2026-08-27T09:10:00.000Z');
   back = assignTail(back, 'N5PG', SCHED, '2026-08-27T15:00:00.000Z');
+  back = setCrew(back, { pic: 'Capt. Ray Okafor', sic: 'FO Marcus Bell', fa: null }, SCHED, '2026-08-28T08:00:00.000Z');
   back = postMessage(back, SCHED, 'N5PG will already be at Teterboro from M. Osei’s trip; we ferry it up to Hanscom that afternoon. If anyone needs KTEB → KBED that day, the leg is empty.', '2026-08-27T15:02:00.000Z');
 
   // A pickup: the aircraft positions empty to JFK, the passenger rides home (Bryan, 2026-09-01).
