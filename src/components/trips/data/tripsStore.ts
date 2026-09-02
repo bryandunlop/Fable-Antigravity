@@ -5,7 +5,7 @@ import { SCHEDULING_DECIDES } from '../engine/places';
 
 export const TRIPS_KEY = 'trip-records-state';
 const VERSION_KEY = 'trip-records-version';
-const VERSION = '7';
+const VERSION = '9';
 
 export interface LeadOption { id: string; name: string }
 /** Principals the demo EA books for. Names match the booking portal's passenger fixtures. */
@@ -86,7 +86,18 @@ export function seedTrips(): Trip[] {
   back = assignTail(back, 'N5PG', SCHED, '2026-08-27T15:00:00.000Z');
   back = postMessage(back, SCHED, 'N5PG will already be at Teterboro from M. Osei’s trip; we ferry it up to Hanscom that afternoon. If anyone needs KTEB → KBED that day, the leg is empty.', '2026-08-27T15:02:00.000Z');
 
-  return [seattle, board, meh, bos, out, back];
+  // A pickup: the aircraft positions empty to JFK, the passenger rides home (Bryan, 2026-09-01).
+  let pickup = createDraft({
+    title: 'JFK pickup', leadPassengerId: 'P-REYES', leadPassengerName: 'A. Reyes', seatsHeld: 2, by: EA, nowUtc: '2026-08-28T12:00:00.000Z',
+    legs: [
+      newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'New York', placeId: 'pl-nyc', airport: 'KJFK' }, date: daysFromNow(16), timing: { kind: 'depart', departLocal: '07:30', flexHours: 0 }, positioning: true }),
+      newLeg({ from: { placeName: 'New York', placeId: 'pl-nyc', airport: 'KJFK' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(16), timing: { kind: 'depart', departLocal: '12:30', flexHours: 1 } }),
+    ],
+  });
+  pickup = submitItinerary(pickup, EA, '2026-08-28T12:05:00.000Z');
+  pickup = assignTail(pickup, 'N5PG', SCHED, '2026-08-28T15:00:00.000Z');
+
+  return [seattle, board, meh, bos, out, back, pickup];
 }
 
 /** Rows written before D106 lack the T-72 fields; read them as empty rather than crashing. */

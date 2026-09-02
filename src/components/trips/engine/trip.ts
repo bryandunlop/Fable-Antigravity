@@ -42,6 +42,12 @@ export interface TripLeg {
   timing: LegTiming;
   /** Catering note for this leg, when loaded. Read by the trip sheet and the email (D106). */
   catering?: string;
+  /**
+   * Nobody aboard — the aircraft positions for a pickup or a drop (Bryan, 2026-09-01: 'an empty leg on
+   * behalf of their lead passenger from LUK to JFK, then the passenger from JFK to LUK'). Reads
+   * 'potentially open' on the schedule; never on a passenger's email.
+   */
+  positioning?: boolean;
 }
 
 export type TripEvent =
@@ -59,6 +65,7 @@ export type TripEvent =
   | { id: string; kind: 'board-set'; at: string; by: Actor; window: BoardWindow | null }
   | { id: string; kind: 'change-requested'; at: string; by: Actor; change: ChangeRequest }
   | { id: string; kind: 'change-decided'; at: string; by: Actor; changeId: string; approved: boolean; note: string }
+  | { id: string; kind: 'leg-added'; at: string; by: Actor; legId: string; positioning: boolean }
   | { id: string; kind: 'passengers-updated'; at: string; by: Actor; names: string[] }
   | { id: string; kind: 'catering-set'; at: string; by: Actor; legId: string; text: string }
   | { id: string; kind: 'crew-set'; at: string; by: Actor; crew: TripCrew }
@@ -294,6 +301,7 @@ export function readinessChecks(trip: Trip): ReadinessCheck[] {
       else if (!e.airport) out.push({ legId: leg.id, text: `Leg ${n}: ${e.placeName} is not a place we know — scheduling will ask` });
       else out.push({ legId: leg.id, text: `Leg ${n}: ${e.placeName} resolved to ${e.airport}` });
     }
+    if (leg.positioning) out.push({ legId: leg.id, text: `Leg ${n}: positioning — nobody aboard` });
     if (leg.timing.kind === 'flexible') out.push({ legId: leg.id, text: `Leg ${n}: any time that day` });
   });
   return out;
@@ -407,6 +415,19 @@ export function recordCutoffMove(trip: Trip, cutoff: string, dueUtc: string, rea
   return append({ ...trip, cutoffOverrides: [...trip.cutoffOverrides, override] }, { kind: 'cutoff-moved', at: nowUtc, by, cutoff, dueUtc, reason: r });
 }
 
+/**
+ * Scheduling adds a leg onto a live trip — usually the positioning leg a complex rotation needs
+ * (Bryan, 2026-09-01: scheduling 'would have the ability on complex trips to add a leg'). The EA
+ * cannot; her path is a change request. Inserted at `index` (0 = before the first leg).
+ */
+export function addLegBy(trip: Trip, index: number, leg: Omit<TripLeg, 'id'>, by: Actor, nowUtc: string): Trip {
+  if (by.role !== 'scheduling' || (trip.status !== 'submitted' && trip.status !== 'confirmed')) return trip;
+  const i = Math.max(0, Math.min(trip.legs.length, index));
+  const full = newLeg(leg);
+  const legs = [...trip.legs.slice(0, i), full, ...trip.legs.slice(i)];
+  return append({ ...trip, legs }, { kind: 'leg-added', at: nowUtc, by, legId: full.id, positioning: !!leg.positioning });
+}
+
 // ── Changes after submission (scheduling must approve) ────────────────────────────────
 
 /** The EA asks; nothing moves yet. One pending request per leg at a time. */
@@ -477,6 +498,7 @@ export function eventText(e: TripEvent): string {
     case 'board-set': return e.window ? `Board trip · ${e.window.fromDate} to ${e.window.toDate} · ${e.window.tailsNeeded} aircraft` : 'No longer a board trip';
     case 'change-requested': return `Change requested on a leg${e.change.reason ? `: ${e.change.reason}` : ''}`;
     case 'change-decided': return `${e.approved ? 'Change approved' : 'Change declined'}${e.note ? `: ${e.note}` : ''}`;
+    case 'leg-added': return e.positioning ? 'Positioning leg added by scheduling' : 'Leg added by scheduling';
   }
 }
 

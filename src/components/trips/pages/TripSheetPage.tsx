@@ -93,7 +93,7 @@ export default function TripSheetPage() {
                 <td className="py-2 pr-3"><div className="font-medium">{l.from.label}</div><div className={cn('text-xs', l.planned ? 'text-amber-800 dark:text-amber-400' : 'text-muted-foreground')}>{l.from.wall ?? '—'} · {z(l.from.utc)}{l.planned ? ' · planning time' : ''}</div></td>
                 <td className="py-2 pr-3"><div className="font-medium">{l.to.label}</div><div className="text-xs text-muted-foreground">{l.to.wall ?? '—'} · {z(l.to.utc)}{l.dayShift ? ` +${l.dayShift}` : ''}</div></td>
                 <td className="py-2 pr-3 tabular-nums">{formatElapsed(l.elapsedMinutes)}</td>
-                <td className="py-2">{l.aboard.join(' · ')}{l.catering && <div className="text-xs text-muted-foreground">Catering: {l.catering}</div>}</td>
+                <td className="py-2">{l.positioning ? <span className="text-muted-foreground">positioning · nobody aboard</span> : l.aboard.join(' · ')}{l.catering && <div className="text-xs text-muted-foreground">Catering: {l.catering}</div>}</td>
               </tr>
             ))}
           </tbody>

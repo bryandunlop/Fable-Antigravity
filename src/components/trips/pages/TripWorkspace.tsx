@@ -14,7 +14,7 @@ import { airportLabel, SCHEDULING_DECIDES } from '../engine/places';
 import {
   addDocument, addLeg, askQuestion, assignTail, canSubmit, decline, documentsOf, eventText, postMessage,
   readinessChecks, removeLeg, setHeader, shareDraft, submitBlockers, submitItinerary, updateLeg,
-  setCatering, setCrew, setPassengers, bumpTrip, cancelTrip, setBoard, requestChange, decideChange, pendingChanges, passengerEditPolicy,
+  setCatering, setCrew, setPassengers, bumpTrip, cancelTrip, setBoard, requestChange, decideChange, pendingChanges, passengerEditPolicy, addLegBy, newLeg,
   type Trip, type TripEvent, type DenialCategory, type ChangeRequest,
 } from '../engine/trip';
 import { cutoffsFor, formatEt, freezeDue, moveCutoff, firstDepartureUtc, isInternational, type CutoffKind } from '../engine/cutoffs';
@@ -23,7 +23,8 @@ import { PlacePicker } from '../components/PlacePicker';
 import { freezeSheet, inFreezeWindow, latestSheet } from '../engine/tripSheet';
 import { autoSendIfDue, draftEmail, emailDraftOf, emailState } from '../engine/briefingEmail';
 import { getCrewRoster } from '../../crew/crewRecords';
-import { appendOverlay } from '../../../availability/source';
+import { appendOverlay, readAvailabilityForDates } from '../../../availability/source';
+import { useTrips } from '../../hooks/useFleetAvailability';
 import { loadAvailabilityData } from '../../../availability/data/availabilityStore';
 import { reconcileBoardHolds, releaseAllBoardHolds } from '../engine/board';
 import { DENIAL_CATEGORIES, DENIAL_LABEL } from '../engine/metrics';
@@ -58,6 +59,8 @@ export default function TripWorkspace() {
   const [moving, setMoving] = useState<{ kind: CutoffKind; date: string; reason: string } | null>(null);
   const [namesText, setNamesText] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<{ kind: 'decline' | 'bump'; category: DenialCategory; note: string } | null>(null);
+  const schedTrips = useTrips();
+  const [addingLeg, setAddingLeg] = useState<{ index: number; from: import('../engine/trip').LegEnd; to: import('../engine/trip').LegEnd; date: string } | null>(null);
   const [changing, setChanging] = useState<{ legId: string; date: string; arriveBy: string; to: import('../engine/trip').LegEnd | null; reason: string } | null>(null);
   const roster = useMemo(() => getCrewRoster(nowUtc()), [nowUtc]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -124,6 +127,24 @@ export default function TripWorkspace() {
   const hoursToDeparture = dep ? (Date.parse(dep) - Date.parse(nowUtc())) / 3_600_000 : null;
   const paxPolicy = passengerEditPolicy(hoursToDeparture, isInternational(trip), settings.cutoffs.namesDomesticHours, settings.cutoffs.namesInternationalHours);
   const pending = pendingChanges(trip);
+  // TL-48: which tails are actually free on this trip's days. Scheduling may only assign one of
+  // those; a busy tail is listed with why, so the double booking is a decision, never an accident.
+  const tripDates = trip.legs.map(l => l.date).filter((d): d is string => !!d);
+  const tailState: Record<string, string | null> = (() => {
+    const out: Record<string, string | null> = {};
+    if (tripDates.length === 0 || !isSched) return out;
+    const cells = readAvailabilityForDates({ trips: schedTrips }, tripDates, 'operator', nowUtc());
+    for (const t of CORE_TAILS) {
+      const mine = cells.filter(c => c.tail === t && c.dateUtc && tripDates.includes(c.dateUtc));
+      // The trip's own occupancy (already assigned) does not count against itself.
+      const blocking = mine.find(c => c.state !== 'available' && !(c.tripId === trip.id));
+      out[t] = blocking ? `${blocking.label ?? blocking.category}${blocking.scheduleLabel ? ` · ${blocking.scheduleLabel}` : ''} on ${blocking.dateUtc.slice(5)}` : null;
+    }
+    return out;
+  })();
+  const freeTails = CORE_TAILS.filter(t => tailState[t] === null);
+  const tailToOffer = freeTails.includes(tail) ? tail : (freeTails[0] ?? tail);
+  if (tailToOffer !== tail && trip.status === 'submitted') setTimeout(() => setTail(tailToOffer), 0);
   const rotation = (() => {
     if (!trip.tail) return [];
     const dates = trip.legs.map(l => l.date).filter((d): d is string => !!d).sort();
@@ -231,10 +252,10 @@ export default function TripWorkspace() {
             )}
             {isSched && trip.status === 'submitted' && (
               <div className="flex items-center gap-1.5">
-                <select className={field} value={tail} onChange={e => setTail(e.target.value)} aria-label="Aircraft">
-                  {CORE_TAILS.map(t => <option key={t} value={t}>{t}</option>)}
+                <select className={field} value={tail} onChange={e => setTail(e.target.value)} aria-label="Aircraft" title={tailState[tail] ?? 'Free on every day of this trip'}>
+                  {CORE_TAILS.map(t => <option key={t} value={t}>{t}{tailState[t] ? ` — ${tailState[t]}` : ''}</option>)}
                 </select>
-                <Button size="sm" onClick={() => update(tripId, t => assignTail(t, tail, actor, nowUtc()))}>Assign {tail}</Button>
+                <Button size="sm" disabled={!freeTails.includes(tail)} title={tailState[tail] ?? undefined} onClick={() => update(tripId, t => assignTail(t, tail, actor, nowUtc()))}>Assign {tail}</Button>
                 <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'decline', category: 'no-crew', note: '' })}>Decline</Button>
               </div>
             )}
@@ -279,7 +300,7 @@ export default function TripWorkspace() {
                 missingDate={blockers.some(b => b.legId === leg.id && b.text.includes('date'))} />
             ) : (
               <div key={leg.id} className="rounded-md border border-border p-3 text-sm">
-                <div className="gfo-eyebrow mb-1 text-muted-foreground">Leg {i + 1} · {day(leg.date)}</div>
+                <div className="gfo-eyebrow mb-1 text-muted-foreground">Leg {i + 1} · {day(leg.date)}{leg.positioning ? ' · positioning · nobody aboard' : ''}</div>
                 <div className="font-medium text-primary">{leg.from.placeName} → {leg.to.placeName}</div>
                 <div className="text-xs text-muted-foreground">{airportLabel(places, leg.from.airport ?? '?')} → {airportLabel(places, leg.to.airport ?? '?')} · {describeTiming(leg.timing)}</div>
                 {isSched && (leg.to.airport === SCHEDULING_DECIDES || !leg.to.airport) && (
@@ -329,6 +350,30 @@ export default function TripWorkspace() {
               </div>
             ))}
             {editable && <Button variant="outline" size="sm" onClick={() => update(tripId, t => addLeg(t))}>+ Add a leg</Button>}
+            {isSched && live && !addingLeg && (
+              <Button variant="outline" size="sm" onClick={() => setAddingLeg({ index: 0, from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { ...trip.legs[0].from }, date: trip.legs[0].date ?? '' })}>+ Add a positioning leg</Button>
+            )}
+            {addingLeg && (
+              <div className="space-y-2 rounded-md border border-dashed border-emerald-600/60 p-3">
+                <div className="gfo-eyebrow text-emerald-800 dark:text-emerald-300">Positioning leg · nobody aboard</div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <PlacePicker label="From" value={addingLeg.from} places={places} onChange={from => setAddingLeg({ ...addingLeg, from })} />
+                  <PlacePicker label="To" value={addingLeg.to} places={places} onChange={to => setAddingLeg({ ...addingLeg, to })} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-muted-foreground">Date<input type="date" className={`${field} mt-0.5 w-full`} value={addingLeg.date} aria-label="Positioning leg date" onChange={e => setAddingLeg({ ...addingLeg, date: e.target.value })} /></label>
+                  <label className="text-xs text-muted-foreground">Insert<select className={`${field} mt-0.5 w-full`} value={addingLeg.index} aria-label="Insert position" onChange={e => setAddingLeg({ ...addingLeg, index: Number(e.target.value) })}>
+                    <option value={0}>before leg 1</option>
+                    {trip.legs.map((_, i) => <option key={i + 1} value={i + 1}>after leg {i + 1}</option>)}
+                  </select></label>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button size="sm" disabled={!addingLeg.date || !addingLeg.from.placeName || !addingLeg.to.placeName} onClick={() => { update(tripId, t => addLegBy(t, addingLeg.index, { ...newLeg(), from: addingLeg.from, to: addingLeg.to, date: addingLeg.date, timing: { kind: 'flexible' }, positioning: true }, actor, nowUtc())); setAddingLeg(null); }}>Add it</Button>
+                  <Button size="sm" variant="outline" onClick={() => setAddingLeg(null)}>Cancel</Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Reads 'potentially open' on the fleet schedule; a rider could take it. In Phase 2 a leg entered in myairops arrives here the same way.</p>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 grid gap-3 border-t border-border pt-4 text-sm md:grid-cols-2">
@@ -510,7 +555,7 @@ export default function TripWorkspace() {
               <ul className="space-y-1 text-sm">
                 {rotation.map((r, i) => (
                   <li key={i} className={cn('flex items-center justify-between gap-2', r.kind !== 'passenger' && 'text-emerald-800 dark:text-emerald-300')}>
-                    <span>{r.dateUtc.slice(5)} · {r.from} → {r.to}{r.kind === 'ferry' ? ' · empty · potentially open' : r.kind === 'return' ? ' · empty return · potentially open' : ''}</span>
+                    <span>{r.dateUtc.slice(5)} · {r.from} → {r.to}{r.kind === 'ferry' ? ' · empty · potentially open' : r.kind === 'return' ? ' · empty return · potentially open' : r.kind === 'positioning' ? ' · positioning · potentially open' : ''}</span>
                     <span className="text-xs text-muted-foreground">{r.kind === 'passenger' ? (r.tripId === trip.id ? 'this trip' : r.title) : ''}</span>
                   </li>
                 ))}
