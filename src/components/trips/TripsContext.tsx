@@ -70,7 +70,19 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
   }, []);
 
   const update = useCallback((tripId: string, fn: (t: Trip) => Trip) => {
-    setAllTrips(prev => { const next = prev.map(t => (t.id === tripId ? fn(t) : t)); saveTrips(next); return next; });
+    setAllTrips(prev => {
+      const current = prev.find(t => t.id === tripId);
+      if (!current) return prev;
+      const updated = fn(current);
+      // An engine function that declined to act returns the trip it was given. Writing anyway
+      // would re-render every consumer and re-stringify the whole store — once a minute, forever,
+      // now that the module clock calls this for every live trip on every tick (fresh review,
+      // 2026-09-02). Identity is the engines' own signal; they are all written to return `t`.
+      if (updated === current) return prev;
+      const next = prev.map(t => (t.id === tripId ? updated : t));
+      saveTrips(next);
+      return next;
+    });
   }, []);
 
   const setPlaces = useCallback((next: PlaceRecord[]) => { savePlaces(next); setPlacesState(next); }, []);
