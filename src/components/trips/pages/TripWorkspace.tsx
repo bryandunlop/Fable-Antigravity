@@ -261,7 +261,7 @@ export default function TripWorkspace() {
                 <select className={field} value={tail} onChange={e => setTail(e.target.value)} aria-label="Aircraft" title={tailState[tail] ?? 'Free on every day of this trip'}>
                   {CORE_TAILS.map(t => <option key={t} value={t}>{t}{tailState[t] ? ` — ${tailState[t]}` : ''}</option>)}
                 </select>
-                <Button size="sm" disabled={!freeTails.includes(tail)} title={tailState[tail] ?? undefined} onClick={() => update(tripId, t => assignTail(t, tail, actor, nowUtc()))}>Assign {tail}</Button>
+                <Button size="sm" disabled={!freeTails.includes(tail)} title={tailState[tail] ?? undefined} onClick={() => update(tripId, t => assignTail(t, tail, actor, nowUtc(), { free: tailState[tail] === null, reason: tailState[tail] ?? null }))}>Assign {tail}</Button>
                 <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'decline', category: 'no-crew', note: '' })}>Decline</Button>
               </div>
             )}

@@ -31,7 +31,7 @@ function trip(id: string, days: number, seats = 2): Trip {
 
 /** Fully settled: aircraft on, crew set, every seat named. */
 function settled(id: string, days: number): Trip {
-  let t = assignTail(trip(id, days, 2), 'N1PG', SCHED, NOW);
+  let t = assignTail(trip(id, days, 2), 'N1PG', SCHED, NOW, { free: true, reason: null });
   t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
   return setPassengers(t, ['A. Reyes', 'S. Reyes'], EA, NOW, ['P-REYES', 'P-SREYES']);
 }
@@ -51,13 +51,13 @@ describe('the bands', () => {
   });
 
   it('puts an aircraft with nobody flying it in front of scheduling', () => {
-    const q = run([assignTail(trip('crew', 40, 1), 'N1PG', SCHED, NOW)]);
+    const q = run([assignTail(trip('crew', 40, 1), 'N1PG', SCHED, NOW, { free: true, reason: null })]);
     expect(idsIn(q, 'you')).toEqual(['t-crew']);
     expect(q.you[0].reasons).toContain('No crew set');
   });
 
   it('puts an undecided change request in front of scheduling', () => {
-    let t = assignTail(trip('b', 40), 'N1PG', SCHED, NOW);
+    let t = assignTail(trip('b', 40), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = requestChange(t, t.legs[0].id, { date: '2026-11-01' }, 'Meeting moved', EA, NOW);
     const q = run([t]);
     expect(idsIn(q, 'you')).toEqual(['t-b']);
@@ -69,7 +69,7 @@ describe('the bands', () => {
       ? { ...p, documents: [{ id: 'd1', kind: 'passport' as const, label: 'Passport — USA', country: 'USA', numberMasked: '••• 1', expiresOn: '2026-09-01' }] }
       : p));
     // An international leg is what raises a gate at all.
-    let t = assignTail(trip('c', 40), 'N1PG', SCHED, NOW);
+    let t = assignTail(trip('c', 40), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = { ...t, legs: t.legs.map(l => ({ ...l, to: { ...l.to, airport: 'EGLF' } })) };
     t = setPassengers(t, ['A. Reyes', 'S. Reyes'], EA, NOW, ['P-REYES', 'P-SREYES']);
     const q = run([t], withExpired);
@@ -85,7 +85,7 @@ describe('the bands', () => {
   });
 
   it('puts unnamed seats in front of the EA', () => {
-    let t = assignTail(trip('e', 40, 4), 'N1PG', SCHED, NOW);
+    let t = assignTail(trip('e', 40, 4), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     const q = run([t]);
     expect(idsIn(q, 'ea')).toEqual(['t-e']);

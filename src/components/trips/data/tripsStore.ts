@@ -64,7 +64,7 @@ export function seedTrips(): Trip[] {
     ],
   });
   bos = submitItinerary(bos, EA, '2026-08-12T11:20:00.000Z');
-  bos = assignTail(bos, 'N6PG', SCHED, '2026-08-13T08:45:00.000Z');
+  bos = assignTail(bos, 'N6PG', SCHED, '2026-08-13T08:45:00.000Z', { free: true, reason: null });
   bos = setPassengers(bos, ['A. Reyes', 'S. Reyes'], EA, '2026-08-20T10:00:00.000Z');
   bos = setCatering(bos, bos.legs[0].id, 'Light breakfast for 2, no shellfish', EA, '2026-08-21T09:00:00.000Z');
   bos = setCrew(bos, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: 'Lena Nguyen' }, SCHED, '2026-08-22T08:00:00.000Z');
@@ -77,7 +77,7 @@ export function seedTrips(): Trip[] {
     legs: [newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'New York', placeId: 'pl-nyc', airport: 'KTEB' }, date: daysFromNow(5), timing: { kind: 'depart', departLocal: '08:00', flexHours: 0 } })],
   });
   out = submitItinerary(out, EA, '2026-08-26T10:05:00.000Z');
-  out = assignTail(out, 'N5PG', SCHED, '2026-08-26T14:00:00.000Z');
+  out = assignTail(out, 'N5PG', SCHED, '2026-08-26T14:00:00.000Z', { free: true, reason: null });
   out = setCrew(out, { pic: 'Capt. Ray Okafor', sic: 'FO Marcus Bell', fa: null }, SCHED, '2026-08-27T08:00:00.000Z');
   out = setPassengers(out, ['M. Osei', 'K. Tanaka'], EA, '2026-08-27T09:00:00.000Z');
   let back = createDraft({
@@ -85,7 +85,7 @@ export function seedTrips(): Trip[] {
     legs: [newLeg({ from: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBED' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(7), timing: { kind: 'depart', departLocal: '17:00', flexHours: 1 } })],
   });
   back = submitItinerary(back, EA, '2026-08-27T09:10:00.000Z');
-  back = assignTail(back, 'N5PG', SCHED, '2026-08-27T15:00:00.000Z');
+  back = assignTail(back, 'N5PG', SCHED, '2026-08-27T15:00:00.000Z', { free: true, reason: null });
   back = setCrew(back, { pic: 'Capt. Ray Okafor', sic: 'FO Marcus Bell', fa: null }, SCHED, '2026-08-28T08:00:00.000Z');
   back = postMessage(back, SCHED, 'N5PG will already be at Teterboro from M. Osei’s trip; we ferry it up to Hanscom that afternoon. If anyone needs KTEB → KBED that day, the leg is empty.', '2026-08-27T15:02:00.000Z');
 
@@ -98,7 +98,7 @@ export function seedTrips(): Trip[] {
     ],
   });
   pickup = submitItinerary(pickup, EA, '2026-08-28T12:05:00.000Z');
-  pickup = assignTail(pickup, 'N5PG', SCHED, '2026-08-28T15:00:00.000Z');
+  pickup = assignTail(pickup, 'N5PG', SCHED, '2026-08-28T15:00:00.000Z', { free: true, reason: null });
 
   // London, with a document gate on it (D109 slice 3). S. Reyes's passport lapses before the trip,
   // so the sheet refuses to freeze until scheduling overrides it with a reason. The dates are far
@@ -111,7 +111,7 @@ export function seedTrips(): Trip[] {
     ],
   });
   london = submitItinerary(london, EA, '2026-08-29T09:20:00.000Z');
-  london = assignTail(london, 'N1PG', SCHED, '2026-08-30T10:00:00.000Z');
+  london = assignTail(london, 'N1PG', SCHED, '2026-08-30T10:00:00.000Z', { free: true, reason: null });
   london = setPassengers(london, ['A. Reyes', 'S. Reyes'], EA, '2026-08-30T11:00:00.000Z');
   london = postMessage(london, SCHED, 'N1PG held. Passports and forms before the 21-day cutoff please.', '2026-08-30T10:05:00.000Z');
 

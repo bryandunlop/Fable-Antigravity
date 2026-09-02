@@ -415,9 +415,30 @@ export function addDocument(trip: Trip, by: Actor, doc: Omit<TripDocument, 'id'>
  * "The scheduling team cannot hold an aircraft unless there is an itinerary." Refused on a
  * draft — shared or not — and refused for anyone but scheduling.
  */
-export function assignTail(trip: Trip, tail: string, by: Actor, nowUtc: string): Trip {
+/** Whether this tail is actually free across the trip's days, and why not when it is not. */
+export interface TailVerdict {
+  free: boolean;
+  /** What is holding it, for the message. Null when free. */
+  reason: string | null;
+}
+
+/**
+ * Put an aircraft on a trip — TL-48.
+ *
+ * `verdict` is REQUIRED, deliberately not defaulted to free. The workspace already refused a busy
+ * tail by disabling its button, and a guard that lives only in a button is a guard one new call site
+ * away from being gone: nothing would have flagged a second caller, and the failure is a
+ * double-booked aircraft that reads as confirmed to everybody. The UI keeps its disabled button and
+ * its "why" tooltip — that is the friendly layer — and this is the one that cannot be walked past.
+ * (The same lesson as `freezeSheet`'s required `blocking`, which is where a real bypass was found.)
+ *
+ * Returns the trip it was given when it declines, like every other engine function here; the module
+ * clock depends on that identity.
+ */
+export function assignTail(trip: Trip, tail: string, by: Actor, nowUtc: string, verdict: TailVerdict): Trip {
   if (by.role !== 'scheduling') return trip;
   if (trip.status !== 'submitted' && trip.status !== 'confirmed') return trip;
+  if (!verdict.free) return trip;
   const t = tail.trim().toUpperCase();
   if (!t) return trip;
   return append({ ...trip, tail: t, status: 'confirmed' }, { kind: 'assigned', at: nowUtc, by, tail: t });

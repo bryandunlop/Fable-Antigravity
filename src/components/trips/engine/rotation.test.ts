@@ -8,7 +8,7 @@ function oneWay(title: string, from: string, to: string, date: string, tail: str
   let t = createDraft({ title, leadPassengerId: 'P', leadPassengerName: title, by: EA, nowUtc: '2026-09-01T00:00:00.000Z',
     legs: [newLeg({ from: { placeName: from, placeId: null, airport: from }, to: { placeName: to, placeId: null, airport: to }, date, timing: { kind: 'depart', departLocal: '09:00', flexHours: 0 } })] });
   t = submitItinerary(t, EA, '2026-09-01T00:00:00.000Z');
-  return tail ? assignTail(t, tail, SCHED, '2026-09-01T00:00:00.000Z') : t;
+  return tail ? assignTail(t, tail, SCHED, '2026-09-01T00:00:00.000Z', { free: true, reason: null }) : t;
 }
 
 describe('trips occupy tails, and a tail has a day', () => {
@@ -42,7 +42,7 @@ describe('positioning legs — nobody aboard, on purpose', () => {
         newLeg({ from: { placeName: 'Cincinnati', placeId: null, airport: 'KLUK' }, to: { placeName: 'JFK', placeId: null, airport: 'KJFK' }, date: '2026-09-20', timing: { kind: 'depart', departLocal: '07:00', flexHours: 0 }, positioning: true }),
         newLeg({ from: { placeName: 'JFK', placeId: null, airport: 'KJFK' }, to: { placeName: 'Cincinnati', placeId: null, airport: 'KLUK' }, date: '2026-09-20', timing: { kind: 'depart', departLocal: '11:00', flexHours: 0 } }),
       ] });
-    t = assignTail(submitItinerary(t, EA, '2026-09-01T00:00:00.000Z'), 'N5PG', S, '2026-09-01T00:00:00.000Z');
+    t = assignTail(submitItinerary(t, EA, '2026-09-01T00:00:00.000Z'), 'N5PG', S, '2026-09-01T00:00:00.000Z', { free: true, reason: null });
     const recs = tripsAsRecords([t]);
     expect(recs[0].legs.map(l => l.paxCount)).toEqual([0, 1]);
     const rot = rotationFor('N5PG', recs, '2026-09-01', '2026-09-30');

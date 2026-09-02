@@ -95,7 +95,7 @@ describe('waiting on', () => {
   it('is scheduling while the aircraft has nobody flying it', () => {
     // Regression: a tailed, crewless trip read "Waiting on nobody · crew set, nothing owed" on a row
     // that simultaneously said "No crew set" (fresh review, 2026-09-02).
-    const t = assignTail(base(), 'N1PG', SCHED, NOW);
+    const t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     expect(summarise(t).waitingOn).toBe('scheduling');
   });
 
@@ -104,7 +104,7 @@ describe('waiting on', () => {
   });
 
   it('is scheduling while a change request is undecided', () => {
-    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    let t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = requestChange(t, t.legs[0].id, { date: '2026-10-17' }, 'Meeting moved', EA, NOW);
     expect(summarise(t).waitingOn).toBe('scheduling');
   });
@@ -114,13 +114,13 @@ describe('waiting on', () => {
     const withExpired = bare.map(p => (p.id === sreyes.id
       ? { ...p, documents: [{ id: 'd1', kind: 'passport' as const, label: 'Passport — USA', country: 'USA', numberMasked: '••• 1', expiresOn: '2026-10-12' }] }
       : p));
-    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    let t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = setPassengers(t, ['A. Reyes', 'S. Reyes'], EA, NOW, ['P-REYES', 'P-SREYES']);
     expect(summarise(t, withExpired).waitingOn).toBe('scheduling');
   });
 
   it('is the EA when scheduling has asked them a question', () => {
-    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    let t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     // Crew too: an aircraft with nobody flying it is scheduling's own outstanding job, and it
     // outranks anything the EA owes.
     t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
@@ -129,7 +129,7 @@ describe('waiting on', () => {
   });
 
   it('is nobody when the aircraft is on and nothing is outstanding', () => {
-    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    let t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     t = setPassengers(t, ['A. Reyes', 'S. Reyes', 'K. Tanaka'], EA, NOW, ['P-REYES', 'P-SREYES', 'P-TANAKA']);
     expect(summarise(t).waitingOn).toBe('nobody');
@@ -158,13 +158,13 @@ describe('tab counts', () => {
   });
 
   it('counts undecided change requests on Itinerary', () => {
-    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    let t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = requestChange(t, t.legs[0].id, { date: '2026-10-17' }, 'Meeting moved', EA, NOW);
     expect(summarise(t).counts.itinerary).toBe(1);
   });
 
   it('is zero, never undefined, when there is nothing to decide', () => {
-    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    let t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = setPassengers(t, ['A. Reyes', 'S. Reyes', 'K. Tanaka'], EA, NOW, ['P-REYES', 'P-SREYES', 'P-TANAKA']);
     t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     const s = summarise(t);
@@ -176,7 +176,7 @@ describe('the gaps the fresh review found', () => {
   it('counts an aircraft with nobody flying it on the Ops tab', () => {
     // The one tab that could never raise its hand: crew is a decision scheduling owes, and it sat
     // behind a tab with no number on it.
-    const withTail = assignTail(base(), 'N1PG', SCHED, NOW);
+    const withTail = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     expect(summarise(withTail).counts.ops).toBe(1);
     const crewed = setCrew(withTail, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     expect(summarise(crewed).counts.ops).toBe(0);
@@ -190,7 +190,7 @@ describe('the gaps the fresh review found', () => {
     // Pinning the semantics the reviewer flagged: in a linear record an EA message after a question
     // reads as the reply, and there is no "answer this" affordance to be stricter with. If that ever
     // becomes wrong, this test is what says the behaviour was chosen rather than overlooked.
-    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    let t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = askQuestion(t, SCHED, 'passengers', 'Who is the third seat?', NOW);
     expect(summarise(t).counts.record).toBe(1);
     t = postMessage(t, EA, 'Booking the car for Monday.', NOW);
@@ -198,7 +198,7 @@ describe('the gaps the fresh review found', () => {
   });
 
   it('does not let a SCHEDULING message answer scheduling’s own question', () => {
-    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    let t = assignTail(base(), 'N1PG', SCHED, NOW, { free: true, reason: null });
     t = askQuestion(t, SCHED, 'passengers', 'Who is the third seat?', NOW);
     t = postMessage(t, SCHED, 'Bumping this to the top of the pile.', NOW);
     expect(summarise(t).counts.record).toBe(1);
