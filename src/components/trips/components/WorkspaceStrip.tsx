@@ -95,8 +95,22 @@ export function WorkspaceStrip({
           return (
             <button
               key={t}
+              id={`trip-tab-${t}`}
               role="tab"
               aria-selected={active}
+              aria-controls="trip-tab-panel"
+              tabIndex={active ? 0 : -1}
+              onKeyDown={e => {
+                // Arrow keys move between tabs, as the tab pattern expects; without it a keyboard
+                // user tabs through every tab button to reach the content.
+                const i = tabs.indexOf(t);
+                if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                  e.preventDefault();
+                  const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+                  onTab(next);
+                  document.getElementById(`trip-tab-${next}`)?.focus();
+                }
+              }}
               onClick={() => onTab(t)}
               className={cn(
                 'flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 text-sm transition-colors',

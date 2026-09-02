@@ -123,6 +123,11 @@ export default function TripWorkspace() {
   const tabs: WorkspaceTab[] = isSched
     ? ['itinerary', 'people', 'record', 'documents', 'sheet', 'ops']
     : ['itinerary', 'people', 'record', 'documents', 'sheet'];
+  // A role can change under an open page (it is React state in this demo), and Ops is scheduling's.
+  // Without this the viewer keeps a tab that no longer exists and the body renders nothing at all —
+  // a blank page with no explanation (fresh review, 2026-09-02). The `!isSched` fallback below says
+  // what happened; this puts them somewhere useful.
+  const activeTab = tabs.includes(tab) ? tab : 'itinerary';
   // TL-48: which tails are actually free on this trip's days. Scheduling may only assign one of
   // those; a busy tail is listed with why, so the double booking is a decision, never an accident.
   const tripDates = trip.legs.map(l => l.date).filter((d): d is string => !!d);
@@ -276,7 +281,7 @@ export default function TripWorkspace() {
         }
       />
 
-      <WorkspaceStrip summary={summary} tab={tab} onTab={setTab} tabs={tabs} nowUtc={nowUtc()} />
+      <WorkspaceStrip summary={summary} tab={activeTab} onTab={setTab} tabs={tabs} nowUtc={nowUtc()} />
 
       {refusal && (
         <GfoPanel title={refusal.kind === 'decline' ? 'Decline this request' : `Bump this trip off ${trip.tail}`}>
@@ -292,7 +297,8 @@ export default function TripWorkspace() {
         </GfoPanel>
       )}
 
-      {tab === 'itinerary' && (
+      <div id="trip-tab-panel" role="tabpanel" aria-labelledby={`trip-tab-${activeTab}`} className="space-y-4">
+      {activeTab === 'itinerary' && (
       <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
         <GfoPanel title="Itinerary">
           <div className="space-y-3">
@@ -459,7 +465,7 @@ export default function TripWorkspace() {
       </div>
       )}
 
-      {tab === 'people' && (
+      {activeTab === 'people' && (
         <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
           <GfoPanel title="People">
             <div className="grid gap-3 text-sm md:grid-cols-2">
@@ -499,6 +505,17 @@ export default function TripWorkspace() {
               </div>
             )}
             </div>
+            <div className="mt-3 border-t border-border pt-3">
+              {live && trip.tail && (
+                <div>
+                  <label className="gfo-eyebrow mb-1 block text-muted-foreground">Crew</label>
+                  {/* Read-only for everyone here, scheduling included: this tab answers "who is on
+                      this trip". Assigning them is a scheduling decision, and it lives on Ops, which
+                      is where the tab count for an uncrewed aircraft points. */}
+                  <div>{trip.crew ? `${trip.crew.pic} · ${trip.crew.sic}${trip.crew.fa ? ` · ${trip.crew.fa}` : ''}` : <span className="text-muted-foreground">not yet assigned</span>}</div>
+                </div>
+              )}
+            </div>
             <p className="mt-3 text-xs text-muted-foreground">
               A name here resolves to a person record — the reserve, the briefing email, the document
               gates and the metrics all read that record, not the name.
@@ -535,7 +552,7 @@ export default function TripWorkspace() {
         </div>
       )}
 
-      {tab === 'record' && (
+      {activeTab === 'record' && (
         <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
         {/* ── Record ── */}
         <GfoPanel
@@ -570,7 +587,7 @@ export default function TripWorkspace() {
         </div>
       )}
 
-      {tab === 'documents' && (
+      {activeTab === 'documents' && (
         <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
           {live ? <DocumentGatesPanel
               gates={gates}
@@ -599,7 +616,7 @@ export default function TripWorkspace() {
         </div>
       )}
 
-      {tab === 'sheet' && live && (
+      {activeTab === 'sheet' && live && (
         <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
           <GfoPanel title="The 72-hour moment">
               {!sheet && (
@@ -634,36 +651,30 @@ export default function TripWorkspace() {
             </GfoPanel>
         </div>
       )}
-      {tab === 'sheet' && !live && (
+      {activeTab === 'sheet' && !live && (
         <GfoPanel><p className="text-sm text-muted-foreground">The sheet and the email exist once the itinerary is submitted.</p></GfoPanel>
       )}
 
-      {tab === 'ops' && isSched && (
+      {activeTab === 'ops' && isSched && (
         <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
-          <GfoPanel title="Crew and the aircraft's day">
-            <div className="grid gap-3 text-sm md:grid-cols-2">
-            {live && trip.tail && (
-              <div className="md:col-span-2">
-                <label className="gfo-eyebrow mb-1 block text-muted-foreground">Crew</label>
-                {isSched ? (
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {(['PIC', 'SIC', 'FA'] as const).map(role => (
-                      <select key={role} className={`${field} w-full`} aria-label={role}
-                        value={role === 'PIC' ? trip.crew?.pic ?? '' : role === 'SIC' ? trip.crew?.sic ?? '' : trip.crew?.fa ?? ''}
-                        onChange={e => update(tripId, t => setCrew(t, { pic: t.crew?.pic ?? '', sic: t.crew?.sic ?? '', fa: t.crew?.fa ?? null, [role === 'PIC' ? 'pic' : role === 'SIC' ? 'sic' : 'fa']: e.target.value || (role === 'FA' ? null : '') }, actor, nowUtc()))}>
-                        <option value="">{role} —</option>
-                        {roster.filter(c => c.role === role).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                      </select>
-                    ))}
-                  </div>
-                ) : <div>{trip.crew ? `${trip.crew.pic} · ${trip.crew.sic}${trip.crew.fa ? ` · ${trip.crew.fa}` : ''}` : <span className="text-muted-foreground">not yet assigned</span>}</div>}
+          <GfoPanel title="Crew">
+            {live && trip.tail ? (
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['PIC', 'SIC', 'FA'] as const).map(role => (
+                  <select key={role} className={`${field} w-full`} aria-label={role}
+                    value={role === 'PIC' ? trip.crew?.pic ?? '' : role === 'SIC' ? trip.crew?.sic ?? '' : trip.crew?.fa ?? ''}
+                    onChange={e => update(tripId, t => setCrew(t, { pic: t.crew?.pic ?? '', sic: t.crew?.sic ?? '', fa: t.crew?.fa ?? null, [role === 'PIC' ? 'pic' : role === 'SIC' ? 'sic' : 'fa']: e.target.value || (role === 'FA' ? null : '') }, actor, nowUtc()))}>
+                    <option value="">{role} —</option>
+                    {roster.filter(c => c.role === role).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                ))}
               </div>
-            )}
-            </div>
-            {!live && <p className="text-sm text-muted-foreground">Crew are set once the trip is confirmed on an aircraft.</p>}
+            ) : <p className="text-sm text-muted-foreground">Crew are set once the trip is confirmed on an aircraft.</p>}
+            {live && trip.tail && !trip.crew && <p className="mt-2 text-xs text-amber-800 dark:text-amber-400">{trip.tail} has nobody flying it yet.</p>}
+            {trip.tail && rotation.length === 0 && <p className="mt-3 text-xs text-muted-foreground">Nothing else on {trip.tail} around these dates.</p>}
           </GfoPanel>
           <div className="space-y-4">
-            {isSched && trip.tail && rotation.length > 0 && (
+{isSched && trip.tail && rotation.length > 0 && (
             <GfoPanel title={`${trip.tail} around this trip`}>
               <ul className="space-y-1 text-sm">
                 {rotation.map((r, i) => (
@@ -679,6 +690,10 @@ export default function TripWorkspace() {
           </div>
         </div>
       )}
+      {activeTab === 'ops' && !isSched && (
+        <GfoPanel><p className="text-sm text-muted-foreground">Ops is scheduling's view of the aircraft's day.</p></GfoPanel>
+      )}
+      </div>
     </div>
   );
 }

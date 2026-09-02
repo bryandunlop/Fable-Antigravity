@@ -115,7 +115,10 @@ export function workspaceSummary(
       record: questions,
       documents: unresolvedGates.length,
       sheet: emailWaiting ? 1 : 0,
-      ops: 0,
+      // A confirmed aircraft with nobody flying it is a decision scheduling owes, and it was the one
+      // tab that could never raise its hand (fresh review, 2026-09-02) — the same "hides a real
+      // decision" hole this file exists to close.
+      ops: live && trip.tail && !trip.crew ? 1 : 0,
     },
   };
 }

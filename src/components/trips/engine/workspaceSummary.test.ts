@@ -4,7 +4,7 @@ import { DEFAULT_CUTOFFS } from './cutoffs';
 import { DEFAULT_DOCUMENT_POLICY, documentGates } from './documentGates';
 import { SEED_PEOPLE, personByName, type Person } from './people';
 import {
-  createDraft, newLeg, submitItinerary, assignTail, setPassengers, requestChange, askQuestion,
+  createDraft, newLeg, submitItinerary, assignTail, setPassengers, requestChange, askQuestion, setCrew, postMessage,
   type Actor, type Trip,
 } from './trip';
 
@@ -155,7 +155,41 @@ describe('tab counts', () => {
   it('is zero, never undefined, when there is nothing to decide', () => {
     let t = assignTail(base(), 'N1PG', SCHED, NOW);
     t = setPassengers(t, ['A. Reyes', 'S. Reyes', 'K. Tanaka'], EA, NOW, ['P-REYES', 'P-SREYES', 'P-TANAKA']);
+    t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     const s = summarise(t);
     expect(s.counts).toEqual({ itinerary: 0, people: 0, record: 0, documents: 0, sheet: 0, ops: 0 });
+  });
+});
+
+describe('the gaps the fresh review found', () => {
+  it('counts an aircraft with nobody flying it on the Ops tab', () => {
+    // The one tab that could never raise its hand: crew is a decision scheduling owes, and it sat
+    // behind a tab with no number on it.
+    const withTail = assignTail(base(), 'N1PG', SCHED, NOW);
+    expect(summarise(withTail).counts.ops).toBe(1);
+    const crewed = setCrew(withTail, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
+    expect(summarise(crewed).counts.ops).toBe(0);
+  });
+
+  it('does not ask for crew before there is an aircraft to crew', () => {
+    expect(summarise(base()).counts.ops).toBe(0);
+  });
+
+  it('treats any later EA message as the answer to an open question — deliberately', () => {
+    // Pinning the semantics the reviewer flagged: in a linear record an EA message after a question
+    // reads as the reply, and there is no "answer this" affordance to be stricter with. If that ever
+    // becomes wrong, this test is what says the behaviour was chosen rather than overlooked.
+    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    t = askQuestion(t, SCHED, 'passengers', 'Who is the third seat?', NOW);
+    expect(summarise(t).counts.record).toBe(1);
+    t = postMessage(t, EA, 'Booking the car for Monday.', NOW);
+    expect(summarise(t).counts.record).toBe(0);
+  });
+
+  it('does not let a SCHEDULING message answer scheduling’s own question', () => {
+    let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    t = askQuestion(t, SCHED, 'passengers', 'Who is the third seat?', NOW);
+    t = postMessage(t, SCHED, 'Bumping this to the top of the pile.', NOW);
+    expect(summarise(t).counts.record).toBe(1);
   });
 });
