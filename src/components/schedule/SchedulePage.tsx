@@ -296,7 +296,7 @@ function DayCell({
         </span>
         {view === 'fleet' && known && (
           <span className={cn('rounded px-1 text-[10px] font-semibold tabular-nums', free > 0 ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400' : 'text-muted-foreground/60')}>
-            {free} open
+            {free} open{(tails?.filter(t => t.state !== 'available' && t.potentiallyOpen).length ?? 0) > 0 ? ` · ${tails!.filter(t => t.state !== 'available' && t.potentiallyOpen).length} maybe` : ''}
           </span>
         )}
       </div>
@@ -353,19 +353,26 @@ function destinationOf(scheduleLabel: string | null | undefined): string | null 
 function TailChip({ cell, showRoute, action }: { cell: DisclosedCell; showRoute: boolean; action?: () => void }) {
   // Every string here comes from the DISCLOSED cell. Nothing reaches the model.
   const word = chipWord(cell);
-  const dest = showRoute && cell.category === 'committed' ? destinationOf(cell.scheduleLabel) : null;
   const title = cell.publicLabel ?? cell.label ?? undefined;
   // Open is the answer the reader came for, so it is the only saturated chip on the grid.
   // Everything blocked is one quiet grey — the reason word still says why, on hover it says more.
   const open = cell.state === 'available';
+  // An empty positioning leg: the aircraft is away but a rider could take the leg (Bryan, 2026-09-01:
+  // "potentially open"). Between open and blocked in weight; the endpoints only where disclosed.
+  const maybe = !open && !!cell.potentiallyOpen;
   const tone = open
     ? 'bg-emerald-600 text-white font-semibold shadow-sm hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:text-emerald-950'
-    : 'bg-muted/60 text-muted-foreground/70';
+    : maybe
+      ? 'border border-dashed border-emerald-600 text-emerald-800 dark:border-emerald-400 dark:text-emerald-300 font-medium'
+      : 'bg-muted/60 text-muted-foreground/70';
+  const dest = maybe
+    ? (showRoute && cell.openLegLabel ? cell.openLegLabel.replace(' (return home)', '') : 'potentially open')
+    : showRoute && cell.category === 'committed' ? destinationOf(cell.scheduleLabel) : null;
 
   const body = (
     <>
       <span className="font-medium">{cell.tail.replace(/^N/, '')}</span>
-      <span className="truncate">{dest ?? word}</span>
+      <span className="truncate" title={maybe ? `Potentially open — the aircraft flies an empty leg this day${cell.openLegLabel ? ` (${cell.openLegLabel})` : ''}` : undefined}>{dest ?? word}</span>
     </>
   );
 

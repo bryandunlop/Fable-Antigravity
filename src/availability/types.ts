@@ -99,6 +99,8 @@ export interface TailDayAvailability {
   crew: CrewDaySummary;
   /** The trip holding this day, when one does. */
   tripId: string | null;
+  /** An empty positioning leg this day (engine/emptyLegs.ts). The day is committed but POTENTIALLY OPEN. */
+  openLeg?: { from: string; to: string; kind: 'ferry' | 'return' } | null;
 }
 
 export interface AvailabilityDay {

@@ -5,7 +5,7 @@ import { SCHEDULING_DECIDES } from '../engine/places';
 
 export const TRIPS_KEY = 'trip-records-state';
 const VERSION_KEY = 'trip-records-version';
-const VERSION = '5';
+const VERSION = '7';
 
 export interface LeadOption { id: string; name: string }
 /** Principals the demo EA books for. Names match the booking portal's passenger fixtures. */
@@ -70,7 +70,23 @@ export function seedTrips(): Trip[] {
   bos = setCrew(bos, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: 'Lena Nguyen' }, SCHED, '2026-08-22T08:00:00.000Z');
   bos = postMessage(bos, SCHED, 'N6PG confirmed. Names by the 14th please.', '2026-08-13T08:46:00.000Z');
 
-  return [seattle, board, meh, bos];
+  // One-way pair on N5PG (Bryan, 2026-09-01): one lead out to Teterboro, another back from Boston two
+  // days later. The aircraft ferries KTEB → KBED empty in between — the leg that reads 'potentially open'.
+  let out = createDraft({
+    title: 'Teterboro — one way out', leadPassengerId: 'P-OSEI', leadPassengerName: 'M. Osei', seatsHeld: 2, by: EA, nowUtc: '2026-08-26T10:00:00.000Z',
+    legs: [newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'New York', placeId: 'pl-nyc', airport: 'KTEB' }, date: daysFromNow(5), timing: { kind: 'depart', departLocal: '08:00', flexHours: 0 } })],
+  });
+  out = submitItinerary(out, EA, '2026-08-26T10:05:00.000Z');
+  out = assignTail(out, 'N5PG', SCHED, '2026-08-26T14:00:00.000Z');
+  let back = createDraft({
+    title: 'Boston — one way home', leadPassengerId: 'P-LINDQVIST', leadPassengerName: 'J. Lindqvist', seatsHeld: 3, by: EA, nowUtc: '2026-08-27T09:00:00.000Z',
+    legs: [newLeg({ from: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBED' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(7), timing: { kind: 'depart', departLocal: '17:00', flexHours: 1 } })],
+  });
+  back = submitItinerary(back, EA, '2026-08-27T09:10:00.000Z');
+  back = assignTail(back, 'N5PG', SCHED, '2026-08-27T15:00:00.000Z');
+  back = postMessage(back, SCHED, 'N5PG will already be at Teterboro from M. Osei’s trip; we ferry it up to Hanscom that afternoon. If anyone needs KTEB → KBED that day, the leg is empty.', '2026-08-27T15:02:00.000Z');
+
+  return [seattle, board, meh, bos, out, back];
 }
 
 /** Rows written before D106 lack the T-72 fields; read them as empty rather than crashing. */
@@ -83,6 +99,7 @@ function withDefaults(t: Trip): Trip {
     frozenSheets: t.frozenSheets ?? [],
     emailDraft: t.emailDraft ?? null,
     board: t.board ?? null,
+    changeRequests: t.changeRequests ?? [],
   };
 }
 

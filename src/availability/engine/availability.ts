@@ -16,6 +16,7 @@ import type { CrewDayCoverage, CrewRecord } from '../../components/crew/crewReco
 import type { Serviceability } from '../../components/tech-log/types';
 import type { TripServiceabilityAlert } from '../../components/tech-log/engine/tripAlerts';
 import type { TripRecord } from '../../scheduling/store/types';
+import { emptyLegIndex } from './emptyLegs';
 import type {
   AvailabilityConflict,
   AvailabilityDay,
@@ -46,6 +47,8 @@ export interface AvailabilityInput {
   tripAlerts: TripServiceabilityAlert[];
   /** Phase-2 seam: real crew-to-trip assignment. Absent = one notional crew per trip. */
   crewAssignments?: CrewAssignment[];
+  /** Fields that count as home besides the register's home base (the scheduling seed says KCVG). */
+  homeAirports?: string[];
   /**
    * D107 — "the plane always has to be available for the CEO." On any day the principal has no
    * trip of their own, one of `candidateTails` (in preference order) that would otherwise read
@@ -153,6 +156,7 @@ export function buildFleetAvailability(
 
   const rows = input.tails.map(({ tail, type }) => {
     const tailOccupancy = occupancy.get(tail);
+    const empties = emptyLegIndex(demandTrips(input.trips), tail, nowUtc, input.homeAirports ?? []);
     const tailAlerts = alertsByTail.get(tail) ?? [];
 
     const cells = dayList.map(({ dateUtc }): TailDayAvailability => {
@@ -291,6 +295,7 @@ export function buildFleetAvailability(
         overlay: null,
         crew,
         tripId: occupied?.trip.id ?? null,
+        openLeg: (() => { const e = empties.get(dateUtc); return e ? { from: e.from, to: e.to, kind: e.kind } : null; })(),
       };
 
       const overlay = activeOverlayFor(input.overlays, tail, dateUtc);

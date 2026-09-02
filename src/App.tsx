@@ -454,7 +454,10 @@ export default function App() {
                                   path="/trips/*"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'lead', 'admin', 'executive']}>
-                                      <TripsRoutes userRole={userRole} additionalRoles={additionalRoles} />
+                                      {/* The watches page reads the fleet picture (useTrips), which needs the scheduling workspace. */}
+                                      <SchedulingWorkspaceProvider>
+                                        <TripsRoutes userRole={userRole} additionalRoles={additionalRoles} />
+                                      </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }
                                 />

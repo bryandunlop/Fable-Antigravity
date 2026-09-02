@@ -237,3 +237,21 @@ describe('categoryLabel is composed, never looked up', () => {
     expect(categoryLabel('maintenance', 'not-a-date')).toBe('Unavailable — no return date set');
   });
 });
+
+describe('potentially open — an empty leg is disclosed as a flag, its endpoints only to the full-schedule tiers', () => {
+  it('a plain executive learns the day is potentially open and nothing else', async () => {
+    const { discloseCell } = await import('./disclosure');
+    const cell = {
+      tail: 'N5PG', dateUtc: '2026-09-12', state: 'committed', tripId: 't2',
+      reason: { category: 'committed', rank: 3, detail: 'Back · KBED → KLUK', untilUtc: null },
+      reasons: [{ category: 'committed', rank: 3, detail: 'Back · KBED → KLUK', untilUtc: null }],
+      conflicts: [], overlay: null, crew: { crewsFormable: 2, crewsCommitted: 1, crewsFree: 1, rostered: true },
+      openLeg: { from: 'KTEB', to: 'KBED', kind: 'ferry' },
+    } as unknown as import('../types').TailDayAvailability;
+    const exec = discloseCell(cell, 'executive');
+    expect(exec.potentiallyOpen).toBe(true);
+    expect(JSON.stringify(exec)).not.toContain('KTEB');
+    const full = discloseCell(cell, 'executive-full');
+    expect(full.openLegLabel).toBe('KTEB → KBED');
+  });
+});
