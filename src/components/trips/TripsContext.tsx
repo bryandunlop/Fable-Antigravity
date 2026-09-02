@@ -33,7 +33,13 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
   const [allTrips, setAllTrips] = useState<Trip[]>(() => loadTrips());
   const [places, setPlacesState] = useState<PlaceRecord[]>(() => loadPlaces());
 
-  const actor = useMemo<Actor>(() => ({ name: actingUser(userRole).name, role: actorRoleFor(userRole, additionalRoles) }), [userRole, additionalRoles]);
+  const actor = useMemo<Actor>(() => {
+    const role = actorRoleFor(userRole, additionalRoles);
+    const resolved = actingUser(userRole).name;
+    // The demo scheduler has no system user of their own; the record must still carry a name.
+    const name = resolved === 'You' && role === 'scheduling' ? 'R. Calloway' : resolved;
+    return { name, role };
+  }, [userRole, additionalRoles]);
   const nowUtc = useCallback(() => new Date().toISOString(), []);
 
   const trips = useMemo(() => {

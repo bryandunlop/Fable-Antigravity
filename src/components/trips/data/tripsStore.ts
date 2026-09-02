@@ -5,7 +5,7 @@ import { SCHEDULING_DECIDES } from '../engine/places';
 
 export const TRIPS_KEY = 'trip-records-state';
 const VERSION_KEY = 'trip-records-version';
-const VERSION = '1';
+const VERSION = '2';
 
 export interface LeadOption { id: string; name: string }
 /** Principals the demo EA books for. Names match the booking portal's passenger fixtures. */
@@ -20,7 +20,7 @@ const SCHED: Actor = { name: 'R. Calloway', role: 'scheduling' };
 
 export function seedTrips(): Trip[] {
   const seattle = createDraft({
-    title: 'Seattle plant visit', leadPassengerId: 'P-REYES', leadPassengerName: 'A. Reyes', seatsHeld: 4, by: EA, nowUtc: '2026-09-03T13:12:00.000Z',
+    title: 'Seattle plant visit', leadPassengerId: 'P-REYES', leadPassengerName: 'A. Reyes', seatsHeld: 4, by: EA, nowUtc: '2026-08-25T13:12:00.000Z',
     legs: [
       newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'Seattle', placeId: 'pl-sea', airport: 'KBFI' }, date: '2026-10-14', timing: { kind: 'arrive', arriveByLocal: '15:00' } }),
       newLeg({ from: { placeName: 'Seattle', placeId: 'pl-sea', airport: 'KBFI' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: null, timing: { kind: 'flexible' } }),
