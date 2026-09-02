@@ -462,7 +462,7 @@ export default function App() {
                                 <Route
                                   path="/fleet-schedule"
                                   element={
-                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['executive', 'scheduling', 'lead', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['executive', 'admin-assistant', 'scheduling', 'lead', 'admin']}>
                                       <SchedulingWorkspaceProvider>
                                         <SchedulePage userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>

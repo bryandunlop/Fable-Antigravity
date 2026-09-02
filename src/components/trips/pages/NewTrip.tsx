@@ -40,7 +40,15 @@ export default function NewTrip() {
   const checks = readinessChecks(preview);
 
   function updateLegAt(i: number, patch: Partial<Omit<TripLeg, 'id'>>) {
-    setLegs(ls => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+    setLegs(ls => ls.map((l, j) => {
+      if (j === i) return { ...l, ...patch };
+      // The next leg usually starts where this one ends: mirror a destination into an empty
+      // (or previously mirrored) departure on the following leg.
+      if (j === i + 1 && patch.to && (!l.from.placeName || l.from.placeName === ls[i].to.placeName)) {
+        return { ...l, from: { ...patch.to } };
+      }
+      return l;
+    }));
   }
   function addLegAfterLast() {
     setLegs(ls => [...ls, newLeg({ from: { ...ls[ls.length - 1].to } })]);
