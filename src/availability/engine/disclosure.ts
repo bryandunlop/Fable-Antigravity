@@ -33,6 +33,13 @@ export interface DisclosedCell {
   /** Built from (category, untilUtc). Null when the day is available. */
   label: string | null;
   untilUtc: string | null;
+  /**
+   * Every audience: the aircraft flies an empty positioning leg this day, so a rider could take it.
+   * The ENDPOINTS are executive-full/operator only (`openLegLabel`) — a plain executive learns only
+   * that the day is potentially open, not where the aircraft went.
+   */
+  potentiallyOpen?: boolean;
+  openLegLabel?: string | null;
   /** executive-full and operator only: the route or 'away'. Never a defect line. */
   scheduleLabel?: string | null;
   /** executive-full and operator only. */
@@ -129,6 +136,7 @@ export function discloseCell(cell: TailDayAvailability, audience: Audience): Dis
     category: cell.reason.category,
     label: categoryLabel(cell.reason.category, cell.reason.untilUtc),
     untilUtc: cell.reason.untilUtc,
+    potentiallyOpen: !!cell.openLeg && (cell.state === 'committed' || cell.state === 'available'),
   };
 
   if (audience === 'executive') return base;
@@ -140,6 +148,7 @@ export function discloseCell(cell: TailDayAvailability, audience: Audience): Dis
     // or the next consumer to render one re-opens the hole the label gate just closed.
     tripId: cell.reason.category === 'committed' ? cell.tripId : null,
     publicLabel: cell.overlay?.publicLabel ?? null,
+    openLegLabel: cell.openLeg ? `${cell.openLeg.from} → ${cell.openLeg.to}${cell.openLeg.kind === 'return' ? ' (return home)' : ''}` : null,
   };
 
   if (audience === 'executive-full') return withSchedule;

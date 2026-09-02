@@ -27,6 +27,7 @@ import { deriveReleaseSuggestions } from './engine/suggestions';
 import { loadTrips } from '../components/trips/data/tripsStore';
 import { loadSettings } from '../components/trips/data/settingsStore';
 import { principalReserveInput } from '../components/trips/engine/principal';
+import { tripsAsRecords } from '../components/trips/engine/rotation';
 import type {
   Audience,
   AvailabilityData,
@@ -43,11 +44,16 @@ export interface AvailabilitySources {
   data?: AvailabilityData;
   /** Override the D107 reserve: an explicit value, or `null` for none. Absent = read the trips module. */
   principalReserve?: PrincipalReserve | null;
+  /** Tests set false to keep the trips module's records out. */
+  includeModuleTrips?: boolean;
 }
 
 function assembleInput(sources: AvailabilitySources, nowUtc: string, days: number): AvailabilityInput {
   const detail = readFleetOpsDetail(nowUtc);
   const data = sources.data ?? loadAvailabilityData(nowUtc);
+  // A confirmed trip in the trips module with a tail occupies that tail here too (D105/D107).
+  const moduleTrips = sources.includeModuleTrips === false ? [] : tripsAsRecords(loadTrips());
+  const trips = [...sources.trips, ...moduleTrips.filter(m => !sources.trips.some(t => t.id === m.id))];
 
   const tailStatus: Record<string, Serviceability> = {};
   const tailHeadline: Record<string, string | null> = {};
@@ -60,7 +66,7 @@ function assembleInput(sources: AvailabilitySources, nowUtc: string, days: numbe
     // Tails come from the tech-log projection, which is the only roster that can receive a
     // verdict at all — a tail with no tech-log record has no serviceability to derive.
     tails: detail.map(d => ({ tail: d.tailNumber, type: d.type })),
-    trips: sources.trips,
+    trips,
     downtime: data.downtimeBlocks,
     crewRoster: getCrewRoster(nowUtc),
     crewCoverage: getCrewDayCoverage(nowUtc, days),
@@ -69,7 +75,7 @@ function assembleInput(sources: AvailabilitySources, nowUtc: string, days: numbe
     tailHeadline,
     principalReserve: sources.principalReserve === null ? undefined : (sources.principalReserve ?? principalReserveInput(loadTrips(), loadSettings().principalReserve)),
     tripAlerts: readTripServiceabilityAlerts(
-      sources.trips.map(t => ({
+      trips.map(t => ({
         tripId: t.id,
         tripNumber: t.tripNumber,
         tail: t.tail,

@@ -248,7 +248,20 @@ function FleetWeekRowCells({
         }
 
         if (cell.category === 'no-crew') {
+          if (cell.potentiallyOpen) {
           return (
+            <span
+              key={cell.dateUtc}
+              title={`Potentially open — the aircraft flies an empty leg this day${cell.openLegLabel ? ` (${cell.openLegLabel})` : ''}`}
+              className="flex min-h-9 flex-col items-center justify-center truncate rounded-md border border-dashed border-emerald-600 px-1 text-[11px] font-medium text-emerald-800 dark:border-emerald-400 dark:text-emerald-300"
+            >
+              <span>maybe</span>
+              <span className="truncate text-[10px] font-normal opacity-80">{showSchedule && cell.openLegLabel ? cell.openLegLabel.replace(' (return home)', '') : 'empty leg'}</span>
+            </span>
+          );
+        }
+
+        return (
             <span
               key={cell.dateUtc}
               title={title}

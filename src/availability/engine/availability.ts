@@ -16,6 +16,7 @@ import type { CrewDayCoverage, CrewRecord } from '../../components/crew/crewReco
 import type { Serviceability } from '../../components/tech-log/types';
 import type { TripServiceabilityAlert } from '../../components/tech-log/engine/tripAlerts';
 import type { TripRecord } from '../../scheduling/store/types';
+import { emptyLegIndex } from './emptyLegs';
 import type {
   AvailabilityConflict,
   AvailabilityDay,
@@ -153,6 +154,7 @@ export function buildFleetAvailability(
 
   const rows = input.tails.map(({ tail, type }) => {
     const tailOccupancy = occupancy.get(tail);
+    const empties = emptyLegIndex(demandTrips(input.trips), tail, nowUtc);
     const tailAlerts = alertsByTail.get(tail) ?? [];
 
     const cells = dayList.map(({ dateUtc }): TailDayAvailability => {
@@ -291,6 +293,7 @@ export function buildFleetAvailability(
         overlay: null,
         crew,
         tripId: occupied?.trip.id ?? null,
+        openLeg: (() => { const e = empties.get(dateUtc); return e ? { from: e.from, to: e.to, kind: e.kind } : null; })(),
       };
 
       const overlay = activeOverlayFor(input.overlays, tail, dateUtc);

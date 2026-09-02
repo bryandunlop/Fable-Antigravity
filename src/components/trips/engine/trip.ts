@@ -57,6 +57,8 @@ export type TripEvent =
   | { id: string; kind: 'bumped'; at: string; by: Actor; reason: string; category: DenialCategory; tail: string | null }
   | { id: string; kind: 'cancelled'; at: string; by: Actor; reason: string }
   | { id: string; kind: 'board-set'; at: string; by: Actor; window: BoardWindow | null }
+  | { id: string; kind: 'change-requested'; at: string; by: Actor; change: ChangeRequest }
+  | { id: string; kind: 'change-decided'; at: string; by: Actor; changeId: string; approved: boolean; note: string }
   | { id: string; kind: 'passengers-updated'; at: string; by: Actor; names: string[] }
   | { id: string; kind: 'catering-set'; at: string; by: Actor; legId: string; text: string }
   | { id: string; kind: 'crew-set'; at: string; by: Actor; crew: TripCrew }
@@ -65,6 +67,23 @@ export type TripEvent =
   | { id: string; kind: 'sent-to-crew'; at: string; by: Actor; version: number }
   | { id: string; kind: 'email-drafted'; at: string; by: Actor; version: number; recipients: string[] }
   | { id: string; kind: 'email-sent'; at: string; by: Actor; recipients: string[]; auto: boolean };
+
+/**
+ * A change the EA asks for after the itinerary is submitted (Bryan, 2026-09-01: "the admins should
+ * also be able to request to modify times, dates, etc after the trip is approved, but it needs to
+ * be approved by scheduling"). The itinerary does not move until scheduling says yes.
+ */
+export interface ChangeRequest {
+  id: string;
+  legId: string;
+  /** Only the fields the EA is allowed to ask about. */
+  patch: Partial<Pick<TripLeg, 'date' | 'timing'>> & { from?: LegEnd; to?: LegEnd };
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  decidedBy?: string;
+  decidedAt?: string;
+  note?: string;
+}
 
 /** D107 — why a request was refused or an aircraft taken away. Counted by the metrics page. */
 export type DenialCategory = 'no-crew' | 'maintenance' | 'senior-conflict' | 'not-a-fit' | 'other';
@@ -127,6 +146,7 @@ export interface Trip {
   emailDraft: unknown | null;
   /** Set when this is a board trip: its window blocks the fleet (engine/board.ts). */
   board: BoardWindow | null;
+  changeRequests: ChangeRequest[];
   createdBy: Actor;
   createdAt: string;
   events: TripEvent[];
@@ -176,6 +196,7 @@ export function createDraft(input: {
     frozenSheets: [],
     emailDraft: null,
     board: null,
+    changeRequests: [],
     createdBy: input.by,
     createdAt: input.nowUtc,
     events: [{ id: nextId('ev'), kind: 'created', at: input.nowUtc, by: input.by }],
@@ -386,6 +407,42 @@ export function recordCutoffMove(trip: Trip, cutoff: string, dueUtc: string, rea
   return append({ ...trip, cutoffOverrides: [...trip.cutoffOverrides, override] }, { kind: 'cutoff-moved', at: nowUtc, by, cutoff, dueUtc, reason: r });
 }
 
+// ── Changes after submission (scheduling must approve) ────────────────────────────────
+
+/** The EA asks; nothing moves yet. One pending request per leg at a time. */
+export function requestChange(trip: Trip, legId: string, patch: ChangeRequest['patch'], reason: string, by: Actor, nowUtc: string): Trip {
+  if (by.role !== 'ea' || (trip.status !== 'submitted' && trip.status !== 'confirmed')) return trip;
+  if (!trip.legs.some(l => l.id === legId)) return trip;
+  if (Object.keys(patch).length === 0) return trip;
+  if (trip.changeRequests.some(c => c.legId === legId && c.status === 'pending')) return trip;
+  const change: ChangeRequest = { id: nextId('chg'), legId, patch, reason: reason.trim(), status: 'pending' };
+  return append({ ...trip, changeRequests: [...trip.changeRequests, change] }, { kind: 'change-requested', at: nowUtc, by, change });
+}
+
+/** Scheduling decides. Approving applies the patch to the leg; rejecting leaves the itinerary alone. */
+export function decideChange(trip: Trip, changeId: string, approved: boolean, note: string, by: Actor, nowUtc: string): Trip {
+  if (by.role !== 'scheduling') return trip;
+  const change = trip.changeRequests.find(c => c.id === changeId && c.status === 'pending');
+  if (!change) return trip;
+  const legs = approved ? trip.legs.map(l => (l.id === change.legId ? { ...l, ...change.patch } : l)) : trip.legs;
+  const changeRequests = trip.changeRequests.map(c => (c.id === changeId ? { ...c, status: approved ? 'approved' as const : 'rejected' as const, decidedBy: by.name, decidedAt: nowUtc, note: note.trim() } : c));
+  return append({ ...trip, legs, changeRequests }, { kind: 'change-decided', at: nowUtc, by, changeId, approved, note: note.trim() });
+}
+
+export const pendingChanges = (trip: Trip): ChangeRequest[] => trip.changeRequests.filter(c => c.status === 'pending');
+
+/**
+ * How free the EA is with the passenger list. Free while far out; once inside the names cutoff the
+ * list needs scheduling's approval — and international trips hit that wall earlier (documents, APIS).
+ * The hours come from the cutoff defaults so the same number governs both.
+ */
+export function passengerEditPolicy(hoursToDeparture: number | null, international: boolean, namesDomesticHours: number, namesInternationalHours: number): 'free' | 'approval' | 'locked' {
+  if (hoursToDeparture === null) return 'free';
+  if (hoursToDeparture <= 0) return 'locked';
+  const wall = international ? namesInternationalHours : namesDomesticHours;
+  return hoursToDeparture > wall ? 'free' : 'approval';
+}
+
 // ── Readers ───────────────────────────────────────────────────────────────────────
 
 export const documentsOf = (trip: Trip): TripDocument[] =>
@@ -418,6 +475,8 @@ export function eventText(e: TripEvent): string {
     case 'bumped': return `Bumped off ${e.tail ?? 'the aircraft'} — ${e.category}${e.reason ? `: ${e.reason}` : ''}`;
     case 'cancelled': return `Cancelled by the requester${e.reason ? `: ${e.reason}` : ''}`;
     case 'board-set': return e.window ? `Board trip · ${e.window.fromDate} to ${e.window.toDate} · ${e.window.tailsNeeded} aircraft` : 'No longer a board trip';
+    case 'change-requested': return `Change requested on a leg${e.change.reason ? `: ${e.change.reason}` : ''}`;
+    case 'change-decided': return `${e.approved ? 'Change approved' : 'Change declined'}${e.note ? `: ${e.note}` : ''}`;
   }
 }
 

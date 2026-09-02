@@ -14,10 +14,12 @@ import { airportLabel, SCHEDULING_DECIDES } from '../engine/places';
 import {
   addDocument, addLeg, askQuestion, assignTail, canSubmit, decline, documentsOf, eventText, postMessage,
   readinessChecks, removeLeg, setHeader, shareDraft, submitBlockers, submitItinerary, updateLeg,
-  setCatering, setCrew, setPassengers, bumpTrip, cancelTrip, setBoard,
-  type Trip, type TripEvent, type DenialCategory,
+  setCatering, setCrew, setPassengers, bumpTrip, cancelTrip, setBoard, requestChange, decideChange, pendingChanges, passengerEditPolicy,
+  type Trip, type TripEvent, type DenialCategory, type ChangeRequest,
 } from '../engine/trip';
-import { cutoffsFor, formatEt, freezeDue, moveCutoff, type CutoffKind } from '../engine/cutoffs';
+import { cutoffsFor, formatEt, freezeDue, moveCutoff, firstDepartureUtc, isInternational, type CutoffKind } from '../engine/cutoffs';
+import { rotationFor, tripsAsRecords } from '../engine/rotation';
+import { PlacePicker } from '../components/PlacePicker';
 import { freezeSheet, inFreezeWindow, latestSheet } from '../engine/tripSheet';
 import { autoSendIfDue, draftEmail, emailDraftOf, emailState } from '../engine/briefingEmail';
 import { getCrewRoster } from '../../crew/crewRecords';
@@ -48,7 +50,7 @@ const STATUS_TONE: Record<Trip['status'], string> = {
 export default function TripWorkspace() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { trips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor, setWatches } = useTripsModule();
+  const { trips, allTrips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor, setWatches } = useTripsModule();
   const trip = trips.find(t => t.id === id);
   const [draft, setDraft] = useState('');
   const [q, setQ] = useState('');
@@ -56,6 +58,7 @@ export default function TripWorkspace() {
   const [moving, setMoving] = useState<{ kind: CutoffKind; date: string; reason: string } | null>(null);
   const [namesText, setNamesText] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<{ kind: 'decline' | 'bump'; category: DenialCategory; note: string } | null>(null);
+  const [changing, setChanging] = useState<{ legId: string; date: string; arriveBy: string; to: import('../engine/trip').LegEnd | null; reason: string } | null>(null);
   const roster = useMemo(() => getCrewRoster(nowUtc()), [nowUtc]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -117,6 +120,28 @@ export default function TripWorkspace() {
   const email = emailState(trip, nowUtc());
   const live = trip.status === 'submitted' || trip.status === 'confirmed';
   const canFreezeNow = isSched && live && !sheet && inFreezeWindow(trip, settings.cutoffs.freezeHours * 3, nowUtc());
+  const dep = firstDepartureUtc(trip);
+  const hoursToDeparture = dep ? (Date.parse(dep) - Date.parse(nowUtc())) / 3_600_000 : null;
+  const paxPolicy = passengerEditPolicy(hoursToDeparture, isInternational(trip), settings.cutoffs.namesDomesticHours, settings.cutoffs.namesInternationalHours);
+  const pending = pendingChanges(trip);
+  const rotation = (() => {
+    if (!trip.tail) return [];
+    const dates = trip.legs.map(l => l.date).filter((d): d is string => !!d).sort();
+    if (dates.length === 0) return [];
+    const from = new Date(Date.parse(`${dates[0]}T00:00:00Z`) - 2 * 86_400_000).toISOString().slice(0, 10);
+    const to = new Date(Date.parse(`${dates[dates.length - 1]}T00:00:00Z`) + 3 * 86_400_000).toISOString().slice(0, 10);
+    return rotationFor(trip.tail, tripsAsRecords(allTrips), from, to);
+  })();
+  function submitChange() {
+    if (!changing) return;
+    const leg = trip!.legs.find(l => l.id === changing.legId)!;
+    const patch: ChangeRequest['patch'] = {};
+    if (changing.date && changing.date !== leg.date) patch.date = changing.date;
+    if (changing.arriveBy) patch.timing = { kind: 'arrive', arriveByLocal: changing.arriveBy };
+    if (changing.to && changing.to.placeName && (changing.to.placeName !== leg.to.placeName || changing.to.airport !== leg.to.airport)) patch.to = changing.to;
+    update(tripId, t => requestChange(t, changing.legId, patch, changing.reason, actor, nowUtc()));
+    setChanging(null);
+  }
 
   function freezeNow() {
     const now = nowUtc();
@@ -260,6 +285,40 @@ export default function TripWorkspace() {
                 {isSched && (leg.to.airport === SCHEDULING_DECIDES || !leg.to.airport) && (
                   <Button variant="outline" size="sm" className="mt-2" onClick={askAirport}>Ask about the airport</Button>
                 )}
+                {pending.filter(c => c.legId === leg.id).map(c => (
+                  <div key={c.id} className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-xs">
+                    <div className="font-medium text-amber-800 dark:text-amber-400">Change requested{c.reason ? ` — ${c.reason}` : ''}</div>
+                    <div className="text-muted-foreground">
+                      {c.patch.date && <span>date → {c.patch.date} · </span>}
+                      {c.patch.timing?.kind === 'arrive' && <span>be there by {c.patch.timing.arriveByLocal} · </span>}
+                      {c.patch.to && <span>to → {c.patch.to.placeName}{c.patch.to.airport ? ` (${c.patch.to.airport})` : ''}</span>}
+                    </div>
+                    {isSched && (
+                      <div className="mt-1.5 flex gap-1.5">
+                        <Button size="sm" onClick={() => update(tripId, t => decideChange(t, c.id, true, '', actor, nowUtc()))}>Approve</Button>
+                        <Button size="sm" variant="outline" onClick={() => { const n = window.prompt('Why not? (the EA reads this)') ?? ''; update(tripId, t => decideChange(t, c.id, false, n, actor, nowUtc())); }}>Decline</Button>
+                      </div>
+                    )}
+                    {isEa && <div className="mt-1 text-muted-foreground">Waiting on scheduling. The itinerary does not move until they approve.</div>}
+                  </div>
+                ))}
+                {isEa && live && !pending.some(c => c.legId === leg.id) && changing?.legId !== leg.id && (
+                  <Button variant="outline" size="sm" className="mt-2" onClick={() => setChanging({ legId: leg.id, date: leg.date ?? '', arriveBy: leg.timing.kind === 'arrive' ? leg.timing.arriveByLocal : '', to: null, reason: '' })}>Request a change</Button>
+                )}
+                {changing?.legId === leg.id && (
+                  <div className="mt-2 space-y-2 rounded-md border border-border p-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs text-muted-foreground">New date<input type="date" className={`${field} mt-0.5 w-full`} value={changing.date} aria-label="New date" onChange={e => setChanging({ ...changing, date: e.target.value })} /></label>
+                      <label className="text-xs text-muted-foreground">Be there by<input type="time" className={`${field} mt-0.5 w-full`} value={changing.arriveBy} aria-label="New arrive by" onChange={e => setChanging({ ...changing, arriveBy: e.target.value })} /></label>
+                    </div>
+                    <PlacePicker label="New destination (optional)" value={changing.to ?? { placeName: '', placeId: null, airport: null }} places={places} onChange={to => setChanging({ ...changing, to })} />
+                    <input className={`${field} w-full`} value={changing.reason} placeholder="Why — scheduling reads this" aria-label="Change reason" onChange={e => setChanging({ ...changing, reason: e.target.value })} />
+                    <div className="flex gap-1.5">
+                      <Button size="sm" onClick={submitChange} disabled={!changing.reason.trim()}>Ask scheduling</Button>
+                      <Button size="sm" variant="outline" onClick={() => setChanging(null)}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
                 {live && (isEa || isSched) && (
                   <label className="mt-2 block">
                     <span className="gfo-eyebrow text-muted-foreground">Catering</span>
@@ -292,10 +351,17 @@ export default function TripWorkspace() {
             {live && (
               <div className="md:col-span-2">
                 <label className="gfo-eyebrow mb-1 block text-muted-foreground">Names so far · {trip.passengerNames.length} of {trip.seatsHeld}</label>
-                {isEa ? (
+                {isEa && paxPolicy === 'free' ? (
                   <div className="flex gap-1.5">
                     <input className={`${field} flex-1`} value={namesText ?? trip.passengerNames.join(', ')} aria-label="Passenger names"
                       onChange={e => setNamesText(e.target.value)} onBlur={saveNames} onKeyDown={e => e.key === 'Enter' && saveNames()} placeholder="Comma-separated" />
+                  </div>
+                ) : isEa ? (
+                  <div>
+                    <div>{trip.passengerNames.join(' · ')}</div>
+                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-400">
+                      {paxPolicy === 'locked' ? 'Departed — the list is closed.' : `Inside the ${isInternational(trip) ? 'international' : 'domestic'} names cutoff — ask scheduling in the record to change who is aboard.`}
+                    </p>
                   </div>
                 ) : <div>{trip.passengerNames.join(' · ')}</div>}
                 {trip.passengerNames.length < trip.seatsHeld && <p className="mt-1 text-xs text-muted-foreground">{trip.seatsHeld - trip.passengerNames.length} seat{trip.seatsHeld - trip.passengerNames.length === 1 ? '' : 's'} still unnamed.</p>}
@@ -438,6 +504,20 @@ export default function TripWorkspace() {
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">Defaults from Trip settings; a move here is this trip only.</p>
           </GfoPanel>
+
+          {isSched && trip.tail && rotation.length > 0 && (
+            <GfoPanel title={`${trip.tail} around this trip`}>
+              <ul className="space-y-1 text-sm">
+                {rotation.map((r, i) => (
+                  <li key={i} className={cn('flex items-center justify-between gap-2', r.kind !== 'passenger' && 'text-emerald-800 dark:text-emerald-300')}>
+                    <span>{r.dateUtc.slice(5)} · {r.from} → {r.to}{r.kind === 'ferry' ? ' · empty · potentially open' : r.kind === 'return' ? ' · empty return · potentially open' : ''}</span>
+                    <span className="text-xs text-muted-foreground">{r.kind === 'passenger' ? (r.tripId === trip.id ? 'this trip' : r.title) : ''}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-muted-foreground">Every leg this aircraft flies around these dates, across trips. An empty leg is one a rider could take.</p>
+            </GfoPanel>
+          )}
 
           {live && (
             <GfoPanel title="The 72-hour moment">

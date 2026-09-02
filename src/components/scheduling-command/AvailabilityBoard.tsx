@@ -25,7 +25,7 @@ function cellText(cell: TailDayAvailability): string {
     case 'none': return 'open';
     case 'maintenance': return cell.reason.untilUtc ? 'maint' : 'maint ?';
     case 'not-in-service': return 'not in svc';
-    case 'committed': return 'trip';
+    case 'committed': return cell.openLeg ? `trip · empty ${cell.openLeg.from}→${cell.openLeg.to}` : 'trip';
     case 'held': return 'held';
     case 'reserved': return 'reserved · principal';
     case 'no-crew': return 'no crew';
