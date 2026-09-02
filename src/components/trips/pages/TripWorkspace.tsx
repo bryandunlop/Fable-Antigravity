@@ -23,7 +23,8 @@ import { PlacePicker } from '../components/PlacePicker';
 import { freezeSheet, inFreezeWindow, latestSheet } from '../engine/tripSheet';
 import { autoSendIfDue, draftEmail, emailDraftOf, emailState } from '../engine/briefingEmail';
 import { getCrewRoster } from '../../crew/crewRecords';
-import { appendOverlay } from '../../../availability/source';
+import { appendOverlay, readAvailabilityForDates } from '../../../availability/source';
+import { useTrips } from '../../hooks/useFleetAvailability';
 import { loadAvailabilityData } from '../../../availability/data/availabilityStore';
 import { reconcileBoardHolds, releaseAllBoardHolds } from '../engine/board';
 import { DENIAL_CATEGORIES, DENIAL_LABEL } from '../engine/metrics';
@@ -58,6 +59,7 @@ export default function TripWorkspace() {
   const [moving, setMoving] = useState<{ kind: CutoffKind; date: string; reason: string } | null>(null);
   const [namesText, setNamesText] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<{ kind: 'decline' | 'bump'; category: DenialCategory; note: string } | null>(null);
+  const schedTrips = useTrips();
   const [addingLeg, setAddingLeg] = useState<{ index: number; from: import('../engine/trip').LegEnd; to: import('../engine/trip').LegEnd; date: string } | null>(null);
   const [changing, setChanging] = useState<{ legId: string; date: string; arriveBy: string; to: import('../engine/trip').LegEnd | null; reason: string } | null>(null);
   const roster = useMemo(() => getCrewRoster(nowUtc()), [nowUtc]);
@@ -125,6 +127,24 @@ export default function TripWorkspace() {
   const hoursToDeparture = dep ? (Date.parse(dep) - Date.parse(nowUtc())) / 3_600_000 : null;
   const paxPolicy = passengerEditPolicy(hoursToDeparture, isInternational(trip), settings.cutoffs.namesDomesticHours, settings.cutoffs.namesInternationalHours);
   const pending = pendingChanges(trip);
+  // TL-48: which tails are actually free on this trip's days. Scheduling may only assign one of
+  // those; a busy tail is listed with why, so the double booking is a decision, never an accident.
+  const tripDates = trip.legs.map(l => l.date).filter((d): d is string => !!d);
+  const tailState: Record<string, string | null> = (() => {
+    const out: Record<string, string | null> = {};
+    if (tripDates.length === 0 || !isSched) return out;
+    const cells = readAvailabilityForDates({ trips: schedTrips }, tripDates, 'operator', nowUtc());
+    for (const t of CORE_TAILS) {
+      const mine = cells.filter(c => c.tail === t && c.dateUtc && tripDates.includes(c.dateUtc));
+      // The trip's own occupancy (already assigned) does not count against itself.
+      const blocking = mine.find(c => c.state !== 'available' && !(c.tripId === trip.id));
+      out[t] = blocking ? `${blocking.label ?? blocking.category}${blocking.scheduleLabel ? ` · ${blocking.scheduleLabel}` : ''} on ${blocking.dateUtc.slice(5)}` : null;
+    }
+    return out;
+  })();
+  const freeTails = CORE_TAILS.filter(t => tailState[t] === null);
+  const tailToOffer = freeTails.includes(tail) ? tail : (freeTails[0] ?? tail);
+  if (tailToOffer !== tail && trip.status === 'submitted') setTimeout(() => setTail(tailToOffer), 0);
   const rotation = (() => {
     if (!trip.tail) return [];
     const dates = trip.legs.map(l => l.date).filter((d): d is string => !!d).sort();
@@ -232,10 +252,10 @@ export default function TripWorkspace() {
             )}
             {isSched && trip.status === 'submitted' && (
               <div className="flex items-center gap-1.5">
-                <select className={field} value={tail} onChange={e => setTail(e.target.value)} aria-label="Aircraft">
-                  {CORE_TAILS.map(t => <option key={t} value={t}>{t}</option>)}
+                <select className={field} value={tail} onChange={e => setTail(e.target.value)} aria-label="Aircraft" title={tailState[tail] ?? 'Free on every day of this trip'}>
+                  {CORE_TAILS.map(t => <option key={t} value={t}>{t}{tailState[t] ? ` — ${tailState[t]}` : ''}</option>)}
                 </select>
-                <Button size="sm" onClick={() => update(tripId, t => assignTail(t, tail, actor, nowUtc()))}>Assign {tail}</Button>
+                <Button size="sm" disabled={!freeTails.includes(tail)} title={tailState[tail] ?? undefined} onClick={() => update(tripId, t => assignTail(t, tail, actor, nowUtc()))}>Assign {tail}</Button>
                 <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'decline', category: 'no-crew', note: '' })}>Decline</Button>
               </div>
             )}
