@@ -1,11 +1,13 @@
 // The trip workspace (D105, direction C): itinerary · record · documents, one page per trip.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Mail, Paperclip, Search, Send, Snowflake } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
+import { useMinuteTick } from '../useTripClock';
+import { LegClockLine } from '../components/LegClockLine';
 import { useTripsModule } from '../TripsContext';
 import { LEADS } from '../data/tripsStore';
 import { LegEditor } from '../components/LegEditor';
@@ -71,37 +73,11 @@ export default function TripWorkspace() {
     return qq ? all.filter(e => `${eventText(e)} ${e.by.name} ${e.kind}`.toLowerCase().includes(qq)) : all;
   }, [trip?.events, q]);
 
-  // The clock does two things on its own: at T-72 the sheet freezes and the email is drafted;
-  // past the dead-man timer the email goes. Both are recorded as events; neither needs a person.
-  // A minute tick, so a trip left open crosses T-72 and the dead-man deadline without a reload
-  // (fresh review, 2026-09-01). In production this is a scheduled job, not a component.
-  const [clockTick, setClockTick] = useState(0);
-  useEffect(() => {
-    const h = window.setInterval(() => setClockTick(t => t + 1), 60_000);
-    return () => window.clearInterval(h);
-  }, []);
-  const tripIdForClock = trip?.id ?? null;
-  const tripStatus = trip?.status;
-  const hasSheet = !!(trip && latestSheet(trip));
-  const draftState = trip ? emailState(trip, nowUtc()).state : 'none';
-  useEffect(() => {
-    if (!tripIdForClock || (tripStatus !== 'submitted' && tripStatus !== 'confirmed')) return;
-    const now = nowUtc();
-    update(tripIdForClock, t => {
-      let next = t;
-      if (!latestSheet(next) && freezeDue(next, settings.cutoffs, now)) {
-        const by = { name: 'T-72 clock', role: 'system' as const };
-        next = freezeSheet(next, sheetCtx, now, by);
-        const sheet = latestSheet(next);
-        if (sheet && !emailDraftOf(next)) {
-          next = draftEmail(next, sheet, settings.email, settings.passengerPrefs, weatherFor(sheet.legs.map(l => l.to.icao).filter((x): x is string => !!x)), by, now);
-        }
-      }
-      next = autoSendIfDue(next, now);
-      return next;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tripIdForClock, tripStatus, hasSheet, draftState, clockTick]);
+  // The T-72 freeze, the email draft and the dead-man send now run on the module clock in
+  // `TripClockEffects`, for every trip, from any trips page — not only while this page is open.
+  // A minute tick here keeps THIS page's read-outs (countdowns, "freeze now" availability)
+  // moving; the rules themselves are not this component's job.
+  useMinuteTick();
 
   if (!trip) {
     return (
@@ -303,6 +279,7 @@ export default function TripWorkspace() {
                 <div className="gfo-eyebrow mb-1 text-muted-foreground">Leg {i + 1} · {day(leg.date)}{leg.positioning ? ' · positioning · nobody aboard' : ''}</div>
                 <div className="font-medium text-primary">{leg.from.placeName} → {leg.to.placeName}</div>
                 <div className="text-xs text-muted-foreground">{airportLabel(places, leg.from.airport ?? '?')} → {airportLabel(places, leg.to.airport ?? '?')} · {describeTiming(leg.timing)}</div>
+                <LegClockLine leg={leg} />
                 {isSched && (leg.to.airport === SCHEDULING_DECIDES || !leg.to.airport) && (
                   <Button variant="outline" size="sm" className="mt-2" onClick={askAirport}>Ask about the airport</Button>
                 )}

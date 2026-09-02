@@ -21,6 +21,7 @@ import { Button } from '../ui/button';
 import { cn } from '../ui/utils';
 import { GfoPageHeader, GfoPanel } from '../gfo';
 import { monthGrid, addMonths, dayKey } from '../inflight/tripCalendar';
+import { referenceDayKey, referenceToday } from '../trips/engine/referenceDay';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
 import { audienceFor, useTrips } from '../hooks/useFleetAvailability';
 import { actingUser } from '../safety-center/actingUser';
@@ -42,7 +43,7 @@ const MAX_HORIZON_DAYS = 500;
 type View = 'open-days' | 'fleet';
 
 function horizonThrough(nowUtc: string, last: { year: number; month: number }): number {
-  const from = Date.parse(`${nowUtc.slice(0, 10)}T00:00:00.000Z`);
+  const from = Date.parse(`${referenceDayKey(nowUtc)}T00:00:00.000Z`);
   // Six weeks past the final month's start covers the trailing days a six-week grid borrows.
   const to = Date.UTC(last.year, last.month + 1, 7);
   return Math.min(MAX_HORIZON_DAYS, Math.max(1, Math.floor((to - from) / DAY_MS) + 1));
@@ -58,7 +59,11 @@ export default function SchedulePage({
   const { nowUtc } = useSchedulingWorkspace();
   const trips = useTrips();
   const now = nowUtc();
-  const today = useMemo(() => new Date(), []);
+  // The calendar is the operator's, not the browser's (D24: America/New_York). Reading the
+  // viewer's local day put "today" in a cell the UTC-keyed engine had no row for whenever the two
+  // disagreed — after 20:00 ET the month appeared to start tomorrow (LG-330).
+  const today = useMemo(() => referenceToday(now), [now]);
+  const startDayKey = useMemo(() => referenceDayKey(now), [now]);
   const actor = actingUser(userRole);
 
   const realAudience = useMemo(() => audienceFor(userRole, additionalRoles), [userRole, additionalRoles]);
@@ -80,9 +85,9 @@ export default function SchedulePage({
   );
 
   const fleet = useMemo(
-    () => readFleetAvailability({ trips }, now, horizonThrough(now, months[months.length - 1])),
+    () => readFleetAvailability({ trips }, now, horizonThrough(now, months[months.length - 1]), startDayKey),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trips, now, months, version],
+    [trips, now, months, version, startDayKey],
   );
   const counts = useMemo(() => freeCountByDay(fleet), [fleet]);
   const countByDate = useMemo(() => Object.fromEntries(counts.map(c => [c.dateUtc, c])), [counts]);

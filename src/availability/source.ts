@@ -96,8 +96,10 @@ export function readFleetAvailability(
   sources: AvailabilitySources,
   nowUtc: string,
   days = 14,
+  /** First day of the window, when the caller's calendar is not the UTC one (LG-330). */
+  startDayKey?: string,
 ): FleetAvailability {
-  return buildFleetAvailability(assembleInput(sources, nowUtc, days), nowUtc, days);
+  return buildFleetAvailability(assembleInput(sources, nowUtc, days), nowUtc, days, startDayKey);
 }
 
 export function readDisclosedAvailability(

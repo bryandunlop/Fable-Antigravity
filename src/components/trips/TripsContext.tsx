@@ -2,6 +2,7 @@
 // register, and one `update` that runs an engine function and persists. No rules live here.
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import TripClockEffects from './TripClockEffects';
 import { actingUser } from '../safety-center/actingUser';
 import { loadTrips, saveTrips } from './data/tripsStore';
 import { loadPlaces, savePlaces } from './data/placesStore';
@@ -69,7 +70,19 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
   }, []);
 
   const update = useCallback((tripId: string, fn: (t: Trip) => Trip) => {
-    setAllTrips(prev => { const next = prev.map(t => (t.id === tripId ? fn(t) : t)); saveTrips(next); return next; });
+    setAllTrips(prev => {
+      const current = prev.find(t => t.id === tripId);
+      if (!current) return prev;
+      const updated = fn(current);
+      // An engine function that declined to act returns the trip it was given. Writing anyway
+      // would re-render every consumer and re-stringify the whole store — once a minute, forever,
+      // now that the module clock calls this for every live trip on every tick (fresh review,
+      // 2026-09-02). Identity is the engines' own signal; they are all written to return `t`.
+      if (updated === current) return prev;
+      const next = prev.map(t => (t.id === tripId ? updated : t));
+      saveTrips(next);
+      return next;
+    });
   }, []);
 
   const setPlaces = useCallback((next: PlaceRecord[]) => { savePlaces(next); setPlacesState(next); }, []);
@@ -85,7 +98,14 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
   }, []);
 
   const value = useMemo(() => ({ actor, trips, allTrips, places, settings, setSettings, watches, setWatches, sheetCtx, weatherFor, nowUtc, create, update, setPlaces }), [actor, trips, allTrips, places, settings, setSettings, watches, setWatches, sheetCtx, weatherFor, nowUtc, create, update, setPlaces]);
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {/* The module's own clock: T-72 freeze, dead-man send and watches, for every trip, from
+          whichever trips page happens to be open. */}
+      <TripClockEffects />
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export function useTripsModule(): TripsContextValue {
