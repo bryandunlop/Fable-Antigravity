@@ -113,8 +113,10 @@ describe('document expiry', () => {
   });
 
   it('says nothing about a person with no documents — absence is not expiry', () => {
-    const bare = personByName(people, 'S. Reyes')!;
-    expect(documentsExpiringBefore(people, [bare.id], '2030-01-01')).toEqual([]);
+    // Built rather than borrowed: everyone in the seed now carries something, and a fixture that
+    // depends on a seed row happening to be empty breaks the day someone fills it in.
+    const nobody = resolvePassengers(people, ['Nobody Asked'], '2026-09-02T00:00:00.000Z');
+    expect(documentsExpiringBefore(nobody.people, nobody.ids, '2030-01-01')).toEqual([]);
   });
 });
 

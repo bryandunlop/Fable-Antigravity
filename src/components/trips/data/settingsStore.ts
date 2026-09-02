@@ -4,6 +4,7 @@
 import { DEFAULT_CUTOFFS, type CutoffDefaults } from '../engine/cutoffs';
 import { DEFAULT_TEMPLATE, type EmailTemplate, type PassengerPref } from '../engine/briefingEmail';
 import { DEFAULT_PRINCIPAL_RESERVE, type PrincipalReserveSetting } from '../engine/principal';
+import { DEFAULT_DOCUMENT_POLICY, type DocumentPolicy } from '../engine/documentGates';
 
 export interface TripSettings {
   cutoffs: CutoffDefaults;
@@ -13,6 +14,8 @@ export interface TripSettings {
   passengerPrefs: PassengerPref[];
   /** D107 — who the aircraft is always kept for, and which cabin. */
   principalReserve: PrincipalReserveSetting;
+  /** D109 slice 3 — how much passport validity the DEPARTMENT asks for. Policy, not regulation. */
+  documentPolicy: DocumentPolicy;
 }
 
 export const DEFAULT_SETTINGS: TripSettings = {
@@ -24,6 +27,7 @@ export const DEFAULT_SETTINGS: TripSettings = {
     'Lena Nguyen': 'Looks after the cabin; ask her about anything you need before you board.',
   },
   principalReserve: DEFAULT_PRINCIPAL_RESERVE,
+  documentPolicy: DEFAULT_DOCUMENT_POLICY,
   passengerPrefs: [
     { name: 'A. Reyes', pref: 'never', hasFlown: true },
     { name: 'M. Osei', pref: 'never', hasFlown: true },
@@ -50,6 +54,7 @@ export function loadSettings(): TripSettings {
       blurbs: parsed.blurbs ?? DEFAULT_SETTINGS.blurbs,
       passengerPrefs: parsed.passengerPrefs ?? DEFAULT_SETTINGS.passengerPrefs,
       principalReserve: { ...DEFAULT_PRINCIPAL_RESERVE, ...(parsed.principalReserve ?? {}) },
+      documentPolicy: { ...DEFAULT_DOCUMENT_POLICY, ...(parsed.documentPolicy ?? {}) },
     };
   } catch {
     return DEFAULT_SETTINGS;

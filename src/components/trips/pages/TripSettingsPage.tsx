@@ -44,6 +44,17 @@ export default function TripSettingsPage() {
           <p className="mt-3 text-xs text-muted-foreground">Measured from the first departure; shown in Eastern time on every trip.</p>
         </GfoPanel>
 
+        <GfoPanel title="Travel documents">
+          {num('Passport validity beyond an international leg', s.documentPolicy.internationalPassportMonths, n => setSettings({ ...s, documentPolicy: { ...s.documentPolicy, internationalPassportMonths: n } }), 'months')}
+          <p className="mt-3 text-xs text-muted-foreground">
+            <strong>Department policy, not a regulation.</strong> Six months beyond travel is common
+            carrier and destination-entry practice; nobody has yet pointed us at a rule that binds
+            this operator, or at GFO's own written policy. It sits here as a number the department
+            chooses so that it can be changed — and so nothing in the app has to pretend it is law.
+            Set it to 0 to check expiry alone. An expired passport is caught either way.
+          </p>
+        </GfoPanel>
+
         <GfoPanel title="The aircraft always kept for the principal">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={s.principalReserve.enabled} disabled={!canEdit} onChange={e => setSettings({ ...s, principalReserve: { ...s.principalReserve, enabled: e.target.checked } })} aria-label="Reserve on" />Keep one aircraft home whenever the principal has no trip</label>
           <div className="mt-3 grid gap-3 md:grid-cols-2">

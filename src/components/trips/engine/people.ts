@@ -267,7 +267,11 @@ export const SEED_PEOPLE: Person[] = [
     briefingPref: 'every', hasFlown: false,
     forms: { status: 'none' },
     prefs: null,
-    documents: [],
+    // Lapses four days before the London trip departs — the D109 slice 3 case, so the demo has a
+    // real gate to refuse a freeze over rather than a hypothetical one.
+    documents: [
+      { id: 'D7', kind: 'passport', label: 'Passport — USA', country: 'USA', numberMasked: '••• 5510', expiresOn: daysFromNow(40) },
+    ],
   },
   {
     id: 'P-TANAKA', name: 'K. Tanaka', kind: 'staff', principal: false,

@@ -18,6 +18,7 @@ import { useTrips } from '../hooks/useFleetAvailability';
 import { readFleetAvailability } from '../../availability/source';
 import { autoSendIfDue, draftEmail, emailDraftOf } from './engine/briefingEmail';
 import { freezeDue } from './engine/cutoffs';
+import { blockingGates, documentGates } from './engine/documentGates';
 import { freezeSheet, latestSheet } from './engine/tripSheet';
 import { evaluateWatches, freeByCabin } from './engine/watches';
 
@@ -44,7 +45,10 @@ export default function TripClockEffects() {
       update(trip.id, t => {
         let next = t;
         if (!latestSheet(next) && freezeDue(next, settings.cutoffs, now)) {
-          next = freezeSheet(next, sheetCtx, now, CLOCK_ACTOR);
+          // The clock must not freeze past an unresolved document gate. It re-runs every minute, so
+          // the sheet freezes by itself the moment the gate clears or scheduling overrides it.
+          const blocking = blockingGates(next, documentGates(next, people, settings.documentPolicy, now));
+          next = freezeSheet(next, sheetCtx, now, CLOCK_ACTOR, blocking);
           const sheet = latestSheet(next);
           if (sheet && !emailDraftOf(next)) {
             next = draftEmail(
