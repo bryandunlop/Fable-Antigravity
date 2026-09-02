@@ -139,20 +139,20 @@ export default function TripWorkspace() {
     const now = nowUtc();
     for (const o of releaseAllBoardHolds(t, loadAvailabilityData(now).overlays, actor, now)) appendOverlay(o, now);
   }
+  // React runs a functional state updater during render, not inside the handler, so anything
+  // that must happen AFTER the new trip exists is computed from the current trip here and the
+  // updater just installs it.
   function submitNow() {
-    let after: Trip | null = null;
-    update(tripId, t => { after = submitItinerary(t, actor, nowUtc()); return after; });
-    if (after) syncBoardHolds(after);
+    const after = submitItinerary(trip!, actor, nowUtc());
+    update(tripId, () => after);
+    syncBoardHolds(after);
   }
   function confirmRefusal() {
     if (!refusal) return;
     const now = nowUtc();
-    let after: Trip | null = null;
-    update(tripId, t => {
-      after = refusal.kind === 'decline' ? decline(t, actor, refusal.note, now, refusal.category) : bumpTrip(t, actor, refusal.category, refusal.note, now);
-      return after;
-    });
-    if (after && (after as Trip).status === 'declined') releaseBoardHolds(after);
+    const after = refusal.kind === 'decline' ? decline(trip!, actor, refusal.note, now, refusal.category) : bumpTrip(trip!, actor, refusal.category, refusal.note, now);
+    update(tripId, () => after);
+    if (after.status === 'declined') releaseBoardHolds(after);
     setRefusal(null);
   }
   function watchTheseDates() {
@@ -217,7 +217,7 @@ export default function TripWorkspace() {
               <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'bump', category: 'senior-conflict', note: '' })}>Bump off {trip.tail}</Button>
             )}
             {isEa && (trip.status === 'submitted' || trip.status === 'confirmed' || trip.status === 'draft') && (
-              <Button size="sm" variant="ghost" onClick={() => { const r = window.prompt('Cancel this trip — why?'); if (r !== null) { let after: Trip | null = null; update(tripId, t => { after = cancelTrip(t, actor, r, nowUtc()); return after; }); if (after) releaseBoardHolds(after); } }}>Cancel trip</Button>
+              <Button size="sm" variant="ghost" onClick={() => { const r = window.prompt('Cancel this trip — why?'); if (r !== null) { const after = cancelTrip(trip, actor, r, nowUtc()); update(tripId, () => after); releaseBoardHolds(after); } }}>Cancel trip</Button>
             )}
             {isEa && trip.status === 'declined' && (
               <Button size="sm" variant="outline" onClick={watchTheseDates}>Watch these dates</Button>
@@ -329,11 +329,11 @@ export default function TripWorkspace() {
                 {trip.board && (
                   <div className="mt-2 grid grid-cols-3 gap-2">
                     <label className="text-xs text-muted-foreground">Window from<input type="date" className={`${field} mt-0.5 w-full`} value={trip.board.fromDate} disabled={!editable && !isSched} aria-label="Board window from"
-                      onChange={e => { let after: Trip | null = null; update(tripId, t => { after = setBoard(t, { ...t.board!, fromDate: e.target.value }, actor, nowUtc()); return after; }); if (after) syncBoardHolds(after); }} /></label>
+                      onChange={e => { const after = setBoard(trip, { ...trip.board!, fromDate: e.target.value }, actor, nowUtc()); update(tripId, () => after); syncBoardHolds(after); }} /></label>
                     <label className="text-xs text-muted-foreground">to<input type="date" className={`${field} mt-0.5 w-full`} value={trip.board.toDate} disabled={!editable && !isSched} aria-label="Board window to"
-                      onChange={e => { let after: Trip | null = null; update(tripId, t => { after = setBoard(t, { ...t.board!, toDate: e.target.value }, actor, nowUtc()); return after; }); if (after) syncBoardHolds(after); }} /></label>
+                      onChange={e => { const after = setBoard(trip, { ...trip.board!, toDate: e.target.value }, actor, nowUtc()); update(tripId, () => after); syncBoardHolds(after); }} /></label>
                     <label className="text-xs text-muted-foreground">Aircraft needed<select className={`${field} mt-0.5 w-full`} value={trip.board.tailsNeeded} disabled={!editable && !isSched} aria-label="Aircraft needed"
-                      onChange={e => { let after: Trip | null = null; update(tripId, t => { after = setBoard(t, { ...t.board!, tailsNeeded: Number(e.target.value) }, actor, nowUtc()); return after; }); if (after) syncBoardHolds(after); }}>
+                      onChange={e => { const after = setBoard(trip, { ...trip.board!, tailsNeeded: Number(e.target.value) }, actor, nowUtc()); update(tripId, () => after); syncBoardHolds(after); }}>
                       {CORE_TAILS.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
                     </select></label>
                   </div>
