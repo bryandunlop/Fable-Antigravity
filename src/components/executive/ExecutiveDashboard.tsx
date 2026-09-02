@@ -11,6 +11,7 @@ import { tripsFlownThisMonth } from '../lead/leadSelectors';
 import { getOnTimeLegStats } from '../lead/bookingQueueSeed';
 import { useFleetAvailability } from '../hooks/useFleetAvailability';
 import { shortDate, type DisclosedCell } from '../../availability/engine/disclosure';
+import { isCoreTail } from '../../fleet/registry';
 
 function greetingFor(hour: number): string {
   if (hour < 12) return 'Good morning';
@@ -39,7 +40,12 @@ export default function ExecutiveDashboard({
 }: { userRole?: string; additionalRoles?: string[] }) {
   const navigate = useNavigate();
   const clock = useOpsClock();
-  const { fleet, dispatchable, inFlight } = useUnifiedFleetStatus();
+  const unified = useUnifiedFleetStatus();
+  // The four. The tech-log projection also knows the demo-only tail and the incoming G800;
+  // an executive plans against the core register, so the strip and the rows show only those.
+  const fleet = unified.fleet.filter(ac => isCoreTail(ac.tailNumber));
+  const dispatchable = fleet.filter(ac => ac.airworthiness.status === 'GREEN' || ac.airworthiness.status === 'AMBER').length;
+  const inFlight = unified.inFlight;
   const { name: viewerName } = actingUser(userRole);
 
   // The whole availability picture — maintenance windows with a return date, crew coverage,
@@ -117,7 +123,7 @@ export default function ExecutiveDashboard({
                   {d.dateLabel}
                 </span>
               ))}
-              {availability.rows.map(row => {
+              {availability.rows.filter(row => isCoreTail(row.tail)).map(row => {
                 const ac = fleet.find(a => a.tailNumber === row.tail);
                 return (
                   <FleetWeekRowCells

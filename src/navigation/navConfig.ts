@@ -10,7 +10,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity, AlertOctagon, AlertTriangle, Archive, ArrowRightLeft, BarChart3,
-  Boxes, Building2, Calendar, CalendarCheck, CalendarDays, CalendarRange, Car, ClipboardCheck,
+  Boxes, Building2, Calendar, CalendarCheck, CalendarDays, CalendarFold, CalendarRange, Car, ClipboardCheck,
   ClipboardList, ClipboardPen, ClipboardType, Database, FileCheck, FileText,
   FileWarning, Flag,
   Fuel, Gauge, HardHat, Home, IdCard, Layers, LayoutDashboard, ListChecks,
@@ -74,7 +74,7 @@ export const FRONT_DOORS: Record<string, string> = {
   'dom': '/tech-log',
   'maintenance-workflow': '/maintenance-workflow',
   'lead': '/lead-dashboard',
-  'executive': '/executive',
+  'executive': '/fleet-schedule',
   // D100 — an executive administrator opens on the portal, because booking and
   // managing her principal's travel IS her job, not a corner of it.
   'admin-assistant': '/booking-portal',
@@ -104,7 +104,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/', label: 'Dashboard', domain: 'home', icon: Home, primary: true, roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager'] },
   { path: '/tasks-action-items', label: 'My Tasks', domain: 'home', icon: Target, primary: true, keywords: ['action items'], roles: ['pilot', 'inflight', 'admin', 'lead', 'safety', 'maintenance', 'scheduling'] },
   // D99 — the executive fleet week view: per-tail timeline (destinations + open days) with inline metrics.
-  { path: '/executive', label: 'Fleet Week', domain: 'home', icon: CalendarRange, primary: true, keywords: ['executive', 'availability', 'fleet', 'open days', 'week view'], roles: ['executive', 'admin'] },
+  { path: '/fleet-schedule', label: 'Schedule', domain: 'home', icon: CalendarFold, primary: true, keywords: ['executive', 'availability', 'fleet', 'open days', 'month', 'calendar', 'schedule'], roles: ['executive', 'admin'] },
+  { path: '/executive', label: 'Fleet Week', domain: 'home', icon: CalendarRange, keywords: ['executive', 'availability', 'fleet', 'open days', 'week view'], roles: ['executive', 'admin'] },
+  { path: '/fleet-schedule', label: 'Fleet schedule', domain: 'scheduling', icon: CalendarFold, keywords: ['availability', 'block', 'hold', 'month', 'calendar', 'open days'], roles: ['scheduling', 'lead'] },
   // Per-approver inbox (D39): requests awaiting your role's sign-off, plus what you filed.
   { path: '/approvals', label: 'Approvals', domain: 'home', icon: Stamp, primary: true, keywords: ['approve', 'waiver', 'sign-off', 'request'], roles: ['pilot', 'chief-pilot', 'inflight', 'fa-manager', 'maintenance', 'chief-inspector', 'shift-lead', 'safety', 'lead', 'scheduling', 'document-manager', 'admin', 'dom'] },
   // D66: Procedural Bulletins and Flight Ops Bulletins used to sit here and under
