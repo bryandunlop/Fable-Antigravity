@@ -265,9 +265,6 @@ export default function TripWorkspace() {
                 <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'decline', category: 'no-crew', note: '' })}>Decline</Button>
               </div>
             )}
-            {isSched && trip.status === 'confirmed' && (
-              <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'bump', category: 'senior-conflict', note: '' })}>Bump off {trip.tail}</Button>
-            )}
             {isEa && (trip.status === 'submitted' || trip.status === 'confirmed' || trip.status === 'draft') && (
               <Button size="sm" variant="ghost" onClick={() => { const r = window.prompt('Cancel this trip — why?'); if (r !== null) { const after = cancelTrip(trip, actor, r, nowUtc()); update(tripId, () => after); releaseBoardHolds(after); } }}>Cancel trip</Button>
             )}
@@ -293,7 +290,12 @@ export default function TripWorkspace() {
             <Button size="sm" onClick={confirmRefusal}>{refusal.kind === 'decline' ? 'Decline' : 'Bump'}</Button>
             <Button size="sm" variant="outline" onClick={() => setRefusal(null)}>Cancel</Button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">The category is what the metrics count. {refusal.kind === 'bump' ? 'The trip returns to the queue without an aircraft.' : 'The EA can watch these dates for an opening.'}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            The category is what the metrics count.{' '}
+            {refusal.kind === 'bump'
+              ? `${trip.tail ?? 'The aircraft'} is freed here and the trip returns to the queue as a request without an aircraft. myGFO cannot change myairops — that schedule is handled separately.`
+              : 'The EA can watch these dates for an opening.'}
+          </p>
         </GfoPanel>
       )}
 
@@ -671,6 +673,19 @@ export default function TripWorkspace() {
               </div>
             ) : <p className="text-sm text-muted-foreground">Crew are set once the trip is confirmed on an aircraft.</p>}
             {live && trip.tail && !trip.crew && <p className="mt-2 text-xs text-amber-800 dark:text-amber-400">{trip.tail} has nobody flying it yet.</p>}
+            {trip.status === 'confirmed' && (
+              <div className="mt-4 border-t border-border pt-4">
+                <div className="gfo-eyebrow mb-1 text-muted-foreground">Take the aircraft back</div>
+                <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'bump', category: 'senior-conflict', note: '' })}>
+                  Bump off {trip.tail}
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Frees {trip.tail} here and returns the trip to the queue as a request without an
+                  aircraft. It does not change myairops — myGFO has no write path there — so the
+                  schedule in myairops still has to be dealt with separately.
+                </p>
+              </div>
+            )}
             {trip.tail && rotation.length === 0 && <p className="mt-3 text-xs text-muted-foreground">Nothing else on {trip.tail} around these dates.</p>}
           </GfoPanel>
           <div className="space-y-4">
