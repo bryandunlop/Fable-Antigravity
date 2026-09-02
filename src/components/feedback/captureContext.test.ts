@@ -24,3 +24,11 @@ describe('captureContext', () => {
     ).toBe('1180x820');
   });
 });
+
+describe('viewport capture guards against a pre-layout read', () => {
+  it('treats a zero-size window as unknown rather than reporting 0x0', () => {
+    expect(
+      captureContext({ pathname: '/', role: 'pilot', viewportWidth: 0, viewportHeight: 0 }).viewport,
+    ).toBe('unknown');
+  });
+});

@@ -1,36 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import {
-  Bug,
-  Lightbulb,
-  PencilRuler,
-  LifeBuoy,
-  ExternalLink,
-  RefreshCw,
-  Send,
-  AlertTriangle,
-  Code2,
-} from 'lucide-react';
+import { ExternalLink, RefreshCw, Send, AlertTriangle, Code2 } from 'lucide-react';
 import { feedbackStore, useFeedbackReports } from './feedbackStore';
 import { fileReport, refreshReport } from './feedbackSync';
 import { jiraClient, jiraConfig } from './feedbackJira';
 import { feedbackToJiraRequest } from './jira/mapping';
+import { formatBytes } from './attachments';
 import { FEEDBACK_IMPACTS, FEEDBACK_KINDS, type FeedbackKind, type FeedbackReport } from './types';
 
-const ICONS: Record<FeedbackKind, typeof Bug> = {
-  bug: Bug,
-  idea: Lightbulb,
-  change: PencilRuler,
-  help: LifeBuoy,
-};
-
-const KIND_LABEL: Record<FeedbackKind, string> = {
-  bug: 'Bug',
-  idea: 'Idea',
-  change: 'Change',
-  help: 'Help',
-};
+/** One word, from the same table the dialog's buttons read — they cannot drift. */
+const KIND_LABEL = Object.fromEntries(
+  FEEDBACK_KINDS.map((k) => [k.kind, k.short]),
+) as Record<FeedbackKind, string>;
 
 type Filter = 'all' | 'unfiled' | 'filed' | 'failed';
 
@@ -124,7 +106,6 @@ export function FeedbackPage() {
             </div>
           )}
           {visible.map((report) => {
-            const Icon = ICONS[report.kind];
             const active = selected?.id === report.id;
             return (
               <button
@@ -134,7 +115,6 @@ export function FeedbackPage() {
                   active ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/60'
                 }`}
               >
-                <Icon className="w-[17px] h-[17px] mt-0.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[14px] font-semibold leading-snug">{report.title}</div>
                   <div className="text-[12px] text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
@@ -187,6 +167,38 @@ export function FeedbackPage() {
                 <Row label="Context">Not shared by the reporter</Row>
               )}
             </dl>
+
+            {selected.attachments.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">
+                  Screenshots
+                </div>
+                <div className="flex gap-2.5 flex-wrap">
+                  {selected.attachments.map((a) => (
+                    <a
+                      key={a.id}
+                      href={a.dataUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`${a.name} · ${formatBytes(a.size)}${a.jiraAttachmentId ? ' · in Jira' : ''}`}
+                    >
+                      <img
+                        src={a.dataUrl}
+                        alt={a.name}
+                        className="w-[92px] h-[66px] object-cover rounded-md border border-border hover:border-accent transition-colors"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selected.attachmentError && (
+              <div className="mt-3 rounded-md px-3 py-2.5 text-[12.5px] leading-snug flex gap-2 items-start border border-border">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
+                <span>{selected.attachmentError}</span>
+              </div>
+            )}
 
             {selected.jira && (
               <div className="mt-4 rounded-md border border-border px-3 py-2.5 flex items-center justify-between gap-3">
@@ -285,5 +297,4 @@ function SyncBadge({ report }: { report: FeedbackReport }) {
   return <Badge variant="secondary" className="shrink-0">Needs triage</Badge>;
 }
 
-/** Re-exported so the nav manifest's label and this page cannot drift apart. */
-export const FEEDBACK_KIND_LABELS = FEEDBACK_KINDS;
+

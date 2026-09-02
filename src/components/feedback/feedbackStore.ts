@@ -10,7 +10,13 @@
 
 import { useEffect, useReducer } from 'react';
 import { daysAgo } from '../../lib/demoDates';
-import type { FeedbackContext, FeedbackImpact, FeedbackKind, FeedbackReport } from './types';
+import type {
+  FeedbackAttachment,
+  FeedbackContext,
+  FeedbackImpact,
+  FeedbackKind,
+  FeedbackReport,
+} from './types';
 
 const KEY = 'feedback_reports_v1';
 
@@ -23,6 +29,7 @@ export interface NewFeedback {
   reporter: string;
   shareContext: boolean;
   context: FeedbackContext;
+  attachments: FeedbackAttachment[];
 }
 
 const SEED_CONTEXT: FeedbackContext = {
@@ -49,6 +56,7 @@ const SEED: FeedbackReport[] = [
     submittedAt: daysAgo(1),
     shareContext: true,
     context: SEED_CONTEXT,
+    attachments: [],
     sync: 'local',
   },
   {
@@ -63,6 +71,7 @@ const SEED: FeedbackReport[] = [
     submittedAt: daysAgo(4),
     shareContext: true,
     context: { ...SEED_CONTEXT, route: '/trips', screen: 'Trips', role: 'scheduling' },
+    attachments: [],
     sync: 'filed',
     jira: {
       key: 'MYGFO-398',
@@ -83,6 +92,7 @@ const SEED: FeedbackReport[] = [
     submittedAt: daysAgo(9),
     shareContext: false,
     context: { ...SEED_CONTEXT, route: '/documents', screen: 'Document Center', role: 'inflight' },
+    attachments: [],
     sync: 'failed',
     syncError: { message: 'Service temporarily unavailable', retryable: true },
   },

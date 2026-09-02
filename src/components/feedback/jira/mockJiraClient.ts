@@ -14,6 +14,7 @@ import {
   type AdfDocument,
   type JiraCreatedIssue,
   type JiraIssue,
+  type JiraAttachment,
   type JiraIssueCreateRequest,
   type JiraTransition,
 } from './types';
@@ -29,8 +30,11 @@ const WORKFLOW: JiraTransition[] = [
 
 interface MockDb {
   seq: number;
+  attachmentSeq: number;
   issues: Record<string, JiraIssue>;
   comments: Record<string, string[]>;
+  /** Filenames only — the bytes are not re-stored, the report already holds them. */
+  attachments: Record<string, JiraAttachment[]>;
 }
 
 export interface MockJiraOptions {
@@ -43,7 +47,7 @@ export interface MockJiraOptions {
 }
 
 function emptyDb(): MockDb {
-  return { seq: 400, issues: {}, comments: {} };
+  return { seq: 400, attachmentSeq: 9000, issues: {}, comments: {}, attachments: {} };
 }
 
 export class MockJiraClient implements JiraClient {
@@ -147,6 +151,7 @@ export class MockJiraClient implements JiraClient {
     db.seq = seq;
     db.issues[key] = issue;
     db.comments[key] = [adfToPlainText(request.fields.description)];
+    db.attachments[key] = [];
     this.write(db);
     return { id: issue.id, key: issue.key, self: issue.self };
   }
@@ -185,6 +190,39 @@ export class MockJiraClient implements JiraClient {
     issue.fields.status = transition.to;
     issue.fields.updated = this.now().toISOString();
     this.write(db);
+  }
+
+  async addAttachment(issueIdOrKey: string, file: Blob, filename: string): Promise<JiraAttachment[]> {
+    await this.settle();
+    const db = this.read();
+    const issue = this.require(db, issueIdOrKey);
+    // Jira caps attachment size per instance and 413s past it. 10 MB is the Cloud
+    // default; anything the app sends is already downscaled well below it, so a
+    // hit here means the downscale did not run.
+    if (file.size > 10 * 1024 * 1024) {
+      throw new JiraApiError('Attachment exceeds the maximum size.', 413, [
+        'The file you are trying to attach is too large.',
+      ]);
+    }
+    const seq = db.attachmentSeq + 1;
+    const attachment: JiraAttachment = {
+      id: String(seq),
+      filename,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      content: `${this.config.siteBaseUrl}/rest/api/3/attachment/content/${seq}`,
+      thumbnail: `${this.config.siteBaseUrl}/rest/api/3/attachment/thumbnail/${seq}`,
+    };
+    db.attachmentSeq = seq;
+    db.attachments[issue.key] = [...(db.attachments[issue.key] ?? []), attachment];
+    issue.fields.updated = this.now().toISOString();
+    this.write(db);
+    return [attachment];
+  }
+
+  /** Test/demo helper — reads back what an issue is carrying. Not part of JiraClient. */
+  attachmentsFor(issueKey: string): JiraAttachment[] {
+    return this.read().attachments[issueKey] ?? [];
   }
 
   /** Test/demo helper — not part of JiraClient, never called by app code. */

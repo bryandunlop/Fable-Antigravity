@@ -70,6 +70,21 @@ export interface JiraTransition {
   to: { id: string; name: string };
 }
 
+/**
+ * One entry of the array returned by
+ * `POST /rest/api/3/issue/{issueIdOrKey}/attachments`. Jira answers an upload
+ * with an array even when a single file was sent.
+ */
+export interface JiraAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  /** URL the file can be downloaded from. */
+  content: string;
+  thumbnail?: string;
+}
+
 /** Body of `POST /rest/api/3/issue/{issueIdOrKey}/comment`. */
 export interface JiraCommentRequest {
   body: AdfDocument;
