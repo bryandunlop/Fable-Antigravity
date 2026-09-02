@@ -9,6 +9,8 @@ import { cn } from '../../ui/utils';
 import { useMinuteTick } from '../useTripClock';
 import { LegClockLine } from '../components/LegClockLine';
 import { DocumentGatesPanel } from '../components/DocumentGatesPanel';
+import { WorkspaceStrip, type WorkspaceTab } from '../components/WorkspaceStrip';
+import { workspaceSummary } from '../engine/workspaceSummary';
 import { blockingGates, documentGates, gateFacts, gateKey } from '../engine/documentGates';
 import { useTripsModule } from '../TripsContext';
 import { LEADS } from '../data/tripsStore';
@@ -63,6 +65,8 @@ export default function TripWorkspace() {
   const [tail, setTail] = useState(CORE_TAILS[0]);
   const [moving, setMoving] = useState<{ kind: CutoffKind; date: string; reason: string } | null>(null);
   const [namesText, setNamesText] = useState<string | null>(null);
+  // Option A (D109 slice 4): one tab at a time, with the strip above carrying what a tab would hide.
+  const [tab, setTab] = useState<WorkspaceTab>('itinerary');
   const [refusal, setRefusal] = useState<{ kind: 'decline' | 'bump'; category: DenialCategory; note: string } | null>(null);
   const schedTrips = useTrips();
   const [addingLeg, setAddingLeg] = useState<{ index: number; from: import('../engine/trip').LegEnd; to: import('../engine/trip').LegEnd; date: string } | null>(null);
@@ -110,6 +114,15 @@ export default function TripWorkspace() {
   // blocking ones refuse the freeze until scheduling overrides them with a reason.
   const gates = documentGates(trip, people, settings.documentPolicy, nowUtc());
   const gatesBlocking = blockingGates(trip, gates);
+  const summary = workspaceSummary(trip, people, settings, gates, nowUtc());
+  // Everyone aboard as a record, so the People tab links to /people rather than printing a string.
+  const aboardPeople = (trip.passengerIds?.length
+    ? trip.passengerIds.map(pid => people.find(x => x.id === pid))
+    : trip.passengerNames.map(n => people.find(x => x.name === n))
+  ).filter((x): x is NonNullable<typeof x> => !!x);
+  const tabs: WorkspaceTab[] = isSched
+    ? ['itinerary', 'people', 'record', 'documents', 'sheet', 'ops']
+    : ['itinerary', 'people', 'record', 'documents', 'sheet'];
   // TL-48: which tails are actually free on this trip's days. Scheduling may only assign one of
   // those; a busy tail is listed with why, so the double booking is a decision, never an accident.
   const tripDates = trip.legs.map(l => l.date).filter((d): d is string => !!d);
@@ -263,6 +276,8 @@ export default function TripWorkspace() {
         }
       />
 
+      <WorkspaceStrip summary={summary} tab={tab} onTab={setTab} tabs={tabs} nowUtc={nowUtc()} />
+
       {refusal && (
         <GfoPanel title={refusal.kind === 'decline' ? 'Decline this request' : `Bump this trip off ${trip.tail}`}>
           <div className="grid gap-3 md:grid-cols-[260px_1fr_auto_auto]">
@@ -277,8 +292,8 @@ export default function TripWorkspace() {
         </GfoPanel>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_1.3fr_0.9fr]">
-        {/* ── Itinerary ── */}
+      {tab === 'itinerary' && (
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
         <GfoPanel title="Itinerary">
           <div className="space-y-3">
             {trip.legs.map((leg, i) => editable ? (
@@ -366,58 +381,6 @@ export default function TripWorkspace() {
           </div>
 
           <div className="mt-4 grid gap-3 border-t border-border pt-4 text-sm md:grid-cols-2">
-            <div>
-              <label className="gfo-eyebrow mb-1 block text-muted-foreground">Lead</label>
-              {editable ? (
-                <select className={`${field} w-full`} value={trip.leadPassengerId} aria-label="Lead passenger"
-                  onChange={e => update(tripId, t => setHeader(t, { leadPassengerId: e.target.value, leadPassengerName: LEADS.find(l => l.id === e.target.value)?.name ?? '' }))}>
-                  {LEADS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              ) : <div>{trip.leadPassengerName}</div>}
-            </div>
-            <div>
-              <label className="gfo-eyebrow mb-1 block text-muted-foreground">Seats to hold</label>
-              {editable ? (
-                <input type="number" min={1} max={14} className={`${field} w-full`} value={trip.seatsHeld} aria-label="Seats to hold"
-                  onChange={e => update(tripId, t => setHeader(t, { seatsHeld: Math.max(1, Number(e.target.value) || 1) }))} />
-              ) : <div>{trip.seatsHeld}</div>}
-            </div>
-            {live && (
-              <div className="md:col-span-2">
-                <label className="gfo-eyebrow mb-1 block text-muted-foreground">Names so far · {trip.passengerNames.length} of {trip.seatsHeld}</label>
-                {isEa && paxPolicy === 'free' ? (
-                  <div className="flex gap-1.5">
-                    <input className={`${field} flex-1`} value={namesText ?? trip.passengerNames.join(', ')} aria-label="Passenger names"
-                      onChange={e => setNamesText(e.target.value)} onBlur={saveNames} onKeyDown={e => e.key === 'Enter' && saveNames()} placeholder="Comma-separated" />
-                  </div>
-                ) : isEa ? (
-                  <div>
-                    <div>{trip.passengerNames.join(' · ')}</div>
-                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-400">
-                      {paxPolicy === 'locked' ? 'Departed — the list is closed.' : `Inside the ${isInternational(trip) ? 'international' : 'domestic'} names cutoff — ask scheduling in the record to change who is aboard.`}
-                    </p>
-                  </div>
-                ) : <div>{trip.passengerNames.join(' · ')}</div>}
-                {trip.passengerNames.length < trip.seatsHeld && <p className="mt-1 text-xs text-muted-foreground">{trip.seatsHeld - trip.passengerNames.length} seat{trip.seatsHeld - trip.passengerNames.length === 1 ? '' : 's'} still unnamed.</p>}
-              </div>
-            )}
-            {live && trip.tail && (
-              <div className="md:col-span-2">
-                <label className="gfo-eyebrow mb-1 block text-muted-foreground">Crew</label>
-                {isSched ? (
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {(['PIC', 'SIC', 'FA'] as const).map(role => (
-                      <select key={role} className={`${field} w-full`} aria-label={role}
-                        value={role === 'PIC' ? trip.crew?.pic ?? '' : role === 'SIC' ? trip.crew?.sic ?? '' : trip.crew?.fa ?? ''}
-                        onChange={e => update(tripId, t => setCrew(t, { pic: t.crew?.pic ?? '', sic: t.crew?.sic ?? '', fa: t.crew?.fa ?? null, [role === 'PIC' ? 'pic' : role === 'SIC' ? 'sic' : 'fa']: e.target.value || (role === 'FA' ? null : '') }, actor, nowUtc()))}>
-                        <option value="">{role} —</option>
-                        {roster.filter(c => c.role === role).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                      </select>
-                    ))}
-                  </div>
-                ) : <div>{trip.crew ? `${trip.crew.pic} · ${trip.crew.sic}${trip.crew.fa ? ` · ${trip.crew.fa}` : ''}` : <span className="text-muted-foreground">not yet assigned</span>}</div>}
-              </div>
-            )}
             {(editable || trip.board) && (
               <div className="md:col-span-2 rounded-md border border-dashed border-border p-2">
                 <label className="flex items-center gap-2 text-sm">
@@ -460,54 +423,8 @@ export default function TripWorkspace() {
           )}
         </GfoPanel>
 
-        {/* ── Record ── */}
-        <GfoPanel
-          title="Record"
-          action={
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search this trip…" aria-label="Search this trip"
-                className="h-8 w-48 rounded-md border border-border bg-input-background pl-7 pr-2 text-xs outline-none focus:ring-2 focus:ring-ring" />
-            </div>
-          }
-        >
-          <ol className="space-y-3">
-            {feed.map(e => <EventRow key={e.id} e={e} />)}
-            {feed.length === 0 && <li className="text-sm text-muted-foreground">Nothing matches.</li>}
-          </ol>
-          {(isEa || isSched) && (
-            <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-              <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()}
-                placeholder={isSched && !trip.visibleToScheduling ? 'Not visible to scheduling yet' : isSched ? 'Message the EA…' : 'Message scheduling…'}
-                disabled={isSched && !trip.visibleToScheduling}
-                aria-label="Message" className={`${field} flex-1`} />
-              <input ref={fileRef} type="file" className="hidden" onChange={onFile} aria-label="Attach a file" />
-              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} title="Attach a file"><Paperclip className="h-4 w-4" /></Button>
-              <Button size="sm" onClick={send} disabled={!draft.trim()}><Send className="mr-1.5 h-4 w-4" />Send</Button>
-            </div>
-          )}
-          {isEa && !trip.visibleToScheduling && (
-            <p className="mt-2 text-xs text-muted-foreground">Only you can see this record until you share or submit.</p>
-          )}
-        </GfoPanel>
 
-        {/* ── Documents + coming up ── */}
         <div className="space-y-4">
-          <GfoPanel title="Documents" action={<Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Paperclip className="mr-1.5 h-4 w-4" />Add</Button>}>
-            {docs.length === 0 && <p className="text-sm text-muted-foreground">Nothing yet. Drop the agenda, passports, anything the trip needs.</p>}
-            <ul className="divide-y divide-border text-sm">
-              {docs.map(d => (
-                <li key={d.id} className="flex items-center justify-between py-2">
-                  <span className="min-w-0">
-                    {d.dataUrl ? <a href={d.dataUrl} download={d.name} className="truncate font-medium text-primary hover:underline">{d.name}</a> : <span className="truncate font-medium">{d.name}</span>}
-                    <span className="block text-xs text-muted-foreground">{(d.sizeBytes / 1024).toFixed(0)} KB · {d.tag.kind === 'leg' ? `leg ${trip.legs.findIndex(l => l.id === (d.tag as { legId: string }).legId) + 1}` : d.tag.kind === 'passenger' ? d.tag.name : 'trip'}</span>
-                  </span>
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">EA + scheduling</span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-xs text-muted-foreground">Crew never see these here. Scheduling sends what the crew needs, later.</p>
-          </GfoPanel>
           <GfoPanel title="Coming up">
             {cutoffs.length === 0 && <p className="text-sm text-muted-foreground">Give the first leg a date and the cutoffs appear.</p>}
             <ul className="space-y-2 text-sm">
@@ -538,32 +455,153 @@ export default function TripWorkspace() {
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">Defaults from Trip settings; a move here is this trip only.</p>
           </GfoPanel>
+        </div>
+      </div>
+      )}
 
-          {isSched && trip.tail && rotation.length > 0 && (
-            <GfoPanel title={`${trip.tail} around this trip`}>
-              <ul className="space-y-1 text-sm">
-                {rotation.map((r, i) => (
-                  <li key={i} className={cn('flex items-center justify-between gap-2', r.kind !== 'passenger' && 'text-emerald-800 dark:text-emerald-300')}>
-                    <span>{r.dateUtc.slice(5)} · {r.from} → {r.to}{r.kind === 'ferry' ? ' · empty · potentially open' : r.kind === 'return' ? ' · empty return · potentially open' : r.kind === 'positioning' ? ' · positioning · potentially open' : ''}</span>
-                    <span className="text-xs text-muted-foreground">{r.kind === 'passenger' ? (r.tripId === trip.id ? 'this trip' : r.title) : ''}</span>
+      {tab === 'people' && (
+        <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+          <GfoPanel title="People">
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+            <div>
+              <label className="gfo-eyebrow mb-1 block text-muted-foreground">Lead</label>
+              {editable ? (
+                <select className={`${field} w-full`} value={trip.leadPassengerId} aria-label="Lead passenger"
+                  onChange={e => update(tripId, t => setHeader(t, { leadPassengerId: e.target.value, leadPassengerName: LEADS.find(l => l.id === e.target.value)?.name ?? '' }))}>
+                  {LEADS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              ) : <div>{trip.leadPassengerName}</div>}
+            </div>
+            <div>
+              <label className="gfo-eyebrow mb-1 block text-muted-foreground">Seats to hold</label>
+              {editable ? (
+                <input type="number" min={1} max={14} className={`${field} w-full`} value={trip.seatsHeld} aria-label="Seats to hold"
+                  onChange={e => update(tripId, t => setHeader(t, { seatsHeld: Math.max(1, Number(e.target.value) || 1) }))} />
+              ) : <div>{trip.seatsHeld}</div>}
+            </div>
+            {live && (
+              <div className="md:col-span-2">
+                <label className="gfo-eyebrow mb-1 block text-muted-foreground">Names so far · {trip.passengerNames.length} of {trip.seatsHeld}</label>
+                {isEa && paxPolicy === 'free' ? (
+                  <div className="flex gap-1.5">
+                    <input className={`${field} flex-1`} value={namesText ?? trip.passengerNames.join(', ')} aria-label="Passenger names"
+                      onChange={e => setNamesText(e.target.value)} onBlur={saveNames} onKeyDown={e => e.key === 'Enter' && saveNames()} placeholder="Comma-separated" />
+                  </div>
+                ) : isEa ? (
+                  <div>
+                    <div>{trip.passengerNames.join(' · ')}</div>
+                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-400">
+                      {paxPolicy === 'locked' ? 'Departed — the list is closed.' : `Inside the ${isInternational(trip) ? 'international' : 'domestic'} names cutoff — ask scheduling in the record to change who is aboard.`}
+                    </p>
+                  </div>
+                ) : <div>{trip.passengerNames.join(' · ')}</div>}
+                {trip.passengerNames.length < trip.seatsHeld && <p className="mt-1 text-xs text-muted-foreground">{trip.seatsHeld - trip.passengerNames.length} seat{trip.seatsHeld - trip.passengerNames.length === 1 ? '' : 's'} still unnamed.</p>}
+              </div>
+            )}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              A name here resolves to a person record — the reserve, the briefing email, the document
+              gates and the metrics all read that record, not the name.
+            </p>
+          </GfoPanel>
+          <div className="space-y-4">
+            <GfoPanel title="Aboard">
+              {aboardPeople.length === 0 && <p className="text-sm text-muted-foreground">Nobody named yet.</p>}
+              <ul className="divide-y divide-border text-sm">
+                {aboardPeople.map(p => (
+                  <li key={p.id} className="py-2">
+                    <button className="text-left" onClick={() => navigate(`/people/${p.id}`)}>
+                      <span className="font-medium text-primary hover:underline">{p.name}</span>
+                    </button>
+                    <div className="text-xs text-muted-foreground">
+                      {p.forms.status === 'approved' ? 'Forms approved'
+                        : p.forms.status === 'in-review' ? 'Forms in review'
+                        : p.forms.status === 'resubmit' ? 'Forms need resubmitting'
+                        : 'No forms on file'}
+                    </div>
+                    {gates.filter(g => g.personId === p.id).length > 0 && (
+                      <button className="text-xs text-amber-800 hover:underline dark:text-amber-400" onClick={() => setTab('documents')}>
+                        {gates.filter(g => g.personId === p.id).length} document gate{gates.filter(g => g.personId === p.id).length === 1 ? '' : 's'}
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-xs text-muted-foreground">Every leg this aircraft flies around these dates, across trips. An empty leg is one a rider could take.</p>
+              {trip.passengerNames.some(n => !aboardPeople.some(p => p.name === n)) && (
+                <p className="mt-2 text-xs text-muted-foreground">Some names have no record yet; they get one when the list is saved.</p>
+              )}
             </GfoPanel>
-          )}
+          </div>
+        </div>
+      )}
 
-          {live && (
-            <>
-            <DocumentGatesPanel
+      {tab === 'record' && (
+        <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+        {/* ── Record ── */}
+        <GfoPanel
+          title="Record"
+          action={
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search this trip…" aria-label="Search this trip"
+                className="h-8 w-48 rounded-md border border-border bg-input-background pl-7 pr-2 text-xs outline-none focus:ring-2 focus:ring-ring" />
+            </div>
+          }
+        >
+          <ol className="space-y-3">
+            {feed.map(e => <EventRow key={e.id} e={e} />)}
+            {feed.length === 0 && <li className="text-sm text-muted-foreground">Nothing matches.</li>}
+          </ol>
+          {(isEa || isSched) && (
+            <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
+              <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()}
+                placeholder={isSched && !trip.visibleToScheduling ? 'Not visible to scheduling yet' : isSched ? 'Message the EA…' : 'Message scheduling…'}
+                disabled={isSched && !trip.visibleToScheduling}
+                aria-label="Message" className={`${field} flex-1`} />
+              <input ref={fileRef} type="file" className="hidden" onChange={onFile} aria-label="Attach a file" />
+              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} title="Attach a file"><Paperclip className="h-4 w-4" /></Button>
+              <Button size="sm" onClick={send} disabled={!draft.trim()}><Send className="mr-1.5 h-4 w-4" />Send</Button>
+            </div>
+          )}
+          {isEa && !trip.visibleToScheduling && (
+            <p className="mt-2 text-xs text-muted-foreground">Only you can see this record until you share or submit.</p>
+          )}
+        </GfoPanel>
+        </div>
+      )}
+
+      {tab === 'documents' && (
+        <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+          {live ? <DocumentGatesPanel
               gates={gates}
               blocking={gatesBlocking}
               trip={trip}
               canOverride={isSched}
               onOverride={(gate, reason) => update(tripId, t => overrideGate(t, gateKey(gate), reason, actor, nowUtc(), gateFacts(gate)))}
-            />
+            /> : null}
+          <div className="space-y-4">
+            <GfoPanel title="Documents" action={<Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Paperclip className="mr-1.5 h-4 w-4" />Add</Button>}>
+            {docs.length === 0 && <p className="text-sm text-muted-foreground">Nothing yet. Drop the agenda, passports, anything the trip needs.</p>}
+            <ul className="divide-y divide-border text-sm">
+              {docs.map(d => (
+                <li key={d.id} className="flex items-center justify-between py-2">
+                  <span className="min-w-0">
+                    {d.dataUrl ? <a href={d.dataUrl} download={d.name} className="truncate font-medium text-primary hover:underline">{d.name}</a> : <span className="truncate font-medium">{d.name}</span>}
+                    <span className="block text-xs text-muted-foreground">{(d.sizeBytes / 1024).toFixed(0)} KB · {d.tag.kind === 'leg' ? `leg ${trip.legs.findIndex(l => l.id === (d.tag as { legId: string }).legId) + 1}` : d.tag.kind === 'passenger' ? d.tag.name : 'trip'}</span>
+                  </span>
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">EA + scheduling</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-muted-foreground">Crew never see these here. Scheduling sends what the crew needs, later.</p>
+          </GfoPanel>
+          </div>
+        </div>
+      )}
 
-            <GfoPanel title="The 72-hour moment">
+      {tab === 'sheet' && live && (
+        <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+          <GfoPanel title="The 72-hour moment">
               {!sheet && (
                 <div className="space-y-2 text-sm">
                   <p className="text-muted-foreground">The trip sheet freezes and the passenger email is drafted at {cutoffs.find(c => c.kind === 'freeze') ? formatEt(cutoffs.find(c => c.kind === 'freeze')!.dueUtc) : 'T-72'}.</p>
@@ -594,10 +632,53 @@ export default function TripWorkspace() {
                 </div>
               )}
             </GfoPanel>
-            </>
-          )}
         </div>
-      </div>
+      )}
+      {tab === 'sheet' && !live && (
+        <GfoPanel><p className="text-sm text-muted-foreground">The sheet and the email exist once the itinerary is submitted.</p></GfoPanel>
+      )}
+
+      {tab === 'ops' && isSched && (
+        <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+          <GfoPanel title="Crew and the aircraft's day">
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+            {live && trip.tail && (
+              <div className="md:col-span-2">
+                <label className="gfo-eyebrow mb-1 block text-muted-foreground">Crew</label>
+                {isSched ? (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['PIC', 'SIC', 'FA'] as const).map(role => (
+                      <select key={role} className={`${field} w-full`} aria-label={role}
+                        value={role === 'PIC' ? trip.crew?.pic ?? '' : role === 'SIC' ? trip.crew?.sic ?? '' : trip.crew?.fa ?? ''}
+                        onChange={e => update(tripId, t => setCrew(t, { pic: t.crew?.pic ?? '', sic: t.crew?.sic ?? '', fa: t.crew?.fa ?? null, [role === 'PIC' ? 'pic' : role === 'SIC' ? 'sic' : 'fa']: e.target.value || (role === 'FA' ? null : '') }, actor, nowUtc()))}>
+                        <option value="">{role} —</option>
+                        {roster.filter(c => c.role === role).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      </select>
+                    ))}
+                  </div>
+                ) : <div>{trip.crew ? `${trip.crew.pic} · ${trip.crew.sic}${trip.crew.fa ? ` · ${trip.crew.fa}` : ''}` : <span className="text-muted-foreground">not yet assigned</span>}</div>}
+              </div>
+            )}
+            </div>
+            {!live && <p className="text-sm text-muted-foreground">Crew are set once the trip is confirmed on an aircraft.</p>}
+          </GfoPanel>
+          <div className="space-y-4">
+            {isSched && trip.tail && rotation.length > 0 && (
+            <GfoPanel title={`${trip.tail} around this trip`}>
+              <ul className="space-y-1 text-sm">
+                {rotation.map((r, i) => (
+                  <li key={i} className={cn('flex items-center justify-between gap-2', r.kind !== 'passenger' && 'text-emerald-800 dark:text-emerald-300')}>
+                    <span>{r.dateUtc.slice(5)} · {r.from} → {r.to}{r.kind === 'ferry' ? ' · empty · potentially open' : r.kind === 'return' ? ' · empty return · potentially open' : r.kind === 'positioning' ? ' · positioning · potentially open' : ''}</span>
+                    <span className="text-xs text-muted-foreground">{r.kind === 'passenger' ? (r.tripId === trip.id ? 'this trip' : r.title) : ''}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-muted-foreground">Every leg this aircraft flies around these dates, across trips. An empty leg is one a rider could take.</p>
+            </GfoPanel>
+          )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
