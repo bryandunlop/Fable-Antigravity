@@ -33,6 +33,7 @@ import { DocWorkbench } from './components/documents/pages/DocWorkbench';
 import LeadDashboard from './components/lead/LeadDashboard';
 import ExecutiveDashboard from './components/executive/ExecutiveDashboard';
 import SchedulePage from './components/schedule/SchedulePage';
+import TripsRoutes from './components/trips/TripsRoutes';
 import ManagerInsights from './components/ManagerInsights';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
@@ -445,6 +446,15 @@ export default function App() {
                                       <SchedulingWorkspaceProvider>
                                         <LeadDashboard userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                {/* D105 — the trip workspace: request builder, record, documents, places register */}
+                                <Route
+                                  path="/trips/*"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'lead', 'admin', 'executive']}>
+                                      <TripsRoutes userRole={userRole} additionalRoles={additionalRoles} />
                                     </ProtectedRoute>
                                   }
                                 />
