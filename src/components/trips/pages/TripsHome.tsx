@@ -9,6 +9,7 @@ import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
 import { useTripsModule } from '../TripsContext';
 import { routeLabel, searchEvents, submitBlockers, tripSpan, eventText, type Trip } from '../engine/trip';
+import { schedulingQueue, BAND_LABEL, BAND_NOTE, type QueueBand, type QueueRow } from '../engine/queue';
 
 const STATUS_LABEL: Record<Trip['status'], string> = { draft: 'Draft', submitted: 'Submitted', confirmed: 'Confirmed', declined: 'Declined', cancelled: 'Cancelled' };
 const STATUS_TONE: Record<Trip['status'], string> = {
@@ -24,17 +25,27 @@ function fmt(d: string | null): string {
   return new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
+const BAND_ORDER: QueueBand[] = ['you', 'ea', 'freezing', 'nobody'];
+
 export default function TripsHome() {
-  const { trips, actor } = useTripsModule();
+  const { trips, actor, people, settings, nowUtc } = useTripsModule();
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const hits = useMemo(() => searchEvents(trips, q).slice(0, 12), [trips, q]);
+  const isSched = actor.role === 'scheduling';
 
-  const groups: Array<{ title: string; rows: Trip[] }> = actor.role === 'scheduling'
+  // Scheduling reads the queue, not a status list: "submitted" and "confirmed" say what state a trip
+  // is in, never who is holding it up, and that is the only question a scheduler opens this page with.
+  const queue = useMemo(
+    () => (isSched ? schedulingQueue(trips, people, settings, nowUtc()) : null),
+    [isSched, trips, people, settings, nowUtc],
+  );
+
+  const groups: Array<{ title: string; rows: Trip[] }> = isSched
     ? [
-        { title: 'Submitted — waiting on an aircraft', rows: trips.filter(t => t.status === 'submitted') },
+        // Drafts are not in the queue — nobody can act on a trip that has not been submitted — so
+        // they keep a list of their own.
         { title: 'Drafts shared with you', rows: trips.filter(t => t.status === 'draft') },
-        { title: 'Confirmed', rows: trips.filter(t => t.status === 'confirmed') },
       ]
     : [
         { title: 'Drafts', rows: trips.filter(t => t.status === 'draft') },
@@ -45,7 +56,7 @@ export default function TripsHome() {
   return (
     <div className="mx-auto max-w-[1200px] space-y-4 p-6">
       <GfoPageHeader
-        eyebrow={actor.role === 'scheduling' ? 'Scheduling · trips' : `Trips · ${actor.name.split(' ')[0]}`}
+        eyebrow={isSched ? 'Scheduling · trips' : `Trips · ${actor.name.split(' ')[0]}`}
         title="Trips"
         actions={
           <div className="flex items-center gap-2">
@@ -54,7 +65,7 @@ export default function TripsHome() {
               <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search every trip record…" aria-label="Search trip records"
                 className="h-9 w-72 rounded-md border border-border bg-input-background pl-8 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
             </div>
-            {actor.role !== 'scheduling' && (
+            {!isSched && (
               <Button size="sm" onClick={() => navigate('/trips/new')}><Plus className="mr-1.5 h-4 w-4" />New trip</Button>
             )}
           </div>
@@ -76,6 +87,20 @@ export default function TripsHome() {
           </ul>
         </GfoPanel>
       )}
+
+      {queue && BAND_ORDER.map(band => {
+        const rows = queue[band];
+        if (rows.length === 0 && band !== 'you') return null;
+        return (
+          <GfoPanel key={band} title={`${BAND_LABEL[band]}${rows.length ? ` · ${rows.length}` : ''}`}>
+            {rows.length === 0 && <p className="text-sm text-muted-foreground">Nothing. {BAND_NOTE[band]}</p>}
+            {rows.length > 0 && <p className="mb-3 text-xs text-muted-foreground">{BAND_NOTE[band]}</p>}
+            <ul className="divide-y divide-border">
+              {rows.map(r => <QueueRowItem key={r.trip.id} row={r} />)}
+            </ul>
+          </GfoPanel>
+        );
+      })}
 
       {groups.map(g => (
         <GfoPanel key={g.title} title={g.title}>
@@ -106,5 +131,38 @@ export default function TripsHome() {
         </GfoPanel>
       ))}
     </div>
+  );
+}
+
+/** One trip in the queue: what it is, why it is here, and how long it has been waiting. */
+function QueueRowItem({ row }: { row: QueueRow }) {
+  const span = tripSpan(row.trip);
+  const days = Math.floor(row.ageHours / 24);
+  const age = row.ageHours < 1 ? 'just now' : days >= 1 ? `${days} day${days === 1 ? '' : 's'}` : `${Math.floor(row.ageHours)} h`;
+  return (
+    <li>
+      <Link to={`/trips/${row.trip.id}`} className="flex items-start gap-4 py-2.5 hover:bg-muted/40">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-primary">{row.trip.title}</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {routeLabel(row.trip)} · {row.trip.leadPassengerName} + {Math.max(0, row.trip.seatsHeld - 1)} · {fmt(span.start)}
+            {span.end && span.end !== span.start ? ` – ${fmt(span.end)}` : ''}
+          </span>
+          {row.reasons.length > 0 && (
+            <span className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+              {row.reasons.map(reason => (
+                <span key={reason} className={cn('text-xs', /gate|unnamed|unanswered|Freezes/.test(reason) ? 'text-amber-800 dark:text-amber-400' : 'text-muted-foreground')}>
+                  {reason}
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+        <span className="shrink-0 text-right">
+          {row.trip.tail && <span className="block text-xs font-medium">{row.trip.tail}</span>}
+          <span className="block text-xs text-muted-foreground">{age}</span>
+        </span>
+      </Link>
+    </li>
   );
 }
