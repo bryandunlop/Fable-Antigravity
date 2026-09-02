@@ -60,6 +60,14 @@ const SEED: AirportCoord[] = [
   { icao: 'KAUS', iata: 'AUS', lat: 30.1975, lon: -97.6664, name: 'Austin-Bergstrom' },
   { icao: 'EGGW', iata: 'LTN', lat: 51.8747, lon: -0.3683, name: 'London Luton' },
   { icao: 'LSGG', iata: 'GVA', lat: 46.2381, lon: 6.1090, name: 'Geneva' },
+  // D105/D106 — the places register's fields (trip sheet wall clocks and block estimates).
+  { icao: 'KBFI', iata: 'BFI', lat: 47.53, lon: -122.3019, name: 'Seattle Boeing Field' },
+  { icao: 'KSEA', iata: 'SEA', lat: 47.4502, lon: -122.3088, name: 'Seattle-Tacoma' },
+  { icao: 'KPAE', iata: 'PAE', lat: 47.9063, lon: -122.2816, name: 'Paine Field (Everett)' },
+  { icao: 'KBED', iata: 'BED', lat: 42.47, lon: -71.289, name: 'Hanscom Field' },
+  { icao: 'KAVP', iata: 'AVP', lat: 41.3385, lon: -75.7234, name: 'Wilkes-Barre/Scranton' },
+  { icao: 'KMRB', iata: 'MRB', lat: 39.4019, lon: -77.9846, name: 'Eastern WV Regional (Martinsburg)' },
+  { icao: 'EGLF', iata: 'FAB', lat: 51.2758, lon: -0.7763, name: 'Farnborough' },
 ];
 
 const BY_CODE = new Map<string, AirportCoord>();

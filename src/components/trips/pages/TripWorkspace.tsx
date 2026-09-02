@@ -1,8 +1,8 @@
 // The trip workspace (D105, direction C): itinerary · record · documents, one page per trip.
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Paperclip, Search, Send } from 'lucide-react';
+import { ArrowLeft, FileText, Mail, Paperclip, Search, Send, Snowflake } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
@@ -14,8 +14,13 @@ import { airportLabel, SCHEDULING_DECIDES } from '../engine/places';
 import {
   addDocument, addLeg, askQuestion, assignTail, canSubmit, decline, documentsOf, eventText, postMessage,
   readinessChecks, removeLeg, setHeader, shareDraft, submitBlockers, submitItinerary, updateLeg,
+  setCatering, setCrew, setPassengers,
   type Trip, type TripEvent,
 } from '../engine/trip';
+import { cutoffsFor, formatEt, freezeDue, moveCutoff, type CutoffKind } from '../engine/cutoffs';
+import { freezeSheet, inFreezeWindow, latestSheet } from '../engine/tripSheet';
+import { autoSendIfDue, draftEmail, emailDraftOf, emailState } from '../engine/briefingEmail';
+import { getCrewRoster } from '../../crew/crewRecords';
 import { describeTiming } from '../../booking-portal/engine/legTiming';
 
 const field = 'h-9 rounded-md border border-border bg-input-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring';
@@ -37,11 +42,14 @@ const STATUS_TONE: Record<Trip['status'], string> = {
 export default function TripWorkspace() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { trips, actor, places, update, nowUtc } = useTripsModule();
+  const { trips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor } = useTripsModule();
   const trip = trips.find(t => t.id === id);
   const [draft, setDraft] = useState('');
   const [q, setQ] = useState('');
   const [tail, setTail] = useState(CORE_TAILS[0]);
+  const [moving, setMoving] = useState<{ kind: CutoffKind; date: string; reason: string } | null>(null);
+  const [namesText, setNamesText] = useState<string | null>(null);
+  const roster = useMemo(() => getCrewRoster(nowUtc()), [nowUtc]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const feed = useMemo(() => {
@@ -49,6 +57,31 @@ export default function TripWorkspace() {
     const all = [...(trip?.events ?? [])].sort((a, b) => a.at.localeCompare(b.at));
     return qq ? all.filter(e => `${eventText(e)} ${e.by.name} ${e.kind}`.toLowerCase().includes(qq)) : all;
   }, [trip?.events, q]);
+
+  // The clock does two things on its own: at T-72 the sheet freezes and the email is drafted;
+  // past the dead-man timer the email goes. Both are recorded as events; neither needs a person.
+  const tripIdForClock = trip?.id ?? null;
+  const tripStatus = trip?.status;
+  const hasSheet = !!(trip && latestSheet(trip));
+  const draftState = trip ? emailState(trip, nowUtc()).state : 'none';
+  useEffect(() => {
+    if (!tripIdForClock || (tripStatus !== 'submitted' && tripStatus !== 'confirmed')) return;
+    const now = nowUtc();
+    update(tripIdForClock, t => {
+      let next = t;
+      if (!latestSheet(next) && freezeDue(next, settings.cutoffs, now)) {
+        const by = { name: 'T-72 clock', role: 'system' as const };
+        next = freezeSheet(next, sheetCtx, now, by);
+        const sheet = latestSheet(next);
+        if (sheet && !emailDraftOf(next)) {
+          next = draftEmail(next, sheet, settings.email, settings.passengerPrefs, weatherFor(sheet.legs.map(l => l.to.icao).filter((x): x is string => !!x)), by, now);
+        }
+      }
+      next = autoSendIfDue(next, now);
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripIdForClock, tripStatus, hasSheet, draftState]);
 
   if (!trip) {
     return (
@@ -65,6 +98,28 @@ export default function TripWorkspace() {
   const blockers = submitBlockers(trip);
   const checks = readinessChecks(trip);
   const docs = documentsOf(trip);
+  const cutoffs = cutoffsFor(trip, settings.cutoffs);
+  const sheet = latestSheet(trip);
+  const email = emailState(trip, nowUtc());
+  const live = trip.status === 'submitted' || trip.status === 'confirmed';
+  const canFreezeNow = isSched && live && !sheet && inFreezeWindow(trip, settings.cutoffs.freezeHours * 3, nowUtc());
+
+  function freezeNow() {
+    const now = nowUtc();
+    update(tripId, t => {
+      let next = freezeSheet(t, sheetCtx, now, actor);
+      const sh = latestSheet(next);
+      if (sh && !emailDraftOf(next)) {
+        next = draftEmail(next, sh, settings.email, settings.passengerPrefs, weatherFor(sh.legs.map(l => l.to.icao).filter((x): x is string => !!x)), actor, now);
+      }
+      return next;
+    });
+  }
+  function saveNames() {
+    if (namesText === null) return;
+    update(tripId, t => setPassengers(t, namesText.split(',').map(x => x.trim()).filter(Boolean), actor, nowUtc()));
+    setNamesText(null);
+  }
 
   function send() {
     if (!draft.trim()) return;
@@ -136,6 +191,13 @@ export default function TripWorkspace() {
                 {isSched && (leg.to.airport === SCHEDULING_DECIDES || !leg.to.airport) && (
                   <Button variant="outline" size="sm" className="mt-2" onClick={askAirport}>Ask about the airport</Button>
                 )}
+                {live && (isEa || isSched) && (
+                  <label className="mt-2 block">
+                    <span className="gfo-eyebrow text-muted-foreground">Catering</span>
+                    <input className={`${field} mt-0.5 w-full`} defaultValue={leg.catering ?? ''} placeholder="Nothing loaded yet" aria-label={`Catering leg ${i + 1}`}
+                      onBlur={e => { if ((leg.catering ?? '') !== e.target.value.trim()) update(tripId, t => setCatering(t, leg.id, e.target.value, actor, nowUtc())); }} />
+                  </label>
+                )}
               </div>
             ))}
             {editable && <Button variant="outline" size="sm" onClick={() => update(tripId, t => addLeg(t))}>+ Add a leg</Button>}
@@ -158,6 +220,35 @@ export default function TripWorkspace() {
                   onChange={e => update(tripId, t => setHeader(t, { seatsHeld: Math.max(1, Number(e.target.value) || 1) }))} />
               ) : <div>{trip.seatsHeld}</div>}
             </div>
+            {live && (
+              <div className="md:col-span-2">
+                <label className="gfo-eyebrow mb-1 block text-muted-foreground">Names so far · {trip.passengerNames.length} of {trip.seatsHeld}</label>
+                {isEa ? (
+                  <div className="flex gap-1.5">
+                    <input className={`${field} flex-1`} value={namesText ?? trip.passengerNames.join(', ')} aria-label="Passenger names"
+                      onChange={e => setNamesText(e.target.value)} onBlur={saveNames} onKeyDown={e => e.key === 'Enter' && saveNames()} placeholder="Comma-separated" />
+                  </div>
+                ) : <div>{trip.passengerNames.join(' · ')}</div>}
+                {trip.passengerNames.length < trip.seatsHeld && <p className="mt-1 text-xs text-muted-foreground">{trip.seatsHeld - trip.passengerNames.length} seat{trip.seatsHeld - trip.passengerNames.length === 1 ? '' : 's'} still unnamed.</p>}
+              </div>
+            )}
+            {live && trip.tail && (
+              <div className="md:col-span-2">
+                <label className="gfo-eyebrow mb-1 block text-muted-foreground">Crew</label>
+                {isSched ? (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['PIC', 'SIC', 'FA'] as const).map(role => (
+                      <select key={role} className={`${field} w-full`} aria-label={role}
+                        value={role === 'PIC' ? trip.crew?.pic ?? '' : role === 'SIC' ? trip.crew?.sic ?? '' : trip.crew?.fa ?? ''}
+                        onChange={e => update(tripId, t => setCrew(t, { pic: t.crew?.pic ?? '', sic: t.crew?.sic ?? '', fa: t.crew?.fa ?? null, [role === 'PIC' ? 'pic' : role === 'SIC' ? 'sic' : 'fa']: e.target.value || (role === 'FA' ? null : '') }, actor, nowUtc()))}>
+                        <option value="">{role} —</option>
+                        {roster.filter(c => c.role === role).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      </select>
+                    ))}
+                  </div>
+                ) : <div>{trip.crew ? `${trip.crew.pic} · ${trip.crew.sic}${trip.crew.fa ? ` · ${trip.crew.fa}` : ''}` : <span className="text-muted-foreground">not yet assigned</span>}</div>}
+              </div>
+            )}
             {editable && (
               <div className="md:col-span-2">
                 <label className="gfo-eyebrow mb-1 block text-muted-foreground">Trip name</label>
@@ -227,12 +318,63 @@ export default function TripWorkspace() {
             <p className="mt-3 text-xs text-muted-foreground">Crew never see these here. Scheduling sends what the crew needs, later.</p>
           </GfoPanel>
           <GfoPanel title="Coming up">
-            <ul className="space-y-1 text-sm">
-              <li><span className="text-muted-foreground">21 days out</span> · names for {Math.max(0, trip.seatsHeld - 1)} seats</li>
-              <li><span className="text-muted-foreground">72 h out</span> · trip sheet freezes</li>
+            {cutoffs.length === 0 && <p className="text-sm text-muted-foreground">Give the first leg a date and the cutoffs appear.</p>}
+            <ul className="space-y-2 text-sm">
+              {cutoffs.map(c => (
+                <li key={c.kind}>
+                  <div className="flex items-start justify-between gap-2">
+                    <span>
+                      <span className="block">{c.label}</span>
+                      <span className={cn('block text-xs', c.dueUtc < nowUtc() ? 'text-muted-foreground line-through' : 'text-muted-foreground')}>{formatEt(c.dueUtc)}{c.source === 'override' && <span className="ml-1 rounded bg-amber-500/10 px-1 text-[10px] font-medium text-amber-800 dark:text-amber-400">moved</span>}</span>
+                      {c.source === 'override' && <span className="block text-[11px] text-muted-foreground">{c.movedBy}: {c.reason}</span>}
+                    </span>
+                    {isSched && live && moving?.kind !== c.kind && (
+                      <button className="text-xs text-accent hover:underline" onClick={() => setMoving({ kind: c.kind, date: c.dueUtc.slice(0, 10), reason: '' })}>Move</button>
+                    )}
+                  </div>
+                  {moving?.kind === c.kind && (
+                    <div className="mt-1.5 space-y-1.5 rounded-md border border-border p-2">
+                      <input type="date" className={`${field} w-full`} value={moving.date} aria-label="New date" onChange={e => setMoving({ ...moving, date: e.target.value })} />
+                      <input className={`${field} w-full`} value={moving.reason} placeholder="Why — the record keeps it" aria-label="Reason" onChange={e => setMoving({ ...moving, reason: e.target.value })} />
+                      <div className="flex gap-1.5">
+                        <Button size="sm" disabled={!moving.reason.trim() || !moving.date} onClick={() => { update(tripId, t => moveCutoff(t, moving.kind, `${moving.date}T13:00:00.000Z`, moving.reason, actor, nowUtc())); setMoving(null); }}>Move it</Button>
+                        <Button size="sm" variant="outline" onClick={() => setMoving(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
             </ul>
-            <p className="mt-2 text-xs text-muted-foreground">Cutoffs become settings in Phase 3.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Defaults from Trip settings; a move here is this trip only.</p>
           </GfoPanel>
+
+          {live && (
+            <GfoPanel title="The 72-hour moment">
+              {!sheet && (
+                <div className="space-y-2 text-sm">
+                  <p className="text-muted-foreground">The trip sheet freezes and the passenger email is drafted at {cutoffs.find(c => c.kind === 'freeze') ? formatEt(cutoffs.find(c => c.kind === 'freeze')!.dueUtc) : 'T-72'}.</p>
+                  {canFreezeNow && <Button size="sm" variant="outline" onClick={freezeNow}><Snowflake className="mr-1.5 h-4 w-4" />Freeze now</Button>}
+                  {isSched && live && !canFreezeNow && <p className="text-xs text-muted-foreground">Freeze early becomes available inside {settings.cutoffs.freezeHours * 3} h of departure.</p>}
+                </div>
+              )}
+              {sheet && (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between"><span>Trip sheet v{sheet.version}</span><Button size="sm" variant="outline" onClick={() => navigate(`/trips/${trip.id}/sheet`)}><FileText className="mr-1.5 h-4 w-4" />Open</Button></div>
+                  <div className="flex items-center justify-between">
+                    <span>
+                      Passenger email
+                      <span className="block text-xs text-muted-foreground">
+                        {email.state === 'drafted' && `drafted · sends itself in ${email.hoursLeft.toFixed(1)} h if nobody does`}
+                        {email.state === 'sent' && (email.auto ? `auto-sent unreviewed · ${formatEt(email.at)}` : `sent · ${formatEt(email.at)}`)}
+                        {email.state === 'none' && 'not drafted'}
+                      </span>
+                    </span>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/trips/${trip.id}/email`)}><Mail className="mr-1.5 h-4 w-4" />Open</Button>
+                  </div>
+                </div>
+              )}
+            </GfoPanel>
+          )}
         </div>
       </div>
     </div>

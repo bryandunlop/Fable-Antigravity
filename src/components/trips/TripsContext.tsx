@@ -5,6 +5,10 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { actingUser } from '../safety-center/actingUser';
 import { loadTrips, saveTrips } from './data/tripsStore';
 import { loadPlaces, savePlaces } from './data/placesStore';
+import { loadSettings, saveSettings, type TripSettings } from './data/settingsStore';
+import { getDemoForecast } from '../../services/weatherMockData';
+import type { WeatherByIcao } from './engine/briefingEmail';
+import type { SheetContext } from './engine/tripSheet';
 import { visibleToScheduling, type Actor, type ActorRole, type Trip } from './engine/trip';
 import type { PlaceRecord } from './engine/places';
 
@@ -21,6 +25,12 @@ interface TripsContextValue {
   trips: Trip[];
   allTrips: Trip[];
   places: PlaceRecord[];
+  settings: TripSettings;
+  setSettings: (next: TripSettings) => void;
+  /** Places + crew blurbs, the inputs a frozen sheet needs. */
+  sheetCtx: SheetContext;
+  /** Demo forecast keyed by destination ICAO — the NWS service's seed, labelled as such in the UI. */
+  weatherFor: (icaos: string[]) => WeatherByIcao;
   nowUtc: () => string;
   create: (trip: Trip) => void;
   update: (tripId: string, fn: (t: Trip) => Trip) => void;
@@ -32,6 +42,7 @@ const Ctx = createContext<TripsContextValue | null>(null);
 export function TripsProvider({ userRole, additionalRoles = [], children }: { userRole: string; additionalRoles?: string[]; children: ReactNode }) {
   const [allTrips, setAllTrips] = useState<Trip[]>(() => loadTrips());
   const [places, setPlacesState] = useState<PlaceRecord[]>(() => loadPlaces());
+  const [settings, setSettingsState] = useState<TripSettings>(() => loadSettings());
 
   const actor = useMemo<Actor>(() => {
     const role = actorRoleFor(userRole, additionalRoles);
@@ -56,8 +67,18 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
   }, []);
 
   const setPlaces = useCallback((next: PlaceRecord[]) => { savePlaces(next); setPlacesState(next); }, []);
+  const setSettings = useCallback((next: TripSettings) => { saveSettings(next); setSettingsState(next); }, []);
+  const sheetCtx = useMemo<SheetContext>(() => ({ places, blurbs: settings.blurbs }), [places, settings.blurbs]);
+  const weatherFor = useCallback((icaos: string[]): WeatherByIcao => {
+    // One demo forecast for every destination: the NWS seed is not per-field. Phase 2 swaps in
+    // fetchForecast(icao) behind the same shape.
+    const periods = getDemoForecast();
+    const out: WeatherByIcao = {};
+    for (const i of icaos) out[i] = periods[1] ?? periods[0];
+    return out;
+  }, []);
 
-  const value = useMemo(() => ({ actor, trips, allTrips, places, nowUtc, create, update, setPlaces }), [actor, trips, allTrips, places, nowUtc, create, update, setPlaces]);
+  const value = useMemo(() => ({ actor, trips, allTrips, places, settings, setSettings, sheetCtx, weatherFor, nowUtc, create, update, setPlaces }), [actor, trips, allTrips, places, settings, setSettings, sheetCtx, weatherFor, nowUtc, create, update, setPlaces]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
