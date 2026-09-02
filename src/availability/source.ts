@@ -24,9 +24,10 @@ import { disclose, discloseCell, type DisclosedAvailability, type DisclosedCell 
 import { deriveReleaseSuggestions } from './engine/suggestions';
 // D107: the trips module tells the engine who the principal is and when they are away. The
 // dependency points this way (availability reads trips) so no page has to plumb it through.
-import { loadTrips } from '../components/trips/data/tripsStore';
+import { loadTrips, saveTrips } from '../components/trips/data/tripsStore';
 import { loadSettings } from '../components/trips/data/settingsStore';
 import { principalReserveInput } from '../components/trips/engine/principal';
+import { loadLinkedRegister } from '../components/trips/data/peopleStore';
 import { tripsAsRecords } from '../components/trips/engine/rotation';
 import type {
   Audience,
@@ -75,7 +76,13 @@ function assembleInput(sources: AvailabilitySources, nowUtc: string, days: numbe
     tailHeadline,
     // Cincinnati is home whichever field the record names: Lunken (the register) or CVG (the scheduling seed).
     homeAirports: ['KLUK', 'KCVG'],
-    principalReserve: sources.principalReserve === null ? undefined : (sources.principalReserve ?? principalReserveInput(loadTrips(), loadSettings().principalReserve)),
+    principalReserve: sources.principalReserve === null ? undefined : (sources.principalReserve ?? (() => {
+      // The same load the trips module does, so a page that never mounts it (the fleet schedule,
+      // read on its own) still reserves for the principal and still links names to records.
+      const s = loadSettings();
+      const l = loadLinkedRegister(loadTrips, saveTrips, s.passengerPrefs, s.principalReserve?.name, new Date().toISOString());
+      return principalReserveInput(l.trips, l.people, s.principalReserve);
+    })()),
     tripAlerts: readTripServiceabilityAlerts(
       trips.map(t => ({
         tripId: t.id,

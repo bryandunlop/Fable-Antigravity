@@ -1,13 +1,15 @@
 // The React seam for the trip module: who the viewer is, the trips they may see, the places
 // register, and one `update` that runs an engine function and persists. No rules live here.
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import TripClockEffects from './TripClockEffects';
 import { actingUser } from '../safety-center/actingUser';
 import { loadTrips, saveTrips } from './data/tripsStore';
 import { loadPlaces, savePlaces } from './data/placesStore';
 import { loadSettings, saveSettings, type TripSettings } from './data/settingsStore';
 import { loadWatches, saveWatches } from './data/watchesStore';
+import { loadLinkedRegister, savePeople } from './data/peopleStore';
+import { resolvePassengers, withFlownDerived, type Person } from './engine/people';
 import type { Watch } from './engine/watches';
 import { getDemoForecast } from '../../services/weatherMockData';
 import type { WeatherByIcao } from './engine/briefingEmail';
@@ -32,6 +34,14 @@ interface TripsContextValue {
   setSettings: (next: TripSettings) => void;
   watches: Watch[];
   setWatches: (fn: (w: Watch[]) => Watch[]) => void;
+  /** The people register (Phase 5 slice 2). `/people` owns it; other surfaces read it. */
+  people: Person[];
+  setPeople: (fn: (p: Person[]) => Person[]) => void;
+  /**
+   * Names in, ids out, creating an unverified guest for anyone new — and storing the register, so
+   * a caller never has to remember to persist the people a trip just invented.
+   */
+  resolvePassengerIds: (names: string[]) => string[];
   /** Places + crew blurbs, the inputs a frozen sheet needs. */
   sheetCtx: SheetContext;
   /** Demo forecast keyed by destination ICAO — the NWS service's seed, labelled as such in the UI. */
@@ -45,10 +55,26 @@ interface TripsContextValue {
 const Ctx = createContext<TripsContextValue | null>(null);
 
 export function TripsProvider({ userRole, additionalRoles = [], children }: { userRole: string; additionalRoles?: string[]; children: ReactNode }) {
-  const [allTrips, setAllTrips] = useState<Trip[]>(() => loadTrips());
+  // Load the trips and the register together, and link them once: a trip written before Phase 5
+  // slice 2 carries only names, and a name is severed by the first rename. See
+  // `backfillPassengerIds` — this must happen before anyone can be renamed, i.e. here.
+  const [initial] = useState(() => {
+    const s = loadSettings();
+    return loadLinkedRegister<Trip>(
+      loadTrips, saveTrips, s.passengerPrefs, s.principalReserve?.name, new Date().toISOString(),
+    );
+  });
+  const [allTrips, setAllTrips] = useState<Trip[]>(() => initial.trips);
   const [places, setPlacesState] = useState<PlaceRecord[]>(() => loadPlaces());
   const [settings, setSettingsState] = useState<TripSettings>(() => loadSettings());
   const [watches, setWatchesState] = useState<Watch[]>(() => loadWatches());
+  const [storedPeople, setPeopleState] = useState<Person[]>(() => initial.people);
+  // `hasFlown` is derived from the trips, never authored — see `withFlownDerived`.
+  const people = useMemo(() => withFlownDerived(storedPeople, allTrips, new Date().toISOString()), [storedPeople, allTrips]);
+  const setPeople = useCallback((fn: (p: Person[]) => Person[]) => {
+    setPeopleState(prev => { const next = fn(prev); if (next === prev) return prev; savePeople(next); return next; });
+  }, []);
+
   const setWatches = useCallback((fn: (w: Watch[]) => Watch[]) => { setWatchesState(prev => { const next = fn(prev); saveWatches(next); return next; }); }, []);
 
   const actor = useMemo<Actor>(() => {
@@ -86,6 +112,17 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
   }, []);
 
   const setPlaces = useCallback((next: PlaceRecord[]) => { savePlaces(next); setPlacesState(next); }, []);
+  // Tracks the STORED register, not the derived one: writing a derived `hasFlown` back to storage
+  // would turn a projection into a stored flag, which is the thing it exists to avoid.
+  const peopleRef = useRef(storedPeople);
+  peopleRef.current = storedPeople;
+  const resolvePassengerIds = useCallback((names: string[]) => {
+    // Reads through a ref so the caller can resolve and act in one go without waiting a render for
+    // the register to come back; the state write below is what persists any newly-created guest.
+    const r = resolvePassengers(peopleRef.current, names, new Date().toISOString());
+    if (r.created.length > 0) { peopleRef.current = r.people; setPeople(() => r.people); }
+    return r.ids;
+  }, [setPeople]);
   const setSettings = useCallback((next: TripSettings) => { saveSettings(next); setSettingsState(next); }, []);
   const sheetCtx = useMemo<SheetContext>(() => ({ places, blurbs: settings.blurbs }), [places, settings.blurbs]);
   const weatherFor = useCallback((icaos: string[]): WeatherByIcao => {
@@ -97,7 +134,7 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
     return out;
   }, []);
 
-  const value = useMemo(() => ({ actor, trips, allTrips, places, settings, setSettings, watches, setWatches, sheetCtx, weatherFor, nowUtc, create, update, setPlaces }), [actor, trips, allTrips, places, settings, setSettings, watches, setWatches, sheetCtx, weatherFor, nowUtc, create, update, setPlaces]);
+  const value = useMemo(() => ({ actor, trips, allTrips, places, settings, setSettings, watches, setWatches, people, setPeople, resolvePassengerIds, sheetCtx, weatherFor, nowUtc, create, update, setPlaces }), [actor, trips, allTrips, places, settings, setSettings, watches, setWatches, people, setPeople, resolvePassengerIds, sheetCtx, weatherFor, nowUtc, create, update, setPlaces]);
   return (
     <Ctx.Provider value={value}>
       {/* The module's own clock: T-72 freeze, dead-man send and watches, for every trip, from

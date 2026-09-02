@@ -9,6 +9,8 @@ import EmailPage from './pages/EmailPage';
 import TripSettingsPage from './pages/TripSettingsPage';
 import WatchesPage from './pages/WatchesPage';
 import MetricsPage from './pages/MetricsPage';
+import PeoplePage from './pages/PeoplePage';
+import PersonPage from './pages/PersonPage';
 
 export default function TripsRoutes({ userRole, additionalRoles = [] }: { userRole: string; additionalRoles?: string[] }) {
   return (
@@ -20,6 +22,8 @@ export default function TripsRoutes({ userRole, additionalRoles = [] }: { userRo
         <Route path="settings" element={<TripSettingsPage />} />
         <Route path="watches" element={<WatchesPage />} />
         <Route path="metrics" element={<MetricsPage />} />
+        <Route path="people" element={<PeoplePage />} />
+        <Route path="people/:id" element={<PersonPage />} />
         <Route path=":id/sheet" element={<TripSheetPage />} />
         <Route path=":id/email" element={<EmailPage />} />
         <Route path=":id" element={<TripWorkspace />} />

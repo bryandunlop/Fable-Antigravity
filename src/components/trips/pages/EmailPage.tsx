@@ -8,14 +8,15 @@ import { Button } from '../../ui/button';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
 import { useTripsModule } from '../TripsContext';
-import { autoSendIfDue, editDraftBlock, emailDraftOf, emailState, sendEmail, setDraftRecipients } from '../engine/briefingEmail';
+import { upsertPerson, type BriefingPrefValue } from '../engine/people';
+import { autoSendIfDue, editDraftBlock, emailDraftOf, emailState, sendEmail, setDraftRecipients, emailAddressFor, personAboard } from '../engine/briefingEmail';
 import { latestSheet } from '../engine/tripSheet';
 import { formatEt } from '../engine/cutoffs';
 
 export default function EmailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { trips, actor, update, nowUtc, settings, setSettings } = useTripsModule();
+  const { trips, actor, update, nowUtc, settings, people, setPeople } = useTripsModule();
   const trip = trips.find(t => t.id === id);
   const draft = trip ? emailDraftOf(trip) : null;
   const sheet = trip ? latestSheet(trip) : null;
@@ -41,11 +42,18 @@ export default function EmailPage() {
     const next = draft!.recipients.includes(name) ? draft!.recipients.filter(r => r !== name) : [...draft!.recipients, name];
     update(trip!.id, t => setDraftRecipients(t, next));
   }
-  function setPref(name: string, pref: 'every' | 'first' | 'never') {
-    const prefs = settings.passengerPrefs.some(p => p.name === name)
-      ? settings.passengerPrefs.map(p => (p.name === name ? { ...p, pref } : p))
-      : [...settings.passengerPrefs, { name, pref, hasFlown: false }];
-    setSettings({ ...settings, passengerPrefs: prefs });
+  /**
+   * The panel below has always SAID "the preference lives on the passenger record". Until Phase 5
+   * slice 2 it did not — it wrote a name-keyed entry in trip settings, which detached from the
+   * person the moment anyone was renamed. It writes the record now, and the copy is true.
+   */
+  function setPref(name: string, pref: BriefingPrefValue) {
+    setPeople(ps => {
+      // Resolved through the sheet's frozen ids, so a rename between freeze and send still finds
+      // the right record. Creating one here instead would fork the person in two.
+      const person = personAboard(sheet!, ps, name);
+      return person ? upsertPerson(ps, { ...person, briefingPref: pref }) : ps;
+    });
   }
 
   return (
@@ -80,7 +88,7 @@ export default function EmailPage() {
         <GfoPanel title="Who gets it">
           <ul className="space-y-2 text-sm">
             {everyone.map(name => {
-              const pref = settings.passengerPrefs.find(p => p.name === name)?.pref ?? 'every';
+              const pref = personAboard(sheet, people, name)?.briefingPref ?? 'every';
               const on = draft.recipients.includes(name);
               return (
                 <li key={name} className="flex items-center justify-between gap-2">
@@ -108,7 +116,14 @@ export default function EmailPage() {
           {current && (
             <div className="rounded-md border border-border bg-card p-5">
               <div className="border-b border-border pb-3 text-sm">
-                <div><span className="text-muted-foreground">To</span> {current.to}</div>
+                <div>
+                  <span className="text-muted-foreground">To</span> {current.to}
+                  {/* The address comes off the person record, so it follows a rename and an update
+                      without the draft having to be rebuilt (Phase 5 slice 2). */}
+                  {emailAddressFor(sheet, people, current.to)
+                    ? <span className="text-muted-foreground"> &lt;{emailAddressFor(sheet, people, current.to)}&gt;</span>
+                    : <span className="text-amber-700 dark:text-amber-400"> · no email on file</span>}
+                </div>
                 <div><span className="text-muted-foreground">Subject</span> <span className="font-medium">{current.subject}</span></div>
               </div>
               <div className="mt-4 space-y-4">

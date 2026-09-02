@@ -35,6 +35,13 @@ export interface SheetLeg {
   /** +1 when the arrival is the next local day. */
   dayShift: number | null;
   aboard: string[];
+  /**
+   * The same people as records, frozen with the names. Without this a later rename makes the frozen
+   * names unresolvable, and every reader falls back to a name lookup that now matches nobody — the
+   * email preference silently read as its default, and editing it FORKED the person into a second
+   * unverified record (fresh review, 2026-09-02). Optional: sheets frozen before this carry none.
+   */
+  aboardIds?: string[];
   catering: string | null;
   /** True when the departure time is a planning number, not one scheduling set. */
   planned: boolean;
@@ -74,6 +81,7 @@ export function sheetLeg(leg: TripLeg, n: number, trip: Trip, places: PlaceRecor
     elapsedMinutes: clock.times.elapsedMinutes ?? clock.estimatedMinutes,
     dayShift: clock.times.dayShift,
     aboard: leg.positioning ? [] : trip.passengerNames,
+    aboardIds: leg.positioning ? [] : trip.passengerIds,
     catering: leg.positioning ? null : (leg.catering ?? null),
     planned: clock.planned,
     positioning: !!leg.positioning,
