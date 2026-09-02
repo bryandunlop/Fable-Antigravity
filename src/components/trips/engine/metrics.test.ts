@@ -13,13 +13,13 @@ function submitted(lead: string, at = '2026-08-20T00:00:00.000Z') {
 
 describe('metrics count events, and the reason is a category', () => {
   it('denied by category, bumped by lead, accepted and cancelled', () => {
-    const a = assignTail(submitted('M. Osei'), 'N5PG', SCHED, '2026-08-21T00:00:00.000Z');
+    const a = assignTail(submitted('M. Osei'), 'N5PG', SCHED, '2026-08-21T00:00:00.000Z', { free: true, reason: null });
     const bumped = bumpTrip(a, SCHED, 'senior-conflict', 'Board moved', '2026-08-22T00:00:00.000Z');
     const d1 = decline(submitted('J. Lindqvist'), SCHED, 'nobody free', '2026-08-23T00:00:00.000Z', 'no-crew');
     const d2 = decline(submitted('M. Osei'), SCHED, '', '2026-08-24T00:00:00.000Z', 'no-crew');
     const d3 = decline(submitted('A. Reyes'), SCHED, 'ten people on a G500', '2026-08-25T00:00:00.000Z', 'not-a-fit');
     const c = cancelTrip(submitted('A. Reyes'), EA, 'meeting moved', '2026-08-26T00:00:00.000Z');
-    const ok = assignTail(submitted('A. Reyes'), 'N1PG', SCHED, '2026-08-27T00:00:00.000Z');
+    const ok = assignTail(submitted('A. Reyes'), 'N1PG', SCHED, '2026-08-27T00:00:00.000Z', { free: true, reason: null });
     const m = computeMetrics([bumped, d1, d2, d3, c, ok], NOW);
     expect(m.requests).toBe(6);
     expect(m.accepted).toBe(2);
@@ -32,7 +32,7 @@ describe('metrics count events, and the reason is a category', () => {
   it('a bump needs scheduling and a confirmed trip; it clears the tail and returns the trip to the queue', () => {
     const s = submitted('x');
     expect(bumpTrip(s, SCHED, 'other', '', NOW)).toBe(s);
-    const a = assignTail(s, 'N5PG', SCHED, NOW);
+    const a = assignTail(s, 'N5PG', SCHED, NOW, { free: true, reason: null });
     expect(bumpTrip(a, EA, 'other', '', NOW)).toBe(a);
     const b = bumpTrip(a, SCHED, 'maintenance', 'N5PG AOG', NOW);
     expect(b.status).toBe('submitted'); expect(b.tail).toBeNull();

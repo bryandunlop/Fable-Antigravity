@@ -78,15 +78,15 @@ describe('drafts are private until the EA shares them', () => {
 
 describe('scheduling cannot hold an aircraft without an itinerary', () => {
   it('refuses to assign a tail on a draft, even a shared one', () => {
-    const t = assignTail(shareDraft(draft(), EA, T0), 'N5PG', SCHED, T0);
+    const t = assignTail(shareDraft(draft(), EA, T0), 'N5PG', SCHED, T0, { free: true, reason: null });
     expect(t.tail).toBeNull();
     expect(t.events.some(e => e.kind === 'assigned')).toBe(false);
   });
 
   it('assigns on a submitted trip, by scheduling only', () => {
     let t = draft(); t = updateLeg(t, t.legs[1].id, { date: '2026-10-16' }); t = submitItinerary(t, EA, T0);
-    expect(assignTail(t, 'N5PG', EA, T0).tail).toBeNull();
-    const done = assignTail(t, 'n5pg', SCHED, T0);
+    expect(assignTail(t, 'N5PG', EA, T0, { free: true, reason: null }).tail).toBeNull();
+    const done = assignTail(t, 'n5pg', SCHED, T0, { free: true, reason: null });
     expect(done.tail).toBe('N5PG');
     expect(done.status).toBe('confirmed');
   });
@@ -113,5 +113,42 @@ describe('the record is one searchable stream', () => {
     t = chooseAirport(t, t.legs[0].id, 'to', 'KSEA', SCHED, T0);
     expect(t.events.at(-1)).toMatchObject({ kind: 'airport-changed', airport: 'KSEA' });
     expect(t.legs[0].to.airport).toBe('KSEA');
+  });
+});
+
+describe('TL-48 — the engine refuses a busy tail, not just the button', () => {
+  /** Submitted, which is the only state an aircraft can go onto — a shared draft is still a draft. */
+  const live = () => {
+    let t = draft();
+    t = updateLeg(t, t.legs[1].id, { date: '2026-10-16' });
+    return submitItinerary(t, EA, T0);
+  };
+  const FREE = { free: true, reason: null };
+  const BUSY = { free: false, reason: 'M. Osei · Teterboro on 10-16' };
+
+  it('assigns when the verdict says the tail is free', () => {
+    const t = assignTail(live(), 'N5PG', SCHED, T0, FREE);
+    expect(t.tail).toBe('N5PG');
+    expect(t.status).toBe('confirmed');
+  });
+
+  it('returns the trip unchanged and records nothing when the tail is busy', () => {
+    const before = live();
+    const after = assignTail(before, 'N5PG', SCHED, T0, BUSY);
+    // Identity, not just equality: the module clock relies on a declining engine handing back
+    // exactly what it was given (see clockIdempotence.test.ts).
+    expect(after).toBe(before);
+    expect(after.tail).toBeNull();
+    expect(after.events.some(e => e.kind === 'assigned')).toBe(false);
+  });
+
+  it('a busy verdict outranks everything else that would have allowed it', () => {
+    // Right role, right status, real tail — and still refused, because the aircraft is spoken for.
+    const before = live();
+    expect(assignTail(before, 'n5pg', SCHED, T0, BUSY)).toBe(before);
+  });
+
+  it('still refuses the wrong role even when the tail is free', () => {
+    expect(assignTail(live(), 'N5PG', EA, T0, FREE).tail).toBeNull();
   });
 });

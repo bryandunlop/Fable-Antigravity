@@ -17,7 +17,7 @@ function trip() {
       newLeg({ from: { placeName: 'Seattle', placeId: 'pl-sea', airport: 'KBFI' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: '2026-10-16', timing: { kind: 'depart', departLocal: '16:00', flexHours: 0 } }),
     ] });
   t = submitItinerary(t, EA, '2026-09-02T00:00:00.000Z');
-  t = assignTail(t, 'N5PG', SCHED, '2026-09-03T00:00:00.000Z');
+  t = assignTail(t, 'N5PG', SCHED, '2026-09-03T00:00:00.000Z', { free: true, reason: null });
   t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: 'Lena Nguyen' }, SCHED, '2026-09-03T00:00:00.000Z');
   t = setPassengers(t, ['A. Reyes', 'S. Reyes', 'K. Tanaka'], EA, '2026-09-04T00:00:00.000Z');
   t = setCatering(t, t.legs[0].id, 'Light breakfast, no shellfish', EA, '2026-09-05T00:00:00.000Z');
