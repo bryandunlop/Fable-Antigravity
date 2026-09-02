@@ -157,10 +157,33 @@ export function documentGates(
   return out;
 }
 
-/** The gates nobody has overridden. These are what refuse the freeze. */
+/**
+ * The gates nobody has overridden. These are what refuse the freeze.
+ *
+ * An override clears a gate only while the two facts it was decided about still hold — the leg's
+ * date and the document's expiry. Move the leg, or correct the document, and the gate comes back
+ * unresolved: the decision was made about the situation as it stood, and a changed situation has
+ * not been decided about by anyone.
+ */
 export function blockingGates(trip: Trip, gates: DocumentGate[]): DocumentGate[] {
-  const cleared = new Set((trip.gateOverrides ?? []).map(o => o.gateKey));
-  return gates.filter(g => !cleared.has(gateKey(g)));
+  const cleared = new Map((trip.gateOverrides ?? []).map(o => [o.gateKey, o]));
+  return gates.filter(g => {
+    const o = cleared.get(gateKey(g));
+    if (!o) return true;
+    return o.legDate !== g.legDate || o.documentExpiresOn !== g.document.expiresOn;
+  });
+}
+
+/** What an override of this gate is a decision about. Pass to `overrideGate`. */
+export function gateFacts(gate: DocumentGate): { legDate: string; documentExpiresOn: string } {
+  return { legDate: gate.legDate, documentExpiresOn: gate.document.expiresOn };
+}
+
+/** The override still standing over this gate, or undefined when it has gone stale or never existed. */
+export function liveOverrideFor(trip: Trip, gate: DocumentGate) {
+  const o = (trip.gateOverrides ?? []).find(x => x.gateKey === gateKey(gate));
+  if (!o) return undefined;
+  return o.legDate === gate.legDate && o.documentExpiresOn === gate.document.expiresOn ? o : undefined;
 }
 
 /** One line per person for a summary strip: "S. Reyes — passport expired". */

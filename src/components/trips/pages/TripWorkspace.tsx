@@ -9,7 +9,7 @@ import { cn } from '../../ui/utils';
 import { useMinuteTick } from '../useTripClock';
 import { LegClockLine } from '../components/LegClockLine';
 import { DocumentGatesPanel } from '../components/DocumentGatesPanel';
-import { blockingGates, documentGates } from '../engine/documentGates';
+import { blockingGates, documentGates, gateFacts, gateKey } from '../engine/documentGates';
 import { useTripsModule } from '../TripsContext';
 import { LEADS } from '../data/tripsStore';
 import { LegEditor } from '../components/LegEditor';
@@ -560,7 +560,7 @@ export default function TripWorkspace() {
               blocking={gatesBlocking}
               trip={trip}
               canOverride={isSched}
-              onOverride={(key, reason) => update(tripId, t => overrideGate(t, key, reason, actor, nowUtc()))}
+              onOverride={(gate, reason) => update(tripId, t => overrideGate(t, gateKey(gate), reason, actor, nowUtc(), gateFacts(gate)))}
             />
 
             <GfoPanel title="The 72-hour moment">

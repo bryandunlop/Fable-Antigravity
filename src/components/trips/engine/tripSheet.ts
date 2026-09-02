@@ -144,8 +144,13 @@ export function changedSinceFreeze(trip: Trip, ctx: SheetContext, nowUtc: string
  * neither throw nor write, and it must freeze the moment the gate clears or scheduling overrides it.
  * Nothing is recorded on a refusal — a refusal is the absence of an event, and writing one every
  * minute would bury the record. The workspace is what says why (D109 slice 3, canvas Q4).
+ *
+ * REQUIRED, deliberately not defaulted to `[]`. Written with a default, the trip-sheet page's
+ * "refreeze as v2" button — which predates this parameter — kept freezing straight past every gate,
+ * with no type error to notice (fresh review, 2026-09-02). A caller with genuinely nothing to check
+ * passes `[]` and that is a decision on the record, not an omission.
  */
-export function freezeSheet(trip: Trip, ctx: SheetContext, nowUtc: string, by: Actor, blocking: unknown[] = []): Trip {
+export function freezeSheet(trip: Trip, ctx: SheetContext, nowUtc: string, by: Actor, blocking: unknown[]): Trip {
   if (trip.status !== 'submitted' && trip.status !== 'confirmed') return trip;
   if (blocking.length > 0) return trip;
   const sheet = buildSheet(trip, ctx, nowUtc, by);

@@ -306,6 +306,19 @@ export function submitBlockers(trip: Trip): SubmitBlocker[] {
 export interface GateOverride {
   /** `personId|legId|documentId` — see `documentGates.gateKey`. */
   gateKey: string;
+  /**
+   * The two facts the decision was actually about, frozen at the moment it was made: the leg's date
+   * and the document's expiry.
+   *
+   * Without them the key alone cleared the gate forever. A leg's date moves — that is what
+   * `changedSinceFreeze` exists for — so an override granted over a passport that was merely SHORT
+   * for a 16 October leg went on clearing the same leg after it moved to December, by which time the
+   * passport had actually expired. The decision was made about a smaller problem than the one it
+   * ended up authorising. `documentGates.blockingGates` re-raises the gate when either value has
+   * changed. (Fresh review, 2026-09-02.)
+   */
+  legDate: string;
+  documentExpiresOn: string;
   reason: string;
   by: Actor;
   at: string;
@@ -320,12 +333,20 @@ export const gateOverrides = (trip: Trip): GateOverride[] => trip.gateOverrides 
  * decision, it is a click. Returns the trip unchanged when it declines — the module clock relies on
  * that identity (see `clockIdempotence.test.ts`).
  */
-export function overrideGate(trip: Trip, gateKey: string, reason: string, by: Actor, nowUtc: string): Trip {
+export function overrideGate(
+  trip: Trip,
+  gateKey: string,
+  reason: string,
+  by: Actor,
+  nowUtc: string,
+  /** What the decision was about — see `GateOverride.legDate`. */
+  about: { legDate: string; documentExpiresOn: string },
+): Trip {
   const text = reason.trim();
   if (!text || by.role !== 'scheduling') return trip;
   const existing = gateOverrides(trip);
   if (existing.some(o => o.gateKey === gateKey)) return trip;
-  const override: GateOverride = { gateKey, reason: text, by, at: nowUtc };
+  const override: GateOverride = { gateKey, legDate: about.legDate, documentExpiresOn: about.documentExpiresOn, reason: text, by, at: nowUtc };
   return append(
     { ...trip, gateOverrides: [...existing, override] },
     { kind: 'gate-overridden', at: nowUtc, by, gateKey, reason: text },

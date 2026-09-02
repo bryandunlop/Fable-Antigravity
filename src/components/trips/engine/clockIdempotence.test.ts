@@ -46,7 +46,7 @@ describe('engine identity when nothing is due', () => {
 
   it('freezeSheet is the one that DOES act, so the guard cannot swallow real work', () => {
     const trip = liveTrip();
-    const frozen = freezeSheet(trip, ctx, NOW, by);
+    const frozen = freezeSheet(trip, ctx, NOW, by, []);
     expect(frozen).not.toBe(trip);
     expect(latestSheet(frozen)).toBeTruthy();
   });

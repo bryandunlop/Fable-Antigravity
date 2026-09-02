@@ -14,8 +14,8 @@ import { useState } from 'react';
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPanel } from '../../gfo';
-import { gateKey, type DocumentGate } from '../engine/documentGates';
-import { gateOverrides, type Trip } from '../engine/trip';
+import { gateKey, liveOverrideFor, type DocumentGate } from '../engine/documentGates';
+import type { Trip } from '../engine/trip';
 
 const field = 'h-9 w-full rounded-md border border-border bg-input-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring';
 
@@ -26,13 +26,12 @@ export function DocumentGatesPanel({
   blocking: DocumentGate[];
   trip: Trip;
   canOverride: boolean;
-  onOverride: (gateKey: string, reason: string) => void;
+  onOverride: (gate: DocumentGate, reason: string) => void;
 }) {
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   if (gates.length === 0) return null;
 
-  const overrides = gateOverrides(trip);
   const blockingKeys = new Set(blocking.map(gateKey));
 
   return (
@@ -41,7 +40,9 @@ export function DocumentGatesPanel({
         {gates.map(g => {
           const key = gateKey(g);
           const isBlocking = blockingKeys.has(key);
-          const override = overrides.find(o => o.gateKey === key);
+          // Only an override still standing over THIS situation counts — one made about an earlier
+          // leg date or an earlier expiry has gone stale and the gate is blocking again.
+          const override = liveOverrideFor(trip, g);
           return (
             <li key={key} className="rounded-md border border-border p-3 text-sm">
               <div className="flex items-start gap-2">
@@ -77,7 +78,7 @@ export function DocumentGatesPanel({
                         value={reason} onChange={e => setReason(e.target.value)}
                       />
                       <div className="flex gap-2">
-                        <Button size="sm" disabled={!reason.trim()} onClick={() => { onOverride(key, reason); setOpenFor(null); }}>
+                        <Button size="sm" disabled={!reason.trim()} onClick={() => { onOverride(g, reason); setOpenFor(null); }}>
                           Record the override
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setOpenFor(null)}>Cancel</Button>

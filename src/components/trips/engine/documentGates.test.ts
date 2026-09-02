@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  documentGates, blockingGates, gateKey, DEFAULT_DOCUMENT_POLICY,
+  documentGates, blockingGates, gateKey, gateFacts, liveOverrideFor, DEFAULT_DOCUMENT_POLICY,
   type DocumentPolicy,
 } from './documentGates';
 import { SEED_PEOPLE, personByName, upsertPerson, type Person, type TravelDocument } from './people';
@@ -181,7 +181,7 @@ describe('scheduling overrides a gate with a reason', () => {
   });
 
   it('an override clears exactly the gate it names, and records who and why', () => {
-    const t = overrideGate(base, gateKey(gates[0]), 'Renewal booked, courier confirmed for 10 Oct', SCHED, NOW);
+    const t = overrideGate(base, gateKey(gates[0]), 'Renewal booked, courier confirmed for 10 Oct', SCHED, NOW, gateFacts(gates[0]));
     expect(blockingGates(t, gates)).toHaveLength(1);
     const ov = gateOverrides(t);
     expect(ov).toHaveLength(1);
@@ -191,20 +191,20 @@ describe('scheduling overrides a gate with a reason', () => {
   });
 
   it('refuses an empty reason — an override with no reason is not a decision', () => {
-    expect(overrideGate(base, gateKey(gates[0]), '   ', SCHED, NOW)).toBe(base);
+    expect(overrideGate(base, gateKey(gates[0]), '   ', SCHED, NOW, gateFacts(gates[0]))).toBe(base);
   });
 
   it('only scheduling may override', () => {
-    expect(overrideGate(base, gateKey(gates[0]), 'because', EA, NOW)).toBe(base);
+    expect(overrideGate(base, gateKey(gates[0]), 'because', EA, NOW, gateFacts(gates[0]))).toBe(base);
   });
 
   it('a second override of the same gate changes nothing', () => {
-    const once = overrideGate(base, gateKey(gates[0]), 'a reason', SCHED, NOW);
-    expect(overrideGate(once, gateKey(gates[0]), 'a reason', SCHED, NOW)).toBe(once);
+    const once = overrideGate(base, gateKey(gates[0]), 'a reason', SCHED, NOW, gateFacts(gates[0]));
+    expect(overrideGate(once, gateKey(gates[0]), 'a reason', SCHED, NOW, gateFacts(gates[0]))).toBe(once);
   });
 
   it('an override does not travel to a different person or leg', () => {
-    const t = overrideGate(base, gateKey(gates[0]), 'a reason', SCHED, NOW);
+    const t = overrideGate(base, gateKey(gates[0]), 'a reason', SCHED, NOW, gateFacts(gates[0]));
     const stillBlocking = blockingGates(t, gates);
     expect(stillBlocking[0].legIndex).toBe(1);
   });
@@ -229,19 +229,69 @@ describe('the gate refuses the freeze (canvas Q4)', () => {
 
   it('freezes the moment every gate is overridden', () => {
     let t = base;
-    for (const g of gates) t = overrideGate(t, gateKey(g), 'Renewal booked', SCHED, NOW);
+    for (const g of gates) t = overrideGate(t, gateKey(g), 'Renewal booked', SCHED, NOW, gateFacts(g));
     expect(blockingGates(t, gates)).toHaveLength(0);
     const out = freezeSheet(t, CTX, NOW, SCHED, blockingGates(t, gates));
     expect(latestSheet(out)).toBeTruthy();
   });
 
   it('one override of two is not enough — the sheet still will not freeze', () => {
-    const t = overrideGate(base, gateKey(gates[0]), 'Renewal booked', SCHED, NOW);
+    const t = overrideGate(base, gateKey(gates[0]), 'Renewal booked', SCHED, NOW, gateFacts(gates[0]));
     expect(freezeSheet(t, CTX, NOW, SCHED, blockingGates(t, gates))).toBe(t);
   });
 
   it('freezes normally when there are no gates at all', () => {
     const clean = trip(DOMESTIC);
     expect(latestSheet(freezeSheet(clean, CTX, NOW, SCHED, []))).toBeTruthy();
+  });
+});
+
+describe('an override is a decision about a situation, not a permanent pass', () => {
+  const people = peopleWith([doc({ expiresOn: '2026-12-01' })]);   // short of the window, not expired
+  const base = trip(INTERNATIONAL);
+  const gates = documentGates(base, people, DEFAULT_DOCUMENT_POLICY, NOW);
+
+  it('clears the gate while the leg date and the expiry are what they were', () => {
+    expect(gates[0].kind).toBe('short-validity');
+    const t = overrideGate(base, gateKey(gates[0]), 'Renewal booked', SCHED, NOW, gateFacts(gates[0]));
+    expect(blockingGates(t, gates)).toHaveLength(1);   // only the other leg remains
+    expect(liveOverrideFor(t, gates[0])).toBeTruthy();
+  });
+
+  it('comes back the moment the leg moves — the passport is now actually expired', () => {
+    const t = overrideGate(base, gateKey(gates[0]), 'Renewal booked', SCHED, NOW, gateFacts(gates[0]));
+    // The leg slips to December. Same leg id, same document, a materially worse problem: the
+    // override was granted over a passport that was merely short, and must not authorise this.
+    const moved = { ...t, legs: t.legs.map((l, i) => (i === 0 ? { ...l, date: '2026-12-20' } : l)) };
+    const after = documentGates(moved, people, DEFAULT_DOCUMENT_POLICY, NOW);
+    expect(after[0].kind).toBe('expired');
+    expect(blockingGates(moved, after).some(g => g.legIndex === 0)).toBe(true);
+    expect(liveOverrideFor(moved, after[0])).toBeUndefined();
+  });
+
+  it('comes back when the document itself is corrected under the same id', () => {
+    const t = overrideGate(base, gateKey(gates[0]), 'Renewal booked', SCHED, NOW, gateFacts(gates[0]));
+    const corrected = peopleWith([doc({ expiresOn: '2026-10-01' })]);   // same id, worse date
+    const after = documentGates(t, corrected, DEFAULT_DOCUMENT_POLICY, NOW);
+    expect(blockingGates(t, after).some(g => g.legIndex === 0)).toBe(true);
+  });
+
+  it('keeps the override when nothing that mattered changed', () => {
+    const t = overrideGate(base, gateKey(gates[0]), 'Renewal booked', SCHED, NOW, gateFacts(gates[0]));
+    // A change to something the decision was not about — the catering — leaves it standing.
+    const recatered = { ...t, legs: t.legs.map((l, i) => (i === 0 ? { ...l, catering: 'Cold plate' } : l)) };
+    const after = documentGates(recatered, people, DEFAULT_DOCUMENT_POLICY, NOW);
+    expect(liveOverrideFor(recatered, after[0])).toBeTruthy();
+  });
+
+  it('a stale override refuses the freeze again', () => {
+    const CTX = { places: SEED_PLACES, blurbs: {} };
+    let t = base;
+    for (const g of gates) t = overrideGate(t, gateKey(g), 'Renewal booked', SCHED, NOW, gateFacts(g));
+    expect(latestSheet(freezeSheet(t, CTX, NOW, SCHED, blockingGates(t, gates)))).toBeTruthy();
+
+    const moved = { ...t, legs: t.legs.map((l, i) => (i === 0 ? { ...l, date: '2026-12-20' } : l)) };
+    const after = documentGates(moved, people, DEFAULT_DOCUMENT_POLICY, NOW);
+    expect(freezeSheet(moved, CTX, NOW, SCHED, blockingGates(moved, after))).toBe(moved);
   });
 });
