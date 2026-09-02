@@ -12,8 +12,15 @@
 //   add comment        POST   /rest/api/3/issue/{issueIdOrKey}/comment
 //   list transitions   GET    /rest/api/3/issue/{issueIdOrKey}/transitions
 //   perform transition POST   /rest/api/3/issue/{issueIdOrKey}/transitions
+//   add attachment     POST   /rest/api/3/issue/{issueIdOrKey}/attachments
 //
-// Two constraints that are NOT optional:
+// The attachment call is the odd one out and gets three things wrong if copied
+// from the others: it is `multipart/form-data` (not JSON), the form field must be
+// named exactly `file`, and it REQUIRES the header `X-Atlassian-Token: no-check`
+// — without it Jira rejects the upload as XSRF. A malformed body returns 415, not
+// 400, which is why it looks like a content-type problem rather than a data one.
+//
+// Two further constraints that are NOT optional:
 //
 //  1. The browser must never hold the Jira credential and cannot call Jira
 //     directly anyway — Atlassian does not send CORS headers for these endpoints.
@@ -29,6 +36,7 @@
 // is one line in feedbackJira.ts.
 
 import type {
+  JiraAttachment,
   JiraCreatedIssue,
   JiraIssue,
   JiraIssueCreateRequest,
@@ -51,6 +59,13 @@ export interface JiraClient {
 
   /** POST /rest/api/3/issue/{issueIdOrKey}/transitions — body `{ transition: { id } }` */
   transitionIssue(issueIdOrKey: string, transitionId: string): Promise<void>;
+
+  /**
+   * POST /rest/api/3/issue/{issueIdOrKey}/attachments
+   * multipart/form-data, field name `file`, header `X-Atlassian-Token: no-check`.
+   * Returns one entry per uploaded file.
+   */
+  addAttachment(issueIdOrKey: string, file: Blob, filename: string): Promise<JiraAttachment[]>;
 
   /** Browser link for a human. Not an API call; derived from the site base URL. */
   browseUrl(issueKey: string): string;

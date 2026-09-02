@@ -7,11 +7,21 @@
 
 export type FeedbackKind = 'bug' | 'idea' | 'change' | 'help';
 
-export const FEEDBACK_KINDS: { kind: FeedbackKind; label: string; blurb: string }[] = [
-  { kind: 'bug', label: 'Something is broken', blurb: 'It did the wrong thing, or nothing at all.' },
-  { kind: 'idea', label: 'I have an idea', blurb: 'Something myGFO does not do yet.' },
-  { kind: 'change', label: 'Change what exists', blurb: 'It works, but not the way we work.' },
-  { kind: 'help', label: 'I need help', blurb: 'I cannot find it or cannot make it do the thing.' },
+/**
+ * `short` is the button face — one word, because four buttons sit side by side.
+ * `label` is the same choice written as a sentence, used wherever there is room
+ * (the board's detail panel, the Jira issue). `blurb` is the hover title.
+ */
+export const FEEDBACK_KINDS: {
+  kind: FeedbackKind;
+  short: string;
+  label: string;
+  blurb: string;
+}[] = [
+  { kind: 'bug', short: 'Bug', label: 'Something is broken', blurb: 'It did the wrong thing, or nothing at all.' },
+  { kind: 'idea', short: 'Idea', label: 'An idea', blurb: 'Something myGFO does not do yet.' },
+  { kind: 'change', short: 'Change', label: 'A change to what exists', blurb: 'It works, but not the way we work.' },
+  { kind: 'help', short: 'Help', label: 'A question', blurb: 'I cannot find it, or cannot make it do the thing.' },
 ];
 
 /**
@@ -28,6 +38,22 @@ export const FEEDBACK_IMPACTS: { impact: FeedbackImpact; label: string; blurb: s
   { impact: 'annoying', label: 'Annoying', blurb: 'It works; it grates.' },
   { impact: 'idea-only', label: 'No impact today', blurb: 'Just an idea for later.' },
 ];
+
+/**
+ * A screenshot the reporter attached. Held as a data URL because the demo has no
+ * blob store; the real integration streams the same bytes to Jira's multipart
+ * attachment endpoint and keeps nothing locally.
+ */
+export interface FeedbackAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  /** Bytes AFTER downscaling — what actually gets stored and sent. */
+  size: number;
+  dataUrl: string;
+  /** Jira attachment id, once uploaded. Absent until the issue is filed. */
+  jiraAttachmentId?: string;
+}
 
 /** Where the report is on its way to Jira. Separate from the Jira status itself. */
 export type SyncState = 'local' | 'sending' | 'filed' | 'failed';
@@ -76,8 +102,15 @@ export interface FeedbackReport {
   /** False when the reporter opts out of sending the captured context. */
   shareContext: boolean;
   context: FeedbackContext;
+  attachments: FeedbackAttachment[];
   sync: SyncState;
   /** Why the last send failed, and whether trying again could help. */
   syncError?: { message: string; retryable: boolean };
+  /**
+   * The issue was created but one or more screenshots did not upload. Filing is
+   * NOT rolled back — an issue with a missing image beats no issue at all, and
+   * silently dropping the evidence is the failure a reporter would never see.
+   */
+  attachmentError?: string;
   jira?: JiraLink;
 }
