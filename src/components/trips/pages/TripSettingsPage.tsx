@@ -4,13 +4,14 @@
 import { Button } from '../../ui/button';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { useTripsModule } from '../TripsContext';
+import { principalOf, setPrincipal, upsertPerson, type BriefingPrefValue } from '../engine/people';
 import { DEFAULT_SETTINGS } from '../data/settingsStore';
 import type { TemplateBlock } from '../engine/briefingEmail';
 
 const field = 'h-9 rounded-md border border-border bg-input-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring';
 
 export default function TripSettingsPage() {
-  const { settings, setSettings, actor } = useTripsModule();
+  const { settings, setSettings, actor, people, setPeople } = useTripsModule();
   const canEdit = actor.role === 'scheduling';
   const s = settings;
 
@@ -47,8 +48,11 @@ export default function TripSettingsPage() {
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={s.principalReserve.enabled} disabled={!canEdit} onChange={e => setSettings({ ...s, principalReserve: { ...s.principalReserve, enabled: e.target.checked } })} aria-label="Reserve on" />Keep one aircraft home whenever the principal has no trip</label>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="text-sm"><span className="gfo-eyebrow mb-1 block text-muted-foreground">Principal</span>
-              <select className={`${field} w-full`} value={s.principalReserve.name} disabled={!canEdit} aria-label="Principal" onChange={e => setSettings({ ...s, principalReserve: { ...s.principalReserve, name: e.target.value } })}>
-                {s.passengerPrefs.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+              {/* The principal is a FLAG ON THE RECORD, not a name in settings — a name here stopped
+                  matching the moment anyone was renamed, and the reserve then quietly released the
+                  aircraft (Phase 5 slice 2). */}
+              <select className={`${field} w-full`} value={principalOf(people)?.id ?? ''} disabled={!canEdit} aria-label="Principal" onChange={e => setPeople(ps => setPrincipal(ps, e.target.value))}>
+                {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select></label>
             <label className="text-sm"><span className="gfo-eyebrow mb-1 block text-muted-foreground">Cabin to keep</span>
               <select className={`${field} w-full`} value={s.principalReserve.cabin} disabled={!canEdit} aria-label="Cabin" onChange={e => setSettings({ ...s, principalReserve: { ...s.principalReserve, cabin: e.target.value as 'big' | 'standard' | 'any' } })}>
@@ -108,14 +112,14 @@ export default function TripSettingsPage() {
 
         <GfoPanel title="Who gets the email">
           <ul className="space-y-2">
-            {s.passengerPrefs.map(p => (
-              <li key={p.name} className="flex items-center justify-between text-sm"><span>{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.hasFlown ? 'has flown' : 'first trip ahead'}</span></span>
-                <select className={`${field} h-8`} value={p.pref} disabled={!canEdit} aria-label={`${p.name} preference`} onChange={e => setSettings({ ...s, passengerPrefs: s.passengerPrefs.map(x => (x.name === p.name ? { ...x, pref: e.target.value as 'every' | 'first' | 'never' } : x)) })}>
+            {people.map(p => (
+              <li key={p.id} className="flex items-center justify-between text-sm"><span>{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.hasFlown ? 'has flown' : 'first trip ahead'}</span></span>
+                <select className={`${field} h-8`} value={p.briefingPref} disabled={!canEdit} aria-label={`${p.name} preference`} onChange={e => setPeople(ps => upsertPerson(ps, { ...p, briefingPref: e.target.value as BriefingPrefValue }))}>
                   <option value="every">every trip</option><option value="first">first trip only</option><option value="never">never</option>
                 </select></li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-muted-foreground">Someone not on this list gets the email — missing a first-timer is the worse failure.</p>
+          <p className="mt-3 text-xs text-muted-foreground">Someone not on this list gets the email — missing a first-timer is the worse failure. Edited here or on the person's own record; there is one copy.</p>
         </GfoPanel>
       </div>
     </div>

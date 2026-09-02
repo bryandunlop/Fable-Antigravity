@@ -15,9 +15,15 @@
 import type { ForecastPeriod } from '../../../services/nwsForecastService';
 import type { FrozenSheet } from './tripSheet';
 import type { Actor, Trip } from './trip';
+import { personByName, type Person } from './people';
 
 export type BriefingPref = 'every' | 'first' | 'never';
 
+/**
+ * LEGACY. The briefing preference now lives on the person record (`engine/people.ts`), because a
+ * preference keyed by display name silently detaches the moment anyone is renamed. This shape
+ * survives only so `data/peopleStore.migrateSettingsOntoPeople` can read the old settings once.
+ */
 export interface PassengerPref {
   name: string;
   pref: BriefingPref;
@@ -69,16 +75,28 @@ function longDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 }
 
-/** Passengers who should get this trip's email, per the record's preference. Lead included. */
-export function recipientsFor(sheet: FrozenSheet, prefs: PassengerPref[]): string[] {
+/**
+ * Passengers who should get this trip's email, per their own record's preference. Lead included.
+ *
+ * WHO is aboard comes from the FROZEN SHEET, never from the live trip — the sheet is the record of
+ * who was on the trip when it froze, and re-deriving that at send time would let a later edit
+ * change who a frozen briefing was addressed to. Only the PREFERENCE is read live: whether someone
+ * wants the email is a standing choice they may change up to the moment it goes.
+ */
+export function recipientsFor(sheet: FrozenSheet, people: Person[]): string[] {
   const names = Array.from(new Set(sheet.legs.flatMap(l => l.aboard)));
   return names.filter(n => {
-    const p = prefs.find(x => x.name === n);
-    if (!p) return true; // unknown person: send — the open question is the default, and missing a first-timer is the worse failure
-    if (p.pref === 'never') return false;
-    if (p.pref === 'first') return !p.hasFlown;
+    const p = personByName(people, n);
+    if (!p) return true; // unknown person: send — missing a first-timer is the worse failure
+    if (p.briefingPref === 'never') return false;
+    if (p.briefingPref === 'first') return !p.hasFlown;
     return true;
   });
+}
+
+/** The address the briefing would go to, for the preview header. Null when we hold none. */
+export function emailAddressFor(people: Person[], name: string): string | null {
+  return personByName(people, name)?.email ?? null;
 }
 
 export function renderEmail(sheet: FrozenSheet, to: string, template: EmailTemplate, weather: WeatherByIcao): RenderedEmail {
@@ -143,10 +161,10 @@ export interface EmailDraft {
 export const emailDraftOf = (trip: Trip): EmailDraft | null => (trip.emailDraft as EmailDraft | null) ?? null;
 
 /** Made at freeze. A newer sheet replaces an UNSENT draft; a sent one stays as the record. */
-export function draftEmail(trip: Trip, sheet: FrozenSheet, template: EmailTemplate, prefs: PassengerPref[], weather: WeatherByIcao, by: Actor, nowUtc: string): Trip {
+export function draftEmail(trip: Trip, sheet: FrozenSheet, template: EmailTemplate, people: Person[], weather: WeatherByIcao, by: Actor, nowUtc: string): Trip {
   const existing = emailDraftOf(trip);
   if (existing?.sentAtUtc) return trip;
-  const recipients = recipientsFor(sheet, prefs);
+  const recipients = recipientsFor(sheet, people);
   const draft: EmailDraft = {
     sheetVersion: sheet.version,
     draftedAtUtc: nowUtc,

@@ -27,6 +27,7 @@ import { deriveReleaseSuggestions } from './engine/suggestions';
 import { loadTrips } from '../components/trips/data/tripsStore';
 import { loadSettings } from '../components/trips/data/settingsStore';
 import { principalReserveInput } from '../components/trips/engine/principal';
+import { loadPeople, backfillPassengerIds } from '../components/trips/data/peopleStore';
 import { tripsAsRecords } from '../components/trips/engine/rotation';
 import type {
   Audience,
@@ -75,7 +76,12 @@ function assembleInput(sources: AvailabilitySources, nowUtc: string, days: numbe
     tailHeadline,
     // Cincinnati is home whichever field the record names: Lunken (the register) or CVG (the scheduling seed).
     homeAirports: ['KLUK', 'KCVG'],
-    principalReserve: sources.principalReserve === null ? undefined : (sources.principalReserve ?? principalReserveInput(loadTrips(), loadSettings().principalReserve)),
+    principalReserve: sources.principalReserve === null ? undefined : (sources.principalReserve ?? principalReserveInput(...((): [ReturnType<typeof loadTrips>, ReturnType<typeof loadPeople>] => {
+      // Same link as TripsProvider does on mount, in case the engine is read first (a page that
+      // never mounts the trips module still reserves for the principal).
+      const l = backfillPassengerIds(loadTrips(), loadPeople(), new Date().toISOString());
+      return [l.trips, l.people];
+    })(), loadSettings().principalReserve)),
     tripAlerts: readTripServiceabilityAlerts(
       trips.map(t => ({
         tripId: t.id,

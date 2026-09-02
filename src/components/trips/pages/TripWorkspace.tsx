@@ -53,7 +53,7 @@ const STATUS_TONE: Record<Trip['status'], string> = {
 export default function TripWorkspace() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { trips, allTrips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor, setWatches } = useTripsModule();
+  const { trips, allTrips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor, setWatches, people, resolvePassengerIds } = useTripsModule();
   const trip = trips.find(t => t.id === id);
   const [draft, setDraft] = useState('');
   const [q, setQ] = useState('');
@@ -146,7 +146,7 @@ export default function TripWorkspace() {
       let next = freezeSheet(t, sheetCtx, now, actor);
       const sh = latestSheet(next);
       if (sh && !emailDraftOf(next)) {
-        next = draftEmail(next, sh, settings.email, settings.passengerPrefs, weatherFor(sh.legs.map(l => l.to.icao).filter((x): x is string => !!x)), actor, now);
+        next = draftEmail(next, sh, settings.email, people, weatherFor(sh.legs.map(l => l.to.icao).filter((x): x is string => !!x)), actor, now);
       }
       return next;
     });
@@ -185,7 +185,12 @@ export default function TripWorkspace() {
   }
   function saveNames() {
     if (namesText === null) return;
-    update(tripId, t => setPassengers(t, namesText.split(',').map(x => x.trim()).filter(Boolean), actor, nowUtc()));
+    const names = namesText.split(',').map(x => x.trim()).filter(Boolean);
+    // Resolve to people first: a name nobody knows becomes an unverified guest record rather than
+    // a string that no document check or forms status will ever hang off (Phase 5 slice 2).
+    const withLead = names.includes(trip!.leadPassengerName) ? names : [trip!.leadPassengerName, ...names];
+    const ids = resolvePassengerIds(withLead);
+    update(tripId, t => setPassengers(t, names, actor, nowUtc(), ids));
     setNamesText(null);
   }
 

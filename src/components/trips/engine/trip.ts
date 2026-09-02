@@ -145,6 +145,12 @@ export interface Trip {
   tail: string | null;
   /** Names known so far, lead included. Seats not yet named = seatsHeld - names.length. */
   passengerNames: string[];
+  /**
+   * The same people as records (`engine/people.ts`), in the same order. Optional because trips
+   * written before Phase 5 slice 2 have none, and a missing list must read as "not resolved yet"
+   * rather than "nobody aboard" — every reader falls back to `passengerNames`.
+   */
+  passengerIds?: string[];
   crew: TripCrew | null;
   cutoffOverrides: CutoffOverride[];
   /** Frozen T-72 sheets, oldest first; version = index + 1. Opaque here: engine/tripSheet.ts owns the shape. */
@@ -388,11 +394,18 @@ export function setBoard(trip: Trip, window: BoardWindow | null, by: Actor, nowU
 }
 
 /** Names arrive over months. Allowed on a draft or a submitted/confirmed trip — never after decline. */
-export function setPassengers(trip: Trip, names: string[], by: Actor, nowUtc: string): Trip {
+/**
+ * `ids` is resolved by the caller (which owns the people register) and must line up with the
+ * cleaned names one-for-one. When it does not — an old caller, or a resolution that failed — the
+ * ids are dropped rather than stored half-aligned, because a list that is right for some seats and
+ * wrong for others is worse than one that is honestly absent.
+ */
+export function setPassengers(trip: Trip, names: string[], by: Actor, nowUtc: string, ids?: string[]): Trip {
   if (trip.status === 'declined') return trip;
   const clean = Array.from(new Set(names.map(n => n.trim()).filter(Boolean)));
   if (!clean.includes(trip.leadPassengerName)) clean.unshift(trip.leadPassengerName);
-  return append({ ...trip, passengerNames: clean }, { kind: 'passengers-updated', at: nowUtc, by, names: clean });
+  const passengerIds = ids && ids.length === clean.length ? ids : undefined;
+  return append({ ...trip, passengerNames: clean, passengerIds }, { kind: 'passengers-updated', at: nowUtc, by, names: clean });
 }
 
 export function setCatering(trip: Trip, legId: string, text: string, by: Actor, nowUtc: string): Trip {

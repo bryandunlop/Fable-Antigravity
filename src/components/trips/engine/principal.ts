@@ -6,12 +6,18 @@
 // reserving. Pure: callers pass trips and settings.
 
 import { CORE_FLEET } from '../../../fleet/registry';
+import { personById, principalOf, type Person } from './people';
 import type { Trip } from './trip';
 import type { PrincipalReserve } from '../../../availability/engine/availability';
 
 export interface PrincipalReserveSetting {
   enabled: boolean;
-  /** Passenger display name, as it appears on trips. */
+  /**
+   * LEGACY, migration only. The principal is a FLAG ON THE PERSON RECORD (`Person.principal`), not
+   * a name in settings — a name here stopped matching the moment anyone was renamed, and the
+   * reserve then silently released the aircraft with nothing on screen to say why (Phase 5 slice 2).
+   * `data/peopleStore.migrateSettingsOntoPeople` reads this once and then it means nothing.
+   */
   name: string;
   cabin: 'big' | 'standard' | 'any';
 }
@@ -30,11 +36,20 @@ export function tripDays(trip: Trip): string[] {
   return out;
 }
 
-/** Days the principal is travelling — any live trip that carries their name. */
-export function principalAwayDates(trips: Trip[], name: string): string[] {
+/**
+ * Days the principal is travelling — any live trip that carries them.
+ *
+ * Matched by ID where the trip has resolved passenger ids, falling back to the display name for a
+ * trip written before ids existed. The fallback is what keeps an old trip counted; the id path is
+ * what keeps a renamed principal counted.
+ */
+export function principalAwayDates(trips: Trip[], person: Person): string[] {
   const days = new Set<string>();
   for (const t of trips) {
-    if (!t.passengerNames.includes(name)) continue;
+    const aboard = t.passengerIds?.length
+      ? t.passengerIds.includes(person.id)
+      : t.passengerNames.includes(person.name);
+    if (!aboard) continue;
     for (const d of tripDays(t)) days.add(d);
   }
   return Array.from(days).sort();
@@ -44,7 +59,19 @@ export function candidateTails(cabin: PrincipalReserveSetting['cabin']): string[
   return CORE_FLEET.filter(a => cabin === 'any' || a.cabin === cabin).map(a => a.tail);
 }
 
-export function principalReserveInput(trips: Trip[], setting: PrincipalReserveSetting): PrincipalReserve | undefined {
-  if (!setting.enabled || !setting.name.trim()) return undefined;
-  return { name: setting.name, candidateTails: candidateTails(setting.cabin), awayDates: principalAwayDates(trips, setting.name) };
+/**
+ * The reserve, or undefined when it is off or nobody is marked as the principal. `personId` may be
+ * passed to reserve for someone other than the flagged principal; by default it is whoever carries
+ * `principal: true` on their record.
+ */
+export function principalReserveInput(
+  trips: Trip[],
+  people: Person[],
+  setting: PrincipalReserveSetting,
+  personId?: string,
+): PrincipalReserve | undefined {
+  if (!setting.enabled) return undefined;
+  const person = personId ? personById(people, personId) : principalOf(people);
+  if (!person) return undefined;
+  return { name: person.name, candidateTails: candidateTails(setting.cabin), awayDates: principalAwayDates(trips, person) };
 }

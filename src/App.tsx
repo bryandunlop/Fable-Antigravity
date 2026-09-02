@@ -34,6 +34,7 @@ import LeadDashboard from './components/lead/LeadDashboard';
 import ExecutiveDashboard from './components/executive/ExecutiveDashboard';
 import SchedulePage from './components/schedule/SchedulePage';
 import TripsRoutes from './components/trips/TripsRoutes';
+import PeopleRoutes from './components/trips/PeopleRoutes';
 import ManagerInsights from './components/ManagerInsights';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
@@ -458,6 +459,17 @@ export default function App() {
                                       {/* The watches page reads the fleet picture (useTrips), which needs the scheduling workspace. */}
                                       <SchedulingWorkspaceProvider>
                                         <TripsRoutes userRole={userRole} additionalRoles={additionalRoles} />
+                                      </SchedulingWorkspaceProvider>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                {/* Phase 5 slice 2 — the people register; a person is a record, not a name on a trip */}
+                                <Route
+                                  path="/people/*"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'lead', 'admin']}>
+                                      <SchedulingWorkspaceProvider>
+                                        <PeopleRoutes userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>
                                     </ProtectedRoute>
                                   }

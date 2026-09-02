@@ -25,7 +25,7 @@ import { evaluateWatches, freeByCabin } from './engine/watches';
 const CLOCK_ACTOR = { name: 'T-72 clock', role: 'system' as const };
 
 export default function TripClockEffects() {
-  const { trips, settings, sheetCtx, weatherFor, update, setWatches, nowUtc } = useTripsModule();
+  const { trips, settings, sheetCtx, weatherFor, update, setWatches, people, nowUtc } = useTripsModule();
   const tick = useMinuteTick();
   const schedTrips = useTrips();
 
@@ -48,7 +48,7 @@ export default function TripClockEffects() {
           const sheet = latestSheet(next);
           if (sheet && !emailDraftOf(next)) {
             next = draftEmail(
-              next, sheet, settings.email, settings.passengerPrefs,
+              next, sheet, settings.email, people,
               weatherFor(sheet.legs.map(l => l.to.icao).filter((x): x is string => !!x)),
               CLOCK_ACTOR, now,
             );
