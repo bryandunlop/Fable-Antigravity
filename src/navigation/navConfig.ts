@@ -107,6 +107,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/fleet-schedule', label: 'Schedule', domain: 'home', icon: CalendarFold, primary: true, keywords: ['executive', 'availability', 'fleet', 'open days', 'month', 'calendar', 'schedule'], roles: ['executive', 'admin'] },
   { path: '/executive', label: 'Fleet Week', domain: 'home', icon: CalendarRange, keywords: ['executive', 'availability', 'fleet', 'open days', 'week view'], roles: ['executive', 'admin'] },
   { path: '/trips', label: 'Trips', domain: 'scheduling', icon: Briefcase, primary: true, keywords: ['trip', 'request', 'workspace', 'record', 'documents', 'draft', 'places'], roles: ['admin-assistant', 'scheduling', 'lead'] },
+  { path: '/trips/settings', label: 'Trip settings', domain: 'scheduling', icon: Sliders, keywords: ['cutoffs', 'email', 'template', 'dead man', 'blurbs', 'passenger preferences'], roles: ['scheduling'] },
   { path: '/trips/places', label: 'Places', domain: 'scheduling', icon: MapPin, keywords: ['airport', 'alias', 'plant', 'city', 'seattle', 'boeing field'], roles: ['scheduling'] },
   { path: '/fleet-schedule', label: 'Fleet schedule', domain: 'scheduling', icon: CalendarFold, keywords: ['availability', 'block', 'hold', 'month', 'calendar', 'open days'], roles: ['scheduling', 'lead', 'admin-assistant'] },
   // Per-approver inbox (D39): requests awaiting your role's sign-off, plus what you filed.

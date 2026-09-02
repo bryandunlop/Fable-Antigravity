@@ -1,11 +1,11 @@
 // THIN localStorage wrapper for trip records + the demo seed. No logic: engine/trip.ts owns it.
 
-import { createDraft, newLeg, postMessage, shareDraft, submitItinerary, askQuestion, addDocument, assignTail, type Trip, type Actor } from '../engine/trip';
+import { createDraft, newLeg, postMessage, shareDraft, submitItinerary, askQuestion, addDocument, assignTail, setPassengers, setCatering, setCrew, type Trip, type Actor } from '../engine/trip';
 import { SCHEDULING_DECIDES } from '../engine/places';
 
 export const TRIPS_KEY = 'trip-records-state';
 const VERSION_KEY = 'trip-records-version';
-const VERSION = '2';
+const VERSION = '4';
 
 export interface LeadOption { id: string; name: string }
 /** Principals the demo EA books for. Names match the booking portal's passenger fixtures. */
@@ -17,6 +17,12 @@ export const LEADS: LeadOption[] = [
 
 const EA: Actor = { name: 'Dana Whitfield', role: 'ea' };
 const SCHED: Actor = { name: 'R. Calloway', role: 'scheduling' };
+
+/** 'YYYY-MM-DD' n days from now (local). The Boston seed sits inside the T-72 window on purpose. */
+function daysFromNow(n: number): string {
+  const d = new Date(); d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export function seedTrips(): Trip[] {
   const seattle = createDraft({
@@ -53,15 +59,30 @@ export function seedTrips(): Trip[] {
   let bos = createDraft({
     title: 'Boston — Gillette day', leadPassengerId: 'P-REYES', leadPassengerName: 'A. Reyes', seatsHeld: 2, by: EA, nowUtc: '2026-08-12T11:00:00.000Z',
     legs: [
-      newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBED' }, date: '2026-09-17', timing: { kind: 'arrive', arriveByLocal: '10:00' } }),
-      newLeg({ from: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBED' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: '2026-09-17', timing: { kind: 'depart', departLocal: '18:00', flexHours: 0 } }),
+      newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBED' }, date: daysFromNow(2), timing: { kind: 'depart', departLocal: '07:30', flexHours: 0 } }),
+      newLeg({ from: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBED' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(2), timing: { kind: 'depart', departLocal: '18:00', flexHours: 0 } }),
     ],
   });
   bos = submitItinerary(bos, EA, '2026-08-12T11:20:00.000Z');
   bos = assignTail(bos, 'N6PG', SCHED, '2026-08-13T08:45:00.000Z');
+  bos = setPassengers(bos, ['A. Reyes', 'S. Reyes'], EA, '2026-08-20T10:00:00.000Z');
+  bos = setCatering(bos, bos.legs[0].id, 'Light breakfast for 2, no shellfish', EA, '2026-08-21T09:00:00.000Z');
+  bos = setCrew(bos, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: 'Lena Nguyen' }, SCHED, '2026-08-22T08:00:00.000Z');
   bos = postMessage(bos, SCHED, 'N6PG confirmed. Names by the 14th please.', '2026-08-13T08:46:00.000Z');
 
   return [seattle, board, meh, bos];
+}
+
+/** Rows written before D106 lack the T-72 fields; read them as empty rather than crashing. */
+function withDefaults(t: Trip): Trip {
+  return {
+    ...t,
+    passengerNames: t.passengerNames ?? [t.leadPassengerName],
+    crew: t.crew ?? null,
+    cutoffOverrides: t.cutoffOverrides ?? [],
+    frozenSheets: t.frozenSheets ?? [],
+    emailDraft: t.emailDraft ?? null,
+  };
 }
 
 export function loadTrips(): Trip[] {
@@ -69,7 +90,7 @@ export function loadTrips(): Trip[] {
   try {
     if (localStorage.getItem(VERSION_KEY) !== VERSION) return seedTrips();
     const raw = localStorage.getItem(TRIPS_KEY);
-    return raw ? (JSON.parse(raw) as Trip[]) : seedTrips();
+    return raw ? (JSON.parse(raw) as Trip[]).map(withDefaults) : seedTrips();
   } catch {
     return seedTrips();
   }

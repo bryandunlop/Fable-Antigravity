@@ -40,6 +40,8 @@ export interface TripLeg {
   /** ISO date or null while the EA does not know. */
   date: string | null;
   timing: LegTiming;
+  /** Catering note for this leg, when loaded. Read by the trip sheet and the email (D106). */
+  catering?: string;
 }
 
 export type TripEvent =
@@ -51,7 +53,31 @@ export type TripEvent =
   | { id: string; kind: 'question'; at: string; by: Actor; about: 'airport' | 'date' | 'passengers' | 'other'; text: string }
   | { id: string; kind: 'assigned'; at: string; by: Actor; tail: string }
   | { id: string; kind: 'airport-changed'; at: string; by: Actor; legId: string; end: 'from' | 'to'; airport: string }
-  | { id: string; kind: 'declined'; at: string; by: Actor; reason: string };
+  | { id: string; kind: 'declined'; at: string; by: Actor; reason: string }
+  | { id: string; kind: 'passengers-updated'; at: string; by: Actor; names: string[] }
+  | { id: string; kind: 'catering-set'; at: string; by: Actor; legId: string; text: string }
+  | { id: string; kind: 'crew-set'; at: string; by: Actor; crew: TripCrew }
+  | { id: string; kind: 'cutoff-moved'; at: string; by: Actor; cutoff: string; dueUtc: string; reason: string }
+  | { id: string; kind: 'sheet-frozen'; at: string; by: Actor; version: number }
+  | { id: string; kind: 'sent-to-crew'; at: string; by: Actor; version: number }
+  | { id: string; kind: 'email-drafted'; at: string; by: Actor; version: number; recipients: string[] }
+  | { id: string; kind: 'email-sent'; at: string; by: Actor; recipients: string[]; auto: boolean };
+
+/** Who is flying it. Set by scheduling; snapshotted into the frozen sheet. */
+export interface TripCrew {
+  pic: string;
+  sic: string;
+  fa: string | null;
+}
+
+/** A per-trip move of one cutoff (D106). The defaults live in settings; this is the exception. */
+export interface CutoffOverride {
+  cutoff: string;
+  dueUtc: string;
+  reason: string;
+  by: Actor;
+  at: string;
+}
 
 export type TripEventKind = TripEvent['kind'];
 
@@ -78,6 +104,14 @@ export interface Trip {
   seatsHeld: number;
   legs: TripLeg[];
   tail: string | null;
+  /** Names known so far, lead included. Seats not yet named = seatsHeld - names.length. */
+  passengerNames: string[];
+  crew: TripCrew | null;
+  cutoffOverrides: CutoffOverride[];
+  /** Frozen T-72 sheets, oldest first; version = index + 1. Opaque here: engine/tripSheet.ts owns the shape. */
+  frozenSheets: unknown[];
+  /** The passenger email draft made at freeze; engine/briefingEmail.ts owns the shape. */
+  emailDraft: unknown | null;
   createdBy: Actor;
   createdAt: string;
   events: TripEvent[];
@@ -121,6 +155,11 @@ export function createDraft(input: {
     seatsHeld: input.seatsHeld ?? 1,
     legs,
     tail: null,
+    passengerNames: [input.leadPassengerName],
+    crew: null,
+    cutoffOverrides: [],
+    frozenSheets: [],
+    emailDraft: null,
     createdBy: input.by,
     createdAt: input.nowUtc,
     events: [{ id: nextId('ev'), kind: 'created', at: input.nowUtc, by: input.by }],
@@ -281,6 +320,34 @@ export function decline(trip: Trip, by: Actor, reason: string, nowUtc: string): 
   return append({ ...trip, status: 'declined' }, { kind: 'declined', at: nowUtc, by, reason: reason.trim() });
 }
 
+/** Names arrive over months. Allowed on a draft or a submitted/confirmed trip — never after decline. */
+export function setPassengers(trip: Trip, names: string[], by: Actor, nowUtc: string): Trip {
+  if (trip.status === 'declined') return trip;
+  const clean = Array.from(new Set(names.map(n => n.trim()).filter(Boolean)));
+  if (!clean.includes(trip.leadPassengerName)) clean.unshift(trip.leadPassengerName);
+  return append({ ...trip, passengerNames: clean }, { kind: 'passengers-updated', at: nowUtc, by, names: clean });
+}
+
+export function setCatering(trip: Trip, legId: string, text: string, by: Actor, nowUtc: string): Trip {
+  if (trip.status === 'declined') return trip;
+  const legs = trip.legs.map(l => (l.id === legId ? { ...l, catering: text.trim() || undefined } : l));
+  return append({ ...trip, legs }, { kind: 'catering-set', at: nowUtc, by, legId, text: text.trim() });
+}
+
+/** Scheduling names the crew. Refused before a tail is assigned — no aircraft, no crew. */
+export function setCrew(trip: Trip, crew: TripCrew, by: Actor, nowUtc: string): Trip {
+  if (by.role !== 'scheduling' || !trip.tail) return trip;
+  return append({ ...trip, crew }, { kind: 'crew-set', at: nowUtc, by, crew });
+}
+
+/** Append-only record of a cutoff move; engine/cutoffs.ts decides what it means. */
+export function recordCutoffMove(trip: Trip, cutoff: string, dueUtc: string, reason: string, by: Actor, nowUtc: string): Trip {
+  const r = reason.trim();
+  if (by.role !== 'scheduling' || !r) return trip;
+  const override: CutoffOverride = { cutoff, dueUtc, reason: r, by, at: nowUtc };
+  return append({ ...trip, cutoffOverrides: [...trip.cutoffOverrides, override] }, { kind: 'cutoff-moved', at: nowUtc, by, cutoff, dueUtc, reason: r });
+}
+
 // ── Readers ───────────────────────────────────────────────────────────────────────
 
 export const documentsOf = (trip: Trip): TripDocument[] =>
@@ -302,6 +369,14 @@ export function eventText(e: TripEvent): string {
     case 'assigned': return `${e.tail} assigned`;
     case 'airport-changed': return `Airport changed to ${e.airport}`;
     case 'declined': return `Declined: ${e.reason}`;
+    case 'passengers-updated': return `Passengers: ${e.names.join(', ')}`;
+    case 'catering-set': return e.text ? `Catering set: ${e.text}` : 'Catering cleared';
+    case 'crew-set': return `Crew: ${e.crew.pic}, ${e.crew.sic}${e.crew.fa ? `, ${e.crew.fa}` : ''}`;
+    case 'cutoff-moved': return `${e.cutoff} cutoff moved to ${e.dueUtc.slice(0, 10)} — ${e.reason}`;
+    case 'sheet-frozen': return `Trip sheet frozen · v${e.version}`;
+    case 'sent-to-crew': return `Trip sheet v${e.version} sent to crew`;
+    case 'email-drafted': return `Passenger email drafted for ${e.recipients.length} ${e.recipients.length === 1 ? 'person' : 'people'}`;
+    case 'email-sent': return `${e.auto ? 'Passenger email auto-sent (unreviewed)' : 'Passenger email sent'} to ${e.recipients.join(', ')}`;
   }
 }
 
