@@ -109,6 +109,12 @@ export default function SchedulePage({
   }
 
   function askEa(dateUtc: string, tail?: string) {
+    // An EA starts a trip draft on that day (D105: the calendar is the front door into the
+    // trip workspace). An executive still hands the day to their EA.
+    if (userRole === 'admin-assistant') {
+      navigate(`/trips/new?date=${dateUtc}`);
+      return;
+    }
     navigate('/booking-portal/requests/new', {
       state: { dates: [dateUtc], fromExecutive: tail ? { tail, dateUtc } : undefined },
     });
@@ -224,7 +230,7 @@ export default function SchedulePage({
           {MONTH_NAMES[cursor.month]} averages {monthAverage} of {CORE_FLEET_SIZE} aircraft free per day
           {monthProvisional && ' · the crew roster is not published this far ahead, so far-out days are a plan, not a promise'}
           {' · '}open means airworthy, unscheduled, and a crew is free.
-          {audience === 'executive' && ' Tap a day and your EA takes it from there.'}
+          {audience === 'executive' && (userRole === 'admin-assistant' ? ' Tap a day to start a trip on it.' : ' Tap a day and your EA takes it from there.')}
           {canBlock && !previewAsExecutive && ' Tap an open tail to block it; releases are approved on the scheduling board.'}
         </p>
       </GfoPanel>

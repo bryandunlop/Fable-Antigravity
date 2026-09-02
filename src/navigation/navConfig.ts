@@ -10,7 +10,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity, AlertOctagon, AlertTriangle, Archive, ArrowRightLeft, BarChart3,
-  Boxes, Building2, Calendar, CalendarCheck, CalendarDays, CalendarFold, CalendarRange, Car, ClipboardCheck,
+  Boxes, Briefcase, Building2, Calendar, CalendarCheck, CalendarDays, CalendarFold, CalendarRange, Car, ClipboardCheck,
   ClipboardList, ClipboardPen, ClipboardType, Database, FileCheck, FileText,
   FileWarning, Flag,
   Fuel, Gauge, HardHat, Home, IdCard, Layers, LayoutDashboard, ListChecks,
@@ -106,7 +106,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // D99 — the executive fleet week view: per-tail timeline (destinations + open days) with inline metrics.
   { path: '/fleet-schedule', label: 'Schedule', domain: 'home', icon: CalendarFold, primary: true, keywords: ['executive', 'availability', 'fleet', 'open days', 'month', 'calendar', 'schedule'], roles: ['executive', 'admin'] },
   { path: '/executive', label: 'Fleet Week', domain: 'home', icon: CalendarRange, keywords: ['executive', 'availability', 'fleet', 'open days', 'week view'], roles: ['executive', 'admin'] },
-  { path: '/fleet-schedule', label: 'Fleet schedule', domain: 'scheduling', icon: CalendarFold, keywords: ['availability', 'block', 'hold', 'month', 'calendar', 'open days'], roles: ['scheduling', 'lead'] },
+  { path: '/trips', label: 'Trips', domain: 'scheduling', icon: Briefcase, primary: true, keywords: ['trip', 'request', 'workspace', 'record', 'documents', 'draft', 'places'], roles: ['admin-assistant', 'scheduling', 'lead'] },
+  { path: '/trips/places', label: 'Places', domain: 'scheduling', icon: MapPin, keywords: ['airport', 'alias', 'plant', 'city', 'seattle', 'boeing field'], roles: ['scheduling'] },
+  { path: '/fleet-schedule', label: 'Fleet schedule', domain: 'scheduling', icon: CalendarFold, keywords: ['availability', 'block', 'hold', 'month', 'calendar', 'open days'], roles: ['scheduling', 'lead', 'admin-assistant'] },
   // Per-approver inbox (D39): requests awaiting your role's sign-off, plus what you filed.
   { path: '/approvals', label: 'Approvals', domain: 'home', icon: Stamp, primary: true, keywords: ['approve', 'waiver', 'sign-off', 'request'], roles: ['pilot', 'chief-pilot', 'inflight', 'fa-manager', 'maintenance', 'chief-inspector', 'shift-lead', 'safety', 'lead', 'scheduling', 'document-manager', 'admin', 'dom'] },
   // D66: Procedural Bulletins and Flight Ops Bulletins used to sit here and under

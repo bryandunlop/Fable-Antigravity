@@ -33,6 +33,7 @@ import { DocWorkbench } from './components/documents/pages/DocWorkbench';
 import LeadDashboard from './components/lead/LeadDashboard';
 import ExecutiveDashboard from './components/executive/ExecutiveDashboard';
 import SchedulePage from './components/schedule/SchedulePage';
+import TripsRoutes from './components/trips/TripsRoutes';
 import ManagerInsights from './components/ManagerInsights';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import MaintenanceHub from './components/MaintenanceHub';
@@ -448,11 +449,20 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
+                                {/* D105 — the trip workspace: request builder, record, documents, places register */}
+                                <Route
+                                  path="/trips/*"
+                                  element={
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['admin-assistant', 'scheduling', 'lead', 'admin', 'executive']}>
+                                      <TripsRoutes userRole={userRole} additionalRoles={additionalRoles} />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 {/* D104 — the schedule page: open-days count + fleet calendar, scheduling can block */}
                                 <Route
                                   path="/fleet-schedule"
                                   element={
-                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['executive', 'scheduling', 'lead', 'admin']}>
+                                    <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['executive', 'admin-assistant', 'scheduling', 'lead', 'admin']}>
                                       <SchedulingWorkspaceProvider>
                                         <SchedulePage userRole={userRole} additionalRoles={additionalRoles} />
                                       </SchedulingWorkspaceProvider>
