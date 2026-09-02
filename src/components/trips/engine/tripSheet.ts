@@ -36,6 +36,8 @@ export interface SheetLeg {
   catering: string | null;
   /** True when the departure time is a planning number, not one scheduling set. */
   planned: boolean;
+  /** Nobody aboard — the aircraft is positioning. */
+  positioning: boolean;
 }
 
 export interface SheetCrewLine { role: 'PIC' | 'SIC' | 'FA'; name: string; blurb: string | null }
@@ -97,9 +99,10 @@ export function sheetLeg(leg: TripLeg, n: number, trip: Trip, places: PlaceRecor
     to: { icao: toIcao, place: leg.to.placeName, label: leg.to.airport ? airportLabel(places, leg.to.airport) : leg.to.placeName, wall: wallLabel(arrUtc, toIcao), utc: arrUtc },
     elapsedMinutes: lt?.elapsedMinutes ?? estimateMinutes(fromIcao, toIcao),
     dayShift: lt?.dayShift ?? null,
-    aboard: trip.passengerNames,
-    catering: leg.catering ?? null,
+    aboard: leg.positioning ? [] : trip.passengerNames,
+    catering: leg.positioning ? null : (leg.catering ?? null),
     planned: leg.timing.kind !== 'depart',
+    positioning: !!leg.positioning,
   };
 }
 

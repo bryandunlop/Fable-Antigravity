@@ -29,7 +29,7 @@ export function LegEditor({ index, leg, places, onChange, onRemove, disabled, mi
   return (
     <div className={cn('rounded-md border p-3', missingDate ? 'border-destructive/60 bg-destructive/5' : 'border-border')}>
       <div className="mb-2 flex items-center justify-between">
-        <span className="gfo-eyebrow text-muted-foreground">Leg {index + 1}</span>
+        <span className="gfo-eyebrow text-muted-foreground">Leg {index + 1}{leg.positioning ? ' · positioning' : ''}</span>
         {onRemove && !disabled && (
           <button type="button" onClick={onRemove} className="text-muted-foreground hover:text-destructive" aria-label={`Remove leg ${index + 1}`}><X className="h-4 w-4" /></button>
         )}
@@ -69,6 +69,10 @@ export function LegEditor({ index, leg, places, onChange, onRemove, disabled, mi
           </div>
         </div>
       </div>
+      <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+        <input type="checkbox" checked={!!leg.positioning} disabled={disabled} aria-label={`Leg ${index + 1} positioning`} onChange={e => onChange({ positioning: e.target.checked })} />
+        Nobody aboard — the aircraft positions for a pickup or a drop
+      </label>
       {!disabled && !onRemove && <span className="sr-only">first leg</span>}
       {disabled && <Button variant="ghost" size="sm" className="hidden">-</Button>}
     </div>

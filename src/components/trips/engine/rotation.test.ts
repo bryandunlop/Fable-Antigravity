@@ -32,3 +32,32 @@ describe('trips occupy tails, and a tail has a day', () => {
     expect(rotationFor('N5PG', recs, '2026-09-01', '2026-09-30').at(-1)).toMatchObject({ kind: 'return', from: 'KTEB', to: 'KLUK', dateUtc: '2026-09-11' });
   });
 });
+
+describe('positioning legs — nobody aboard, on purpose', () => {
+  it('an EA-requested empty leg out to JFK and a passenger leg home read as positioning then passenger, paxCount 0 on the empty one', async () => {
+    const { createDraft, newLeg, submitItinerary, assignTail } = await import('./trip');
+    const EA = { name: 'Dana', role: 'ea' as const }; const S = { name: 'R', role: 'scheduling' as const };
+    let t = createDraft({ title: 'JFK pickup', leadPassengerId: 'P', leadPassengerName: 'A. Reyes', seatsHeld: 2, by: EA, nowUtc: '2026-09-01T00:00:00.000Z',
+      legs: [
+        newLeg({ from: { placeName: 'Cincinnati', placeId: null, airport: 'KLUK' }, to: { placeName: 'JFK', placeId: null, airport: 'KJFK' }, date: '2026-09-20', timing: { kind: 'depart', departLocal: '07:00', flexHours: 0 }, positioning: true }),
+        newLeg({ from: { placeName: 'JFK', placeId: null, airport: 'KJFK' }, to: { placeName: 'Cincinnati', placeId: null, airport: 'KLUK' }, date: '2026-09-20', timing: { kind: 'depart', departLocal: '11:00', flexHours: 0 } }),
+      ] });
+    t = assignTail(submitItinerary(t, EA, '2026-09-01T00:00:00.000Z'), 'N5PG', S, '2026-09-01T00:00:00.000Z');
+    const recs = tripsAsRecords([t]);
+    expect(recs[0].legs.map(l => l.paxCount)).toEqual([0, 1]);
+    const rot = rotationFor('N5PG', recs, '2026-09-01', '2026-09-30');
+    expect(rot.map(x => x.kind)).toEqual(['positioning', 'passenger']);
+  });
+  it('scheduling can add a positioning leg onto a live trip; the EA cannot', async () => {
+    const { createDraft, newLeg, submitItinerary, addLegBy } = await import('./trip');
+    const EA = { name: 'Dana', role: 'ea' as const }; const S = { name: 'R', role: 'scheduling' as const };
+    let t = createDraft({ title: 'x', leadPassengerId: 'P', leadPassengerName: 'A', by: EA, nowUtc: '2026-09-01T00:00:00.000Z',
+      legs: [newLeg({ from: { placeName: 'a', placeId: null, airport: 'KTEB' }, to: { placeName: 'b', placeId: null, airport: 'KLUK' }, date: '2026-09-20' })] });
+    t = submitItinerary(t, EA, '2026-09-01T00:00:00.000Z');
+    const pos = { from: { placeName: 'Cincinnati', placeId: null, airport: 'KLUK' }, to: { placeName: 'a', placeId: null, airport: 'KTEB' }, date: '2026-09-20', timing: { kind: 'flexible' as const }, positioning: true };
+    expect(addLegBy(t, 0, pos, EA, '2026-09-01T00:00:00.000Z')).toBe(t);
+    const added = addLegBy(t, 0, pos, S, '2026-09-01T00:00:00.000Z');
+    expect(added.legs).toHaveLength(2); expect(added.legs[0].positioning).toBe(true);
+    expect(added.events.at(-1)).toMatchObject({ kind: 'leg-added', positioning: true });
+  });
+});
