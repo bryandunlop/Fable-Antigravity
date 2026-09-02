@@ -17,7 +17,7 @@ import {
   MapPin, MapPinCheck, Monitor, Package, PackagePlus, Plane, PlaneTakeoff, Route,
   Send, Settings, Shield, ShieldCheck, Sliders, Sparkles, Target, Timer, Upload,
   BadgeCheck, BookUser, PlaneLanding, Radar, SearchCheck, Stamp,
-  Mail, Repeat, Ticket, UserCheck, Users, Utensils, Warehouse, Wrench,
+  Mail, MessageSquarePlus, Repeat, Ticket, UserCheck, Users, Utensils, Warehouse, Wrench,
 } from 'lucide-react';
 
 export type Domain =
@@ -249,6 +249,12 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // ── Documents ─────────────────────────────────────────────────────────────
   { path: '/documents', label: 'Document Center', domain: 'documents', icon: Archive, primary: true, detailLabel: 'Document', keywords: ['manual', 'gom', 'library', 'sop', 'compliance', 'read and initial', 'tribal knowledge', 'bulletin', 'bulletins', 'procedural bulletin', 'flight ops bulletin', 'pb', 'fob', 'interim', 'nonofficial', 'cabin knowledge', 'bedding', 'cabin lighting', 'wifi'], roles: ['pilot', 'inflight', 'lead-fa', 'fa-manager', 'commissary-manager', 'admin', 'lead', 'safety', 'maintenance', 'scheduling', 'document-manager', 'procedural-specialist'] },
   { path: '/documents', label: 'Document Library', domain: 'documents', icon: Archive, primary: true, roles: ['dms-manager'] },
+
+  // Feedback about myGFO ITSELF — bugs, ideas, change requests, help. Distinct
+  // from Suggestion Box (operational suggestions routed to managers); this one
+  // is triaged into the engineering backlog in Jira. Every role can reach it,
+  // because every role uses the software.
+  { path: '/feedback', label: 'Feedback', domain: 'home', icon: MessageSquarePlus, primary: false, keywords: ['bug', 'idea', 'report a bug', 'change request', 'help', 'support', 'jira'], roles: ['pilot', 'inflight', 'lead-fa', 'fa-manager', 'commissary-manager', 'admin', 'lead', 'vp', 'admin-assistant', 'executive', 'safety', 'maintenance', 'maintenance-coordinator', 'shift-lead', 'scheduling', 'dom', 'chief-pilot', 'chief-inspector', 'document-manager', 'dms-manager', 'procedural-specialist', 'airport-evaluator'] },
 
   // ── Admin ─────────────────────────────────────────────────────────────────
   { path: '/admin', label: 'Admin Panel', domain: 'admin', icon: Settings, primary: true, keywords: ['users', 'management'], roles: ['admin'] },

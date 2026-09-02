@@ -5,6 +5,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupConte
 import NotificationCenter from './NotificationCenter';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetDemoDataButton } from './ResetDemoDataButton';
+import { FeedbackButton } from './feedback/FeedbackButton';
 import BreadcrumbNav from './BreadcrumbNav';
 import CommandPalette from './CommandPalette';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
@@ -471,6 +472,11 @@ function NavigationContent({ userRole, additionalRoles = [], onLogout, children 
                   drawer's account block — a bare Logout icon at top-right is the
                   classic mis-tap, and it was the only irreversible control up there. */}
               <span className="hidden md:inline-flex"><ThemeToggle /></span>
+
+              {/* Report a bug / suggest an idea, from any screen. Sits beside the
+                  other utilities rather than as a floating blob over the content —
+                  a persistent FAB covers the bottom-right of every table in the app. */}
+              <span className="hidden md:inline-flex"><FeedbackButton userRole={userRole} /></span>
 
               {/* Global "Reset demo data" — the one factory reset (D37 Wave-1 Q3) */}
               <span className="hidden md:inline-flex"><ResetDemoDataButton /></span>
