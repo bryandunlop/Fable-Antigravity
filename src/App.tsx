@@ -58,6 +58,7 @@ import SchedulingDashboard from './components/SchedulingDashboard';
 import CriticalBusinessFunctions from './components/CriticalBusinessFunctions';
 import RollingActionItems from './components/RollingActionItems';
 import SuggestionBox from './components/SuggestionBox';
+import { FeedbackPage } from './components/feedback/FeedbackPage';
 import PilotCurrency from './components/PilotCurrency';
 import PassengerForms from './components/PassengerForms';
 import PublicPassengerForm from './components/PublicPassengerForm';
@@ -650,6 +651,7 @@ export default function App() {
                                 <Route path="/critical-functions" element={<CriticalBusinessFunctions />} />
                                 <Route path="/rolling-action-items" element={<RollingActionItems />} />
                                 <Route path="/suggestion-box" element={<SuggestionBox />} />
+                                <Route path="/feedback" element={<FeedbackPage />} />
                                 <Route path="/parts-inventory" element={<PartsInventory />} />
                                 <Route path="/passenger-forms" element={<PassengerForms />} />
                                 <Route path="/tasks-action-items" element={<UnifiedTasksActionItems userRole={userRole} />} />
