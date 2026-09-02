@@ -77,7 +77,7 @@ export const FRONT_DOORS: Record<string, string> = {
   'executive': '/fleet-schedule',
   // D100 — an executive administrator opens on the portal, because booking and
   // managing her principal's travel IS her job, not a corner of it.
-  'admin-assistant': '/booking-portal',
+  'admin-assistant': '/trips',
 };
 
 // Sidebar domains open by default on first visit (everything else starts collapsed).
@@ -172,7 +172,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // Booking portal (PR #31 / [[LG-125]]): the EA-facing front door for trip requests. The rest of
   // that branch's nav diff was a stale fork of main and was dropped in the merge — this entry is the
   // only thing it actually added here.
-  { path: '/booking-portal', label: 'Booking Portal', domain: 'scheduling', icon: Ticket, primary: true, keywords: ['booking', 'empty seats', 'trip request', 'ea', 'watches', 'fleet hold'], roles: ['admin-assistant', 'scheduling', 'admin', 'lead'] },
+  // The old portal is hidden from the Executive Administrator (Bryan, 2026-09-01, LG-338): her
+  // door is /trips (D105). Scheduling/lead/admin keep it until the rebuild covers their pages.
+  { path: '/booking-portal', label: 'Booking Portal', domain: 'scheduling', icon: Ticket, primary: true, keywords: ['booking', 'empty seats', 'trip request', 'ea', 'watches', 'fleet hold'], roles: ['scheduling', 'admin', 'lead'] },
   { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', railLabel: 'Sched Board', domain: 'scheduling', icon: LayoutDashboard, primary: false, roles: ['scheduling', 'admin'] },
   { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: Route, primary: false, roles: ['scheduling', 'admin'] },
   // D100 — chasing travel forms is the EA's own workload, so she gets the door.

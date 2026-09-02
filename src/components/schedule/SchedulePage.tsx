@@ -145,22 +145,6 @@ export default function SchedulePage({
                 {previewAsExecutive ? 'Viewing as executive' : 'View as executive'}
               </Button>
             )}
-            <div className="flex rounded-md border border-border p-0.5" role="tablist" aria-label="View">
-              {(['open-days', 'fleet'] as View[]).map(v => (
-                <button
-                  key={v}
-                  role="tab"
-                  aria-selected={view === v}
-                  onClick={() => setView(v)}
-                  className={cn(
-                    'rounded px-3 py-1 text-sm transition-colors',
-                    view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-primary',
-                  )}
-                >
-                  {v === 'open-days' ? 'Open days' : 'Fleet'}
-                </button>
-              ))}
-            </div>
             <div className="flex items-center gap-1">
               <Button size="sm" variant="outline" onClick={() => step(-1)} aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></Button>
               <Button size="sm" variant="outline" onClick={() => setCursor({ year: today.getFullYear(), month: today.getMonth() })}>Today</Button>
@@ -169,6 +153,29 @@ export default function SchedulePage({
           </div>
         }
       />
+
+      {/* The view switch — the first thing on the page after the title (Bryan: larger, more obvious) */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg border border-border bg-card p-1 shadow-sm" role="tablist" aria-label="View">
+          {(['open-days', 'fleet'] as View[]).map(v => (
+            <button
+              key={v}
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={cn(
+                'rounded-md px-5 py-2.5 text-base font-medium transition-colors',
+                view === v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-primary',
+              )}
+            >
+              {v === 'open-days' ? 'Open days' : 'Fleet'}
+            </button>
+          ))}
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {view === 'open-days' ? 'How many of the four are free, day by day.' : 'Which aircraft are open, day by day. Open ones stand out; everything else steps back.'}
+        </span>
+      </div>
 
       {/* Month strip — aim at a month before arriving in it */}
       <div className="flex gap-1 overflow-x-auto pb-1">
@@ -288,7 +295,9 @@ function DayCell({
           {dayNumber}
         </span>
         {view === 'fleet' && known && (
-          <span className="text-[10px] tabular-nums text-muted-foreground">{free}/{count!.fleetSize}</span>
+          <span className={cn('rounded px-1 text-[10px] font-semibold tabular-nums', free > 0 ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400' : 'text-muted-foreground/60')}>
+            {free} open
+          </span>
         )}
       </div>
 
@@ -346,16 +355,12 @@ function TailChip({ cell, showRoute, action }: { cell: DisclosedCell; showRoute:
   const word = chipWord(cell);
   const dest = showRoute && cell.category === 'committed' ? destinationOf(cell.scheduleLabel) : null;
   const title = cell.publicLabel ?? cell.label ?? undefined;
-  const tone =
-    cell.state === 'available'
-      ? 'border border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary'
-      : cell.category === 'maintenance'
-        ? 'bg-destructive/10 text-destructive'
-        : cell.category === 'held'
-          ? 'bg-amber-500/10 text-amber-800 dark:text-amber-400'
-          : cell.category === 'committed'
-            ? 'bg-muted text-foreground/80'
-            : 'bg-muted text-muted-foreground/70';
+  // Open is the answer the reader came for, so it is the only saturated chip on the grid.
+  // Everything blocked is one quiet grey — the reason word still says why, on hover it says more.
+  const open = cell.state === 'available';
+  const tone = open
+    ? 'bg-emerald-600 text-white font-semibold shadow-sm hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:text-emerald-950'
+    : 'bg-muted/60 text-muted-foreground/70';
 
   const body = (
     <>
@@ -366,13 +371,13 @@ function TailChip({ cell, showRoute, action }: { cell: DisclosedCell; showRoute:
 
   if (action) {
     return (
-      <button type="button" onClick={action} title={title} className={cn('flex w-full items-center justify-between rounded px-1.5 py-0.5 text-[11px] leading-tight transition-colors', tone)}>
+      <button type="button" onClick={action} title={title} className={cn('flex w-full items-center justify-between rounded px-1.5 leading-tight transition-colors', open ? 'py-1 text-xs' : 'py-0.5 text-[11px]', tone)}>
         {body}
       </button>
     );
   }
   return (
-    <span title={title} className={cn('flex w-full items-center justify-between rounded px-1.5 py-0.5 text-[11px] leading-tight', tone)}>
+    <span title={title} className={cn('flex w-full items-center justify-between rounded px-1.5 leading-tight', open ? 'py-1 text-xs' : 'py-0.5 text-[11px]', tone)}>
       {body}
     </span>
   );
