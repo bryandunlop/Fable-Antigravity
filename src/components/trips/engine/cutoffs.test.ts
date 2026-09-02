@@ -28,6 +28,14 @@ describe('the anchor: first departure, DST-aware', () => {
     expect(plannedDepartureLocal(newLeg({ timing: { kind: 'arrive', arriveByLocal: '07:00' } }))).toBe('06:00');
     expect(plannedDepartureLocal(newLeg())).toBe('09:00');
   });
+  it('a positioning leg out to a pickup does not move the passenger cutoffs — they anchor on the passenger leg', () => {
+    const t = trip();
+    t.legs = [
+      newLeg({ from: { placeName: 'Cincinnati', placeId: null, airport: 'KLUK' }, to: { placeName: 'JFK', placeId: null, airport: 'KJFK' }, date: '2026-10-14', timing: { kind: 'depart', departLocal: '07:30', flexHours: 0 }, positioning: true }),
+      newLeg({ from: { placeName: 'JFK', placeId: null, airport: 'KJFK' }, to: { placeName: 'Cincinnati', placeId: null, airport: 'KLUK' }, date: '2026-10-14', timing: { kind: 'depart', departLocal: '12:30', flexHours: 0 } }),
+    ];
+    expect(firstDepartureUtc(t)).toBe('2026-10-14T16:30:00.000Z');
+  });
   it('no date, no cutoffs — never a guess', () => {
     const t = trip(); t.legs[0].date = null;
     expect(firstDepartureUtc(t)).toBeNull();

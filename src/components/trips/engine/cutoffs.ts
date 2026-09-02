@@ -89,7 +89,9 @@ export function plannedDepartureLocal(leg: TripLeg): string {
 
 /** The first departure as an instant. Null until the first leg has a date. */
 export function firstDepartureUtc(trip: Trip): string | null {
-  const leg = trip.legs[0];
+  // Passenger cutoffs anchor on the first leg a passenger is ON. An empty positioning leg out to a
+  // pickup leaves earlier, but names, forms and the email are about the people, not the ferry.
+  const leg = trip.legs.find(l => !l.positioning) ?? trip.legs[0];
   if (!leg?.date) return null;
   const zone = (leg.from.airport && leg.from.airport !== SCHEDULING_DECIDES ? zoneForAirport(leg.from.airport) : null) ?? REFERENCE_ZONE;
   return zonedToUtc(leg.date, plannedDepartureLocal(leg), zone);

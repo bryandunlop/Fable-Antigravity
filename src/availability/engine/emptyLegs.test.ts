@@ -46,3 +46,13 @@ describe('empty legs — what a one-way trip leaves behind', () => {
     expect(emptyLegsFor([t1, t2], 'N5PG', NOW)).toEqual([]);
   });
 });
+
+describe('an explicit positioning leg is an empty leg in its own right', () => {
+  it('paxCount 0 reads as potentially open on its own day', () => {
+    const t = trip('t1', 'N5PG', [['KLUK', 'KJFK', '2026-09-20T11:00:00.000Z'], ['KJFK', 'KLUK', '2026-09-20T15:00:00.000Z']]);
+    t.legs[0].paxCount = 0;
+    expect(emptyLegsFor([t], 'N5PG', NOW)).toEqual([
+      { tail: 'N5PG', dateUtc: '2026-09-20', from: 'KLUK', to: 'KJFK', kind: 'positioning', afterTripId: 't1', beforeTripId: 't1' },
+    ]);
+  });
+});

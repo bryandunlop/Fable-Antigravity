@@ -22,7 +22,7 @@ export interface EmptyLeg {
   dateUtc: string;
   from: string;
   to: string;
-  kind: 'ferry' | 'return';
+  kind: 'ferry' | 'return' | 'positioning';
   /** The trips either side, for the operator. */
   afterTripId: string;
   beforeTripId: string | null;
@@ -31,7 +31,7 @@ export interface EmptyLeg {
 const DAY_MS = 86_400_000;
 const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-interface FlatLeg { tripId: string; dep: string; arr: string; depMs: number; arrMs: number }
+interface FlatLeg { tripId: string; dep: string; arr: string; depMs: number; arrMs: number; pax: number }
 
 function flatten(trips: TripRecord[], tail: string): FlatLeg[] {
   return trips
@@ -42,6 +42,7 @@ function flatten(trips: TripRecord[], tail: string): FlatLeg[] {
       arr: l.arrivalIcao,
       depMs: Date.parse(l.departureTimeUtc),
       arrMs: l.arrivalTimeUtc ? Date.parse(l.arrivalTimeUtc) : Date.parse(l.departureTimeUtc) + 2 * 3_600_000,
+      pax: l.paxCount,
     })))
     .filter(l => !Number.isNaN(l.depMs))
     .sort((a, b) => a.depMs - b.depMs);
@@ -67,6 +68,8 @@ export function emptyLegsFor(trips: TripRecord[], tail: string, nowUtc: string, 
   for (let i = 0; i < legs.length; i++) {
     const cur = legs[i];
     const next = legs[i + 1];
+    // A leg the trip itself flies empty — a pickup or a drop — is an empty leg in its own right.
+    if (cur.pax === 0) out.push({ tail, dateUtc: dayKey(cur.depMs), from: cur.dep, to: cur.arr, kind: 'positioning', afterTripId: cur.tripId, beforeTripId: cur.tripId });
     if (next) {
       if (cur.arr !== next.dep) {
         out.push({ tail, dateUtc: dayKey(next.depMs), from: cur.arr, to: next.dep, kind: 'ferry', afterTripId: cur.tripId, beforeTripId: next.tripId });

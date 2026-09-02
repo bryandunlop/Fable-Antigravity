@@ -28,7 +28,7 @@ export function tripAsRecord(trip: Trip): TripRecord | null {
     const zone = zoneForAirport(dep) ?? REFERENCE_ZONE;
     const depUtc = zonedToUtc(l.date, plannedDepartureLocal(l), zone);
     const arrUtc = new Date(Date.parse(depUtc) + estimateMinutes(dep, arr) * 60_000).toISOString();
-    legs.push({ id: `${trip.id}-l${i}`, sequence: i + 1, departureIcao: dep, arrivalIcao: arr, departureTimeUtc: depUtc, arrivalTimeUtc: arrUtc, paxCount: trip.passengerNames.length });
+    legs.push({ id: `${trip.id}-l${i}`, sequence: i + 1, departureIcao: dep, arrivalIcao: arr, departureTimeUtc: depUtc, arrivalTimeUtc: arrUtc, paxCount: l.positioning ? 0 : trip.passengerNames.length });
   });
   if (legs.length === 0) return null;
   const dates = trip.legs.map(l => l.date).filter((d): d is string => !!d).sort();
@@ -45,7 +45,7 @@ export function tripAsRecord(trip: Trip): TripRecord | null {
 export const tripsAsRecords = (trips: Trip[]): TripRecord[] => trips.map(tripAsRecord).filter((r): r is TripRecord => !!r);
 
 export interface RotationLeg {
-  kind: 'passenger' | 'ferry' | 'return';
+  kind: 'passenger' | 'positioning' | 'ferry' | 'return';
   from: string;
   to: string;
   dateUtc: string;
@@ -66,7 +66,7 @@ export function rotationFor(tail: string, records: TripRecord[], fromDate: strin
     const day = l.departureTimeUtc.slice(0, 10);
     const prev = legs[i - 1];
     if (prev && prev.l.arrivalIcao !== l.departureIcao) out.push({ kind: 'ferry', from: prev.l.arrivalIcao, to: l.departureIcao, dateUtc: day, tripId: null, title: null, aboard: 0 });
-    out.push({ kind: 'passenger', from: l.departureIcao, to: l.arrivalIcao, dateUtc: day, tripId: r.id, title: r.tripNumber, aboard: l.paxCount });
+    out.push({ kind: l.paxCount === 0 ? 'positioning' : 'passenger', from: l.departureIcao, to: l.arrivalIcao, dateUtc: day, tripId: r.id, title: r.tripNumber, aboard: l.paxCount });
   }
   const last = legs.at(-1);
   const home = aircraftFor(tail)?.homeBase;
