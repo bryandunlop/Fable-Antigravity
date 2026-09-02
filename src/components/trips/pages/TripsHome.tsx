@@ -8,6 +8,7 @@ import { Button } from '../../ui/button';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
 import { useTripsModule } from '../TripsContext';
+import { useMinuteTick } from '../useTripClock';
 import { routeLabel, searchEvents, submitBlockers, tripSpan, eventText, type Trip } from '../engine/trip';
 import { schedulingQueue, BAND_LABEL, BAND_NOTE, type QueueBand, type QueueRow } from '../engine/queue';
 
@@ -33,12 +34,19 @@ export default function TripsHome() {
   const [q, setQ] = useState('');
   const hits = useMemo(() => searchEvents(trips, q).slice(0, 12), [trips, q]);
   const isSched = actor.role === 'scheduling';
+  // The queue is a read-out of TIME — ages, and what freezes this week — so it runs on the module
+  // clock. Without this it computed once at mount and never again (`nowUtc` is a stable callback, so
+  // it pins nothing), and a scheduler with the page open all afternoon read the same ages and the
+  // same "freezing this week" they saw at nine o'clock. That is the exact bug slice 1 existed to
+  // fix, on the exact page its docstring names (fresh review, 2026-09-02).
+  const tick = useMinuteTick();
 
   // Scheduling reads the queue, not a status list: "submitted" and "confirmed" say what state a trip
   // is in, never who is holding it up, and that is the only question a scheduler opens this page with.
   const queue = useMemo(
     () => (isSched ? schedulingQueue(trips, people, settings, nowUtc()) : null),
-    [isSched, trips, people, settings, nowUtc],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isSched, trips, people, settings, tick],
   );
 
   const groups: Array<{ title: string; rows: Trip[] }> = isSched

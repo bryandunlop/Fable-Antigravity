@@ -92,6 +92,13 @@ describe('the freeze cell', () => {
 });
 
 describe('waiting on', () => {
+  it('is scheduling while the aircraft has nobody flying it', () => {
+    // Regression: a tailed, crewless trip read "Waiting on nobody · crew set, nothing owed" on a row
+    // that simultaneously said "No crew set" (fresh review, 2026-09-02).
+    const t = assignTail(base(), 'N1PG', SCHED, NOW);
+    expect(summarise(t).waitingOn).toBe('scheduling');
+  });
+
   it('is scheduling while a submitted trip has no aircraft', () => {
     expect(summarise(base()).waitingOn).toBe('scheduling');
   });
@@ -114,12 +121,16 @@ describe('waiting on', () => {
 
   it('is the EA when scheduling has asked them a question', () => {
     let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    // Crew too: an aircraft with nobody flying it is scheduling's own outstanding job, and it
+    // outranks anything the EA owes.
+    t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     t = askQuestion(t, SCHED, 'passengers', 'Who is the third seat?', NOW);
     expect(summarise(t).waitingOn).toBe('ea');
   });
 
   it('is nobody when the aircraft is on and nothing is outstanding', () => {
     let t = assignTail(base(), 'N1PG', SCHED, NOW);
+    t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     t = setPassengers(t, ['A. Reyes', 'S. Reyes', 'K. Tanaka'], EA, NOW, ['P-REYES', 'P-SREYES', 'P-TANAKA']);
     expect(summarise(t).waitingOn).toBe('nobody');
   });

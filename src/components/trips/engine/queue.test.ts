@@ -50,6 +50,12 @@ describe('the bands', () => {
     expect(q.you[0].reasons).toContain('No aircraft yet');
   });
 
+  it('puts an aircraft with nobody flying it in front of scheduling', () => {
+    const q = run([assignTail(trip('crew', 40, 1), 'N1PG', SCHED, NOW)]);
+    expect(idsIn(q, 'you')).toEqual(['t-crew']);
+    expect(q.you[0].reasons).toContain('No crew set');
+  });
+
   it('puts an undecided change request in front of scheduling', () => {
     let t = assignTail(trip('b', 40), 'N1PG', SCHED, NOW);
     t = requestChange(t, t.legs[0].id, { date: '2026-11-01' }, 'Meeting moved', EA, NOW);
@@ -79,7 +85,8 @@ describe('the bands', () => {
   });
 
   it('puts unnamed seats in front of the EA', () => {
-    const t = assignTail(trip('e', 40, 4), 'N1PG', SCHED, NOW);
+    let t = assignTail(trip('e', 40, 4), 'N1PG', SCHED, NOW);
+    t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     const q = run([t]);
     expect(idsIn(q, 'ea')).toEqual(['t-e']);
     expect(q.ea[0].reasons.some(r => /unnamed/i.test(r))).toBe(true);
