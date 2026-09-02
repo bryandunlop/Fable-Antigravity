@@ -61,7 +61,15 @@ export interface Person {
   ea: string | null;
   email: string | null;
   briefingPref: BriefingPref;
-  /** Whether they have flown with us — what a 'first' briefing preference turns on. */
+  /**
+   * Whether they have flown with us — what a 'first' briefing preference turns off.
+   *
+   * DERIVED, not authored: `withFlownDerived` recomputes it from the trip records, because nothing
+   * ever set it and a 'first trip only' preference could therefore never turn off — every guest
+   * created from a typed name started `false` and stayed there forever (fresh review, 2026-09-02).
+   * The stored value survives only as the seed's starting point and as the answer for a person the
+   * trip records say nothing about.
+   */
   hasFlown: boolean;
   forms: { status: FormStatus; note?: string };
   documents: TravelDocument[];
@@ -321,4 +329,33 @@ export function personHistory(trips: TripLike[], person: Person, nowUtc: string)
     asked: theirs.reduce((n, t) => n + t.events.filter(e => e.kind === 'question').length, 0),
     lastFlown: flown[0] ? { date: flown[0].dates[flown[0].dates.length - 1], title: flown[0].t.title } : null,
   };
+}
+
+/**
+ * `hasFlown` recomputed from the trip records — one trip already behind them makes it true.
+ *
+ * Kept a derived projection rather than a stored flag, for the same reason serviceability is: a
+ * flag nobody updates is a flag that lies. Nothing in the app ever set this one, so a person whose
+ * preference was "only their first trip" would have been emailed on every trip forever.
+ *
+ * A person the trips say nothing about keeps whatever the record holds — that is the seed's answer,
+ * and the honest one for someone with no history to read.
+ */
+export function withFlownDerived(people: Person[], trips: TripLike[], nowUtc: string): Person[] {
+  const today = nowUtc.slice(0, 10);
+  const flown = new Set<string>();
+  for (const t of trips) {
+    if (t.status === 'draft' || t.status === 'declined' || t.status === 'cancelled') continue;
+    const dates = t.legs.map(l => l.date).filter((d): d is string => !!d).sort();
+    if (dates.length === 0 || dates[dates.length - 1] >= today) continue;
+    for (const p of people) if (tripCarries(t, p)) flown.add(p.id);
+  }
+  let changed = false;
+  const out = people.map(p => {
+    const next = p.hasFlown || flown.has(p.id);
+    if (next === p.hasFlown) return p;
+    changed = true;
+    return { ...p, hasFlown: next };
+  });
+  return changed ? out : people;
 }

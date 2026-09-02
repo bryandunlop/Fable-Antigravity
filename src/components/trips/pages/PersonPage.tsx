@@ -48,7 +48,10 @@ export default function PersonPage() {
   }
 
   const isSched = actor.role === 'scheduling';
-  const patch = (next: Partial<Person>) => setPeople(ps => upsertPerson(ps, { ...person, ...next }));
+  // Re-reads the person from the register inside the updater rather than merging onto the copy
+  // captured at render: two edits landing in one React batch would otherwise lose the first.
+  const patch = (next: Partial<Person>) =>
+    setPeople(ps => { const cur = personById(ps, person.id); return cur ? upsertPerson(ps, { ...cur, ...next }) : ps; });
 
   return (
     <div className="mx-auto max-w-[900px] space-y-4 p-6">

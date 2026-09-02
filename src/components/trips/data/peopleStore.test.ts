@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { migrateSettingsOntoPeople, backfillPassengerIds } from './peopleStore';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { installMemoryStorage } from '../../../test/memoryStorage';
+import { migrateSettingsOntoPeople, backfillPassengerIds, loadLinkedRegister, hasMigrated, markMigrated, savePeople } from './peopleStore';
 import { SEED_PEOPLE, personByName, principalOf, upsertPerson } from '../engine/people';
 import type { PassengerPref } from '../engine/briefingEmail';
 
@@ -87,5 +88,39 @@ describe('backfilling passenger ids onto trips written before records existed', 
     const out = backfillPassengerIds(already, SEED_PEOPLE, NOW);
     expect(out.trips).toBe(already);
     expect(out.people).toBe(SEED_PEOPLE);
+  });
+});
+
+describe('the settings migration is one-shot', () => {
+  let restore: () => void;
+  beforeEach(() => { restore = installMemoryStorage(); });
+  afterEach(() => restore());
+
+  it('is skipped once the flag is set, so a later edit on /people survives a remount', () => {
+    // The failure this guards: the migration ran on EVERY mount of TripsProvider, and
+    // loadSettings() never returns an empty passengerPrefs (it falls back to DEFAULT_SETTINGS),
+    // so a preference edited on the record was reverted on the next navigation, silently.
+    expect(hasMigrated()).toBe(false);
+    markMigrated();
+    expect(hasMigrated()).toBe(true);
+  });
+
+  it('loadLinkedRegister does not re-apply the old settings after the first run', () => {
+    const trips = [{ passengerNames: ['A. Reyes'] }];
+    const store = { trips };
+    const load = () => store.trips;
+    const save = (t: typeof trips) => { store.trips = t; };
+
+    // First run: the old 'never' preference lands on the record.
+    const first = loadLinkedRegister(load, save, OLD_PREFS, 'A. Reyes', NOW);
+    expect(personByName(first.people, 'A. Reyes')?.briefingPref).toBe('never');
+
+    // Scheduling then edits it to 'every' and it is stored.
+    const edited = upsertPerson(first.people, { ...personByName(first.people, 'A. Reyes')!, briefingPref: 'every' });
+    savePeople(edited);
+
+    // Second run — a remount, with the very same stale settings still in place.
+    const second = loadLinkedRegister(load, save, OLD_PREFS, 'A. Reyes', NOW);
+    expect(personByName(second.people, 'A. Reyes')?.briefingPref).toBe('every');
   });
 });

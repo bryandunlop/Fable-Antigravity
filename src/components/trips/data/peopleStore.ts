@@ -10,6 +10,14 @@ import type { PassengerPref } from '../engine/briefingEmail';
 const KEY = 'trip-people-state';
 const VERSION_KEY = 'trip-people-version';
 const VERSION = '1';
+/**
+ * Set once the name-keyed settings have been folded onto the records. Load-bearing: without it the
+ * migration re-ran on every mount of `TripsProvider` — which is every navigation to /trips or
+ * /people — and the stale `settings.passengerPrefs` overwrote whatever scheduling had just edited
+ * on the record. `loadSettings()` returns DEFAULT_SETTINGS when storage is empty, so those old
+ * preferences are never absent and the revert was silent and permanent. (Fresh review, 2026-09-02.)
+ */
+const MIGRATED_KEY = 'trip-people-migrated';
 
 export function loadPeople(): Person[] {
   if (typeof localStorage === 'undefined') return SEED_PEOPLE;
@@ -32,12 +40,11 @@ export function savePeople(people: Person[]): void {
 }
 
 /**
- * Fold the name-keyed settings that used to hold this data onto the records.
+ * Fold the name-keyed settings that used to hold this data onto the records. ONE SHOT — see
+ * `MIGRATED_KEY`; `loadLinkedRegister` is what enforces that, this function is the pure half.
  *
- * Pure and idempotent, so it is safe to run on every load: a preference already on the record is
- * only overwritten when the old settings still carry one for that name, and a name in the old
- * settings that matches nobody is IGNORED rather than creating a person — a stale preference for a
- * name that no longer exists should not resurrect them as a passenger.
+ * A name in the old settings that matches nobody is IGNORED rather than creating a person: a stale
+ * preference for a name that no longer exists should not resurrect them as a passenger.
  */
 export function migrateSettingsOntoPeople(
   people: Person[],
@@ -88,3 +95,43 @@ export function backfillPassengerIds<T extends { passengerNames: string[]; passe
   });
   return changed || register !== people ? { trips: changed ? out : trips, people: register } : { trips, people };
 }
+
+/** Has the one-shot settings migration already run in this browser? */
+export function hasMigrated(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  return localStorage.getItem(MIGRATED_KEY) === VERSION;
+}
+
+export function markMigrated(): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(MIGRATED_KEY, VERSION);
+}
+
+/**
+ * The register and the trips, loaded, migrated, linked and persisted — in one place.
+ *
+ * Two call sites need this (`TripsProvider` on mount, and `availability/source` for the principal
+ * reserve when no trips page is open). They previously each ran their own copy of the sequence and
+ * only one of them persisted the result, which meant the rule "the backfill must happen before
+ * anyone is renamed" depended on which page you opened first. (Fresh review, 2026-09-02.)
+ */
+export function loadLinkedRegister<T extends TripLike>(
+  loadTripsFn: () => T[],
+  saveTripsFn: (t: T[]) => void,
+  settingsPrefs: PassengerPref[] | undefined,
+  settingsPrincipalName: string | undefined,
+  nowUtc: string,
+): { trips: T[]; people: Person[] } {
+  const stored = loadPeople();
+  const migrated = hasMigrated()
+    ? stored
+    : migrateSettingsOntoPeople(stored, settingsPrefs, settingsPrincipalName);
+  const linked = backfillPassengerIds(loadTripsFn(), migrated, nowUtc);
+  if (linked.trips !== undefined) saveTripsFn(linked.trips);
+  savePeople(linked.people);
+  markMigrated();
+  return linked;
+}
+
+/** The slice of a trip this module links. Structural, so the store stays free of trip logic. */
+export interface TripLike { passengerNames: string[]; passengerIds?: string[] }

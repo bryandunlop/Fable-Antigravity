@@ -8,8 +8,8 @@ import { Button } from '../../ui/button';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
 import { useTripsModule } from '../TripsContext';
-import { personByName, resolvePassengers, upsertPerson, type BriefingPrefValue } from '../engine/people';
-import { autoSendIfDue, editDraftBlock, emailDraftOf, emailState, sendEmail, setDraftRecipients, emailAddressFor } from '../engine/briefingEmail';
+import { upsertPerson, type BriefingPrefValue } from '../engine/people';
+import { autoSendIfDue, editDraftBlock, emailDraftOf, emailState, sendEmail, setDraftRecipients, emailAddressFor, personAboard } from '../engine/briefingEmail';
 import { latestSheet } from '../engine/tripSheet';
 import { formatEt } from '../engine/cutoffs';
 
@@ -49,10 +49,10 @@ export default function EmailPage() {
    */
   function setPref(name: string, pref: BriefingPrefValue) {
     setPeople(ps => {
-      const person = personByName(ps, name);
-      // Someone aboard with no record yet: give them one rather than dropping the preference.
-      if (!person) return resolvePassengers(ps, [name], nowUtc()).people.map(p => (p.name === name ? { ...p, briefingPref: pref } : p));
-      return upsertPerson(ps, { ...person, briefingPref: pref });
+      // Resolved through the sheet's frozen ids, so a rename between freeze and send still finds
+      // the right record. Creating one here instead would fork the person in two.
+      const person = personAboard(sheet!, ps, name);
+      return person ? upsertPerson(ps, { ...person, briefingPref: pref }) : ps;
     });
   }
 
@@ -88,7 +88,7 @@ export default function EmailPage() {
         <GfoPanel title="Who gets it">
           <ul className="space-y-2 text-sm">
             {everyone.map(name => {
-              const pref = personByName(people, name)?.briefingPref ?? 'every';
+              const pref = personAboard(sheet, people, name)?.briefingPref ?? 'every';
               const on = draft.recipients.includes(name);
               return (
                 <li key={name} className="flex items-center justify-between gap-2">
@@ -120,8 +120,8 @@ export default function EmailPage() {
                   <span className="text-muted-foreground">To</span> {current.to}
                   {/* The address comes off the person record, so it follows a rename and an update
                       without the draft having to be rebuilt (Phase 5 slice 2). */}
-                  {emailAddressFor(people, current.to)
-                    ? <span className="text-muted-foreground"> &lt;{emailAddressFor(people, current.to)}&gt;</span>
+                  {emailAddressFor(sheet, people, current.to)
+                    ? <span className="text-muted-foreground"> &lt;{emailAddressFor(sheet, people, current.to)}&gt;</span>
                     : <span className="text-amber-700 dark:text-amber-400"> · no email on file</span>}
                 </div>
                 <div><span className="text-muted-foreground">Subject</span> <span className="font-medium">{current.subject}</span></div>

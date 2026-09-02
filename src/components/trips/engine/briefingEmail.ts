@@ -15,7 +15,7 @@
 import type { ForecastPeriod } from '../../../services/nwsForecastService';
 import type { FrozenSheet } from './tripSheet';
 import type { Actor, Trip } from './trip';
-import { personByName, type Person } from './people';
+import { personById, personByName, type Person } from './people';
 
 export type BriefingPref = 'every' | 'first' | 'never';
 
@@ -86,7 +86,7 @@ function longDate(iso: string): string {
 export function recipientsFor(sheet: FrozenSheet, people: Person[]): string[] {
   const names = Array.from(new Set(sheet.legs.flatMap(l => l.aboard)));
   return names.filter(n => {
-    const p = personByName(people, n);
+    const p = personAboard(sheet, people, n);
     if (!p) return true; // unknown person: send — missing a first-timer is the worse failure
     if (p.briefingPref === 'never') return false;
     if (p.briefingPref === 'first') return !p.hasFlown;
@@ -94,9 +94,25 @@ export function recipientsFor(sheet: FrozenSheet, people: Person[]): string[] {
   });
 }
 
+/**
+ * The record behind a name frozen on the sheet.
+ *
+ * By ID first, using the ids frozen beside the names, so a rename between freeze and send still
+ * resolves. The name lookup is only the fallback for sheets frozen before ids existed — and it is
+ * the path that quietly fails after a rename, which is exactly why the ids are frozen.
+ */
+export function personAboard(sheet: FrozenSheet, people: Person[], name: string): Person | undefined {
+  for (const leg of sheet.legs) {
+    const i = leg.aboard.indexOf(name);
+    const id = i >= 0 ? leg.aboardIds?.[i] : undefined;
+    if (id) return personById(people, id);
+  }
+  return personByName(people, name);
+}
+
 /** The address the briefing would go to, for the preview header. Null when we hold none. */
-export function emailAddressFor(people: Person[], name: string): string | null {
-  return personByName(people, name)?.email ?? null;
+export function emailAddressFor(sheet: FrozenSheet, people: Person[], name: string): string | null {
+  return personAboard(sheet, people, name)?.email ?? null;
 }
 
 export function renderEmail(sheet: FrozenSheet, to: string, template: EmailTemplate, weather: WeatherByIcao): RenderedEmail {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   SEED_PEOPLE, personById, personByName, principalOf, renamePerson,
   resolvePassengers, briefingPrefFor, recipientNames, upsertPerson, documentsExpiringBefore,
+  withFlownDerived,
   type Person,
 } from './people';
 
@@ -114,5 +115,50 @@ describe('document expiry', () => {
   it('says nothing about a person with no documents — absence is not expiry', () => {
     const bare = personByName(people, 'S. Reyes')!;
     expect(documentsExpiringBefore(people, [bare.id], '2030-01-01')).toEqual([]);
+  });
+});
+
+describe('hasFlown is derived, not authored', () => {
+  const trip = (names: string[], ids: string[], lastDate: string, status = 'confirmed') => ({
+    id: `t-${lastDate}`, title: 'T', status,
+    passengerNames: names, passengerIds: ids,
+    legs: [{ date: lastDate }], events: [],
+  });
+  const NOW = '2026-09-02T12:00:00.000Z';
+
+  it('turns true once a trip is behind them — nothing else ever set it', () => {
+    const guest = resolvePassengers(people, ['New Guest'], NOW).created[0];
+    const register = upsertPerson(people, guest);
+    expect(guest.hasFlown).toBe(false);
+    const flown = withFlownDerived(register, [trip(['New Guest'], [guest.id], '2026-08-01')], NOW);
+    expect(personById(flown, guest.id)?.hasFlown).toBe(true);
+  });
+
+  it("closes the 'first trip only' loop: they are emailed once, then not again", () => {
+    const guest = resolvePassengers(people, ['New Guest'], NOW).created[0];   // briefingPref 'first'
+    const before = upsertPerson(people, guest);
+    expect(recipientNames(before, [guest.id])).toEqual(['New Guest']);
+    const after = withFlownDerived(before, [trip(['New Guest'], [guest.id], '2026-08-01')], NOW);
+    expect(recipientNames(after, [guest.id])).toEqual([]);
+  });
+
+  it('a trip still ahead of them does not count as flown', () => {
+    const guest = resolvePassengers(people, ['New Guest'], NOW).created[0];
+    const register = upsertPerson(people, guest);
+    const out = withFlownDerived(register, [trip(['New Guest'], [guest.id], '2026-12-01')], NOW);
+    expect(personById(out, guest.id)?.hasFlown).toBe(false);
+  });
+
+  it('a cancelled or draft trip is not a flight', () => {
+    const guest = resolvePassengers(people, ['New Guest'], NOW).created[0];
+    const register = upsertPerson(people, guest);
+    for (const status of ['draft', 'cancelled', 'declined']) {
+      const out = withFlownDerived(register, [trip(['New Guest'], [guest.id], '2026-08-01', status)], NOW);
+      expect(personById(out, guest.id)?.hasFlown, status).toBe(false);
+    }
+  });
+
+  it('returns the same array when nothing changed, so it can run on every render', () => {
+    expect(withFlownDerived(people, [], NOW)).toBe(people);
   });
 });

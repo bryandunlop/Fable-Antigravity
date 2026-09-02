@@ -36,12 +36,18 @@ describe('who gets it', () => {
     expect(recipientsFor(sheet, NOBODY)).toEqual(['A. Reyes', 'S. Reyes', 'K. Tanaka']);
   });
 
-  it('follows a renamed person by record, not by the name it was given', () => {
-    const sheet = buildSheet(trip(), CTX, T, SCHED);
-    // S. Reyes wants every email. Rename them on the record and the frozen sheet still says
-    // "S. Reyes" — the preference must still be found, because it hangs off the id, not the string.
+  it('follows a person renamed AFTER the sheet froze, via the ids frozen beside the names', () => {
+    // The trip resolves its passengers to ids, so the frozen sheet carries both.
+    const withIds = { ...trip(), passengerIds: ['P-REYES', 'P-SREYES', 'P-TANAKA'] };
+    const sheet = buildSheet(withIds, CTX, T, SCHED);
+    expect(sheet.legs[0].aboardIds).toEqual(['P-REYES', 'P-SREYES', 'P-TANAKA']);
+    expect(recipientsFor(sheet, PEOPLE)).toEqual(['S. Reyes']);
+
+    // Now actually rename them. The sheet still says "S. Reyes"; the record says "Sam Reyes".
+    // A name lookup would miss and fall through to the send-anyway default; the id must not.
     const s = personByName(PEOPLE, 'S. Reyes')!;
-    const renamed = upsertPerson(PEOPLE, { ...s, briefingPref: 'never' });
+    const renamed = upsertPerson(PEOPLE, { ...s, name: 'Sam Reyes', briefingPref: 'never' });
+    expect(personByName(renamed, 'S. Reyes')).toBeUndefined();
     expect(recipientsFor(sheet, renamed)).toEqual([]);
   });
 });
