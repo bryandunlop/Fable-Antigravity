@@ -60,6 +60,13 @@ export default function TripWorkspace() {
 
   // The clock does two things on its own: at T-72 the sheet freezes and the email is drafted;
   // past the dead-man timer the email goes. Both are recorded as events; neither needs a person.
+  // A minute tick, so a trip left open crosses T-72 and the dead-man deadline without a reload
+  // (fresh review, 2026-09-01). In production this is a scheduled job, not a component.
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const h = window.setInterval(() => setClockTick(t => t + 1), 60_000);
+    return () => window.clearInterval(h);
+  }, []);
   const tripIdForClock = trip?.id ?? null;
   const tripStatus = trip?.status;
   const hasSheet = !!(trip && latestSheet(trip));
@@ -81,7 +88,7 @@ export default function TripWorkspace() {
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tripIdForClock, tripStatus, hasSheet, draftState]);
+  }, [tripIdForClock, tripStatus, hasSheet, draftState, clockTick]);
 
   if (!trip) {
     return (
