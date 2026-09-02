@@ -73,6 +73,8 @@ function assembleInput(sources: AvailabilitySources, nowUtc: string, days: numbe
     overlays: data.overlays,
     tailStatus,
     tailHeadline,
+    // Cincinnati is home whichever field the record names: Lunken (the register) or CVG (the scheduling seed).
+    homeAirports: ['KLUK', 'KCVG'],
     principalReserve: sources.principalReserve === null ? undefined : (sources.principalReserve ?? principalReserveInput(loadTrips(), loadSettings().principalReserve)),
     tripAlerts: readTripServiceabilityAlerts(
       trips.map(t => ({

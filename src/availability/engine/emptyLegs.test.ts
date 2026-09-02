@@ -35,6 +35,11 @@ describe('empty legs — what a one-way trip leaves behind', () => {
     const t1 = trip('t1', 'N5PG', [['KLUK', 'KTEB', '2026-09-10T13:00:00.000Z'], ['KTEB', 'KLUK', '2026-09-12T20:00:00.000Z']]);
     expect(emptyLegsFor([t1], 'N5PG', NOW)).toEqual([]);
   });
+  it('landing at CVG counts as home when the caller says so — no phantom return', () => {
+    const t1 = trip('t1', 'N5PG', [['KCVG', 'KTEB', '2026-09-10T13:00:00.000Z'], ['KTEB', 'KCVG', '2026-09-11T20:00:00.000Z']]);
+    expect(emptyLegsFor([t1], 'N5PG', NOW)).toHaveLength(1);
+    expect(emptyLegsFor([t1], 'N5PG', NOW, ['KCVG'])).toEqual([]);
+  });
   it('other tails and cancelled trips are ignored', () => {
     const t1 = trip('t1', 'N6PG', [['KLUK', 'KTEB', '2026-09-10T13:00:00.000Z']]);
     const t2 = { ...trip('t2', 'N5PG', [['KLUK', 'KTEB', '2026-09-10T13:00:00.000Z']]), status: 'cancelled' as const };

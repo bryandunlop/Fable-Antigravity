@@ -47,8 +47,21 @@ function flatten(trips: TripRecord[], tail: string): FlatLeg[] {
     .sort((a, b) => a.depMs - b.depMs);
 }
 
-export function emptyLegsFor(trips: TripRecord[], tail: string, nowUtc: string, returnWithinDays = 3): EmptyLeg[] {
+/**
+ * Which fields count as 'home' for the return rule. The register's home base plus any the caller
+ * adds — the scheduling seed uses KCVG for Cincinnati where the register says KLUK, and a landing
+ * at either is the aircraft home, not away.
+ */
+export function homeAirportsFor(tail: string, extra: string[] = []): Set<string> {
+  const s = new Set(extra);
+  const hb = aircraftFor(tail)?.homeBase;
+  if (hb) s.add(hb);
+  return s;
+}
+
+export function emptyLegsFor(trips: TripRecord[], tail: string, nowUtc: string, extraHome: string[] = [], returnWithinDays = 3): EmptyLeg[] {
   const legs = flatten(trips, tail);
+  const homes = homeAirportsFor(tail, extraHome);
   const home = aircraftFor(tail)?.homeBase ?? null;
   const out: EmptyLeg[] = [];
   for (let i = 0; i < legs.length; i++) {
@@ -58,11 +71,9 @@ export function emptyLegsFor(trips: TripRecord[], tail: string, nowUtc: string, 
       if (cur.arr !== next.dep) {
         out.push({ tail, dateUtc: dayKey(next.depMs), from: cur.arr, to: next.dep, kind: 'ferry', afterTripId: cur.tripId, beforeTripId: next.tripId });
       }
-    } else if (home && cur.arr !== home && cur.arrMs >= Date.parse(nowUtc) - DAY_MS) {
+    } else if (home && !homes.has(cur.arr) && cur.arrMs >= Date.parse(nowUtc) - DAY_MS) {
       // Nothing booked after this leg: the aircraft has to come home some time. Say so the next day.
       out.push({ tail, dateUtc: dayKey(cur.arrMs + DAY_MS), from: cur.arr, to: home, kind: 'return', afterTripId: cur.tripId, beforeTripId: null });
-    } else if (home && cur.arr !== home) {
-      // past
     }
     // A gap longer than returnWithinDays between two legs that both leave the aircraft away is
     // also a return-and-back opportunity; kept simple here — the ferry above already covers it
@@ -73,8 +84,8 @@ export function emptyLegsFor(trips: TripRecord[], tail: string, nowUtc: string, 
 }
 
 /** dateUtc → empty leg, for one tail. */
-export function emptyLegIndex(trips: TripRecord[], tail: string, nowUtc: string): Map<string, EmptyLeg> {
+export function emptyLegIndex(trips: TripRecord[], tail: string, nowUtc: string, extraHome: string[] = []): Map<string, EmptyLeg> {
   const m = new Map<string, EmptyLeg>();
-  for (const e of emptyLegsFor(trips, tail, nowUtc)) if (!m.has(e.dateUtc)) m.set(e.dateUtc, e);
+  for (const e of emptyLegsFor(trips, tail, nowUtc, extraHome)) if (!m.has(e.dateUtc)) m.set(e.dateUtc, e);
   return m;
 }

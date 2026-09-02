@@ -47,6 +47,8 @@ export interface AvailabilityInput {
   tripAlerts: TripServiceabilityAlert[];
   /** Phase-2 seam: real crew-to-trip assignment. Absent = one notional crew per trip. */
   crewAssignments?: CrewAssignment[];
+  /** Fields that count as home besides the register's home base (the scheduling seed says KCVG). */
+  homeAirports?: string[];
   /**
    * D107 — "the plane always has to be available for the CEO." On any day the principal has no
    * trip of their own, one of `candidateTails` (in preference order) that would otherwise read
@@ -154,7 +156,7 @@ export function buildFleetAvailability(
 
   const rows = input.tails.map(({ tail, type }) => {
     const tailOccupancy = occupancy.get(tail);
-    const empties = emptyLegIndex(demandTrips(input.trips), tail, nowUtc);
+    const empties = emptyLegIndex(demandTrips(input.trips), tail, nowUtc, input.homeAirports ?? []);
     const tailAlerts = alertsByTail.get(tail) ?? [];
 
     const cells = dayList.map(({ dateUtc }): TailDayAvailability => {
