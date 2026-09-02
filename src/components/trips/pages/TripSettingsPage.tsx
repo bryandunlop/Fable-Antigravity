@@ -43,6 +43,21 @@ export default function TripSettingsPage() {
           <p className="mt-3 text-xs text-muted-foreground">Measured from the first departure; shown in Eastern time on every trip.</p>
         </GfoPanel>
 
+        <GfoPanel title="The aircraft always kept for the principal">
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={s.principalReserve.enabled} disabled={!canEdit} onChange={e => setSettings({ ...s, principalReserve: { ...s.principalReserve, enabled: e.target.checked } })} aria-label="Reserve on" />Keep one aircraft home whenever the principal has no trip</label>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <label className="text-sm"><span className="gfo-eyebrow mb-1 block text-muted-foreground">Principal</span>
+              <select className={`${field} w-full`} value={s.principalReserve.name} disabled={!canEdit} aria-label="Principal" onChange={e => setSettings({ ...s, principalReserve: { ...s.principalReserve, name: e.target.value } })}>
+                {s.passengerPrefs.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+              </select></label>
+            <label className="text-sm"><span className="gfo-eyebrow mb-1 block text-muted-foreground">Cabin to keep</span>
+              <select className={`${field} w-full`} value={s.principalReserve.cabin} disabled={!canEdit} aria-label="Cabin" onChange={e => setSettings({ ...s, principalReserve: { ...s.principalReserve, cabin: e.target.value as 'big' | 'standard' | 'any' } })}>
+                <option value="big">big cabin (G650ER)</option><option value="standard">standard cabin (G500)</option><option value="any">any</option>
+              </select></label>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Days the principal is on a trip of their own free all four. Scheduling can release the reserve for a day from the board, with a reason.</p>
+        </GfoPanel>
+
         <GfoPanel title="Dead-man switch">
           {num('Auto-send the passenger email if nobody has, after', s.email.deadManHours, n => setSettings({ ...s, email: { ...s.email, deadManHours: n } }), 'hours')}
           <p className="mt-3 text-xs text-muted-foreground">Open question (Q27): the interval, whether it applies to international trips, and who is told an email went out unreviewed. The record always says so.</p>

@@ -19,9 +19,14 @@ import {
   loadAvailabilityData,
   saveDowntimeBlock as saveDowntimeBlockToStore,
 } from './data/availabilityStore';
-import { buildFleetAvailability, type AvailabilityInput } from './engine/availability';
+import { buildFleetAvailability, type AvailabilityInput, type PrincipalReserve } from './engine/availability';
 import { disclose, discloseCell, type DisclosedAvailability, type DisclosedCell } from './engine/disclosure';
 import { deriveReleaseSuggestions } from './engine/suggestions';
+// D107: the trips module tells the engine who the principal is and when they are away. The
+// dependency points this way (availability reads trips) so no page has to plumb it through.
+import { loadTrips } from '../components/trips/data/tripsStore';
+import { loadSettings } from '../components/trips/data/settingsStore';
+import { principalReserveInput } from '../components/trips/engine/principal';
 import type {
   Audience,
   AvailabilityData,
@@ -36,6 +41,8 @@ export interface AvailabilitySources {
   trips: TripRecord[];
   /** Overrides the persisted blocks/overlays — used by tests and by the myairops adapter. */
   data?: AvailabilityData;
+  /** Override the D107 reserve: an explicit value, or `null` for none. Absent = read the trips module. */
+  principalReserve?: PrincipalReserve | null;
 }
 
 function assembleInput(sources: AvailabilitySources, nowUtc: string, days: number): AvailabilityInput {
@@ -60,6 +67,7 @@ function assembleInput(sources: AvailabilitySources, nowUtc: string, days: numbe
     overlays: data.overlays,
     tailStatus,
     tailHeadline,
+    principalReserve: sources.principalReserve === null ? undefined : (sources.principalReserve ?? principalReserveInput(loadTrips(), loadSettings().principalReserve)),
     tripAlerts: readTripServiceabilityAlerts(
       sources.trips.map(t => ({
         tripId: t.id,

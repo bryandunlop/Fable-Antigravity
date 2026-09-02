@@ -3,6 +3,7 @@
 
 import { DEFAULT_CUTOFFS, type CutoffDefaults } from '../engine/cutoffs';
 import { DEFAULT_TEMPLATE, type EmailTemplate, type PassengerPref } from '../engine/briefingEmail';
+import { DEFAULT_PRINCIPAL_RESERVE, type PrincipalReserveSetting } from '../engine/principal';
 
 export interface TripSettings {
   cutoffs: CutoffDefaults;
@@ -10,6 +11,8 @@ export interface TripSettings {
   /** Crew name → the line the passenger email says about them. */
   blurbs: Record<string, string>;
   passengerPrefs: PassengerPref[];
+  /** D107 — who the aircraft is always kept for, and which cabin. */
+  principalReserve: PrincipalReserveSetting;
 }
 
 export const DEFAULT_SETTINGS: TripSettings = {
@@ -20,6 +23,7 @@ export const DEFAULT_SETTINGS: TripSettings = {
     'FO Emily Chen': 'Joined from the airlines in 2024; type-rated on the G500 and G650ER.',
     'Lena Nguyen': 'Looks after the cabin; ask her about anything you need before you board.',
   },
+  principalReserve: DEFAULT_PRINCIPAL_RESERVE,
   passengerPrefs: [
     { name: 'A. Reyes', pref: 'never', hasFlown: true },
     { name: 'M. Osei', pref: 'never', hasFlown: true },
@@ -45,6 +49,7 @@ export function loadSettings(): TripSettings {
       email: { ...DEFAULT_TEMPLATE, ...(parsed.email ?? {}) },
       blurbs: parsed.blurbs ?? DEFAULT_SETTINGS.blurbs,
       passengerPrefs: parsed.passengerPrefs ?? DEFAULT_SETTINGS.passengerPrefs,
+      principalReserve: { ...DEFAULT_PRINCIPAL_RESERVE, ...(parsed.principalReserve ?? {}) },
     };
   } catch {
     return DEFAULT_SETTINGS;

@@ -46,6 +46,20 @@ export interface AvailabilityInput {
   tripAlerts: TripServiceabilityAlert[];
   /** Phase-2 seam: real crew-to-trip assignment. Absent = one notional crew per trip. */
   crewAssignments?: CrewAssignment[];
+  /**
+   * D107 — "the plane always has to be available for the CEO." On any day the principal has no
+   * trip of their own, one of `candidateTails` (in preference order) that would otherwise read
+   * available is marked `reserved`. Scheduling releases it like a hold. Absent = no reserve.
+   */
+  principalReserve?: PrincipalReserve;
+}
+
+export interface PrincipalReserve {
+  name: string;
+  /** Core tails of the right cabin, in the order to try them. */
+  candidateTails: string[];
+  /** UTC day keys on which the principal is travelling — no reserve needed those days. */
+  awayDates: string[];
 }
 
 /** Trips still consuming a tail — cancelled and flown trips make no demand. */
@@ -110,8 +124,9 @@ export const RANK = {
   COMMITTED: 3,
   HELD: 4,
   NO_CREW: 5,
-  NOT_YET_ROSTERED: 6,
-  NONE: 7,
+  RESERVED: 6,
+  NOT_YET_ROSTERED: 7,
+  NONE: 8,
 } as const;
 
 const NO_REASON: AvailabilityReason = { category: 'none', rank: RANK.NONE, detail: '', untilUtc: null };
@@ -300,6 +315,41 @@ export function buildFleetAvailability(
 
     return { tail, type, cells };
   });
+
+  // ── The principal reserve, after everything else (D107) ───────────────────────────────
+  // A post-pass rather than a rung: the reserve must pick a tail that is genuinely available —
+  // airworthy, unscheduled, crewed, not held — so it can only be decided once the ladder has run
+  // for every tail. One tail per day, first candidate that is open; a release overlay on any
+  // candidate that day means scheduling let the reserve go, so the day is skipped.
+  const reserve = input.principalReserve;
+  if (reserve && reserve.candidateTails.length > 0) {
+    const away = new Set(reserve.awayDates);
+    const byTail = new Map(rows.map(r => [r.tail, r]));
+    dayList.forEach(({ dateUtc }, dayIndex) => {
+      if (away.has(dateUtc)) return;
+      const released = reserve.candidateTails.some(t => activeOverlayFor(input.overlays, t, dateUtc)?.kind === 'release');
+      if (released) return;
+      for (const t of reserve.candidateTails) {
+        const row = byTail.get(t);
+        const cell = row?.cells[dayIndex];
+        if (!row || !cell || cell.state !== 'available') continue;
+        const reason: AvailabilityReason = {
+          category: 'reserved',
+          rank: RANK.RESERVED,
+          detail: `Kept for ${reserve.name}`,
+          untilUtc: null,
+          sourceRef: { kind: 'reserve', id: `${t}-${dateUtc}` },
+        };
+        row.cells[dayIndex] = {
+          ...cell,
+          state: 'reserved',
+          reason,
+          reasons: [reason, ...cell.reasons.filter(r => r.category !== 'none')],
+        };
+        break;
+      }
+    });
+  }
 
   return { days: dayList, rows, generatedAtUtc: nowUtc };
 }

@@ -19,7 +19,7 @@ import type {
 const HOLD_RANK = 4;
 
 /** Reason categories a release is permitted to clear. */
-const RELEASABLE = new Set<AvailabilityReason['category']>(['held', 'no-crew']);
+const RELEASABLE = new Set<AvailabilityReason['category']>(['held', 'no-crew', 'reserved']);
 
 function coversDay(o: SchedulerOverlay, dateUtc: string): boolean {
   return o.fromDateUtc <= dateUtc && dateUtc <= o.toDateUtc;

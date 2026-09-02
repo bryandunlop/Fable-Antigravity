@@ -15,7 +15,7 @@
 import type { LegTiming } from '../../booking-portal/engine/legTiming';
 import { SCHEDULING_DECIDES } from './places';
 
-export type TripStatus = 'draft' | 'submitted' | 'confirmed' | 'declined';
+export type TripStatus = 'draft' | 'submitted' | 'confirmed' | 'declined' | 'cancelled';
 
 export type ActorRole = 'ea' | 'scheduling' | 'executive' | 'system';
 
@@ -53,7 +53,10 @@ export type TripEvent =
   | { id: string; kind: 'question'; at: string; by: Actor; about: 'airport' | 'date' | 'passengers' | 'other'; text: string }
   | { id: string; kind: 'assigned'; at: string; by: Actor; tail: string }
   | { id: string; kind: 'airport-changed'; at: string; by: Actor; legId: string; end: 'from' | 'to'; airport: string }
-  | { id: string; kind: 'declined'; at: string; by: Actor; reason: string }
+  | { id: string; kind: 'declined'; at: string; by: Actor; reason: string; category?: DenialCategory }
+  | { id: string; kind: 'bumped'; at: string; by: Actor; reason: string; category: DenialCategory; tail: string | null }
+  | { id: string; kind: 'cancelled'; at: string; by: Actor; reason: string }
+  | { id: string; kind: 'board-set'; at: string; by: Actor; window: BoardWindow | null }
   | { id: string; kind: 'passengers-updated'; at: string; by: Actor; names: string[] }
   | { id: string; kind: 'catering-set'; at: string; by: Actor; legId: string; text: string }
   | { id: string; kind: 'crew-set'; at: string; by: Actor; crew: TripCrew }
@@ -62,6 +65,16 @@ export type TripEvent =
   | { id: string; kind: 'sent-to-crew'; at: string; by: Actor; version: number }
   | { id: string; kind: 'email-drafted'; at: string; by: Actor; version: number; recipients: string[] }
   | { id: string; kind: 'email-sent'; at: string; by: Actor; recipients: string[]; auto: boolean };
+
+/** D107 — why a request was refused or an aircraft taken away. Counted by the metrics page. */
+export type DenialCategory = 'no-crew' | 'maintenance' | 'senior-conflict' | 'not-a-fit' | 'other';
+
+/** D107 — a board trip's window; the fleet-wide block follows it. */
+export interface BoardWindow {
+  fromDate: string;
+  toDate: string;
+  tailsNeeded: number;
+}
 
 /** Who is flying it. Set by scheduling; snapshotted into the frozen sheet. */
 export interface TripCrew {
@@ -112,6 +125,8 @@ export interface Trip {
   frozenSheets: unknown[];
   /** The passenger email draft made at freeze; engine/briefingEmail.ts owns the shape. */
   emailDraft: unknown | null;
+  /** Set when this is a board trip: its window blocks the fleet (engine/board.ts). */
+  board: BoardWindow | null;
   createdBy: Actor;
   createdAt: string;
   events: TripEvent[];
@@ -160,6 +175,7 @@ export function createDraft(input: {
     cutoffOverrides: [],
     frozenSheets: [],
     emailDraft: null,
+    board: null,
     createdBy: input.by,
     createdAt: input.nowUtc,
     events: [{ id: nextId('ev'), kind: 'created', at: input.nowUtc, by: input.by }],
@@ -315,9 +331,31 @@ export function assignTail(trip: Trip, tail: string, by: Actor, nowUtc: string):
   return append({ ...trip, tail: t, status: 'confirmed' }, { kind: 'assigned', at: nowUtc, by, tail: t });
 }
 
-export function decline(trip: Trip, by: Actor, reason: string, nowUtc: string): Trip {
+export function decline(trip: Trip, by: Actor, reason: string, nowUtc: string, category: DenialCategory = 'other'): Trip {
   if (by.role !== 'scheduling' || trip.status !== 'submitted') return trip;
-  return append({ ...trip, status: 'declined' }, { kind: 'declined', at: nowUtc, by, reason: reason.trim() });
+  return append({ ...trip, status: 'declined' }, { kind: 'declined', at: nowUtc, by, reason: reason.trim(), category });
+}
+
+/**
+ * A bump: a confirmed trip loses its aircraft to something senior. It goes back to the queue as
+ * submitted, tail cleared, and the event carries the category so the metrics can count it.
+ */
+export function bumpTrip(trip: Trip, by: Actor, category: DenialCategory, reason: string, nowUtc: string): Trip {
+  if (by.role !== 'scheduling' || trip.status !== 'confirmed') return trip;
+  return append({ ...trip, status: 'submitted', tail: null }, { kind: 'bumped', at: nowUtc, by, reason: reason.trim(), category, tail: trip.tail });
+}
+
+/** The EA withdraws. Allowed on anything not already declined or cancelled. */
+export function cancelTrip(trip: Trip, by: Actor, reason: string, nowUtc: string): Trip {
+  if (by.role !== 'ea' || trip.status === 'declined' || trip.status === 'cancelled') return trip;
+  return append({ ...trip, status: 'cancelled' }, { kind: 'cancelled', at: nowUtc, by, reason: reason.trim() });
+}
+
+/** Mark (or unmark) a board trip and its window. Draft-only for the window; scheduling may change tailsNeeded later. */
+export function setBoard(trip: Trip, window: BoardWindow | null, by: Actor, nowUtc: string): Trip {
+  if (trip.status === 'declined' || trip.status === 'cancelled') return trip;
+  if (trip.status !== 'draft' && by.role !== 'scheduling') return trip;
+  return append({ ...trip, board: window }, { kind: 'board-set', at: nowUtc, by, window });
 }
 
 /** Names arrive over months. Allowed on a draft or a submitted/confirmed trip — never after decline. */
@@ -377,6 +415,9 @@ export function eventText(e: TripEvent): string {
     case 'sent-to-crew': return `Trip sheet v${e.version} sent to crew`;
     case 'email-drafted': return `Passenger email drafted for ${e.recipients.length} ${e.recipients.length === 1 ? 'person' : 'people'}`;
     case 'email-sent': return `${e.auto ? 'Passenger email auto-sent (unreviewed)' : 'Passenger email sent'} to ${e.recipients.join(', ')}`;
+    case 'bumped': return `Bumped off ${e.tail ?? 'the aircraft'} — ${e.category}${e.reason ? `: ${e.reason}` : ''}`;
+    case 'cancelled': return `Cancelled by the requester${e.reason ? `: ${e.reason}` : ''}`;
+    case 'board-set': return e.window ? `Board trip · ${e.window.fromDate} to ${e.window.toDate} · ${e.window.tailsNeeded} aircraft` : 'No longer a board trip';
   }
 }
 

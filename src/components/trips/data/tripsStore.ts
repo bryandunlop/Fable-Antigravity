@@ -5,7 +5,7 @@ import { SCHEDULING_DECIDES } from '../engine/places';
 
 export const TRIPS_KEY = 'trip-records-state';
 const VERSION_KEY = 'trip-records-version';
-const VERSION = '4';
+const VERSION = '5';
 
 export interface LeadOption { id: string; name: string }
 /** Principals the demo EA books for. Names match the booking portal's passenger fixtures. */
@@ -82,6 +82,7 @@ function withDefaults(t: Trip): Trip {
     cutoffOverrides: t.cutoffOverrides ?? [],
     frozenSheets: t.frozenSheets ?? [],
     emailDraft: t.emailDraft ?? null,
+    board: t.board ?? null,
   };
 }
 

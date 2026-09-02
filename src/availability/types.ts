@@ -9,7 +9,7 @@
 // append-only overlay ON TOP of the derivation, never an edit to it.
 
 /** What the day is, once the ladder in engine/availability.ts has run. */
-export type AvailabilityState = 'available' | 'held' | 'committed' | 'unavailable';
+export type AvailabilityState = 'available' | 'held' | 'reserved' | 'committed' | 'unavailable';
 
 /**
  * The only thing an executive or EA ever learns about a blocked day.
@@ -23,6 +23,8 @@ export type ReasonCategory =
   | 'not-yet-rostered'
   | 'committed'
   | 'held'
+  /** One tail kept home for the principal on a day they have no trip (D107). Releasable. */
+  | 'reserved'
   | 'none';
 
 export interface AvailabilityReason {
@@ -33,7 +35,7 @@ export interface AvailabilityReason {
   detail: string;
   /** The bounding date — the ETR. null means genuinely open-ended (see LG-308). */
   untilUtc: string | null;
-  sourceRef?: { kind: 'downtime' | 'defect' | 'deferral' | 'trip' | 'hold' | 'crew'; id: string };
+  sourceRef?: { kind: 'downtime' | 'defect' | 'deferral' | 'trip' | 'hold' | 'crew' | 'reserve'; id: string };
 }
 
 export type ConflictKind =
