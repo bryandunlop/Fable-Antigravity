@@ -10,7 +10,7 @@ import { useTripsModule } from '../TripsContext';
 import { LEADS } from '../data/tripsStore';
 import { LegEditor } from '../components/LegEditor';
 import { CORE_TAILS } from '../../../fleet/registry';
-import { airportLabel } from '../engine/places';
+import { airportLabel, SCHEDULING_DECIDES } from '../engine/places';
 import {
   addDocument, addLeg, askQuestion, assignTail, canSubmit, decline, documentsOf, eventText, postMessage,
   readinessChecks, removeLeg, setHeader, shareDraft, submitBlockers, submitItinerary, updateLeg,
@@ -133,7 +133,7 @@ export default function TripWorkspace() {
                 <div className="gfo-eyebrow mb-1 text-muted-foreground">Leg {i + 1} · {day(leg.date)}</div>
                 <div className="font-medium text-primary">{leg.from.placeName} → {leg.to.placeName}</div>
                 <div className="text-xs text-muted-foreground">{airportLabel(places, leg.from.airport ?? '?')} → {airportLabel(places, leg.to.airport ?? '?')} · {describeTiming(leg.timing)}</div>
-                {isSched && (leg.to.airport === 'scheduling-decides' || !leg.to.airport) && (
+                {isSched && (leg.to.airport === SCHEDULING_DECIDES || !leg.to.airport) && (
                   <Button variant="outline" size="sm" className="mt-2" onClick={askAirport}>Ask about the airport</Button>
                 )}
               </div>
