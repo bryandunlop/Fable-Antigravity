@@ -10,12 +10,13 @@ import { cn } from '../../ui/utils';
 import { useTripsModule } from '../TripsContext';
 import { routeLabel, searchEvents, submitBlockers, tripSpan, eventText, type Trip } from '../engine/trip';
 
-const STATUS_LABEL: Record<Trip['status'], string> = { draft: 'Draft', submitted: 'Submitted', confirmed: 'Confirmed', declined: 'Declined' };
+const STATUS_LABEL: Record<Trip['status'], string> = { draft: 'Draft', submitted: 'Submitted', confirmed: 'Confirmed', declined: 'Declined', cancelled: 'Cancelled' };
 const STATUS_TONE: Record<Trip['status'], string> = {
   draft: 'bg-amber-500/10 text-amber-800 dark:text-amber-400',
   submitted: 'bg-secondary text-secondary-foreground',
   confirmed: 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400',
   declined: 'bg-destructive/10 text-destructive',
+  cancelled: 'bg-muted text-muted-foreground',
 };
 
 function fmt(d: string | null): string {

@@ -14,13 +14,18 @@ import { airportLabel, SCHEDULING_DECIDES } from '../engine/places';
 import {
   addDocument, addLeg, askQuestion, assignTail, canSubmit, decline, documentsOf, eventText, postMessage,
   readinessChecks, removeLeg, setHeader, shareDraft, submitBlockers, submitItinerary, updateLeg,
-  setCatering, setCrew, setPassengers,
-  type Trip, type TripEvent,
+  setCatering, setCrew, setPassengers, bumpTrip, cancelTrip, setBoard,
+  type Trip, type TripEvent, type DenialCategory,
 } from '../engine/trip';
 import { cutoffsFor, formatEt, freezeDue, moveCutoff, type CutoffKind } from '../engine/cutoffs';
 import { freezeSheet, inFreezeWindow, latestSheet } from '../engine/tripSheet';
 import { autoSendIfDue, draftEmail, emailDraftOf, emailState } from '../engine/briefingEmail';
 import { getCrewRoster } from '../../crew/crewRecords';
+import { appendOverlay } from '../../../availability/source';
+import { loadAvailabilityData } from '../../../availability/data/availabilityStore';
+import { reconcileBoardHolds, releaseAllBoardHolds } from '../engine/board';
+import { DENIAL_CATEGORIES, DENIAL_LABEL } from '../engine/metrics';
+import { newWatch } from '../engine/watches';
 import { describeTiming } from '../../booking-portal/engine/legTiming';
 
 const field = 'h-9 rounded-md border border-border bg-input-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring';
@@ -37,18 +42,20 @@ const STATUS_TONE: Record<Trip['status'], string> = {
   submitted: 'bg-secondary text-secondary-foreground',
   confirmed: 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400',
   declined: 'bg-destructive/10 text-destructive',
+  cancelled: 'bg-muted text-muted-foreground',
 };
 
 export default function TripWorkspace() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { trips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor } = useTripsModule();
+  const { trips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor, setWatches } = useTripsModule();
   const trip = trips.find(t => t.id === id);
   const [draft, setDraft] = useState('');
   const [q, setQ] = useState('');
   const [tail, setTail] = useState(CORE_TAILS[0]);
   const [moving, setMoving] = useState<{ kind: CutoffKind; date: string; reason: string } | null>(null);
   const [namesText, setNamesText] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<{ kind: 'decline' | 'bump'; category: DenialCategory; note: string } | null>(null);
   const roster = useMemo(() => getCrewRoster(nowUtc()), [nowUtc]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -122,6 +129,38 @@ export default function TripWorkspace() {
       return next;
     });
   }
+  /** Board trips: make the fleet-wide holds match the trip's window (engine/board.ts). */
+  function syncBoardHolds(t: Trip) {
+    if (!t.board || (t.status !== 'submitted' && t.status !== 'confirmed')) return;
+    const now = nowUtc();
+    for (const o of reconcileBoardHolds(t, t.board, loadAvailabilityData(now).overlays, actor, now)) appendOverlay(o, now);
+  }
+  function releaseBoardHolds(t: Trip) {
+    const now = nowUtc();
+    for (const o of releaseAllBoardHolds(t, loadAvailabilityData(now).overlays, actor, now)) appendOverlay(o, now);
+  }
+  // React runs a functional state updater during render, not inside the handler, so anything
+  // that must happen AFTER the new trip exists is computed from the current trip here and the
+  // updater just installs it.
+  function submitNow() {
+    const after = submitItinerary(trip!, actor, nowUtc());
+    update(tripId, () => after);
+    syncBoardHolds(after);
+  }
+  function confirmRefusal() {
+    if (!refusal) return;
+    const now = nowUtc();
+    const after = refusal.kind === 'decline' ? decline(trip!, actor, refusal.note, now, refusal.category) : bumpTrip(trip!, actor, refusal.category, refusal.note, now);
+    update(tripId, () => after);
+    if (after.status === 'declined') releaseBoardHolds(after);
+    setRefusal(null);
+  }
+  function watchTheseDates() {
+    const dates = trip!.legs.map(l => l.date).filter((d): d is string => !!d).sort();
+    if (dates.length === 0) return;
+    setWatches(ws => [...ws, newWatch({ cabin: 'any', fromDate: dates[0], toDate: dates[dates.length - 1], forName: trip!.leadPassengerName, seats: trip!.seatsHeld, createdBy: actor.name, fromTripId: trip!.id }, nowUtc())]);
+    navigate('/trips/watches');
+  }
   function saveNames() {
     if (namesText === null) return;
     update(tripId, t => setPassengers(t, namesText.split(',').map(x => x.trim()).filter(Boolean), actor, nowUtc()));
@@ -163,7 +202,7 @@ export default function TripWorkspace() {
             )}
             {isEa && trip.status === 'draft' && (
               <Button size="sm" disabled={!canSubmit(trip)} title={blockers.map(b => b.text).join(' · ') || undefined}
-                onClick={() => update(tripId, t => submitItinerary(t, actor, nowUtc()))}>Submit itinerary</Button>
+                onClick={submitNow}>Submit itinerary</Button>
             )}
             {isSched && trip.status === 'submitted' && (
               <div className="flex items-center gap-1.5">
@@ -171,8 +210,17 @@ export default function TripWorkspace() {
                   {CORE_TAILS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
                 <Button size="sm" onClick={() => update(tripId, t => assignTail(t, tail, actor, nowUtc()))}>Assign {tail}</Button>
-                <Button size="sm" variant="outline" onClick={() => { const r = window.prompt('Reason (the EA sees this):'); if (r) update(tripId, t => decline(t, actor, r, nowUtc())); }}>Decline</Button>
+                <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'decline', category: 'no-crew', note: '' })}>Decline</Button>
               </div>
+            )}
+            {isSched && trip.status === 'confirmed' && (
+              <Button size="sm" variant="outline" onClick={() => setRefusal({ kind: 'bump', category: 'senior-conflict', note: '' })}>Bump off {trip.tail}</Button>
+            )}
+            {isEa && (trip.status === 'submitted' || trip.status === 'confirmed' || trip.status === 'draft') && (
+              <Button size="sm" variant="ghost" onClick={() => { const r = window.prompt('Cancel this trip — why?'); if (r !== null) { const after = cancelTrip(trip, actor, r, nowUtc()); update(tripId, () => after); releaseBoardHolds(after); } }}>Cancel trip</Button>
+            )}
+            {isEa && trip.status === 'declined' && (
+              <Button size="sm" variant="outline" onClick={watchTheseDates}>Watch these dates</Button>
             )}
             {isSched && trip.status === 'draft' && (
               <span className="text-xs text-muted-foreground">A shared draft — nothing can be held until it is submitted.</span>
@@ -180,6 +228,20 @@ export default function TripWorkspace() {
           </div>
         }
       />
+
+      {refusal && (
+        <GfoPanel title={refusal.kind === 'decline' ? 'Decline this request' : `Bump this trip off ${trip.tail}`}>
+          <div className="grid gap-3 md:grid-cols-[260px_1fr_auto_auto]">
+            <select className={field} value={refusal.category} aria-label="Reason category" onChange={e => setRefusal({ ...refusal, category: e.target.value as DenialCategory })}>
+              {DENIAL_CATEGORIES.map(c => <option key={c} value={c}>{DENIAL_LABEL[c]}</option>)}
+            </select>
+            <input className={field} value={refusal.note} placeholder="A line the EA reads (optional)" aria-label="Reason note" onChange={e => setRefusal({ ...refusal, note: e.target.value })} />
+            <Button size="sm" onClick={confirmRefusal}>{refusal.kind === 'decline' ? 'Decline' : 'Bump'}</Button>
+            <Button size="sm" variant="outline" onClick={() => setRefusal(null)}>Cancel</Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">The category is what the metrics count. {refusal.kind === 'bump' ? 'The trip returns to the queue without an aircraft.' : 'The EA can watch these dates for an opening.'}</p>
+        </GfoPanel>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[1.1fr_1.3fr_0.9fr]">
         {/* ── Itinerary ── */}
@@ -254,6 +316,28 @@ export default function TripWorkspace() {
                     ))}
                   </div>
                 ) : <div>{trip.crew ? `${trip.crew.pic} · ${trip.crew.sic}${trip.crew.fa ? ` · ${trip.crew.fa}` : ''}` : <span className="text-muted-foreground">not yet assigned</span>}</div>}
+              </div>
+            )}
+            {(editable || trip.board) && (
+              <div className="md:col-span-2 rounded-md border border-dashed border-border p-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={!!trip.board} disabled={!editable} aria-label="Board trip"
+                    onChange={e => update(tripId, t => setBoard(t, e.target.checked ? { fromDate: t.legs[0]?.date ?? '', toDate: t.legs.at(-1)?.date ?? t.legs[0]?.date ?? '', tailsNeeded: CORE_TAILS.length } : null, actor, nowUtc()))} />
+                  <span className="font-medium">Board of directors trip</span>
+                  <span className="text-xs text-muted-foreground">blocks the fleet across its window when submitted; give days back by narrowing</span>
+                </label>
+                {trip.board && (
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    <label className="text-xs text-muted-foreground">Window from<input type="date" className={`${field} mt-0.5 w-full`} value={trip.board.fromDate} disabled={!editable && !isSched} aria-label="Board window from"
+                      onChange={e => { const after = setBoard(trip, { ...trip.board!, fromDate: e.target.value }, actor, nowUtc()); update(tripId, () => after); syncBoardHolds(after); }} /></label>
+                    <label className="text-xs text-muted-foreground">to<input type="date" className={`${field} mt-0.5 w-full`} value={trip.board.toDate} disabled={!editable && !isSched} aria-label="Board window to"
+                      onChange={e => { const after = setBoard(trip, { ...trip.board!, toDate: e.target.value }, actor, nowUtc()); update(tripId, () => after); syncBoardHolds(after); }} /></label>
+                    <label className="text-xs text-muted-foreground">Aircraft needed<select className={`${field} mt-0.5 w-full`} value={trip.board.tailsNeeded} disabled={!editable && !isSched} aria-label="Aircraft needed"
+                      onChange={e => { const after = setBoard(trip, { ...trip.board!, tailsNeeded: Number(e.target.value) }, actor, nowUtc()); update(tripId, () => after); syncBoardHolds(after); }}>
+                      {CORE_TAILS.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                    </select></label>
+                  </div>
+                )}
               </div>
             )}
             {editable && (

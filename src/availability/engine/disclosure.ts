@@ -95,6 +95,8 @@ export function categoryLabel(category: ReasonCategory, untilUtc: string | null)
       return until ? `Already committed until ${until}` : 'Already committed';
     case 'held':
       return 'Held by scheduling';
+    case 'reserved':
+      return 'Reserved';
     case 'none':
       return null;
   }

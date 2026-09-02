@@ -223,6 +223,18 @@ function FleetWeekRowCells({
           );
         }
 
+        if (cell.category === 'reserved') {
+          return (
+            <span
+              key={cell.dateUtc}
+              title={title}
+              className="flex min-h-9 items-center justify-center truncate rounded-md bg-amber-500/10 px-1 text-[11px] font-medium text-amber-700 dark:text-amber-500"
+            >
+              reserved
+            </span>
+          );
+        }
+
         if (cell.category === 'held') {
           return (
             <span

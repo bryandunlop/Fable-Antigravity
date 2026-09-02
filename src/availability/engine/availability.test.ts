@@ -399,3 +399,44 @@ describe('far horizon — beyond the published crew roster', () => {
     expect(RANK.NOT_YET_ROSTERED).toBeLessThan(RANK.NONE);
   });
 });
+
+describe('the principal reserve (D107) — one aircraft stays home while the principal is home', () => {
+  const FLEET = [{ tail: 'N1PG', type: 'G650ER' }, { tail: 'N2PG', type: 'G650ER' }, { tail: 'N5PG', type: 'G500' }];
+  const reserve = (awayDates: string[] = []) => ({ name: 'A. Reyes', candidateTails: ['N1PG', 'N2PG'], awayDates });
+  const on = (fleet: ReturnType<typeof buildFleetAvailability>, tail: string, dateUtc: string) =>
+    fleet.rows.find(r => r.tail === tail)!.cells.find(c => c.dateUtc === dateUtc)!;
+
+  it('reserves the first open big-cabin tail and nothing else', () => {
+    const f = buildFleetAvailability(input({ tails: FLEET, trips: [], principalReserve: reserve() }), NOW, 3);
+    expect(on(f, 'N1PG', '2026-09-02').state).toBe('reserved');
+    expect(on(f, 'N1PG', '2026-09-02').reason.category).toBe('reserved');
+    expect(on(f, 'N2PG', '2026-09-02').state).toBe('available');
+    expect(on(f, 'N5PG', '2026-09-02').state).toBe('available');
+  });
+
+  it('falls to the next candidate when the first is in maintenance, and never reserves a standard cabin', () => {
+    const f = buildFleetAvailability(input({ tails: FLEET, trips: [], downtime: [block({ tail: 'N1PG', scheduledStartUtc: '2026-09-01T00:00:00.000Z', scheduledEndUtc: '2026-09-10T00:00:00.000Z' })], principalReserve: reserve() }), NOW, 3);
+    expect(on(f, 'N1PG', '2026-09-02').state).toBe('unavailable');
+    expect(on(f, 'N2PG', '2026-09-02').state).toBe('reserved');
+    expect(on(f, 'N5PG', '2026-09-02').state).toBe('available');
+  });
+
+  it('no reserve on a day the principal is away', () => {
+    const f = buildFleetAvailability(input({ tails: FLEET, trips: [], principalReserve: reserve(['2026-09-02']) }), NOW, 3);
+    expect(on(f, 'N1PG', '2026-09-02').state).toBe('available');
+    expect(on(f, 'N1PG', '2026-09-03').state).toBe('reserved');
+  });
+
+  it('a scheduling release on a candidate lets the reserve go for that day', () => {
+    const release: SchedulerOverlay = { ...hold({ id: 'rel-1', kind: 'release', tail: 'N1PG', fromDateUtc: '2026-09-02', toDateUtc: '2026-09-02', reasonNote: 'CEO in meetings all day', publicLabel: null }) };
+    const f = buildFleetAvailability(input({ tails: FLEET, trips: [], overlays: [release], principalReserve: reserve() }), NOW, 3);
+    expect(on(f, 'N1PG', '2026-09-02').state).toBe('available');
+    expect(on(f, 'N2PG', '2026-09-02').state).toBe('available');
+    expect(on(f, 'N1PG', '2026-09-03').state).toBe('reserved');
+  });
+
+  it('with no reserve configured, nothing changes', () => {
+    const f = buildFleetAvailability(input({ tails: FLEET, trips: [] }), NOW, 3);
+    expect(f.rows.every(r => r.cells.every(c => c.state !== 'reserved'))).toBe(true);
+  });
+});

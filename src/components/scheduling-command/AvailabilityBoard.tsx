@@ -15,6 +15,7 @@ import { ReleaseSuggestions } from './ReleaseSuggestions';
 const CELL_CLASS: Record<TailDayAvailability['state'], string> = {
   available: 'border border-dashed border-border text-muted-foreground/60',
   held: 'bg-amber-500/15 text-amber-700 dark:text-amber-500',
+  reserved: 'bg-amber-500/10 text-amber-800 dark:text-amber-400',
   committed: 'bg-primary/10 text-primary',
   unavailable: 'bg-destructive/10 text-destructive',
 };
@@ -26,6 +27,7 @@ function cellText(cell: TailDayAvailability): string {
     case 'not-in-service': return 'not in svc';
     case 'committed': return 'trip';
     case 'held': return 'held';
+    case 'reserved': return 'reserved · principal';
     case 'no-crew': return 'no crew';
     // Not a block — the roster for that day does not exist yet. Reads open, says why.
     case 'not-yet-rostered': return 'open · unrostered';

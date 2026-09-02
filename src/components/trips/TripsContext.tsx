@@ -6,6 +6,8 @@ import { actingUser } from '../safety-center/actingUser';
 import { loadTrips, saveTrips } from './data/tripsStore';
 import { loadPlaces, savePlaces } from './data/placesStore';
 import { loadSettings, saveSettings, type TripSettings } from './data/settingsStore';
+import { loadWatches, saveWatches } from './data/watchesStore';
+import type { Watch } from './engine/watches';
 import { getDemoForecast } from '../../services/weatherMockData';
 import type { WeatherByIcao } from './engine/briefingEmail';
 import type { SheetContext } from './engine/tripSheet';
@@ -27,6 +29,8 @@ interface TripsContextValue {
   places: PlaceRecord[];
   settings: TripSettings;
   setSettings: (next: TripSettings) => void;
+  watches: Watch[];
+  setWatches: (fn: (w: Watch[]) => Watch[]) => void;
   /** Places + crew blurbs, the inputs a frozen sheet needs. */
   sheetCtx: SheetContext;
   /** Demo forecast keyed by destination ICAO — the NWS service's seed, labelled as such in the UI. */
@@ -43,6 +47,8 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
   const [allTrips, setAllTrips] = useState<Trip[]>(() => loadTrips());
   const [places, setPlacesState] = useState<PlaceRecord[]>(() => loadPlaces());
   const [settings, setSettingsState] = useState<TripSettings>(() => loadSettings());
+  const [watches, setWatchesState] = useState<Watch[]>(() => loadWatches());
+  const setWatches = useCallback((fn: (w: Watch[]) => Watch[]) => { setWatchesState(prev => { const next = fn(prev); saveWatches(next); return next; }); }, []);
 
   const actor = useMemo<Actor>(() => {
     const role = actorRoleFor(userRole, additionalRoles);
@@ -78,7 +84,7 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
     return out;
   }, []);
 
-  const value = useMemo(() => ({ actor, trips, allTrips, places, settings, setSettings, sheetCtx, weatherFor, nowUtc, create, update, setPlaces }), [actor, trips, allTrips, places, settings, setSettings, sheetCtx, weatherFor, nowUtc, create, update, setPlaces]);
+  const value = useMemo(() => ({ actor, trips, allTrips, places, settings, setSettings, watches, setWatches, sheetCtx, weatherFor, nowUtc, create, update, setPlaces }), [actor, trips, allTrips, places, settings, setSettings, watches, setWatches, sheetCtx, weatherFor, nowUtc, create, update, setPlaces]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

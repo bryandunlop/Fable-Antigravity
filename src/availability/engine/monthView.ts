@@ -54,5 +54,6 @@ export function chipWord(cell: DisclosedCell): string {
     case 'not-yet-rostered': return 'open';
     case 'committed': return 'away';
     case 'held': return 'held';
+    case 'reserved': return 'reserved';
   }
 }
