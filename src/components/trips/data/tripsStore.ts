@@ -97,7 +97,22 @@ export function seedTrips(): Trip[] {
   pickup = submitItinerary(pickup, EA, '2026-08-28T12:05:00.000Z');
   pickup = assignTail(pickup, 'N5PG', SCHED, '2026-08-28T15:00:00.000Z');
 
-  return [seattle, board, meh, bos, out, back, pickup];
+  // London, with a document gate on it (D109 slice 3). S. Reyes's passport lapses before the trip,
+  // so the sheet refuses to freeze until scheduling overrides it with a reason. The dates are far
+  // enough out that the T-72 clock is not already past them.
+  let london = createDraft({
+    title: 'London — Weybridge site', leadPassengerId: 'P-REYES', leadPassengerName: 'A. Reyes', seatsHeld: 3, by: EA, nowUtc: '2026-08-29T09:00:00.000Z',
+    legs: [
+      newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'London', placeId: 'pl-lon', airport: 'EGLF' }, date: daysFromNow(44), timing: { kind: 'depart', departLocal: '18:30', flexHours: 0 } }),
+      newLeg({ from: { placeName: 'London', placeId: 'pl-lon', airport: 'EGLF' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(47), timing: { kind: 'depart', departLocal: '11:00', flexHours: 0 } }),
+    ],
+  });
+  london = submitItinerary(london, EA, '2026-08-29T09:20:00.000Z');
+  london = assignTail(london, 'N1PG', SCHED, '2026-08-30T10:00:00.000Z');
+  london = setPassengers(london, ['A. Reyes', 'S. Reyes'], EA, '2026-08-30T11:00:00.000Z');
+  london = postMessage(london, SCHED, 'N1PG held. Passports and forms before the 21-day cutoff please.', '2026-08-30T10:05:00.000Z');
+
+  return [seattle, board, meh, bos, out, back, pickup, london];
 }
 
 /** Rows written before D106 lack the T-72 fields; read them as empty rather than crashing. */

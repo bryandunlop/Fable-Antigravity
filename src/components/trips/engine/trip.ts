@@ -60,6 +60,7 @@ export type TripEvent =
   | { id: string; kind: 'assigned'; at: string; by: Actor; tail: string }
   | { id: string; kind: 'airport-changed'; at: string; by: Actor; legId: string; end: 'from' | 'to'; airport: string }
   | { id: string; kind: 'declined'; at: string; by: Actor; reason: string; category?: DenialCategory }
+  | { id: string; kind: 'gate-overridden'; at: string; by: Actor; gateKey: string; reason: string }
   | { id: string; kind: 'bumped'; at: string; by: Actor; reason: string; category: DenialCategory; tail: string | null }
   | { id: string; kind: 'cancelled'; at: string; by: Actor; reason: string }
   | { id: string; kind: 'board-set'; at: string; by: Actor; window: BoardWindow | null }
@@ -153,6 +154,12 @@ export interface Trip {
   passengerIds?: string[];
   crew: TripCrew | null;
   cutoffOverrides: CutoffOverride[];
+  /**
+   * Document gates scheduling has decided to fly past, each with a reason (D109 slice 3, canvas Q4:
+   * "warn and let scheduling override with a reason"). Optional — trips written before slice 3
+   * carry none, and an absent list means no override was ever made, never that none was needed.
+   */
+  gateOverrides?: GateOverride[];
   /** Frozen T-72 sheets, oldest first; version = index + 1. Opaque here: engine/tripSheet.ts owns the shape. */
   frozenSheets: unknown[];
   /** The passenger email draft made at freeze; engine/briefingEmail.ts owns the shape. */
@@ -296,6 +303,56 @@ export function submitBlockers(trip: Trip): SubmitBlocker[] {
 }
 
 /** Things the EA should glance at but that do not block — the "check" line. */
+export interface GateOverride {
+  /** `personId|legId|documentId` — see `documentGates.gateKey`. */
+  gateKey: string;
+  /**
+   * The two facts the decision was actually about, frozen at the moment it was made: the leg's date
+   * and the document's expiry.
+   *
+   * Without them the key alone cleared the gate forever. A leg's date moves — that is what
+   * `changedSinceFreeze` exists for — so an override granted over a passport that was merely SHORT
+   * for a 16 October leg went on clearing the same leg after it moved to December, by which time the
+   * passport had actually expired. The decision was made about a smaller problem than the one it
+   * ended up authorising. `documentGates.blockingGates` re-raises the gate when either value has
+   * changed. (Fresh review, 2026-09-02.)
+   */
+  legDate: string;
+  documentExpiresOn: string;
+  reason: string;
+  by: Actor;
+  at: string;
+}
+
+export const gateOverrides = (trip: Trip): GateOverride[] => trip.gateOverrides ?? [];
+
+/**
+ * Scheduling decides to fly past a document gate, and must say why.
+ *
+ * Refuses a blank reason and refuses anyone but scheduling: an override with no reason is not a
+ * decision, it is a click. Returns the trip unchanged when it declines — the module clock relies on
+ * that identity (see `clockIdempotence.test.ts`).
+ */
+export function overrideGate(
+  trip: Trip,
+  gateKey: string,
+  reason: string,
+  by: Actor,
+  nowUtc: string,
+  /** What the decision was about — see `GateOverride.legDate`. */
+  about: { legDate: string; documentExpiresOn: string },
+): Trip {
+  const text = reason.trim();
+  if (!text || by.role !== 'scheduling') return trip;
+  const existing = gateOverrides(trip);
+  if (existing.some(o => o.gateKey === gateKey)) return trip;
+  const override: GateOverride = { gateKey, legDate: about.legDate, documentExpiresOn: about.documentExpiresOn, reason: text, by, at: nowUtc };
+  return append(
+    { ...trip, gateOverrides: [...existing, override] },
+    { kind: 'gate-overridden', at: nowUtc, by, gateKey, reason: text },
+  );
+}
+
 export function readinessChecks(trip: Trip): ReadinessCheck[] {
   const out: ReadinessCheck[] = [];
   trip.legs.forEach((leg, i) => {
@@ -506,6 +563,8 @@ export function eventText(e: TripEvent): string {
     case 'sent-to-crew': return `Trip sheet v${e.version} sent to crew`;
     case 'email-drafted': return `Passenger email drafted for ${e.recipients.length} ${e.recipients.length === 1 ? 'person' : 'people'}`;
     case 'email-sent': return `${e.auto ? 'Passenger email auto-sent (unreviewed)' : 'Passenger email sent'} to ${e.recipients.join(', ')}`;
+    case 'gate-overridden': return `Document gate overridden — ${e.reason}`;
+
     case 'bumped': return `Bumped off ${e.tail ?? 'the aircraft'} — ${e.category}${e.reason ? `: ${e.reason}` : ''}`;
     case 'cancelled': return `Cancelled by the requester${e.reason ? `: ${e.reason}` : ''}`;
     case 'board-set': return e.window ? `Board trip · ${e.window.fromDate} to ${e.window.toDate} · ${e.window.tailsNeeded} aircraft` : 'No longer a board trip';

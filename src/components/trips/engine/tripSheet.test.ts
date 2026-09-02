@@ -51,21 +51,21 @@ describe('the sheet is generated, never typed', () => {
 describe('freezing is a snapshot with a version', () => {
   it('refuses on a draft', () => {
     const d = createDraft({ title: 'x', leadPassengerId: 'P', leadPassengerName: 'P', by: EA, nowUtc: T });
-    expect(latestSheet(freezeSheet(d, CTX, T, SCHED))).toBeNull();
+    expect(latestSheet(freezeSheet(d, CTX, T, SCHED, []))).toBeNull();
   });
 
   it('v1 does not change when the trip changes afterwards; a refreeze makes v2', () => {
-    let t = freezeSheet(confirmedTrip(), CTX, T, SCHED);
+    let t = freezeSheet(confirmedTrip(), CTX, T, SCHED, []);
     const v1 = latestSheet(t)!;
     expect(v1.version).toBe(1);
     expect(t.events.at(-1)).toMatchObject({ kind: 'sheet-frozen', version: 1 });
     // No change → no second version
-    expect(freezeSheet(t, CTX, '2026-10-11T14:00:00.000Z', SCHED).frozenSheets).toHaveLength(1);
+    expect(freezeSheet(t, CTX, '2026-10-11T14:00:00.000Z', SCHED, []).frozenSheets).toHaveLength(1);
     // A change after the freeze
     t = setCatering(t, t.legs[1].id, 'Dinner for 3', EA, '2026-10-12T00:00:00.000Z');
     expect(changedSinceFreeze(t, CTX, '2026-10-12T00:00:00.000Z', SCHED)).toBe(true);
     expect(latestSheet(t)!.legs[1].catering).toBeNull(); // v1 untouched
-    t = freezeSheet(t, CTX, '2026-10-12T00:05:00.000Z', SCHED);
+    t = freezeSheet(t, CTX, '2026-10-12T00:05:00.000Z', SCHED, []);
     expect(latestSheet(t)!.version).toBe(2);
     expect(latestSheet(t)!.legs[1].catering).toBe('Dinner for 3');
     expect(t.frozenSheets).toHaveLength(2);
@@ -74,7 +74,7 @@ describe('freezing is a snapshot with a version', () => {
   it('send to crew records the version, scheduling only, and needs a frozen sheet', () => {
     const t0 = confirmedTrip();
     expect(sendSheetToCrew(t0, SCHED, T)).toBe(t0);
-    const t = freezeSheet(t0, CTX, T, SCHED);
+    const t = freezeSheet(t0, CTX, T, SCHED, []);
     expect(sendSheetToCrew(t, EA, T)).toBe(t);
     expect(sendSheetToCrew(t, SCHED, T).events.at(-1)).toMatchObject({ kind: 'sent-to-crew', version: 1 });
   });

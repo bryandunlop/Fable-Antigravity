@@ -136,8 +136,23 @@ export function changedSinceFreeze(trip: Trip, ctx: SheetContext, nowUtc: string
  * (a second identical freeze is noise). Anyone on the trip may freeze — the freeze is a clock
  * event, not an authority.
  */
-export function freezeSheet(trip: Trip, ctx: SheetContext, nowUtc: string, by: Actor): Trip {
+/**
+ * Freeze the sheet — unless an unresolved document gate says not to.
+ *
+ * `blocking` is the gates nobody has overridden (`documentGates.blockingGates`). When any remain,
+ * this DECLINES and returns the trip it was given: the T-72 clock calls it every minute, so it must
+ * neither throw nor write, and it must freeze the moment the gate clears or scheduling overrides it.
+ * Nothing is recorded on a refusal — a refusal is the absence of an event, and writing one every
+ * minute would bury the record. The workspace is what says why (D109 slice 3, canvas Q4).
+ *
+ * REQUIRED, deliberately not defaulted to `[]`. Written with a default, the trip-sheet page's
+ * "refreeze as v2" button — which predates this parameter — kept freezing straight past every gate,
+ * with no type error to notice (fresh review, 2026-09-02). A caller with genuinely nothing to check
+ * passes `[]` and that is a decision on the record, not an omission.
+ */
+export function freezeSheet(trip: Trip, ctx: SheetContext, nowUtc: string, by: Actor, blocking: unknown[]): Trip {
   if (trip.status !== 'submitted' && trip.status !== 'confirmed') return trip;
+  if (blocking.length > 0) return trip;
   const sheet = buildSheet(trip, ctx, nowUtc, by);
   const last = latestSheet(trip);
   if (last && last.fingerprint === sheet.fingerprint) return trip;

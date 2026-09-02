@@ -8,6 +8,8 @@ import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
 import { useMinuteTick } from '../useTripClock';
 import { LegClockLine } from '../components/LegClockLine';
+import { DocumentGatesPanel } from '../components/DocumentGatesPanel';
+import { blockingGates, documentGates, gateFacts, gateKey } from '../engine/documentGates';
 import { useTripsModule } from '../TripsContext';
 import { LEADS } from '../data/tripsStore';
 import { LegEditor } from '../components/LegEditor';
@@ -18,6 +20,7 @@ import {
   readinessChecks, removeLeg, setHeader, shareDraft, submitBlockers, submitItinerary, updateLeg,
   setCatering, setCrew, setPassengers, bumpTrip, cancelTrip, setBoard, requestChange, decideChange, pendingChanges, passengerEditPolicy, addLegBy, newLeg,
   type Trip, type TripEvent, type DenialCategory, type ChangeRequest,
+  overrideGate,
 } from '../engine/trip';
 import { cutoffsFor, formatEt, freezeDue, moveCutoff, firstDepartureUtc, isInternational, type CutoffKind } from '../engine/cutoffs';
 import { rotationFor, tripsAsRecords } from '../engine/rotation';
@@ -103,6 +106,10 @@ export default function TripWorkspace() {
   const hoursToDeparture = dep ? (Date.parse(dep) - Date.parse(nowUtc())) / 3_600_000 : null;
   const paxPolicy = passengerEditPolicy(hoursToDeparture, isInternational(trip), settings.cutoffs.namesDomesticHours, settings.cutoffs.namesInternationalHours);
   const pending = pendingChanges(trip);
+  // Document gates (D109 slice 3): who aboard is carrying something that runs out too soon. The
+  // blocking ones refuse the freeze until scheduling overrides them with a reason.
+  const gates = documentGates(trip, people, settings.documentPolicy, nowUtc());
+  const gatesBlocking = blockingGates(trip, gates);
   // TL-48: which tails are actually free on this trip's days. Scheduling may only assign one of
   // those; a busy tail is listed with why, so the double booking is a decision, never an accident.
   const tripDates = trip.legs.map(l => l.date).filter((d): d is string => !!d);
@@ -143,7 +150,7 @@ export default function TripWorkspace() {
   function freezeNow() {
     const now = nowUtc();
     update(tripId, t => {
-      let next = freezeSheet(t, sheetCtx, now, actor);
+      let next = freezeSheet(t, sheetCtx, now, actor, gatesBlocking);
       const sh = latestSheet(next);
       if (sh && !emailDraftOf(next)) {
         next = draftEmail(next, sh, settings.email, people, weatherFor(sh.legs.map(l => l.to.icao).filter((x): x is string => !!x)), actor, now);
@@ -547,12 +554,27 @@ export default function TripWorkspace() {
           )}
 
           {live && (
+            <>
+            <DocumentGatesPanel
+              gates={gates}
+              blocking={gatesBlocking}
+              trip={trip}
+              canOverride={isSched}
+              onOverride={(gate, reason) => update(tripId, t => overrideGate(t, gateKey(gate), reason, actor, nowUtc(), gateFacts(gate)))}
+            />
+
             <GfoPanel title="The 72-hour moment">
               {!sheet && (
                 <div className="space-y-2 text-sm">
                   <p className="text-muted-foreground">The trip sheet freezes and the passenger email is drafted at {cutoffs.find(c => c.kind === 'freeze') ? formatEt(cutoffs.find(c => c.kind === 'freeze')!.dueUtc) : 'T-72'}.</p>
-                  {canFreezeNow && <Button size="sm" variant="outline" onClick={freezeNow}><Snowflake className="mr-1.5 h-4 w-4" />Freeze now</Button>}
-                  {isSched && live && !canFreezeNow && <p className="text-xs text-muted-foreground">Freeze early becomes available inside {settings.cutoffs.freezeHours * 3} h of departure.</p>}
+                  {gatesBlocking.length > 0 && (
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      The sheet will not freeze while {gatesBlocking.length} document {gatesBlocking.length === 1 ? 'gate is' : 'gates are'} unresolved — see below.
+                      The T-72 clock keeps trying, and freezes by itself the moment they clear.
+                    </p>
+                  )}
+                  {canFreezeNow && gatesBlocking.length === 0 && <Button size="sm" variant="outline" onClick={freezeNow}><Snowflake className="mr-1.5 h-4 w-4" />Freeze now</Button>}
+                  {isSched && live && !canFreezeNow && gatesBlocking.length === 0 && <p className="text-xs text-muted-foreground">Freeze early becomes available inside {settings.cutoffs.freezeHours * 3} h of departure.</p>}
                 </div>
               )}
               {sheet && (
@@ -572,6 +594,7 @@ export default function TripWorkspace() {
                 </div>
               )}
             </GfoPanel>
+            </>
           )}
         </div>
       </div>

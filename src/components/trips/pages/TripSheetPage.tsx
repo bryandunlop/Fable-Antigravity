@@ -10,6 +10,7 @@ import { useTripsModule } from '../TripsContext';
 import { changedSinceFreeze, freezeSheet, frozenSheets, sendSheetToCrew, type FrozenSheet } from '../engine/tripSheet';
 import { formatEt } from '../engine/cutoffs';
 import { formatElapsed } from '../../../services/legTime';
+import { blockingGates, documentGates } from '../engine/documentGates';
 
 function longDate(d: string): string {
   return new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -19,7 +20,7 @@ const z = (iso: string) => `${iso.slice(11, 16)}Z`;
 export default function TripSheetPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { trips, actor, sheetCtx, update, nowUtc } = useTripsModule();
+  const { trips, actor, sheetCtx, update, nowUtc, people, settings } = useTripsModule();
   const trip = trips.find(t => t.id === id);
   const versions = trip ? frozenSheets(trip) : [];
   const [pick, setPick] = useState<number | null>(null);
@@ -37,6 +38,8 @@ export default function TripSheetPage() {
 
   const isSched = actor.role === 'scheduling';
   const stale = changedSinceFreeze(trip, sheetCtx, nowUtc(), actor);
+  const gates = documentGates(trip, people, settings.documentPolicy, nowUtc());
+  const gatesBlocking = blockingGates(trip, gates);
   const sentEvents = trip.events.filter(e => e.kind === 'sent-to-crew' && e.version === sheet.version);
 
   return (
@@ -58,13 +61,21 @@ export default function TripSheetPage() {
               {isSched && (
                 <Button size="sm" onClick={() => update(trip.id, t => sendSheetToCrew(t, actor, nowUtc()))}><Send className="mr-1.5 h-4 w-4" />Send to crew</Button>
               )}
-              {isSched && stale && (
-                <Button size="sm" variant="outline" onClick={() => { update(trip.id, t => freezeSheet(t, sheetCtx, nowUtc(), actor)); setPick(null); }}>Refreeze as v{versions.length + 1}</Button>
+              {/* A refreeze runs the same document gates as the first freeze. It is the path that
+                  matters most: the trip changed, which is exactly how a date moves onto the wrong
+                  side of someone's passport expiry. */}
+              {isSched && stale && gatesBlocking.length === 0 && (
+                <Button size="sm" variant="outline" onClick={() => { update(trip.id, t => freezeSheet(t, sheetCtx, nowUtc(), actor, gatesBlocking)); setPick(null); }}>Refreeze as v{versions.length + 1}</Button>
               )}
             </div>
           }
         />
         {stale && <p className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-400">The trip has changed since this version was frozen. This sheet still says what it said; scheduling can refreeze.</p>}
+        {stale && gatesBlocking.length > 0 && (
+          <p className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-400">
+            It cannot be refrozen yet: {gatesBlocking.length} travel-document {gatesBlocking.length === 1 ? 'gate is' : 'gates are'} unresolved. Resolve or override them on the trip.
+          </p>
+        )}
         {sentEvents.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Sent to crew {sentEvents.map(e => formatEt(e.at)).join(', ')} · the EFB push is Phase 2</p>}
       </div>
 
