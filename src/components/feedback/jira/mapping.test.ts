@@ -22,6 +22,7 @@ const report: FeedbackReport = {
     viewport: '1180x820',
     userAgent: 'TestAgent/1.0',
   },
+  attachments: [],
   sync: 'local',
 };
 
