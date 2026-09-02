@@ -10,25 +10,18 @@
 // Pure.
 
 import type { TripRecord, TripLegRecord } from '../../../scheduling/store/types';
-import { SCHEDULING_DECIDES } from './places';
-import { plannedDepartureLocal, zonedToUtc, REFERENCE_ZONE } from './cutoffs';
-import { estimateMinutes } from './tripSheet';
-import { zoneForAirport } from '../../../services/airportZone';
+import { legClock, icaoOf } from './legClock';
 import { aircraftFor } from '../../../fleet/registry';
 import type { Trip } from './trip';
-
-const icaoOf = (a: string | null) => (a && a !== SCHEDULING_DECIDES ? a : null);
 
 export function tripAsRecord(trip: Trip): TripRecord | null {
   if (!trip.tail || (trip.status !== 'confirmed' && trip.status !== 'submitted')) return null;
   const legs: TripLegRecord[] = [];
   trip.legs.forEach((l, i) => {
     const dep = icaoOf(l.from.airport), arr = icaoOf(l.to.airport);
-    if (!l.date || !dep || !arr) return;
-    const zone = zoneForAirport(dep) ?? REFERENCE_ZONE;
-    const depUtc = zonedToUtc(l.date, plannedDepartureLocal(l), zone);
-    const arrUtc = new Date(Date.parse(depUtc) + estimateMinutes(dep, arr) * 60_000).toISOString();
-    legs.push({ id: `${trip.id}-l${i}`, sequence: i + 1, departureIcao: dep, arrivalIcao: arr, departureTimeUtc: depUtc, arrivalTimeUtc: arrUtc, paxCount: l.positioning ? 0 : trip.passengerNames.length });
+    const clock = legClock(l);
+    if (!clock || !dep || !arr) return;
+    legs.push({ id: `${trip.id}-l${i}`, sequence: i + 1, departureIcao: dep, arrivalIcao: arr, departureTimeUtc: clock.depUtc, arrivalTimeUtc: clock.arrUtc, paxCount: l.positioning ? 0 : trip.passengerNames.length });
   });
   if (legs.length === 0) return null;
   const dates = trip.legs.map(l => l.date).filter((d): d is string => !!d).sort();

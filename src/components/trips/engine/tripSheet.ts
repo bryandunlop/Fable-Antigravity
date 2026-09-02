@@ -7,12 +7,14 @@
 //
 // Pure. Callers pass the clock, the places register and the crew roster.
 
-import { legTimes } from '../../../services/legTime';
-import { lookupAirport } from '../../../services/airportCoords';
-import { airportLabel, SCHEDULING_DECIDES, type PlaceRecord } from './places';
-import { firstDepartureUtc, plannedDepartureLocal, zonedToUtc, REFERENCE_ZONE } from './cutoffs';
-import { zoneForAirport } from '../../../services/airportZone';
+import { airportLabel, type PlaceRecord } from './places';
+import { firstDepartureUtc } from './cutoffs';
+import { legClock, formatLegWall, estimateMinutes, icaoOf } from './legClock';
 import { documentsOf, type Actor, type Trip, type TripLeg } from './trip';
+
+// The leg arithmetic lives in `legClock` now; re-exported so existing callers and tests keep
+// their import site while there is exactly one implementation.
+export { estimateMinutes };
 
 export interface SheetEnd {
   icao: string | null;
@@ -57,51 +59,23 @@ export interface FrozenSheet {
   fingerprint: string;
 }
 
-const KT = 440;
-const TAXI_MIN = 20;
-
-function nm(a: string, b: string): number | null {
-  const A = lookupAirport(a), B = lookupAirport(b);
-  if (!A || !B) return null;
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const dLat = toRad(B.lat - A.lat), dLon = toRad(B.lon - A.lon);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(A.lat)) * Math.cos(toRad(B.lat)) * Math.sin(dLon / 2) ** 2;
-  return 3440.065 * 2 * Math.asin(Math.sqrt(h));
-}
-
-/** Planning block time. 120 min when either field is unknown — stated, never hidden. */
-export function estimateMinutes(from: string | null, to: string | null): number {
-  if (!from || !to || from === SCHEDULING_DECIDES || to === SCHEDULING_DECIDES) return 120;
-  const d = nm(from, to);
-  return d === null ? 120 : Math.round((d / KT) * 60 + TAXI_MIN);
-}
-
-function wallLabel(iso: string, icao: string | null): string | null {
-  if (!icao || icao === SCHEDULING_DECIDES) return null;
-  const zone = zoneForAirport(icao);
-  if (!zone) return null;
-  const t = legTimes({ departureIcao: icao, arrivalIcao: icao, departureUtc: iso, arrivalUtc: iso }).departure;
-  return t.wallTime ? `${t.wallTime} ${t.zoneLabel ?? ''}`.trim() : null;
-}
-
 export function sheetLeg(leg: TripLeg, n: number, trip: Trip, places: PlaceRecord[]): SheetLeg | null {
-  if (!leg.date) return null;
-  const fromIcao = leg.from.airport && leg.from.airport !== SCHEDULING_DECIDES ? leg.from.airport : null;
-  const toIcao = leg.to.airport && leg.to.airport !== SCHEDULING_DECIDES ? leg.to.airport : null;
-  const zone = (fromIcao ? zoneForAirport(fromIcao) : null) ?? REFERENCE_ZONE;
-  const depUtc = zonedToUtc(leg.date, plannedDepartureLocal(leg), zone);
-  const arrUtc = new Date(Date.parse(depUtc) + estimateMinutes(fromIcao, toIcao) * 60_000).toISOString();
-  const lt = fromIcao && toIcao ? legTimes({ departureIcao: fromIcao, arrivalIcao: toIcao, departureUtc: depUtc, arrivalUtc: arrUtc }) : null;
+  const clock = legClock(leg);
+  if (!clock || !leg.date) return null;
+  const fromIcao = icaoOf(leg.from.airport);
+  const toIcao = icaoOf(leg.to.airport);
+  const wall = (end: typeof clock.times.departure, icao: string | null) =>
+    icao && end.wallTime ? formatLegWall(end) : null;
   return {
     n,
     date: leg.date,
-    from: { icao: fromIcao, place: leg.from.placeName, label: leg.from.airport ? airportLabel(places, leg.from.airport) : leg.from.placeName, wall: wallLabel(depUtc, fromIcao), utc: depUtc },
-    to: { icao: toIcao, place: leg.to.placeName, label: leg.to.airport ? airportLabel(places, leg.to.airport) : leg.to.placeName, wall: wallLabel(arrUtc, toIcao), utc: arrUtc },
-    elapsedMinutes: lt?.elapsedMinutes ?? estimateMinutes(fromIcao, toIcao),
-    dayShift: lt?.dayShift ?? null,
+    from: { icao: fromIcao, place: leg.from.placeName, label: leg.from.airport ? airportLabel(places, leg.from.airport) : leg.from.placeName, wall: wall(clock.times.departure, fromIcao), utc: clock.depUtc },
+    to: { icao: toIcao, place: leg.to.placeName, label: leg.to.airport ? airportLabel(places, leg.to.airport) : leg.to.placeName, wall: wall(clock.times.arrival, toIcao), utc: clock.arrUtc },
+    elapsedMinutes: clock.times.elapsedMinutes ?? clock.estimatedMinutes,
+    dayShift: clock.times.dayShift,
     aboard: leg.positioning ? [] : trip.passengerNames,
     catering: leg.positioning ? null : (leg.catering ?? null),
-    planned: leg.timing.kind !== 'depart',
+    planned: clock.planned,
     positioning: !!leg.positioning,
   };
 }

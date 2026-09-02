@@ -1,6 +1,6 @@
 // Watches (D107): a cabin and a window; fires with a pre-filled request when something opens.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, X } from 'lucide-react';
 import { Button } from '../../ui/button';
@@ -8,9 +8,7 @@ import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
 import { useTripsModule } from '../TripsContext';
 import { LEADS } from '../data/tripsStore';
-import { readFleetAvailability } from '../../../availability/source';
-import { useTrips } from '../../hooks/useFleetAvailability';
-import { dismissWatch, evaluateWatches, freeByCabin, newWatch, type WatchCabin } from '../engine/watches';
+import { dismissWatch, newWatch, type WatchCabin } from '../engine/watches';
 
 const field = 'h-9 rounded-md border border-border bg-input-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring';
 const CABIN_LABEL: Record<WatchCabin, string> = { big: 'Big cabin (G650ER)', standard: 'Standard cabin (G500)', any: 'Any aircraft' };
@@ -18,12 +16,10 @@ const CABIN_LABEL: Record<WatchCabin, string> = { big: 'Big cabin (G650ER)', sta
 export default function WatchesPage() {
   const { watches, setWatches, actor, nowUtc } = useTripsModule();
   const navigate = useNavigate();
-  const schedTrips = useTrips();
   const [form, setForm] = useState({ cabin: 'big' as WatchCabin, from: '', to: '', forName: LEADS[0].name, seats: 2 });
 
-  // Evaluate against today's picture every time the page opens or the fleet changes.
-  const free = useMemo(() => freeByCabin(readFleetAvailability({ trips: schedTrips }, nowUtc(), 400)), [schedTrips, nowUtc]);
-  useEffect(() => { setWatches(ws => evaluateWatches(ws, free, nowUtc())); }, [free, nowUtc, setWatches]);
+  // Watches are evaluated on the module clock (`TripClockEffects`), so one fires whether or not
+  // this page is open. Nothing to do here but read them.
 
   const mine = actor.role === 'scheduling' ? watches : watches.filter(w => w.createdBy === actor.name);
   const fired = mine.filter(w => w.status === 'fired');

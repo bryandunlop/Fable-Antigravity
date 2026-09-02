@@ -107,8 +107,18 @@ function occupancyByTailDay(trips: TripRecord[]): Map<string, Map<string, Occupa
   return byTail;
 }
 
-function buildDays(nowUtc: string, days: number): AvailabilityDay[] {
-  const todayStartMs = Date.parse(`${utcDayKey(Date.parse(nowUtc))}T00:00:00.000Z`);
+/**
+ * The window's days, starting at `startDayKey` when the caller names one.
+ *
+ * Day keys here are UTC calendar days. That is fine for a fleet whose legs are stored in UTC, and
+ * wrong for the reader whenever their calendar day is not the UTC one: after 20:00 Eastern, the
+ * UTC day has already rolled over, so a grid drawn on the operator's day found no row for "today"
+ * and started at tomorrow (LG-330, seen 2026-09-01 on /fleet-schedule). A caller that draws an
+ * operator-zone calendar (D24: America/New_York) passes the day it means to start on, and gets a
+ * row for it. `nowUtc` still means now — this only moves the window's left edge.
+ */
+function buildDays(nowUtc: string, days: number, startDayKey?: string): AvailabilityDay[] {
+  const todayStartMs = Date.parse(`${startDayKey ?? utcDayKey(Date.parse(nowUtc))}T00:00:00.000Z`);
   return Array.from({ length: days }, (_, i) => {
     const ms = todayStartMs + i * DAY_MS;
     const date = new Date(ms);
@@ -138,8 +148,9 @@ export function buildFleetAvailability(
   input: AvailabilityInput,
   nowUtc: string,
   days = 14,
+  startDayKey?: string,
 ): FleetAvailability {
-  const dayList = buildDays(nowUtc, days);
+  const dayList = buildDays(nowUtc, days, startDayKey);
   const occupancy = occupancyByTailDay(input.trips);
 
   const capacity = new Map<string, CrewDayCapacity>(

@@ -2,6 +2,7 @@
 // register, and one `update` that runs an engine function and persists. No rules live here.
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import TripClockEffects from './TripClockEffects';
 import { actingUser } from '../safety-center/actingUser';
 import { loadTrips, saveTrips } from './data/tripsStore';
 import { loadPlaces, savePlaces } from './data/placesStore';
@@ -85,7 +86,14 @@ export function TripsProvider({ userRole, additionalRoles = [], children }: { us
   }, []);
 
   const value = useMemo(() => ({ actor, trips, allTrips, places, settings, setSettings, watches, setWatches, sheetCtx, weatherFor, nowUtc, create, update, setPlaces }), [actor, trips, allTrips, places, settings, setSettings, watches, setWatches, sheetCtx, weatherFor, nowUtc, create, update, setPlaces]);
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {/* The module's own clock: T-72 freeze, dead-man send and watches, for every trip, from
+          whichever trips page happens to be open. */}
+      <TripClockEffects />
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export function useTripsModule(): TripsContextValue {

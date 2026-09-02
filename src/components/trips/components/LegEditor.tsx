@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { cn } from '../../ui/utils';
 import { PlacePicker } from './PlacePicker';
+import { LegClockLine } from './LegClockLine';
 import type { PlaceRecord } from '../engine/places';
 import type { TripLeg } from '../engine/trip';
 import type { LegTiming } from '../../booking-portal/engine/legTiming';
@@ -69,6 +70,8 @@ export function LegEditor({ index, leg, places, onChange, onRemove, disabled, mi
           </div>
         </div>
       </div>
+      {/* What the times you just chose actually mean at each end (Phase 5 slice 1). */}
+      <LegClockLine leg={leg} />
       <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <input type="checkbox" checked={!!leg.positioning} disabled={disabled} aria-label={`Leg ${index + 1} positioning`} onChange={e => onChange({ positioning: e.target.checked })} />
         Nobody aboard — the aircraft positions for a pickup or a drop
