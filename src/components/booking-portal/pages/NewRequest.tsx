@@ -117,8 +117,15 @@ export default function NewRequest() {
     [trips, legDates, audience, nowUtc],
   );
 
+  // A draft leg carries a `timing`, not a departure clock — an arrive-by leg's departure
+  // is DERIVED from the flight time. Reading a `departLocal` off it silently yields
+  // undefined, which is the overnight rule never firing on the trip it exists for.
   const profileSuggestion = useMemo(
-    () => suggestProfile(legs.map(l => ({ from: l.from, to: l.to, departLocal: l.departLocal }))),
+    () => suggestProfile(legs.map(l => ({
+      from: l.from,
+      to: l.to,
+      departLocal: expectedDeparture(l.timing, estimate(l.from, l.to).minutes) ?? undefined,
+    }))),
     [legs],
   );
 
