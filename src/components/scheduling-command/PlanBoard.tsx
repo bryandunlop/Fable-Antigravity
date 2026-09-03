@@ -57,7 +57,7 @@ export function PlanBoard({
   /** Marks on the block and the crew row under each tail (D110 slice 3), keyed by trip id. */
   marks?: Map<string, { labels: string[]; crewLabel: string | null; crewMissing: boolean; messages?: number }>;
   /** Submitted bookings with no aircraft — the Unassigned lane at the bottom of the board. */
-  unassigned?: Array<{ id: string; title: string; route: string; departureDate: string; durationDays: number }>;
+  unassigned?: Array<{ id: string; title: string; route: string; departureDate: string; durationDays: number; messages?: number }>;
   onOpenBooking?: (tripId: string) => void;
   onTripClick: (trip: BoardTrip) => void;
   /** Optional lens switch — the shelf's "full forward picture" link (D87). */
@@ -306,7 +306,7 @@ export function PlanBoard({
                                   </span>
                                 )}
                                 <div className="pl-3 pr-2 py-1.5 leading-tight">
-                                  <div className="flex items-center gap-1 text-[12px] font-semibold text-foreground whitespace-nowrap">
+                                  <div className={`flex items-center gap-1 text-[12px] font-semibold text-foreground whitespace-nowrap ${(m?.messages ?? 0) > 0 ? 'pr-10' : ''}`}>
                                     {conflicted && <AlertTriangle className="h-3 w-3 shrink-0 text-[var(--gfo-error,#EF3340)]" />}
                                     {trip.isInternational ? <Globe className="h-3 w-3 shrink-0 opacity-70" /> : <MapPin className="h-3 w-3 shrink-0 opacity-70" />}
                                     <span>{line1}</span>
@@ -404,7 +404,12 @@ export function PlanBoard({
                         className="absolute z-[5] overflow-hidden rounded-md border-2 border-dashed border-[var(--gfo-error,#EF3340)] bg-background px-2 py-1.5 text-left text-[11px] font-medium leading-tight text-[var(--gfo-error-ink,#C81E2B)] hover:bg-muted/40"
                         style={{ left: uLeft.get(u.id) ?? `${g.startPct}%`, width: zoom !== 'quarter' ? `max(${g.widthPct}%, ${CARD_MIN_W}px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (uH + BAR_GAP), height: uH }}
                       >
-                        {zoom !== 'quarter' && <><div className="text-[12px] font-semibold whitespace-nowrap">{u.route}</div><div className="whitespace-nowrap">{u.title}</div><div className="whitespace-nowrap">no tail · assign</div></>}
+                        {zoom !== 'quarter' && <><div className="text-[12px] font-semibold whitespace-nowrap pr-10">{u.route}</div><div className="whitespace-nowrap">{u.title}</div><div className="whitespace-nowrap">no tail · assign{(u.messages ?? 0) > 0 ? ` · ✉ ${u.messages}` : ''}</div></>}
+                        {(u.messages ?? 0) > 0 && (
+                          <span className="absolute right-1 top-1 inline-flex items-center gap-0.5 rounded-full bg-[var(--gfo-warning,#F1B434)] px-1.5 py-0.5 text-[10px] font-bold text-[#3b2a00]" title={`${u.messages} unanswered message${u.messages === 1 ? '' : 's'} from the EA`}>
+                            <MessageSquare className="h-2.5 w-2.5" /> {u.messages}
+                          </span>
+                        )}
                       </button>
                     );
                   })}

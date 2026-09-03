@@ -21,7 +21,7 @@ import { FilterBar } from './FilterBar';
 import { DockedTripDrawer } from './DockedTripDrawer';
 import { QueueView } from './QueueView';
 import { MessagesPanel } from './MessagesPanel';
-import { outstandingAcrossTrips } from '../trips/engine/adminMessages';
+import { outstandingAcrossTrips, outstandingAdminMessages } from '../trips/engine/adminMessages';
 import { recallLens, rememberLens, type HomeLens } from './lensMemory';
 import { loadTrips, saveTrips, TRIPS_CHANGED_EVENT } from '../trips/data/tripsStore';
 import { loadSettings } from '../trips/data/settingsStore';
@@ -226,7 +226,7 @@ export default function SchedulingCommandCenter({
     const span = tripSpan(t);
     const first = t.legs.map(l => legClock(l)?.depUtc).find((d): d is string => !!d);
     const days = span.start && span.end ? Math.max(1, Math.round((Date.parse(span.end) - Date.parse(span.start)) / 86_400_000) + 1) : 1;
-    return { id: t.id, title: t.title, route: routeLabel(t), departureDate: first ?? (span.start ? `${span.start}T12:00:00.000Z` : nowUtc()), durationDays: days };
+    return { id: t.id, title: t.title, route: routeLabel(t), departureDate: first ?? (span.start ? `${span.start}T12:00:00.000Z` : nowUtc()), durationDays: days, messages: outstandingAdminMessages(t).length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }).filter(u => tailFilter.size === 0), [bookings, tailFilter]);
 
