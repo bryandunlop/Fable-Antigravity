@@ -287,7 +287,7 @@ export function PlanBoard({
                       <HoverCard key={trip.id} openDelay={150} closeDelay={50}>
                         {/* A nudged card carries a tick at its true departure, so the eye can trace it back to the day. */}
                         {nudgedPx > 2 && (
-                          <span aria-hidden className="absolute z-[6] bg-foreground/50" style={{ left: trueLeft, width: 2, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }} />
+                          <span aria-hidden title="True departure — the card was moved right to fit its label" className="absolute z-[6] bg-foreground/20" style={{ left: trueLeft, width: 1, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }} />
                         )}
                         <HoverCardTrigger asChild>
                           <button

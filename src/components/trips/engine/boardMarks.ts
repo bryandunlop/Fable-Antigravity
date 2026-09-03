@@ -6,6 +6,7 @@
 import { blockingGates, documentGates, type DocumentPolicy } from './documentGates';
 import type { Person } from './people';
 import { pendingChanges, type Trip, type TripCrew } from './trip';
+import { outstandingAdminMessages } from './adminMessages';
 
 export interface BoardMarks {
   /** Unresolved document gates on people aboard. */
@@ -15,6 +16,8 @@ export interface BoardMarks {
   /** Assigned aircraft, nobody flying it yet. */
   crewMissing: boolean;
   crew: TripCrew | null;
+  /** Unanswered messages from the EA (LG-398). */
+  messages: number;
 }
 
 const isLive = (t: Trip) => t.status === 'submitted' || t.status === 'confirmed';
@@ -24,7 +27,7 @@ export function boardMarksFor(trips: Trip[], people: Person[], policy: DocumentP
   for (const t of trips) {
     if (!isLive(t)) continue;
     const gates = blockingGates(t, documentGates(t, people, policy, nowUtc)).length;
-    out.set(t.id, { gates, changes: pendingChanges(t).length, crewMissing: !!t.tail && !t.crew, crew: t.crew });
+    out.set(t.id, { gates, changes: pendingChanges(t).length, crewMissing: !!t.tail && !t.crew, crew: t.crew, messages: outstandingAdminMessages(t).length });
   }
   return out;
 }
@@ -35,6 +38,7 @@ export function markLabels(m: BoardMarks | undefined): string[] {
   const out: string[] = [];
   if (m.gates > 0) out.push(m.gates === 1 ? '✕ gate' : `✕ ${m.gates} gates`);
   if (m.changes > 0) out.push(m.changes === 1 ? '△ change' : `△ ${m.changes} changes`);
+  if (m.messages > 0) out.push(m.messages === 1 ? '✉ message' : `✉ ${m.messages} messages`);
   return out;
 }
 

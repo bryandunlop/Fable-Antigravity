@@ -20,6 +20,7 @@ import type { Person } from './people';
 import { emailDraftOf } from './briefingEmail';
 import { latestSheet } from './tripSheet';
 import { pendingChanges, type Trip } from './trip';
+import { outstandingAdminMessages } from './adminMessages';
 
 export type WaitingOn = 'scheduling' | 'ea' | 'nobody';
 
@@ -46,6 +47,8 @@ export interface WorkspaceSummary {
   people: { named: number; seats: number; unnamed: number; gates: number };
   freeze: { dueUtc: string; blocked: boolean; frozen: boolean } | null;
   waitingOn: WaitingOn;
+  /** Messages from the EA that scheduling has not answered (LG-398). */
+  messages: number;
   /** When the wait started — the last thing that happened on the trip. */
   waitingSinceUtc: string | null;
   counts: WorkspaceCounts;
@@ -89,6 +92,7 @@ export function workspaceSummary(
   const questions = openQuestions(trip);
 
   const live = trip.status === 'submitted' || trip.status === 'confirmed';
+  const messages = live ? outstandingAdminMessages(trip).length : 0;
   const draftEmail = emailDraftOf(trip);
   const emailWaiting = live && !!draftEmail && !draftEmail.sentAtUtc;
 
@@ -101,7 +105,8 @@ export function workspaceSummary(
       // crew is a decision scheduling owes. Without it a tailed, crewless trip read as "Waiting on
       // nobody · Aircraft on, crew set, everyone named" on a row that simultaneously said "No crew
       // set" (fresh review, 2026-09-02).
-      : !trip.tail || !trip.crew || changes > 0 || unresolvedGates.length > 0 || emailWaiting ? 'scheduling'
+      // An unanswered message from the EA is scheduling's to answer (LG-398).
+      : !trip.tail || !trip.crew || changes > 0 || unresolvedGates.length > 0 || emailWaiting || messages > 0 ? 'scheduling'
         : questions > 0 || unnamed > 0 ? 'ea'
           : 'nobody';
 
@@ -112,6 +117,7 @@ export function workspaceSummary(
     people: { named, seats: trip.seatsHeld, unnamed, gates: unresolvedGates.length },
     freeze,
     waitingOn,
+    messages,
     waitingSinceUtc: lastEvent?.at ?? null,
     counts: {
       // Only things a person has to DECIDE get a count. A leg without a date is a blocker the
@@ -119,7 +125,7 @@ export function workspaceSummary(
       itinerary: changes,
       people: live ? unnamed : 0,
       checklist: 0,
-      record: questions,
+      record: questions + messages,
       documents: unresolvedGates.length,
       sheet: emailWaiting ? 1 : 0,
       // A confirmed aircraft with nobody flying it is a decision scheduling owes, and it was the one
