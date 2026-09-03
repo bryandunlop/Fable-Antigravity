@@ -36,3 +36,18 @@ export const CARD_TONE_CLASS: Record<CardTone, string> = {
   blue: 'bg-[var(--gfo-daylight,#0096FC)]/10 text-[var(--gfo-midnight,#142D7E)] dark:text-[var(--gfo-daylight-light,#7FCCFE)]',
   grey: 'bg-muted text-muted-foreground',
 };
+
+/**
+ * Where the trip goes, for line 1: the first stop that is not home. 'KBED → KLUK' is KBED, not
+ * home; 'KLUK → KLGA → KBOS → KLUK' is KLGA (fresh review, 2026-09-03). Falls back to the last stop.
+ */
+export function fieldOf(route: string, home: string | undefined): string {
+  const stops = route.split(' → ').map(s => s.trim()).filter(Boolean);
+  if (stops.length === 0) return route;
+  return stops.find(s => s !== home) ?? stops[stops.length - 1];
+}
+
+/** How many days a card really occupies on screen: its time span, or the label floor, whichever is wider. */
+export function renderedDays(durationDays: number, colWidthPx: number, floorPx: number): number {
+  return Math.max(durationDays, floorPx / colWidthPx);
+}
