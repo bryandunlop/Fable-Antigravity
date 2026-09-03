@@ -1,7 +1,7 @@
 // The trip workspace (D105, direction C): itinerary · record · documents, one page per trip.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Mail, Paperclip, Search, Send, Snowflake } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
@@ -70,6 +70,10 @@ export default function TripWorkspace({ tripId: tripIdProp, docked = false, init
 } = {}) {
   const params = useParams();
   const id = tripIdProp ?? params.id;
+  // A message row links straight at the conversation (`?tab=record`, D111). An unknown or
+  // role-forbidden tab needs no guard here — `activeTab` below already falls back to the itinerary
+  // when the name is not in this viewer's `tabs`.
+  const [urlSearch] = useSearchParams();
   const navigate = useNavigate();
   const { trips, allTrips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor, setWatches, people, resolvePassengerIds } = useTripsModule();
   const trip = trips.find(t => t.id === id);
@@ -79,7 +83,7 @@ export default function TripWorkspace({ tripId: tripIdProp, docked = false, init
   const [moving, setMoving] = useState<{ kind: CutoffKind; date: string; reason: string } | null>(null);
   const [namesText, setNamesText] = useState<string | null>(null);
   // Option A (D109 slice 4): one tab at a time, with the strip above carrying what a tab would hide.
-  const [tab, setTab] = useState<WorkspaceTab>(initialTab ?? 'itinerary');
+  const [tab, setTab] = useState<WorkspaceTab>(initialTab ?? (urlSearch.get('tab') as WorkspaceTab | null) ?? 'itinerary');
   const [refusal, setRefusal] = useState<{ kind: 'decline' | 'bump'; category: DenialCategory; note: string } | null>(null);
   const schedTrips = useTrips();
   // D110 slice 2: the checklist hangs off the booking. Its items live in the scheduling store,

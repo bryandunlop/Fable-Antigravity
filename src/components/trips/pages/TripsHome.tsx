@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { MessageSquare, Plus, Search } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
 import { cn } from '../../ui/utils';
@@ -11,6 +11,7 @@ import { useTripsModule } from '../TripsContext';
 import { useMinuteTick } from '../useTripClock';
 import { routeLabel, searchEvents, submitBlockers, tripSpan, eventText, type Trip } from '../engine/trip';
 import { schedulingQueue, BAND_LABEL, BAND_NOTE, type QueueBand, type QueueRow } from '../engine/queue';
+import { eaQueue, EA_BAND_LABEL, EA_BAND_NOTE, type EaBand, type EaQueueRow } from '../engine/eaQueue';
 
 const STATUS_LABEL: Record<Trip['status'], string> = { draft: 'Draft', submitted: 'Submitted', confirmed: 'Confirmed', declined: 'Declined', cancelled: 'Cancelled' };
 const STATUS_TONE: Record<Trip['status'], string> = {
@@ -27,6 +28,9 @@ function fmt(d: string | null): string {
 }
 
 const BAND_ORDER: QueueBand[] = ['you', 'ea', 'freezing', 'nobody'];
+// Her own band first, for the same reason the scheduler's is: the list is read top-down and the
+// thing she owes is the only thing on it that nobody else can move.
+const EA_BAND_ORDER: EaBand[] = ['you', 'scheduling', 'freezing', 'nobody'];
 
 export default function TripsHome() {
   const { trips, actor, people, settings, nowUtc } = useTripsModule();
@@ -49,6 +53,14 @@ export default function TripsHome() {
     [isSched, trips, people, settings, tick],
   );
 
+  // Hers runs on the same minute tick, and for the same reason: the ages and the freeze window are
+  // a read-out of time, so a page left open all afternoon must not still be showing nine o'clock.
+  const eaBands = useMemo(
+    () => (isSched ? null : eaQueue(trips, people, settings, nowUtc())),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isSched, trips, people, settings, tick],
+  );
+
   const groups: Array<{ title: string; rows: Trip[] }> = isSched
     ? [
         // Drafts are not in the queue — nobody can act on a trip that has not been submitted — so
@@ -56,9 +68,10 @@ export default function TripsHome() {
         { title: 'Drafts shared with you', rows: trips.filter(t => t.status === 'draft') },
       ]
     : [
+        // Submitted and confirmed trips are in the bands above — a status list cannot say which one
+        // needs her, which is the only question she opens this page with. Drafts stay a list
+        // because nothing is owed either way until she submits.
         { title: 'Drafts', rows: trips.filter(t => t.status === 'draft') },
-        { title: 'Submitted', rows: trips.filter(t => t.status === 'submitted') },
-        { title: 'Confirmed', rows: trips.filter(t => t.status === 'confirmed') },
       ];
 
   return (
@@ -95,6 +108,20 @@ export default function TripsHome() {
           </ul>
         </GfoPanel>
       )}
+
+      {eaBands && EA_BAND_ORDER.map(band => {
+        const rows = eaBands[band];
+        if (rows.length === 0 && band !== 'you') return null;
+        return (
+          <GfoPanel key={band} title={`${EA_BAND_LABEL[band]}${rows.length ? ` · ${rows.length}` : ''}`}>
+            {rows.length === 0 && <p className="text-sm text-muted-foreground">Nothing. {EA_BAND_NOTE[band]}</p>}
+            {rows.length > 0 && <p className="mb-3 text-xs text-muted-foreground">{EA_BAND_NOTE[band]}</p>}
+            <ul className="divide-y divide-border">
+              {rows.map(r => <EaQueueRowItem key={r.trip.id} row={r} />)}
+            </ul>
+          </GfoPanel>
+        );
+      })}
 
       {queue && BAND_ORDER.map(band => {
         const rows = queue[band];
@@ -160,6 +187,47 @@ function QueueRowItem({ row }: { row: QueueRow }) {
             <span className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
               {row.reasons.map(reason => (
                 <span key={reason} className={cn('text-xs', /gate|unnamed|unanswered|Freezes/.test(reason) ? 'text-amber-800 dark:text-amber-400' : 'text-muted-foreground')}>
+                  {reason}
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+        <span className="shrink-0 text-right">
+          {row.trip.tail && <span className="block text-xs font-medium">{row.trip.tail}</span>}
+          <span className="block text-xs text-muted-foreground">{age}</span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+/** One trip in the EA's queue. Same shape as the scheduler's row, plus the message mark — hers is
+ *  the only queue where "somebody said something" is a reason to look. */
+function EaQueueRowItem({ row }: { row: EaQueueRow }) {
+  const span = tripSpan(row.trip);
+  const days = Math.floor(row.ageHours / 24);
+  const age = row.ageHours < 1 ? 'just now' : days >= 1 ? `${days} day${days === 1 ? '' : 's'}` : `${Math.floor(row.ageHours)} h`;
+  return (
+    <li>
+      <Link to={`/trips/${row.trip.id}${row.news > 0 ? '?tab=record' : ''}`} className="flex items-start gap-4 py-2.5 hover:bg-muted/40">
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium text-primary">{row.trip.title}</span>
+            {row.news > 0 && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-400">
+                <MessageSquare className="h-3 w-3" aria-hidden="true" />{row.news}
+              </span>
+            )}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {routeLabel(row.trip)} · {row.trip.leadPassengerName} + {Math.max(0, row.trip.seatsHeld - 1)} · {fmt(span.start)}
+            {span.end && span.end !== span.start ? ` – ${fmt(span.end)}` : ''}
+          </span>
+          {row.reasons.length > 0 && (
+            <span className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+              {row.reasons.map(reason => (
+                <span key={reason} className={cn('text-xs', /asked|unnamed|unresolved|Freezes/.test(reason) ? 'text-amber-800 dark:text-amber-400' : 'text-muted-foreground')}>
                   {reason}
                 </span>
               ))}

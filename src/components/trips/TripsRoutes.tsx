@@ -8,6 +8,7 @@ import TripSheetPage from './pages/TripSheetPage';
 import EmailPage from './pages/EmailPage';
 import TripSettingsPage from './pages/TripSettingsPage';
 import WatchesPage from './pages/WatchesPage';
+import MessagesLogPage from './pages/MessagesLogPage';
 import MetricsPage from './pages/MetricsPage';
 import PeoplePage from './pages/PeoplePage';
 import PersonPage from './pages/PersonPage';
@@ -21,6 +22,7 @@ export default function TripsRoutes({ userRole, additionalRoles = [] }: { userRo
         <Route path="places" element={<PlacesAdmin />} />
         <Route path="settings" element={<TripSettingsPage />} />
         <Route path="watches" element={<WatchesPage />} />
+        <Route path="messages" element={<MessagesLogPage />} />
         <Route path="metrics" element={<MetricsPage />} />
         <Route path="people" element={<PeoplePage />} />
         <Route path="people/:id" element={<PersonPage />} />

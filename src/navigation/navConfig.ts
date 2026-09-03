@@ -17,7 +17,7 @@ import {
   MapPin, MapPinCheck, Monitor, Package, PackagePlus, Plane, PlaneTakeoff, Route,
   Send, Settings, Shield, ShieldCheck, Sliders, Sparkles, Target, Timer, Upload,
   BadgeCheck, BookUser, PlaneLanding, Radar, SearchCheck, Stamp,
-  Mail, MessageSquarePlus, Repeat, Ticket, UserCheck, Users, Utensils, Warehouse, Wrench,
+  Mail, MessageSquare, MessageSquarePlus, Repeat, Ticket, UserCheck, Users, Utensils, Warehouse, Wrench,
 } from 'lucide-react';
 
 export type Domain =
@@ -109,6 +109,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/trips', label: 'Trips', domain: 'scheduling', icon: Briefcase, primary: true, keywords: ['trip', 'request', 'workspace', 'record', 'documents', 'draft', 'places'], roles: ['admin-assistant', 'scheduling', 'lead'] },
   { path: '/people', label: 'People', domain: 'scheduling', icon: Users, keywords: ['passenger', 'passengers', 'principal', 'guest', 'documents', 'passport', 'visa', 'forms', 'briefing'], roles: ['admin-assistant', 'scheduling', 'lead'] },
   { path: '/trips/watches', label: 'Watches', domain: 'scheduling', icon: Radar, keywords: ['watchlist', 'waitlist', 'cabin', 'frees up'], roles: ['admin-assistant', 'scheduling'] },
+  // D111 — the EA's message log. Scheduling reads its unanswered-message panel on the scheduling
+  // home; she has no home to hang one on, so hers is a door of its own.
+  { path: '/trips/messages', label: 'Messages', domain: 'scheduling', icon: MessageSquare, keywords: ['message', 'messages', 'chat', 'thread', 'conversation', 'asked', 'question', 'scheduling'], roles: ['admin-assistant'] },
   // D110 slice 4: metrics, settings and places sit behind the gear on the scheduling home, not in the rail.
   { path: '/trips/metrics', label: 'Trip metrics', domain: 'scheduling', icon: BarChart3, sidebar: false, keywords: ['bump rate', 'denied', 'accepted', 'cancelled'], roles: ['scheduling', 'lead'] },
   { path: '/trips/settings', label: 'Trip settings', domain: 'scheduling', icon: Sliders, sidebar: false, keywords: ['cutoffs', 'email', 'template', 'dead man', 'blurbs', 'passenger preferences'], roles: ['scheduling'] },
