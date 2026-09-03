@@ -217,8 +217,8 @@ export default function SchedulingCommandCenter({
 
   const boardMarks = useMemo(() => {
     const m = boardMarksFor(bookings.trips, bookings.people, bookings.settings.documentPolicy, nowUtc());
-    const out = new Map<string, { labels: string[]; crewLabel: string | null; crewMissing: boolean }>();
-    for (const [id, bm] of m) out.set(id, { labels: markLabels(bm), crewLabel: crewLabel(bm.crew), crewMissing: bm.crewMissing });
+    const out = new Map<string, { labels: string[]; crewLabel: string | null; crewMissing: boolean; messages: number }>();
+    for (const [id, bm] of m) out.set(id, { labels: markLabels(bm), crewLabel: crewLabel(bm.crew), crewMissing: bm.crewMissing, messages: bm.messages });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings]);
