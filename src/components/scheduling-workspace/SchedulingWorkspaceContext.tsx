@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { InMemorySchedulingStore, SchedulingService, seedTemplates, seedDemoTrips, seedVolumeTrips } from '../../scheduling/store';
+import { InMemorySchedulingStore, SchedulingService, seedTemplates } from '../../scheduling/store';
+import { syncBookingsIntoStore } from '../../scheduling/bridge/projectBookings';
+import { loadTrips, TRIPS_CHANGED_EVENT } from '../trips/data/tripsStore';
 import { defaultPilotVisibleDefs } from '../../scheduling/engine';
 import { seedMyairopsBookingTrips } from '../../integration/myairops/seedMyairops';
 
@@ -39,20 +41,26 @@ function ensureSeeded(): Promise<void> {
       for (const id of defaultPilotVisibleDefs(await store.listPublishedTemplates())) {
         await store.setPilotVisible(id, true);
       }
-      // Demo trips so every role lands on a populated Trips tab + ForeFlight push list.
-      // Stable trip ids make this idempotent across StrictMode remounts. Remove this
-      // one call for a clean/empty workspace.
-      await seedDemoTrips(service, new Date().toISOString());
-      // Month-scale deterministic volume (real checklists, proximity-worked) so the
-      // command-center plan/run boards demonstrate dozens-of-trips scale.
-      await seedVolumeTrips(service, new Date().toISOString());
       // Booking-API fixture trips through the real myairops adapter — the exact
       // path a Phase-2 pull takes. These carry the serviceability-alert and
       // passenger-currency demo scenarios (MAO-7301/7305/7310).
       await seedMyairopsBookingTrips(service, new Date().toISOString());
+      // D110 slice 1: the booking is the only trip. The command-center fixtures
+      // (seedDemoTrips / seedVolumeTrips) are gone; every record the boards show is a
+      // projection of a booking in the trips module, kept in step by resyncBookings().
+      await resyncBookings();
     })();
   }
   return seedPromise;
+}
+
+/**
+ * Project every scheduling-visible booking into the store (idempotent). Runs at seed time and
+ * whenever the trips module writes (TRIPS_CHANGED_EVENT / a storage event from another tab).
+ */
+export async function resyncBookings(): Promise<void> {
+  const bookings = loadTrips().filter(t => t.visibleToScheduling);
+  await syncBookingsIntoStore(bookings, service, store, new Date().toISOString());
 }
 
 export function SchedulingWorkspaceProvider({ children }: { children: ReactNode }) {
@@ -65,6 +73,21 @@ export function SchedulingWorkspaceProvider({ children }: { children: ReactNode 
     ensureSeeded().then(() => { if (!cancelled) setReady(true); });
     return () => { cancelled = true; };
   }, []);
+
+  // Keep the store in step with the bookings: same tab (the trips module writes) or another tab.
+  useEffect(() => {
+    let inFlight: Promise<void> | null = null;
+    const onChange = () => {
+      if (inFlight) return;
+      inFlight = ensureSeeded().then(resyncBookings).finally(() => { inFlight = null; bump(); });
+    };
+    window.addEventListener(TRIPS_CHANGED_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener(TRIPS_CHANGED_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, [bump]);
 
   const nowUtc = useCallback(() => new Date().toISOString(), []);
 

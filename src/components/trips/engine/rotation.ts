@@ -2,40 +2,20 @@
 //
 // Two jobs:
 //  1. `tripsAsRecords` — a confirmed trip with a tail must OCCUPY that tail in the availability
-//     engine, or the fleet schedule keeps showing it open. The engine reads TripRecords; this
-//     projects our records into that shape (planning departure times, estimated arrivals).
+//     engine, or the fleet schedule keeps showing it open. The projection itself is
+//     engine/projection.ts (D110 slice 1: faithful leg ids, derived trip type); re-exported here.
 //  2. `rotationFor` — for scheduling: everything one tail does across a window, all trips, with
 //     the empty legs between them, so a one-way out and a different one-way back read as one
 //     aircraft day with a ferry in the middle.
 // Pure.
 
-import type { TripRecord, TripLegRecord } from '../../../scheduling/store/types';
-import { legClock, icaoOf } from './legClock';
+import type { TripRecord } from '../../../scheduling/store/types';
 import { aircraftFor } from '../../../fleet/registry';
-import type { Trip } from './trip';
+import { tripToRecord, tripsToRecords } from './projection';
 
-export function tripAsRecord(trip: Trip): TripRecord | null {
-  if (!trip.tail || (trip.status !== 'confirmed' && trip.status !== 'submitted')) return null;
-  const legs: TripLegRecord[] = [];
-  trip.legs.forEach((l, i) => {
-    const dep = icaoOf(l.from.airport), arr = icaoOf(l.to.airport);
-    const clock = legClock(l);
-    if (!clock || !dep || !arr) return;
-    legs.push({ id: `${trip.id}-l${i}`, sequence: i + 1, departureIcao: dep, arrivalIcao: arr, departureTimeUtc: clock.depUtc, arrivalTimeUtc: clock.arrUtc, paxCount: l.positioning ? 0 : trip.passengerNames.length });
-  });
-  if (legs.length === 0) return null;
-  const dates = trip.legs.map(l => l.date).filter((d): d is string => !!d).sort();
-  return {
-    id: trip.id, tripNumber: trip.title, sourceSystem: 'manual', sourceTripRef: null,
-    tail: trip.tail, aircraftType: aircraftFor(trip.tail)?.type ?? 'G500', tripType: 'domestic', priority: 'standard',
-    // A submitted trip with a tail is not yet confirmed, but the tail is spoken for.
-    status: 'confirmed',
-    startDate: `${dates[0]}T00:00:00.000Z`, endDate: `${dates[dates.length - 1]}T23:59:59.000Z`,
-    legs, createdBy: trip.createdBy.name, createdAtUtc: trip.createdAt,
-  };
-}
-
-export const tripsAsRecords = (trips: Trip[]): TripRecord[] => trips.map(tripAsRecord).filter((r): r is TripRecord => !!r);
+/** The booking projected into the store's shape; the faithful version lives in engine/projection.ts (D110). */
+export const tripAsRecord = tripToRecord;
+export const tripsAsRecords = tripsToRecords;
 
 export interface RotationLeg {
   kind: 'passenger' | 'positioning' | 'ferry' | 'return';
