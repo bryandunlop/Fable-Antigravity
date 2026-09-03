@@ -9,7 +9,7 @@ import type { MaintenanceDowntimeBlock } from '../../availability/types';
 import { effectiveWindow } from '../../availability/engine/downtime';
 import { fleetRowsFor } from './fleet';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
-import { cardTone, cardProblemLine, fieldOf, renderedDays, CARD_TONE_CLASS } from './boardCard';
+import { cardTone, cardProblemLine, fieldOf, CARD_TONE_CLASS } from './boardCard';
 import { aircraftFor } from '../../fleet/registry';
 import { TripIdentityLine } from './TripIdentity';
 import { buildWindow, dayColumns, barGeometry, packLanes, type ZoomPreset } from './planBoardMath';
@@ -72,12 +72,17 @@ export function PlanBoard({
 
   const rows = useMemo(() => fleetRowsFor(trips).map(ac => {
     const tailTrips = trips.filter(t => t.aircraft === ac.tail);
+    // A bar runs from departure to the LAST ARRIVAL, in real hours — never rounded up to whole
+    // days. Rounding made a 21:00 departure occupy the next morning and flagged a maintenance
+    // window it never touched as a conflict (Bryan, 2026-09-03: a tail is never double-booked).
+    const MIN_SPAN = 2 * 3_600_000;
     const bars = tailTrips
       .map(t => {
         const startMs = new Date(t.departureDate).getTime();
-        return { trip: t, startMs, endMs: startMs + t.durationDays * DAY_MS };
+        const endMs = Math.max(new Date(t.arrivalDate ?? t.departureDate).getTime(), startMs + MIN_SPAN);
+        return { trip: t, startMs, endMs, spanDays: (endMs - startMs) / DAY_MS };
       })
-      .filter(b => barGeometry(b.startMs, b.trip.durationDays, window_) !== null);
+      .filter(b => barGeometry(b.startMs, b.spanDays, window_) !== null);
 
     const downtimeBars = downtime
       .filter(b => b.tail === ac.tail)
@@ -92,17 +97,39 @@ export function PlanBoard({
 
     // One packing over BOTH kinds: a trip overlapping a maintenance window lands in the same
     // conflictIds set the board already renders, with no new conflict logic.
-    // Pack by what is DRAWN, not only by time: a card has a label floor, so two short trips two
-    // days apart would otherwise share a lane and overlap on screen (fresh review, 2026-09-03).
-    const drawnEnd = (startMs: number, durationDays: number) => startMs + (zoom !== 'quarter' ? renderedDays(durationDays, colW, CARD_MIN_W) : durationDays) * DAY_MS;
+    // Lanes pack by TIME only: a second lane means a real double booking, and a tail is never
+    // double-booked (Bryan, 2026-09-03). The label floor is handled below by nudging a card to the
+    // right of the one before it, never by stacking — a nudged card is not a conflict.
     const lanes = packLanes([
-      ...bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: drawnEnd(b.startMs, b.trip.durationDays) })),
+      ...bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })),
       ...downtimeBars.map(b => ({ id: b.block.id, startMs: b.startMs, endMs: b.endMs })),
     ]);
-    return { ac, bars, downtimeBars, lanes };
-  }), [trips, downtime, window_, zoom, colW]);
+    // Two different things: a trip on top of another trip (a double booking — never, per Bryan)
+    // and a trip inside a maintenance window (an alert, drawn as the hatch). Count them apart.
+    const tripOnly = packLanes(bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })));
+    const doubleBooked = tripOnly.conflictIds.size;
+    const inMaintenance = bars.filter(b => lanes.conflictIds.has(b.trip.id) && !tripOnly.conflictIds.has(b.trip.id)).length;
+    // Drawn positions: time position in px, then each card sits at least 4px right of the previous
+    // card in its lane, so the label floor never puts one card over another.
+    const drawnLeft = new Map<string, number>();
+    const byLane = new Map<number, typeof bars>();
+    for (const b of bars) { const l = lanes.laneOf.get(b.trip.id) ?? 0; (byLane.get(l) ?? byLane.set(l, []).get(l)!).push(b); }
+    for (const [, list] of byLane) {
+      let prevRight = -Infinity;
+      for (const b of [...list].sort((x, y) => x.startMs - y.startMs)) {
+        const g = barGeometry(b.startMs, b.spanDays, window_)!;
+        const timeLeft = (g.startPct / 100) * boardW;
+        const widthPx = zoom !== 'quarter' ? Math.max((g.widthPct / 100) * boardW, CARD_MIN_W) : Math.max((g.widthPct / 100) * boardW, 14);
+        const left = Math.max(timeLeft, prevRight + 4);
+        drawnLeft.set(b.trip.id, left);
+        prevRight = left + widthPx;
+      }
+    }
+    return { ac, bars, downtimeBars, lanes, drawnLeft, doubleBooked, inMaintenance };
+  }), [trips, downtime, window_, zoom, colW, boardW]);
 
-  const conflictCount = rows.reduce((n, r) => n + r.lanes.conflictIds.size, 0);
+  const doubleBookedCount = rows.reduce((n, r) => n + r.doubleBooked, 0);
+  const inMaintenanceCount = rows.reduce((n, r) => n + r.inMaintenance, 0);
 
   // The board's bridges to "what's coming" (D87): a per-tail next-due chip and, below the grid,
   // per-week summaries of trips departing beyond the visible window.
@@ -122,9 +149,14 @@ export function PlanBoard({
         <h2 className="text-base font-semibold flex items-center gap-2">
           Plan board
           <span className="text-sm font-normal text-muted-foreground">{monthLabel}</span>
-          {conflictCount > 0 && (
+          {doubleBookedCount > 0 && (
             <span className="status-badge status-error inline-flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> {conflictCount} conflicting trips
+              <AlertTriangle className="h-3 w-3" /> {doubleBookedCount} double-booked
+            </span>
+          )}
+          {inMaintenanceCount > 0 && (
+            <span className="status-badge status-warning inline-flex items-center gap-1" title="A trip booked inside a maintenance window — the serviceability alert, not a double booking">
+              <AlertTriangle className="h-3 w-3" /> {inMaintenanceCount} inside a maintenance window
             </span>
           )}
         </h2>
@@ -169,7 +201,7 @@ export function PlanBoard({
           </div>
 
           {/* Tail rows */}
-          {rows.map(({ ac, bars, downtimeBars, lanes }) => {
+          {rows.map(({ ac, bars, downtimeBars, lanes, drawnLeft }) => {
             // Cards (LG-396): line 1 where and who, line 2 crew, line 3 what is wrong — the crew row
             // folded into the card. The quarter zoom cannot fit words, so it keeps the thin bars.
             const cards = zoom !== 'quarter';
@@ -238,8 +270,8 @@ export function PlanBoard({
                   {/* Trip cards (LG-396, Bryan: B with A's stripe). The tint is the worst problem, the
                       4px stripe on the left edge is the derived status, and the words never truncate to
                       the bar's width: the card is as wide as its days, with a floor for the label. */}
-                  {bars.map(({ trip, startMs }) => {
-                    const g = barGeometry(startMs, trip.durationDays, window_)!;
+                  {bars.map(({ trip, startMs, spanDays }) => {
+                    const g = barGeometry(startMs, spanDays, window_)!;
                     const lane = lanes.laneOf.get(trip.id) ?? 0;
                     const status = deriveTripStatus(trip, nowMs);
                     const style = TRIP_STATUS_STYLES[status];
@@ -249,13 +281,19 @@ export function PlanBoard({
                     const tone = cardTone(facts);
                     const field = fieldOf(trip.route, aircraftFor(ac.tail)?.homeBase ?? 'KLUK');
                     const line1 = `${field}${trip.lead ? ` · ${trip.lead}` : ''}${trip.aboard ? ` · ${trip.aboard}` : ''}`;
+                    const trueLeft = (g.startPct / 100) * boardW;
+                    const nudgedPx = (drawnLeft.get(trip.id) ?? trueLeft) - trueLeft;
                     return (
                       <HoverCard key={trip.id} openDelay={150} closeDelay={50}>
+                        {/* A nudged card carries a tick at its true departure, so the eye can trace it back to the day. */}
+                        {nudgedPx > 2 && (
+                          <span aria-hidden className="absolute z-[6] bg-foreground/50" style={{ left: trueLeft, width: 2, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }} />
+                        )}
                         <HoverCardTrigger asChild>
                           <button
                             onClick={() => onTripClick(trip)}
                             className={`absolute z-[5] cursor-pointer overflow-hidden text-left transition-all hover:brightness-95 hover:shadow-sm ${cards ? `rounded-md ${CARD_TONE_CLASS[tone]}` : `rounded-md px-2 flex items-center gap-1.5 text-[11px] font-medium ${style.bar}`} ${conflicted ? 'ring-2 ring-[var(--gfo-error,#EF3340)] ring-offset-1' : ''} ${g.clippedStart ? 'rounded-l-none' : ''} ${g.clippedEnd ? 'rounded-r-none' : ''}`}
-                            style={{ left: `${g.startPct}%`, width: cards ? `max(${g.widthPct}%, ${CARD_MIN_W}px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }}
+                            style={{ left: drawnLeft.get(trip.id) ?? `${g.startPct}%`, width: cards ? `max(${g.widthPct}%, ${CARD_MIN_W}px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }}
                           >
                             {cards ? (
                               <>
@@ -333,7 +371,9 @@ export function PlanBoard({
             const items = unassigned
               .map(u => ({ u, startMs: new Date(u.departureDate).getTime(), g: barGeometry(new Date(u.departureDate).getTime(), u.durationDays, window_) }))
               .filter((x): x is typeof x & { g: NonNullable<typeof x.g> } => x.g !== null);
-            const lanes2 = packLanes(items.map(x => ({ id: x.u.id, startMs: x.startMs, endMs: x.startMs + (zoom !== 'quarter' ? renderedDays(x.u.durationDays, colW, CARD_MIN_W) : x.u.durationDays) * DAY_MS })));
+            const lanes2 = packLanes(items.map(x => ({ id: x.u.id, startMs: x.startMs, endMs: x.startMs + x.u.durationDays * DAY_MS })));
+            const uLeft = new Map<string, number>();
+            { let prevRight = -Infinity; for (const x of [...items].sort((a, b) => a.startMs - b.startMs)) { const w = zoom !== 'quarter' ? Math.max((x.g.widthPct / 100) * boardW, CARD_MIN_W) : 14; const left = Math.max((x.g.startPct / 100) * boardW, prevRight + 4); uLeft.set(x.u.id, left); prevRight = left + w; } }
             const laneCount = Math.max(1, lanes2.laneCount);
             const uH = zoom !== 'quarter' ? CARD_H : BAR_H;
             const rowH = ROW_PAD * 2 + laneCount * uH + (laneCount - 1) * BAR_GAP;
@@ -356,7 +396,7 @@ export function PlanBoard({
                         onClick={() => onOpenBooking?.(u.id)}
                         title={`${u.title} — submitted, no aircraft yet`}
                         className="absolute z-[5] overflow-hidden rounded-md border-2 border-dashed border-[var(--gfo-error,#EF3340)] bg-background px-2 py-1.5 text-left text-[11px] font-medium leading-tight text-[var(--gfo-error-ink,#C81E2B)] hover:bg-muted/40"
-                        style={{ left: `${g.startPct}%`, width: zoom !== 'quarter' ? `max(${g.widthPct}%, ${CARD_MIN_W}px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (uH + BAR_GAP), height: uH }}
+                        style={{ left: uLeft.get(u.id) ?? `${g.startPct}%`, width: zoom !== 'quarter' ? `max(${g.widthPct}%, ${CARD_MIN_W}px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (uH + BAR_GAP), height: uH }}
                       >
                         {zoom !== 'quarter' && <><div className="text-[12px] font-semibold whitespace-nowrap">{u.route}</div><div className="whitespace-nowrap">{u.title}</div><div className="whitespace-nowrap">no tail · assign</div></>}
                       </button>

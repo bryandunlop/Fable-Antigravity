@@ -29,6 +29,8 @@ export interface BoardTrip {
   aircraftType: string;
   route: string;
   departureDate: string; // earliest leg departure (fallback: startDate)
+  /** The last leg's arrival (fallback: endDate). The board packs and draws by this, not by whole days — a 21:00 departure does not occupy tomorrow. */
+  arrivalDate?: string;
   durationDays: number;
   readinessScore: number; // engine completion × 100
   criticalBlocker?: string; // blocked task title (+ note)
@@ -68,6 +70,19 @@ export function toBoardTask(x: TaskInstance): BoardTask {
   };
 }
 
+/** A leg with no arrival on file is still flying for a while — the myairops resolver's own grace (24 h), not zero. */
+const UNKNOWN_ARRIVAL_GRACE_MS = 24 * 3_600_000;
+
+/** When the aircraft is back on the ground for good: the latest arrival across the legs, else the record's end. */
+export function arrivalOf(trip: Pick<TripRecord, 'legs' | 'endDate'>): string {
+  let latest = 0;
+  for (const l of trip.legs) {
+    const t = l.arrivalTimeUtc ? Date.parse(l.arrivalTimeUtc) : Date.parse(l.departureTimeUtc) + UNKNOWN_ARRIVAL_GRACE_MS;
+    if (t > latest) latest = t;
+  }
+  return latest ? new Date(latest).toISOString() : trip.endDate;
+}
+
 export function boardTripOf(trip: TripRecord, instances: TaskInstance[]): BoardTrip {
   const readiness = deriveSchedulingReadiness(instances);
   const blocked = readiness.blocker ? instances.find(i => i.id === readiness.blocker) : undefined;
@@ -89,6 +104,7 @@ export function boardTripOf(trip: TripRecord, instances: TaskInstance[]): BoardT
     aboard: trip.legs.reduce((m, l) => Math.max(m, l.paxCount), 0),
     departureDate,
     durationDays,
+    arrivalDate: arrivalOf(trip),
     readinessScore: Math.round(readiness.completion * 100),
     criticalBlocker: blocked ? (blocked.notes ? `${blocked.title} — ${blocked.notes}` : blocked.title) : undefined,
     isInternational: trip.tripType === 'international',
