@@ -142,7 +142,7 @@ export function seedTrips(): Trip[] {
     ],
   });
   vineyard = submitItinerary(vineyard, EA, '2026-08-30T13:10:00.000Z');
-  vineyard = assignTail(vineyard, 'N1PG', SCHED, '2026-08-30T15:00:00.000Z', { free: true, reason: null });
+  vineyard = assignTail(vineyard, 'N2PG', SCHED, '2026-08-30T15:00:00.000Z', { free: true, reason: null });
   vineyard = setPassengers(vineyard, ['M. Osei', 'K. Tanaka', 'A. Reyes', 'S. Reyes', 'J. Lindqvist', 'P. Hartley', 'D. Whitfield'], EA, '2026-08-31T11:00:00.000Z');
 
   let dca = createDraft({
