@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDraft, newLeg, submitItinerary, assignTail, setCrew, setPassengers, setCatering, type Actor } from './trip';
 import { buildSheet } from './tripSheet';
 import { SEED_PLACES } from './places';
-import { DEFAULT_TEMPLATE, recipientsFor, renderEmail, draftEmail, sendEmail, autoSendIfDue, emailState, editDraftBlock } from './briefingEmail';
+import { DEFAULT_TEMPLATE, recipientsFor, renderEmail, draftEmail, sendEmail, autoSendIfDue, emailState, editDraftBlock, emailHero, dayTimeline, minusMinutes } from './briefingEmail';
 import { SEED_PEOPLE, personByName, upsertPerson, type Person } from './people';
 
 const EA: Actor = { name: 'Dana Whitfield', role: 'ea' };
@@ -57,9 +57,11 @@ describe('the email reads the frozen sheet', () => {
     const e = renderEmail(buildSheet(trip(), CTX, T, SCHED), 'S. Reyes', DEFAULT_TEMPLATE, WX);
     expect(e.subject).toBe('Your trip to Seattle, Wednesday, October 14');
     const ids = e.blocks.map(b => b.id);
-    expect(ids).toEqual(['when', 'weather', 'aboard', 'safety', 'crew', 'catering']);
+    expect(ids).toEqual(['when', 'weather', 'aboard', 'safety', 'crew', 'catering', 'updates']);
     expect(e.blocks.find(b => b.id === 'when')!.text).toContain('30 minutes before 09:20 EDT');
-    expect(e.blocks.find(b => b.id === 'weather')!.text).toContain('mostly cloudy, around 14°C');
+    // A Cincinnati passenger reads Fahrenheit; the service normalises to °C at its boundary and the
+    // email converts back at its own (14°C → 57°F). Found 2026-09-02 on the canvas (LG-373).
+    expect(e.blocks.find(b => b.id === 'weather')!.text).toContain('mostly cloudy, around 57°F');
     expect(e.blocks.find(b => b.id === 'crew')!.text).toContain('Captain Capt. John Smith — Twenty years on Gulfstreams.');
     expect(e.blocks.find(b => b.id === 'catering')!.text).toBe('Leg 1: Light breakfast, no shellfish.');
     expect(e.blocks.find(b => b.id === 'safety')!.source).toBe('template');
@@ -67,7 +69,7 @@ describe('the email reads the frozen sheet', () => {
   it('a disabled block is left out; no weather means no weather block, not an empty one', () => {
     const tpl = { ...DEFAULT_TEMPLATE, blocks: DEFAULT_TEMPLATE.blocks.map(b => (b.id === 'aboard' ? { ...b, enabled: false } : b)) };
     const e = renderEmail(buildSheet(trip(), CTX, T, SCHED), 'S. Reyes', tpl, {});
-    expect(e.blocks.map(b => b.id)).toEqual(['when', 'safety', 'crew', 'catering']);
+    expect(e.blocks.map(b => b.id)).toEqual(['when', 'safety', 'crew', 'catering', 'updates']);
   });
 });
 
@@ -96,5 +98,43 @@ describe('drafted at freeze, sent by scheduling, or by the dead-man switch', () 
     expect((t.emailDraft as { emails: { blocks: { id: string; text: string }[] }[] }).emails[0].blocks.find(b => b.id === 'safety')!.text).toBe('Watch the step at the cabin door.');
     const sent = sendEmail(t, SCHED, T);
     expect(editDraftBlock(sent, 'S. Reyes', 'safety', 'changed')).toBe(sent);
+  });
+});
+
+// The shape Bryan picked on 2026-09-02 (LG-373): the be-there time and place as the headline, then the
+// day as a timeline. Both are DERIVED from the frozen sheet at render, and frozen into the draft with
+// the blocks — so a later change to the trip cannot move a headline a passenger already read.
+describe('the headline and the day timeline', () => {
+  it('subtracts the 30-minute be-there margin from a wall time and keeps the zone', () => {
+    expect(minusMinutes('09:20 EDT', 30)).toBe('08:50 EDT');
+    expect(minusMinutes('00:10 PDT', 30)).toBe('23:40 PDT');
+    expect(minusMinutes(null, 30)).toBeNull();
+  });
+  it('headline: the first leg the recipient is on — be there 30 min before, at the departure field', () => {
+    const h = emailHero(buildSheet(trip(), CTX, T, SCHED), 'S. Reyes');
+    expect(h).toMatchObject({ date: 'Wednesday, October 14', beThere: '08:50 EDT', place: 'Cincinnati Municipal (Lunken)' });
+    expect(h!.strap).toContain('Wheels up 09:20 EDT');
+    expect(h!.strap).toContain('Seattle');
+  });
+  it('timeline: be-there, wheels-up and arrive for each leg the recipient is on, in order', () => {
+    const rows = dayTimeline(buildSheet(trip(), CTX, T, SCHED), 'S. Reyes');
+    expect(rows.map(r => r.kind)).toEqual(['be-there', 'depart', 'arrive', 'be-there', 'depart', 'arrive']);
+    expect(rows[0]).toMatchObject({ time: '08:50 EDT', date: '2026-10-14' });
+    expect(rows[1].label).toBe('Wheels up');
+    expect(rows[1].sub).toContain('Light breakfast, no shellfish');
+    expect(rows[2].label).toContain('Seattle');
+    expect(rows[3].date).toBe('2026-10-16');
+  });
+  it('a recipient who is only on the return leg gets a headline and timeline for that leg alone', () => {
+    const sheet = buildSheet(trip(), CTX, T, SCHED);
+    const only2 = { ...sheet, legs: sheet.legs.map((l, i) => (i === 0 ? { ...l, aboard: ['A. Reyes'] } : l)) };
+    expect(emailHero(only2, 'S. Reyes')!.date).toBe('Friday, October 16');
+    expect(dayTimeline(only2, 'S. Reyes')).toHaveLength(3);
+    expect(emailHero(only2, 'Nobody')).toBeNull();
+  });
+  it('the rendered email carries the headline and timeline alongside the blocks', () => {
+    const e = renderEmail(buildSheet(trip(), CTX, T, SCHED), 'S. Reyes', DEFAULT_TEMPLATE, WX);
+    expect(e.hero?.beThere).toBe('08:50 EDT');
+    expect(e.timeline).toHaveLength(6);
   });
 });

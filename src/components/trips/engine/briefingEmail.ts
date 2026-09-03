@@ -13,7 +13,7 @@
 // Pure.
 
 import type { ForecastPeriod } from '../../../services/nwsForecastService';
-import type { FrozenSheet } from './tripSheet';
+import type { FrozenSheet, SheetEnd } from './tripSheet';
 import type { Actor, Trip } from './trip';
 import { personById, personByName, type Person } from './people';
 
@@ -30,7 +30,7 @@ export interface PassengerPref {
   hasFlown: boolean;
 }
 
-export type BlockId = 'when' | 'weather' | 'aboard' | 'safety' | 'crew' | 'catering';
+export type BlockId = 'when' | 'weather' | 'aboard' | 'safety' | 'crew' | 'catering' | 'updates';
 
 export interface TemplateBlock {
   id: BlockId;
@@ -58,6 +58,9 @@ export const DEFAULT_TEMPLATE: EmailTemplate = {
     { id: 'safety', title: 'Safety', enabled: true, body: 'Please keep your seat belt fastened whenever you are seated. The crew will brief the exits and equipment before departure.', link: '' },
     { id: 'crew', title: 'Your crew', enabled: true, body: '' },
     { id: 'catering', title: 'Catering', enabled: true, body: '' },
+    // The promise behind the day-of delay update (LG-374). Words only: the update itself is a
+    // separate message, and whether it can be sent at all waits on Q29.
+    { id: 'updates', title: 'On the day, we watch the clock for you', enabled: true, body: 'If your departure moves by more than 15 minutes, you get a short message with the new time — automatically, before you leave for the airport. A person calls if anything bigger changes.' },
   ],
 };
 
@@ -67,6 +70,77 @@ export interface RenderedEmail {
   to: string;
   subject: string;
   blocks: RenderedBlock[];
+  /**
+   * The headline and the day as a timeline — the shape Bryan picked 2026-09-02 (LG-373). Derived
+   * from the frozen sheet at render and stored with the draft, so they are as frozen as the blocks.
+   * Optional: drafts made before this carry none and render blocks only.
+   */
+  hero?: EmailHero | null;
+  timeline?: TimelineRow[];
+}
+
+/** Minutes a passenger is asked to be at the aircraft before departure. */
+export const BE_THERE_MINUTES = 30;
+
+export interface EmailHero {
+  /** 'Wednesday, October 14' — the same `longDate` the subject line uses. */
+  date: string;
+  /** '08:50 EDT' — departure wall time minus the be-there margin; null when the field is unplaced. */
+  beThere: string | null;
+  /** The departure field as the sheet labels it, without the ICAO. */
+  place: string;
+  /** 'Wheels up 09:20 EDT · Seattle 12:35 PDT' */
+  strap: string;
+}
+
+export interface TimelineRow {
+  kind: 'be-there' | 'depart' | 'arrive';
+  date: string;
+  /** '08:50 EDT', or null when the field has no wall clock yet. */
+  time: string | null;
+  label: string;
+  sub: string | null;
+}
+
+/** '09:20 EDT' minus n minutes, wrapping at midnight, zone label kept. Null in, null out. */
+export function minusMinutes(wall: string | null, minutes: number): string | null {
+  if (!wall) return null;
+  const [hhmm, ...zone] = wall.split(' ');
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return wall;
+  const t = (((h * 60 + m - minutes) % 1440) + 1440) % 1440;
+  const out = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+  return zone.length ? `${out} ${zone.join(' ')}` : out;
+}
+
+const placeOf = (end: SheetEnd): string => end.label.split(' · ')[0] || end.place;
+const legsAboard = (sheet: FrozenSheet, to: string) => sheet.legs.filter(l => l.aboard.includes(to));
+
+
+/** The headline: the first leg this recipient is on. Null when they are on none. */
+export function emailHero(sheet: FrozenSheet, to: string): EmailHero | null {
+  const mine = legsAboard(sheet, to);
+  const first = mine[0];
+  if (!first) return null;
+  // The headline is about the first day: wheels up and where that leg lands. The timeline below
+  // carries the rest of the trip.
+  const strap = [
+    first.from.wall ? `Wheels up ${first.from.wall}` : 'Departure time to be confirmed',
+    first.to.wall ? `${first.to.place || placeOf(first.to)} ${first.to.wall}` : null,
+  ].filter(Boolean).join(' · ');
+  return { date: longDate(first.date + 'T00:00:00Z'), beThere: minusMinutes(first.from.wall, BE_THERE_MINUTES), place: placeOf(first.from), strap };
+}
+
+/** The day as rows: be there, wheels up, arrive — for each leg this recipient is on, in order. */
+export function dayTimeline(sheet: FrozenSheet, to: string): TimelineRow[] {
+  const rows: TimelineRow[] = [];
+  for (const l of legsAboard(sheet, to)) {
+    const flight = l.elapsedMinutes ? `About ${Math.floor(l.elapsedMinutes / 60)} h ${String(l.elapsedMinutes % 60).padStart(2, '0')} in the air` : null;
+    rows.push({ kind: 'be-there', date: l.date, time: minusMinutes(l.from.wall, BE_THERE_MINUTES), label: `At the aircraft, ${placeOf(l.from)}`, sub: l.planned ? 'Planning time until scheduling confirms it' : null });
+    rows.push({ kind: 'depart', date: l.date, time: l.from.wall, label: 'Wheels up', sub: [flight, l.catering].filter(Boolean).join(' · ') || null });
+    rows.push({ kind: 'arrive', date: l.date, time: l.to.wall, label: `Arrive ${l.to.place && l.to.place !== placeOf(l.to) ? `${l.to.place} — ${placeOf(l.to)}` : placeOf(l.to)}`, sub: l.dayShift ? 'The next local day' : null });
+  }
+  return rows;
 }
 
 export interface WeatherByIcao { [icao: string]: ForecastPeriod | undefined }
@@ -127,7 +201,8 @@ export function renderEmail(sheet: FrozenSheet, to: string, template: EmailTempl
       case 'when': {
         if (!first) break;
         const lines = sheet.legs.filter(l => l.aboard.includes(to)).map(l => {
-          const be = l.from.wall ? `Please be at ${l.from.label} 30 minutes before ${l.from.wall}.` : `Please be at ${l.from.label} 30 minutes before departure.`;
+          // The same margin the timeline uses — one constant, or the two halves of the email disagree.
+          const be = l.from.wall ? `Please be at ${l.from.label} ${BE_THERE_MINUTES} minutes before ${l.from.wall}.` : `Please be at ${l.from.label} ${BE_THERE_MINUTES} minutes before departure.`;
           const arr = l.to.wall ? ` You arrive ${l.to.label} at ${l.to.wall}${l.dayShift ? ' the next day' : ''}.` : '';
           return `Leg ${l.n}, ${longDate(l.date + 'T00:00:00Z')}: ${be}${arr}${l.planned ? ' Times are planning times until scheduling confirms them.' : ''}`;
         });
@@ -138,7 +213,9 @@ export function renderEmail(sheet: FrozenSheet, to: string, template: EmailTempl
         const parts = sheet.legs.map(l => {
           const w = l.to.icao ? weather[l.to.icao] : undefined;
           if (!w) return null;
-          const temp = w.tempC === null ? '' : `, around ${Math.round(w.tempC)}°C`;
+          // The service normalises NWS to °C at its boundary; a Cincinnati passenger reads °F, so convert
+          // back at this one (LG-373). Rounded after conversion, not before.
+          const temp = w.tempC === null ? '' : `, around ${Math.round(w.tempC * 9 / 5 + 32)}°F`;
           return `${l.to.place || l.to.label.split(' · ')[0]}: ${w.shortForecast.toLowerCase()}${temp}${w.precipProbability ? `, ${w.precipProbability}% chance of precipitation` : ''}.`;
         }).filter((x): x is string => !!x);
         if (parts.length) blocks.push({ id: b.id, title: b.title, text: parts.join(' '), source: 'auto' });
@@ -159,7 +236,7 @@ export function renderEmail(sheet: FrozenSheet, to: string, template: EmailTempl
         if (b.body.trim()) blocks.push({ id: b.id, title: b.title, text: b.body, link: b.link || undefined, source: 'template' });
     }
   }
-  return { to, subject, blocks };
+  return { to, subject, blocks, hero: emailHero(sheet, to), timeline: dayTimeline(sheet, to) };
 }
 
 export interface EmailDraft {
