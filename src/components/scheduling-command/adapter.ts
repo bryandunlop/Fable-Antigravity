@@ -70,11 +70,14 @@ export function toBoardTask(x: TaskInstance): BoardTask {
   };
 }
 
+/** A leg with no arrival on file is still flying for a while — the myairops resolver's own grace (24 h), not zero. */
+const UNKNOWN_ARRIVAL_GRACE_MS = 24 * 3_600_000;
+
 /** When the aircraft is back on the ground for good: the latest arrival across the legs, else the record's end. */
 export function arrivalOf(trip: Pick<TripRecord, 'legs' | 'endDate'>): string {
   let latest = 0;
   for (const l of trip.legs) {
-    const t = Date.parse(l.arrivalTimeUtc ?? l.departureTimeUtc);
+    const t = l.arrivalTimeUtc ? Date.parse(l.arrivalTimeUtc) : Date.parse(l.departureTimeUtc) + UNKNOWN_ARRIVAL_GRACE_MS;
     if (t > latest) latest = t;
   }
   return latest ? new Date(latest).toISOString() : trip.endDate;

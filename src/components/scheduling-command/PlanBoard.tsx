@@ -104,6 +104,11 @@ export function PlanBoard({
       ...bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })),
       ...downtimeBars.map(b => ({ id: b.block.id, startMs: b.startMs, endMs: b.endMs })),
     ]);
+    // Two different things: a trip on top of another trip (a double booking — never, per Bryan)
+    // and a trip inside a maintenance window (an alert, drawn as the hatch). Count them apart.
+    const tripOnly = packLanes(bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })));
+    const doubleBooked = tripOnly.conflictIds.size;
+    const inMaintenance = bars.filter(b => lanes.conflictIds.has(b.trip.id) && !tripOnly.conflictIds.has(b.trip.id)).length;
     // Drawn positions: time position in px, then each card sits at least 4px right of the previous
     // card in its lane, so the label floor never puts one card over another.
     const drawnLeft = new Map<string, number>();
@@ -120,10 +125,11 @@ export function PlanBoard({
         prevRight = left + widthPx;
       }
     }
-    return { ac, bars, downtimeBars, lanes, drawnLeft };
+    return { ac, bars, downtimeBars, lanes, drawnLeft, doubleBooked, inMaintenance };
   }), [trips, downtime, window_, zoom, colW, boardW]);
 
-  const conflictCount = rows.reduce((n, r) => n + r.lanes.conflictIds.size, 0);
+  const doubleBookedCount = rows.reduce((n, r) => n + r.doubleBooked, 0);
+  const inMaintenanceCount = rows.reduce((n, r) => n + r.inMaintenance, 0);
 
   // The board's bridges to "what's coming" (D87): a per-tail next-due chip and, below the grid,
   // per-week summaries of trips departing beyond the visible window.
@@ -143,9 +149,14 @@ export function PlanBoard({
         <h2 className="text-base font-semibold flex items-center gap-2">
           Plan board
           <span className="text-sm font-normal text-muted-foreground">{monthLabel}</span>
-          {conflictCount > 0 && (
+          {doubleBookedCount > 0 && (
             <span className="status-badge status-error inline-flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> {conflictCount} conflicting trips
+              <AlertTriangle className="h-3 w-3" /> {doubleBookedCount} double-booked
+            </span>
+          )}
+          {inMaintenanceCount > 0 && (
+            <span className="status-badge status-warning inline-flex items-center gap-1" title="A trip booked inside a maintenance window — the serviceability alert, not a double booking">
+              <AlertTriangle className="h-3 w-3" /> {inMaintenanceCount} inside a maintenance window
             </span>
           )}
         </h2>
@@ -270,8 +281,14 @@ export function PlanBoard({
                     const tone = cardTone(facts);
                     const field = fieldOf(trip.route, aircraftFor(ac.tail)?.homeBase ?? 'KLUK');
                     const line1 = `${field}${trip.lead ? ` · ${trip.lead}` : ''}${trip.aboard ? ` · ${trip.aboard}` : ''}`;
+                    const trueLeft = (g.startPct / 100) * boardW;
+                    const nudgedPx = (drawnLeft.get(trip.id) ?? trueLeft) - trueLeft;
                     return (
                       <HoverCard key={trip.id} openDelay={150} closeDelay={50}>
+                        {/* A nudged card carries a tick at its true departure, so the eye can trace it back to the day. */}
+                        {nudgedPx > 2 && (
+                          <span aria-hidden className="absolute z-[6] bg-foreground/50" style={{ left: trueLeft, width: 2, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }} />
+                        )}
                         <HoverCardTrigger asChild>
                           <button
                             onClick={() => onTripClick(trip)}

@@ -13,6 +13,8 @@ export interface TripStatusInput {
   criticalBlocker?: string;
   departureDate: string;
   durationDays: number;
+  /** The last arrival, when known — the airborne window ends here, not at a whole-day boundary. */
+  arrivalDate?: string;
 }
 
 export function deriveTripStatus(t: TripStatusInput, nowMs: number): TripDerivedStatus {
@@ -23,7 +25,8 @@ export function deriveTripStatus(t: TripStatusInput, nowMs: number): TripDerived
 
   if (t.readinessScore === 100) {
     // Airborne only from actual departure — a same-day trip still on the ground is 'ready'.
-    const inFlightWindow = nowMs >= depMs && nowMs < depMs + t.durationDays * DAY_MS;
+    const endMs = t.arrivalDate ? new Date(t.arrivalDate).getTime() : depMs + t.durationDays * DAY_MS;
+    const inFlightWindow = nowMs >= depMs && nowMs < endMs;
     return inFlightWindow ? 'airborne' : 'ready';
   }
 
