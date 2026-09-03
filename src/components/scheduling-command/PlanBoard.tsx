@@ -240,8 +240,9 @@ export function PlanBoard({
 
                   {/* Maintenance windows — their own strip ABOVE the trips, on top of everything, so a
                       trip card can never cover one (Bryan, 2026-09-03). A wrench, not a map pin. */}
-                  {downtimeBars.map(({ block, g }) => {
-                    const conflicted = bars.some(b => inMaintenanceIds.has(b.trip.id) && b.startMs < Date.parse(block.actualEndUtc ?? block.scheduledEndUtc) && Date.parse(block.scheduledStartUtc) < b.endMs);
+                  {downtimeBars.map(({ block, g, startMs: dStart, endMs: dEnd }) => {
+                    // The same window inMaintenanceIds used (effectiveWindow), so the two rings agree.
+                    const conflicted = bars.some(b => inMaintenanceIds.has(b.trip.id) && b.startMs < dEnd && dStart < b.endMs);
                     return (
                       <HoverCard key={block.id} openDelay={150} closeDelay={50}>
                         <HoverCardTrigger asChild>
