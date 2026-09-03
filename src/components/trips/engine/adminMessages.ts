@@ -51,14 +51,3 @@ export function outstandingAcrossTrips(trips: Trip[], nowUtc: string): Outstandi
   }
   return out.sort((a, b) => b.ageHours - a.ageHours);
 }
-
-/** Every live trip with news for the EA, most recent activity first — her dedicated space. */
-export function newsAcrossTrips(trips: Trip[], nowUtc: string): OutstandingMessage[] {
-  const now = Date.parse(nowUtc);
-  const out: OutstandingMessage[] = [];
-  for (const trip of trips) {
-    if (trip.status === 'cancelled' || trip.status === 'declined') continue;
-    for (const message of newsForEa(trip)) out.push({ trip, message, ageHours: Math.max(0, (now - Date.parse(message.at)) / 3_600_000) });
-  }
-  return out.sort((a, b) => a.ageHours - b.ageHours);
-}

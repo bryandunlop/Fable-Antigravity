@@ -20,7 +20,7 @@ import type { Person } from './people';
 import { emailDraftOf } from './briefingEmail';
 import { latestSheet } from './tripSheet';
 import { pendingChanges, type Trip } from './trip';
-import { outstandingAdminMessages } from './adminMessages';
+import { newsForEa, outstandingAdminMessages } from './adminMessages';
 
 export type WaitingOn = 'scheduling' | 'ea' | 'nobody';
 
@@ -59,14 +59,14 @@ export interface SummarySettings {
   documentPolicy: DocumentPolicy;
 }
 
-/** Questions scheduling asked that the EA has not answered. A question is answered by any later message. */
+/**
+ * Questions scheduling asked that the EA has not answered. A question is answered by anything she
+ * says next — which is `newsForEa`'s rule, so this reads it rather than keeping a second copy. Two
+ * loops with subtly different ideas of "she has spoken" is how a band and a reason line end up
+ * contradicting each other on the same row (fresh review, 2026-09-03).
+ */
 function openQuestions(trip: Trip): number {
-  let open = 0;
-  for (const e of trip.events) {
-    if (e.kind === 'question' && e.by.role === 'scheduling') open += 1;
-    else if (e.kind === 'message' && e.by.role === 'ea') open = 0;
-  }
-  return open;
+  return newsForEa(trip).filter(e => e.kind === 'question').length;
 }
 
 export function workspaceSummary(

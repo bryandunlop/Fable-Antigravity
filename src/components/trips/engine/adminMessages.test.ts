@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDraft, newLeg, submitItinerary, postMessage, askQuestion, type Actor } from './trip';
-import { outstandingAdminMessages, outstandingAcrossTrips, newsForEa, newsAcrossTrips } from './adminMessages';
+import { outstandingAdminMessages, outstandingAcrossTrips, newsForEa } from './adminMessages';
 
 const EA: Actor = { name: 'Dana', role: 'ea' };
 const SCHED: Actor = { name: 'R. Calloway', role: 'scheduling' };
@@ -65,11 +65,4 @@ describe('the mirror: what scheduling has said since the EA last spoke', () => {
     expect(newsForEa(t)).toEqual([]);
   });
 
-  it('the log lists every live trip, most recent activity first', () => {
-    const a = postMessage(trip('Boston'), SCHED, 'old', T(1));
-    const b = postMessage(trip('Seattle'), SCHED, 'new', T(5));
-    const out = newsAcrossTrips([a, b], T(6));
-    expect(out.map(o => o.trip.title)).toEqual(['Seattle', 'Boston']);
-    expect(out[0].ageHours).toBe(1);
-  });
 });
