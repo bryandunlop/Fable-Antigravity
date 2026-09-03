@@ -97,6 +97,11 @@ export default function SchedulingCommandCenter({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingsTick, tick]);
   const bookingIds = useMemo(() => new Set(bookings.trips.map(t => t.id)), [bookings]);
+  // One clock reading per data change, not per keystroke: the Queue lens memoises on it, and a
+  // fresh string every render would recompute the gates for every booking while someone types in
+  // the search box (fresh review, 2026-09-03).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const queueNow = useMemo(() => nowUtc(), [bookings, tick]);
   const [utility, setUtility] = useState<Utility | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [tailFilter, setTailFilter] = useState<Set<string>>(new Set());
@@ -351,7 +356,7 @@ export default function SchedulingCommandCenter({
         />
       )}
       {onLensSurface && lens === 'queue' && (
-        <QueueView trips={bookings.trips} people={bookings.people} settings={bookings.settings} nowUtc={nowUtc()} tailFilter={tailFilter} onOpenTrip={id => openTrip(id)} />
+        <QueueView trips={bookings.trips} people={bookings.people} settings={bookings.settings} nowUtc={queueNow} tailFilter={tailFilter} onOpenTrip={id => openTrip(id)} />
       )}
       {utility === 'availability' && (
         <AvailabilityBoard

@@ -165,7 +165,9 @@ export function PlanBoard({
           {/* Tail rows */}
           {rows.map(({ ac, bars, downtimeBars, lanes }) => {
             const hasCrewRow = !!marks && bars.length > 0;
-            const rowH = ROW_PAD * 2 + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP + (hasCrewRow ? CREW_H + BAR_GAP : 0);
+            // One crew row per lane: two conflicting trips on a tail get two crew chips, not one on
+            // top of the other (fresh review, 2026-09-03).
+            const rowH = ROW_PAD * 2 + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP + (hasCrewRow ? lanes.laneCount * (CREW_H + BAR_GAP) : 0);
             const svc = serviceability?.[ac.tail];
             return (
               <div key={ac.tail} className="flex border-b border-border/50">
@@ -286,7 +288,8 @@ export function PlanBoard({
                   {hasCrewRow && bars.map(({ trip, startMs }) => {
                     const g = barGeometry(startMs, trip.durationDays, window_)!;
                     const m = marks!.get(trip.id);
-                    const top = ROW_PAD + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP + BAR_GAP;
+                    const lane = lanes.laneOf.get(trip.id) ?? 0;
+                    const top = ROW_PAD + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP + BAR_GAP + lane * (CREW_H + BAR_GAP);
                     if (!m) return null;
                     return (
                       <div
