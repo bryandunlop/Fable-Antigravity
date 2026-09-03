@@ -5,7 +5,10 @@ import { SCHEDULING_DECIDES } from '../engine/places';
 
 export const TRIPS_KEY = 'trip-records-state';
 const VERSION_KEY = 'trip-records-version';
-const VERSION = '9';
+const VERSION = '10';
+
+/** Fired on every write so the scheduling store can re-project the bookings (D110 slice 1). */
+export const TRIPS_CHANGED_EVENT = 'trips-changed';
 
 export interface LeadOption { id: string; name: string }
 /** Principals the demo EA books for. Names match the booking portal's passenger fixtures. */
@@ -115,7 +118,45 @@ export function seedTrips(): Trip[] {
   london = setPassengers(london, ['A. Reyes', 'S. Reyes'], EA, '2026-08-30T11:00:00.000Z');
   london = postMessage(london, SCHED, 'N1PG held. Passports and forms before the 21-day cutoff please.', '2026-08-30T10:05:00.000Z');
 
-  return [seattle, board, meh, bos, out, back, pickup, london];
+  // Three bookings that used to be command-center fixtures (D110 slice 1: the booking is the only trip).
+  // Between them they exercise the per-airport checklist (KLGA ARO, KBOS PPR), the 7-pax special
+  // handling item and the DASSP checklist, now hanging off real bookings on the board.
+  let northeast = createDraft({
+    title: 'Northeast round — LGA and Boston', leadPassengerId: 'P-LINDQVIST', leadPassengerName: 'J. Lindqvist', seatsHeld: 4, by: EA, nowUtc: '2026-08-30T09:00:00.000Z',
+    legs: [
+      newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'New York', placeId: 'pl-nyc', airport: 'KLGA' }, date: daysFromNow(3), timing: { kind: 'depart', departLocal: '07:00', flexHours: 0 } }),
+      newLeg({ from: { placeName: 'New York', placeId: 'pl-nyc', airport: 'KLGA' }, to: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBOS' }, date: daysFromNow(3), timing: { kind: 'depart', departLocal: '12:00', flexHours: 0 } }),
+      newLeg({ from: { placeName: 'Boston', placeId: 'pl-bos', airport: 'KBOS' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(3), timing: { kind: 'depart', departLocal: '16:00', flexHours: 1 } }),
+    ],
+  });
+  northeast = submitItinerary(northeast, EA, '2026-08-30T09:10:00.000Z');
+  northeast = assignTail(northeast, 'N2PG', SCHED, '2026-08-30T11:00:00.000Z', { free: true, reason: null });
+  northeast = setPassengers(northeast, ['J. Lindqvist', 'K. Tanaka', 'M. Osei', 'A. Reyes'], EA, '2026-08-31T09:00:00.000Z');
+  northeast = setCrew(northeast, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: 'Lena Nguyen' }, SCHED, '2026-08-31T10:00:00.000Z');
+
+  let vineyard = createDraft({
+    title: "Martha's Vineyard — seven aboard", leadPassengerId: 'P-OSEI', leadPassengerName: 'M. Osei', seatsHeld: 7, by: EA, nowUtc: '2026-08-30T13:00:00.000Z',
+    legs: [
+      newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: "Martha's Vineyard", placeId: 'pl-mvy', airport: 'KMVY' }, date: daysFromNow(4), timing: { kind: 'depart', departLocal: '08:30', flexHours: 0 } }),
+      newLeg({ from: { placeName: "Martha's Vineyard", placeId: 'pl-mvy', airport: 'KMVY' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(4), timing: { kind: 'depart', departLocal: '17:30', flexHours: 1 } }),
+    ],
+  });
+  vineyard = submitItinerary(vineyard, EA, '2026-08-30T13:10:00.000Z');
+  vineyard = assignTail(vineyard, 'N1PG', SCHED, '2026-08-30T15:00:00.000Z', { free: true, reason: null });
+  vineyard = setPassengers(vineyard, ['M. Osei', 'K. Tanaka', 'A. Reyes', 'S. Reyes', 'J. Lindqvist', 'P. Hartley', 'D. Whitfield'], EA, '2026-08-31T11:00:00.000Z');
+
+  let dca = createDraft({
+    title: 'Washington — DCA day', leadPassengerId: 'P-OSEI', leadPassengerName: 'M. Osei', seatsHeld: 3, by: EA, nowUtc: '2026-08-31T08:00:00.000Z',
+    legs: [
+      newLeg({ from: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, to: { placeName: 'Washington', placeId: 'pl-dca', airport: 'KDCA' }, date: daysFromNow(6), timing: { kind: 'depart', departLocal: '07:45', flexHours: 0 } }),
+      newLeg({ from: { placeName: 'Washington', placeId: 'pl-dca', airport: 'KDCA' }, to: { placeName: 'Cincinnati', placeId: 'pl-cvg', airport: 'KLUK' }, date: daysFromNow(6), timing: { kind: 'depart', departLocal: '18:30', flexHours: 0 } }),
+    ],
+  });
+  dca = submitItinerary(dca, EA, '2026-08-31T08:10:00.000Z');
+  dca = assignTail(dca, 'N6PG', SCHED, '2026-08-31T09:00:00.000Z', { free: true, reason: null });
+  dca = setPassengers(dca, ['M. Osei', 'K. Tanaka', 'P. Hartley'], EA, '2026-08-31T12:00:00.000Z');
+
+  return [seattle, board, meh, bos, out, back, pickup, london, northeast, vineyard, dca];
 }
 
 /** Rows written before D106 lack the T-72 fields; read them as empty rather than crashing. */
@@ -147,4 +188,5 @@ export function saveTrips(trips: Trip[]): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(TRIPS_KEY, JSON.stringify(trips));
   localStorage.setItem(VERSION_KEY, VERSION);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(TRIPS_CHANGED_EVENT));
 }
