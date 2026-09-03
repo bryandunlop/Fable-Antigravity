@@ -9,6 +9,7 @@ import type { MaintenanceDowntimeBlock } from '../../availability/types';
 import { effectiveWindow } from '../../availability/engine/downtime';
 import { fleetRowsFor } from './fleet';
 import { deriveTripStatus, TRIP_STATUS_STYLES } from './tripStatus';
+import { cardTone, cardProblemLine, CARD_TONE_CLASS } from './boardCard';
 import { TripIdentityLine } from './TripIdentity';
 import { buildWindow, dayColumns, barGeometry, packLanes, type ZoomPreset } from './planBoardMath';
 import { nextDuePerTail, beyondWindowWeeks } from './boardBridges';
@@ -17,7 +18,7 @@ const DAY_MS = 86400000;
 const BAR_H = 30;
 const BAR_GAP = 6;
 const ROW_PAD = 10;
-const CREW_H = 18; // the crew row under each tail's bars (D110 slice 3)
+const CARD_H = 64; // a trip is a three-line card at 2w/month (LG-396); the quarter zoom keeps thin bars
 
 // Label density degrades with zoom: route + readiness at 2w, route at month, bare bar at quarter.
 const COL_W: Record<ZoomPreset, number> = { '2w': 88, month: 44, quarter: 18 };
@@ -164,10 +165,11 @@ export function PlanBoard({
 
           {/* Tail rows */}
           {rows.map(({ ac, bars, downtimeBars, lanes }) => {
-            const hasCrewRow = !!marks && bars.length > 0;
-            // One crew row per lane: two conflicting trips on a tail get two crew chips, not one on
-            // top of the other (fresh review, 2026-09-03).
-            const rowH = ROW_PAD * 2 + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP + (hasCrewRow ? lanes.laneCount * (CREW_H + BAR_GAP) : 0);
+            // Cards (LG-396): line 1 where and who, line 2 crew, line 3 what is wrong — the crew row
+            // folded into the card. The quarter zoom cannot fit words, so it keeps the thin bars.
+            const cards = zoom !== 'quarter';
+            const barH = cards ? CARD_H : BAR_H;
+            const rowH = ROW_PAD * 2 + lanes.laneCount * barH + (lanes.laneCount - 1) * BAR_GAP;
             const svc = serviceability?.[ac.tail];
             return (
               <div key={ac.tail} className="flex border-b border-border/50">
@@ -228,33 +230,44 @@ export function PlanBoard({
                     );
                   })}
 
-                  {/* Trip bars */}
+                  {/* Trip cards (LG-396, Bryan: B with A's stripe). The tint is the worst problem, the
+                      4px stripe on the left edge is the derived status, and the words never truncate to
+                      the bar's width: the card is as wide as its days, with a floor for the label. */}
                   {bars.map(({ trip, startMs }) => {
                     const g = barGeometry(startMs, trip.durationDays, window_)!;
                     const lane = lanes.laneOf.get(trip.id) ?? 0;
                     const status = deriveTripStatus(trip, nowMs);
                     const style = TRIP_STATUS_STYLES[status];
                     const conflicted = lanes.conflictIds.has(trip.id);
+                    const m = marks?.get(trip.id);
+                    const facts = { labels: m?.labels ?? [], crewMissing: !!m?.crewMissing, status, openTasks: trip.tasks.filter(t => t.status === 'open' || t.status === 'in_progress' || t.status === 'blocked').length };
+                    const tone = cardTone(facts);
+                    const field = trip.route.split(' → ').slice(1, 2)[0] ?? trip.route;
+                    const line1 = `${field}${trip.lead ? ` · ${trip.lead}` : ''}${trip.aboard ? ` · ${trip.aboard}` : ''}`;
                     return (
                       <HoverCard key={trip.id} openDelay={150} closeDelay={50}>
                         <HoverCardTrigger asChild>
                           <button
                             onClick={() => onTripClick(trip)}
-                            className={`absolute rounded-md px-2 overflow-hidden flex items-center gap-1.5 text-[11px] font-medium cursor-pointer transition-all hover:brightness-95 hover:shadow-sm z-[5] ${style.bar} ${conflicted ? 'ring-2 ring-[var(--gfo-error,#EF3340)] ring-offset-1' : ''} ${g.clippedStart ? 'rounded-l-none' : ''} ${g.clippedEnd ? 'rounded-r-none' : ''}`}
-                            style={{ left: `${g.startPct}%`, width: `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (BAR_H + BAR_GAP), height: BAR_H }}
+                            className={`absolute z-[5] cursor-pointer overflow-hidden text-left transition-all hover:brightness-95 hover:shadow-sm ${cards ? `rounded-md ${CARD_TONE_CLASS[tone]}` : `rounded-md px-2 flex items-center gap-1.5 text-[11px] font-medium ${style.bar}`} ${conflicted ? 'ring-2 ring-[var(--gfo-error,#EF3340)] ring-offset-1' : ''} ${g.clippedStart ? 'rounded-l-none' : ''} ${g.clippedEnd ? 'rounded-r-none' : ''}`}
+                            style={{ left: `${g.startPct}%`, width: cards ? `max(${g.widthPct}%, 150px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }}
                           >
-                            {conflicted && <AlertTriangle className="h-3 w-3 shrink-0" />}
-                            {zoom !== 'quarter' && (
+                            {cards ? (
                               <>
-                                {trip.isInternational ? <Globe className="h-2.5 w-2.5 shrink-0" /> : <MapPin className="h-2.5 w-2.5 shrink-0" />}
-                                <span className="truncate">
-                                  {trip.route}
-                                  {zoom === '2w' && status !== 'ready' && status !== 'airborne' ? ` · ${trip.readinessScore}%` : ''}
-                                </span>
-                                {marks?.get(trip.id)?.labels.map(l => (
-                                  <span key={l} className="shrink-0 rounded bg-background/70 px-1 text-[10px] font-semibold text-[var(--gfo-error-ink,#C81E2B)]">{l}</span>
-                                ))}
+                                {/* A's edge line: the derived status, 4px, on the left. */}
+                                <span className={`absolute left-0 top-0 bottom-0 w-1 ${style.dot}`} aria-hidden />
+                                <div className="pl-3 pr-2 py-1.5 leading-tight">
+                                  <div className="flex items-center gap-1 text-[12px] font-semibold text-foreground whitespace-nowrap">
+                                    {conflicted && <AlertTriangle className="h-3 w-3 shrink-0 text-[var(--gfo-error,#EF3340)]" />}
+                                    {trip.isInternational ? <Globe className="h-3 w-3 shrink-0 opacity-70" /> : <MapPin className="h-3 w-3 shrink-0 opacity-70" />}
+                                    <span>{line1}</span>
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground whitespace-nowrap">{m ? (m.crewMissing ? 'no crew' : m.crewLabel) : trip.client}</div>
+                                  <div className="text-[11px] font-medium whitespace-nowrap">{cardProblemLine(facts)}</div>
+                                </div>
                               </>
+                            ) : (
+                              <>{conflicted && <AlertTriangle className="h-3 w-3 shrink-0" />}</>
                             )}
                           </button>
                         </HoverCardTrigger>
@@ -283,25 +296,6 @@ export function PlanBoard({
                     );
                   })}
 
-                  {/* The crew row (D110 slice 3): under each bar, who is flying it — or a dashed
-                      gap, so an unassigned crew reads exactly like an unassigned tail. */}
-                  {hasCrewRow && bars.map(({ trip, startMs }) => {
-                    const g = barGeometry(startMs, trip.durationDays, window_)!;
-                    const m = marks!.get(trip.id);
-                    const lane = lanes.laneOf.get(trip.id) ?? 0;
-                    const top = ROW_PAD + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP + BAR_GAP + lane * (CREW_H + BAR_GAP);
-                    if (!m) return null;
-                    return (
-                      <div
-                        key={`crew-${trip.id}`}
-                        title={m.crewLabel ?? 'No crew assigned'}
-                        className={`absolute z-[4] flex items-center overflow-hidden rounded px-1.5 text-[10px] font-medium ${m.crewMissing ? 'border border-dashed border-[var(--gfo-error,#EF3340)] text-[var(--gfo-error-ink,#C81E2B)]' : 'bg-muted text-muted-foreground'}`}
-                        style={{ left: `${g.startPct}%`, width: `max(${g.widthPct}%, 14px)`, top, height: CREW_H }}
-                      >
-                        {zoom !== 'quarter' && <span className="truncate">{m.crewMissing ? 'no crew' : m.crewLabel}</span>}
-                      </div>
-                    );
-                  })}
                 </div>
                 <div className="w-44 shrink-0 sticky right-0 z-10 bg-card border-l px-3 flex items-center" style={{ height: rowH }}>
                   {(() => {
@@ -336,7 +330,8 @@ export function PlanBoard({
               .filter((x): x is typeof x & { g: NonNullable<typeof x.g> } => x.g !== null);
             const lanes2 = packLanes(items.map(x => ({ id: x.u.id, startMs: x.startMs, endMs: x.startMs + x.u.durationDays * DAY_MS })));
             const laneCount = Math.max(1, lanes2.laneCount);
-            const rowH = ROW_PAD * 2 + laneCount * BAR_H + (laneCount - 1) * BAR_GAP;
+            const uH = zoom !== 'quarter' ? CARD_H : BAR_H;
+            const rowH = ROW_PAD * 2 + laneCount * uH + (laneCount - 1) * BAR_GAP;
             return (
               <div className="flex border-b border-border/50 bg-[var(--gfo-error,#EF3340)]/[0.03]">
                 <div className="w-44 shrink-0 sticky left-0 z-10 bg-card border-r px-4 flex flex-col justify-center" style={{ height: rowH }}>
@@ -355,10 +350,10 @@ export function PlanBoard({
                         key={u.id}
                         onClick={() => onOpenBooking?.(u.id)}
                         title={`${u.title} — submitted, no aircraft yet`}
-                        className="absolute z-[5] flex items-center gap-1 overflow-hidden rounded-md border-2 border-dashed border-[var(--gfo-error,#EF3340)] bg-background px-2 text-[11px] font-medium text-[var(--gfo-error-ink,#C81E2B)] hover:bg-muted/40"
-                        style={{ left: `${g.startPct}%`, width: `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (BAR_H + BAR_GAP), height: BAR_H }}
+                        className="absolute z-[5] overflow-hidden rounded-md border-2 border-dashed border-[var(--gfo-error,#EF3340)] bg-background px-2 py-1.5 text-left text-[11px] font-medium leading-tight text-[var(--gfo-error-ink,#C81E2B)] hover:bg-muted/40"
+                        style={{ left: `${g.startPct}%`, width: zoom !== 'quarter' ? `max(${g.widthPct}%, 150px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (uH + BAR_GAP), height: uH }}
                       >
-                        {zoom !== 'quarter' && <span className="truncate">{u.route} · assign</span>}
+                        {zoom !== 'quarter' && <><div className="text-[12px] font-semibold whitespace-nowrap">{u.route}</div><div className="whitespace-nowrap">{u.title}</div><div className="whitespace-nowrap">no tail · assign</div></>}
                       </button>
                     );
                   })}

@@ -38,6 +38,9 @@ export interface BoardTrip {
   tripStatus: TripRecord['status'];
   /** The crew row under the tail (D110 slice 3); undefined on records that never carried one. */
   crew?: TripRecord['crew'];
+  /** Card line 1 (LG-396): the lead's name and how many are aboard at most. */
+  lead?: string;
+  aboard?: number;
   tasks: BoardTask[];
 }
 
@@ -82,6 +85,8 @@ export function boardTripOf(trip: TripRecord, instances: TaskInstance[]): BoardT
     aircraft: trip.tail,
     aircraftType: trip.aircraftType,
     route: routeOf(trip.legs),
+    lead: trip.lead,
+    aboard: trip.legs.reduce((m, l) => Math.max(m, l.paxCount), 0),
     departureDate,
     durationDays,
     readinessScore: Math.round(readiness.completion * 100),

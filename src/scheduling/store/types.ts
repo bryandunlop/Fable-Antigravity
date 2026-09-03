@@ -29,6 +29,8 @@ export interface TripRecord {
   people?: Array<{ id: string; name: string }>;
   /** Who is flying it (D110 slice 3) — the board's crew row. Set by the booking projection; absent on fixtures. */
   crew?: { pic: string; sic: string; fa: string | null } | null;
+  /** The lead passenger's name — the board card's line 1 (LG-396). */
+  lead?: string;
   createdBy: string;
   createdAtUtc: string;
   lastEditedBy?: string;
