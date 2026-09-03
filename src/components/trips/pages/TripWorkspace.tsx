@@ -675,7 +675,7 @@ export default function TripWorkspace({ tripId: tripIdProp, docked = false, init
         <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
         {/* ── Record ── */}
         <GfoPanel
-          title="Record"
+          title="Messages"
           action={
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />

@@ -20,7 +20,7 @@ export const TAB_LABEL: Record<WorkspaceTab, string> = {
   itinerary: 'Itinerary',
   people: 'People',
   checklist: 'Checklist',
-  record: 'Record',
+  record: 'Messages',
   documents: 'Documents',
   sheet: 'Sheet & email',
   ops: 'Ops',

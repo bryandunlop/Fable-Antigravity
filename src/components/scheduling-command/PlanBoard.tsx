@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, AlertTriangle, Globe, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Globe, MapPin, MessageSquare, Wrench } from 'lucide-react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card';
 import { Card } from '../ui/card';
 import { Progress } from '../ui/progress';
@@ -21,6 +21,7 @@ const BAR_GAP = 6;
 const ROW_PAD = 10;
 const CARD_H = 64; // a trip is a three-line card at 2w/month (LG-396); the quarter zoom keeps thin bars
 const CARD_MIN_W = 150; // the label floor — a card is never narrower than its words
+const MX_H = 22; // the maintenance strip above a tail's trips (Bryan, 2026-09-03: never covered up)
 
 // Label density degrades with zoom: route + readiness at 2w, route at month, bare bar at quarter.
 const COL_W: Record<ZoomPreset, number> = { '2w': 88, month: 44, quarter: 18 };
@@ -54,9 +55,9 @@ export function PlanBoard({
    */
   downtime?: MaintenanceDowntimeBlock[];
   /** Marks on the block and the crew row under each tail (D110 slice 3), keyed by trip id. */
-  marks?: Map<string, { labels: string[]; crewLabel: string | null; crewMissing: boolean }>;
+  marks?: Map<string, { labels: string[]; crewLabel: string | null; crewMissing: boolean; messages?: number }>;
   /** Submitted bookings with no aircraft — the Unassigned lane at the bottom of the board. */
-  unassigned?: Array<{ id: string; title: string; route: string; departureDate: string; durationDays: number }>;
+  unassigned?: Array<{ id: string; title: string; route: string; departureDate: string; durationDays: number; messages?: number }>;
   onOpenBooking?: (tripId: string) => void;
   onTripClick: (trip: BoardTrip) => void;
   /** Optional lens switch — the shelf's "full forward picture" link (D87). */
@@ -100,15 +101,13 @@ export function PlanBoard({
     // Lanes pack by TIME only: a second lane means a real double booking, and a tail is never
     // double-booked (Bryan, 2026-09-03). The label floor is handled below by nudging a card to the
     // right of the one before it, never by stacking — a nudged card is not a conflict.
-    const lanes = packLanes([
-      ...bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })),
-      ...downtimeBars.map(b => ({ id: b.block.id, startMs: b.startMs, endMs: b.endMs })),
-    ]);
-    // Two different things: a trip on top of another trip (a double booking — never, per Bryan)
-    // and a trip inside a maintenance window (an alert, drawn as the hatch). Count them apart.
-    const tripOnly = packLanes(bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })));
-    const doubleBooked = tripOnly.conflictIds.size;
-    const inMaintenance = bars.filter(b => lanes.conflictIds.has(b.trip.id) && !tripOnly.conflictIds.has(b.trip.id)).length;
+    // Trips pack into lanes on their own. A maintenance window is not a lane occupant: it gets its
+    // own strip above the trips, so nothing can ever cover it (Bryan, 2026-09-03).
+    const lanes = packLanes(bars.map(b => ({ id: b.trip.id, startMs: b.startMs, endMs: b.endMs })));
+    const doubleBooked = lanes.conflictIds.size;
+    // A trip inside a maintenance window is an alert (the serviceability scenario), never a double booking.
+    const inMaintenanceIds = new Set(bars.filter(b => downtimeBars.some(d => b.startMs < d.endMs && d.startMs < b.endMs)).map(b => b.trip.id));
+    const inMaintenance = inMaintenanceIds.size;
     // Drawn positions: time position in px, then each card sits at least 4px right of the previous
     // card in its lane, so the label floor never puts one card over another.
     const drawnLeft = new Map<string, number>();
@@ -125,7 +124,7 @@ export function PlanBoard({
         prevRight = left + widthPx;
       }
     }
-    return { ac, bars, downtimeBars, lanes, drawnLeft, doubleBooked, inMaintenance };
+    return { ac, bars, downtimeBars, lanes, drawnLeft, doubleBooked, inMaintenance, inMaintenanceIds };
   }), [trips, downtime, window_, zoom, colW, boardW]);
 
   const doubleBookedCount = rows.reduce((n, r) => n + r.doubleBooked, 0);
@@ -201,12 +200,14 @@ export function PlanBoard({
           </div>
 
           {/* Tail rows */}
-          {rows.map(({ ac, bars, downtimeBars, lanes, drawnLeft }) => {
+          {rows.map(({ ac, bars, downtimeBars, lanes, drawnLeft, inMaintenanceIds }) => {
             // Cards (LG-396): line 1 where and who, line 2 crew, line 3 what is wrong — the crew row
             // folded into the card. The quarter zoom cannot fit words, so it keeps the thin bars.
             const cards = zoom !== 'quarter';
             const barH = cards ? CARD_H : BAR_H;
-            const rowH = ROW_PAD * 2 + lanes.laneCount * barH + (lanes.laneCount - 1) * BAR_GAP;
+            const mxStrip = downtimeBars.length > 0 ? MX_H + BAR_GAP : 0;
+            const laneTop = ROW_PAD + mxStrip;
+            const rowH = ROW_PAD * 2 + mxStrip + lanes.laneCount * barH + (lanes.laneCount - 1) * BAR_GAP;
             const svc = serviceability?.[ac.tail];
             return (
               <div key={ac.tail} className="flex border-b border-border/50">
@@ -237,20 +238,20 @@ export function PlanBoard({
                   ))}
                   {todayVisible && <div className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10" style={{ left: `${todayPct}%` }} />}
 
-                  {/* Maintenance windows — behind the trip bars, so a trip booked into one reads
-                      as sitting ON the hatched band rather than beside it. */}
-                  {downtimeBars.map(({ block, g }) => {
-                    const lane = lanes.laneOf.get(block.id) ?? 0;
-                    const conflicted = lanes.conflictIds.has(block.id);
+                  {/* Maintenance windows — their own strip ABOVE the trips, on top of everything, so a
+                      trip card can never cover one (Bryan, 2026-09-03). A wrench, not a map pin. */}
+                  {downtimeBars.map(({ block, g, startMs: dStart, endMs: dEnd }) => {
+                    // The same window inMaintenanceIds used (effectiveWindow), so the two rings agree.
+                    const conflicted = bars.some(b => inMaintenanceIds.has(b.trip.id) && b.startMs < dEnd && dStart < b.endMs);
                     return (
                       <HoverCard key={block.id} openDelay={150} closeDelay={50}>
                         <HoverCardTrigger asChild>
                           <div
-                            className={`absolute z-[4] flex items-center gap-1 overflow-hidden rounded-md border border-dashed border-[var(--gfo-error,#EF3340)] bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(239,51,64,0.18)_4px,rgba(239,51,64,0.18)_8px)] px-2 text-[11px] font-medium text-[var(--gfo-error,#EF3340)] ${conflicted ? 'ring-2 ring-[var(--gfo-error,#EF3340)] ring-offset-1' : ''}`}
-                            style={{ left: `${g.startPct}%`, width: `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (BAR_H + BAR_GAP), height: BAR_H }}
+                            className={`absolute z-[8] flex items-center gap-1.5 overflow-hidden rounded-md border border-[var(--gfo-error,#EF3340)] bg-[repeating-linear-gradient(45deg,#fff,#fff_4px,rgba(239,51,64,0.22)_4px,rgba(239,51,64,0.22)_8px)] px-2 text-[11px] font-semibold text-[var(--gfo-error-ink,#C81E2B)] dark:bg-[repeating-linear-gradient(45deg,#1c1c1e,#1c1c1e_4px,rgba(239,51,64,0.35)_4px,rgba(239,51,64,0.35)_8px)] ${conflicted ? 'ring-2 ring-[var(--gfo-error,#EF3340)] ring-offset-1' : ''}`}
+                            style={{ left: `${g.startPct}%`, width: `max(${g.widthPct}%, 28px)`, top: ROW_PAD, height: MX_H }}
                           >
-                            <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-                            {zoom === '2w' && <span className="truncate">{block.maintenanceType}</span>}
+                            <Wrench className="h-3 w-3 shrink-0" aria-hidden />
+                            {zoom !== 'quarter' && <span className="truncate">Maintenance · {block.maintenanceType}{conflicted ? ' · trip booked inside' : ''}</span>}
                           </div>
                         </HoverCardTrigger>
                         <HoverCardContent className="w-72 space-y-1 text-sm">
@@ -275,7 +276,7 @@ export function PlanBoard({
                     const lane = lanes.laneOf.get(trip.id) ?? 0;
                     const status = deriveTripStatus(trip, nowMs);
                     const style = TRIP_STATUS_STYLES[status];
-                    const conflicted = lanes.conflictIds.has(trip.id);
+                    const conflicted = lanes.conflictIds.has(trip.id) || inMaintenanceIds.has(trip.id);
                     const m = marks?.get(trip.id);
                     const facts = { labels: m?.labels ?? [], crewMissing: !!m?.crewMissing, status, openTasks: trip.tasks.filter(t => t.status === 'open' || t.status === 'in_progress' || t.status === 'blocked').length };
                     const tone = cardTone(facts);
@@ -287,20 +288,26 @@ export function PlanBoard({
                       <HoverCard key={trip.id} openDelay={150} closeDelay={50}>
                         {/* A nudged card carries a tick at its true departure, so the eye can trace it back to the day. */}
                         {nudgedPx > 2 && (
-                          <span aria-hidden title="True departure — the card was moved right to fit its label" className="absolute z-[6] bg-foreground/20" style={{ left: trueLeft, width: 1, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }} />
+                          <span aria-hidden title="True departure — the card was moved right to fit its label" className="absolute z-[6] bg-foreground/20" style={{ left: trueLeft, width: 1, top: laneTop + lane * (barH + BAR_GAP), height: barH }} />
                         )}
                         <HoverCardTrigger asChild>
                           <button
                             onClick={() => onTripClick(trip)}
                             className={`absolute z-[5] cursor-pointer overflow-hidden text-left transition-all hover:brightness-95 hover:shadow-sm ${cards ? `rounded-md ${CARD_TONE_CLASS[tone]}` : `rounded-md px-2 flex items-center gap-1.5 text-[11px] font-medium ${style.bar}`} ${conflicted ? 'ring-2 ring-[var(--gfo-error,#EF3340)] ring-offset-1' : ''} ${g.clippedStart ? 'rounded-l-none' : ''} ${g.clippedEnd ? 'rounded-r-none' : ''}`}
-                            style={{ left: drawnLeft.get(trip.id) ?? `${g.startPct}%`, width: cards ? `max(${g.widthPct}%, ${CARD_MIN_W}px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (barH + BAR_GAP), height: barH }}
+                            style={{ left: drawnLeft.get(trip.id) ?? `${g.startPct}%`, width: cards ? `max(${g.widthPct}%, ${CARD_MIN_W}px)` : `max(${g.widthPct}%, 14px)`, top: laneTop + lane * (barH + BAR_GAP), height: barH }}
                           >
                             {cards ? (
                               <>
                                 {/* A's edge line: the derived status, 4px, on the left. */}
                                 <span className={`absolute left-0 top-0 bottom-0 w-1 ${style.dot}`} aria-hidden />
+                                {/* An unanswered admin message is a badge the eye lands on, not only a word on line 3 (Bryan, 2026-09-03). */}
+                                {(m?.messages ?? 0) > 0 && (
+                                  <span className="absolute right-1 top-1 inline-flex items-center gap-0.5 rounded-full bg-[var(--gfo-warning,#F1B434)] px-1.5 py-0.5 text-[10px] font-bold text-[#3b2a00]" title={`${m!.messages} unanswered message${m!.messages === 1 ? '' : 's'} from the EA`}>
+                                    <MessageSquare className="h-2.5 w-2.5" /> {m!.messages}
+                                  </span>
+                                )}
                                 <div className="pl-3 pr-2 py-1.5 leading-tight">
-                                  <div className="flex items-center gap-1 text-[12px] font-semibold text-foreground whitespace-nowrap">
+                                  <div className={`flex items-center gap-1 text-[12px] font-semibold text-foreground whitespace-nowrap ${(m?.messages ?? 0) > 0 ? 'pr-10' : ''}`}>
                                     {conflicted && <AlertTriangle className="h-3 w-3 shrink-0 text-[var(--gfo-error,#EF3340)]" />}
                                     {trip.isInternational ? <Globe className="h-3 w-3 shrink-0 opacity-70" /> : <MapPin className="h-3 w-3 shrink-0 opacity-70" />}
                                     <span>{line1}</span>
@@ -398,7 +405,12 @@ export function PlanBoard({
                         className="absolute z-[5] overflow-hidden rounded-md border-2 border-dashed border-[var(--gfo-error,#EF3340)] bg-background px-2 py-1.5 text-left text-[11px] font-medium leading-tight text-[var(--gfo-error-ink,#C81E2B)] hover:bg-muted/40"
                         style={{ left: uLeft.get(u.id) ?? `${g.startPct}%`, width: zoom !== 'quarter' ? `max(${g.widthPct}%, ${CARD_MIN_W}px)` : `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (uH + BAR_GAP), height: uH }}
                       >
-                        {zoom !== 'quarter' && <><div className="text-[12px] font-semibold whitespace-nowrap">{u.route}</div><div className="whitespace-nowrap">{u.title}</div><div className="whitespace-nowrap">no tail · assign</div></>}
+                        {zoom !== 'quarter' && <><div className="text-[12px] font-semibold whitespace-nowrap pr-10">{u.route}</div><div className="whitespace-nowrap">{u.title}</div><div className="whitespace-nowrap">no tail · assign{(u.messages ?? 0) > 0 ? ` · ✉ ${u.messages}` : ''}</div></>}
+                        {(u.messages ?? 0) > 0 && (
+                          <span className="absolute right-1 top-1 inline-flex items-center gap-0.5 rounded-full bg-[var(--gfo-warning,#F1B434)] px-1.5 py-0.5 text-[10px] font-bold text-[#3b2a00]" title={`${u.messages} unanswered message${u.messages === 1 ? '' : 's'} from the EA`}>
+                            <MessageSquare className="h-2.5 w-2.5" /> {u.messages}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
