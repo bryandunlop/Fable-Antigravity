@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { InMemorySchedulingStore, SchedulingService, seedTemplates } from '../store';
-import { createDraft, newLeg, submitItinerary, assignTail, addLegBy, cancelTrip, type Actor, type Trip } from '../../components/trips/engine/trip';
+import { createDraft, newLeg, submitItinerary, assignTail, addLegBy, cancelTrip, bumpTrip, type Actor, type Trip } from '../../components/trips/engine/trip';
 import { syncBookingsIntoStore } from './projectBookings';
 
 const EA: Actor = { name: 'Dana', role: 'ea' };
@@ -62,5 +62,33 @@ describe('the booking is the only trip: bookings are projected into the scheduli
     await syncBookingsIntoStore([booking('Teterboro')], service, store, T0);
     expect(await store.listTrips()).toHaveLength(2);
     expect((await store.getTrip('mao-1'))!.status).toBe('confirmed');
+  });
+  it('a bumped booking (alive, no tail) cancels its open work but keeps cleared work; a new tail brings the open work back', async () => {
+    const { store, service } = await harness();
+    const t = booking('Teterboro');
+    await syncBookingsIntoStore([t], service, store, T0);
+    const before = await store.listInstancesForTrip(t.id);
+    expect(before.length).toBeGreaterThan(1);
+    const first = before[0];
+    if (first.requiresAck) await service.applyAction(first.id, { kind: 'ack' }, 'sched', T0);
+    await service.applyAction(first.id, { kind: 'complete' }, 'sched', T0);
+
+    const bumped = bumpTrip(t, SCHED, 'senior-conflict', 'CEO needs it', T0);
+    const r1 = await syncBookingsIntoStore([bumped], service, store, T0);
+    expect(r1.cancelled).toBe(1);
+    const after = await store.listInstancesForTrip(t.id);
+    expect(after.find(i => i.id === first.id)!.status).toBe('done');
+    expect(after.filter(i => i.id !== first.id).every(i => i.status === 'cancelled')).toBe(true);
+    expect((await store.getTrip(t.id))!.status).toBe('cancelled');
+
+    const again = assignTail(bumped, 'N1PG', SCHED, T0, { free: true, reason: null });
+    const r2 = await syncBookingsIntoStore([again], service, store, T0);
+    expect(r2.updated).toBe(1);
+    const revived = await store.listInstancesForTrip(t.id);
+    expect((await store.getTrip(t.id))!.status).toBe('confirmed');
+    expect((await store.getTrip(t.id))!.tail).toBe('N1PG');
+    expect(revived.find(i => i.id === first.id)!.status).toBe('done');
+    expect(revived.filter(i => i.id !== first.id).some(i => i.status === 'open')).toBe(true);
+    expect(revived.some(i => i.status === 'cancelled')).toBe(false);
   });
 });

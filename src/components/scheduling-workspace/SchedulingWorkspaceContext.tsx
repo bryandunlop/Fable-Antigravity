@@ -76,14 +76,28 @@ export function SchedulingWorkspaceProvider({ children }: { children: ReactNode 
 
   // Keep the store in step with the bookings: same tab (the trips module writes) or another tab.
   useEffect(() => {
+    // One sync at a time; a change that lands mid-sync is queued and runs once the current one
+    // finishes (fresh review: without the trailing run, the second of two edits in the same
+    // minute was silently dropped until an unrelated event happened along).
     let inFlight: Promise<void> | null = null;
+    let queued = false;
+    let disposed = false;
+    const run = () => {
+      inFlight = ensureSeeded().then(resyncBookings).finally(() => {
+        inFlight = null;
+        if (disposed) return;
+        bump();
+        if (queued) { queued = false; run(); }
+      });
+    };
     const onChange = () => {
-      if (inFlight) return;
-      inFlight = ensureSeeded().then(resyncBookings).finally(() => { inFlight = null; bump(); });
+      if (inFlight) { queued = true; return; }
+      run();
     };
     window.addEventListener(TRIPS_CHANGED_EVENT, onChange);
     window.addEventListener('storage', onChange);
     return () => {
+      disposed = true;
       window.removeEventListener(TRIPS_CHANGED_EVENT, onChange);
       window.removeEventListener('storage', onChange);
     };

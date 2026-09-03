@@ -23,7 +23,6 @@ function fingerprint(r: TripRecord): string {
 
 export async function syncBookingsIntoStore(bookings: Trip[], service: SchedulingService, store: SchedulingStore, nowUtc: string): Promise<SyncResult> {
   const result: SyncResult = { created: 0, updated: 0, unchanged: 0, cancelled: 0 };
-  const seen = new Set<string>();
   for (const booking of bookings) {
     const desired = tripToRecord(booking);
     const existing = await store.getTrip(booking.id);
@@ -31,11 +30,17 @@ export async function syncBookingsIntoStore(bookings: Trip[], service: Schedulin
       // Stopped projecting. Only a record that came from this booking is ours to cancel.
       if (existing && existing.sourceSystem === 'manual' && existing.status !== 'cancelled') {
         await store.saveTrip({ ...existing, status: 'cancelled', lastEditedBy: 'bookings-sync', lastEditedAtUtc: nowUtc });
+        // Its open work goes with it, so nothing sits open on a record the boards no longer show.
+        // Cleared work stays cleared: if the booking comes back (a bump, then a new tail) the
+        // reconcile restores the cancelled items and the done ones are still done.
+        for (const inst of await store.listInstancesForTrip(booking.id)) {
+          if (inst.status !== 'open' && inst.status !== 'in_progress' && inst.status !== 'blocked') continue;
+          await store.updateInstance({ ...inst, status: 'cancelled', reflag: undefined, auditTrail: [...inst.auditTrail, { atUtc: nowUtc, actor: 'bookings-sync', action: 'cancelled', detail: 'booking no longer occupies a tail' }] });
+        }
         result.cancelled += 1;
       }
       continue;
     }
-    seen.add(booking.id);
     if (!existing) {
       await service.createTripMirror(desired, nowUtc);
       result.created += 1;
