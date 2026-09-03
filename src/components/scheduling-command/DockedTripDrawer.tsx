@@ -32,7 +32,7 @@ export function DockedTripDrawer({
         <SheetDescription className="sr-only">The booking's itinerary, people, checklist, record, documents and sheet.</SheetDescription>
         {tripId && (
           <TripsProvider userRole={userRole} additionalRoles={additionalRoles}>
-            <TripWorkspace tripId={tripId} docked initialTab={initialTab} />
+            <TripWorkspace key={tripId} tripId={tripId} docked initialTab={initialTab} />
           </TripsProvider>
         )}
       </SheetContent>
