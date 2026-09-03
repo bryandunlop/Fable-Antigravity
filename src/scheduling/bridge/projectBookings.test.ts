@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { InMemorySchedulingStore, SchedulingService, seedTemplates } from '../store';
 import { createDraft, newLeg, submitItinerary, assignTail, addLegBy, cancelTrip, bumpTrip, type Actor, type Trip } from '../../components/trips/engine/trip';
-import { syncBookingsIntoStore } from './projectBookings';
+import { syncBookingsIntoStore, persistBookingInstances, restoreBookingInstances } from './projectBookings';
 
 const EA: Actor = { name: 'Dana', role: 'ea' };
 const SCHED: Actor = { name: 'R. Calloway', role: 'scheduling' };
@@ -90,5 +90,24 @@ describe('the booking is the only trip: bookings are projected into the scheduli
     expect(revived.find(i => i.id === first.id)!.status).toBe('done');
     expect(revived.filter(i => i.id !== first.id).some(i => i.status === 'open')).toBe(true);
     expect(revived.some(i => i.status === 'cancelled')).toBe(false);
+  });
+  it('cleared work survives a reload: persisted instances are restored before the first sync and the mirror does not overwrite them', async () => {
+    const mem = new Map<string, string>();
+    const storage = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); } };
+    const a = await harness();
+    const t = booking('Teterboro');
+    await syncBookingsIntoStore([t], a.service, a.store, T0);
+    const first = (await a.store.listInstancesForTrip(t.id))[0];
+    if (first.requiresAck) await a.service.applyAction(first.id, { kind: 'ack' }, 'sched', T0);
+    await a.service.applyAction(first.id, { kind: 'complete' }, 'sched', T0);
+    await persistBookingInstances(a.store, storage);
+
+    const b = await harness();
+    expect(await restoreBookingInstances(b.store, storage)).toBeGreaterThan(0);
+    const r = await syncBookingsIntoStore([t], b.service, b.store, T0);
+    expect(r.created).toBe(1);
+    const after = await b.store.listInstancesForTrip(t.id);
+    expect(after.find(i => i.id === first.id)!.status).toBe('done');
+    expect(after.length).toBe((await a.store.listInstancesForTrip(t.id)).length);
   });
 });

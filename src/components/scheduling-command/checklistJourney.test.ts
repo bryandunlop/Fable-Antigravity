@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildChecklistJourney } from './checklistJourney';
+import { buildChecklistJourney, railEntries } from './checklistJourney';
 import type { TaskInstance } from '../../scheduling/engine';
 import type { TripLegRecord } from '../../scheduling/store/types';
 
@@ -72,5 +72,27 @@ describe('D89 review catches', () => {
     const j = buildChecklistJourney(legs2, [zombie], NOW);
     expect(j.sections[0].flagged).toHaveLength(0);
     expect(j.sections[0].cleared.map(x => x.id)).toEqual([zombie.id]);
+  });
+});
+
+describe('the booking cutoffs sit on the rail (D110 slice 2)', () => {
+  it('cutoff markers land in the whole-trip section in time order among the open items, and a passed one says so', () => {
+    const legs = [{ id: 'leg-a', sequence: 1, departureIcao: 'KLUK', arrivalIcao: 'EGLL', departureTimeUtc: '2026-09-12T12:00:00.000Z', paxCount: 2 }];
+    const item = (id: string, dueAtUtc: string) => ({
+      id, templateId: 't', templateVersion: 1, taskDefId: id, title: id, category: 'ops', order: 1, tripId: 'trip-1', runDate: null,
+      status: 'open' as const, ownerRole: 'scheduling', dueAtUtc, requiresAck: false, ackState: 'n_a' as const, auditTrail: [],
+    });
+    const j = buildChecklistJourney(legs, [item('early', '2026-09-05T12:00:00.000Z'), item('late', '2026-09-11T12:00:00.000Z')], Date.parse('2026-09-07T00:00:00.000Z'), [
+      { key: 'names', label: 'Names cutoff', atUtc: '2026-09-09T13:00:00.000Z' },
+      { key: 'forms', label: 'Forms cutoff', atUtc: '2026-09-01T13:00:00.000Z' },
+    ]);
+    const trip = j.sections.find(s => s.kind === 'trip')!;
+    expect(trip.markers.map(m => `${m.key}:${m.state}`)).toEqual(['forms:passed', 'names:ahead']);
+    expect(railEntries(trip).map(e => e.kind === 'item' ? e.item.id : e.marker.key)).toEqual(['forms', 'early', 'names', 'late']);
+  });
+  it('cutoffs alone are enough to draw the whole-trip section', () => {
+    const j = buildChecklistJourney([], [], 0, [{ key: 'freeze', label: 'Freeze', atUtc: '2026-09-09T13:00:00.000Z' }]);
+    expect(j.sections).toHaveLength(1);
+    expect(j.sections[0].markers).toHaveLength(1);
   });
 });

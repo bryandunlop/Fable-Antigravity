@@ -11,9 +11,9 @@ export interface ReconcilePlan {
   toUpdate: TaskInstance[];
 }
 
-/** Identity of a task within a trip: def + (for per-airport) which leg-endpoint. */
-export function instanceKey(i: Pick<TaskInstance, 'taskDefId' | 'legId' | 'airportRole'>): string {
-  return `${i.taskDefId}|${i.legId ?? ''}|${i.airportRole ?? ''}`;
+/** Identity of a task within a trip: def + (for per-airport) which leg-endpoint + (for per-person) which person. */
+export function instanceKey(i: Pick<TaskInstance, 'taskDefId' | 'legId' | 'airportRole' | 'personId'>): string {
+  return `${i.taskDefId}|${i.legId ?? ''}|${i.airportRole ?? ''}|${i.personId ?? ''}`;
 }
 
 function matchesChange(rt: ReTrigger, live: TaskInstance, diff: TripDiff): boolean {
@@ -90,7 +90,7 @@ export function reconcileTrip(
         reflag: undefined,
         etdUtc: desiredInst.etdUtc,
         dueAtUtc: desiredInst.dueAtUtc,
-        auditTrail: [...live.auditTrail, { atUtc: nowUtc, actor, action: 'restored', detail: 'leg re-added' }],
+        auditTrail: [...live.auditTrail, { atUtc: nowUtc, actor, action: 'restored', detail: live.personId ? 'person re-added' : 'leg re-added' }],
       });
       continue;
     }

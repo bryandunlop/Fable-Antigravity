@@ -14,6 +14,7 @@ const EFFECTIVE_FROM = '2026-01-01T00:00:00.000Z';
 // the human conversation stays — this is the digital delivery of what was covered.
 const SEND_CREW_BRIEF = {
   id: 'send-crew-brief',
+    bindTo: 'crew',
   title: 'Send crew brief',
   description:
     'Deliver the trip brief to the crew in the system — schedule, pax, handling, and anything covered verbally.',
@@ -75,6 +76,7 @@ const ALL_TRIPS_TASKS: TaskDefinition[] = [
   },
   {
     id: 'crew-hotel-information-obtained',
+    bindTo: 'crew',
     title: 'Crew hotel information obtained',
     ownerRole: 'scheduling',
     category: 'crew',
@@ -146,6 +148,7 @@ const PER_AIRPORT_TASKS: TaskDefinition[] = [
   },
   {
     id: 'pax-forms',
+    bindTo: 'person',
     // Excel left the deadline blank; assumed 1 business day before departure (flagged for the DOM).
     title: 'Confirm passenger forms',
     description: 'Confirm all passenger forms are on file. Re-flags when a passenger is added.',
@@ -425,6 +428,7 @@ const INTERNATIONAL_PER_TRIP: ChecklistTemplate = {
     },
     {
       id: 'intl-confirm-pic-international-captain',
+    bindTo: 'crew',
       title: 'Confirm PIC is a qualified International Captain',
       ownerRole: 'scheduling',
       category: 'crew',
@@ -434,6 +438,7 @@ const INTERNATIONAL_PER_TRIP: ChecklistTemplate = {
     },
     {
       id: 'intl-crew-passports-visas',
+    bindTo: 'crew',
       title: 'Confirm CREW passports & visas',
       ownerRole: 'scheduling',
       category: 'crew',
@@ -443,8 +448,9 @@ const INTERNATIONAL_PER_TRIP: ChecklistTemplate = {
     },
     {
       id: 'intl-pax-passports-visas',
+    bindTo: 'person',
       title: 'Confirm PAX passports & visas',
-      description: 'Deferred follow-on: not wired to PassengerFormContext document readiness yet — manual confirm for now.',
+      description: 'One item per person aboard; the document gate on that person is the same item (D110 slice 2).',
       ownerRole: 'scheduling',
       category: 'crew',
       order: 5,

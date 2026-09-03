@@ -168,7 +168,7 @@ describe('tab counts', () => {
     t = setPassengers(t, ['A. Reyes', 'S. Reyes', 'K. Tanaka'], EA, NOW, ['P-REYES', 'P-SREYES', 'P-TANAKA']);
     t = setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW);
     const s = summarise(t);
-    expect(s.counts).toEqual({ itinerary: 0, people: 0, record: 0, documents: 0, sheet: 0, ops: 0 });
+    expect(s.counts).toEqual({ itinerary: 0, people: 0, checklist: 0, record: 0, documents: 0, sheet: 0, ops: 0 });
   });
 });
 

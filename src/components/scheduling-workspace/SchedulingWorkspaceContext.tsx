@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { InMemorySchedulingStore, SchedulingService, seedTemplates } from '../../scheduling/store';
-import { syncBookingsIntoStore } from '../../scheduling/bridge/projectBookings';
+import { syncBookingsIntoStore, persistBookingInstances, restoreBookingInstances } from '../../scheduling/bridge/projectBookings';
 import { loadTrips, TRIPS_CHANGED_EVENT } from '../trips/data/tripsStore';
 import { defaultPilotVisibleDefs } from '../../scheduling/engine';
 import { seedMyairopsBookingTrips } from '../../integration/myairops/seedMyairops';
@@ -45,6 +45,9 @@ function ensureSeeded(): Promise<void> {
       // path a Phase-2 pull takes. These carry the serviceability-alert and
       // passenger-currency demo scenarios (MAO-7301/7305/7310).
       await seedMyairopsBookingTrips(service, new Date().toISOString());
+      // D110 slice 2: cleared checklist work on bookings survives a reload — put it back before
+      // the first sync, or the mirror would hand every booking a fresh open checklist.
+      await restoreBookingInstances(store);
       // D110 slice 1: the booking is the only trip. The command-center fixtures
       // (seedDemoTrips / seedVolumeTrips) are gone; every record the boards show is a
       // projection of a booking in the trips module, kept in step by resyncBookings().
@@ -61,12 +64,14 @@ function ensureSeeded(): Promise<void> {
 export async function resyncBookings(): Promise<void> {
   const bookings = loadTrips().filter(t => t.visibleToScheduling);
   await syncBookingsIntoStore(bookings, service, store, new Date().toISOString());
+  await persistBookingInstances(store);
 }
 
 export function SchedulingWorkspaceProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [tick, setTick] = useState(0);
-  const bump = useCallback(() => setTick((t) => t + 1), []);
+  // Every mutation bumps; every bump persists the bookings' checklist state (D110 slice 2).
+  const bump = useCallback(() => { setTick((t) => t + 1); void persistBookingInstances(store); }, []);
 
   useEffect(() => {
     let cancelled = false;

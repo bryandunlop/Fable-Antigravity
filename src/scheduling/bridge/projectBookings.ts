@@ -10,6 +10,7 @@
 
 import type { SchedulingService } from '../store/service';
 import type { SchedulingStore, TripRecord } from '../store/types';
+import type { TaskInstance } from '../engine';
 import { tripToRecord } from '../../components/trips/engine/projection';
 import type { Trip } from '../../components/trips/engine/trip';
 
@@ -42,7 +43,15 @@ export async function syncBookingsIntoStore(bookings: Trip[], service: Schedulin
       continue;
     }
     if (!existing) {
+      // Restored instances for this booking (a reload) must survive the mirror: createTripMirror
+      // writes a fresh open set by the same deterministic ids, so mirror first, then put the live
+      // state back over it and reconcile once for anything the booking changed meanwhile.
+      const kept = await store.listInstancesForTrip(booking.id);
       await service.createTripMirror(desired, nowUtc);
+      if (kept.length) {
+        await store.saveInstances(kept);
+        await service.updateTrip(desired, nowUtc);
+      }
       result.created += 1;
     } else if (fingerprint(existing) === fingerprint(desired)) {
       result.unchanged += 1;
@@ -52,4 +61,42 @@ export async function syncBookingsIntoStore(bookings: Trip[], service: Schedulin
     }
   }
   return result;
+}
+
+// ── Persistence (D110 slice 2) ─────────────────────────────────────────────────────────────────
+// The scheduling store is in-memory; the bookings persist. Without this, a reload re-mirrored every
+// booking with a fresh checklist and cleared work vanished — the TL-38 class of bug. Only instances
+// of booking-derived records are kept; fixtures re-seed themselves.
+
+export const BOOKING_INSTANCES_KEY = 'scheduling-booking-instances';
+const BOOKING_INSTANCES_VERSION = '1';
+
+export async function snapshotBookingInstances(store: SchedulingStore): Promise<TaskInstance[]> {
+  const out: TaskInstance[] = [];
+  for (const t of await store.listTrips()) {
+    if (t.sourceSystem !== 'manual') continue;
+    out.push(...await store.listInstancesForTrip(t.id));
+  }
+  return out;
+}
+
+export async function persistBookingInstances(store: SchedulingStore, storage: Pick<Storage, 'setItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): Promise<void> {
+  if (!storage) return;
+  const xs = await snapshotBookingInstances(store);
+  storage.setItem(BOOKING_INSTANCES_KEY, JSON.stringify({ version: BOOKING_INSTANCES_VERSION, instances: xs }));
+}
+
+/** Put persisted instances back before the first sync, so createTripMirror never overwrites cleared work. */
+export async function restoreBookingInstances(store: SchedulingStore, storage: Pick<Storage, 'getItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): Promise<number> {
+  if (!storage) return 0;
+  try {
+    const raw = storage.getItem(BOOKING_INSTANCES_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw) as { version: string; instances: TaskInstance[] };
+    if (parsed.version !== BOOKING_INSTANCES_VERSION || !Array.isArray(parsed.instances)) return 0;
+    await store.saveInstances(parsed.instances);
+    return parsed.instances.length;
+  } catch {
+    return 0;
+  }
 }

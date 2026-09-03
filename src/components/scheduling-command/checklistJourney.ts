@@ -6,6 +6,20 @@ import type { TripLegRecord } from '../../scheduling/store/types';
 // reflags (D89) surface as always-visible flagged rows — cleared work stays cleared; the flag is
 // information, never a demand. Pure; all time inputs explicit.
 
+/**
+ * A booking cutoff drawn on the rail (D110 slice 2, Bryan: "put the cutoffs on the rail"). Not a
+ * checklist item — nothing to clear — but it is when the work around it is actually due, so it sits
+ * among the whole-trip items in time order.
+ */
+export interface RailMarker {
+  key: string;
+  label: string;
+  atUtc: string;
+  /** 'passed' once the clock is beyond it. */
+  state: 'ahead' | 'passed';
+  note?: string;
+}
+
 export interface JourneySection {
   key: string;               // 'trip' or the legId
   kind: 'trip' | 'leg';
@@ -18,6 +32,17 @@ export interface JourneySection {
   open: TaskInstance[];      // time-ordered by dueAtUtc
   flagged: TaskInstance[];   // settled but carrying an advisory reflag — always visible
   cleared: TaskInstance[];   // settled, unflagged — folds to a ledge
+  /** Cutoff nodes for this section, time-ordered. Only the whole-trip section carries them today. */
+  markers: RailMarker[];
+}
+
+/** The whole-trip section's open items and cutoff markers, interleaved by time. */
+export function railEntries(section: JourneySection): Array<{ kind: 'item'; item: TaskInstance } | { kind: 'marker'; marker: RailMarker }> {
+  const entries: Array<{ at: number; entry: { kind: 'item'; item: TaskInstance } | { kind: 'marker'; marker: RailMarker } }> = [
+    ...section.open.map(item => ({ at: dueMs(item), entry: { kind: 'item' as const, item } })),
+    ...section.markers.map(marker => ({ at: new Date(marker.atUtc).getTime(), entry: { kind: 'marker' as const, marker } })),
+  ];
+  return entries.sort((a, b) => a.at - b.at).map(e => e.entry);
 }
 
 export interface ChecklistJourney {
@@ -34,7 +59,11 @@ export function buildChecklistJourney(
   legs: TripLegRecord[],
   instances: TaskInstance[],
   nowMs: number,
+  cutoffs: Array<{ key: string; label: string; atUtc: string; note?: string }> = [],
 ): ChecklistJourney {
+  const markers: RailMarker[] = cutoffs
+    .map(c => ({ key: c.key, label: c.label, atUtc: c.atUtc, note: c.note, state: new Date(c.atUtc).getTime() <= nowMs ? 'passed' as const : 'ahead' as const }))
+    .sort((a, b) => a.atUtc.localeCompare(b.atUtc));
   const orderedLegs = [...legs].sort((a, b) => a.sequence - b.sequence);
   const legIds = new Set(orderedLegs.map(l => l.id));
 
@@ -48,7 +77,8 @@ export function buildChecklistJourney(
 
   const toSection = (key: string, kind: 'trip' | 'leg', leg?: TripLegRecord): JourneySection | null => {
     const xs = bucket.get(key) ?? [];
-    if (xs.length === 0) return null;
+    // The whole-trip section exists whenever there are cutoffs to draw, items or not.
+    if (xs.length === 0 && !(kind === 'trip' && markers.length > 0)) return null;
     const settled = xs.filter(isSettled);
     return {
       key, kind,
@@ -58,6 +88,7 @@ export function buildChecklistJourney(
       open: xs.filter(t => !isSettled(t)).sort((a, b) => dueMs(a) - dueMs(b)),
       flagged: settled.filter(t => t.reflag && t.status !== 'cancelled').sort((a, b) => clearedMs(a) - clearedMs(b)),
       cleared: settled.filter(t => !t.reflag || t.status === 'cancelled').sort((a, b) => clearedMs(a) - clearedMs(b)),
+      markers: kind === 'trip' ? markers : [],
     };
   };
 

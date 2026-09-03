@@ -25,6 +25,8 @@ export interface TripRecord {
   startDate: string; // ISO
   endDate: string;   // ISO
   legs: TripLegRecord[];
+  /** Who is aboard, as records (D110 slice 2). Set by the booking projection; absent on fixtures. */
+  people?: Array<{ id: string; name: string }>;
   createdBy: string;
   createdAtUtc: string;
   lastEditedBy?: string;

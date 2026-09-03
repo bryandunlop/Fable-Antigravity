@@ -50,12 +50,17 @@ export function tripToRecord(trip: Trip): TripRecord | null {
   });
   if (legs.length === 0) return null;
   const dates = trip.legs.map(l => l.date).filter((d): d is string => !!d).sort();
+  // Who is aboard, as records — only when the names have resolved to ids (Phase 5 slice 2); a
+  // name with no record yet is not a person an item can be bound to.
+  const people = trip.passengerIds && trip.passengerIds.length === trip.passengerNames.length
+    ? trip.passengerIds.map((id, i) => ({ id, name: trip.passengerNames[i] }))
+    : undefined;
   return {
     id: trip.id, tripNumber: trip.title, sourceSystem: 'manual', sourceTripRef: null,
     tail: trip.tail, aircraftType: aircraftFor(trip.tail)?.type ?? 'G500', tripType: tripTypeOf(trip), priority: 'standard',
     status,
     startDate: `${dates[0]}T00:00:00.000Z`, endDate: `${dates[dates.length - 1]}T23:59:59.000Z`,
-    legs, createdBy: trip.createdBy.name, createdAtUtc: trip.createdAt,
+    legs, ...(people ? { people } : {}), createdBy: trip.createdBy.name, createdAtUtc: trip.createdAt,
   };
 }
 

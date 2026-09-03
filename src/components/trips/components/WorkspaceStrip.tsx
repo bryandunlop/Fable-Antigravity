@@ -14,11 +14,12 @@ import { cn } from '../../ui/utils';
 import { formatEt } from '../engine/cutoffs';
 import { WAITING_LABEL, type WorkspaceSummary } from '../engine/workspaceSummary';
 
-export type WorkspaceTab = 'itinerary' | 'people' | 'record' | 'documents' | 'sheet' | 'ops';
+export type WorkspaceTab = 'itinerary' | 'people' | 'checklist' | 'record' | 'documents' | 'sheet' | 'ops';
 
 export const TAB_LABEL: Record<WorkspaceTab, string> = {
   itinerary: 'Itinerary',
   people: 'People',
+  checklist: 'Checklist',
   record: 'Record',
   documents: 'Documents',
   sheet: 'Sheet & email',

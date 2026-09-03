@@ -3,11 +3,13 @@ import { computeDueAtUtc } from './dueDates';
 import { evaluateCondition } from './conditions';
 import { matchAirport, expandEndpoints } from './airports';
 import type {
-  ChecklistTemplate, TaskDefinition, TaskInstance, TripContext, DueContext, IdFactory, LegContext,
+  ChecklistTemplate, TaskDefinition, TaskInstance, TripContext, DueContext, IdFactory, LegContext, PersonContext, BoundTo,
 } from './types';
 
 /** Per-airport provenance stamped on a per-leg instance. */
-interface AirportExtra { legId: string; airportIcao: string; airportRole: 'departure' | 'arrival' }
+interface AirportExtra { legId: string; airportIcao: string; airportRole: 'departure' | 'arrival'; sequence: number }
+/** Per-person provenance stamped on a person-bound instance (D110 slice 2). */
+interface PersonExtra { person: PersonContext }
 
 /** Office-local YYYY-MM-DD for a UTC instant + offset. */
 function officeLocalDate(iso: string, offsetMinutes: number): string {
@@ -21,12 +23,22 @@ function officeLocalDate(iso: string, offsetMinutes: number): string {
 function buildInstance(
   def: TaskDefinition, template: ChecklistTemplate, ctx: DueContext,
   tripId: string | null, runDate: string | null, idFactory: IdFactory,
-  extra?: AirportExtra,
+  extra?: AirportExtra, person?: PersonExtra,
 ): TaskInstance {
   // Per-airport instances MUST include leg + endpoint in the seed, or the same airport on two
-  // legs (out-and-back, tech stop) collides to one id and the store silently drops one.
-  const suffix = extra ? `:${extra.legId}:${extra.airportRole}` : '';
+  // legs (out-and-back, tech stop) collides to one id and the store silently drops one. Per-person
+  // instances include the person for the same reason.
+  const suffix = extra ? `:${extra.legId}:${extra.airportRole}` : person ? `:person:${person.person.id}` : '';
   const seed = `${template.id}:${template.version}:${def.id}:${tripId ?? runDate}${suffix}`;
+  // What the item is about (D110 slice 2). A per-airport task is about its leg; a fanned-out task
+  // is about its person; a crew task is about the crew; anything else is about the whole trip.
+  const boundTo: BoundTo | undefined = extra
+    ? { kind: 'leg', id: extra.legId, label: `Leg ${extra.sequence} · ${extra.airportIcao}` }
+    : person
+      ? { kind: 'person', id: person.person.id, label: person.person.name }
+      : def.bindTo === 'crew'
+        ? { kind: 'crew', id: 'crew', label: 'Crew' }
+        : undefined;
   return {
     id: idFactory(seed),
     templateId: template.id,
@@ -47,6 +59,8 @@ function buildInstance(
     handoffTarget: def.handoffTarget,
     escalation: def.escalation,
     ...(extra ? { legId: extra.legId, airportIcao: extra.airportIcao, airportRole: extra.airportRole } : {}),
+    ...(person ? { personId: person.person.id } : {}),
+    ...(boundTo ? { boundTo } : {}),
     auditTrail: [{ atUtc: ctx.nowUtc, actor: 'system', action: 'created' }],
   };
 }
@@ -65,7 +79,7 @@ function instantiatePerAirport(
       if (!matchAirport(icao, at.airport)) continue;
       const anchorEtd = endpoint === 'departure' ? leg.departureTimeUtc : (leg.arrivalTimeUtc ?? leg.departureTimeUtc);
       out.push(buildInstance(def, template, { ...ctx, etdUtc: anchorEtd }, tripId, null, idFactory, {
-        legId: leg.legId, airportIcao: icao.toUpperCase(), airportRole: endpoint,
+        legId: leg.legId, airportIcao: icao.toUpperCase(), airportRole: endpoint, sequence: leg.sequence,
       }));
     }
   }
@@ -97,6 +111,10 @@ export function instantiatePerTrip(
         .filter((def) => (def.condition ? evaluateCondition(def.condition, trip) : true))
         .flatMap((def) => (def.appliesTo
           ? instantiatePerAirport(def, template, ctx, trip.tripId, legs, idFactory)
-          : [buildInstance(def, template, dueCtx, trip.tripId, null, idFactory)])),
+          // A person-bound task fans out per person aboard. With nobody named yet it falls back to
+          // one trip-level item, so a pack whose people are not known still works (the hinge of D110).
+          : def.bindTo === 'person' && (trip.people?.length ?? 0) > 0
+            ? trip.people!.map((person) => buildInstance(def, template, dueCtx, trip.tripId, null, idFactory, undefined, { person }))
+            : [buildInstance(def, template, dueCtx, trip.tripId, null, idFactory)])),
     );
 }
