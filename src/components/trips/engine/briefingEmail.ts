@@ -83,7 +83,7 @@ export interface RenderedEmail {
 export const BE_THERE_MINUTES = 30;
 
 export interface EmailHero {
-  /** 'Wednesday 14 October' */
+  /** 'Wednesday, October 14' — the same `longDate` the subject line uses. */
   date: string;
   /** '08:50 EDT' — departure wall time minus the be-there margin; null when the field is unplaced. */
   beThere: string | null;
@@ -201,7 +201,8 @@ export function renderEmail(sheet: FrozenSheet, to: string, template: EmailTempl
       case 'when': {
         if (!first) break;
         const lines = sheet.legs.filter(l => l.aboard.includes(to)).map(l => {
-          const be = l.from.wall ? `Please be at ${l.from.label} 30 minutes before ${l.from.wall}.` : `Please be at ${l.from.label} 30 minutes before departure.`;
+          // The same margin the timeline uses — one constant, or the two halves of the email disagree.
+          const be = l.from.wall ? `Please be at ${l.from.label} ${BE_THERE_MINUTES} minutes before ${l.from.wall}.` : `Please be at ${l.from.label} ${BE_THERE_MINUTES} minutes before departure.`;
           const arr = l.to.wall ? ` You arrive ${l.to.label} at ${l.to.wall}${l.dayShift ? ' the next day' : ''}.` : '';
           return `Leg ${l.n}, ${longDate(l.date + 'T00:00:00Z')}: ${be}${arr}${l.planned ? ' Times are planning times until scheduling confirms them.' : ''}`;
         });
