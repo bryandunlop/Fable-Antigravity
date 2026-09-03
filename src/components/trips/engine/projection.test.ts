@@ -46,4 +46,10 @@ describe('a booking projects faithfully into the scheduling record', () => {
   it('tripsToRecords drops what does not project', () => {
     expect(tripsToRecords([booking([['KLUK', 'KTEB', '2026-09-10']]), booking([['KLUK', 'KTEB', '2026-09-10']], null)])).toHaveLength(1);
   });
+  it('the people aboard ride along as records when the names have resolved to ids', () => {
+    const t = booking([['KLUK', 'EGLF', '2026-09-10']], 'N2PG', ['A. Reyes', 'S. Reyes']);
+    const withIds: Trip = { ...t, passengerIds: ['P-REYES', 'P-SREYES'] };
+    expect(tripToRecord(withIds)!.people).toEqual([{ id: 'P-REYES', name: 'A. Reyes' }, { id: 'P-SREYES', name: 'S. Reyes' }]);
+    expect(tripToRecord(t)!.people).toBeUndefined();
+  });
 });

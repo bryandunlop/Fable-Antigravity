@@ -36,6 +36,7 @@ export class InMemorySchedulingStore implements SchedulingStore {
   async saveInstances(xs: TaskInstance[]): Promise<void> { for (const x of xs) this.instances.set(x.id, structuredClone(x)); }
   async getInstance(id: string): Promise<TaskInstance | null> { const x = this.instances.get(id); return x ? structuredClone(x) : null; }
   async updateInstance(x: TaskInstance): Promise<void> { this.instances.set(x.id, structuredClone(x)); }
+  async removeInstances(ids: string[]): Promise<void> { for (const id of ids) this.instances.delete(id); }
   async listInstancesForTrip(tripId: string): Promise<TaskInstance[]> {
     return [...this.instances.values()].filter((x) => x.tripId === tripId).map((x) => structuredClone(x));
   }

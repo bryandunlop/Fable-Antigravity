@@ -25,6 +25,8 @@ export interface TripRecord {
   startDate: string; // ISO
   endDate: string;   // ISO
   legs: TripLegRecord[];
+  /** Who is aboard, as records (D110 slice 2). Set by the booking projection; absent on fixtures. */
+  people?: Array<{ id: string; name: string }>;
   createdBy: string;
   createdAtUtc: string;
   lastEditedBy?: string;
@@ -75,6 +77,8 @@ export interface SchedulingStore {
   updateInstance(x: TaskInstance): Promise<void>;
   listInstancesForTrip(tripId: string): Promise<TaskInstance[]>;
   listRecurringInstances(runDate: string): Promise<TaskInstance[]>;
+  /** Drop rows outright — only for restored rows superseded by a re-minted id (D110 slice 2); a live task is cancelled, never removed. */
+  removeInstances(ids: string[]): Promise<void>;
 
   // Events.
   saveEvent(e: SchedulingEvent): Promise<SchedulingEvent>;

@@ -10,6 +10,8 @@
 
 import type { SchedulingService } from '../store/service';
 import type { SchedulingStore, TripRecord } from '../store/types';
+import type { TaskInstance } from '../engine';
+import { instanceKey } from '../engine/reconcile';
 import { tripToRecord } from '../../components/trips/engine/projection';
 import type { Trip } from '../../components/trips/engine/trip';
 
@@ -42,7 +44,34 @@ export async function syncBookingsIntoStore(bookings: Trip[], service: Schedulin
       continue;
     }
     if (!existing) {
-      await service.createTripMirror(desired, nowUtc);
+      // Restored instances for this booking (a reload) must survive the mirror. Mirror first, then
+      // carry the LIVE STATE of each kept instance onto the fresh one with the same task identity
+      // (instanceKey — def + leg + person), never by id: a template republished under a new version
+      // mints new ids, and re-inserting the old rows by id would leave two of every item (fresh
+      // review, 2026-09-03). Kept rows with no fresh twin are dropped — the pack no longer asks for
+      // them. Then one reconcile for anything the booking changed meanwhile.
+      const kept = await store.listInstancesForTrip(booking.id);
+      const { instances: fresh } = await service.createTripMirror(desired, nowUtc);
+      if (kept.length) {
+        const freshByKey = new Map(fresh.map(f => [instanceKey(f), f]));
+        const carried: TaskInstance[] = [];
+        for (const k of kept) {
+          const twin = freshByKey.get(instanceKey(k));
+          if (!twin) continue;
+          carried.push({
+            ...twin,
+            status: k.status, ackState: k.ackState, ackedBy: k.ackedBy, ackedAtUtc: k.ackedAtUtc,
+            completedBy: k.completedBy, completedAtUtc: k.completedAtUtc, notes: k.notes, reflag: k.reflag,
+            auditTrail: twin.id === k.id ? k.auditTrail : [...k.auditTrail, { atUtc: nowUtc, actor: 'bookings-sync', action: 'carried', detail: `state carried from ${k.id}` }],
+          });
+        }
+        if (carried.length) await store.saveInstances(carried);
+        // The old rows themselves go: their state now lives on the fresh ids.
+        const freshIds = new Set(fresh.map(f => f.id));
+        const stale = kept.filter(k => !freshIds.has(k.id)).map(k => k.id);
+        if (stale.length) await store.removeInstances(stale);
+        await service.updateTrip(desired, nowUtc);
+      }
       result.created += 1;
     } else if (fingerprint(existing) === fingerprint(desired)) {
       result.unchanged += 1;
@@ -52,4 +81,42 @@ export async function syncBookingsIntoStore(bookings: Trip[], service: Schedulin
     }
   }
   return result;
+}
+
+// ── Persistence (D110 slice 2) ─────────────────────────────────────────────────────────────────
+// The scheduling store is in-memory; the bookings persist. Without this, a reload re-mirrored every
+// booking with a fresh checklist and cleared work vanished — the TL-38 class of bug. Only instances
+// of booking-derived records are kept; fixtures re-seed themselves.
+
+export const BOOKING_INSTANCES_KEY = 'scheduling-booking-instances';
+const BOOKING_INSTANCES_VERSION = '1';
+
+export async function snapshotBookingInstances(store: SchedulingStore): Promise<TaskInstance[]> {
+  const out: TaskInstance[] = [];
+  for (const t of await store.listTrips()) {
+    if (t.sourceSystem !== 'manual') continue;
+    out.push(...await store.listInstancesForTrip(t.id));
+  }
+  return out;
+}
+
+export async function persistBookingInstances(store: SchedulingStore, storage: Pick<Storage, 'setItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): Promise<void> {
+  if (!storage) return;
+  const xs = await snapshotBookingInstances(store);
+  storage.setItem(BOOKING_INSTANCES_KEY, JSON.stringify({ version: BOOKING_INSTANCES_VERSION, instances: xs }));
+}
+
+/** Put persisted instances back before the first sync, so createTripMirror never overwrites cleared work. */
+export async function restoreBookingInstances(store: SchedulingStore, storage: Pick<Storage, 'getItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): Promise<number> {
+  if (!storage) return 0;
+  try {
+    const raw = storage.getItem(BOOKING_INSTANCES_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw) as { version: string; instances: TaskInstance[] };
+    if (parsed.version !== BOOKING_INSTANCES_VERSION || !Array.isArray(parsed.instances)) return 0;
+    await store.saveInstances(parsed.instances);
+    return parsed.instances.length;
+  } catch {
+    return 0;
+  }
 }

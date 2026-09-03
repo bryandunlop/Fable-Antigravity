@@ -59,7 +59,15 @@ export interface TripContext {
   /** Per-leg context for per-airport instantiation + reconcile (Phase 2). Optional for
    *  back-compat with trip-level-only callers; toTripContext populates it for real trips. */
   legs?: LegContext[];
+  /** Who is aboard, as records (D110 slice 2) — a person-bound task fans out one per entry. */
+  people?: PersonContext[];
 }
+
+export interface PersonContext { id: string; name: string }
+
+/** What an item is about — the leg, person or crew it verifies (D110 slice 2). Absent = the whole trip. */
+export type BindKind = 'leg' | 'person' | 'crew';
+export interface BoundTo { kind: BindKind; id: string; label: string }
 
 export type Condition =
   | { kind: 'always' }
@@ -106,6 +114,8 @@ export interface TaskDefinition {
   appliesTo?: AppliesTo;
   /** Which trip changes re-flag a completed instance (Phase 2). undefined/empty = never. */
   reTriggerOn?: ReTrigger[];
+  /** Fan out per person aboard, or bind to the crew (D110 slice 2). Per-airport tasks bind to their leg via `appliesTo`. */
+  bindTo?: 'person' | 'crew';
   dependsOn?: string; // task-def id — NOTE: declared for future dependency gating; the engine does NOT enforce it (instantiate ignores it; readiness never derives BLOCKED from it). A later Plan 2/3 store/UI concern.
 }
 
@@ -160,6 +170,10 @@ export interface TaskInstance {
   legId?: string;
   airportIcao?: string;
   airportRole?: 'departure' | 'arrival';
+  /** Per-person instance provenance (D110 slice 2): which person this instance is for. */
+  personId?: string;
+  /** The booking fact this item verifies; the People tab, the board mark and the Checklist row all read it. */
+  boundTo?: BoundTo;
   /** Set when a completed task was re-opened by a trip change; cleared on re-completion. */
   reflag?: { change: ReTrigger };
   auditTrail: AuditEntry[];

@@ -32,6 +32,8 @@ export const WAITING_LABEL: Record<WaitingOn, string> = {
 export interface WorkspaceCounts {
   itinerary: number;
   people: number;
+  /** Open checklist items. The engine does not hold the items; the page fills this in (D110 slice 2). */
+  checklist: number;
   record: number;
   documents: number;
   sheet: number;
@@ -116,6 +118,7 @@ export function workspaceSummary(
       // Itinerary tab already shows in full; a number on the tab for it would be noise.
       itinerary: changes,
       people: live ? unnamed : 0,
+      checklist: 0,
       record: questions,
       documents: unresolvedGates.length,
       sheet: emailWaiting ? 1 : 0,

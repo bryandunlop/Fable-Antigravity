@@ -1,6 +1,6 @@
 // The trip workspace (D105, direction C): itinerary · record · documents, one page per trip.
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Mail, Paperclip, Search, Send, Snowflake } from 'lucide-react';
 import { Button } from '../../ui/button';
@@ -32,6 +32,12 @@ import { autoSendIfDue, draftEmail, emailDraftOf, emailState } from '../engine/b
 import { getCrewRoster } from '../../crew/crewRecords';
 import { appendOverlay, readAvailabilityForDates } from '../../../availability/source';
 import { useTrips } from '../../hooks/useFleetAvailability';
+import { useSchedulingWorkspace } from '../../scheduling-workspace/SchedulingWorkspaceContext';
+import { legClock } from '../engine/legClock';
+import type { TaskInstance, TaskAction } from '../../../scheduling/engine';
+import { buildChecklistJourney } from '../../scheduling-command/checklistJourney';
+import { JourneySectionBlock, BoundChip } from '../../scheduling-command/JourneyRail';
+import { boundCounts, cutoffMarkers, gatesForItem, itemsForPerson } from '../engine/boundItems';
 import { loadAvailabilityData } from '../../../availability/data/availabilityStore';
 import { reconcileBoardHolds, releaseAllBoardHolds } from '../engine/board';
 import { DENIAL_CATEGORIES, DENIAL_LABEL } from '../engine/metrics';
@@ -69,6 +75,17 @@ export default function TripWorkspace() {
   const [tab, setTab] = useState<WorkspaceTab>('itinerary');
   const [refusal, setRefusal] = useState<{ kind: 'decline' | 'bump'; category: DenialCategory; note: string } | null>(null);
   const schedTrips = useTrips();
+  // D110 slice 2: the checklist hangs off the booking. Its items live in the scheduling store,
+  // keyed by this booking's id; read them per tick so a clear elsewhere shows here.
+  const { store: schedStore, service: schedService, ready: schedReady, tick: schedTick, bump: schedBump } = useSchedulingWorkspace();
+  const [instances, setInstances] = useState<TaskInstance[]>([]);
+  useEffect(() => {
+    if (!schedReady || !id) return;
+    let cancelled = false;
+    schedStore.listInstancesForTrip(id).then(xs => { if (!cancelled) setInstances(xs); });
+    return () => { cancelled = true; };
+  }, [schedStore, schedReady, schedTick, id]);
+  const [openLedges, setOpenLedges] = useState<Set<string>>(new Set());
   const [addingLeg, setAddingLeg] = useState<{ index: number; from: import('../engine/trip').LegEnd; to: import('../engine/trip').LegEnd; date: string } | null>(null);
   const [changing, setChanging] = useState<{ legId: string; date: string; arriveBy: string; to: import('../engine/trip').LegEnd | null; reason: string } | null>(null);
   const roster = useMemo(() => getCrewRoster(nowUtc()), [nowUtc]);
@@ -114,14 +131,31 @@ export default function TripWorkspace() {
   // blocking ones refuse the freeze until scheduling overrides them with a reason.
   const gates = documentGates(trip, people, settings.documentPolicy, nowUtc());
   const gatesBlocking = blockingGates(trip, gates);
-  const summary = workspaceSummary(trip, people, settings, gates, nowUtc());
+  const openItems = instances.filter(i => i.status === 'open' || i.status === 'in_progress' || i.status === 'blocked');
+  const summaryBase = workspaceSummary(trip, people, settings, gates, nowUtc());
+  const summary = { ...summaryBase, counts: { ...summaryBase.counts, checklist: openItems.length } };
+  const journey = buildChecklistJourney(
+    trip.legs.map((l, i) => ({ id: l.id, sequence: i + 1, departureIcao: l.from.airport ?? '', arrivalIcao: l.to.airport ?? '', departureTimeUtc: legClock(l)?.depUtc ?? '', paxCount: trip.passengerNames.length })),
+    instances, Date.parse(nowUtc()), cutoffMarkers(cutoffs),
+  );
+  const railCounts = boundCounts(
+    instances,
+    trip.legs.map((l, i) => ({ id: l.id, label: `Leg ${i + 1} · ${l.from.airport ?? '?'} → ${l.to.airport ?? '?'}` })),
+    (trip.passengerIds?.length ? trip.passengerIds.map((pid, i) => ({ id: pid, name: trip.passengerNames[i] ?? pid })) : []),
+    gatesBlocking,
+  );
+  async function onChecklistAction(instanceId: string, action: TaskAction) {
+    await schedService.applyAction(instanceId, action, actor.role, nowUtc());
+    schedBump();
+  }
   // Everyone aboard as a record, so the People tab links to /people rather than printing a string.
   const aboardPeople = (trip.passengerIds?.length
     ? trip.passengerIds.map(pid => people.find(x => x.id === pid))
     : trip.passengerNames.map(n => people.find(x => x.name === n))
   ).filter((x): x is NonNullable<typeof x> => !!x);
+  // The Checklist tab is scheduling's: it is what scheduling owes the booking (D110 slice 2).
   const tabs: WorkspaceTab[] = isSched
-    ? ['itinerary', 'people', 'record', 'documents', 'sheet', 'ops']
+    ? ['itinerary', 'people', 'checklist', 'record', 'documents', 'sheet', 'ops']
     : ['itinerary', 'people', 'record', 'documents', 'sheet'];
   // A role can change under an open page (it is React state in this demo), and Ops is scheduling's.
   // Without this the viewer keeps a tab that no longer exists and the body renders nothing at all —
@@ -543,6 +577,13 @@ export default function TripWorkspace() {
                         {gates.filter(g => g.personId === p.id).length} document gate{gates.filter(g => g.personId === p.id).length === 1 ? '' : 's'}
                       </button>
                     )}
+                    {isSched && itemsForPerson(instances, p.id).length > 0 && (
+                      <div>
+                        <button className="text-xs text-primary hover:underline" onClick={() => setTab('checklist')}>
+                          {itemsForPerson(instances, p.id).map(i => i.title).join(' · ')}
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -551,6 +592,73 @@ export default function TripWorkspace() {
               )}
             </GfoPanel>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'checklist' && isSched && (
+        <div className="grid gap-4 xl:grid-cols-[1.5fr_0.8fr]">
+          <GfoPanel title={`Checklist · ${openItems.length} open`}>
+            {journey.sections.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {trip.tail ? 'No checklist for this trip yet.' : 'The checklist starts when the trip has an aircraft.'}
+              </p>
+            ) : (
+              <div className="space-y-5">
+                {journey.sections.map((section, idx) => (
+                  <div key={section.key}>
+                    <JourneySectionBlock
+                      section={section}
+                      ledgeOpen={openLedges.has(section.key)}
+                      onToggleLedge={() => setOpenLedges(prev => { const next = new Set(prev); next.has(section.key) ? next.delete(section.key) : next.add(section.key); return next; })}
+                      onAction={onChecklistAction}
+                      decorate={inst => {
+                        const g = gatesForItem(inst, gatesBlocking);
+                        return (
+                          <>
+                            <BoundChip inst={inst} onOpen={b => setTab(b.kind === 'person' ? 'people' : b.kind === 'crew' ? 'ops' : 'itinerary')} />
+                            {g.length > 0 && (
+                              <button type="button" className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-[var(--gfo-error,#EF3340)]/10 text-[var(--gfo-error-ink,#C81E2B)] hover:underline" onClick={() => setTab('documents')}>
+                                {g.length === 1 ? 'gate' : `${g.length} gates`} · {g[0].document.label} {g[0].kind === 'expired' ? 'expired' : 'short of policy'}
+                              </button>
+                            )}
+                          </>
+                        );
+                      }}
+                    />
+                    {journey.nowAfterIndex === idx && idx < journey.sections.length - 1 && (
+                      <div className="my-4 flex items-center gap-2.5" aria-label="Current time position">
+                        <div className="h-0.5 flex-1 rounded bg-[var(--gfo-midnight,#142D7E)]" />
+                        <span className="text-[10px] font-bold tracking-widest text-[var(--gfo-midnight,#142D7E)]">NOW · {formatEt(nowUtc())}</span>
+                        <div className="h-0.5 flex-1 rounded bg-[var(--gfo-midnight,#142D7E)]" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </GfoPanel>
+          <GfoPanel title="Bound to the booking">
+            <ul className="divide-y divide-border text-sm">
+              {railCounts.map(c => (
+                <li key={`${c.kind}-${c.id}`} className="flex items-center justify-between gap-3 py-2">
+                  <div>
+                    <div className="font-medium">{c.label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {c.open} open · {c.cleared} cleared{c.gates > 0 && <span className="text-[var(--gfo-error-ink,#C81E2B)]"> · {c.gates} gate{c.gates === 1 ? '' : 's'}</span>}
+                    </div>
+                  </div>
+                  {c.kind !== 'trip' && (
+                    <button className="text-xs text-primary hover:underline" onClick={() => setTab(c.kind === 'person' ? 'people' : c.kind === 'crew' ? 'ops' : 'itinerary')}>
+                      {c.kind === 'person' ? 'People' : c.kind === 'crew' ? 'Ops' : 'Itinerary'}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-muted-foreground">
+              One item, three doors: the row here, the line on the person, and the mark on the board are the same record. The cutoffs on the rail are the booking's (D106), not items.
+            </p>
+          </GfoPanel>
         </div>
       )}
 
