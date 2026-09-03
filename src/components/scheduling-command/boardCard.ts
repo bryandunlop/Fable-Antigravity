@@ -21,12 +21,11 @@ export function cardTone(f: CardFacts): CardTone {
   return 'grey';
 }
 
-/** Line 3 of the card: the worst thing first, then what is left. */
+/** Line 3 of the card: the worst thing first, then what is left. Line 2 already says "no crew", so this line does not repeat it. */
 export function cardProblemLine(f: CardFacts): string {
   const parts: string[] = [];
   if (f.status === 'blocked') parts.push('blocked');
   parts.push(...f.labels);
-  if (f.crewMissing) parts.push('no crew');
   if (parts.length === 0) return f.openTasks > 0 ? `${f.openTasks} open` : f.status === 'airborne' ? 'airborne' : 'ready';
   return parts.join(' · ') + (f.openTasks > 0 ? ` · ${f.openTasks} open` : '');
 }

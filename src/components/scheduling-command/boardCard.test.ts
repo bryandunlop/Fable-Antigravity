@@ -11,7 +11,7 @@ describe('the card says its worst problem first', () => {
     expect(cardTone({ labels: [], crewMissing: false, status: 'on-track', openTasks: 2 })).toBe('amber');
   });
   it('line 3 reads worst first, then what is left', () => {
-    expect(cardProblemLine({ labels: ['✕ gate', '△ change'], crewMissing: true, status: 'on-track', openTasks: 3 })).toBe('✕ gate · △ change · no crew · 3 open');
+    expect(cardProblemLine({ labels: ['✕ gate', '△ change'], crewMissing: true, status: 'on-track', openTasks: 3 })).toBe('✕ gate · △ change · 3 open');
     expect(cardProblemLine({ labels: [], crewMissing: false, status: 'ready', openTasks: 0 })).toBe('ready');
     expect(cardProblemLine({ labels: [], crewMissing: false, status: 'airborne', openTasks: 0 })).toBe('airborne');
   });
