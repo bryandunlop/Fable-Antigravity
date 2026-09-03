@@ -50,7 +50,7 @@ export function loadSettings(): TripSettings {
     const parsed = JSON.parse(raw) as Partial<TripSettings>;
     return {
       cutoffs: { ...DEFAULT_CUTOFFS, ...(parsed.cutoffs ?? {}) },
-      email: { ...DEFAULT_TEMPLATE, ...(parsed.email ?? {}) },
+      email: withDefaultBlocks({ ...DEFAULT_TEMPLATE, ...(parsed.email ?? {}) }),
       blurbs: parsed.blurbs ?? DEFAULT_SETTINGS.blurbs,
       passengerPrefs: parsed.passengerPrefs ?? DEFAULT_SETTINGS.passengerPrefs,
       principalReserve: { ...DEFAULT_PRINCIPAL_RESERVE, ...(parsed.principalReserve ?? {}) },
@@ -65,4 +65,15 @@ export function saveSettings(s: TripSettings): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(KEY, JSON.stringify(s));
   localStorage.setItem(VERSION_KEY, VERSION);
+}
+
+/**
+ * A template saved before a block existed keeps its own blocks and gains the new one at the end,
+ * with the default words — otherwise a settings blob from last week silently drops the block from
+ * every email. Order of the saved blocks is preserved.
+ */
+function withDefaultBlocks(t: EmailTemplate): EmailTemplate {
+  const have = new Set(t.blocks.map(b => b.id));
+  const missing = DEFAULT_TEMPLATE.blocks.filter(b => !have.has(b.id));
+  return missing.length ? { ...t, blocks: [...t.blocks, ...missing] } : t;
 }

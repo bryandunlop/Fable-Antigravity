@@ -126,11 +126,45 @@ export default function EmailPage() {
                 </div>
                 <div><span className="text-muted-foreground">Subject</span> <span className="font-medium">{current.subject}</span></div>
               </div>
+              {/* The shape Bryan picked 2026-09-02 (LG-373): headline first, then the day as a timeline,
+                  then the blocks. Both are frozen into the draft at render; drafts made before this
+                  carry neither and fall through to blocks only. */}
+              {current.hero && (
+                <div className="mt-4 bg-primary px-6 py-5 text-primary-foreground">
+                  <div className="gfo-eyebrow text-primary-foreground/70">{current.hero.date}</div>
+                  <div className="mt-1 text-2xl font-bold leading-tight">
+                    {current.hero.beThere ? `Be at ${current.hero.place} by ${current.hero.beThere}` : `Departure from ${current.hero.place} — time to be confirmed`}
+                  </div>
+                  <div className="mt-1 text-sm text-primary-foreground/80">{current.hero.strap}</div>
+                </div>
+              )}
+              {current.timeline && current.timeline.length > 0 && (
+                <div className="mt-5">
+                  <div className="gfo-eyebrow text-muted-foreground">Your day</div>
+                  <ol className="mt-2">
+                    {current.timeline.map((r, i) => (
+                      <li key={i} className="flex gap-4">
+                        <div className="flex w-3 flex-col items-center">
+                          <span className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', r.kind === 'arrive' ? 'bg-accent' : 'bg-primary')} />
+                          {i < current.timeline!.length - 1 && <span className="w-0.5 flex-1 bg-border" />}
+                        </div>
+                        <div className="flex gap-3 pb-3">
+                          <span className={cn('w-20 shrink-0 text-sm font-bold tabular-nums', r.kind === 'arrive' ? 'text-accent' : 'text-primary')}>{r.time ?? 'TBC'}</span>
+                          <span className="text-sm leading-snug">
+                            {r.label}
+                            {r.sub && <span className="block text-xs text-muted-foreground">{r.sub}</span>}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
               <div className="mt-4 space-y-4">
                 {current.blocks.map(b => (
                   <div key={b.id}>
                     <div className="flex items-baseline justify-between">
-                      <div className="text-sm font-semibold text-primary">{b.title}</div>
+                      <div className="text-sm font-semibold text-primary">{b.id === 'when' && current.timeline?.length ? 'Plain-text version of the above' : b.title}</div>
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{b.source === 'auto' ? (b.id === 'weather' ? 'auto · demo forecast' : 'auto from the trip') : 'template'}</span>
                     </div>
                     {editable ? (
