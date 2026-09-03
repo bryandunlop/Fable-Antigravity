@@ -72,12 +72,17 @@ export function PlanBoard({
 
   const rows = useMemo(() => fleetRowsFor(trips).map(ac => {
     const tailTrips = trips.filter(t => t.aircraft === ac.tail);
+    // A bar runs from departure to the LAST ARRIVAL, in real hours — never rounded up to whole
+    // days. Rounding made a 21:00 departure occupy the next morning and flagged a maintenance
+    // window it never touched as a conflict (Bryan, 2026-09-03: a tail is never double-booked).
+    const MIN_SPAN = 2 * 3_600_000;
     const bars = tailTrips
       .map(t => {
         const startMs = new Date(t.departureDate).getTime();
-        return { trip: t, startMs, endMs: startMs + t.durationDays * DAY_MS };
+        const endMs = Math.max(new Date(t.arrivalDate ?? t.departureDate).getTime(), startMs + MIN_SPAN);
+        return { trip: t, startMs, endMs, spanDays: (endMs - startMs) / DAY_MS };
       })
-      .filter(b => barGeometry(b.startMs, b.trip.durationDays, window_) !== null);
+      .filter(b => barGeometry(b.startMs, b.spanDays, window_) !== null);
 
     const downtimeBars = downtime
       .filter(b => b.tail === ac.tail)
@@ -107,7 +112,7 @@ export function PlanBoard({
     for (const [, list] of byLane) {
       let prevRight = -Infinity;
       for (const b of [...list].sort((x, y) => x.startMs - y.startMs)) {
-        const g = barGeometry(b.startMs, b.trip.durationDays, window_)!;
+        const g = barGeometry(b.startMs, b.spanDays, window_)!;
         const timeLeft = (g.startPct / 100) * boardW;
         const widthPx = zoom !== 'quarter' ? Math.max((g.widthPct / 100) * boardW, CARD_MIN_W) : Math.max((g.widthPct / 100) * boardW, 14);
         const left = Math.max(timeLeft, prevRight + 4);
@@ -254,8 +259,8 @@ export function PlanBoard({
                   {/* Trip cards (LG-396, Bryan: B with A's stripe). The tint is the worst problem, the
                       4px stripe on the left edge is the derived status, and the words never truncate to
                       the bar's width: the card is as wide as its days, with a floor for the label. */}
-                  {bars.map(({ trip, startMs }) => {
-                    const g = barGeometry(startMs, trip.durationDays, window_)!;
+                  {bars.map(({ trip, startMs, spanDays }) => {
+                    const g = barGeometry(startMs, spanDays, window_)!;
                     const lane = lanes.laneOf.get(trip.id) ?? 0;
                     const status = deriveTripStatus(trip, nowMs);
                     const style = TRIP_STATUS_STYLES[status];
