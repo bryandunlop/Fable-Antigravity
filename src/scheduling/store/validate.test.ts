@@ -143,3 +143,16 @@ describe('validator hardening — silently-useless configs are rejected (audit #
     expect(() => parseTemplate(recurring)).toThrow(/recurring/i);
   });
 });
+
+describe('bindTo survives validation (D110 slice 2)', () => {
+  const base = { id: 'tpl', name: 'T', triggerType: 'per_trip', scope: 'international', version: 1, status: 'published', effectiveFrom: '2026-01-01T00:00:00.000Z' };
+  const def = (extra: Record<string, unknown>) => ({ id: 'd', title: 'D', ownerRole: 'scheduling', category: 'crew', order: 1, dueRule: { kind: 'hoursBeforeEtd', hours: 24 }, requiresAck: false, ...extra });
+  it('keeps person and crew bindings', () => {
+    expect(parseTemplate({ ...base, taskDefinitions: [def({ bindTo: 'person' })] }).taskDefinitions[0].bindTo).toBe('person');
+    expect(parseTemplate({ ...base, taskDefinitions: [def({ bindTo: 'crew' })] }).taskDefinitions[0].bindTo).toBe('crew');
+  });
+  it('refuses an unknown binding, and a binding on a per-airport task', () => {
+    expect(() => parseTemplate({ ...base, taskDefinitions: [def({ bindTo: 'leg' })] })).toThrow(/bindTo/);
+    expect(() => parseTemplate({ ...base, taskDefinitions: [def({ bindTo: 'person', appliesTo: { endpoint: 'both', airport: { kind: 'prefix', prefix: 'K' } } })] })).toThrow(/bindTo/);
+  });
+});

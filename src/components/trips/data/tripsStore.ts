@@ -186,7 +186,12 @@ export function loadTrips(): Trip[] {
 
 export function saveTrips(trips: Trip[]): void {
   if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(TRIPS_KEY, JSON.stringify(trips));
+  const next = JSON.stringify(trips);
+  // Only a real change is a change. The availability read re-links the register on every render
+  // and writes the same trips back; announcing that spun the scheduling store into a resync →
+  // bump → re-read → write loop that starved the router (found 2026-09-03 in slice 2).
+  const changed = localStorage.getItem(TRIPS_KEY) !== next || localStorage.getItem(VERSION_KEY) !== VERSION;
+  localStorage.setItem(TRIPS_KEY, next);
   localStorage.setItem(VERSION_KEY, VERSION);
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(TRIPS_CHANGED_EVENT));
+  if (changed && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(TRIPS_CHANGED_EVENT));
 }

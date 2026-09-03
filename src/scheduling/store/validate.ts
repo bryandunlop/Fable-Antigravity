@@ -153,6 +153,13 @@ function parseTaskDef(raw: unknown): TaskDefinition {
   if (typeof raw.dependsOn === 'string') def.dependsOn = raw.dependsOn;
   if (raw.appliesTo !== undefined) def.appliesTo = parseAppliesTo(raw.appliesTo);
   if (raw.reTriggerOn !== undefined) def.reTriggerOn = parseReTriggerOn(raw.reTriggerOn);
+  // D110 slice 2 — what the item is about. A per-airport task binds to its leg via appliesTo, so
+  // bindTo is only for people and crew.
+  if (raw.bindTo !== undefined) {
+    if (raw.bindTo !== 'person' && raw.bindTo !== 'crew') throw new Error(`taskDefinition.bindTo: invalid value '${String(raw.bindTo)}'`);
+    if (raw.appliesTo !== undefined) throw new Error('taskDefinition.bindTo: a per-airport task is already bound to its leg');
+    def.bindTo = raw.bindTo;
+  }
   return def;
 }
 
