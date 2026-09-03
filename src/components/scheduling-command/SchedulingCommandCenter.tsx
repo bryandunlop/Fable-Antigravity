@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { CalendarCheck, CalendarDays, ClipboardList, Eye, Inbox as InboxIcon, LayoutList, Loader2, Rows3, Send, Telescope, Tv } from 'lucide-react';
+import { BarChart3, BookUser, CalendarCheck, ClipboardList, ClipboardType, Eye, Inbox as InboxIcon, ListChecks, Loader2, MapPin, Rows3, Send, Settings2, Sliders, Telescope, Tv } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
@@ -16,10 +17,17 @@ import { AttentionBand } from './AttentionBand';
 import { toTripsForAlerts } from './alertTrips';
 import { fleetRowsFor } from './fleet';
 import { PlanBoard } from './PlanBoard';
-import { CalendarView } from './CalendarView';
-import { DispatchTable } from './DispatchTable';
 import { FilterBar } from './FilterBar';
-import { TripDrawer } from './TripDrawer';
+import { DockedTripDrawer } from './DockedTripDrawer';
+import { QueueView } from './QueueView';
+import { recallLens, rememberLens, type HomeLens } from './lensMemory';
+import { loadTrips, saveTrips, TRIPS_CHANGED_EVENT } from '../trips/data/tripsStore';
+import { loadSettings } from '../trips/data/settingsStore';
+import { loadLinkedRegister } from '../trips/data/peopleStore';
+import { withFlownDerived } from '../trips/engine/people';
+import { boardMarksFor, markLabels, crewLabel, unassignedBookings } from '../trips/engine/boardMarks';
+import { legClock } from '../trips/engine/legClock';
+import { routeLabel, tripSpan, type Trip } from '../trips/engine/trip';
 import { buildHorizonBoard, officeTasksDueToday } from './horizonSelectors';
 import { AvailabilityBoard } from './AvailabilityBoard';
 import { actingUser } from '../safety-center/actingUser';
@@ -29,23 +37,22 @@ import { HorizonView } from './HorizonView';
 import { matchesTripTypeFilter, hasOpenWork, filterCounts } from './tripFilters';
 import type { TripType } from '../../scheduling/engine';
 
-// One home, four lenses (D87): Horizon (default) / Fleet board / Calendar / List are PROJECTIONS
-// of the same filtered trip set — not surfaces with their own content models. The old
-// Schedule / Upcoming / Action Center tabs folded into this.
-type Lens = 'horizon' | 'board' | 'calendar' | 'list' | 'availability';
-type Utility = 'templates' | 'inbox' | 'foreflight' | 'pilot-visibility';
+// One home, three lenses (D110 slice 3, canvas C): Board (the picture schedulers think in — the
+// default), Horizon (the same trips by when work is due) and Queue (by who is waiting) are
+// PROJECTIONS of the same filtered bookings under one filter row. The last lens is remembered per
+// person. Calendar and List retired with D110; Availability (LG-311) — the one surface that manages
+// what is NOT committed — moved beside Templates as a utility.
+type Lens = HomeLens;
+type Utility = 'availability' | 'templates' | 'inbox' | 'foreflight' | 'pilot-visibility';
 
 const LENSES: { key: Lens; label: string; icon: React.ElementType }[] = [
+  { key: 'board', label: 'Board', icon: Rows3 },
   { key: 'horizon', label: 'Horizon', icon: Telescope },
-  { key: 'board', label: 'Fleet board', icon: Rows3 },
-  { key: 'calendar', label: 'Calendar', icon: CalendarDays },
-  { key: 'list', label: 'List', icon: LayoutList },
-  // The fifth lens (LG-311). The other four project COMMITTED trips; this one is the only
-  // surface that shows — and manages — what is NOT committed and why.
-  { key: 'availability', label: 'Availability', icon: CalendarCheck },
+  { key: 'queue', label: 'Queue', icon: ListChecks },
 ];
 
 const UTILITY_TABS: { key: Utility; label: string; icon: React.ElementType }[] = [
+  { key: 'availability', label: 'Availability', icon: CalendarCheck },
   { key: 'templates', label: 'Templates', icon: ClipboardList },
   { key: 'inbox', label: 'Inbox', icon: InboxIcon },
   { key: 'foreflight', label: 'ForeFlight', icon: Send },
@@ -68,7 +75,33 @@ export default function SchedulingCommandCenter({
 }) {
   const { service, store, ready, tick, bump, nowUtc, officeTzOffsetMinutes } = useSchedulingWorkspace();
 
-  const [lens, setLens] = useState<Lens>('horizon');
+  const person = useMemo(() => actingUser(userRole).name, [userRole]);
+  const [lens, setLensState] = useState<Lens>(() => recallLens(person, typeof localStorage === 'undefined' ? null : localStorage));
+  const setLens = (l: Lens) => { setLensState(l); rememberLens(person, l, typeof localStorage === 'undefined' ? null : localStorage); };
+
+  // The bookings themselves (D110): the board's marks, crew row and Unassigned lane, and the Queue
+  // lens, read the trips module directly — the scheduling store holds their projection, not their
+  // people, gates or change requests. Re-read whenever the module writes.
+  const [bookingsTick, setBookingsTick] = useState(0);
+  useEffect(() => {
+    const on = () => setBookingsTick(t => t + 1);
+    window.addEventListener(TRIPS_CHANGED_EVENT, on);
+    window.addEventListener('storage', on);
+    return () => { window.removeEventListener(TRIPS_CHANGED_EVENT, on); window.removeEventListener('storage', on); };
+  }, []);
+  const bookings = useMemo(() => {
+    const s = loadSettings();
+    const linked = loadLinkedRegister<Trip>(loadTrips, saveTrips, s.passengerPrefs, s.principalReserve?.name, new Date().toISOString());
+    const people = withFlownDerived(linked.people, linked.trips, new Date().toISOString());
+    return { trips: linked.trips.filter(t => t.visibleToScheduling), people, settings: s };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingsTick, tick]);
+  const bookingIds = useMemo(() => new Set(bookings.trips.map(t => t.id)), [bookings]);
+  // One clock reading per data change, not per keystroke: the Queue lens memoises on it, and a
+  // fresh string every render would recompute the gates for every booking while someone types in
+  // the search box (fresh review, 2026-09-03).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const queueNow = useMemo(() => nowUtc(), [bookings, tick]);
   const [utility, setUtility] = useState<Utility | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [tailFilter, setTailFilter] = useState<Set<string>>(new Set());
@@ -178,6 +211,21 @@ export default function SchedulingCommandCenter({
 
   const counts = useMemo(() => filterCounts(trips), [trips]);
 
+  const boardMarks = useMemo(() => {
+    const m = boardMarksFor(bookings.trips, bookings.people, bookings.settings.documentPolicy, nowUtc());
+    const out = new Map<string, { labels: string[]; crewLabel: string | null; crewMissing: boolean }>();
+    for (const [id, bm] of m) out.set(id, { labels: markLabels(bm), crewLabel: crewLabel(bm.crew), crewMissing: bm.crewMissing });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings]);
+  const unassigned = useMemo(() => unassignedBookings(bookings.trips).map(t => {
+    const span = tripSpan(t);
+    const first = t.legs.map(l => legClock(l)?.depUtc).find((d): d is string => !!d);
+    const days = span.start && span.end ? Math.max(1, Math.round((Date.parse(span.end) - Date.parse(span.start)) / 86_400_000) + 1) : 1;
+    return { id: t.id, title: t.title, route: routeLabel(t), departureDate: first ?? (span.start ? `${span.start}T12:00:00.000Z` : nowUtc()), durationDays: days };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }).filter(u => tailFilter.size === 0), [bookings, tailFilter]);
+
   const horizonModel = useMemo(
     () => buildHorizonBoard(filteredTrips, nowMs, horizonDays),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,12 +269,34 @@ export default function SchedulingCommandCenter({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Scheduling</h1>
           <p className="text-sm text-muted-foreground">
-            {trips.length} trips · synced from myairops · readiness derived live from checklist state
+            {trips.length} trips · bookings and the myairops feed · readiness derived live from checklist state
           </p>
         </div>
-        <Button variant="outline" size="sm" asChild className="text-muted-foreground">
-          <Link to="/scheduling-wall"><Tv className="h-4 w-4 mr-1.5" /> Ops wall</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild className="text-muted-foreground">
+            <Link to="/scheduling-wall"><Tv className="h-4 w-4 mr-1.5" /> Ops wall</Link>
+          </Button>
+          {/* D110 slice 4: everything that used to be a rail entry and is not a lens lives here. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="text-muted-foreground" aria-label="Scheduling settings and tools">
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Trips</DropdownMenuLabel>
+              <DropdownMenuItem asChild><Link to="/trips/settings"><Sliders className="mr-2 h-4 w-4" /> Trip settings</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/trips/places"><MapPin className="mr-2 h-4 w-4" /> Places</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/trips/metrics"><BarChart3 className="mr-2 h-4 w-4" /> Trip metrics</Link></DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>People</DropdownMenuLabel>
+              <DropdownMenuItem asChild><Link to="/crew-scheduling-workload"><BookUser className="mr-2 h-4 w-4" /> Crew workload</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/passenger-forms"><ClipboardType className="mr-2 h-4 w-4" /> Passenger forms</Link></DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setUtility('templates')}><ClipboardList className="mr-2 h-4 w-4" /> Checklist templates</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* The lens switch: four projections of the same trips + quiet utilities */}
@@ -279,15 +349,16 @@ export default function SchedulingCommandCenter({
         />
       )}
       {onLensSurface && lens === 'board' && (
-        <PlanBoard trips={filteredTrips} nowMs={nowMs} serviceability={fleetServiceability} downtime={downtimeBlocks} onTripClick={t => openTrip(t.id)} onOpenHorizon={() => setLens('horizon')} />
+        <PlanBoard
+          trips={filteredTrips} nowMs={nowMs} serviceability={fleetServiceability} downtime={downtimeBlocks}
+          marks={boardMarks} unassigned={unassigned} onOpenBooking={id => openTrip(id)}
+          onTripClick={t => openTrip(t.id)} onOpenHorizon={() => setLens('horizon')}
+        />
       )}
-      {onLensSurface && lens === 'calendar' && (
-        <CalendarView trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
+      {onLensSurface && lens === 'queue' && (
+        <QueueView trips={bookings.trips} people={bookings.people} settings={bookings.settings} nowUtc={queueNow} tailFilter={tailFilter} onOpenTrip={id => openTrip(id)} />
       )}
-      {onLensSurface && lens === 'list' && (
-        <DispatchTable trips={filteredTrips} nowMs={nowMs} onTripClick={t => openTrip(t.id)} />
-      )}
-      {onLensSurface && lens === 'availability' && (
+      {utility === 'availability' && (
         <AvailabilityBoard
           fleet={availability}
           serviceability={fleetServiceability}
@@ -305,12 +376,14 @@ export default function SchedulingCommandCenter({
       {utility === 'pilot-visibility' && <PilotVisibilityPanel />}
 
       {/* The trip workspace, over whichever lens you're in */}
-      <TripDrawer
+      <DockedTripDrawer
         tripId={drawer?.tripId ?? null}
+        isBooking={!!drawer && bookingIds.has(drawer.tripId)}
         focusTaskId={drawer?.taskId}
         open={!!drawer}
         onOpenChange={o => { if (!o) setDrawer(null); }}
         userRole={userRole}
+        additionalRoles={additionalRoles}
       />
     </div>
   );

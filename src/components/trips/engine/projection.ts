@@ -60,7 +60,7 @@ export function tripToRecord(trip: Trip): TripRecord | null {
     tail: trip.tail, aircraftType: aircraftFor(trip.tail)?.type ?? 'G500', tripType: tripTypeOf(trip), priority: 'standard',
     status,
     startDate: `${dates[0]}T00:00:00.000Z`, endDate: `${dates[dates.length - 1]}T23:59:59.000Z`,
-    legs, ...(people ? { people } : {}), createdBy: trip.createdBy.name, createdAtUtc: trip.createdAt,
+    legs, ...(people ? { people } : {}), crew: trip.crew, createdBy: trip.createdBy.name, createdAtUtc: trip.createdAt,
   };
 }
 

@@ -74,6 +74,10 @@ const KNOWN_UNREGISTERED = [
   '/maintenance-workflow/handover',
   '/maintenance-workflow/analytics',
   '/experimental/scheduling-command', // redirect stub
+  // D110 slice 4 redirect stubs — the old command-center URL and the two retired scheduling pages.
+  '/scheduling-command',
+  '/scheduling-dashboard',
+  '/trip-coordination',
   // D66 redirect stubs — the two bulletin readers folded into the Document Center.
   // Kept routed (not deleted) so bookmarks and pre-D66 notification links resolve;
   // deliberately unregistered, because a manifest entry would put the second door back.
@@ -130,10 +134,10 @@ describe('role filtering', () => {
   it('pilot sees the workspace but not scheduling-only pages', () => {
     const paths = entriesForRoles('pilot').map((e) => e.path);
     expect(paths).toContain('/pilot-workspace');
-    expect(paths).not.toContain('/scheduling-command');
+    expect(paths).not.toContain('/scheduling');
   });
   it('additionalRoles widen visibility', () => {
-    expect(entriesForRoles('pilot', ['scheduling']).map((e) => e.path)).toContain('/scheduling-command');
+    expect(entriesForRoles('pilot', ['scheduling']).map((e) => e.path)).toContain('/scheduling');
   });
 });
 
@@ -203,5 +207,13 @@ describe('front doors', () => {
   it('leave pilots and chief pilots on the Dashboard', () => {
     expect(FRONT_DOORS['pilot']).toBeUndefined();
     expect(FRONT_DOORS['chief-pilot']).toBeUndefined();
+  });
+});
+
+describe("D110 slice 4 — scheduling's rail", () => {
+  it('is one Scheduling entry plus Trips, People, Watches and Vacation Request; metrics, settings, places and the retired pages are not in it', () => {
+    const rail = entriesForRoles('scheduling', []).filter(e => e.domain === 'scheduling' && e.sidebar !== false).map(e => e.path);
+    expect(rail).toEqual(['/trips', '/people', '/trips/watches', '/scheduling', '/vacation-request']);
+    expect(FRONT_DOORS['scheduling']).toBe('/scheduling');
   });
 });

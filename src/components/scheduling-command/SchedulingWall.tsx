@@ -211,7 +211,7 @@ export default function SchedulingWall() {
       {/* Quiet footer — the only interactive element, for whoever set the TV up */}
       <div className="flex items-center justify-between text-sm text-white/40">
         <span>Read-only · data refreshes on sync · trips arrive from myairops</span>
-        <Link to="/scheduling-command" className="hover:text-white/70 transition-colors">Open Scheduling →</Link>
+        <Link to="/scheduling" className="hover:text-white/70 transition-colors">Open Scheduling →</Link>
       </div>
     </div>
   );

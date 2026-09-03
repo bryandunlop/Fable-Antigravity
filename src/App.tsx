@@ -55,7 +55,6 @@ import AircraftInventory from './components/AircraftInventory';
 import PostFlightChecklist from './components/PostFlightChecklist';
 import TurndownForm from './components/TurndownForm';
 import TurndownReports from './components/TurndownReports';
-import SchedulingDashboard from './components/SchedulingDashboard';
 import CriticalBusinessFunctions from './components/CriticalBusinessFunctions';
 import RollingActionItems from './components/RollingActionItems';
 import SuggestionBox from './components/SuggestionBox';
@@ -87,7 +86,6 @@ import TripBuilderRoute from './components/trips/TripBuilderRoute';
 import FlightFamily from './components/FlightFamily';
 import ASAPReport from './components/ASAPReport';
 import PartsInventory from './components/PartsInventory';
-import TripCoordination from './components/TripCoordination';
 import CrewSchedulingWorkload from './components/CrewSchedulingWorkload';
 import FlightOperationsCenter from './components/FlightOperationsCenter';
 import StandaloneFRATForm from './components/StandaloneFRATForm';
@@ -615,8 +613,9 @@ export default function App() {
                                 <Route path="/post-flight-checklist" element={<PostFlightChecklist userRole={userRole} />} />
                                 <Route path="/turndown-form" element={<TurndownForm />} />
                                 <Route path="/turndown-reports" element={<TurndownReports />} />
-                                <Route path="/scheduling-dashboard" element={<SchedulingDashboard />} />
-                                <Route path="/trip-coordination" element={<TripCoordination />} />
+                                {/* D110 slice 4: retired — the scheduling home is the board and the queue. */}
+                                <Route path="/scheduling-dashboard" element={<Navigate to="/scheduling" replace />} />
+                                <Route path="/trip-coordination" element={<Navigate to="/scheduling" replace />} />
                                 <Route
                                   path="/crew-scheduling-workload"
                                   element={
@@ -625,8 +624,9 @@ export default function App() {
                                     </ProtectedRoute>
                                   }
                                 />
+                                <Route path="/scheduling-command" element={<Navigate to="/scheduling" replace />} />
                                 <Route
-                                  path="/scheduling-command"
+                                  path="/scheduling"
                                   element={
                                     <ProtectedRoute userRole={userRole} additionalRoles={additionalRoles} allowedRoles={['scheduling', 'admin']}>
                                       <SchedulingWorkspaceProvider>
@@ -636,7 +636,7 @@ export default function App() {
                                   }
                                 />
                                 {/* Retired: the tabbed workspace folded into the command-center hub. */}
-                                <Route path="/scheduling-workspace" element={<Navigate to="/scheduling-command" replace />} />
+                                <Route path="/scheduling-workspace" element={<Navigate to="/scheduling" replace />} />
                                 <Route
                                   path="/passenger-currency"
                                   element={
@@ -762,7 +762,7 @@ export default function App() {
                                 <Route path="/maintenance-workflow/analytics" element={
                                   <MaintenanceWorkflowProvider><MWPredictiveAnalytics /></MaintenanceWorkflowProvider>
                                 } />
-                                <Route path="/experimental/scheduling-command" element={<Navigate to="/scheduling-command" replace />} />
+                                <Route path="/experimental/scheduling-command" element={<Navigate to="/scheduling" replace />} />
                                 {/* Real 404 — broken links are visible bugs, not silent redirects */}
                                 <Route path="*" element={<NotFound />} />
                               </Routes>

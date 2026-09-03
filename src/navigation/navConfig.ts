@@ -68,7 +68,7 @@ export const FRONT_DOORS: Record<string, string> = {
   // Flight Hub is where a pilot works, but it is not the first thing they should see on opening the
   // app — the dashboard is the across-the-day picture, and Flight Hub is one tap from it in the
   // sidebar.
-  'scheduling': '/scheduling-command',
+  'scheduling': '/scheduling',
   'maintenance': '/tech-log',
   'maintenance-coordinator': '/tech-log',
   'dom': '/tech-log',
@@ -109,10 +109,12 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/trips', label: 'Trips', domain: 'scheduling', icon: Briefcase, primary: true, keywords: ['trip', 'request', 'workspace', 'record', 'documents', 'draft', 'places'], roles: ['admin-assistant', 'scheduling', 'lead'] },
   { path: '/people', label: 'People', domain: 'scheduling', icon: Users, keywords: ['passenger', 'passengers', 'principal', 'guest', 'documents', 'passport', 'visa', 'forms', 'briefing'], roles: ['admin-assistant', 'scheduling', 'lead'] },
   { path: '/trips/watches', label: 'Watches', domain: 'scheduling', icon: Radar, keywords: ['watchlist', 'waitlist', 'cabin', 'frees up'], roles: ['admin-assistant', 'scheduling'] },
-  { path: '/trips/metrics', label: 'Trip metrics', domain: 'scheduling', icon: BarChart3, keywords: ['bump rate', 'denied', 'accepted', 'cancelled'], roles: ['scheduling', 'lead'] },
-  { path: '/trips/settings', label: 'Trip settings', domain: 'scheduling', icon: Sliders, keywords: ['cutoffs', 'email', 'template', 'dead man', 'blurbs', 'passenger preferences'], roles: ['scheduling'] },
-  { path: '/trips/places', label: 'Places', domain: 'scheduling', icon: MapPin, keywords: ['airport', 'alias', 'plant', 'city', 'seattle', 'boeing field'], roles: ['scheduling'] },
-  { path: '/fleet-schedule', label: 'Fleet schedule', domain: 'scheduling', icon: CalendarFold, keywords: ['availability', 'block', 'hold', 'month', 'calendar', 'open days'], roles: ['scheduling', 'lead', 'admin-assistant'] },
+  // D110 slice 4: metrics, settings and places sit behind the gear on the scheduling home, not in the rail.
+  { path: '/trips/metrics', label: 'Trip metrics', domain: 'scheduling', icon: BarChart3, sidebar: false, keywords: ['bump rate', 'denied', 'accepted', 'cancelled'], roles: ['scheduling', 'lead'] },
+  { path: '/trips/settings', label: 'Trip settings', domain: 'scheduling', icon: Sliders, sidebar: false, keywords: ['cutoffs', 'email', 'template', 'dead man', 'blurbs', 'passenger preferences'], roles: ['scheduling'] },
+  { path: '/trips/places', label: 'Places', domain: 'scheduling', icon: MapPin, sidebar: false, keywords: ['airport', 'alias', 'plant', 'city', 'seattle', 'boeing field'], roles: ['scheduling'] },
+  // D110 slice 4: for scheduling the fleet schedule IS the home's Board lens; lead and the EA keep this door.
+  { path: '/fleet-schedule', label: 'Fleet schedule', domain: 'scheduling', icon: CalendarFold, keywords: ['availability', 'block', 'hold', 'month', 'calendar', 'open days'], roles: ['lead', 'admin-assistant'] },
   // Per-approver inbox (D39): requests awaiting your role's sign-off, plus what you filed.
   { path: '/approvals', label: 'Approvals', domain: 'home', icon: Stamp, primary: true, keywords: ['approve', 'waiver', 'sign-off', 'request'], roles: ['pilot', 'chief-pilot', 'inflight', 'fa-manager', 'maintenance', 'chief-inspector', 'shift-lead', 'safety', 'lead', 'scheduling', 'document-manager', 'admin', 'dom'] },
   // D66: Procedural Bulletins and Flight Ops Bulletins used to sit here and under
@@ -166,22 +168,23 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { path: '/wall/maintenance', label: 'Maintenance Wall (TV)', domain: 'maintenance', icon: Monitor, sidebar: false, keywords: ['hangar tv', 'mx wall', 'display', 'fleet map'], roles: ['maintenance', 'admin', 'lead'] },
 
   // ── Scheduling — the Scheduling Workspace leads ───────────────────────────
-  { path: '/scheduling-command', label: 'Scheduling', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['master command center', 'horizon', 'checklist', 'handoff', 'fleet board', 'trips', 'templates'], roles: ['scheduling', 'admin'] },
+  // D110: one rail entry. Board · Horizon · Queue lenses, the docked trip workspace, the gear for the rest.
+  { path: '/scheduling', label: 'Scheduling', domain: 'scheduling', icon: CalendarCheck, primary: true, keywords: ['command center', 'horizon', 'queue', 'board', 'checklist', 'handoff', 'fleet board', 'trips', 'templates'], roles: ['scheduling', 'admin'] },
   // D87 wall — TV mode reached from the command center's "Ops wall" button; no sidebar link,
   // but ⌘K-searchable so whoever sets the TV up can find it.
   { path: '/scheduling-wall', label: 'Scheduling Wall (TV)', domain: 'scheduling', icon: CalendarCheck, sidebar: false, keywords: ['ops wall', 'tv', 'wallboard'], roles: ['scheduling', 'admin'] },
   { path: '/schedule', label: 'Schedule Calendar', domain: 'scheduling', icon: Calendar, primary: true, roles: ['pilot', 'admin'] },
-  { path: '/crew-scheduling-workload', label: 'Crew Workload', domain: 'scheduling', icon: BookUser, primary: true, keywords: ['travel'], roles: ['scheduling', 'admin', 'lead'] },
+  // D110 slice 4 (Bryan, Q4): for scheduling, crew workload is a People view — reached from /people and the gear.
+  { path: '/crew-scheduling-workload', label: 'Crew Workload', domain: 'scheduling', icon: BookUser, primary: true, keywords: ['travel'], roles: ['admin', 'lead'] },
   { path: '/vacation-request', label: 'Vacation Request', domain: 'scheduling', icon: CalendarDays, primary: true, roles: ['pilot', 'inflight', 'maintenance', 'admin', 'lead', 'scheduling', 'maintenance-coordinator', 'dom'] },
   // Booking portal (PR #31 / [[LG-125]]): the EA-facing front door for trip requests. The rest of
   // that branch's nav diff was a stale fork of main and was dropped in the merge — this entry is the
   // only thing it actually added here.
   // The old portal is hidden from the Executive Administrator (Bryan, 2026-09-01, LG-338): her
   // door is /trips (D105). Scheduling/lead/admin keep it until the rebuild covers their pages.
-  { path: '/scheduling-dashboard', label: 'Scheduling Dashboard', railLabel: 'Sched Board', domain: 'scheduling', icon: LayoutDashboard, primary: false, roles: ['scheduling', 'admin'] },
-  { path: '/trip-coordination', label: 'Trip Coordination', domain: 'scheduling', icon: Route, primary: false, roles: ['scheduling', 'admin'] },
   // D100 — chasing travel forms is the EA's own workload, so she gets the door.
-  { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: ClipboardType, primary: false, roles: ['scheduling', 'admin', 'admin-assistant'] },
+  // D110 slice 4 (Q4): scheduling reaches the forms from /people; the module reading the people register is [[LG-389]].
+  { path: '/passenger-forms', label: 'Passenger Forms', domain: 'scheduling', icon: ClipboardType, primary: false, roles: ['admin', 'admin-assistant'] },
   // Merged into Passenger Forms as its "Data Currency" tab (Bryan, 2026-08-08):
   // that page already carried Expiring Documents and Outdated Data, so this was
   // the same job behind a second door — and "Passenger Forms" was the name Bryan

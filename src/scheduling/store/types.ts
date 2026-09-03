@@ -27,6 +27,8 @@ export interface TripRecord {
   legs: TripLegRecord[];
   /** Who is aboard, as records (D110 slice 2). Set by the booking projection; absent on fixtures. */
   people?: Array<{ id: string; name: string }>;
+  /** Who is flying it (D110 slice 3) — the board's crew row. Set by the booking projection; absent on fixtures. */
+  crew?: { pic: string; sic: string; fa: string | null } | null;
   createdBy: string;
   createdAtUtc: string;
   lastEditedBy?: string;

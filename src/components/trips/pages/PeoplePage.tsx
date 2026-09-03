@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Star } from 'lucide-react';
 import { GfoPageHeader, GfoPanel } from '../../gfo';
+import { Button } from '../../ui/button';
 import { cn } from '../../ui/utils';
 import { useTripsModule } from '../TripsContext';
 import { personHistory, type FormStatus, type Person } from '../engine/people';
@@ -44,7 +45,7 @@ export function documentSummary(person: Person, todayKey: string): { text: strin
 }
 
 export default function PeoplePage() {
-  const { people, allTrips, nowUtc } = useTripsModule();
+  const { people, allTrips, nowUtc, actor } = useTripsModule();
   const navigate = useNavigate();
   const now = nowUtc();
   const todayKey = now.slice(0, 10);
@@ -64,6 +65,14 @@ export default function PeoplePage() {
         eyebrow="Trips"
         title="People"
         description="Everyone the department flies. A person is a record — the reserve, the briefing email, the document checks and the metrics all read this one, so a rename changes a name and nothing else."
+        actions={
+          // D110 slice 4 (Bryan, Q4): crew workload is a People view, and the forms module is reached from here.
+          <div className="flex items-center gap-2">
+            {/* The crew page is scheduling's; the EA has no door to it (fresh review, 2026-09-03). */}
+            {actor.role === 'scheduling' && <Button variant="outline" size="sm" onClick={() => navigate('/crew-scheduling-workload')}>Crew workload</Button>}
+            <Button variant="outline" size="sm" onClick={() => navigate('/passenger-forms')}>Passenger forms</Button>
+          </div>
+        }
       />
 
       <GfoPanel>
