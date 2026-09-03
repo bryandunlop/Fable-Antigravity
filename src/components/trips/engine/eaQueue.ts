@@ -70,7 +70,8 @@ function reasonsFor(
   if (!trip.tail) out.push('No aircraft yet');
   const changes = pendingChanges(trip).length;
   if (changes > 0) out.push(`${changes} change request${changes === 1 ? '' : 's'} with scheduling`);
-  if (summary.messages > 0) out.push(`${summary.messages} of your message${summary.messages === 1 ? '' : 's'} unanswered`);
+  if (summary.messages === 1) out.push('Your message is unanswered');
+  else if (summary.messages > 1) out.push(`${summary.messages} of your messages unanswered`);
   if (trip.tail && !trip.crew) out.push('No crew set');
   if (freezesInHours !== null && freezesInHours > 0 && freezesInHours <= FREEZING_WINDOW_DAYS * 24) {
     const days = Math.floor(freezesInHours / 24);

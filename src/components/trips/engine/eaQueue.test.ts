@@ -88,4 +88,11 @@ describe("the EA's bands", () => {
     expect(run([setCrew(t, { pic: 'Capt. John Smith', sic: 'FO Emily Chen', fa: null }, SCHED, NOW)]).you[0].reasons)
       .toContain('2 seats unnamed');
   });
+
+  it('reads her own unanswered message as a sentence, not a count of one', () => {
+    const one = postMessage(settled('m', 20), EA, 'Can we push to 10?', NOW);
+    expect(run([one]).scheduling[0].reasons).toContain('Your message is unanswered');
+    const two = postMessage(one, EA, 'And add a bag.', NOW);
+    expect(run([two]).scheduling[0].reasons).toContain('2 of your messages unanswered');
+  });
 });
