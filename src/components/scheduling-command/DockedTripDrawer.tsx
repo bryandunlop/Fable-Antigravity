@@ -11,11 +11,12 @@ import TripWorkspace from '../trips/pages/TripWorkspace';
 import { TripDrawer } from './TripDrawer';
 
 export function DockedTripDrawer({
-  tripId, isBooking, focusTaskId, open, onOpenChange, userRole, additionalRoles = [],
+  tripId, isBooking, focusTaskId, initialTab, open, onOpenChange, userRole, additionalRoles = [],
 }: {
   tripId: string | null;
   isBooking: boolean;
   focusTaskId?: string;
+  initialTab?: 'itinerary' | 'people' | 'checklist' | 'record' | 'documents' | 'sheet' | 'ops';
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userRole: string;
@@ -31,7 +32,7 @@ export function DockedTripDrawer({
         <SheetDescription className="sr-only">The booking's itinerary, people, checklist, record, documents and sheet.</SheetDescription>
         {tripId && (
           <TripsProvider userRole={userRole} additionalRoles={additionalRoles}>
-            <TripWorkspace tripId={tripId} docked />
+            <TripWorkspace key={tripId} tripId={tripId} docked initialTab={initialTab} />
           </TripsProvider>
         )}
       </SheetContent>

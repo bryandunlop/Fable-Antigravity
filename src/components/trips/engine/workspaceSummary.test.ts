@@ -194,6 +194,13 @@ describe('the gaps the fresh review found', () => {
     t = askQuestion(t, SCHED, 'passengers', 'Who is the third seat?', NOW);
     expect(summarise(t).counts.record).toBe(1);
     t = postMessage(t, EA, 'Booking the car for Monday.', NOW);
+    // LG-398 (Bryan, 2026-09-03): the EA's reply is itself an outstanding message until scheduling
+    // answers it — the question is closed, the message is not. Scheduling's reply clears the record.
+    const afterReply = summarise(t);
+    expect(afterReply.messages).toBe(1);
+    expect(afterReply.counts.record).toBe(1);
+    expect(afterReply.waitingOn).toBe('scheduling');
+    t = postMessage(t, SCHED, 'Noted, thanks.', NOW);
     expect(summarise(t).counts.record).toBe(0);
   });
 

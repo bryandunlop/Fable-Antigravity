@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BarChart3, BookUser, CalendarCheck, ClipboardList, ClipboardType, Eye, Inbox as InboxIcon, ListChecks, Loader2, MapPin, Rows3, Send, Settings2, Sliders, Telescope, Tv } from 'lucide-react';
+import { BarChart3, BookUser, CalendarCheck, ClipboardList, ClipboardType, Eye, Inbox as InboxIcon, ListChecks, Loader2, MapPin, MessageSquare, Rows3, Send, Settings2, Sliders, Telescope, Tv } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
@@ -20,6 +20,8 @@ import { PlanBoard } from './PlanBoard';
 import { FilterBar } from './FilterBar';
 import { DockedTripDrawer } from './DockedTripDrawer';
 import { QueueView } from './QueueView';
+import { MessagesPanel } from './MessagesPanel';
+import { outstandingAcrossTrips } from '../trips/engine/adminMessages';
 import { recallLens, rememberLens, type HomeLens } from './lensMemory';
 import { loadTrips, saveTrips, TRIPS_CHANGED_EVENT } from '../trips/data/tripsStore';
 import { loadSettings } from '../trips/data/settingsStore';
@@ -43,7 +45,7 @@ import type { TripType } from '../../scheduling/engine';
 // person. Calendar and List retired with D110; Availability (LG-311) — the one surface that manages
 // what is NOT committed — moved beside Templates as a utility.
 type Lens = HomeLens;
-type Utility = 'availability' | 'templates' | 'inbox' | 'foreflight' | 'pilot-visibility';
+type Utility = 'messages' | 'availability' | 'templates' | 'inbox' | 'foreflight' | 'pilot-visibility';
 
 const LENSES: { key: Lens; label: string; icon: React.ElementType }[] = [
   { key: 'board', label: 'Board', icon: Rows3 },
@@ -52,6 +54,8 @@ const LENSES: { key: Lens; label: string; icon: React.ElementType }[] = [
 ];
 
 const UTILITY_TABS: { key: Utility; label: string; icon: React.ElementType }[] = [
+  // LG-398: the dedicated space for unanswered admin messages; the count rides on the button.
+  { key: 'messages', label: 'Messages', icon: MessageSquare },
   { key: 'availability', label: 'Availability', icon: CalendarCheck },
   { key: 'templates', label: 'Templates', icon: ClipboardList },
   { key: 'inbox', label: 'Inbox', icon: InboxIcon },
@@ -108,7 +112,7 @@ export default function SchedulingCommandCenter({
   const [tripTypeFilter, setTripTypeFilter] = useState<Set<TripType>>(new Set());
   const [hideCleared, setHideCleared] = useState(false);
   const [horizonDays, setHorizonDays] = useState(30);
-  const [drawer, setDrawer] = useState<{ tripId: string; taskId?: string } | null>(null);
+  const [drawer, setDrawer] = useState<{ tripId: string; taskId?: string; tab?: 'record' } | null>(null);
 
   const [trips, setTrips] = useState<BoardTrip[]>([]);
   const [alertTrips, setAlertTrips] = useState<TripForAlerts[]>([]);
@@ -238,7 +242,8 @@ export default function SchedulingCommandCenter({
     [officeTasks],
   );
 
-  const openTrip = (tripId: string, taskId?: string) => setDrawer({ tripId, taskId });
+  const openTrip = (tripId: string, taskId?: string, tab?: 'record') => setDrawer({ tripId, taskId, tab });
+  const messageCount = useMemo(() => outstandingAcrossTrips(bookings.trips, queueNow).length, [bookings, queueNow]);
   const onTaskAction = async (task: BoardTask, action: TaskAction) => {
     try {
       await service.applyAction(task.id, action, userRole, nowUtc());
@@ -321,6 +326,9 @@ export default function SchedulingCommandCenter({
               className="text-muted-foreground data-[active]:text-foreground"
             >
               <Icon className="h-4 w-4 mr-1.5" /> {label}
+              {key === 'messages' && messageCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-[var(--gfo-warning,#F1B434)]/25 px-1.5 text-[11px] font-semibold text-[var(--gfo-warning-ink,#8A6200)]">{messageCount}</span>
+              )}
             </Button>
           ))}
         </div>
@@ -371,6 +379,7 @@ export default function SchedulingCommandCenter({
         />
       )}
       {utility === 'templates' && <TemplatesPanel userRole={userRole} additionalRoles={additionalRoles} />}
+      {utility === 'messages' && <MessagesPanel trips={bookings.trips} nowUtc={queueNow} onOpenTrip={id => openTrip(id, undefined, 'record')} />}
       {utility === 'inbox' && <InboxPanel defaultTargetRole="pilot" />}
       {utility === 'foreflight' && <ForeFlightPanel />}
       {utility === 'pilot-visibility' && <PilotVisibilityPanel />}
@@ -380,6 +389,7 @@ export default function SchedulingCommandCenter({
         tripId={drawer?.tripId ?? null}
         isBooking={!!drawer && bookingIds.has(drawer.tripId)}
         focusTaskId={drawer?.taskId}
+        initialTab={drawer?.tab}
         open={!!drawer}
         onOpenChange={o => { if (!o) setDrawer(null); }}
         userRole={userRole}

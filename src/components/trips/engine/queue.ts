@@ -58,7 +58,9 @@ function reasonsFor(trip: Trip, summary: ReturnType<typeof workspaceSummary>, fr
   if (changes > 0) out.push(`${changes} change request${changes === 1 ? '' : 's'} to decide`);
   if (summary.people.gates > 0) out.push(`${summary.people.gates} document gate${summary.people.gates === 1 ? '' : 's'} unresolved`);
   if (summary.counts.sheet > 0) out.push('Passenger email drafted and unsent');
-  if (summary.counts.record > 0) out.push(`${summary.counts.record} question${summary.counts.record === 1 ? '' : 's'} unanswered`);
+  if (summary.messages > 0) out.push(`${summary.messages} message${summary.messages === 1 ? '' : 's'} from the EA unanswered`);
+  const questions = summary.counts.record - summary.messages;
+  if (questions > 0) out.push(`${questions} question${questions === 1 ? '' : 's'} unanswered`);
   if (summary.people.unnamed > 0) out.push(`${summary.people.unnamed} seat${summary.people.unnamed === 1 ? '' : 's'} unnamed`);
   if (trip.tail && !trip.crew) out.push('No crew set');
   // The freeze rides along as a reason rather than moving the trip to the freezing band: a trip

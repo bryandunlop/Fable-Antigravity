@@ -61,10 +61,12 @@ const STATUS_TONE: Record<Trip['status'], string> = {
   cancelled: 'bg-muted text-muted-foreground',
 };
 
-export default function TripWorkspace({ tripId: tripIdProp, docked = false }: {
+export default function TripWorkspace({ tripId: tripIdProp, docked = false, initialTab }: {
   /** When docked in the scheduling home's drawer (D110 slice 3) the id arrives as a prop, not a route param. */
   tripId?: string;
   docked?: boolean;
+  /** Open on this tab — the messages space opens the Record (LG-398). */
+  initialTab?: WorkspaceTab;
 } = {}) {
   const params = useParams();
   const id = tripIdProp ?? params.id;
@@ -77,7 +79,7 @@ export default function TripWorkspace({ tripId: tripIdProp, docked = false }: {
   const [moving, setMoving] = useState<{ kind: CutoffKind; date: string; reason: string } | null>(null);
   const [namesText, setNamesText] = useState<string | null>(null);
   // Option A (D109 slice 4): one tab at a time, with the strip above carrying what a tab would hide.
-  const [tab, setTab] = useState<WorkspaceTab>('itinerary');
+  const [tab, setTab] = useState<WorkspaceTab>(initialTab ?? 'itinerary');
   const [refusal, setRefusal] = useState<{ kind: 'decline' | 'bump'; category: DenialCategory; note: string } | null>(null);
   const schedTrips = useTrips();
   // D110 slice 2: the checklist hangs off the booking. Its items live in the scheduling store,
