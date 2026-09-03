@@ -110,4 +110,26 @@ describe('the booking is the only trip: bookings are projected into the scheduli
     expect(after.find(i => i.id === first.id)!.status).toBe('done');
     expect(after.length).toBe((await a.store.listInstancesForTrip(t.id)).length);
   });
+  it('a template republished under a new version between sessions does not duplicate the checklist; cleared work carries onto the new ids', async () => {
+    const mem = new Map<string, string>();
+    const storage = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); } };
+    const a = await harness();
+    const t = booking('Teterboro');
+    await syncBookingsIntoStore([t], a.service, a.store, T0);
+    const before = await a.store.listInstancesForTrip(t.id);
+    const first = before[0];
+    if (first.requiresAck) await a.service.applyAction(first.id, { kind: 'ack' }, 'sched', T0);
+    await a.service.applyAction(first.id, { kind: 'complete' }, 'sched', T0);
+    await persistBookingInstances(a.store, storage);
+
+    const b = await harness();
+    const tpl = (await b.store.listPublishedTemplates()).find(x => x.scope === 'domestic')!;
+    await b.store.saveTemplate({ ...tpl, version: tpl.version + 1 });
+    await restoreBookingInstances(b.store, storage);
+    await syncBookingsIntoStore([t], b.service, b.store, T0);
+    const after = await b.store.listInstancesForTrip(t.id);
+    expect(after.length).toBe(before.length);
+    expect(after.every(i => i.templateVersion === tpl.version + 1 || i.templateId !== tpl.id)).toBe(true);
+    expect(after.find(i => i.taskDefId === first.taskDefId && i.legId === first.legId)!.status).toBe('done');
+  });
 });

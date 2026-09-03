@@ -11,6 +11,7 @@
 import type { SchedulingService } from '../store/service';
 import type { SchedulingStore, TripRecord } from '../store/types';
 import type { TaskInstance } from '../engine';
+import { instanceKey } from '../engine/reconcile';
 import { tripToRecord } from '../../components/trips/engine/projection';
 import type { Trip } from '../../components/trips/engine/trip';
 
@@ -43,13 +44,32 @@ export async function syncBookingsIntoStore(bookings: Trip[], service: Schedulin
       continue;
     }
     if (!existing) {
-      // Restored instances for this booking (a reload) must survive the mirror: createTripMirror
-      // writes a fresh open set by the same deterministic ids, so mirror first, then put the live
-      // state back over it and reconcile once for anything the booking changed meanwhile.
+      // Restored instances for this booking (a reload) must survive the mirror. Mirror first, then
+      // carry the LIVE STATE of each kept instance onto the fresh one with the same task identity
+      // (instanceKey — def + leg + person), never by id: a template republished under a new version
+      // mints new ids, and re-inserting the old rows by id would leave two of every item (fresh
+      // review, 2026-09-03). Kept rows with no fresh twin are dropped — the pack no longer asks for
+      // them. Then one reconcile for anything the booking changed meanwhile.
       const kept = await store.listInstancesForTrip(booking.id);
-      await service.createTripMirror(desired, nowUtc);
+      const { instances: fresh } = await service.createTripMirror(desired, nowUtc);
       if (kept.length) {
-        await store.saveInstances(kept);
+        const freshByKey = new Map(fresh.map(f => [instanceKey(f), f]));
+        const carried: TaskInstance[] = [];
+        for (const k of kept) {
+          const twin = freshByKey.get(instanceKey(k));
+          if (!twin) continue;
+          carried.push({
+            ...twin,
+            status: k.status, ackState: k.ackState, ackedBy: k.ackedBy, ackedAtUtc: k.ackedAtUtc,
+            completedBy: k.completedBy, completedAtUtc: k.completedAtUtc, notes: k.notes, reflag: k.reflag,
+            auditTrail: twin.id === k.id ? k.auditTrail : [...k.auditTrail, { atUtc: nowUtc, actor: 'bookings-sync', action: 'carried', detail: `state carried from ${k.id}` }],
+          });
+        }
+        if (carried.length) await store.saveInstances(carried);
+        // The old rows themselves go: their state now lives on the fresh ids.
+        const freshIds = new Set(fresh.map(f => f.id));
+        const stale = kept.filter(k => !freshIds.has(k.id)).map(k => k.id);
+        if (stale.length) await store.removeInstances(stale);
         await service.updateTrip(desired, nowUtc);
       }
       result.created += 1;

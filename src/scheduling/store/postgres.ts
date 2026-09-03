@@ -157,6 +157,10 @@ export class DrizzleSchedulingStore implements SchedulingStore {
       .onConflictDoUpdate({ target: taskInstances.id, set: row });
   }
 
+  async removeInstances(ids: string[]): Promise<void> {
+    for (const id of ids) await this.db.delete(taskInstances).where(eq(taskInstances.id, id));
+  }
+
   async listInstancesForTrip(tripId: string): Promise<TaskInstance[]> {
     const rows = await this.db.select().from(taskInstances).where(eq(taskInstances.tripId, tripId));
     return rows.map(rowToInstance);
