@@ -16,7 +16,7 @@ describe('trip reminders', () => {
     expect(items.map(i => i.id)).toEqual(['trip-reminder:TR1']);
     expect(items[0].severity).toBe('warn');
     expect(items[0].module).toBe('Trip Coordination');
-    expect(items[0].link).toBe('/trip-coordination');
+    expect(items[0].link).toBe('/trips');
   });
 
   it('returns nothing for roles outside the audience and on empty storage', () => {

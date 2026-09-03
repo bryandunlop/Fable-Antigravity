@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { CalendarCheck, ClipboardList, Eye, Inbox as InboxIcon, ListChecks, Loader2, Rows3, Send, Telescope, Tv } from 'lucide-react';
+import { BarChart3, BookUser, CalendarCheck, ClipboardList, ClipboardType, Eye, Inbox as InboxIcon, ListChecks, Loader2, MapPin, Rows3, Send, Settings2, Sliders, Telescope, Tv } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useSchedulingWorkspace } from '../scheduling-workspace/SchedulingWorkspaceContext';
@@ -266,9 +267,31 @@ export default function SchedulingCommandCenter({
             {trips.length} trips · bookings and the myairops feed · readiness derived live from checklist state
           </p>
         </div>
-        <Button variant="outline" size="sm" asChild className="text-muted-foreground">
-          <Link to="/scheduling-wall"><Tv className="h-4 w-4 mr-1.5" /> Ops wall</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild className="text-muted-foreground">
+            <Link to="/scheduling-wall"><Tv className="h-4 w-4 mr-1.5" /> Ops wall</Link>
+          </Button>
+          {/* D110 slice 4: everything that used to be a rail entry and is not a lens lives here. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="text-muted-foreground" aria-label="Scheduling settings and tools">
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Trips</DropdownMenuLabel>
+              <DropdownMenuItem asChild><Link to="/trips/settings"><Sliders className="mr-2 h-4 w-4" /> Trip settings</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/trips/places"><MapPin className="mr-2 h-4 w-4" /> Places</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/trips/metrics"><BarChart3 className="mr-2 h-4 w-4" /> Trip metrics</Link></DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>People</DropdownMenuLabel>
+              <DropdownMenuItem asChild><Link to="/crew-scheduling-workload"><BookUser className="mr-2 h-4 w-4" /> Crew workload</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/passenger-forms"><ClipboardType className="mr-2 h-4 w-4" /> Passenger forms</Link></DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setUtility('templates')}><ClipboardList className="mr-2 h-4 w-4" /> Checklist templates</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* The lens switch: four projections of the same trips + quiet utilities */}

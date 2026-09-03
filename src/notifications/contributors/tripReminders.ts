@@ -18,7 +18,7 @@ export function buildTripReminderFeed(
       title: r.title,
       detail: r.detail,
       module: 'Trip Coordination',
-      link: '/trip-coordination',
+      link: '/trips',
       atUtc: r.dueAtUtc,
     }));
 }

@@ -113,7 +113,7 @@ export function mobileNavItemsForRole(userRole: string): MobileNavItem[] {
       return [
         ...BASE_ITEMS,
         { name: 'Sched', href: '/schedule', icon: Calendar },
-        { name: 'Trips', href: '/trip-coordination', icon: MapPin },
+        { name: 'Trips', href: '/scheduling', icon: MapPin },
       ];
 
     default:
