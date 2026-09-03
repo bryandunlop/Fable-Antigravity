@@ -36,6 +36,8 @@ export interface BoardTrip {
   tripType: TripRecord['tripType'];
   priority: TripRecord['priority'];
   tripStatus: TripRecord['status'];
+  /** The crew row under the tail (D110 slice 3); undefined on records that never carried one. */
+  crew?: TripRecord['crew'];
   tasks: BoardTask[];
 }
 

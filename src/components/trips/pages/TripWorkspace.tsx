@@ -61,8 +61,13 @@ const STATUS_TONE: Record<Trip['status'], string> = {
   cancelled: 'bg-muted text-muted-foreground',
 };
 
-export default function TripWorkspace() {
-  const { id } = useParams();
+export default function TripWorkspace({ tripId: tripIdProp, docked = false }: {
+  /** When docked in the scheduling home's drawer (D110 slice 3) the id arrives as a prop, not a route param. */
+  tripId?: string;
+  docked?: boolean;
+} = {}) {
+  const params = useParams();
+  const id = tripIdProp ?? params.id;
   const navigate = useNavigate();
   const { trips, allTrips, actor, places, update, nowUtc, settings, sheetCtx, weatherFor, setWatches, people, resolvePassengerIds } = useTripsModule();
   const trip = trips.find(t => t.id === id);
@@ -273,9 +278,11 @@ export default function TripWorkspace() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-4 p-6">
+    <div className={docked ? 'space-y-4' : 'mx-auto max-w-[1400px] space-y-4 p-6'}>
       <GfoPageHeader
-        eyebrow={<span className="inline-flex items-center gap-2"><button onClick={() => navigate('/trips')} className="inline-flex items-center gap-1 hover:text-primary"><ArrowLeft className="h-3.5 w-3.5" />Trips</button></span> as unknown as string}
+        eyebrow={(docked
+          ? <span className="inline-flex items-center gap-2"><button onClick={() => navigate(`/trips/${tripId}`)} className="inline-flex items-center gap-1 hover:text-primary">Open full record<ArrowLeft className="h-3.5 w-3.5 rotate-180" /></button></span>
+          : <span className="inline-flex items-center gap-2"><button onClick={() => navigate('/trips')} className="inline-flex items-center gap-1 hover:text-primary"><ArrowLeft className="h-3.5 w-3.5" />Trips</button></span>) as unknown as string}
         title={trip.title}
         description={`${trip.leadPassengerName} + ${Math.max(0, trip.seatsHeld - 1)} · ${trip.tail ?? 'no aircraft yet'} · created by ${trip.createdBy.name}`}
         actions={

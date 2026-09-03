@@ -17,6 +17,7 @@ const DAY_MS = 86400000;
 const BAR_H = 30;
 const BAR_GAP = 6;
 const ROW_PAD = 10;
+const CREW_H = 18; // the crew row under each tail's bars (D110 slice 3)
 
 // Label density degrades with zoom: route + readiness at 2w, route at month, bare bar at quarter.
 const COL_W: Record<ZoomPreset, number> = { '2w': 88, month: 44, quarter: 18 };
@@ -32,6 +33,9 @@ export function PlanBoard({
   nowMs,
   serviceability,
   downtime = [],
+  marks,
+  unassigned = [],
+  onOpenBooking,
   onTripClick,
   onOpenHorizon,
 }: {
@@ -46,6 +50,11 @@ export function PlanBoard({
    * through the existing math rather than through new code.
    */
   downtime?: MaintenanceDowntimeBlock[];
+  /** Marks on the block and the crew row under each tail (D110 slice 3), keyed by trip id. */
+  marks?: Map<string, { labels: string[]; crewLabel: string | null; crewMissing: boolean }>;
+  /** Submitted bookings with no aircraft — the Unassigned lane at the bottom of the board. */
+  unassigned?: Array<{ id: string; title: string; route: string; departureDate: string; durationDays: number }>;
+  onOpenBooking?: (tripId: string) => void;
   onTripClick: (trip: BoardTrip) => void;
   /** Optional lens switch — the shelf's "full forward picture" link (D87). */
   onOpenHorizon?: () => void;
@@ -155,7 +164,8 @@ export function PlanBoard({
 
           {/* Tail rows */}
           {rows.map(({ ac, bars, downtimeBars, lanes }) => {
-            const rowH = ROW_PAD * 2 + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP;
+            const hasCrewRow = !!marks && bars.length > 0;
+            const rowH = ROW_PAD * 2 + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP + (hasCrewRow ? CREW_H + BAR_GAP : 0);
             const svc = serviceability?.[ac.tail];
             return (
               <div key={ac.tail} className="flex border-b border-border/50">
@@ -239,6 +249,9 @@ export function PlanBoard({
                                   {trip.route}
                                   {zoom === '2w' && status !== 'ready' && status !== 'airborne' ? ` · ${trip.readinessScore}%` : ''}
                                 </span>
+                                {marks?.get(trip.id)?.labels.map(l => (
+                                  <span key={l} className="shrink-0 rounded bg-background/70 px-1 text-[10px] font-semibold text-[var(--gfo-error-ink,#C81E2B)]">{l}</span>
+                                ))}
                               </>
                             )}
                           </button>
@@ -267,6 +280,25 @@ export function PlanBoard({
                       </HoverCard>
                     );
                   })}
+
+                  {/* The crew row (D110 slice 3): under each bar, who is flying it — or a dashed
+                      gap, so an unassigned crew reads exactly like an unassigned tail. */}
+                  {hasCrewRow && bars.map(({ trip, startMs }) => {
+                    const g = barGeometry(startMs, trip.durationDays, window_)!;
+                    const m = marks!.get(trip.id);
+                    const top = ROW_PAD + lanes.laneCount * BAR_H + (lanes.laneCount - 1) * BAR_GAP + BAR_GAP;
+                    if (!m) return null;
+                    return (
+                      <div
+                        key={`crew-${trip.id}`}
+                        title={m.crewLabel ?? 'No crew assigned'}
+                        className={`absolute z-[4] flex items-center overflow-hidden rounded px-1.5 text-[10px] font-medium ${m.crewMissing ? 'border border-dashed border-[var(--gfo-error,#EF3340)] text-[var(--gfo-error-ink,#C81E2B)]' : 'bg-muted text-muted-foreground'}`}
+                        style={{ left: `${g.startPct}%`, width: `max(${g.widthPct}%, 14px)`, top, height: CREW_H }}
+                      >
+                        {zoom !== 'quarter' && <span className="truncate">{m.crewMissing ? 'no crew' : m.crewLabel}</span>}
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="w-44 shrink-0 sticky right-0 z-10 bg-card border-l px-3 flex items-center" style={{ height: rowH }}>
                   {(() => {
@@ -292,6 +324,48 @@ export function PlanBoard({
               </div>
             );
           })}
+
+          {/* The Unassigned lane (D110 slice 3): submitted bookings with no aircraft yet. They live
+              in the trips module, not the scheduling store (LG-372), so this row reads the bookings. */}
+          {unassigned.length > 0 && (() => {
+            const items = unassigned
+              .map(u => ({ u, startMs: new Date(u.departureDate).getTime(), g: barGeometry(new Date(u.departureDate).getTime(), u.durationDays, window_) }))
+              .filter((x): x is typeof x & { g: NonNullable<typeof x.g> } => x.g !== null);
+            const lanes2 = packLanes(items.map(x => ({ id: x.u.id, startMs: x.startMs, endMs: x.startMs + x.u.durationDays * DAY_MS })));
+            const laneCount = Math.max(1, lanes2.laneCount);
+            const rowH = ROW_PAD * 2 + laneCount * BAR_H + (laneCount - 1) * BAR_GAP;
+            return (
+              <div className="flex border-b border-border/50 bg-[var(--gfo-error,#EF3340)]/[0.03]">
+                <div className="w-44 shrink-0 sticky left-0 z-10 bg-card border-r px-4 flex flex-col justify-center" style={{ height: rowH }}>
+                  <span className="font-semibold text-[var(--gfo-error-ink,#C81E2B)]">No tail</span>
+                  <span className="text-[11px] text-muted-foreground">{unassigned.length} submitted</span>
+                </div>
+                <div className="relative" style={{ width: boardW, height: rowH }}>
+                  {cols.map((c, i) => (
+                    <div key={i} className={`absolute top-0 bottom-0 border-r border-border/40 ${c.isWeekend ? 'bg-muted/40' : ''}`} style={{ left: i * colW, width: colW }} />
+                  ))}
+                  {todayVisible && <div className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10" style={{ left: `${todayPct}%` }} />}
+                  {items.map(({ u, g }) => {
+                    const lane = lanes2.laneOf.get(u.id) ?? 0;
+                    return (
+                      <button
+                        key={u.id}
+                        onClick={() => onOpenBooking?.(u.id)}
+                        title={`${u.title} — submitted, no aircraft yet`}
+                        className="absolute z-[5] flex items-center gap-1 overflow-hidden rounded-md border-2 border-dashed border-[var(--gfo-error,#EF3340)] bg-background px-2 text-[11px] font-medium text-[var(--gfo-error-ink,#C81E2B)] hover:bg-muted/40"
+                        style={{ left: `${g.startPct}%`, width: `max(${g.widthPct}%, 14px)`, top: ROW_PAD + lane * (BAR_H + BAR_GAP), height: BAR_H }}
+                      >
+                        {zoom !== 'quarter' && <span className="truncate">{u.route} · assign</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="w-44 shrink-0 sticky right-0 z-10 bg-card border-l px-3 flex items-center" style={{ height: rowH }}>
+                  <span className="text-[11px] text-[var(--gfo-error-ink,#C81E2B)]">Assign · waiting on you</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
