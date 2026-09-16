@@ -7,6 +7,7 @@ import DailyFlightsWidget from './DailyFlightsWidget';
 import TailStatusCards from './ops-wall/TailStatusCards';
 import DutyRosterWidget from './DutyRosterWidget';
 import NasImpactTile from './ops-wall/NasImpactTile';
+import FuelPriceTile from './ops-wall/FuelPriceTile';
 import StationWeatherStrip from './ops-wall/StationWeatherStrip';
 import WeatherForecast from './WeatherForecast';
 import { HOME_STATION } from '../config/station';
@@ -35,7 +36,13 @@ function greeting(hour: number): string {
  * wall (/wall/maintenance). Other roles reach it on demand — the fixed Fleet
  * map tile in QuickLinksBar links /fleet-map.
  */
-export default function FleetOpsWall({ userRole }: { userRole: string }) {
+export default function FleetOpsWall({
+  userRole,
+  additionalRoles = [],
+}: {
+  userRole: string;
+  additionalRoles?: string[];
+}) {
   const { fleet, dispatchable, inFlight, satcomLoading, isRefreshing, lastUpdate } = useUnifiedFleetStatus();
   const clock = useOpsClock();
 
@@ -109,7 +116,13 @@ export default function FleetOpsWall({ userRole }: { userRole: string }) {
         <section className="rounded-lg border border-border bg-card p-3">
           <DailyFlightsWidget />
         </section>
-        <NasImpactTile />
+        {/* Conditions column: what is true outside the hangar today. NAS impact
+            and the posted fuel price stack in one cell rather than widening the
+            dock — both are read-at-a-glance facts, not workspaces. */}
+        <div className="space-y-4">
+          <NasImpactTile />
+          <FuelPriceTile userRole={userRole} additionalRoles={additionalRoles} />
+        </div>
         <section className="rounded-lg border border-border bg-card p-3">
           <DutyRosterWidget />
         </section>

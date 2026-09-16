@@ -305,7 +305,7 @@ export default function App() {
                                     (maintenance-workflow keeps its redirect: its persona can't use the home screen). */}
                                 <Route path="/" element={
                                   userRole === 'maintenance-workflow' ? <Navigate to="/maintenance-workflow" replace />
-                                    : <FleetOpsWall userRole={userRole} />
+                                    : <FleetOpsWall userRole={userRole} additionalRoles={additionalRoles} />
                                 } />
                                 <Route path="/aircraft" element={<AircraftStatus />} />
                                 <Route path="/fleet-map" element={<LiveFleetMap />} />
