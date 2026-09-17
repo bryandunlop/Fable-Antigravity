@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { issueReceiptOnce, type FormReceipt } from '../passengers/engine/formReceiptEmail';
+import { getReceiptTemplate } from '../passengers/receiptTemplateStore';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -78,6 +80,16 @@ export interface FormSubmission {
     documentExpirations?: DocumentExpiration[];
     hasExpiringDocuments: boolean;
     uploadedDocuments?: UploadedDocument[];
+
+    /**
+     * The confirmation email this submission triggered, frozen as it was sent.
+     *
+     * Optional because submissions recorded before receipts existed carry none, and because
+     * a receipt with no address to go to still gets composed and stored — `sentAtUtc` null
+     * is the honest record of one that could not go, and the Passenger Forms page shows it
+     * as a chase rather than letting it pass for delivered.
+     */
+    receipt?: FormReceipt;
 }
 
 export interface UploadedDocument {
@@ -112,7 +124,9 @@ interface PassengerFormContextType {
 
     // Submissions
     submissions: FormSubmission[];
-    addSubmission: (submission: Omit<FormSubmission, 'id' | 'dataAge' | 'isOutdated' | 'hasExpiringDocuments' | 'documentExpirations'>) => void;
+    /** Returns the stored submission, so the caller can show the receipt it triggered
+     *  rather than promise one it cannot see. */
+    addSubmission: (submission: Omit<FormSubmission, 'id' | 'dataAge' | 'isOutdated' | 'hasExpiringDocuments' | 'documentExpirations'>) => FormSubmission;
     updateSubmission: (submissionId: string, updates: Partial<FormSubmission>) => void;
     getSubmission: (submissionId: string) => FormSubmission | undefined;
 
@@ -482,6 +496,23 @@ export function PassengerFormProvider({ children }: { children: ReactNode }) {
             hasExpiringDocuments: documentExpirations.some(doc => doc.isExpiringSoon),
             documentExpirations
         };
+
+        // The confirmation the passenger was already being promised. The public form's
+        // success screen has always said "you will receive a confirmation email shortly";
+        // until this, nothing sent one. It is issued here rather than in the form component
+        // because a submission that arrives any other way — an assistant or a scheduler
+        // keying one in — deserves the same receipt, and because the receipt is part of the
+        // record, not part of the screen that happened to create it.
+        //
+        // Issued once, from the submission as stored, so the email says exactly what we
+        // hold. `issueReceiptOnce` is a no-op if one already exists.
+        newSubmission.receipt = issueReceiptOnce(
+            newSubmission.receipt,
+            newSubmission,
+            template,
+            getReceiptTemplate(),
+            new Date().toISOString(),
+        );
 
         setSubmissions(prev => [newSubmission, ...prev]);
 

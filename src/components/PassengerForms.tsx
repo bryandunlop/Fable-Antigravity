@@ -36,9 +36,11 @@ import {
   ExternalLink,
   Copy,
   Check,
-  Settings
+  Settings,
+  Mail
 } from 'lucide-react';
 import FormTemplateEditor from './FormTemplateEditor';
+import FormReceiptEmailPanel, { ReceiptPreview } from './passengers/FormReceiptEmailPanel';
 
 export default function PassengerForms() {
   const {
@@ -229,23 +231,45 @@ export default function PassengerForms() {
             <p className="text-muted-foreground">Manage passenger form submissions and templates</p>
           </div>
           
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="lg" className="shadow-sm">
-                <Settings className="w-4 h-4 mr-2" />
-                Manage Templates
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-full p-0">
-              <div className="p-6">
-                <DialogHeader className="mb-4">
-                  <DialogTitle className="text-2xl font-bold">Form Templates</DialogTitle>
-                  <DialogDescription>Create and edit the forms passengers are asked to complete before a trip.</DialogDescription>
-                </DialogHeader>
-                <FormTemplateEditor />
-              </div>
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-2">
+            {/* The words of the automatic confirmation live beside the forms that trigger it —
+                editing one and not the other is how the two drift apart. */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="lg" variant="outline" className="shadow-sm">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Confirmation Email
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto w-full p-0">
+                <div className="p-6">
+                  <DialogHeader className="mb-4">
+                    <DialogTitle className="text-2xl font-bold">Confirmation Email</DialogTitle>
+                    <DialogDescription>The receipt a passenger gets automatically when their form comes back.</DialogDescription>
+                  </DialogHeader>
+                  <FormReceiptEmailPanel />
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="lg" className="shadow-sm">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Manage Templates
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-full p-0">
+                <div className="p-6">
+                  <DialogHeader className="mb-4">
+                    <DialogTitle className="text-2xl font-bold">Form Templates</DialogTitle>
+                    <DialogDescription>Create and edit the forms passengers are asked to complete before a trip.</DialogDescription>
+                  </DialogHeader>
+                  <FormTemplateEditor />
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
@@ -512,6 +536,34 @@ export default function PassengerForms() {
                   </div>
                 </div>
               )}
+
+              {/* Confirmation email — what the passenger was actually told, and whether it
+                  could go at all. A receipt marked sent that never left is the failure this
+                  section exists to make visible. */}
+              <div>
+                <h3 className="font-semibold mb-2">Confirmation Email</h3>
+                {selectedSubmission.receipt ? (
+                  <>
+                    {selectedSubmission.receipt.blockedReason === 'no-address' && (
+                      <Alert className="mb-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          Composed but never sent — no email address came with this form. Somebody has to
+                          reach this passenger another way.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <ReceiptPreview
+                      email={selectedSubmission.receipt.email}
+                      sentAtUtc={selectedSubmission.receipt.sentAtUtc}
+                    />
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No receipt on this submission — it predates the automatic confirmation.
+                  </p>
+                )}
+              </div>
 
               {/* Form Responses */}
               <div>
