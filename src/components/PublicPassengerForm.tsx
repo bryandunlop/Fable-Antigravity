@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePassengerForms } from './contexts/PassengerFormContext';
 import type { FormField } from './contexts/PassengerFormContext';
+import type { FormReceipt } from './passengers/engine/formReceiptEmail';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -32,6 +33,9 @@ export default function PublicPassengerForm() {
     const [formData, setFormData] = useState<Record<string, any>>({});
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
     const [submitted, setSubmitted] = useState(false);
+    // The receipt the submission issued. Held so the success screen can name the address it
+    // actually went to and the reference it carries, instead of promising a mail in the abstract.
+    const [receipt, setReceipt] = useState<FormReceipt | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const template = selectedFormType ? getTemplate(selectedFormType) : null;
@@ -99,8 +103,9 @@ export default function PublicPassengerForm() {
             phone: formData.companyPhone || ''
         };
 
-        // Create submission
-        addSubmission({
+        // Create submission. The context issues the confirmation email as part of storing it,
+        // and hands the stored record back so this screen can report what actually happened.
+        const stored = addSubmission({
             templateId: template.id,
             templateVersion: template.version,
             formType: template.type,
@@ -111,6 +116,7 @@ export default function PublicPassengerForm() {
             status: 'new'
         });
 
+        setReceipt(stored.receipt ?? null);
         setSubmitted(true);
     };
 
@@ -267,28 +273,70 @@ export default function PublicPassengerForm() {
     };
 
     if (submitted) {
+        const needsAction = receipt?.email.hero.needsAction ?? false;
+        // Only the lines the receipt itself flagged — no second opinion formed on this screen,
+        // or the two could disagree.
+        const warnings = (receipt?.email.blocks ?? [])
+            .flatMap(b => b.lines ?? [])
+            .filter(l => l.tone === 'warn')
+            .map(l => l.text);
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001a5c] to-black flex items-center justify-center p-6">
                 <Card className="max-w-2xl w-full">
                     <CardHeader className="text-center">
                         <div className="flex justify-center mb-4">
-                            <div className="p-4 bg-green-500/10 rounded-full">
-                                <CheckCircle className="w-16 h-16 text-green-500" />
+                            <div className={`p-4 rounded-full ${needsAction ? 'bg-orange-500/10' : 'bg-green-500/10'}`}>
+                                {needsAction
+                                    ? <AlertTriangle className="w-16 h-16 text-orange-500" />
+                                    : <CheckCircle className="w-16 h-16 text-green-500" />}
                             </div>
                         </div>
                         <CardTitle className="text-2xl">Form Submitted Successfully!</CardTitle>
                         <CardDescription>
-                            Thank you for completing the passenger form. Our scheduling team has been notified and will review your submission.
+                            {/* The receipt's own headline, so the screen and the email agree. It says
+                                whether they are done — a screen that always reads "all set" is worth
+                                nothing the one time it is not true. */}
+                            {receipt?.email.hero.headline ?? 'Thank you for completing the passenger form. Our scheduling team has been notified and will review your submission.'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <Alert>
-                            <Info className="h-4 w-4" />
-                            <AlertDescription>
-                                You will receive a confirmation email at <strong>{formData.companyEmail}</strong> shortly.
-                                If you have any questions, please contact the scheduling team.
-                            </AlertDescription>
-                        </Alert>
+                        {/* What this screen used to say, unconditionally, was that a confirmation email
+                            was on its way — while nothing sent one. It reports the real receipt now,
+                            including the case where we hold no address and none can go. */}
+                        {receipt?.sentAtUtc && receipt.email.to ? (
+                            <Alert>
+                                <Info className="h-4 w-4" />
+                                <AlertDescription>
+                                    A confirmation is on its way to <strong>{receipt.email.to}</strong>, with
+                                    everything we received listed in it. Your reference is{' '}
+                                    <strong>{receipt.email.hero.reference}</strong> — quote it if you need to
+                                    ask us anything.
+                                </AlertDescription>
+                            </Alert>
+                        ) : (
+                            <Alert>
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertDescription>
+                                    We have your form{receipt ? <> under reference <strong>{receipt.email.hero.reference}</strong></> : null}, but
+                                    no email address came with it, so we cannot send you a written confirmation.
+                                    Scheduling will reach you another way.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
+                        {/* An expired passport or a blank we still need is worth saying here and not
+                            only in a mail that may go unread. */}
+                        {warnings.length > 0 && (
+                            <Alert>
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertDescription>
+                                    <ul className="list-disc pl-4 space-y-1">
+                                        {warnings.map((w, i) => <li key={i}>{w}</li>)}
+                                    </ul>
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
                         <div className="flex justify-center">
                             <Button onClick={() => window.location.reload()}>
                                 Submit Another Form
