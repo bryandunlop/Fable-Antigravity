@@ -119,6 +119,7 @@ From the CAMP vendor docs. Define these as an enum with explicit handling; do no
 ## Conventions
 - **Migrations:** versioned, forward-only for ledger tables (you cannot revert a ledger table; plan schema before creating). Added columns to ledger tables must be nullable.
 - **Branches/PRs:** feature branches off `main`; PRs require the relevant tests (immutability/idempotency/hash/clock) green. Keep commits scoped and described.
+- **Don't watch PRs.** Open the pull request, report the link, stop. Do not subscribe to PR activity, schedule check-ins, or poll a PR for CI, review or merge-state changes — review here is a human's job, and the weekday digest routine already reports `verify` and ship-it state. Spend the effort *before* the push instead: `npm run type-check:baseline`, `npm test` and `npm run build` are exactly what CI's `verify` job runs, so a clean local run is a green check.
 - **Tests first for correctness-critical logic:** immutability rejection, idempotent ingestion, client-vs-server hash equality, PL-25 clock, provisional-MEL block, CRS A&P-cert enforcement, RII performer/inspector separation.
 - **Idempotency keys:** UUIDv7, client-generated at the moment of the mutation, immutable across retries.
 - **UTC everywhere** in storage; convert for display only.
