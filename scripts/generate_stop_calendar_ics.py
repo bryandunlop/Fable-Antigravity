@@ -8,15 +8,17 @@ page, not drawn in the grid. This script recovers the chips by geometry
 into real date ranges:
 
     STOP 1            Monday -> Sunday (7 days off)
+    STOP 1 weekend    Saturday -> Sunday (2 days off)
     STOP 2/3/FLEX     Saturday -> Sunday (2 days off)
     P&G holiday       single day
     BOD trip          single day
-    Pilot training    single day, except the two spans the PDF states
-                      explicitly under RESIDUAL TRAINING CONFLICTS
 
 The "<group> STOP 1 WKND" chip marks the trailing weekend of that group's
-own STOP 1 week, so it is folded into the STOP 1 event rather than emitted
-as a second overlapping entry.
+own STOP 1 week. It is emitted as its own entry, matching the PDF, so it
+deliberately overlaps the STOP 1 week it belongs to.
+
+Pilot training is skipped: GFO tracks training on a separate calendar.
+Set INCLUDE_TRAINING to re-enable it.
 
 Usage:
     python3 scripts/generate_stop_calendar_ics.py <schedule.pdf> [outdir]
@@ -77,6 +79,10 @@ TRAINING_END_DATES = {
     ("2027-04-01", "G800 Initial - JRG/JWB"): "2027-04-06",
     ("2027-06-10", "G800 Initial - RGP/MTS"): "2027-06-14",
 }
+
+# GFO manages pilot training on its own calendar, so those chips are not
+# emitted. Flip this to True to include them.
+INCLUDE_TRAINING = False
 
 TRAINING_NOTE = ("The schedule marks only the start date for this course; the "
                  "PDF does not state its length. Confirm the end date before "
@@ -214,15 +220,20 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
         kind, label = chip["kind"], chip["label"]
 
         if kind == "STOP1":
-            # The Saturday "STOP 1 WKND" chip is the tail of the same Mon-Sun
-            # week already covered by the Monday chip.
-            if label.endswith("STOP 1 WKND"):
-                continue
             group = label.split()[0]
-            ev = Event(f"STOP 1 — {group}", date, date + 7 * day,
-                       "Seven days off, Monday through Sunday.\n"
-                       f"Crew group {group}.",
-                       ["STOP", "STOP 1"], f"stop1|{group}|{date}")
+            if label.endswith("STOP 1 WKND"):
+                # The trailing Sat/Sun of this group's own STOP 1 week. The PDF
+                # marks it separately, so it is kept as its own entry and
+                # overlaps the seven-day event.
+                ev = Event(f"STOP 1 weekend — {group}", date, date + 2 * day,
+                           "Weekend off (Saturday and Sunday), the tail of "
+                           f"this group's STOP 1 week.\nCrew group {group}.",
+                           ["STOP", "STOP 1 weekend"], f"stop1wknd|{group}|{date}")
+            else:
+                ev = Event(f"STOP 1 — {group}", date, date + 7 * day,
+                           "Seven days off, Monday through Sunday.\n"
+                           f"Crew group {group}.",
+                           ["STOP", "STOP 1"], f"stop1|{group}|{date}")
             _assign(ev, events, per_pilot, group.split("/"))
 
         elif kind in ("STOP23", "FLEX"):
@@ -251,6 +262,8 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
             _assign(ev, events, per_pilot, pilots)
 
         elif kind == "TRAINING":
+            if not INCLUDE_TRAINING:
+                continue
             course, _, who = label.partition(" - ")
             attendees = [p for p in who.split("/") if p]
             end_inclusive = TRAINING_END_DATES.get((chip["date"], label))
