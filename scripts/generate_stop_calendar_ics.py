@@ -324,7 +324,7 @@ def render_ics(events: list[Event], name: str, description: str) -> str:
             f"DTEND;VALUE=DATE:{ev.end:%Y%m%d}",
             f"SUMMARY:{escape(ev.summary)}",
             f"DESCRIPTION:{escape(ev.description)}",
-            f"CATEGORIES:{escape(','.join(ev.categories))}",
+            f"CATEGORIES:{','.join(escape(c) for c in ev.categories)}",
             "TRANSP:TRANSPARENT",
             "STATUS:CONFIRMED",
             "END:VEVENT",
