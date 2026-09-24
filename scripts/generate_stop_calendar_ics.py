@@ -8,8 +8,9 @@ page, not drawn in the grid. This script recovers the chips by geometry
 into real date ranges:
 
     STOP 1            Monday -> Sunday (7 days off)
-    STOP 1 weekend    Saturday -> Sunday (2 days off)
-    STOP 2/3/FLEX     Saturday -> Sunday (2 days off)
+    STOP 1 (weekend)  Saturday -> Sunday (2 days off), same label as the
+                      seven-day week it sits inside
+    STOP 2/3/4        Saturday -> Sunday (2 days off)
     P&G holiday       single day
     BOD trip          single day
 
@@ -107,18 +108,27 @@ CYCLE_THROUGH = dt.date(2028, 1, 1)
 
 # Offset in days from a STOP 1 week's Saturday -> (summary, categories).
 # Weeks 1, 3, 5 and 7 of each group's eight-week cycle.
-WEEKEND_PHASES = (
-    (0,  "STOP 1 weekend",        ["STOP", "STOP 1 weekend"]),
-    (14, "STOP 2 weekend",        ["STOP", "STOP 2"]),
-    (28, "STOP 3 weekend",        ["STOP", "STOP 3"]),
-    (42, "STOP 4 (FLEX) weekend", ["STOP", "STOP 4 FLEX"]),
-)
+# Each group's eight-week cycle gives a weekend off at weeks 1, 3, 5 and 7.
+# Keyed by phase -> (days after that cycle's STOP 1 Saturday, label, categories).
+# The week-1 label is deliberately the same as the seven-day STOP 1 event it
+# sits inside; CATEGORIES is what still tells the two apart.
+WEEKEND_PHASES = {
+    "S1": (0,  "STOP 1",        ["STOP", "STOP 1 weekend"]),
+    "S2": (14, "STOP 2",        ["STOP", "STOP 2"]),
+    "S3": (28, "STOP 3",        ["STOP", "STOP 3"]),
+    "S4": (42, "STOP 4 (FLEX)", ["STOP", "STOP 4 FLEX"]),
+}
 
 
 def weekend_description(phase: str, group: str) -> str:
-    tail = (", the tail of this group's STOP 1 week"
-            if phase == "STOP 1 weekend" else "")
+    tail = ", the tail of this group's STOP 1 week" if phase == "S1" else ""
     return f"Weekend off (Saturday and Sunday){tail}.\nCrew group {group}."
+
+
+def weekend_event(phase: str, group: str, date: dt.date, uid_key: str) -> "Event":
+    _, label, cats = WEEKEND_PHASES[phase]
+    return Event(f"{label} — {group}", date, date + dt.timedelta(days=2),
+                 weekend_description(phase, group), cats, uid_key)
 
 
 def resolve_group(printed: str) -> tuple[str, list[str]]:
@@ -273,10 +283,7 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
                 # The trailing Sat/Sun of this group's own STOP 1 week. The PDF
                 # marks it separately, so it is kept as its own entry and
                 # overlaps the seven-day event.
-                ev = Event(f"STOP 1 weekend — {group}", date, date + 2 * day,
-                           "Weekend off (Saturday and Sunday), the tail of "
-                           f"this group's STOP 1 week.\nCrew group {group}.",
-                           ["STOP", "STOP 1 weekend"], f"stop1wknd|{group}|{date}")
+                ev = weekend_event("S1", group, date, f"stop1wknd|{group}|{date}")
             else:
                 ev = Event(f"STOP 1 — {group}", date, date + 7 * day,
                            "Seven days off, Monday through Sunday.\n"
@@ -286,14 +293,8 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
 
         elif kind in ("STOP23", "FLEX"):
             group, members = resolve_group(label.split()[0])
-            if kind == "FLEX":
-                name, cats = "STOP 4 (FLEX) weekend", ["STOP", "STOP 4 FLEX"]
-            else:
-                num = "2" if "STOP 2" in label else "3"
-                name, cats = f"STOP {num} weekend", ["STOP", f"STOP {num}"]
-            ev = Event(f"{name} — {group}", date, date + 2 * day,
-                       f"Weekend off (Saturday and Sunday).\nCrew group {group}.",
-                       cats, f"{kind}|{label}|{date}")
+            phase = "S4" if kind == "FLEX" else ("S2" if "STOP 2" in label else "S3")
+            ev = weekend_event(phase, group, date, f"{kind}|{label}|{date}")
             _assign(ev, events, per_pilot, members)
 
         elif kind == "HOLIDAY":
@@ -335,14 +336,13 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
         for printed, monday in stop1_weeks:
             group, members = resolve_group(printed)
             saturday = monday + 5 * day
-            for offset, phase, cats in WEEKEND_PHASES:
+            for phase, (offset, label_, _cats) in WEEKEND_PHASES.items():
                 date = saturday + offset * day
-                summary = f"{phase} — {group}"
+                summary = f"{label_} — {group}"
                 if date > CYCLE_THROUGH or (summary, date) in drawn:
                     continue
-                ev = Event(summary, date, date + 2 * day,
-                           weekend_description(phase, group), cats,
-                           f"cycle|{phase}|{group}|{date}")
+                ev = weekend_event(phase, group, date,
+                                   f"cycle|{phase}|{group}|{date}")
                 _assign(ev, events, per_pilot, members)
                 drawn.add((summary, date))
 
