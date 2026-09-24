@@ -99,6 +99,28 @@ PILOT_RENAMES = {
 }
 
 
+# The PDF only draws what falls inside the printed year, so a STOP 1 week
+# near the end of December loses the weekends that belong to it. Emit those
+# up to this date (the last Saturday to carry) so the rotation does not stop
+# mid-cycle at the year boundary. Set to None to emit only what is drawn.
+CYCLE_THROUGH = dt.date(2028, 1, 1)
+
+# Offset in days from a STOP 1 week's Saturday -> (summary, categories).
+# Weeks 1, 3, 5 and 7 of each group's eight-week cycle.
+WEEKEND_PHASES = (
+    (0,  "STOP 1 weekend",        ["STOP", "STOP 1 weekend"]),
+    (14, "STOP 2 weekend",        ["STOP", "STOP 2"]),
+    (28, "STOP 3 weekend",        ["STOP", "STOP 3"]),
+    (42, "STOP 4 (FLEX) weekend", ["STOP", "STOP 4 FLEX"]),
+)
+
+
+def weekend_description(phase: str, group: str) -> str:
+    tail = (", the tail of this group's STOP 1 week"
+            if phase == "STOP 1 weekend" else "")
+    return f"Weekend off (Saturday and Sunday){tail}.\nCrew group {group}."
+
+
 def resolve_group(printed: str) -> tuple[str, list[str]]:
     """Map a printed group label to its current (display name, members)."""
     members = [p for p in printed.split("/") if p not in PILOT_MOVES]
@@ -233,6 +255,7 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
     day = dt.timedelta(days=1)
     events: list[Event] = []
     per_pilot: dict[str, list[Event]] = defaultdict(list)
+    stop1_weeks: list[tuple[str, dt.date]] = []
     printed_groups = sorted({c["label"].split()[0] for c in chips
                              if c["kind"] in ("STOP1", "STOP23", "FLEX")})
     pilots = sorted({p for g in printed_groups for p in resolve_group(g)[1]})
@@ -242,7 +265,10 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
         kind, label = chip["kind"], chip["label"]
 
         if kind == "STOP1":
-            group, members = resolve_group(label.split()[0])
+            printed = label.split()[0]
+            group, members = resolve_group(printed)
+            if not label.endswith("STOP 1 WKND"):
+                stop1_weeks.append((printed, date))
             if label.endswith("STOP 1 WKND"):
                 # The trailing Sat/Sun of this group's own STOP 1 week. The PDF
                 # marks it separately, so it is kept as its own entry and
@@ -303,6 +329,22 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
 
         else:
             raise ValueError(f"unhandled chip kind {kind}")
+
+    if CYCLE_THROUGH is not None:
+        drawn = {(e.summary, e.start) for e in events}
+        for printed, monday in stop1_weeks:
+            group, members = resolve_group(printed)
+            saturday = monday + 5 * day
+            for offset, phase, cats in WEEKEND_PHASES:
+                date = saturday + offset * day
+                summary = f"{phase} — {group}"
+                if date > CYCLE_THROUGH or (summary, date) in drawn:
+                    continue
+                ev = Event(summary, date, date + 2 * day,
+                           weekend_description(phase, group), cats,
+                           f"cycle|{phase}|{group}|{date}")
+                _assign(ev, events, per_pilot, members)
+                drawn.add((summary, date))
 
     events.sort(key=lambda e: (e.start, e.summary))
     for pilot in per_pilot:
