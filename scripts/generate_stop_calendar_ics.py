@@ -84,6 +84,28 @@ TRAINING_END_DATES = {
 # emitted. Flip this to True to include them.
 INCLUDE_TRAINING = False
 
+# Roster changes made after the PDF was drawn. The PDF stays the source of
+# truth for dates; only who sits in which group is overridden here.
+#
+# PILOT_MOVES maps a pilot to the printed group whose rotation they now
+# follow. They are removed from their printed group and added to the target.
+PILOT_MOVES = {
+    "TBD": "ATK/JRG",   # TBD now flies the slot-1 rotation
+}
+
+# PILOT_RENAMES is applied last, so a moved pilot can also be renamed.
+PILOT_RENAMES = {
+    "TBD": "AJW",       # JL1's replacement, now named
+}
+
+
+def resolve_group(printed: str) -> tuple[str, list[str]]:
+    """Map a printed group label to its current (display name, members)."""
+    members = [p for p in printed.split("/") if p not in PILOT_MOVES]
+    members += sorted(p for p, dest in PILOT_MOVES.items() if dest == printed)
+    members = [PILOT_RENAMES.get(p, p) for p in members]
+    return "/".join(members), members
+
 TRAINING_NOTE = ("The schedule marks only the start date for this course; the "
                  "PDF does not state its length. Confirm the end date before "
                  "relying on it.")
@@ -211,16 +233,16 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
     day = dt.timedelta(days=1)
     events: list[Event] = []
     per_pilot: dict[str, list[Event]] = defaultdict(list)
-    groups = sorted({c["label"].split()[0] for c in chips
-                     if c["kind"] in ("STOP1", "STOP23", "FLEX")})
-    pilots = sorted({p for g in groups for p in g.split("/")})
+    printed_groups = sorted({c["label"].split()[0] for c in chips
+                             if c["kind"] in ("STOP1", "STOP23", "FLEX")})
+    pilots = sorted({p for g in printed_groups for p in resolve_group(g)[1]})
 
     for chip in chips:
         date = dt.date.fromisoformat(chip["date"])
         kind, label = chip["kind"], chip["label"]
 
         if kind == "STOP1":
-            group = label.split()[0]
+            group, members = resolve_group(label.split()[0])
             if label.endswith("STOP 1 WKND"):
                 # The trailing Sat/Sun of this group's own STOP 1 week. The PDF
                 # marks it separately, so it is kept as its own entry and
@@ -234,10 +256,10 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
                            "Seven days off, Monday through Sunday.\n"
                            f"Crew group {group}.",
                            ["STOP", "STOP 1"], f"stop1|{group}|{date}")
-            _assign(ev, events, per_pilot, group.split("/"))
+            _assign(ev, events, per_pilot, members)
 
         elif kind in ("STOP23", "FLEX"):
-            group = label.split()[0]
+            group, members = resolve_group(label.split()[0])
             if kind == "FLEX":
                 name, cats = "STOP 4 (FLEX) weekend", ["STOP", "STOP 4 FLEX"]
             else:
@@ -246,7 +268,7 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
             ev = Event(f"{name} — {group}", date, date + 2 * day,
                        f"Weekend off (Saturday and Sunday).\nCrew group {group}.",
                        cats, f"{kind}|{label}|{date}")
-            _assign(ev, events, per_pilot, group.split("/"))
+            _assign(ev, events, per_pilot, members)
 
         elif kind == "HOLIDAY":
             name = HOLIDAY_NAMES.get(chip["date"])
@@ -265,7 +287,8 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
             if not INCLUDE_TRAINING:
                 continue
             course, _, who = label.partition(" - ")
-            attendees = [p for p in who.split("/") if p]
+            attendees = [PILOT_RENAMES.get(p, p) for p in who.split("/") if p]
+            who = "/".join(attendees)
             end_inclusive = TRAINING_END_DATES.get((chip["date"], label))
             if end_inclusive:
                 end = dt.date.fromisoformat(end_inclusive) + day
