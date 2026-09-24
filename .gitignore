@@ -58,3 +58,7 @@ _git/
 docs/training/generator/shots/
 docs/training/generator/annotated/
 docs/training/screenshots/
+
+# Python bytecode cache, created by running the scripts in scripts/
+__pycache__/
+*.py[cod]
