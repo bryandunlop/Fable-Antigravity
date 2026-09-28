@@ -125,10 +125,55 @@ def weekend_description(phase: str, group: str) -> str:
     return f"Weekend off (Saturday and Sunday){tail}.\nCrew group {group}."
 
 
-def weekend_event(phase: str, group: str, date: dt.date, uid_key: str) -> "Event":
+def weekend_event(phase: str, group: str, date: dt.date, uid_key: str,
+                  note: str = "") -> "Event":
     _, label, cats = WEEKEND_PHASES[phase]
     return Event(f"{label} — {group}", date, date + dt.timedelta(days=2),
-                 weekend_description(phase, group), cats, uid_key)
+                 weekend_description(phase, group) + note, cats, uid_key)
+
+
+# One-off week trades agreed after the PDF was drawn, each because a pilot's
+# training landed inside their own STOP 1 week. Written as (pilot, the week
+# they give up, partner, the week they take from that partner).
+#
+# A trade moves the STOP 1 week and its trailing weekend only. The groups'
+# STOP 2, 3 and 4 weekends stay on the printed rotation, so a trade remains a
+# one-week exception instead of cascading through the rest of the cycle.
+WEEK_SWAPS = (
+    ("JWB", "2027-03-29", "JCM", "2027-03-22"),  # JWB G800 Initial, Apr 1-6
+    ("JWB", "2027-09-13", "JJU", "2027-09-20"),  # JWB G500 Recurrent, Sep 16
+    ("JKP", "2027-11-29", "ATK", "2027-12-06"),  # JKP G800 Recurrent, Nov 29
+)
+
+
+def _swap_tables() -> tuple[dict, dict]:
+    leaving: dict[dt.date, set[str]] = defaultdict(set)
+    joining: dict[dt.date, set[str]] = defaultdict(set)
+    for a, week_a, b, week_b in WEEK_SWAPS:
+        wa, wb = dt.date.fromisoformat(week_a), dt.date.fromisoformat(week_b)
+        leaving[wa].add(a); joining[wb].add(a)
+        leaving[wb].add(b); joining[wa].add(b)
+    return leaving, joining
+
+
+SWAP_OUT, SWAP_IN = _swap_tables()
+
+
+def apply_swaps(members: list[str], monday: dt.date) -> tuple[list[str], str]:
+    """Who is actually off in this group's STOP 1 week, and a note if traded."""
+    out = SWAP_OUT.get(monday, set())
+    into = [p for p in sorted(SWAP_IN.get(monday, ())) if p not in members]
+    if not out and not into:
+        return list(members), ""
+    occupants = [p for p in members if p not in out] + into
+    parts = []
+    if out:
+        parts.append("out: " + ", ".join(sorted(out)))
+    if into:
+        parts.append("in: " + ", ".join(into))
+    return occupants, ("\n\nOne-off week trade (" + "; ".join(parts)
+                       + "). Training fell inside a STOP 1 week, so this week "
+                         "was exchanged with an adjacent one.")
 
 
 def resolve_group(printed: str) -> tuple[str, list[str]]:
@@ -277,19 +322,24 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
         if kind == "STOP1":
             printed = label.split()[0]
             group, members = resolve_group(printed)
-            if not label.endswith("STOP 1 WKND"):
+            is_weekend = label.endswith("STOP 1 WKND")
+            # a STOP 1 weekend chip sits on the Saturday of its own STOP 1 week
+            monday = date - 5 * day if is_weekend else date
+            if not is_weekend:
                 stop1_weeks.append((printed, date))
-            if label.endswith("STOP 1 WKND"):
+            occupants, note = apply_swaps(members, monday)
+            who = "/".join(occupants)
+            if is_weekend:
                 # The trailing Sat/Sun of this group's own STOP 1 week. The PDF
                 # marks it separately, so it is kept as its own entry and
                 # overlaps the seven-day event.
-                ev = weekend_event("S1", group, date, f"stop1wknd|{group}|{date}")
+                ev = weekend_event("S1", who, date, f"stop1wknd|{who}|{date}", note)
             else:
-                ev = Event(f"STOP 1 — {group}", date, date + 7 * day,
+                ev = Event(f"STOP 1 — {who}", date, date + 7 * day,
                            "Seven days off, Monday through Sunday.\n"
-                           f"Crew group {group}.",
-                           ["STOP", "STOP 1"], f"stop1|{group}|{date}")
-            _assign(ev, events, per_pilot, members)
+                           f"Crew group {who}." + note,
+                           ["STOP", "STOP 1"], f"stop1|{who}|{date}")
+            _assign(ev, events, per_pilot, occupants)
 
         elif kind in ("STOP23", "FLEX"):
             group, members = resolve_group(label.split()[0])
@@ -338,12 +388,15 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
             saturday = monday + 5 * day
             for phase, (offset, label_, _cats) in WEEKEND_PHASES.items():
                 date = saturday + offset * day
-                summary = f"{label_} — {group}"
+                occupants, note = ((list(members), "") if phase != "S1"
+                                   else apply_swaps(members, monday))
+                who = "/".join(occupants)
+                summary = f"{label_} — {who}"
                 if date > CYCLE_THROUGH or (summary, date) in drawn:
                     continue
-                ev = weekend_event(phase, group, date,
-                                   f"cycle|{phase}|{group}|{date}")
-                _assign(ev, events, per_pilot, members)
+                ev = weekend_event(phase, who, date,
+                                   f"cycle|{phase}|{who}|{date}", note)
+                _assign(ev, events, per_pilot, occupants)
                 drawn.add((summary, date))
 
     events.sort(key=lambda e: (e.start, e.summary))
