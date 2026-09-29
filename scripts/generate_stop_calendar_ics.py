@@ -132,13 +132,22 @@ def weekend_event(phase: str, group: str, date: dt.date, uid_key: str,
                  weekend_description(phase, group) + note, cats, uid_key)
 
 
-# One-off week trades agreed after the PDF was drawn, each because a pilot's
-# training landed inside their own STOP 1 week. Written as (pilot, the week
-# they give up, partner, the week they take from that partner).
+# One-off trades agreed after the PDF was drawn, each because a pilot's
+# training landed inside their own STOP 1 week. Written as (pilot, the STOP 1
+# week they give up, partner, the STOP 1 week they take from that partner).
 #
-# A trade moves the STOP 1 week and its trailing weekend only. The groups'
-# STOP 2, 3 and 4 weekends stay on the printed rotation, so a trade remains a
-# one-week exception instead of cascading through the rest of the cycle.
+# TRADE_SCOPE decides how much of the eight-week cycle moves with the week:
+#
+#   "cycle"  the STOP 1 week and all four of that cycle's weekends move, so the
+#            pilot flies with the adjacent crew for one full cycle. Every STOP
+#            2/3/4 stays at weeks 3/5/7 of the pilot's own cycle; only the cycle
+#            length flexes (7 or 9 weeks) at the two ends of the trade.
+#   "week"   only the STOP 1 week and its trailing weekend move. Fewer events
+#            change, but the pilot's STOP 2/3/4 stay with the old crew and land
+#            off-phase -- one arrives a week after STOP 1, another three weeks
+#            after -- and the longest working stretch grows from 12 to 19 days.
+TRADE_SCOPE = "cycle"
+
 WEEK_SWAPS = (
     ("JWB", "2027-03-29", "JCM", "2027-03-22"),  # JWB G800 Initial, Apr 1-6
     ("JWB", "2027-09-13", "JJU", "2027-09-20"),  # JWB G500 Recurrent, Sep 16
@@ -171,9 +180,38 @@ def apply_swaps(members: list[str], monday: dt.date) -> tuple[list[str], str]:
         parts.append("out: " + ", ".join(sorted(out)))
     if into:
         parts.append("in: " + ", ".join(into))
-    return occupants, ("\n\nOne-off week trade (" + "; ".join(parts)
-                       + "). Training fell inside a STOP 1 week, so this week "
-                         "was exchanged with an adjacent one.")
+    what = ("this eight-week cycle was exchanged with the adjacent crew's"
+            if TRADE_SCOPE == "cycle" else
+            "this week was exchanged with an adjacent one")
+    return occupants, ("\n\nTraded (" + "; ".join(parts) + "): training fell "
+                       "inside a STOP 1 week, so " + what + ".")
+
+
+# Known training overlaps left in place on purpose, keyed by (pilot, first day
+# of the affected STOP entry). The note is appended to that entry, so the
+# calendar records the overlap itself instead of silently showing time off.
+#
+# MTS: the only trades that clear this move Juneteenth between pilots, which
+# the rotation otherwise keeps fixed, so the one-day overlap is accepted -- as
+# the source PDF also did, listing it under residual conflicts.
+#
+# JRG: the course is printed as a six-day span over a weekend. Clearing it
+# means trading a whole cycle, putting two more pilots off the eight-week
+# cadence to recover one weekend, so it is documented rather than moved.
+RESIDUAL_OVERLAPS = {
+    ("MTS", dt.date(2027, 6, 14)):
+        "MTS: G800 Initial runs Jun 10-14 and ends on the Monday of this "
+        "week, so his time off effectively starts Tuesday Jun 15.",
+    ("JRG", dt.date(2027, 4, 3)):
+        "JRG: G800 Initial runs Thu Apr 1 - Tue Apr 6. If the course runs "
+        "through the weekend, JRG is in training for this weekend off.",
+}
+
+
+def residual_note(occupants: list[str], start: dt.date) -> str:
+    notes = [RESIDUAL_OVERLAPS[(p, start)] for p in occupants
+             if (p, start) in RESIDUAL_OVERLAPS]
+    return "".join("\n\n" + n for n in notes)
 
 
 def resolve_group(printed: str) -> tuple[str, list[str]]:
@@ -344,8 +382,13 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
         elif kind in ("STOP23", "FLEX"):
             group, members = resolve_group(label.split()[0])
             phase = "S4" if kind == "FLEX" else ("S2" if "STOP 2" in label else "S3")
-            ev = weekend_event(phase, group, date, f"{kind}|{label}|{date}")
-            _assign(ev, events, per_pilot, members)
+            # the Monday of the STOP 1 week this weekend belongs to
+            cycle_monday = date - (5 + WEEKEND_PHASES[phase][0]) * day
+            occupants, note = (apply_swaps(members, cycle_monday)
+                               if TRADE_SCOPE == "cycle" else (list(members), ""))
+            ev = weekend_event(phase, "/".join(occupants), date,
+                               f"{kind}|{label}|{date}", note)
+            _assign(ev, events, per_pilot, occupants)
 
         elif kind == "HOLIDAY":
             name = HOLIDAY_NAMES.get(chip["date"])
@@ -388,8 +431,9 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
             saturday = monday + 5 * day
             for phase, (offset, label_, _cats) in WEEKEND_PHASES.items():
                 date = saturday + offset * day
-                occupants, note = ((list(members), "") if phase != "S1"
-                                   else apply_swaps(members, monday))
+                occupants, note = (apply_swaps(members, monday)
+                                   if phase == "S1" or TRADE_SCOPE == "cycle"
+                                   else (list(members), ""))
                 who = "/".join(occupants)
                 summary = f"{label_} — {who}"
                 if date > CYCLE_THROUGH or (summary, date) in drawn:
@@ -406,6 +450,8 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
 
 
 def _assign(ev, events, per_pilot, pilots):
+    if "STOP" in ev.categories:
+        ev.description += residual_note(pilots, ev.start)
     events.append(ev)
     for pilot in pilots:
         per_pilot[pilot].append(ev)
