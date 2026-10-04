@@ -7,7 +7,8 @@ page, not drawn in the grid. This script recovers the chips by geometry
 (fill colour -> event type, cell position -> date) and then expands them
 into real date ranges:
 
-    STOP 1            Monday -> Sunday (7 days off)
+    STOP 1            Monday -> Sunday (7 days off); Monday -> Friday (5)
+                      for a week whose weekdays were traded, see WEEK_SWAPS
     STOP 1 (weekend)  Saturday -> Sunday (2 days off), same label as the
                       seven-day week it sits inside
     STOP 2/3/4        Saturday -> Sunday (2 days off)
@@ -136,8 +137,15 @@ def weekend_event(phase: str, group: str, date: dt.date, uid_key: str,
 # training landed inside their own STOP 1 week. Written as (pilot, the STOP 1
 # week they give up, partner, the STOP 1 week they take from that partner).
 #
-# TRADE_SCOPE decides how much of the eight-week cycle moves with the week:
+# TRADE_SCOPE decides how much of the eight-week cycle moves with a trade:
 #
+#   "weekdays"  only Monday-Friday of the STOP 1 week moves. Every weekend --
+#               the STOP 1 weekend and STOP 2/3/4 -- stays on the pilot's own
+#               rotation, so their every-other-weekend rhythm never changes and
+#               no working stretch leaves the normal 7-12 days. The traded week
+#               shows as a five-day entry beside its unchanged weekend. Chosen
+#               by the schedule's owner: weekend overlaps with training are
+#               left in place and settled with payback STOP days instead.
 #   "cycle"  the STOP 1 week and all four of that cycle's weekends move, so the
 #            pilot flies with the adjacent crew for one full cycle. Every STOP
 #            2/3/4 stays at weeks 3/5/7 of the pilot's own cycle; only the cycle
@@ -146,7 +154,7 @@ def weekend_event(phase: str, group: str, date: dt.date, uid_key: str,
 #            change, but the pilot's STOP 2/3/4 stay with the old crew and land
 #            off-phase -- one arrives a week after STOP 1, another three weeks
 #            after -- and the longest working stretch grows from 12 to 19 days.
-TRADE_SCOPE = "cycle"
+TRADE_SCOPE = "weekdays"
 
 WEEK_SWAPS = (
     ("JWB", "2027-03-29", "JCM", "2027-03-22"),  # JWB G800 Initial, Apr 1-6
@@ -180,16 +188,34 @@ def apply_swaps(members: list[str], monday: dt.date) -> tuple[list[str], str]:
         parts.append("out: " + ", ".join(sorted(out)))
     if into:
         parts.append("in: " + ", ".join(into))
-    what = ("this eight-week cycle was exchanged with the adjacent crew's"
-            if TRADE_SCOPE == "cycle" else
-            "this week was exchanged with an adjacent one")
+    what = {"weekdays": "Monday-Friday of this week was exchanged with the "
+                        "adjacent week; weekends stay on the normal rotation",
+            "week": "this week was exchanged with an adjacent one",
+            "cycle": "this eight-week cycle was exchanged with the adjacent "
+                     "crew's"}[TRADE_SCOPE]
     return occupants, ("\n\nTraded (" + "; ".join(parts) + "): training fell "
                        "inside a STOP 1 week, so " + what + ".")
+
+
+def segment_crew(members: list[str], monday: dt.date,
+                 segment: str) -> tuple[list[str], str]:
+    """Who is off for one part of a cycle, plus the trade note if it moved.
+
+    segment is "weekdays" (Monday-Friday of STOP 1), "stop1_weekend", or
+    "later_weekend" (STOP 2/3/4). Weekdays always follow a trade; how many of
+    the weekends follow it is what TRADE_SCOPE decides.
+    """
+    moves = {"weekdays": True,
+             "stop1_weekend": TRADE_SCOPE in ("week", "cycle"),
+             "later_weekend": TRADE_SCOPE == "cycle"}[segment]
+    return apply_swaps(members, monday) if moves else (list(members), "")
 
 
 # Known training overlaps left in place on purpose, keyed by (pilot, first day
 # of the affected STOP entry). The note is appended to that entry, so the
 # calendar records the overlap itself instead of silently showing time off.
+# The owner's policy: trades are for full STOP 1 weeks that collide with
+# training; a day or a weekend that overlaps is settled with payback STOP days.
 #
 # MTS: the only trades that clear this move Juneteenth between pilots, which
 # the rotation otherwise keeps fixed, so the one-day overlap is accepted -- as
@@ -205,6 +231,11 @@ RESIDUAL_OVERLAPS = {
     ("JRG", dt.date(2027, 4, 3)):
         "JRG: G800 Initial runs Thu Apr 1 - Tue Apr 6. If the course runs "
         "through the weekend, JRG is in training for this weekend off.",
+    # JWB's weekdays were traded away from this course, but with weekends kept
+    # on the normal rotation his STOP 1 weekend still sits inside it.
+    ("JWB", dt.date(2027, 4, 3)):
+        "JWB: G800 Initial runs Thu Apr 1 - Tue Apr 6. If the course runs "
+        "through the weekend, JWB is in training for this weekend off.",
 }
 
 
@@ -365,18 +396,30 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
             monday = date - 5 * day if is_weekend else date
             if not is_weekend:
                 stop1_weeks.append((printed, date))
-            occupants, note = apply_swaps(members, monday)
-            who = "/".join(occupants)
             if is_weekend:
                 # The trailing Sat/Sun of this group's own STOP 1 week. The PDF
                 # marks it separately, so it is kept as its own entry and
                 # overlaps the seven-day event.
+                occupants, note = segment_crew(members, monday, "stop1_weekend")
+                who = "/".join(occupants)
                 ev = weekend_event("S1", who, date, f"stop1wknd|{who}|{date}", note)
             else:
-                ev = Event(f"STOP 1 — {who}", date, date + 7 * day,
-                           "Seven days off, Monday through Sunday.\n"
-                           f"Crew group {who}." + note,
-                           ["STOP", "STOP 1"], f"stop1|{who}|{date}")
+                occupants, note = segment_crew(members, monday, "weekdays")
+                weekend_crew, _ = segment_crew(members, monday, "stop1_weekend")
+                who = "/".join(occupants)
+                if occupants == weekend_crew:
+                    ev = Event(f"STOP 1 — {who}", date, date + 7 * day,
+                               "Seven days off, Monday through Sunday.\n"
+                               f"Crew group {who}." + note,
+                               ["STOP", "STOP 1"], f"stop1|{who}|{date}")
+                else:
+                    # Weekdays traded, weekend not: Monday-Friday stands on its
+                    # own, and the weekend keeps its separate entry.
+                    ev = Event(f"STOP 1 — {who}", date, date + 5 * day,
+                               "Monday through Friday off; the weekend after "
+                               "stays on each pilot's own rotation.\n"
+                               f"Crew group {who}." + note,
+                               ["STOP", "STOP 1"], f"stop1|{who}|{date}")
             _assign(ev, events, per_pilot, occupants)
 
         elif kind in ("STOP23", "FLEX"):
@@ -384,8 +427,7 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
             phase = "S4" if kind == "FLEX" else ("S2" if "STOP 2" in label else "S3")
             # the Monday of the STOP 1 week this weekend belongs to
             cycle_monday = date - (5 + WEEKEND_PHASES[phase][0]) * day
-            occupants, note = (apply_swaps(members, cycle_monday)
-                               if TRADE_SCOPE == "cycle" else (list(members), ""))
+            occupants, note = segment_crew(members, cycle_monday, "later_weekend")
             ev = weekend_event(phase, "/".join(occupants), date,
                                f"{kind}|{label}|{date}", note)
             _assign(ev, events, per_pilot, occupants)
@@ -431,9 +473,9 @@ def build_events(chips: list[dict]) -> tuple[list[Event], dict[str, list[Event]]
             saturday = monday + 5 * day
             for phase, (offset, label_, _cats) in WEEKEND_PHASES.items():
                 date = saturday + offset * day
-                occupants, note = (apply_swaps(members, monday)
-                                   if phase == "S1" or TRADE_SCOPE == "cycle"
-                                   else (list(members), ""))
+                occupants, note = segment_crew(
+                    members, monday,
+                    "stop1_weekend" if phase == "S1" else "later_weekend")
                 who = "/".join(occupants)
                 summary = f"{label_} — {who}"
                 if date > CYCLE_THROUGH or (summary, date) in drawn:
