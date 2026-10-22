@@ -1,7 +1,10 @@
 # myGFO vision
 
-`index.html` is the single copy of the myGFO manifesto, roadmap, design notes, ideas register and decisions log. It replaced the earlier Markdown files in revision 3 on 22 Oct 2026, so there is one place to update.
+The vision is two pages, as of revision 4 on 22 Oct 2026.
 
-The file is a page fragment written for Claude's artifact viewer, which adds the document skeleton when it is published. Read it at https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg, which is private to Bryan until he shares it. After an edit, ask Claude to republish the same file so the link keeps working.
+- `index.html` is the story for leadership: the end goal, one trip end to end with mockups, the roadmap, the platform map and the decisions leadership must make. Published at https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg.
+- `reference.html` is the working reference for the myGFO committee and the developer: where things stand, the plan and its gates, the designs, the ideas register and every decision. Published at https://claude.ai/artifact/F3bTxregXxR3ovYRiAzk42.
 
-`COPILOT_HANDOVER.md` is a briefing for GitHub Copilot at work, which can see the production repositories. It explains how the sandbox, Bryan's work mockups and production relate, and lists the reconciliation Copilot should produce. The vision page wins if the two disagree.
+Both links are private to Bryan until he shares them. Both files are page fragments written for Claude's artifact viewer, which adds the document skeleton when they are published. After an edit, ask Claude to republish the same file so the link keeps working.
+
+`COPILOT_HANDOVER.md` is a briefing for GitHub Copilot at work, which can see the production repositories. It explains how the sandbox, Bryan's work mockups and production relate, and lists the reconciliation Copilot should produce. The reference wins if the two disagree. The hand-off is on hold until Bryan is happy with the two pages.

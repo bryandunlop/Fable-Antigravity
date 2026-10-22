@@ -1,9 +1,9 @@
 # myGFO handover for GitHub Copilot
 
 - **From:** Bryan Dunlop, prepared with Claude (Anthropic), 22 Oct 2026.
-- **Written against:** the vision page at Revision 3, `docs/vision/index.html`.
-- **Branch:** until PR #40 merges, this file and the vision page exist only on branch `claude/gfo-vision-roadmap` of `bryandunlop/Fable-Antigravity`. `main` does not have them yet.
-- **Precedence:** if this file and the vision page disagree, the vision page wins. If either disagrees with `CLAUDE.md`, `CLAUDE.md` wins.
+- **Written against:** Revision 4 of the vision, which is two pages. `docs/vision/index.html` is the short story for leadership. `docs/vision/reference.html` is the working reference with all the detail. Section numbers in this file refer to the reference.
+- **Branch:** until PR #40 merges, this file and the vision pages exist only on branch `claude/gfo-vision-roadmap` of `bryandunlop/Fable-Antigravity`. `main` does not have them yet.
+- **Precedence:** if this file and the reference disagree, the reference wins. If either disagrees with `CLAUDE.md`, `CLAUDE.md` wins.
 
 ## Your job
 
@@ -43,7 +43,8 @@ Commit messages cite decision IDs such as D111, which live in Bryan's Obsidian v
 | Path | What it holds |
 |---|---|
 | `CLAUDE.md` | The working agreement: NEVER and ALWAYS rules, invariants, the config and secrets contract, the CAMP error taxonomy, and Open Questions OQ1 to OQ6. |
-| `docs/vision/index.html` | The vision at Revision 3: manifesto, the trip end to end, platform, horizons, designs, the ideas register and the decisions log. Section numbers below refer to it. |
+| `docs/vision/index.html` | The leadership story at Revision 4: the end goal, today and tomorrow, one trip end to end with mockups, the roadmap, the platform map, six principles and the decisions leadership must make. |
+| `docs/vision/reference.html` | The working reference at Revision 4: manifesto, where we are, platform, horizons and gates, designs, the ideas register and the decisions log. Section numbers below refer to it. |
 | `docs/DEVELOPER_HANDOFF_V2.md` | Module hand-off from 6 Jul 2026: Tech Log, Scheduling, Pilot Workspace, Inventory v2, and what blocked each. |
 | `docs/tech-log/HANDOFF.md`, `docs/tech-log-api/` | Tech Log build notes, plus an API sketch in `README.md`, `routes.ts` and `schema.sql`. Compare the schema with production's. |
 | `docs/CANONICAL_MAINTENANCE_SURFACE.md` | Which of three overlapping maintenance surfaces is the real one. |
@@ -90,7 +91,7 @@ And production must always:
 
 ## 5. Decisions so far
 
-From vision section 15. All dated 22 Oct 2026.
+From reference section 14. All dated 22 Oct 2026.
 
 - Bryan designs and mocks up. A developer builds production.
 - myairops stays the scheduling system of record and stays pull-only. GFO has its OData and REST APIs.
@@ -117,9 +118,9 @@ Produce one Markdown report with the headings A to G below, using the tables as 
 
 Status is one of: Live, In build, Not started, Different approach. Confidence is High, Medium or Low.
 
-Rows, from vision section 3: Document Center, Tech Log, Scheduling checklists, EA booking and messages, Passenger records, Flight Hub, Airport company pages, ForeFlight Files, Notifications, Manager views and wall screens, SIFL and tax, FlightAware, Workday, Outlook, Airflow and AI agents.
+Rows, from reference section 2: Document Center, Tech Log, Scheduling checklists, EA booking and messages, Passenger records, Flight Hub, Airport company pages, ForeFlight Files, Notifications, Manager views and wall screens, SIFL and tax, FlightAware, Workday, Outlook, Airflow and AI agents.
 
-Then the eight platform pieces from vision section 4, as their own rows: identity and people with the manager chain and delegates, the trip graph, events and notifications, the expiry engine, the integration hub, signature and audit, the insight data layer, and the agent gateway. For each piece, also say whether production builds it once and shares it, or repeats it per module.
+Then the eight platform pieces from reference section 3, as their own rows: identity and people with the manager chain and delegates, the trip graph, events and notifications, the expiry engine, the integration hub, signature and audit, the insight data layer, and the agent gateway. For each piece, also say whether production builds it once and shares it, or repeats it per module.
 
 ### B. Rule compliance
 
@@ -149,7 +150,7 @@ Recommendation is one of: Port logic and tests, Already covered, Not needed. Por
 
 ### D. Horizon check
 
-For each item in vision section 5, mark Done, In build, Ready or Blocked. Ready means its gates are clear. For Blocked, name the blocker. The gates to check are OQ1 for the CAMP utilization push, OQ2 for the myairops OData mapping, OQ5 for myairops write-back, OQ6 for passenger data residency, and the DOM rulings on the check-flight gate under 14 CFR 91.407(b), supersede authority and the RII ATA list.
+For each item in reference section 4, mark Done, In build, Ready or Blocked. Ready means its gates are clear. For Blocked, name the blocker. The gates to check are OQ1 for the CAMP utilization push, OQ2 for the myairops OData mapping, OQ5 for myairops write-back, OQ6 for passenger data residency, and the DOM rulings on the check-flight gate under 14 CFR 91.407(b), supersede authority and the RII ATA list.
 
 ### E. Integration reality
 
@@ -160,36 +161,35 @@ Rows: myairops OData, REST and webhooks; CAMP SOAP; ForeFlight Files; ForeFlight
 
 ### F. Ideas register
 
-Vision section 14 lists 22 ideas marked "Not discussed". For each one, write one line: does production already have it, and where?
+Reference section 13 lists 22 ideas marked "Not discussed". For each one, write one line: does production already have it, and where?
 
 ### G. Questions for Bryan
 
 - Every disagreement between production and the vision.
 - Everything production has that the vision does not mention, so the vision can absorb it.
-- Any open question in vision section 15 or in `CLAUDE.md` that production already settles.
+- Any open question in reference section 14 or in `CLAUDE.md` that production already settles.
 
-## 7. The vision page's sections
+## 7. The reference page's sections
 
-Open `docs/vision/index.html` in a browser or read the HTML. Each section has an anchor.
+Open `docs/vision/reference.html` in a browser or read the HTML. Each section has an anchor. The trip end to end, with mockups, is on the story page at `docs/vision/index.html#trip`.
 
 | No. | Anchor | Section |
 |---|---|---|
 | 1 | `#manifesto` | Manifesto and the twelve principles |
-| 2 | `#trip` | One trip, end to end |
-| 3 | `#today` | Where we are, and what stays in other apps |
-| 4 | `#platform` | The eight shared platform pieces and the dependency matrix |
-| 5 | `#horizons` | Horizons H0 to H4 and their gates |
-| 6 | `#scope` | Where the project ends |
-| 7 | `#risks` | Risks |
-| 8 | `#airports` | Airport knowledge loop |
-| 9 | `#disruption` | Disruption options |
-| 10 | `#agents` | Agent gateway |
-| 11 | `#tax` | SIFL, SEC and related tax items |
-| 12 | `#erp` | Emergency response app |
-| 13 | `#airflow` | Airflow evaluation |
-| 14 | `#ideas` | Ideas register, 48 ideas with status |
-| 15 | `#questions` | Open questions and the decisions log |
-| 16 | `#sources` | Sources |
+| 2 | `#today` | Where we are, and what stays in other apps |
+| 3 | `#platform` | The eight shared platform pieces and the dependency matrix |
+| 4 | `#horizons` | Horizons H0 to H4 and their gates |
+| 5 | `#scope` | Where the project ends |
+| 6 | `#risks` | Risks |
+| 7 | `#airports` | Airport knowledge loop |
+| 8 | `#disruption` | Disruption options |
+| 9 | `#agents` | Agent gateway |
+| 10 | `#tax` | SIFL, SEC and related tax items |
+| 11 | `#erp` | Emergency response app |
+| 12 | `#airflow` | Airflow evaluation |
+| 13 | `#ideas` | Ideas register, 48 ideas with status |
+| 14 | `#questions` | Open questions and the decisions log |
+| 15 | `#sources` | Sources |
 
 ## 8. Glossary
 

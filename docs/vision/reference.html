@@ -1,0 +1,1187 @@
+<title>myGFO Vision Reference</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: an operations manual. A persistent contents rail with the record of revisions sits on the left;
+   a 68-character reading column runs on the right, and tables, the trip timeline and the ideas register
+   may use the full main column. Chart-magenta change bars mark what changed in this revision. */
+:root {
+  --bg: #F4F6F9;
+  --surface: #FFFFFF;
+  --surface-2: #EBEFF5;
+  --ink: #13202F;
+  --ink-2: #38485B;
+  --muted: #5F6E82;
+  --rule: #D6DEE8;
+  --accent: #1C58B5;
+  --accent-soft: #E2EBF9;
+  --chg: #AE2A7E;
+  --ok: #1D7349; --ok-soft: #E1F1E8;
+  --warn: #8F5600; --warn-soft: #F8ECD6;
+  --info: #46586F; --info-soft: #E6EBF2;
+  --t-off: #3E4C5E; --t-off-soft: #E4E9F0;
+  --t-co: #855700; --t-co-soft: #F7EBD2;
+  --t-hist: #1C58B5; --t-hist-soft: #E2EBF9;
+  --t-crew: #6B3FA0; --t-crew-soft: #EEE6F8;
+  --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C1219; --surface: #131B25; --surface-2: #1A2431;
+    --ink: #E3E9F1; --ink-2: #BAC5D3; --muted: #8B98AA; --rule: #253141;
+    --accent: #7EA9F2; --accent-soft: #18263A; --chg: #E070B9;
+    --ok: #5DBE8A; --ok-soft: #12291E; --warn: #E3A64A; --warn-soft: #2C2210;
+    --info: #A3B3C7; --info-soft: #1C2531;
+    --t-off: #B6C2D1; --t-off-soft: #202A37; --t-co: #E8B65C; --t-co-soft: #2E2412;
+    --t-hist: #7EA9F2; --t-hist-soft: #18263A; --t-crew: #C3A2EE; --t-crew-soft: #251C35;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C1219; --surface: #131B25; --surface-2: #1A2431;
+  --ink: #E3E9F1; --ink-2: #BAC5D3; --muted: #8B98AA; --rule: #253141;
+  --accent: #7EA9F2; --accent-soft: #18263A; --chg: #E070B9;
+  --ok: #5DBE8A; --ok-soft: #12291E; --warn: #E3A64A; --warn-soft: #2C2210;
+  --info: #A3B3C7; --info-soft: #1C2531;
+  --t-off: #B6C2D1; --t-off-soft: #202A37; --t-co: #E8B65C; --t-co-soft: #2E2412;
+  --t-hist: #7EA9F2; --t-hist-soft: #18263A; --t-crew: #C3A2EE; --t-crew-soft: #251C35;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+a { color: var(--accent); text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mono { font-family: var(--font-mono); }
+
+/* Shell */
+.shell {
+  display: grid; grid-template-columns: 252px minmax(0, 1fr); gap: 56px;
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Rail */
+.rail {
+  position: sticky; top: env(safe-area-inset-top, 0px); align-self: start;
+  max-height: 100vh; max-height: 100dvh; overflow-y: auto;
+  padding-block: 32px 24px; scrollbar-width: thin;
+}
+.rail-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { text-decoration: none; color: var(--ink); display: grid; gap: 2px; }
+.brand b { font-family: var(--font-display); font-stretch: 75%; font-weight: 800; font-size: 1.55rem; line-height: 1; letter-spacing: -0.005em; }
+.brand span { font-size: 13px; color: var(--muted); }
+.menu-btn {
+  display: none; font: 500 13px var(--font-body); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 999px;
+  padding: 6px 14px; cursor: pointer;
+}
+.rev { margin: 22px 0 14px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+.rev-title { font: 500 11.5px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.rev ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rev li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 4px; font-size: 12.5px; line-height: 1.4; color: var(--ink-2); margin: 0; }
+.rev li b { font: 600 12px var(--font-mono); color: var(--ink); }
+.rev li .d { display: block; font: 11.5px var(--font-mono); color: var(--muted); }
+.chg-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); margin: 0 0 6px; cursor: pointer; }
+.chg-toggle input { accent-color: var(--chg); width: 15px; height: 15px; margin: 0; }
+.story-link { margin: 4px 0 2px; font-size: 13.5px; }
+.chg-key { display: inline-block; width: 3px; height: 14px; background: var(--chg); vertical-align: -2px; margin-right: 2px; }
+.toc .grp { font: 500 11.5px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; }
+.toc ol { list-style: none; padding: 0; margin: 0; }
+.toc li { margin: 0; }
+.toc a {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 4px;
+  padding: 5px 8px 5px 10px; border-left: 2px solid transparent;
+  color: var(--ink-2); text-decoration: none; font-size: 14px; line-height: 1.35;
+}
+.toc a .n { font: 12px var(--font-mono); color: var(--muted); padding-top: 1px; }
+.toc a:hover { color: var(--ink); background: var(--surface-2); }
+.toc a[aria-current="true"] { color: var(--accent); border-left-color: var(--accent); background: var(--accent-soft); }
+.toc a[aria-current="true"] .n { color: var(--accent); }
+
+/* Main column */
+main.doc { min-width: 0; padding-block: 8px 120px; }
+.prose > p, .prose > ul, .prose > ol, .prose > h3, .prose > .lead { max-width: 68ch; }
+p { margin: 0 0 1em; }
+ul, ol { padding-left: 1.3em; margin: 0 0 1em; }
+li { margin: 0.35em 0; }
+h1, h2, h3 { text-wrap: balance; }
+h3 { font-family: var(--font-body); font-weight: 600; font-size: 1.08rem; line-height: 1.35; margin: 2em 0 0.55em; }
+
+.hero { padding-block: 44px 8px; }
+.eyebrow { font: 500 12px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.hero h1 {
+  font-family: var(--font-display); font-stretch: 75%; font-weight: 780;
+  font-size: clamp(2.3rem, 3.2vw + 1.2rem, 3.7rem); line-height: 1.02; letter-spacing: -0.01em;
+  margin: 10px 0 18px;
+}
+.lead { font-size: 1.22rem; line-height: 1.5; color: var(--ink); margin: 0 0 14px; }
+.byline { font-size: 14px; color: var(--muted); max-width: 68ch; }
+.glance { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.glance a {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  font-size: 13.5px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
+}
+.glance a:hover { border-color: var(--accent); }
+.glance b { font: 600 13px var(--font-mono); font-variant-numeric: tabular-nums; }
+
+section.sec { border-top: 1px solid var(--rule); margin-top: 64px; padding-top: 40px; }
+.sec-head { display: grid; gap: 6px; margin-bottom: 18px; position: relative; }
+.sec-head h2 {
+  font-family: var(--font-display); font-stretch: 80%; font-weight: 720;
+  font-size: clamp(1.65rem, 1.4vw + 1.1rem, 2.25rem); line-height: 1.08; letter-spacing: -0.005em; margin: 0;
+}
+.new { font: 600 11px var(--font-mono); color: var(--chg); letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* Change bars */
+.chg { position: relative; }
+.chg::before { content: ""; position: absolute; left: -18px; top: 0.25em; bottom: 0.25em; width: 3px; background: var(--chg); }
+ul > li.chg::before, ol > li.chg::before { left: calc(-1.3em - 14px); }
+.thread > li.chg::before, .qa > li.chg::before { left: -18px; }
+.toc a.chg::before, .rev li.chg::before { display: none; }
+body.hide-chg .chg::before { display: none; }
+body.hide-chg .new { display: none; }
+
+/* Tables */
+.tablewrap { overflow-x: auto; margin: 1.1em 0 1.6em; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; line-height: 1.5; min-width: 560px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+th { font: 500 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td.k { font-weight: 600; color: var(--ink); white-space: nowrap; }
+tr.chg td:first-child { box-shadow: inset 3px 0 0 var(--chg); }
+body.hide-chg tr.chg td:first-child { box-shadow: none; }
+.fill { font: 12px var(--font-mono); color: var(--muted); border: 1px dashed var(--rule); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.depth { font: 500 12px var(--font-mono); white-space: nowrap; }
+
+/* Principles */
+.principles {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; margin: 1.2em 0 1.6em;
+}
+.principle { background: var(--surface); padding: 16px 18px 18px; display: grid; gap: 6px; align-content: start; }
+.principle .n { font: 500 12px var(--font-mono); color: var(--muted); }
+.principle h3 { margin: 0; font-size: 1rem; line-height: 1.3; }
+.principle p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+.principle.chg::before { left: 0; top: 0; bottom: 0; }
+
+/* Trip timeline */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 1em 0 0.6em; }
+.fbtn {
+  font: 500 13px var(--font-body); padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer;
+  display: inline-flex; gap: 8px; align-items: center;
+}
+.fbtn:hover { border-color: var(--accent); }
+.fbtn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.fbtn .count { font: 600 12px var(--font-mono); font-variant-numeric: tabular-nums; opacity: 0.8; }
+.status-line { font: 13px var(--font-mono); color: var(--muted); margin: 0 0 12px; }
+.thread { list-style: none; padding: 0; margin: 0 0 1.5em; }
+.step {
+  display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 4px 20px;
+  padding: 14px 0; border-top: 1px solid var(--rule); margin: 0; transition: opacity 0.2s ease;
+}
+.step .when { font: 500 12px var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+.step h3 { margin: 0 0 4px; font-size: 1rem; }
+.step p { margin: 0 0 8px; color: var(--ink-2); font-size: 15px; max-width: 68ch; }
+.step .who { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font: 500 11.5px var(--font-mono); padding: 2px 8px; border-radius: 4px; background: var(--surface-2); color: var(--ink-2); text-decoration: none; }
+a.tag { color: var(--accent); background: var(--accent-soft); }
+.step.dim { opacity: 0.25; }
+.branch-label { font: 600 12px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--warn); margin: 22px 0 0; padding-top: 10px; }
+.step.branch .when { color: var(--warn); }
+
+/* Platform pieces */
+.pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 1.2em 0 1.6em; }
+.piece { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px 16px; display: grid; gap: 6px; align-content: start; }
+.piece h3 { margin: 0; font-size: 1rem; display: flex; gap: 8px; align-items: baseline; }
+.piece h3 .n { font: 500 12px var(--font-mono); color: var(--muted); }
+.piece p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+.piece.chg::before { left: -1px; top: -1px; bottom: -1px; border-radius: 6px 0 0 6px; }
+.matrix td.y { text-align: center; color: var(--accent); font-size: 13px; }
+.matrix th:not(:first-child) { text-align: center; }
+.matrix td:first-child { white-space: nowrap; font-weight: 500; }
+
+/* Horizons */
+.horizons { display: grid; gap: 14px; margin: 1.2em 0; }
+.hz { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 18px 22px 16px; }
+.hz-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 6px; }
+.hz-code { font: 600 13px var(--font-mono); color: var(--accent); }
+.hz h3 { margin: 0; font-family: var(--font-display); font-stretch: 85%; font-weight: 700; font-size: 1.32rem; }
+.hz .outcome { font-weight: 500; margin: 0 0 10px; max-width: 68ch; }
+.hz ul { margin: 0 0 12px; }
+.hz li { font-size: 15px; color: var(--ink-2); max-width: 68ch; }
+.gates { background: var(--surface-2); border-radius: 4px; padding: 10px 14px; font-size: 14px; color: var(--ink-2); margin: 0; }
+.gates b { font: 600 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); margin-right: 6px; }
+.hz.track { background: transparent; border-style: dashed; }
+
+/* Airport demo */
+.tier { font: 500 11.5px var(--font-mono); padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.t-off { background: var(--t-off-soft); color: var(--t-off); }
+.t-co { background: var(--t-co-soft); color: var(--t-co); }
+.t-hist { background: var(--t-hist-soft); color: var(--t-hist); }
+.t-crew { background: var(--t-crew-soft); color: var(--t-crew); }
+figure.demo { margin: 1.3em 0 1.6em; max-width: 660px; }
+.brief { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.brief-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+.icao { font: 600 16px var(--font-mono); letter-spacing: 0.08em; }
+.brief-head .name { font-weight: 600; }
+.brief-head .last { margin-left: auto; font: 12px var(--font-mono); color: var(--muted); }
+.since { padding: 12px 16px 14px; background: var(--surface-2); }
+.since-title { font: 600 11.5px var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); margin: 0 0 10px; }
+.since ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.since li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 14.5px; margin: 0; }
+.since li .txt { flex: 1 1 260px; min-width: 0; }
+.since li.safety .txt { font-weight: 500; }
+.got {
+  font: 500 12px var(--font-body); padding: 3px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--warn); background: transparent; color: var(--warn);
+}
+li.acked .got { border-color: var(--ok); color: var(--ok); }
+.brief-rest { padding: 12px 16px 14px; font-size: 14px; color: var(--ink-2); display: grid; gap: 6px; }
+.brief-rest p { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+figure.demo figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+/* Agent gateway diagram */
+.gw { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; margin: 1.2em 0 1.6em; }
+.gw-col { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; }
+.gw-col.mid { border-color: var(--accent); }
+.gw-col.never { background: transparent; border-style: dashed; }
+.gw-col h3 { margin: 0 0 8px; font: 600 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.gw-col.mid h3 { color: var(--accent); }
+.gw-col ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.gw-col li { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.4; }
+.gw-col li b { color: var(--ink); font-weight: 600; display: block; }
+
+/* Ideas register */
+.reg-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 1em 0 12px; }
+.reg-controls .search { flex: 1 1 220px; min-width: 0; }
+.search input {
+  width: 100%; padding: 7px 12px; border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--surface); color: var(--ink); font: 15px var(--font-body);
+}
+.ideas { border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); overflow: hidden; }
+.idea {
+  display: grid; grid-template-columns: minmax(0, 1.25fr) 168px minmax(0, 1.7fr); gap: 6px 18px;
+  padding: 12px 16px; border-top: 1px solid var(--rule); align-items: start;
+}
+.ideas .idea:first-child { border-top: 0; }
+.idea .area { font: 500 11px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 2px; }
+.idea h3 { margin: 0; font-size: 15px; line-height: 1.35; }
+.idea .st { display: grid; gap: 4px; justify-items: start; }
+.idea .lands { font: 12px var(--font-mono); color: var(--muted); margin: 0; }
+.idea .note { font-size: 14px; color: var(--ink-2); margin: 0; }
+.empty { padding: 18px 16px; color: var(--muted); margin: 0; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font: 500 12px var(--font-mono); letter-spacing: 0.02em; padding: 3px 9px 3px 8px; border-radius: 999px;
+}
+.pill::before { content: ""; width: 9px; height: 9px; border-radius: 50%; flex: none; box-sizing: border-box; }
+.s-yes { background: var(--ok-soft); color: var(--ok); }
+.s-yes::before { background: var(--ok); }
+.s-discuss { background: var(--warn-soft); color: var(--warn); }
+.s-discuss::before { border: 1.5px solid var(--warn); background: linear-gradient(90deg, var(--warn) 50%, transparent 50%); }
+.s-elsewhere { background: var(--info-soft); color: var(--info); }
+.s-elsewhere::before { border-radius: 2px; border: 1.5px solid var(--info); }
+.s-open { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--rule); }
+.s-open::before { border: 1.5px dashed var(--muted); }
+
+/* Lists of questions and decisions */
+.qa { list-style: none; padding: 0; margin: 0.6em 0 1.4em; display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.qa li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 10px 0; border-bottom: 1px solid var(--rule); margin: 0; font-size: 15px; }
+.qa .who { font: 12px var(--font-mono); color: var(--muted); text-align: right; }
+.decisions { margin: 0.4em 0 1.4em; }
+.decisions li { font-size: 15px; color: var(--ink-2); }
+.callout { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px 16px; font-size: 14.5px; color: var(--ink-2); max-width: 68ch; }
+.sources li { font-size: 14px; }
+footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+
+/* Phones and narrow windows */
+@media (max-width: 980px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .rail {
+    z-index: 20; max-height: none; overflow: visible; padding-block: 10px;
+    background: var(--bg); border-bottom: 1px solid var(--rule);
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .brand { grid-auto-flow: column; align-items: baseline; gap: 10px; }
+  .brand b { font-size: 1.3rem; }
+  .menu-btn { display: inline-flex; }
+  .rail-body { display: none; }
+  .rail.open .rail-body { display: block; max-height: calc(100dvh - 90px); overflow-y: auto; padding-bottom: 12px; }
+  .hero { padding-block: 28px 4px; }
+  .chg::before { left: -11px; }
+  ul > li.chg::before, ol > li.chg::before { left: calc(-1.3em - 9px); }
+  .thread > li.chg::before, .qa > li.chg::before { left: -11px; }
+}
+@media (max-width: 760px) {
+  .idea { grid-template-columns: minmax(0, 1fr); }
+  .gw { grid-template-columns: minmax(0, 1fr); }
+  .brief-head .last { margin-left: 0; width: 100%; }
+}
+@media (max-width: 560px) {
+  .step { grid-template-columns: minmax(0, 1fr); }
+  .qa li { grid-template-columns: minmax(0, 1fr); }
+  .qa .who { text-align: left; }
+  .lead { font-size: 1.1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .step { transition: none; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail" id="rail">
+    <div class="rail-bar">
+      <a class="brand" href="#top"><b>myGFO</b><span>Vision reference</span></a>
+      <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="railBody">Contents</button>
+    </div>
+    <div class="rail-body" id="railBody">
+      <div class="rev">
+        <p class="rev-title">Record of revisions</p>
+        <ol>
+          <li><b>R4</b><span>Split into a leadership story page and this reference. The trip story moved to the story page.<span class="d">22 OCT 2026</span></span></li>
+          <li><b>R3</b><span>Review decisions, ideas register, four new designs. One HTML page.<span class="d">22 OCT 2026</span></span></li>
+          <li><b>R2</b><span>Answers on capacity, myairops, Dispatch and passengers. Airport loop.<span class="d">22 OCT 2026</span></span></li>
+          <li><b>R1</b><span>Manifesto and roadmap.<span class="d">22 OCT 2026</span></span></li>
+        </ol>
+      </div>
+      <label class="chg-toggle" for="chgToggle"><input type="checkbox" id="chgToggle" checked> <span><span class="chg-key"></span> Show change bars since R2</span></label>
+      <p class="story-link"><a href="https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg" target="_blank" rel="noopener">Open the story page for leadership</a></p>
+      <nav class="toc" aria-label="Contents">
+        <p class="grp">Vision</p>
+        <ol>
+          <li><a href="#manifesto"><span class="n">1</span><span>Manifesto</span></a></li>
+        </ol>
+        <p class="grp">Plan</p>
+        <ol>
+          <li><a href="#today"><span class="n">2</span><span>Where we are</span></a></li>
+          <li><a href="#platform"><span class="n">3</span><span>The shared platform</span></a></li>
+          <li><a href="#horizons"><span class="n">4</span><span>Horizons</span></a></li>
+          <li><a href="#scope"><span class="n">5</span><span>Where the project ends</span></a></li>
+          <li><a href="#risks"><span class="n">6</span><span>Risks</span></a></li>
+        </ol>
+        <p class="grp">Designs</p>
+        <ol>
+          <li><a href="#airports"><span class="n">7</span><span>Airport knowledge loop</span></a></li>
+          <li><a href="#disruption"><span class="n">8</span><span>Disruption options</span></a></li>
+          <li><a href="#agents"><span class="n">9</span><span>Agent gateway</span></a></li>
+          <li><a href="#tax"><span class="n">10</span><span>SIFL, SEC and the rest</span></a></li>
+          <li><a href="#erp"><span class="n">11</span><span>Emergency response app</span></a></li>
+          <li><a href="#airflow"><span class="n">12</span><span>Airflow evaluation</span></a></li>
+        </ol>
+        <p class="grp">Decisions</p>
+        <ol>
+          <li><a href="#ideas"><span class="n">13</span><span>Ideas register</span></a></li>
+          <li><a href="#questions"><span class="n">14</span><span>Questions and decisions</span></a></li>
+          <li><a href="#sources"><span class="n">15</span><span>Sources</span></a></li>
+        </ol>
+      </nav>
+    </div>
+  </aside>
+
+  <main class="doc" id="main">
+    <header class="hero prose" id="top">
+      <p class="eyebrow">Global Flight Operations · Working reference · Revision 4 · 22 OCT 2026</p>
+      <h1>myGFO Vision Reference</h1>
+      <p class="lead">The working detail behind the vision: what exists today, the plan and its gates, the designs, every idea and every decision.</p>
+      <p class="byline">For the myGFO committee and the developer. The short version for leadership is the <a href="https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg" target="_blank" rel="noopener">myGFO Vision and Roadmap</a> story page. Written by Bryan Dunlop with Claude. It is not the developer's work plan.</p>
+      <div class="glance" aria-label="Ideas at a glance">
+        <a href="#ideas" data-set-filter="all"><b data-total="all">48</b> ideas tracked</a>
+        <a href="#ideas" data-set-filter="yes"><b data-total="yes">17</b> in the roadmap</a>
+        <a href="#ideas" data-set-filter="discuss"><b data-total="discuss">5</b> to discuss</a>
+        <a href="#ideas" data-set-filter="elsewhere"><b data-total="elsewhere">4</b> stay in other apps</a>
+        <a href="#ideas" data-set-filter="open"><b data-total="open">22</b> not discussed yet</a>
+      </div>
+    </header>
+
+    <!-- 1 -->
+    <section class="sec prose" id="manifesto">
+      <div class="sec-head"><p class="eyebrow">Vision · 1</p><h2>Manifesto</h2></div>
+      <p>A corporate flight department is a dozen specialist teams passing one thing between them: the trip, and the airplane that flies it. Today that hand-off runs on retyping, email, phone calls and memory. The same passenger is entered three times. A schedule change is noticed by whoever happens to look. A revised manual is published and nobody can say who has read it.</p>
+      <p>The work gets done because good people carry it in their heads. That does not survive a growing fleet, and it does not survive turnover.</p>
+      <div class="principles">
+        <div class="principle"><span class="n">1</span><h3>Enter once, flow everywhere</h3><p>A fact has one home. The allergy an EA enters is the allergy the flight attendant reads, the caterer receives and the trip sheet prints.</p></div>
+        <div class="principle"><span class="n">2</span><h3>Tell people what they need, when they need it</h3><p>Notifications come from the state of the world, not from whoever remembered to send one. When the condition clears, the alert clears itself.</p></div>
+        <div class="principle chg"><span class="n">3</span><h3>Silence is never consent</h3><p>When a signature, status or checklist item is missing, the system asks, asks again, then escalates. Urgent problems go to whoever is on call. Overdue work goes to the manager or their delegate.</p></div>
+        <div class="principle"><span class="n">4</span><h3>Documents are alive</h3><p>Important changes go out at once as bulletins that point at the section they amend. The next revision absorbs them and the bulletins retire. Readers send suggestions straight to the owner.</p></div>
+        <div class="principle"><span class="n">5</span><h3>Every hand-off is a conversation with a record</h3><p>The Tech Log is the model. A pilot and a mechanic talk about a broken airplane, and the conversation is the signed, unchangeable record.</p></div>
+        <div class="principle"><span class="n">6</span><h3>Systems of record stay where they belong</h3><p>CAMP owns airworthiness, myairops the schedule, Workday people and ForeFlight the cockpit. myGFO connects them, and is the record only at the moment of its own signature.</p></div>
+        <div class="principle"><span class="n">7</span><h3>Safety rules are code</h3><p>MEL clocks, A&amp;P certificate checks and RII separation are enforced and tested by the software, not left to training.</p></div>
+        <div class="principle"><span class="n">8</span><h3>Machines prepare, humans decide</h3><p>Automation and AI gather, check, draft and warn. A pilot decides whether the airplane can depart that runway today.</p></div>
+        <div class="principle"><span class="n">9</span><h3>Privacy and security are default-deny</h3><p>Who is on a trip and where they are goes to the smallest audience for the shortest time. Passengers hear from us by email first, and get an app only if they ask.</p></div>
+        <div class="principle chg"><span class="n">10</span><h3>Fewer apps, not more</h3><p>Crew live in myGFO and ForeFlight. Scheduling and EAs live in myGFO and myairops. myGFO pushes into the tools people already use, including Outlook and Teams.</p></div>
+        <div class="principle"><span class="n">11</span><h3>Knowledge compounds</h3><p>Every trip should leave the department knowing more. A short debrief, reviewed before it becomes guidance, carries what one crew learned to the next.</p></div>
+        <div class="principle"><span class="n">12</span><h3>Every screen answers one question</h3><p>The hangar wall, the scheduling wall, the lead's view and the EA's home each answer the question that room asks most often, without a click.</p></div>
+      </div>
+      <h3>What myGFO is not</h3>
+      <ul>
+        <li>Not a maintenance tracking system. CAMP is.</li>
+        <li>Not the scheduling system of record. myairops is, and myGFO only reads from it.</li>
+        <li>Not a flight planner or a performance calculator. ForeFlight and the AFM are.</li>
+        <li>Not an HR system. Workday is.</li>
+        <li class="chg">Not the home of crew legality, training records or flight data monitoring. Those stay in the apps that do them today.</li>
+        <li>Not a surveillance tool. Accountability is about the work, not about watching people.</li>
+      </ul>
+    </section>
+
+    <!-- 3 -->
+    <section class="sec prose" id="today">
+      <div class="sec-head"><p class="eyebrow">Plan · 2</p><h2>Where we are</h2></div>
+      <p>myGFO lives in three places, and this page has to be read with all three in mind.</p>
+      <ul>
+        <li><b>This repository</b> is a design sandbox with mock data. It is good for working through rules and edge cases, and it is behind Bryan's current thinking.</li>
+        <li><b>Bryan's work mockups</b> are newer, built with Copilot in the P&amp;G design system. They are the hand-off to the developer.</li>
+        <li><b>The production platform</b> is built by the developer from those hand-offs. A lot of it exists already.</li>
+      </ul>
+      <p>The table shows how deeply each idea was explored in the sandbox. The production column is Bryan's to fill in.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Area</th><th>Sandbox</th><th>Production</th><th>Notes from the sandbox</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Document Center</td><td><span class="depth">Deep</span></td><td><span class="fill">fill in</span></td><td>Bulletins that amend a manual, absorption inbox, suggestions to the owner, read-and-initial that re-arms per revision, review cycles, register. Group-drive reconciliation is a draft design. ForeFlight Documents mirroring is not built.</td></tr>
+            <tr><td class="k">Tech Log</td><td><span class="depth">Deep</span></td><td><span class="fill">fill in</span></td><td>Nine phases with engine tests. Blocked on the CAMP utilization push (OQ1) and DOM rulings.</td></tr>
+            <tr><td class="k">Scheduling checklists</td><td><span class="depth">Deep</span></td><td><span class="fill">fill in</span></td><td>Rules engine with due rules, conditions, ack escalation and versioned templates.</td></tr>
+            <tr><td class="k">EA booking and messages</td><td><span class="depth">Medium</span></td><td><span class="fill">fill in</span></td><td>Request builder, approvals queue, watches, messages both ways. Write-back to myairops blocked (OQ5).</td></tr>
+            <tr><td class="k">Passenger records</td><td><span class="depth">Medium</span></td><td><span class="fill">fill in</span></td><td>PII residency undecided (OQ6). Default: read through, mirror nothing.</td></tr>
+            <tr><td class="k">Flight Hub</td><td><span class="depth">Medium</span></td><td><span class="fill">fill in</span></td><td>Pilot readiness, trip brief, acceptance, preflight. Flight attendant screens are separate.</td></tr>
+            <tr><td class="k">Airport company pages</td><td><span class="depth">Medium</span></td><td>No</td><td>Source labels, propose, review and publish, per-field confirmation, officer worklist, rules and flags.</td></tr>
+            <tr><td class="k">ForeFlight Files</td><td><span class="depth">Medium</span></td><td><span class="fill">fill in</span></td><td>Client, flight matcher and trip-sheet document.</td></tr>
+            <tr><td class="k">Notifications</td><td><span class="depth">Medium</span></td><td><span class="fill">fill in</span></td><td>Derived feed built. Escalation exists only inside scheduling. No on-call or delegate concept yet.</td></tr>
+            <tr><td class="k">Manager views and walls</td><td><span class="depth">Shallow</span></td><td><span class="fill">fill in</span></td><td>Screens exist on mock data.</td></tr>
+            <tr><td class="k">SIFL and tax</td><td><span class="depth">Shallow</span></td><td><span class="fill">fill in</span></td><td>A screen and a context exist. Not validated.</td></tr>
+            <tr><td class="k">FlightAware, Workday, Outlook</td><td><span class="depth">None</span></td><td><span class="fill">fill in</span></td><td>Not explored. FAA NASR is bundled for airports. Satcom is a mock service.</td></tr>
+            <tr><td class="k">Airflow and AI agents</td><td><span class="depth">None</span></td><td>No</td><td>Not started. Evaluation plan in section 12.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="chg">What stays in other apps</h3>
+      <p>myGFO reads from these where it can and never rebuilds them.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Function</th><th>Lives in</th><th>What myGFO does</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Scheduling system of record</td><td>myairops</td><td>Reads trips, legs and crew. Never writes.</td></tr>
+            <tr><td class="k">Maintenance tracking</td><td>CAMP</td><td>Reads. Writes only through the sandbox-gated path in CLAUDE.md.</td></tr>
+            <tr class="chg"><td class="k">Crew legality</td><td>The app that checks it today</td><td>Shows that app's verdict, if it can be read.</td></tr>
+            <tr class="chg"><td class="k">Training records</td><td>myairops</td><td>Reads expiry dates into the expiry engine.</td></tr>
+            <tr class="chg"><td class="k">Flight data monitoring</td><td>FlightPulse</td><td>Nothing for now.</td></tr>
+            <tr class="chg"><td class="k">Manifest at the door</td><td>myairops app</td><td>Pulls the boarded status.</td></tr>
+            <tr><td class="k">Flight planning and performance</td><td>ForeFlight</td><td>Pushes documents in and surfaces its answers.</td></tr>
+            <tr><td class="k">People and HR</td><td>Workday</td><td>Reads the manager chain. Later, starts joiner and leaver checklists.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="sec prose" id="platform">
+      <div class="sec-head"><p class="eyebrow">Plan · 3</p><h2>The shared platform</h2></div>
+      <p>Every feature rests on the same eight pieces. Building them per module is how the prototype got broad. Building them once is how production gets connected.</p>
+      <div class="pieces">
+        <div class="piece chg"><h3><span class="n">1</span>Identity and people</h3><p>Entra sign-in, one record per human, roles, the manager chain and named delegates. Joiners, movers and leavers start here. People outside P&amp;G need their own path in.</p></div>
+        <div class="piece"><h3><span class="n">2</span>Trip graph</h3><p>One trip with its legs, aircraft, crew and passengers, keyed to myairops. Checklists, briefings, catering, documents and tax hang off it.</p></div>
+        <div class="piece chg"><h3><span class="n">3</span>Events and notifications</h3><p>Changes become events that re-fire checklist items and notify each audience. Two ladders: urgent goes to on-call, overdue goes to the manager or delegate. Quiet hours and crew rest are handled here, once. Channels include push, email, Teams and Outlook.</p></div>
+        <div class="piece chg"><h3><span class="n">4</span>Expiry engine</h3><p>Everything that expires and who must act: crew and passenger documents, aircraft documents, company airport pages, document reviews, and training dates read from myairops.</p></div>
+        <div class="piece"><h3><span class="n">5</span>Integration hub</h3><p>One adapter per outside system behind a capability gate: myairops, CAMP, ForeFlight, FlightAware, Outlook, Workday, Jeppesen and Airflow. Vendor shapes and units stop at the boundary.</p></div>
+        <div class="piece"><h3><span class="n">6</span>Signature and audit</h3><p>One e-signature service with RFC 8785 hashing, append-only ledger tables and server re-stamping. Used by the Tech Log, document acknowledgments and crew acceptance.</p></div>
+        <div class="piece"><h3><span class="n">7</span>Insight data layer</h3><p>A read-only analytical copy. Dashboards, wall screens, tax and agents read from here, never from production tables.</p></div>
+        <div class="piece chg"><h3><span class="n">8</span>Agent gateway</h3><p>myGFO's tools for AI agents, as separate MCP servers by sensitivity, acting on behalf of the signed-in person. Read first, drafts later, never commits.</p></div>
+      </div>
+      <h3>Which modules lean on which pieces</h3>
+      <div class="tablewrap">
+        <table class="matrix">
+          <thead><tr><th>Module</th><th>People</th><th>Trips</th><th>Events</th><th>Expiry</th><th>Integration</th><th>Signature</th><th>Insight</th><th>Agents</th></tr></thead>
+          <tbody>
+            <tr><td>Document Center</td><td class="y">●</td><td></td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td></td><td class="y">●</td></tr>
+            <tr><td>Tech Log</td><td class="y">●</td><td></td><td class="y">●</td><td></td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td></td></tr>
+            <tr><td>Scheduling checklists</td><td></td><td class="y">●</td><td class="y">●</td><td></td><td class="y">●</td><td></td><td></td><td></td></tr>
+            <tr><td>Flight Hub</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td></td><td></td></tr>
+            <tr><td>Airport knowledge loop</td><td class="y">●</td><td></td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td></td><td></td><td class="y">●</td></tr>
+            <tr><td>EA space and passengers</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td></td><td></td><td class="y">●</td></tr>
+            <tr class="chg"><td>Live times and passenger emails</td><td></td><td class="y">●</td><td class="y">●</td><td></td><td class="y">●</td><td></td><td></td><td></td></tr>
+            <tr class="chg"><td>Daily ops brief</td><td></td><td class="y">●</td><td class="y">●</td><td></td><td class="y">●</td><td></td><td class="y">●</td><td></td></tr>
+            <tr class="chg"><td>Joiners, movers, leavers</td><td class="y">●</td><td></td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td></td><td></td></tr>
+            <tr><td>Manager view and walls</td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td class="y">●</td><td></td></tr>
+            <tr class="chg"><td>Tax and disclosure</td><td class="y">●</td><td class="y">●</td><td></td><td></td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td></td></tr>
+            <tr class="chg"><td>Disruption options</td><td></td><td class="y">●</td><td class="y">●</td><td></td><td class="y">●</td><td></td><td class="y">●</td><td class="y">●</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="sec prose" id="horizons">
+      <div class="sec-head"><p class="eyebrow">Plan · 4</p><h2>Horizons</h2></div>
+      <p>A horizon starts when its gates clear, not when a calendar says so. Dates go in only once the developer's capacity is known.</p>
+      <div class="horizons">
+        <article class="hz">
+          <div class="hz-head"><span class="hz-code">H0</span><h3>Land what we are building</h3></div>
+          <p class="outcome">Document Center and Tech Log run in production, used by real people.</p>
+          <ul>
+            <li>Confirm the platform minimum: Entra, Azure SQL ledger tables, Key Vault, the signature service and the notification core.</li>
+            <li class="chg">Build the two escalation ladders and delegates into the notification core from the start.</li>
+            <li>Document Center: finish the living-document model, mirror the pilot content pack to ForeFlight Documents, reconcile the group drives, and escalate unsigned reading to the manager.</li>
+            <li>Tech Log: production backend, offline iPad build and the CAMP sandbox read path. Settle the DOM rulings before the ledger schema freezes, because ledger schema cannot be reverted.</li>
+            <li class="chg">Write the Tech Log's paper fallback procedure. Phone and email cover scheduling, but in the Tech Log the signature is the record.</li>
+            <li>Every mockup names its gate, so nobody expects what an open question still blocks.</li>
+          </ul>
+          <p class="gates"><b>Gates</b>Both modules used on real trips for a month. Immutability, idempotency and hash tests green. A CAMP sandbox round trip proven.</p>
+        </article>
+        <article class="hz">
+          <div class="hz-head"><span class="hz-code">H1</span><h3>The crew's day</h3></div>
+          <p class="outcome">A pilot or flight attendant opens one place and sees everything about the next trip, and ForeFlight already has it.</p>
+          <ul>
+            <li>The trip graph, pulled from myairops.</li>
+            <li>Flight Hub for pilots and flight attendants on real trips.</li>
+            <li>Scheduling checklists that re-fire when a trip changes and notify only the item owners.</li>
+            <li>ForeFlight Files: trip sheets and passenger documents pushed automatically.</li>
+            <li>The airport knowledge loop without AI.</li>
+            <li class="chg">The same loop for FBOs, hotels, handlers, caterers and individual tails.</li>
+            <li class="chg">The expiry engine, with training dates read from myairops.</li>
+            <li class="chg">Trips on the crew's Outlook calendars.</li>
+            <li class="chg">The daily ops brief, first version, posted to Teams and the wall screens.</li>
+            <li class="chg">Joiner, mover and leaver checklists owned by the manager, who assigns subtasks. Tech Log signing authority is removed automatically on the last day, never left as a subtask.</li>
+            <li>The accountability ladder across every module.</li>
+          </ul>
+          <p class="gates"><b>Gates</b>myairops OData mapping confirmed (OQ2). The trip graph matches myairops on every leg for a month without manual fixes.</p>
+        </article>
+        <article class="hz">
+          <div class="hz-head"><span class="hz-code">H2</span><h3>The EA and the passenger</h3></div>
+          <p class="outcome">An EA books and manages passengers without a phone call, and everyone waiting on a flight knows where it is.</p>
+          <ul>
+            <li>The EA and scheduling space, booking-portal stages 1 to 5. Write-back stays gated (OQ5).</li>
+            <li>Passenger records with document and briefing currency, preferences and allergies (OQ6).</li>
+            <li class="chg">FlightAware as the source of live times. Tails are unblocked as needed with Security's agreement, and satcom is the fallback.</li>
+            <li class="chg">Emails to passengers, the EA, drivers and the protection team: the 72-hour email, the night-before brief, and block out, taxi, airborne and door-open estimates.</li>
+            <li class="chg">Boarded status pulled from the myairops app.</li>
+            <li class="chg">Trips on the EA's and principal's Outlook calendars.</li>
+            <li class="chg">One-tap passenger feedback after landing.</li>
+            <li>Wall screens for each sub-department on real data.</li>
+          </ul>
+          <p class="gates"><b>Gates</b>OQ6 decided. Security agrees which tails are unblocked and who may receive live times.</p>
+        </article>
+        <article class="hz">
+          <div class="hz-head"><span class="hz-code">H3</span><h3>The 30,000-foot view</h3></div>
+          <p class="outcome">Leadership sees the department's state and critical work without asking anyone, and the niche procedures run in-house.</p>
+          <ul>
+            <li>The manager view on the insight layer: critical business functions, rolling action items, overdue accountability, fleet and trip health.</li>
+            <li class="chg">Management of change tracked in the lead team's view, starting with the G800 entry into service.</li>
+            <li>The Workday bridge for people, roles and the manager chain, which can also start joiner and leaver checklists.</li>
+            <li class="chg">The tax and disclosure engine: SIFL, the SEC figure and the entertainment disallowance. One parallel tax year before anyone relies on it.</li>
+            <li class="chg">Actual trip costs from invoices, if scheduling, the VP and the CPSO agree.</li>
+            <li class="chg">Disruption options, first version without AI.</li>
+            <li class="chg">A fatigue advisory in trip planning, reading duty data from the crew app.</li>
+            <li>Satcom and FAA NAS sources, FCM if it earns its place, and the CAMP utilization push once OQ1 is answered.</li>
+          </ul>
+          <p class="gates"><b>Gates</b>P&amp;G Tax agrees the methods. HRIS agrees Workday access.</p>
+        </article>
+        <article class="hz">
+          <div class="hz-head"><span class="hz-code">H4</span><h3>Intelligence</h3></div>
+          <p class="outcome">People ask questions in plain language and get answers grounded in our data and in certified aviation data, with the reasoning shown.</p>
+          <ul>
+            <li>Jeppesen ForeFlight Airflow, if the evaluation in section 12 says it fits.</li>
+            <li class="chg">The agent gateway, starting with read-only documents for Copilot.</li>
+            <li class="chg">Disruption options ranked by an agent, with Airflow checking each option.</li>
+            <li class="chg">The daily ops brief with Airflow's weather and NOTAM impact.</li>
+            <li class="chg">A regulatory change watch that files suggestions to document owners.</li>
+            <li>Performance answers from approved data only. The agent asks and explains. It never computes takeoff performance.</li>
+            <li>A passenger app, only if passengers ask for one.</li>
+          </ul>
+          <p class="gates"><b>Gates</b>The insight layer exists. P&amp;G IT and Legal agree the AI use. Each agent server is approved on its own.</p>
+        </article>
+        <article class="hz track chg">
+          <div class="hz-head"><span class="hz-code">Separate</span><h3>Emergency response app</h3></div>
+          <p class="outcome">A separate app, reachable without VPN by people outside the department. Discussion first.</p>
+          <p class="gates"><b>Next</b>See section 11 for what is decided and what to discuss.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="sec prose" id="scope">
+      <div class="sec-head"><p class="eyebrow">Plan · 5</p><h2>Where the project ends</h2></div>
+      <p>The current project is done when the trip on the <a href="https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg#trip" target="_blank" rel="noopener">story page</a> runs end to end on a real trip, with every step on production data. That is the end of H4.</p>
+      <h3>The app goal</h3>
+      <p>Crew live in two apps, myGFO and ForeFlight. Scheduling and EAs live in myGFO and myairops. A feature that adds a third app for crew needs a strong reason.</p>
+      <h3>Outside the line, until decided otherwise</h3>
+      <ul>
+        <li>Replacing CAMP, myairops, ForeFlight or Workday.</li>
+        <li>Writing to myairops, until OQ5 is resolved deliberately.</li>
+        <li>Mirroring passenger PII, until OQ6 is decided.</li>
+        <li class="chg">Crew legality, training records and flight data monitoring, which stay in their apps.</li>
+        <li>Any AI action that commits a booking, a release or a signature.</li>
+        <li class="chg">Live times for principals beyond the people Security approves.</li>
+      </ul>
+      <h3 class="chg">Proposed, not discussed yet</h3>
+      <p>These habits would make the roadmap easier to defend to the VP.</p>
+      <ul>
+        <li><b>Success measures.</b> Calls and emails per trip, fields retyped per trip, time to acknowledge a document, debrief completion, on-time departures, dispatch reliability and the passenger feedback score.</li>
+        <li><b>A retire list per horizon.</b> The spreadsheet, email chain or paper process each horizon replaces, so nobody runs both.</li>
+        <li><b>Owners.</b> A business owner and a data steward for each module.</li>
+        <li><b>Build or buy.</b> One line per module on why it is built rather than bought.</li>
+      </ul>
+      <p>New ideas go into the ideas register, not into a horizon, until someone reviews them.</p>
+    </section>
+
+    <!-- 7 -->
+    <section class="sec prose" id="risks">
+      <div class="sec-head"><p class="eyebrow">Plan · 6</p><h2>Risks</h2></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Risk</th><th>Why it matters</th><th>What we do</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Mockups outrun the build</td><td>Every mockup sets an expectation the developer must meet, including ones behind unanswered vendor questions.</td><td>Each mockup names its gate. Production status is tracked in section 2.</td></tr>
+            <tr><td class="k">Notification fatigue</td><td>“Only if they need to” fails if every module adds alerts.</td><td>One engine, a per-person budget, quiet hours, and a review of every new alert type.</td></tr>
+            <tr><td class="k">Escalation feels like surveillance</td><td>Crew trust drops and people game the signals.</td><td>Escalate on the work, not the person. The person sees the ladder before anyone else does.</td></tr>
+            <tr><td class="k">Vendor dependency</td><td>myairops write-back and the CAMP utilization push are ungranted or undocumented.</td><td>Hard gates. Pull-only until answered.</td></tr>
+            <tr><td class="k">Tax liability</td><td>An in-house SIFL or SEC error is real exposure for named people.</td><td>A full parallel year and sign-off from P&amp;G Tax.</td></tr>
+            <tr><td class="k">AI overreach</td><td>A confident wrong answer about performance or a manifest is a safety or privacy event.</td><td>Advisory only, certified sources, reasoning shown, a human decides.</td></tr>
+            <tr class="chg"><td class="k">Agents expose data</td><td>An agent can surface what a person should not see.</td><td>Separate servers by sensitivity, on-behalf-of identity, read first, no tools that commit.</td></tr>
+            <tr class="chg"><td class="k">Unblocked tails expose principals</td><td>Live tracking reveals where an executive is.</td><td>Security signs off per tail. Blocked tails fall back to satcom or get no live updates.</td></tr>
+            <tr class="chg"><td class="k">Outsiders in the emergency app</td><td>External access widens the attack surface.</td><td>Guest accounts with MFA, dormant until activated, every access logged.</td></tr>
+            <tr><td class="k">Key-person risk</td><td>The vision lives in one head today.</td><td>This page, the developer hand-offs and the decisions log.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="sec prose" id="airports">
+      <div class="sec-head"><p class="eyebrow">Designs · 7</p><h2>Airport knowledge loop</h2></div>
+      <p>Before a flight, each crew member sees one briefing per airport. Every line says where it came from and how old it is. After the trip, and always after an international one, the crew debriefs in under two minutes. Reviewed debriefs improve the company page, so the next crew's briefing is better than this one.</p>
+      <p>Company pages are our own 10-7 pages, the operator-specific series in Jeppesen's numbering. We never rebuild the 10-9 airport chart. Production has no airport pages yet, so this is new work for the developer. The sandbox already has source labels, propose, review and publish, per-field confirmation dates and the officer's worklist to start from.</p>
+
+      <h3>Four tiers of truth</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Tier</th><th>Examples</th><th>Who can change it</th><th>How it shows</th></tr></thead>
+          <tbody>
+            <tr><td><span class="tier t-off">Official</span></td><td>FAA NASR runways and services, NOTAMs and charts through Jeppesen ForeFlight, Airflow's certified data</td><td>Nobody at GFO</td><td>Source and cycle date. Never overridden on screen.</td></tr>
+            <tr><td><span class="tier t-co">Company</span></td><td>Our 10-7: preferred FBO, handler, customs process, PPR, curfews, ramp limits, crew hotel guidance</td><td>Propose, review, publish. Safety fields need the chief pilot.</td><td>The date each field was last confirmed.</td></tr>
+            <tr><td><span class="tier t-hist">Our history</span></td><td>Past GFO trips here, irregularity reports, squawks raised here, typical taxi time, catering issues</td><td>Derived from our records</td><td>“From 9 GFO trips”, with the latest date.</td></tr>
+            <tr><td><span class="tier t-crew">Crew report</span></td><td>Debrief notes not yet reviewed</td><td>The reporter, until reviewed</td><td>“Unreviewed”, with its age and the reporter's role. Hidden after a set age unless confirmed again.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>A lower tier never overwrites a higher one on screen. A crew report that contradicts official data shows as a conflict and goes to the chief pilot.</li>
+        <li>A crew report becomes company content only through review. Nothing promotes itself.</li>
+        <li>Sensitive fields such as hotels and security arrangements are restricted by default.</li>
+      </ul>
+
+      <h3>New since you last looked</h3>
+      <p>Every airport page and briefing opens with what changed since this pilot last looked at this airport. It is personal, so two pilots on the same trip can see different lists.</p>
+      <figure class="demo">
+        <div class="brief">
+          <div class="brief-head"><span class="icao">ZZZZ</span><span class="name">Example International</span><span class="last">Your last look: 14 MAR 2026</span></div>
+          <div class="since">
+            <p class="since-title">New since you last looked · 4 changes, 1 safety</p>
+            <ul>
+              <li class="safety"><span class="tier t-co">Company · safety</span><span class="txt">Ramp closed to aircraft over 90,000 lb until 31 MAR.</span><button class="got" type="button" aria-pressed="false">Got it</button></li>
+              <li><span class="tier t-crew">Crew report · 9 days</span><span class="txt">Customs now meets the aircraft at the FBO.</span></li>
+              <li><span class="tier t-off">Official · Jeppesen</span><span class="txt">New NOTAM: taxiway B closed at night.</span></li>
+              <li><span class="tier t-hist">Our history</span><span class="txt">Typical taxi-out 14 min across 9 GFO departures.</span></li>
+            </ul>
+          </div>
+          <div class="brief-rest">
+            <p><span class="tier t-co">Company · confirmed 02 OCT</span><span>Curfew 2300 to 0600 local. PPR required.</span></p>
+            <p><span class="tier t-co">Company · confirmed 18 SEP</span><span>Preferred FBO and handler on the full page.</span></p>
+          </div>
+        </div>
+        <figcaption>Illustrative only. ZZZZ is the flight-plan code for an aerodrome with no ICAO identifier, and nothing on this card is real airport data. Try the Got it button.</figcaption>
+      </figure>
+      <ol>
+        <li><b>Viewing clears ordinary changes. Safety changes need a tap.</b> A change to PPR, a curfew, a ramp limit or a new conflict stays pinned until the pilot taps Got it.</li>
+        <li><b>Unacknowledged safety changes follow the pilot to the trip.</b> They appear in Flight Hub readiness. Close to departure, the accountability ladder applies.</li>
+        <li><b>A first look is not a diff.</b> It says “First time here” and leads with restrictions.</li>
+        <li><b>A long gap gets a summary.</b> “14 changes since March 2025, 2 of them safety”, with the safety ones shown and the full page one tap away.</li>
+        <li><b>The marker is the pilot's own.</b> Managers never see who viewed what. Only an unacknowledged safety change before a trip reaches a manager.</li>
+      </ol>
+
+      <h3>The briefing, in order</h3>
+      <ol>
+        <li>New since you last looked.</li>
+        <li>Restrictions and hazards, from official and company tiers only. Always shown.</li>
+        <li>What our crews said, with ages, and conflicts awaiting review.</li>
+        <li>Our history at this airport.</li>
+        <li>The company page, with last-confirmed dates.</li>
+      </ol>
+
+      <h3>The debrief</h3>
+      <p>Required after international trips, first visits, and airports with a stale or conflicted page. Offered otherwise.</p>
+      <ol>
+        <li><b>“Was everything as briefed?”</b> One tap for yes. That tap confirms every company field the crew was shown, which keeps pages fresh without anyone doing review work.</li>
+        <li><b>“What was different?”</b> The briefed fields are listed. The crew taps the wrong ones and types or dictates what they saw.</li>
+        <li><b>“Anything new?”</b> Free text or a voice note.</li>
+        <li>Optional ratings for the FBO, handler and catering.</li>
+      </ol>
+
+      <h3>Review</h3>
+      <p>Debrief items land on the Airport Evaluation Officer's worklist. The officer accepts an item into a company-page proposal, keeps it as a crew report that ages out, or rejects it with a reason the reporter can see. An urgent safety item can publish at once as an airport bulletin, which the page absorbs at its next review. Company pages stay independent of Document Center, so this is built inside the airport module.</p>
+
+      <h3 class="chg">Beyond airports</h3>
+      <p>The same tiers and debrief work for FBOs, hotels, handlers and caterers, and for individual tails, where the sandbox's ship notes already hold tail knowledge. Build the loop once and point it at each kind of place or thing crews deal with.</p>
+
+      <h3>Where the data comes from</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Source</th><th>Gives us</th><th>Limits</th></tr></thead>
+          <tbody>
+            <tr><td class="k">FAA NASR</td><td>US airports, runways, services and contacts on a 28-day cycle</td><td>US only. Free. Already bundled in the sandbox.</td></tr>
+            <tr><td class="k">FAA NAS status</td><td>Delays and ground stops at major US airports</td><td>Free and open. Major airports only.</td></tr>
+            <tr><td class="k">Jeppesen ForeFlight</td><td>Charts, NOTAMs, worldwide airport data, the Dispatch airport tab</td><td>Licensed. We use it and never copy it.</td></tr>
+            <tr><td class="k">Airflow</td><td>Certified worldwide data, feasibility and briefing reasoning</td><td>Business-aviation agents announced 16 OCT 2026. Wider rollout planned for early 2027.</td></tr>
+            <tr><td class="k">myairops</td><td>Our trips, handlers and FBOs used, times</td><td>Pull-only.</td></tr>
+            <tr><td class="k">myGFO</td><td>Company pages, debriefs, irregularity reports, squawks, catering</td><td>Ours.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The FAA supplies only the US database and NAS status. Everything else official comes through Jeppesen ForeFlight and Airflow. For international airports, the company, history and crew tiers are where GFO adds its own value.</p>
+
+      <h3>Where Airflow could fit</h3>
+      <p>These are hypotheses for the demos. Airflow describes an open architecture where operators can bring their own agents or tools. What that means in practice is the first thing to learn.</p>
+      <ul>
+        <li>Airflow supplies the official tier worldwide, which fills the international gap.</li>
+        <li>Ops Briefing reads our company pages and crew reports, so they reach the crew inside ForeFlight with no second app.</li>
+        <li>Trip Feasibility and our company pages both describe customs, parking, noise and fuel. Where they disagree, the officer hears first.</li>
+        <li>An assistant turns a voice debrief into proposed field changes and spots duplicates. It drafts; the officer decides.</li>
+      </ul>
+
+      <h3>Distribution</h3>
+      <ul>
+        <li>ForeFlight Documents: a 10-7 style PDF per airport in the pilot content pack.</li>
+        <li>Dispatch, per flight: dispatcher notes or crew notes from operational rules could carry the leg's “what changed”. Confirm which with ForeFlight.</li>
+        <li>Flight Hub: the full interactive briefing, and the only place the debrief happens.</li>
+      </ul>
+    </section>
+
+    <!-- 9 -->
+    <section class="sec prose" id="disruption">
+      <div class="sec-head chg"><p class="eyebrow">Designs · 8 · <span class="new">New in R3</span></p><h2>Disruption options</h2></div>
+      <p>When something breaks a trip, scheduling should see every realistic option ranked, with the reasoning, instead of building them by phone. Bryan wants Airflow involved. This is a shape that allows it.</p>
+      <h3>What starts it</h3>
+      <ul>
+        <li>The Tech Log grounds a tail, or a deferral blocks a leg.</li>
+        <li>A crew member becomes unavailable.</li>
+        <li>Weather, a curfew or a NOTAM blocks a leg.</li>
+        <li>The principal's plans change.</li>
+      </ul>
+      <h3>How it works</h3>
+      <ol>
+        <li><b>Find what is affected.</b> The sandbox already carries Tech Log status onto the scheduling trip.</li>
+        <li><b>Build the options.</b> Wait for the repair using maintenance's estimate, swap to another tail, move the departure, change the routing or add a fuel stop, split the passengers, or use backup lift if GFO has an agreement for it.</li>
+        <li><b>Check each option.</b> Feasibility from Airflow, crew duty and fatigue from the crew app, cost from the cost model, and what each passenger misses.</li>
+        <li><b>Rank them and show why.</b></li>
+        <li><b>Scheduling decides.</b> myGFO drafts the messages to the EA, crew, passengers, drivers, protection team and maintenance.</li>
+        <li><b>Record the decision and the outcome,</b> so the irregularity report and the next disruption both learn from it.</li>
+      </ol>
+      <h3>Where Airflow fits</h3>
+      <p>Airflow's Augmented Ops Control does this for airlines today. It ranks possible responses to a disruption and explains its recommendations. It is airline-only so far, so ask whether a business-aviation version is planned. If it is not, our own agent can call Airflow Trip Feasibility once per option through the agent gateway.</p>
+      <h3>First version without AI</h3>
+      <p>Steps 1, 2 and 5 work without AI: the affected trips, the obvious options from the availability engine, and drafted messages. Ranking and feasibility checks arrive with Airflow.</p>
+    </section>
+
+    <!-- 10 -->
+    <section class="sec prose" id="agents">
+      <div class="sec-head chg"><p class="eyebrow">Designs · 9 · <span class="new">New in R3</span></p><h2>Agent gateway</h2></div>
+      <p>Bryan wants myGFO open to AI agents with parts of it blocked, and wants Airflow to connect through the same door. MCP, the Model Context Protocol, is the standard way an AI agent calls outside tools. Copilot Studio supports MCP servers, and ForeFlight's AI Connector is one. This needs much more thought. The shape below is a starting point.</p>
+      <div class="gw">
+        <div class="gw-col">
+          <h3>Who asks</h3>
+          <ul>
+            <li><b>Copilot in Teams and Outlook</b>EAs, scheduling and managers, under P&amp;G's existing AI governance.</li>
+            <li><b>Airflow agents</b>If Airflow accepts outside tools, it reads operator data from us.</li>
+            <li><b>myGFO's own features</b>Disruption ranking, debrief drafting, regulatory watch.</li>
+          </ul>
+        </div>
+        <div class="gw-col mid">
+          <h3>Through the gateway</h3>
+          <ul>
+            <li><b>Documents</b>Published revisions only. Answers cite the section and revision.</li>
+            <li><b>Fleet status</b>Serviceability, open MEL items, where each tail is.</li>
+            <li><b>Trips</b>Schedule and legs. Passenger names only for roles that may see them.</li>
+            <li><b>Airports</b>Company pages with their tiers and ages.</li>
+            <li><b>People and expiries</b>Your own record. Managers see their team.</li>
+          </ul>
+        </div>
+        <div class="gw-col never">
+          <h3>Never through the gateway</h3>
+          <ul>
+            <li><b>Signing and releases</b>No agent signs or returns an aircraft to service.</li>
+            <li><b>Bookings</b>No agent commits a trip.</li>
+            <li><b>Writes to other systems</b>No myairops or CAMP writes.</li>
+            <li><b>Bulk personal data</b>No exports of passenger or crew records.</li>
+          </ul>
+        </div>
+      </div>
+      <h3>Rules</h3>
+      <ul>
+        <li><b>Split by sensitivity.</b> Each server is approved, blocked and audited on its own. A secondary source says Copilot Studio governs whole servers rather than single tools, so the split is what makes blocking possible.</li>
+        <li><b>On behalf of the person.</b> An agent sees only what the signed-in person can see in myGFO, and every call is logged with both names.</li>
+        <li><b>Read first.</b> Drafts come later and land in myGFO for a person to approve.</li>
+        <li><b>Cite everything.</b> An answer names the record, section or revision it came from.</li>
+      </ul>
+      <h3>Phases</h3>
+      <ol>
+        <li>Documents, read-only, for Copilot. The lowest risk and the first production data set.</li>
+        <li>Fleet status and trips, read-only, for EAs and scheduling.</li>
+        <li>Drafts: a trip request, a debrief proposal, disruption messages. A person approves each in myGFO.</li>
+        <li>Airflow in both directions, once the demos confirm what it supports.</li>
+      </ol>
+      <h3>Regulatory change watch</h3>
+      <p>An agent reads FAA changes, compares them with the documents server, and files a suggestion in the document owner's existing queue. It never edits a manual. The owner decides, through the same review every other change goes through.</p>
+    </section>
+
+    <!-- 11 -->
+    <section class="sec prose" id="tax">
+      <div class="sec-head chg"><p class="eyebrow">Designs · 10 · <span class="new">New in R3</span></p><h2>SIFL, SEC and the rest</h2></div>
+      <p>One trip produces several tax and disclosure numbers. Each needs different inputs, and two need actual costs. P&amp;G Tax decides the methods. myGFO's job is to capture the inputs once, correctly, and keep them unchangeable.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Calculation</th><th>What it answers</th><th>What it needs</th></tr></thead>
+          <tbody>
+            <tr><td class="k">SIFL imputed income</td><td>The taxable value of a personal flight for each employee or guest</td><td>Passenger, purpose per leg, aircraft weight class, statute miles, control-employee status, the SIFL rates for that period</td></tr>
+            <tr><td class="k">Entertainment disallowance</td><td>How much aircraft cost P&amp;G cannot deduct for entertainment flights by specified individuals</td><td>Purpose per passenger and leg, occupied seat hours or miles, deadhead legs, actual costs</td></tr>
+            <tr><td class="k">SEC proxy disclosure</td><td>Personal aircraft use by named executive officers, at aggregate incremental cost</td><td>Variable cost per flight: fuel, maintenance per hour, crew travel, landing and parking, catering, handling. Deadhead legs tied to personal trips.</td></tr>
+            <tr><td class="k">Federal excise tax</td><td>Whether a charge for a flight is taxable transportation</td><td>Any money that changes hands, such as time-sharing reimbursements or charges between P&amp;G entities</td></tr>
+            <tr><td class="k">Time-sharing billing</td><td>What an executive may be charged, if P&amp;G uses time-sharing agreements</td><td>The direct costs 14 CFR 91.501 allows, per flight</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Easy to miss</h3>
+      <ul>
+        <li>SIFL rates change every six months. The engine needs a rate table by period, not one number.</li>
+        <li>SIFL counts statute miles and flight planning uses nautical miles. Convert at the boundary, the same rule as CAMP minutes.</li>
+        <li>The seating-capacity rule can value some personal flights at zero when enough business travelers are aboard. Check who it applies to.</li>
+        <li>The existing tax design already lists control-employee multiples and the security-program provisions.</li>
+        <li>Guests and spouses are attributed to the employee who brought them.</li>
+        <li>Deadhead legs are allocated differently in each calculation.</li>
+        <li>Purpose is captured at booking per passenger and leg, which the booking design already does. A change after the flight is a superseding record, never an edit.</li>
+        <li>Imputed income has to reach payroll for W-2 reporting. Workday may be the path.</li>
+        <li>Each executive needs a year-end statement, and finance needs numbers through the year.</li>
+        <li>The records must be contemporaneous, retained and audit-ready. The append-only ledger helps.</li>
+        <li>The 2017 tax law changed entertainment deductions. P&amp;G Tax decides how the disallowance applies now.</li>
+      </ul>
+      <p class="callout">This is a list of what to discuss with P&amp;G Tax. It is not tax advice.</p>
+    </section>
+
+    <!-- 12 -->
+    <section class="sec prose" id="erp">
+      <div class="sec-head chg"><p class="eyebrow">Designs · 11 · <span class="new">New in R3</span></p><h2>Emergency response app</h2></div>
+      <p>Bryan has thought about this too. It needs more discussion before anything is designed.</p>
+      <h3>Decided</h3>
+      <ul>
+        <li>A separate app, not part of myGFO.</li>
+        <li>Reachable without VPN.</li>
+        <li>Open to people outside the department, and possibly outside P&amp;G.</li>
+      </ul>
+      <h3>To discuss</h3>
+      <ul>
+        <li><b>Ask first</b> whether P&amp;G Global Security already runs a crisis platform. Plugging into it may beat building one.</li>
+        <li><b>Who gets access.</b> P&amp;G Security, Communications, HR and Legal, and outside parties such as the insurer or a family-assistance provider. Guest accounts with MFA, registered before they are needed.</li>
+        <li><b>It must work when myGFO and myairops are down,</b> so it needs its own hosting and a snapshot that refreshes continuously.</li>
+        <li><b>Dormant until activated</b> by the duty manager, with every access logged.</li>
+        <li><b>Contents.</b> Call tree, checklists per role, an unchangeable event log, holding statements and a drill mode.</li>
+      </ul>
+      <h3>What myGFO would provide</h3>
+      <ul>
+        <li>A narrow read-only feed: manifests with boarded status, emergency contacts and last known positions.</li>
+        <li>The overdue trigger. No arrival report a set time after the ETA alerts the duty manager.</li>
+      </ul>
+    </section>
+
+    <!-- 13 -->
+    <section class="sec prose" id="airflow">
+      <div class="sec-head"><p class="eyebrow">Designs · 12</p><h2>Airflow evaluation</h2></div>
+      <p>Airflow is the bet that keeps crews in two apps. GFO already uses ForeFlight Dispatch, where Airflow's business-aviation agents live. Bryan's steps are to see the demos, talk to their teams, write the use cases, and then take a recommendation to the VP.</p>
+      <h3>Use cases, in pilot order</h3>
+      <ol>
+        <li><b>Ops briefing with our airport knowledge.</b> Airflow's worldwide data plus our company pages and crew reports, in one ForeFlight briefing.</li>
+        <li><b>Trip feasibility for scheduling.</b> “Can a G500 do KLUK to EGGW on Thursday with five passengers?” Customs, fire category, parking, noise, fuel and runway, answered before scheduling commits.</li>
+        <li><b>Feasibility inside the EA's request.</b> The EA asks, and the answer comes back with feasibility and cost and a pre-filled request.</li>
+        <li class="chg"><b>Disruption options.</b> Rank the recovery options when a tail goes down. See section 8.</li>
+        <li class="chg"><b>The daily ops brief.</b> Weather and NOTAM impact across the day's flights, posted with fleet status to Teams and the walls.</li>
+      </ol>
+      <h3>Questions for the demos</h3>
+      <ol>
+        <li>Can Ops Briefing or Trip Feasibility take operator content, such as company pages and crew reports? Through which API?</li>
+        <li class="chg">What does bringing our own agent mean in practice? Can our agent call theirs, and can theirs call our MCP servers?</li>
+        <li>Can our system call the agents and get structured results back, or do they live only inside Dispatch?</li>
+        <li>What automation tier does each agent run at? We want advisory only.</li>
+        <li>How is the reasoning shown, and can we keep it with the trip record?</li>
+        <li>Does takeoff performance come from approved AFM data for the G500, G650ER and G800?</li>
+        <li class="chg">Is a business-aviation version of Augmented Ops Control planned?</li>
+        <li class="chg">Can it tell us what changed at an international airport since a given date?</li>
+        <li>Where is our data processed and stored, and is it used for training? What will P&amp;G IT security need?</li>
+        <li>What does the ForeFlight AI Connector expose, and does it support Copilot or Claude?</li>
+        <li>What is the pricing model, and when does business aviation get the full rollout?</li>
+      </ol>
+      <h3>What the VP pitch needs</h3>
+      <p>One use case shown end to end on a real past trip. The time it saves scheduling or crew, what it replaces, the risk controls, and the cost. Use case 1 is probably the strongest, because the international gap is real and the airport loop is useful even without AI.</p>
+    </section>
+
+    <!-- 14 -->
+    <section class="sec prose" id="ideas">
+      <div class="sec-head chg"><p class="eyebrow">Decisions · 13 · <span class="new">New in R3</span></p><h2>Ideas register</h2></div>
+      <p>Every idea raised so far and where it stands after Bryan's answers on 22 OCT 2026. Filter by status or search.</p>
+      <div class="reg-controls">
+        <div class="filters" role="group" aria-label="Filter ideas by status" style="margin:0">
+          <button class="fbtn" type="button" data-status-filter="all" aria-pressed="true">All <span class="count">48</span></button>
+          <button class="fbtn" type="button" data-status-filter="yes" aria-pressed="false">In the roadmap <span class="count">17</span></button>
+          <button class="fbtn" type="button" data-status-filter="discuss" aria-pressed="false">To discuss <span class="count">5</span></button>
+          <button class="fbtn" type="button" data-status-filter="elsewhere" aria-pressed="false">Stays elsewhere <span class="count">4</span></button>
+          <button class="fbtn" type="button" data-status-filter="open" aria-pressed="false">Not discussed <span class="count">22</span></button>
+        </div>
+        <div class="search"><label class="sr" for="ideaSearch">Search ideas</label><input id="ideaSearch" type="search" placeholder="Search ideas" autocomplete="off"></div>
+      </div>
+      <div class="ideas" id="ideaList">
+        <article class="idea" data-status="discuss"><div><p class="area">When things go wrong</p><h3>Emergency response app</h3></div><div class="st"><span class="pill s-discuss">To discuss</span><p class="lands">Separate track</p></div><p class="note">A separate app reachable without VPN by people outside the department, possibly outside P&amp;G. See section 11.</p></article>
+        <article class="idea" data-status="discuss"><div><p class="area">When things go wrong</p><h3>Overdue aircraft trigger</h3></div><div class="st"><span class="pill s-discuss">To discuss</span><p class="lands">Separate track</p></div><p class="note">No arrival report a set time after the ETA alerts the duty manager. Part of the emergency response discussion.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">When things go wrong</p><h3>Two escalation ladders</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H0 · Platform</p></div><p class="note">Urgent problems go to whoever is on call. Overdue work goes to the manager.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">When things go wrong</p><h3>Delegates</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H0 · Platform</p></div><p class="note">A named stand-in receives approvals and escalations while someone is away.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">When things go wrong</p><h3>Disruption options</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H3, agent in H4</p></div><p class="note">Rank the options when a trip breaks, with Airflow checking each. See section 8.</p></article>
+        <article class="idea" data-status="discuss"><div><p class="area">When things go wrong</p><h3>Paper fallback when myGFO is down</h3></div><div class="st"><span class="pill s-discuss">To discuss</span><p class="lands">H0 · Tech Log</p></div><p class="note">Phone and email cover scheduling. The Tech Log still needs a written paper procedure, because the signature is the record.</p></article>
+        <article class="idea" data-status="elsewhere"><div><p class="area">Crew</p><h3>Crew legality at assignment</h3></div><div class="st"><span class="pill s-elsewhere">Stays elsewhere</span><p class="lands">Current crew app</p></div><p class="note">Stays in the app that does it today. myGFO can show its verdict if it can read it.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Crew</p><h3>Fatigue in trip planning</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H3</p></div><p class="note">An advisory score while scheduling builds the trip, reading duty data from the crew app.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Crew</p><h3>Joiners, movers and leavers</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1</p></div><p class="note">The manager owns it and assigns subtasks. Signing authority is removed automatically, never left as a subtask.</p></article>
+        <article class="idea" data-status="elsewhere"><div><p class="area">Crew</p><h3>Training tracking</h3></div><div class="st"><span class="pill s-elsewhere">Stays elsewhere</span><p class="lands">myairops</p></div><p class="note">Stays in myairops. myGFO reads the expiry dates so they show in readiness and the manager view.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Crew</p><h3>Flight times to pilot logbooks</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Unplaced</p></div><p class="note">Push each pilot's times into their own logbook automatically.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">International</p><h3>Permits and APIS as tracked items</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H1</p></div><p class="note">Universal files them today, with a manual cross-check. Track each submission's status and re-file on manifest changes.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">International</p><h3>Destination rules</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H1 or H4</p></div><p class="note">Passport validity, visas, vaccinations and cabotage belong in trip feasibility. Airflow may cover some.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Platform</p><h3>Expiry engine</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1 · Platform</p></div><p class="note">One place for everything that expires and who must act.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">International</p><h3>Aircraft document expiries</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1 · Expiry engine</p></div><p class="note">Registration, radio license, insurance certificates and airspace authorizations.</p></article>
+        <article class="idea" data-status="discuss"><div><p class="area">Money</p><h3>Actual trip costs from invoices</h3></div><div class="st"><span class="pill s-discuss">To discuss</span><p class="lands">H3</p></div><p class="note">Discuss with scheduling, the VP and the CPSO. The SEC figure and the disallowance both need it.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Money</p><h3>SIFL, SEC and the rest</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H3</p></div><p class="note">Every calculation and the data each needs. See section 10.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Money</p><h3>Engine and warranty program claims</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H3</p></div><p class="note">Track coverage and claims per event if the engines are on an hourly program.</p></article>
+        <article class="idea" data-status="elsewhere"><div><p class="area">Safety</p><h3>Flight data monitoring</h3></div><div class="st"><span class="pill s-elsewhere">Stays elsewhere</span><p class="lands">FlightPulse</p></div><p class="note">FlightPulse already does it and stays separate.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Safety</p><h3>Safety performance indicators</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H3</p></div><p class="note">Turn the reporting tools into a handful of tracked measures with targets.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Safety</p><h3>Management of change</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H3</p></div><p class="note">Tracked in the lead team's view. The G800 entry into service is the first case.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Safety</p><h3>Repeat defect alerts</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Tech Log</p></div><p class="note">Already built in the sandbox: the same ATA chapter on the same tail three times in 30 days is flagged. Check whether production has it.</p></article>
+        <article class="idea" data-status="elsewhere"><div><p class="area">Passengers</p><h3>Final manifest at the door</h3></div><div class="st"><span class="pill s-elsewhere">Stays elsewhere</span><p class="lands">myairops app</p></div><p class="note">Done in the myairops app. myGFO pulls the boarded status.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Passengers</p><h3>Times to drivers and protection</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H2</p></div><p class="note">They get block out, taxi and door-open times along with the passengers.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Passengers</p><h3>Outlook calendars</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1 and H2</p></div><p class="note">Trips appear on the EA's, principal's and crew's calendars and move with the trip.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Operations</p><h3>Daily ops brief</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1, Airflow in H4</p></div><p class="note">A morning summary to Teams and the wall screens. Airflow adds weather and NOTAM impact.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Passengers</p><h3>Passenger feedback</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H2</p></div><p class="note">One tap after landing.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Operations</p><h3>Duty of care</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Unplaced</p></div><p class="note">In a crisis, answer where every crew member and aircraft is right now.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Passengers</p><h3>Lost and found</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Unplaced</p></div><p class="note">Small, and it happens every week.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Platform</p><h3>Privacy and retention</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H0</p></div><p class="note">GDPR for EU crew and passengers, a retention schedule, and legal hold after an incident.</p></article>
+        <article class="idea" data-status="discuss"><div><p class="area">Platform</p><h3>Identity for people outside P&amp;G</h3></div><div class="st"><span class="pill s-discuss">To discuss</span><p class="lands">H2 and emergency app</p></div><p class="note">Guests, board members, contract crew and vendors. The emergency app and passenger emails both need it.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Platform</p><h3>IT lead times in the gates</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">All horizons</p></div><p class="note">Each new vendor needs a P&amp;G security review and a third-party risk assessment, which take months.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Platform</p><h3>FlightAware for live times</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H2</p></div><p class="note">Pull from FlightAware. Unblock tails as needed with Security; satcom is the fallback.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Frontier</p><h3>myGFO agent gateway</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H4</p></div><p class="note">MCP servers with parts blocked, for Copilot and Airflow. Needs much more thought. See section 9.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Frontier</p><h3>Regulatory change watch</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H4</p></div><p class="note">An agent watches FAA changes and files a suggestion to the document owner.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Frontier</p><h3>Knowledge loop beyond airports</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1</p></div><p class="note">FBOs, hotels, handlers, caterers and individual tails.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Faults reported before landing</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H3 or H4</p></div><p class="note">Gulfstream's health monitoring reports problems in flight. Feed them to the Tech Log so the part meets the aircraft.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Plan for in-flight connectivity</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Unplaced</p></div><p class="note">The MEL data includes a Starlink item. Live sync and cabin updates in flight, still offline-safe.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Comprehension checks and drafted revisions</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H0 or H4</p></div><p class="note">Ask two or three questions when a bulletin publishes. An AI drafts the next revision from open bulletins for the owner.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Emissions on the booking screen</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H2</p></div><p class="note">Show CO2 next to cost. Check the EU emissions trading threshold for flights to Europe.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>What-if when the principal runs late</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H3</p></div><p class="note">Show the effect on crew duty, the destination curfew and the next leg.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Principal ten minutes out</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H2</p></div><p class="note">With opt-in, the driver's or protection team's ETA to the FBO goes to the crew.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Critical alerts and passkeys</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H1</p></div><p class="note">AOG alerts that break through Do Not Disturb, with Apple's approval. Face ID passkeys for step-up signing.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Roadmap</p><h3>Success measures</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Section 5</p></div><p class="note">How we know myGFO works. A proposed set is in section 5.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Roadmap</p><h3>What each horizon retires</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Section 5</p></div><p class="note">Name the spreadsheet, email chain or paper process each horizon replaces.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Roadmap</p><h3>Owners per module</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Section 5</p></div><p class="note">A business owner and a data steward for each module.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Roadmap</p><h3>Build or buy per module</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Section 5</p></div><p class="note">One line per module on why it is built rather than bought.</p></article>
+        <article class="idea" data-status="open"><div><p class="area">Roadmap</p><h3>Power BI for manager views</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H3</p></div><p class="note">If it is the P&amp;G standard, custom dashboards may be wasted effort.</p></article>
+        <p class="empty" id="ideasEmpty" hidden>No ideas match. Clear the search or choose another status.</p>
+      </div>
+    </section>
+
+    <!-- 15 -->
+    <section class="sec prose" id="questions">
+      <div class="sec-head"><p class="eyebrow">Decisions · 14</p><h2>Questions and decisions</h2></div>
+      <p>These sit beside the numbered Open Questions in CLAUDE.md, which still govern.</p>
+      <h3>Still open</h3>
+      <ul class="qa">
+        <li><span>Which areas in section 2 are live or in build?</span><span class="who">Bryan, developer</span></li>
+        <li><span>What does “40%” mean for documents: production progress, or progress toward the full living-document vision?</span><span class="who">Bryan</span></li>
+        <li><span>Who grants Workday access, and is its manager chain reliable enough to escalate against?</span><span class="who">HRIS</span></li>
+        <li class="chg"><span>Emergency response app: build it, or plug into a P&amp;G Security crisis platform? Who gets access?</span><span class="who">Bryan, Security</span></li>
+        <li class="chg"><span>Should myGFO capture actual trip costs from invoices?</span><span class="who">Scheduling, VP, CPSO</span></li>
+        <li class="chg"><span>Can myGFO read legality and duty data from the crew app, for readiness and the fatigue advisory?</span><span class="who">Bryan</span></li>
+        <li class="chg"><span>Does GFO have backup lift, such as charter or jet-card agreements, for disruptions?</span><span class="who">Scheduling</span></li>
+        <li class="chg"><span>Which tails stay blocked from FlightAware, and who may receive live times?</span><span class="who">Security</span></li>
+        <li class="chg"><span>What is the Tech Log's paper fallback procedure?</span><span class="who">DOM</span></li>
+        <li class="chg"><span>Which agent servers come first, and who approves each one?</span><span class="who">Bryan, P&amp;G IT</span></li>
+        <li><span>Airflow: operator content, bringing our own agent, an international change feed, and business-aviation disruption.</span><span class="who">Demos</span></li>
+        <li><span>Who is the Airport Evaluation Officer, and how many airports get a company page in year one?</span><span class="who">Chief pilot</span></li>
+        <li class="chg"><span>Twenty-two ideas are not discussed yet. <a href="#ideas" data-set-filter="open">Show them</a>.</span><span class="who">Bryan</span></li>
+      </ul>
+      <h3>Decisions log</h3>
+      <p class="eyebrow">R4 · 22 OCT 2026</p>
+      <ul class="decisions">
+        <li>The vision is two documents: a short story page for leadership, and this reference for the myGFO committee and the developer.</li>
+        <li>The roadmap shows sequence and gates only, with no dates.</li>
+        <li>The Copilot hand-off waits until the two pages are settled.</li>
+      </ul>
+      <p class="eyebrow">R3 · 22 OCT 2026</p>
+      <ul class="decisions">
+        <li class="chg">The emergency response app is a separate app, reachable without VPN by people outside the department. Details to discuss.</li>
+        <li class="chg">Crew legality stays in the app that does it today. Training stays in myairops. Flight data monitoring stays in FlightPulse. Boarding is confirmed in the myairops app.</li>
+        <li class="chg">Live times come from FlightAware. Tails are unblocked as needed, and satcom remains available.</li>
+        <li class="chg">Two escalation ladders, and delegates.</li>
+        <li class="chg">Joiners, movers and leavers belong to the manager, who assigns subtasks.</li>
+        <li class="chg">Adopted: the expiry engine, management of change in the lead team's view, times to drivers and protection, Outlook calendars, the daily ops brief, passenger feedback, fatigue in trip planning, the regulatory change watch, and the knowledge loop beyond airports.</li>
+        <li class="chg">Disruption options with Airflow, and a myGFO agent gateway with parts blocked. Both need more thought.</li>
+        <li class="chg">Actual trip costs go to scheduling, the VP and the CPSO.</li>
+        <li class="chg">One HTML page replaced the three Markdown files as the single copy.</li>
+      </ul>
+      <p class="eyebrow">R2 · 22 OCT 2026</p>
+      <ul class="decisions">
+        <li>Bryan designs and mocks up. A developer builds production, and much is built.</li>
+        <li>myairops stays the scheduling system and stays pull-only. GFO has its OData and REST APIs.</li>
+        <li>ForeFlight Dispatch is in use. Airflow is not started.</li>
+        <li>Passengers get email first, and an app only if they ask.</li>
+        <li>Company pages follow the 10-7 model, stay independent of Document Center, and have no production version yet.</li>
+        <li>The FAA supplies only the US database and NAS status. NOTAMs and international data come from Jeppesen ForeFlight and Airflow.</li>
+        <li>Sensitive fields are restricted. These documents live in this repository.</li>
+      </ul>
+    </section>
+
+    <!-- 16 -->
+    <section class="sec prose" id="sources">
+      <div class="sec-head"><p class="eyebrow">Decisions · 15</p><h2>Sources</h2></div>
+      <p>Outside facts on this page came from these sources, checked on 22 OCT 2026.</p>
+      <ul class="sources">
+        <li><a href="https://www.jeppesenforeflight.com/news/jeppesen-foreflight-airflow-tm-platform-new-agents-unveiled-for-business-aviation" target="_blank" rel="noopener">Jeppesen ForeFlight: Airflow agents for business aviation</a></li>
+        <li><a href="https://skiesmag.com/press-releases/jeppesen-foreflight-introduces-new-airflow-agents-for-business-aviation/" target="_blank" rel="noopener">Skies Mag: Airflow agents for business aviation</a></li>
+        <li><a href="https://www.flyingmag.com/jeppesen-ai-agents-foreflight-airflow/" target="_blank" rel="noopener">Flying: AI agents come to Airflow</a></li>
+        <li><a href="https://ai.jeppesenforeflight.com/" target="_blank" rel="noopener">Jeppesen ForeFlight Airflow</a></li>
+        <li><a href="https://www.foreflight.com/releases/dispatch-api/" target="_blank" rel="noopener">ForeFlight Dispatch API release history</a></li>
+        <li><a href="https://ba.foreflight.com/blog/7-key-foreflight-dispatch-features-changing-business-aviation-planning-in-2026" target="_blank" rel="noopener">ForeFlight Dispatch features in 2026</a></li>
+        <li><a href="https://flightaware.com/commercial/foresight" target="_blank" rel="noopener">FlightAware Foresight</a></li>
+        <li><a href="https://nbaa.org/aircraft-operations/security/privacy/limiting-aircraft-data-displayed-ladd/" target="_blank" rel="noopener">NBAA: Limiting Aircraft Data Displayed</a></li>
+        <li><a href="https://www.avbuyer.com/articles/aircraft-ownership/privacy-considerations-for-aircraft-owners-part-3-113251" target="_blank" rel="noopener">AvBuyer: privacy for aircraft owners</a></li>
+        <li><a href="https://www.geaerospace.com/news/press-releases/ge-aviation-and-att-enable-aircraft-health-monitoring" target="_blank" rel="noopener">GE and AT&amp;T: Gulfstream health monitoring</a></li>
+        <li><a href="https://www.geaerospace.com/news/press-releases/systems/ge-achieves-strong-performance-g650-aircraft-health-and-trend-monitoring-and" target="_blank" rel="noopener">GE: G650 health and trend monitoring</a></li>
+        <li><a href="https://www.faa.gov/about/initiatives/notam/faqs" target="_blank" rel="noopener">FAA: NOTAM Management Service FAQs</a></li>
+        <li><a href="https://apis.io/providers/faa/" target="_blank" rel="noopener">FAA API directory</a></li>
+        <li><a href="https://forum.navigraph.com/t/jeppesen-10-7-pages/18561" target="_blank" rel="noopener">Navigraph forum: Jeppesen 10-7 pages</a></li>
+        <li><a href="https://www.boldmethod.com/learn-to-fly/navigation/how-to-use-the-jeppesen-airport-10-9-page/" target="_blank" rel="noopener">Boldmethod: the Jeppesen 10-9 page</a></li>
+        <li><a href="https://www.miljodirektoratet.no/ansvarsomrader/klima/klimakvoter/kvotepliktig-luftfart/" target="_blank" rel="noopener">Norwegian Environment Agency: EU ETS for aviation</a></li>
+        <li><a href="https://www.bcaa.bm/sites/default/files/Web%20Docs/Flight%20Ops/LTO_OPS_CORSIA_20180515%20.pdf" target="_blank" rel="noopener">Bermuda CAA: CORSIA guidance</a></li>
+        <li><a href="https://www.microsoft.com/en-us/microsoft-copilot/blog/copilot-studio/model-context-protocol-mcp-is-now-generally-available-in-microsoft-copilot-studio" target="_blank" rel="noopener">Microsoft: MCP generally available in Copilot Studio</a></li>
+        <li><a href="https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp" target="_blank" rel="noopener">Microsoft Learn: MCP in Copilot Studio</a></li>
+        <li><a href="https://www.stackone.com/blog/best-mcp-gateway-for-copilot-studio/" target="_blank" rel="noopener">StackOne: MCP gateways for Copilot Studio</a></li>
+      </ul>
+      <footer class="end">myGFO Vision Reference · Revision 4 · 22 OCT 2026. Source: docs/vision/reference.html in the myGFO sandbox repository.</footer>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  // Contents drawer on narrow screens
+  var rail = $('#rail');
+  var menuBtn = $('#menuBtn');
+  function setMenu(open) {
+    rail.classList.toggle('open', open);
+    menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuBtn.textContent = open ? 'Close' : 'Contents';
+  }
+  menuBtn.addEventListener('click', function () { setMenu(!rail.classList.contains('open')); });
+  $$('.toc a').forEach(function (a) { a.addEventListener('click', function () { setMenu(false); }); });
+
+  // Highlight the section being read
+  var tocLinks = {};
+  $$('.toc a[href^="#"]').forEach(function (a) { tocLinks[a.getAttribute('href').slice(1)] = a; });
+  var sections = $$('main section[id]');
+  var visible = {};
+  function markCurrent() {
+    var current = null;
+    for (var i = 0; i < sections.length; i++) { if (visible[sections[i].id]) { current = sections[i].id; break; } }
+    if (!current) return;
+    Object.keys(tocLinks).forEach(function (id) {
+      if (id === current) tocLinks[id].setAttribute('aria-current', 'true');
+      else tocLinks[id].removeAttribute('aria-current');
+    });
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+      markCurrent();
+    }, { rootMargin: '-12% 0px -62% 0px' });
+    sections.forEach(function (s) { io.observe(s); });
+  }
+
+  // Change bars, remembered per viewer
+  var KEY = 'mygfo-vision-changebars';
+  var chg = $('#chgToggle');
+  function applyChg(on) { document.body.classList.toggle('hide-chg', !on); chg.checked = on; }
+  var stored = null;
+  try { stored = window.localStorage.getItem(KEY); } catch (e) { stored = null; }
+  applyChg(stored !== 'off');
+  chg.addEventListener('change', function () {
+    applyChg(chg.checked);
+    try { window.localStorage.setItem(KEY, chg.checked ? 'on' : 'off'); } catch (e) { /* storage unavailable */ }
+  });
+
+  // Ideas register
+  var ideas = $$('.idea');
+  var search = $('#ideaSearch');
+  var empty = $('#ideasEmpty');
+  var currentStatus = 'all';
+  function applyIdeas() {
+    var q = (search.value || '').trim().toLowerCase();
+    var counts = { all: 0, yes: 0, discuss: 0, elsewhere: 0, open: 0 };
+    var anyShown = false;
+    ideas.forEach(function (el) {
+      var st = el.getAttribute('data-status');
+      var matches = !q || el.textContent.toLowerCase().indexOf(q) > -1;
+      if (matches) { counts.all++; counts[st]++; }
+      var show = matches && (currentStatus === 'all' || st === currentStatus);
+      el.hidden = !show;
+      if (show) anyShown = true;
+    });
+    $$('[data-status-filter]').forEach(function (b) {
+      var k = b.getAttribute('data-status-filter');
+      var c = b.querySelector('.count');
+      if (c) c.textContent = counts[k];
+      b.setAttribute('aria-pressed', k === currentStatus ? 'true' : 'false');
+    });
+    empty.hidden = anyShown;
+  }
+  $$('[data-status-filter]').forEach(function (b) {
+    b.addEventListener('click', function () { currentStatus = b.getAttribute('data-status-filter'); applyIdeas(); });
+  });
+  search.addEventListener('input', applyIdeas);
+  $$('[data-set-filter]').forEach(function (a) {
+    a.addEventListener('click', function () { currentStatus = a.getAttribute('data-set-filter'); search.value = ''; applyIdeas(); });
+  });
+  var totals = { all: ideas.length, yes: 0, discuss: 0, elsewhere: 0, open: 0 };
+  ideas.forEach(function (el) { totals[el.getAttribute('data-status')]++; });
+  $$('[data-total]').forEach(function (s) { s.textContent = totals[s.getAttribute('data-total')]; });
+  applyIdeas();
+
+  // The example briefing's acknowledgment
+  $$('.got').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var li = b.closest('li');
+      var done = li.classList.toggle('acked');
+      b.textContent = done ? 'Acknowledged' : 'Got it';
+      b.setAttribute('aria-pressed', done ? 'true' : 'false');
+    });
+  });
+})();
+</script>
