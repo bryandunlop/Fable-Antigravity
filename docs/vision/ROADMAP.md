@@ -24,7 +24,7 @@ So the table below describes **how deeply each idea has been explored in this sa
 | EA booking + messages | Medium | _fill in_ | Request builder, approvals queue, watches, messages both ways. Write-back to myairops blocked (OQ5). |
 | Passenger records | Medium | _fill in_ | PII residency undecided (OQ6). Default: read-through, mirror nothing. |
 | Flight Hub (crew) | Medium | _fill in_ | Pilot readiness, trip brief, acceptance, preflight. FA side is separate screens. |
-| Airport company pages | Medium | _fill in_ | Source labels, propose → review → publish, per-field confirmation, officer worklist, rules and flags. See [`airport-knowledge-loop.md`](./airport-knowledge-loop.md). |
+| Airport company pages | Medium | No | Source labels, propose → review → publish, per-field confirmation, officer worklist, rules and flags. See [`airport-knowledge-loop.md`](./airport-knowledge-loop.md). |
 | ForeFlight Files (trip sheets, pax docs) | Medium | _fill in_ | Client, flight matcher, trip-sheet document. |
 | Notifications / accountability | Medium | _fill in_ | Derived feed implemented. Escalation exists only inside scheduling. |
 | Manager views | Shallow | _fill in_ | Screens exist on mock data. |
@@ -86,7 +86,7 @@ flowchart LR
 - **Flight Hub** for pilots and flight attendants on real trips: readiness, brief, acceptance, the crew-relevant checklist items.
 - **Scheduling checklists** on the real engine, with **automatic re-fire** when a trip changes, notifying only the item owners.
 - **ForeFlight Files:** trip sheets and passenger documents pushed automatically.
-- **The airport knowledge loop, without AI:** a per-airport briefing that labels every line as official, company, our history or crew-reported, and a post-trip debrief that confirms or corrects it. Required after international trips. Company pages go to ForeFlight alongside the trip. Design: [`airport-knowledge-loop.md`](./airport-knowledge-loop.md).
+- **The airport knowledge loop, without AI:** a per-airport briefing that opens with what is new since this pilot last looked, labels every line as official, company, our history or crew-reported, and a post-trip debrief that confirms or corrects it. Required after international trips. Company pages go to ForeFlight alongside the trip. Design: [`airport-knowledge-loop.md`](./airport-knowledge-loop.md).
 - **Accountability ladder** generalized app-wide: documents, checklists, status updates.
 
 **Gates:** OQ2 answered; trip graph matches myairops on every leg for a month with no manual fix-ups.
@@ -191,11 +191,13 @@ These are separate from the numbered Open Questions in `CLAUDE.md`, which still 
 - **B. Scheduling system of record.** myairops stays. GFO has its OData and REST APIs. Write-back is hard to get approved, so pull-only stands. → OQ5 unchanged.
 - **C. ForeFlight Dispatch.** In use. Airflow not started. Next steps are demos, use cases and a VP recommendation. → Airflow evaluation in Horizon 4.
 - **D. Passenger channel.** Email first, an app only if passengers want it. → Horizon 2 and 4 updated.
+- **H. Company pages as controlled documents.** No. They stay independent of Document Center, with their own review model.
+- **I. Where this file lives.** Here. These docs are for thinking things through, not the work plan.
+- **Airport data sources.** FAA for the US database and NAS status only. NOTAMs and international data come from Jeppesen ForeFlight and Airflow.
 
 **Still open:**
 
 - **E. Production status.** Which pieces in section 1 are live or in build? Filling in that column turns this into a roadmap the developer can use.
 - **F. What "40%" means for documents.** Is it production progress, or progress toward the full living-document vision?
 - **G. Workday ownership.** Who in HRIS grants access, and is the manager chain in Workday reliable enough to escalate against?
-- **H. Company pages as controlled documents.** Should airport company pages live in Document Center, so they reuse its review, bulletin and audit machinery? See the airport loop doc.
-- **I. Where this file lives.** If the real planning happens at work, this file may belong there. The sandbox copy can then point to it.
+
