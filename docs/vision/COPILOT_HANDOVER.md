@@ -1,7 +1,7 @@
 # myGFO handover for GitHub Copilot
 
 - **From:** Bryan Dunlop, prepared with Claude (Anthropic), 22 Oct 2026.
-- **Written against:** Revision 4 of the vision, which is two pages. `docs/vision/index.html` is the short story for leadership. `docs/vision/reference.html` is the working reference with all the detail. Section numbers in this file refer to the reference.
+- **Written against:** Revision 5 of the vision, which is two pages. `docs/vision/index.html` is the plan and glidepath for leadership, built on five department circles. `docs/vision/reference.html` is the working reference with all the detail. Section numbers in this file refer to the reference.
 - **Branch:** until PR #40 merges, this file and the vision pages exist only on branch `claude/gfo-vision-roadmap` of `bryandunlop/Fable-Antigravity`. `main` does not have them yet.
 - **Precedence:** if this file and the reference disagree, the reference wins. If either disagrees with `CLAUDE.md`, `CLAUDE.md` wins.
 
@@ -43,8 +43,8 @@ Commit messages cite decision IDs such as D111, which live in Bryan's Obsidian v
 | Path | What it holds |
 |---|---|
 | `CLAUDE.md` | The working agreement: NEVER and ALWAYS rules, invariants, the config and secrets contract, the CAMP error taxonomy, and Open Questions OQ1 to OQ6. |
-| `docs/vision/index.html` | The leadership story at Revision 4: the end goal, today and tomorrow, one trip end to end with mockups, the roadmap, the platform map, six principles and the decisions leadership must make. |
-| `docs/vision/reference.html` | The working reference at Revision 4: manifesto, where we are, platform, horizons and gates, designs, the ideas register and the decisions log. Section numbers below refer to it. |
+| `docs/vision/index.html` | The plan and glidepath at Revision 5: five department circles tied together where they overlap, the glidepath from H0 to the end goal, the two-way data loops with ForeFlight and Gulfstream, six example screens, and the decisions leadership must make. |
+| `docs/vision/reference.html` | The working reference at Revision 5: manifesto, where we are, platform, horizons and gates, designs, the ideas register and the decisions log. Section numbers below refer to it. |
 | `docs/DEVELOPER_HANDOFF_V2.md` | Module hand-off from 6 Jul 2026: Tech Log, Scheduling, Pilot Workspace, Inventory v2, and what blocked each. |
 | `docs/tech-log/HANDOFF.md`, `docs/tech-log-api/` | Tech Log build notes, plus an API sketch in `README.md`, `routes.ts` and `schema.sql`. Compare the schema with production's. |
 | `docs/CANONICAL_MAINTENANCE_SURFACE.md` | Which of three overlapping maintenance surfaces is the real one. |
@@ -157,7 +157,7 @@ For each item in reference section 4, mark Done, In build, Ready or Blocked. Rea
 | System | What production uses | Auth method | Reads or writes | Matches the vision? |
 |---|---|---|---|---|
 
-Rows: myairops OData, REST and webhooks; CAMP SOAP; ForeFlight Files; ForeFlight Documents; ForeFlight Dispatch; FlightAware; Microsoft Graph for Outlook, Teams and SharePoint; Workday; satcom; FAA NASR; Jeppesen.
+Rows: myairops OData, REST and webhooks; CAMP SOAP; ForeFlight Files; ForeFlight Documents; the ForeFlight Dispatch API in both directions, including whether myairops already pushes flights to Dispatch; Gulfstream Performance Analytics; FlightAware; Microsoft Graph for Outlook, Teams and SharePoint; Workday; satcom; FAA NASR; Jeppesen.
 
 ### F. Ideas register
 
@@ -171,7 +171,7 @@ Reference section 13 lists 22 ideas marked "Not discussed". For each one, write 
 
 ## 7. The reference page's sections
 
-Open `docs/vision/reference.html` in a browser or read the HTML. Each section has an anchor. The trip end to end, with mockups, is on the story page at `docs/vision/index.html#trip`.
+Open `docs/vision/reference.html` in a browser or read the HTML. Each section has an anchor.
 
 | No. | Anchor | Section |
 |---|---|---|
@@ -190,6 +190,11 @@ Open `docs/vision/reference.html` in a browser or read the HTML. Each section ha
 | 13 | `#ideas` | Ideas register, 48 ideas with status |
 | 14 | `#questions` | Open questions and the decisions log |
 | 15 | `#sources` | Sources |
+| 16 | `#trip` | Appendix: one trip, end to end, by role |
+| 17 | `#lanes` | Appendix: the roadmap by area |
+| 18 | `#doccontrol` | Appendix: the document-control end state, mapped to sandbox engines |
+| 19 | `#loops` | Appendix: data loops with ForeFlight and Gulfstream |
+| 20 | `#owners` | Appendix: the department circles and proposed owners |
 
 ## 8. Glossary
 

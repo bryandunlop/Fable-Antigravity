@@ -17,6 +17,8 @@
   --rule: #D6DEE8;
   --accent: #1C58B5;
   --accent-soft: #E2EBF9;
+  --on-accent: #FFFFFF;
+  --bad: #A3322A; --bad-soft: #F8E4E1;
   --chg: #AE2A7E;
   --ok: #1D7349; --ok-soft: #E1F1E8;
   --warn: #8F5600; --warn-soft: #F8ECD6;
@@ -33,7 +35,7 @@
   :root:not([data-theme="light"]) {
     --bg: #0C1219; --surface: #131B25; --surface-2: #1A2431;
     --ink: #E3E9F1; --ink-2: #BAC5D3; --muted: #8B98AA; --rule: #253141;
-    --accent: #7EA9F2; --accent-soft: #18263A; --chg: #E070B9;
+    --accent: #7EA9F2; --accent-soft: #18263A; --on-accent: #0C1219; --bad: #F08A80; --bad-soft: #33191A; --chg: #E070B9;
     --ok: #5DBE8A; --ok-soft: #12291E; --warn: #E3A64A; --warn-soft: #2C2210;
     --info: #A3B3C7; --info-soft: #1C2531;
     --t-off: #B6C2D1; --t-off-soft: #202A37; --t-co: #E8B65C; --t-co-soft: #2E2412;
@@ -44,7 +46,7 @@
 :root[data-theme="dark"] {
   --bg: #0C1219; --surface: #131B25; --surface-2: #1A2431;
   --ink: #E3E9F1; --ink-2: #BAC5D3; --muted: #8B98AA; --rule: #253141;
-  --accent: #7EA9F2; --accent-soft: #18263A; --chg: #E070B9;
+  --accent: #7EA9F2; --accent-soft: #18263A; --on-accent: #0C1219; --bad: #F08A80; --bad-soft: #33191A; --chg: #E070B9;
   --ok: #5DBE8A; --ok-soft: #12291E; --warn: #E3A64A; --warn-soft: #2C2210;
   --info: #A3B3C7; --info-soft: #1C2531;
   --t-off: #B6C2D1; --t-off-soft: #202A37; --t-co: #E8B65C; --t-co-soft: #2E2412;
@@ -309,6 +311,67 @@ figure.demo figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; 
 .sources li { font-size: 14px; }
 footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
 
+/* Appendix: trip mockups and the swimlane */
+#trip .step .mock-slot { grid-column: 2; margin-top: 10px; }
+#trip .step .copy p { margin: 0 0 8px; }
+.mock { width: 100%; max-width: 440px; font-size: 13px; line-height: 1.4; color: var(--ink); }
+.win { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(15, 25, 40, 0.06), 0 8px 24px rgba(15, 25, 40, 0.08); }
+.win-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--surface-2); border-bottom: 1px solid var(--rule); font: 500 12px var(--font-body); color: var(--ink-2); }
+.dots { display: inline-flex; gap: 5px; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--rule); display: block; }
+.win-body { padding: 12px 14px 14px; display: grid; gap: 10px; }
+.mock p { margin: 0; font-size: inherit; color: inherit; max-width: none; }
+.mock .note { font-size: 12px; color: var(--muted); }
+.mock .src { font-size: 11px; color: var(--muted); }
+.mail .hdr { padding: 10px 14px; border-bottom: 1px solid var(--rule); display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.mail .hdr b { color: var(--ink); font-weight: 600; font-size: 13.5px; }
+.mail .body { padding: 14px; }
+.bethere { display: grid; gap: 2px; padding: 12px 14px; border-radius: 8px; background: var(--accent-soft); margin-bottom: 12px; }
+.bethere .k { font: 600 10.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.bethere .v { font-family: var(--font-display); font-stretch: 80%; font-weight: 750; font-size: 26px; line-height: 1.1; }
+.bethere .p { font-size: 12.5px; color: var(--ink-2); }
+.tl { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+.tl li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; margin: 0; font-size: 12.5px; }
+.tl .t { font: 600 12px var(--font-mono); font-variant-numeric: tabular-nums; }
+.aog { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.badge { font: 600 11px var(--font-mono); padding: 2px 7px; border-radius: 4px; letter-spacing: 0.04em; }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.opt { border: 1px solid var(--rule); border-radius: 8px; padding: 9px 11px; display: grid; gap: 3px; }
+.opt.best { border-color: var(--ok); }
+.opt .row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.opt b { font-size: 13.5px; }
+.opt span.n { font: 600 11px var(--font-mono); color: var(--muted); }
+.opt p { font-size: 12px; color: var(--ink-2); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { font: 500 12px var(--font-body); padding: 4px 11px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.rm-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); margin: 1.1em 0 0.6em; }
+.rm { display: grid; grid-template-columns: 132px repeat(5, minmax(132px, 1fr)) 140px; min-width: 940px; }
+.rm > div { padding: 10px; border-bottom: 1px solid var(--rule); border-left: 1px solid var(--rule); min-width: 0; }
+.rm .lane { border-left: 0; font: 600 12px var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); display: flex; align-items: center; }
+.rm .hz { background: var(--surface-2); display: grid; gap: 2px; align-content: start; }
+.rm .hz .c { font: 600 12px var(--font-mono); color: var(--accent); }
+.rm .hz b { font-family: var(--font-display); font-stretch: 85%; font-size: 15px; line-height: 1.15; }
+.rm .hz.now { background: var(--accent-soft); }
+.rm .hz.now .here { justify-self: start; margin-top: 4px; font: 600 10.5px var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--on-accent); background: var(--accent); padding: 2px 6px; border-radius: 4px; }
+.rm .corner { border-left: 0; background: var(--surface-2); }
+.rm .cell { display: grid; gap: 5px; align-content: start; }
+.rm .cell.now { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.rm .item { font-size: 12.5px; line-height: 1.3; padding: 5px 7px; border-radius: 5px; background: var(--surface-2); color: var(--ink); }
+.rm .now .item { background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent); }
+.rm .gate { font-size: 12px; color: var(--ink-2); display: flex; gap: 7px; align-items: flex-start; }
+.rm .gate::before { content: ""; flex: none; width: 9px; height: 9px; margin-top: 4px; transform: rotate(45deg); border: 1.5px solid var(--warn); background: var(--warn-soft); }
+.rm .end { grid-row: span 8; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: var(--surface-2); }
+.rm .end .flag { font: 600 11px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); display: flex; gap: 6px; align-items: center; }
+.rm .end .flag::before { content: ""; width: 10px; height: 10px; transform: rotate(45deg); background: var(--ink); }
+.rm .end p { margin: 0; font-size: 13px; color: var(--ink-2); }
+.rm .track { grid-column: span 5; }
+.rm .track span { display: block; font-size: 12.5px; padding: 6px 9px; border: 1.5px dashed var(--muted); border-radius: 6px; color: var(--ink-2); }
+.rm .last { border-bottom: 0; }
+.scroll-hint { display: none; font-size: 12.5px; color: var(--muted); }
+code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
 /* Phones and narrow windows */
 @media (max-width: 980px) {
   .shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
@@ -331,6 +394,7 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
   .thread > li.chg::before, .qa > li.chg::before { left: -11px; }
 }
 @media (max-width: 760px) {
+  .scroll-hint { display: block; }
   .idea { grid-template-columns: minmax(0, 1fr); }
   .gw { grid-template-columns: minmax(0, 1fr); }
   .brief-head .last { margin-left: 0; width: 100%; }
@@ -357,6 +421,7 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
       <div class="rev">
         <p class="rev-title">Record of revisions</p>
         <ol>
+          <li><b>R5</b><span>Story page rebuilt around the department circles and the glidepath. Appendix sections 16 to 20 added here.<span class="d">22 OCT 2026</span></span></li>
           <li><b>R4</b><span>Split into a leadership story page and this reference. The trip story moved to the story page.<span class="d">22 OCT 2026</span></span></li>
           <li><b>R3</b><span>Review decisions, ideas register, four new designs. One HTML page.<span class="d">22 OCT 2026</span></span></li>
           <li><b>R2</b><span>Answers on capacity, myairops, Dispatch and passengers. Airport loop.<span class="d">22 OCT 2026</span></span></li>
@@ -393,22 +458,30 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
           <li><a href="#questions"><span class="n">14</span><span>Questions and decisions</span></a></li>
           <li><a href="#sources"><span class="n">15</span><span>Sources</span></a></li>
         </ol>
+        <p class="grp">Appendix</p>
+        <ol>
+          <li><a href="#trip"><span class="n">16</span><span>One trip, end to end</span></a></li>
+          <li><a href="#lanes"><span class="n">17</span><span>Roadmap by area</span></a></li>
+          <li><a href="#doccontrol"><span class="n">18</span><span>Document control end state</span></a></li>
+          <li><a href="#loops"><span class="n">19</span><span>Data loops</span></a></li>
+          <li><a href="#owners"><span class="n">20</span><span>Circles and owners</span></a></li>
+        </ol>
       </nav>
     </div>
   </aside>
 
   <main class="doc" id="main">
     <header class="hero prose" id="top">
-      <p class="eyebrow">Global Flight Operations · Working reference · Revision 4 · 22 OCT 2026</p>
+      <p class="eyebrow">Global Flight Operations · Working reference · Revision 5 · 22 OCT 2026</p>
       <h1>myGFO Vision Reference</h1>
       <p class="lead">The working detail behind the vision: what exists today, the plan and its gates, the designs, every idea and every decision.</p>
       <p class="byline">For the myGFO committee and the developer. The short version for leadership is the <a href="https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg" target="_blank" rel="noopener">myGFO Vision and Roadmap</a> story page. Written by Bryan Dunlop with Claude. It is not the developer's work plan.</p>
       <div class="glance" aria-label="Ideas at a glance">
-        <a href="#ideas" data-set-filter="all"><b data-total="all">48</b> ideas tracked</a>
-        <a href="#ideas" data-set-filter="yes"><b data-total="yes">17</b> in the roadmap</a>
+        <a href="#ideas" data-set-filter="all"><b data-total="all">50</b> ideas tracked</a>
+        <a href="#ideas" data-set-filter="yes"><b data-total="yes">20</b> in the roadmap</a>
         <a href="#ideas" data-set-filter="discuss"><b data-total="discuss">5</b> to discuss</a>
         <a href="#ideas" data-set-filter="elsewhere"><b data-total="elsewhere">4</b> stay in other apps</a>
-        <a href="#ideas" data-set-filter="open"><b data-total="open">22</b> not discussed yet</a>
+        <a href="#ideas" data-set-filter="open"><b data-total="open">21</b> not discussed yet</a>
       </div>
     </header>
 
@@ -618,7 +691,7 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
     <!-- 6 -->
     <section class="sec prose" id="scope">
       <div class="sec-head"><p class="eyebrow">Plan · 5</p><h2>Where the project ends</h2></div>
-      <p>The current project is done when the trip on the <a href="https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg#trip" target="_blank" rel="noopener">story page</a> runs end to end on a real trip, with every step on production data. That is the end of H4.</p>
+      <p>The current project is done when the trip in <a href="#trip">section 16</a> runs end to end on a real trip, with every step on production data. That is the end of H4.</p>
       <h3>The app goal</h3>
       <p>Crew live in two apps, myGFO and ForeFlight. Scheduling and EAs live in myGFO and myairops. A feature that adds a third app for crew needs a strong reason.</p>
       <h3>Outside the line, until decided otherwise</h3>
@@ -944,11 +1017,11 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
       <p>Every idea raised so far and where it stands after Bryan's answers on 22 OCT 2026. Filter by status or search.</p>
       <div class="reg-controls">
         <div class="filters" role="group" aria-label="Filter ideas by status" style="margin:0">
-          <button class="fbtn" type="button" data-status-filter="all" aria-pressed="true">All <span class="count">48</span></button>
-          <button class="fbtn" type="button" data-status-filter="yes" aria-pressed="false">In the roadmap <span class="count">17</span></button>
+          <button class="fbtn" type="button" data-status-filter="all" aria-pressed="true">All <span class="count">50</span></button>
+          <button class="fbtn" type="button" data-status-filter="yes" aria-pressed="false">In the roadmap <span class="count">20</span></button>
           <button class="fbtn" type="button" data-status-filter="discuss" aria-pressed="false">To discuss <span class="count">5</span></button>
           <button class="fbtn" type="button" data-status-filter="elsewhere" aria-pressed="false">Stays elsewhere <span class="count">4</span></button>
-          <button class="fbtn" type="button" data-status-filter="open" aria-pressed="false">Not discussed <span class="count">22</span></button>
+          <button class="fbtn" type="button" data-status-filter="open" aria-pressed="false">Not discussed <span class="count">21</span></button>
         </div>
         <div class="search"><label class="sr" for="ideaSearch">Search ideas</label><input id="ideaSearch" type="search" placeholder="Search ideas" autocomplete="off"></div>
       </div>
@@ -988,8 +1061,10 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
         <article class="idea" data-status="yes"><div><p class="area">Platform</p><h3>FlightAware for live times</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H2</p></div><p class="note">Pull from FlightAware. Unblock tails as needed with Security; satcom is the fallback.</p></article>
         <article class="idea" data-status="yes"><div><p class="area">Frontier</p><h3>myGFO agent gateway</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H4</p></div><p class="note">MCP servers with parts blocked, for Copilot and Airflow. Needs much more thought. See section 9.</p></article>
         <article class="idea" data-status="yes"><div><p class="area">Frontier</p><h3>Regulatory change watch</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H4</p></div><p class="note">An agent watches FAA changes and files a suggestion to the document owner.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Platform</p><h3>Two-way ForeFlight loop</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1 to H4</p></div><p class="note">myGFO sends trips, documents, airport pages and aircraft status. ForeFlight returns planned times, performance and Airflow briefings. See section 19.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Documents</p><h3>Document Center as the document-control system</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H0 onward</p></div><p class="note">Comply365-class control: submit a revision, compare old and new, approve inside, read and sign. See section 18.</p></article>
         <article class="idea" data-status="yes"><div><p class="area">Frontier</p><h3>Knowledge loop beyond airports</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1</p></div><p class="note">FBOs, hotels, handlers, caterers and individual tails.</p></article>
-        <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Faults reported before landing</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H3 or H4</p></div><p class="note">Gulfstream's health monitoring reports problems in flight. Feed them to the Tech Log so the part meets the aircraft.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Aircraft</p><h3>Gulfstream data into the Tech Log</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H3, more in H4</p></div><p class="note">Gulfstream Performance Analytics flags problems early, even in flight. Alerts land in the Tech Log so the part and the technician meet the aircraft. See section 19.</p></article>
         <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Plan for in-flight connectivity</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Unplaced</p></div><p class="note">The MEL data includes a Starlink item. Live sync and cabin updates in flight, still offline-safe.</p></article>
         <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Comprehension checks and drafted revisions</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H0 or H4</p></div><p class="note">Ask two or three questions when a bulletin publishes. An AI drafts the next revision from open bulletins for the owner.</p></article>
         <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Emissions on the booking screen</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H2</p></div><p class="note">Show CO2 next to cost. Check the EU emissions trading threshold for flights to Europe.</p></article>
@@ -1023,9 +1098,20 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
         <li class="chg"><span>Which agent servers come first, and who approves each one?</span><span class="who">Bryan, P&amp;G IT</span></li>
         <li><span>Airflow: operator content, bringing our own agent, an international change feed, and business-aviation disruption.</span><span class="who">Demos</span></li>
         <li><span>Who is the Airport Evaluation Officer, and how many airports get a company page in year one?</span><span class="who">Chief pilot</span></li>
-        <li class="chg"><span>Twenty-two ideas are not discussed yet. <a href="#ideas" data-set-filter="open">Show them</a>.</span><span class="who">Bryan</span></li>
+        <li class="chg"><span>What aircraft data can Gulfstream share with an operator, in what form, and can it reach the Tech Log automatically?</span><span class="who">Bryan, Gulfstream</span></li>
+        <li class="chg"><span>Does myairops already push flights to ForeFlight Dispatch? If so, myGFO reads from both instead of pushing flights itself.</span><span class="who">Scheduling</span></li>
+        <li class="chg"><span>Which Dispatch API fields carry actual times, and does Dispatch send events?</span><span class="who">ForeFlight</span></li>
+        <li class="chg"><span>Who owns each overlap between the department circles? See section 20.</span><span class="who">Lead team</span></li>
+        <li class="chg"><span>Twenty-one ideas are not discussed yet. <a href="#ideas" data-set-filter="open">Show them</a>.</span><span class="who">Bryan</span></li>
       </ul>
       <h3>Decisions log</h3>
+      <p class="eyebrow">R5 · 22 OCT 2026</p>
+      <ul class="decisions">
+        <li class="chg">The vision is drawn as five department circles: pilots, flight attendants, EAs, scheduling and maintenance. Software ties them together where they overlap.</li>
+        <li class="chg">Safety, documents and leadership form a band around the circles, because they touch every one.</li>
+        <li class="chg">The story page leads with the circles, then the glidepath.</li>
+        <li class="chg">Adopted: Gulfstream aircraft data into the Tech Log, a two-way loop with ForeFlight, and Document Center as the document-control system on the level of Comply365.</li>
+      </ul>
       <p class="eyebrow">R4 · 22 OCT 2026</p>
       <ul class="decisions">
         <li>The vision is two documents: a short story page for leadership, and this reference for the myGFO committee and the developer.</li>
@@ -1081,8 +1167,254 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
         <li><a href="https://www.microsoft.com/en-us/microsoft-copilot/blog/copilot-studio/model-context-protocol-mcp-is-now-generally-available-in-microsoft-copilot-studio" target="_blank" rel="noopener">Microsoft: MCP generally available in Copilot Studio</a></li>
         <li><a href="https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp" target="_blank" rel="noopener">Microsoft Learn: MCP in Copilot Studio</a></li>
         <li><a href="https://www.stackone.com/blog/best-mcp-gateway-for-copilot-studio/" target="_blank" rel="noopener">StackOne: MCP gateways for Copilot Studio</a></li>
+        <li><a href="https://www.savannahbusinessjournal.com/news/manufacturing/oct-20-gulfstream-expands-performance-analytics-to-optimize-aircraft-operations/article_62a22865-70cd-42ce-81e0-73fa041b1a63.html" target="_blank" rel="noopener">Savannah Business Journal: Gulfstream expands Performance Analytics</a></li>
+        <li><a href="https://travelprnews.com/article/gulfstream-expands-predictive-aircraft-maintenance-analytics-to-help-operators-reduce-disruptions/" target="_blank" rel="noopener">Travel PR News: Gulfstream predictive maintenance analytics</a></li>
+        <li><a href="https://www.foreflight.com/products/dispatch/integrations/" target="_blank" rel="noopener">ForeFlight Dispatch integrations</a></li>
+        <li><a href="https://wiki.leonsoftware.com/wiki/foreflight" target="_blank" rel="noopener">Leon Software: ForeFlight Dispatch integration</a></li>
+        <li><a href="https://comply365.com/wheels-up-selects-comply365-for-operational-document-compliance-management/" target="_blank" rel="noopener">Comply365: Wheels Up document and compliance management</a></li>
+        <li><a href="https://www.halldale.com/civil-aviation/20786-cat-comply365-platform-streamlines-operations-for-wheels-up" target="_blank" rel="noopener">Halldale: Comply365 platform for Wheels Up</a></li>
       </ul>
-      <footer class="end">myGFO Vision Reference · Revision 4 · 22 OCT 2026. Source: docs/vision/reference.html in the myGFO sandbox repository.</footer>
+      <footer class="end">myGFO Vision Reference · Revision 5 · 22 OCT 2026. Source: docs/vision/reference.html in the myGFO sandbox repository.</footer>
+    </section>
+
+    <!-- 16 -->
+    <section class="sec prose" id="trip">
+      <div class="sec-head chg"><p class="eyebrow">Appendix · 16 · <span class="new">New in R5</span></p><h2>One trip, end to end</h2></div>
+      <p>Every moment of one trip, filterable by role. The <a href="https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg#looks" target="_blank" rel="noopener">story page</a> shows the main screens. The screens here are illustrative mockups with example data.</p>
+      <div class="filters" role="group" aria-label="Show the trip as">
+        <button class="fbtn" type="button" data-role="all" aria-pressed="true">Everyone</button>
+        <button class="fbtn" type="button" data-role="ea" aria-pressed="false">EA</button>
+        <button class="fbtn" type="button" data-role="scheduling" aria-pressed="false">Scheduling</button>
+        <button class="fbtn" type="button" data-role="crew" aria-pressed="false">Crew</button>
+        <button class="fbtn" type="button" data-role="passengers" aria-pressed="false">Passengers</button>
+        <button class="fbtn" type="button" data-role="drivers" aria-pressed="false">Drivers and protection</button>
+        <button class="fbtn" type="button" data-role="maintenance" aria-pressed="false">Maintenance</button>
+        <button class="fbtn" type="button" data-role="managers" aria-pressed="false">Leadership</button>
+      </div>
+      <p class="status-line" id="tripStatus" aria-live="polite">Showing all 11 moments.</p>
+      <ol class="thread">
+        <li class="step" data-roles="ea">
+          <span class="when">Request</span>
+          <div class="copy"><h3>An EA asks a question</h3><p>Copilot answers in Teams from fleet availability, the cost model and Airflow Trip Feasibility. One more tap turns the answer into a request.</p><div class="who"><span class="tag">EA</span></div></div>
+          
+        </li>
+        <li class="step" data-roles="scheduling ea crew passengers">
+          <span class="when">Booking</span>
+          <div class="copy"><h3>The request becomes a booking</h3><p>Scheduling approves and assigns a tail and crew. A fatigue advisory flags a plan that is legal but tiring. The trip lands on the Outlook calendars of the EA, the principal and the crew, and moves when the trip moves.</p><div class="who"><span class="tag">Scheduling</span><span class="tag">EA</span><span class="tag">Crew</span><span class="tag">Passengers</span></div></div>
+        </li>
+        <li class="step" data-roles="ea scheduling">
+          <span class="when">Days out</span>
+          <div class="copy"><h3>Everything gets checked</h3><p>Each passenger is matched to a record: passport valid, profile current, briefed recently. Permits, catering, FBO and hotels each have a due rule. When the trip changes, only the affected items re-fire, and only their owners hear about it.</p><div class="who"><span class="tag">EA</span><span class="tag">Scheduling</span></div></div>
+        </li>
+        <li class="step" data-roles="crew">
+          <span class="when">Days out</span>
+          <div class="copy"><h3>The crew prepare</h3><p>Flight Hub shows the crew's items already checked. Each airport briefing opens with what is new since that pilot last looked, and says where every line came from: official data, company guidance, our history or a crew report.</p><div class="who"><span class="tag">Crew</span></div></div>
+          
+        </li>
+        <li class="step" data-roles="passengers ea scheduling">
+          <span class="when">T-72 h</span>
+          <div class="copy"><h3>Passengers know the plan</h3><p>Cutoffs pass, the trip sheet freezes, and passengers get an email that leads with their be-there time and lays the day out as a timeline.</p><div class="who"><span class="tag">Passengers</span><span class="tag">EA</span><span class="tag">Scheduling</span></div></div>
+          <div class="mock-slot">
+            <div class="mock win mail" aria-label="Mockup of the 72-hour passenger email">
+              <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span>Mail</span></div>
+              <div class="hdr"><span>From: GFO Trip Desk</span><b>Tuesday: be at Lunken by 7:15 AM</b></div>
+              <div class="body">
+                <div class="bethere"><span class="k">Be there</span><span class="v">7:15 AM</span><span class="p">GFO hangar, Lunken Airport, Cincinnati</span></div>
+                <ol class="tl">
+                  <li><span class="t">7:15</span><span>Arrive at the hangar. Bags go straight to the aircraft.</span></li>
+                  <li><span class="t">7:45</span><span>Wheels up.</span></li>
+                  <li><span class="t">9:05</span><span>Land at Teterboro.</span></li>
+                  <li><span class="t">9:15</span><span>Your car is waiting at the FBO. Driver details arrive the evening before.</span></li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li class="step" data-roles="crew managers maintenance">
+          <span class="when">Night before</span>
+          <div class="copy"><h3>Everyone gets their brief</h3><p>The daily ops brief reaches Teams and the wall screens. ForeFlight already holds the trip sheet, passenger documents, airport pages and current manuals.</p><div class="who"><span class="tag">Crew</span><span class="tag">Leadership</span><span class="tag">Maintenance</span></div></div>
+        </li>
+        <li class="step" data-roles="passengers ea drivers">
+          <span class="when">Block out</span>
+          <div class="copy"><h3>The people waiting are told</h3><p>Live times from FlightAware reach the passengers' contacts, the EA, the drivers and the protection team. Nobody has to call to ask where the airplane is.</p><div class="who"><span class="tag">Passengers</span><span class="tag">EA</span><span class="tag">Drivers and protection</span></div></div>
+          
+        </li>
+        <li class="step" data-roles="crew maintenance managers">
+          <span class="when">Block in</span>
+          <div class="copy"><h3>The record closes itself</h3><p>The journey log is signed and hours flow to CAMP. The tax engine computes SIFL and the SEC figure from the confirmed manifest.</p><div class="who"><span class="tag">Crew</span><span class="tag">Maintenance</span><span class="tag">Leadership</span></div></div>
+        </li>
+        <li class="step" data-roles="passengers crew managers">
+          <span class="when">Next day</span>
+          <div class="copy"><h3>The loop closes</h3><p>Passengers rate the trip with one tap. The crew debrief improves the airport page for the next crew. Leadership sees fleet, trips and overdue work without asking anyone.</p><div class="who"><span class="tag">Passengers</span><span class="tag">Crew</span><span class="tag">Leadership</span></div></div>
+          
+        </li>
+      </ol>
+      <p class="branch-label">When it goes wrong</p>
+      <ol class="thread">
+        <li class="step branch" data-roles="maintenance scheduling ea crew passengers drivers">
+          <span class="when">Any time</span>
+          <div class="copy"><h3>A tail goes AOG</h3><p>The Tech Log grounds the aircraft. myGFO lists the affected trips and ranks the options, with Airflow checking each one. Scheduling decides, and myGFO drafts every message.</p><div class="who"><span class="tag">Maintenance</span><span class="tag">Scheduling</span><span class="tag">Everyone affected</span></div></div>
+          <div class="mock-slot">
+            <div class="mock win" aria-label="Mockup of the disruption options board">
+              <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span>myGFO · Scheduling</span></div>
+              <div class="win-body">
+                <div class="aog"><span class="badge bad">AOG</span><b>Tail 2 grounded</b><span class="note">Hydraulic leak. Back in service about 18:00.</span></div>
+                <div class="note">Affects trip 0412: 4 passengers, departing 14:30.</div>
+                <div class="opt best"><div class="row"><b>Swap to tail 4</b><span class="badge ok">Best</span></div><p>Departs 14:30 on time. Feasible. Crew within duty. No passenger impact.</p></div>
+                <div class="opt"><div class="row"><b>Wait for the repair</b><span class="n">2</span></div><p>Departs about 19:00. Two passengers miss a 17:00 meeting.</p></div>
+                <div class="opt"><div class="row"><b>Leave tomorrow at 07:00</b><span class="n">3</span></div><p>Feasible. One passenger cannot travel tomorrow.</p></div>
+                <div class="btns"><span class="btn primary">Choose the swap</span><span class="btn">Compare</span></div>
+                <p class="src">Checked with Airflow Trip Feasibility. Messages drafted for the EA, crew, passengers and driver.</p>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li class="step branch" data-roles="managers scheduling">
+          <span class="when">Airborne</span>
+          <div class="copy"><h3>No arrival report</h3><p>If the aircraft has not reported arrival a set time after its ETA, the duty manager is alerted and can open the emergency response app. To discuss.</p><div class="who"><span class="tag">Leadership</span><span class="tag">Scheduling</span></div></div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 17 -->
+    <section class="sec prose" id="lanes">
+      <div class="sec-head chg"><p class="eyebrow">Appendix · 17 · <span class="new">New in R5</span></p><h2>Roadmap by area</h2></div>
+      <p>The horizons from section 4, laid out by area. The story page draws the same plan as a glidepath.</p>
+      <div class="rm-scroll" role="region" aria-label="Roadmap by area and horizon" tabindex="0">
+        <div class="rm">
+          <div class="corner"></div>
+          <div class="hz now"><span class="c">H0</span><b>Land what we are building</b><span class="here">We are here</span></div>
+          <div class="hz"><span class="c">H1</span><b>The crew's day</b></div>
+          <div class="hz"><span class="c">H2</span><b>The EA and the passenger</b></div>
+          <div class="hz"><span class="c">H3</span><b>The 30,000-foot view</b></div>
+          <div class="hz"><span class="c">H4</span><b>Intelligence</b></div>
+          <div class="hz"><span class="c">Then</span><b>End goal</b></div>
+
+          <div class="lane">Foundation</div>
+          <div class="cell now"><span class="item">Sign-in, ledger and signatures</span><span class="item">Alerts with two escalation paths</span></div>
+          <div class="cell"><span class="item">Trip record from myairops</span><span class="item">Expiry tracking</span></div>
+          <div class="cell"><span class="item">FlightAware live times</span></div>
+          <div class="cell"><span class="item">Workday link</span><span class="item">Insight data</span></div>
+          <div class="cell"><span class="item">Agent gateway</span></div>
+          <div class="end"><span class="flag">End goal</span><p>One real trip runs end to end on production data, with no retyping and no needless calls.</p></div>
+
+          <div class="lane">Documents</div>
+          <div class="cell now"><span class="item">Living documents</span><span class="item">Manuals sync to ForeFlight</span></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"><span class="item">Regulatory change watch</span></div>
+
+          <div class="lane">Tech Log</div>
+          <div class="cell now"><span class="item">Tech Log on iPad, offline</span><span class="item">CAMP sandbox link</span></div>
+          <div class="cell"></div><div class="cell"></div>
+          <div class="cell"><span class="item">Hours push to CAMP</span></div>
+          <div class="cell"></div>
+
+          <div class="lane">Crew</div>
+          <div class="cell now"></div>
+          <div class="cell"><span class="item">Flight Hub</span><span class="item">Airport knowledge loop</span><span class="item">Trip sheets in ForeFlight</span><span class="item">Calendars in Outlook</span></div>
+          <div class="cell"></div>
+          <div class="cell"><span class="item">Fatigue advisory</span></div>
+          <div class="cell"><span class="item">Ops brief with Airflow</span></div>
+
+          <div class="lane">EA and passengers</div>
+          <div class="cell now"></div><div class="cell"></div>
+          <div class="cell"><span class="item">EA booking space</span><span class="item">Passenger records</span><span class="item">Live times by email</span><span class="item">Passenger feedback</span></div>
+          <div class="cell"></div>
+          <div class="cell"><span class="item">Passenger app, if asked</span></div>
+
+          <div class="lane">Leadership</div>
+          <div class="cell now"></div>
+          <div class="cell"><span class="item">Daily ops brief</span><span class="item">Joiners and leavers</span></div>
+          <div class="cell"></div>
+          <div class="cell"><span class="item">Leadership view</span><span class="item">Change management</span><span class="item">SIFL and SEC engine</span></div>
+          <div class="cell"></div>
+
+          <div class="lane">Intelligence</div>
+          <div class="cell now"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"><span class="item">Disruption options</span></div>
+          <div class="cell"><span class="item">Copilot answers</span><span class="item">Airflow agents</span></div>
+
+          <div class="lane">Gate to move on</div>
+          <div class="cell now"><span class="gate">Both modules in real use for a month</span></div>
+          <div class="cell"><span class="gate">myairops data mapping confirmed</span></div>
+          <div class="cell"><span class="gate">Passenger data and live-times decisions</span></div>
+          <div class="cell"><span class="gate">Tax and Workday agreements</span></div>
+          <div class="cell"><span class="gate">AI use approved by IT and Legal</span></div>
+
+          <div class="lane last">Separate track</div>
+          <div class="track last"><span>Emergency response app: a separate app reachable without VPN, for people inside and outside the department. To discuss.</span></div>
+          <div class="cell last"></div>
+        </div>
+      </div>
+      <p class="scroll-hint">Scroll the roadmap sideways to see every horizon.</p>
+    </section>
+
+    <!-- 18 -->
+    <section class="sec prose" id="doccontrol">
+      <div class="sec-head chg"><p class="eyebrow">Appendix · 18 · <span class="new">New in R5</span></p><h2>Document control end state</h2></div>
+      <p>Documents are moving into myGFO. The end state is a document-control system on the level of Comply365, which is the benchmark Bryan named. Comply365's public material describes revision control with automatic syncing, seeing what changed, read and sign in one place, and personal notes kept across updates. The sandbox already has an engine for almost every piece.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Capability</th><th>What it means</th><th>Sandbox engine today</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Structured authoring</td><td>Manuals are written as sections and blocks, not uploaded as PDFs.</td><td><code>blockEditor.ts</code>, <code>blocks.ts</code>, <code>workbench.ts</code></td></tr>
+            <tr><td class="k">Submit a revision</td><td>An author drafts a revision and sends it for review. Readers can send suggestions to the owner.</td><td><code>revisions.ts</code>, <code>workbench.ts</code>, <code>suggestions.ts</code></td></tr>
+            <tr><td class="k">Compare old and new</td><td>The reviewer sees the current and proposed text side by side, with every change marked.</td><td><code>diff.ts</code></td></tr>
+            <tr><td class="k">Approve inside myGFO</td><td>Four-eyes approval. The approver can never be the author.</td><td>The documents reducer</td></tr>
+            <tr><td class="k">Bulletins absorbed</td><td>Urgent changes go out at once and fold into the next revision.</td><td><code>amendments.ts</code>, <code>bulletinCompat.ts</code></td></tr>
+            <tr><td class="k">Read and sign</td><td>Each person signs the revision they read. A new revision asks again.</td><td><code>acknowledgments.ts</code></td></tr>
+            <tr><td class="k">Notes survive revisions</td><td>Personal highlights and notes carry over to the next revision.</td><td><code>annotations.ts</code></td></tr>
+            <tr><td class="k">List of effective pages</td><td>What is current, page by page, for an auditor.</td><td><code>effectivePages.ts</code></td></tr>
+            <tr><td class="k">Regulatory mapping</td><td>Which rule each section satisfies.</td><td><code>regCompliance.ts</code>, <code>regCatalog.ts</code></td></tr>
+            <tr><td class="k">Word in and out</td><td>Import an existing Word manual and export one when needed.</td><td><code>docxImport.ts</code>, <code>docxExport.ts</code></td></tr>
+            <tr><td class="k">Offline and ForeFlight</td><td>Current manuals on the iPad and in ForeFlight Documents.</td><td><code>offline.ts</code>. ForeFlight mirroring is not built.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The engines live in <code>src/components/documents/engine/</code> in the sandbox. Production status is for the developer to confirm.</p>
+    </section>
+
+    <!-- 19 -->
+    <section class="sec prose" id="loops">
+      <div class="sec-head chg"><p class="eyebrow">Appendix · 19 · <span class="new">New in R5</span></p><h2>Data loops</h2></div>
+      <p>Bryan wants data to flow both ways with the outside systems, so each one informs myGFO and myGFO informs it back.</p>
+      <h3>ForeFlight</h3>
+      <ul>
+        <li><b>Confirmed.</b> The Dispatch API lets a scheduling system push scheduled flights into Dispatch. Enroute times, performance and flight documents can flow back.</li>
+        <li><b>Confirmed.</b> Dispatch refuses API updates once a flight is filed, or after someone edits it by hand.</li>
+        <li><b>Open.</b> Which fields carry actual times, and whether Dispatch sends events when something changes.</li>
+        <li><b>Open.</b> Whether myairops already pushes flights to Dispatch. If it does, myGFO reads from both instead of pushing flights itself.</li>
+        <li><b>What myGFO sends.</b> Trips, trip sheets, manuals, airport pages and aircraft status.</li>
+      </ul>
+      <h3>Gulfstream</h3>
+      <ul>
+        <li><b>Confirmed.</b> On 20 Oct 2026 Gulfstream expanded its Performance Analytics program. It combines aircraft health monitoring, operating data and maintenance history into one view of each aircraft.</li>
+        <li><b>Confirmed.</b> Gulfstream says its teams addressed nearly 100 potential operational events before they happened this year, and expects to more than double its analytics capabilities in the first half of 2027.</li>
+        <li><b>Earlier.</b> Gulfstream's health and trend monitoring has reported problems in flight, so a technician and parts could meet the aircraft.</li>
+        <li><b>Open.</b> What data an operator can receive, in what form, and whether it can reach the Tech Log automatically. Coverage calls this analytics, so confirm any AI claim with Gulfstream.</li>
+      </ul>
+      <h3>The knowledge loop</h3>
+      <p>A crew debrief updates the airport page, the page goes to ForeFlight, and the next crew's briefing starts from it. Section 7 has the design.</p>
+    </section>
+
+    <!-- 20 -->
+    <section class="sec prose" id="owners">
+      <div class="sec-head chg"><p class="eyebrow">Appendix · 20 · <span class="new">New in R5</span></p><h2>Circles and owners</h2></div>
+      <p>Each department is a circle. Where two circles overlap, the software ties them together, and someone has to own the rules of that handoff. The owners below are proposals to agree.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Where</th><th>What ties them</th><th>Horizon</th><th>Proposed owner</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Pilots and maintenance</td><td>Tech Log</td><td>H0</td><td>DOM and chief pilot</td></tr>
+            <tr><td class="k">Pilots and flight attendants</td><td>Crew trip and Flight Hub</td><td>H1</td><td>Chief pilot and FA manager</td></tr>
+            <tr><td class="k">Flight attendants and EAs</td><td>The passenger: preferences, allergies, catering, feedback</td><td>H2</td><td>FA manager and an EA lead</td></tr>
+            <tr><td class="k">EAs and scheduling</td><td>Booking and messages</td><td>H2</td><td>Scheduling manager</td></tr>
+            <tr><td class="k">Scheduling and maintenance</td><td>Availability and disruption options</td><td>H3</td><td>Scheduling manager and DOM</td></tr>
+            <tr><td class="k">The centre</td><td>The shared record of trips, people, aircraft and alerts</td><td>H0 and H1</td><td>myGFO product owner</td></tr>
+            <tr><td class="k">The band</td><td>Safety, documents and leadership, which touch every circle</td><td>All</td><td>Safety officer, document manager, lead team</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </main>
 </div>
@@ -1136,6 +1468,26 @@ footer.end { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--ru
     applyChg(chg.checked);
     try { window.localStorage.setItem(KEY, chg.checked ? 'on' : 'off'); } catch (e) { /* storage unavailable */ }
   });
+
+  // The trip, seen by one role (appendix 16)
+  var steps = $$('#trip .step');
+  var tripStatus = $('#tripStatus');
+  var roleNames = { ea: 'an EA', scheduling: 'scheduling', crew: 'the crew', passengers: 'passengers', drivers: 'drivers and the protection team', maintenance: 'maintenance', managers: 'leadership' };
+  if (tripStatus) {
+    $$('[data-role]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var role = b.getAttribute('data-role');
+        $$('[data-role]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        var n = 0;
+        steps.forEach(function (st) {
+          var on = role === 'all' || (' ' + st.getAttribute('data-roles') + ' ').indexOf(' ' + role + ' ') > -1;
+          st.classList.toggle('dim', !on);
+          if (on) n++;
+        });
+        tripStatus.textContent = role === 'all' ? 'Showing all ' + steps.length + ' moments.' : n + ' of ' + steps.length + ' moments reach ' + roleNames[role] + '. The rest are dimmed.';
+      });
+    });
+  }
 
   // Ideas register
   var ideas = $$('.idea');
