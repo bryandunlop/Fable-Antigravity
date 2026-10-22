@@ -8,30 +8,30 @@
 
 ## 1. Where we actually are
 
-The honest picture, because the roadmap has to start from it.
+There are three places myGFO lives, and this roadmap needs to be read with all three in mind:
 
-**The prototype is broad.** This repository holds a working, mock-data prototype of far more than Document Center and Tech Log: scheduling workspace and boards, an EA booking flow with messages, passenger records and forms, a 72-hour passenger email, Flight Hub, airport company pages, inventory and commissary, safety (FRAT/GRAT/ASAP/hazards), a lead dashboard, critical business functions, rolling action items, wall-screen views, a global notification feed, and a SIFL/tax screen.
+1. **This repository** is a design sandbox: a working, mock-data prototype on a hobby stack (Vite, Hono, Neon, Vercel). It is useful for thinking through rules and edge cases. It is **behind** Bryan's current thinking.
+2. **Bryan's work mockups** are newer, built with Copilot in the P&G design system. They are the hand-off spec to the developer. Claude cannot see them.
+3. **The production platform** is built by a developer from those hand-offs, on the stack in `CLAUDE.md`. A lot of it is built already.
 
-**Production is narrow.** Nothing is in production yet. Everything above runs on mock data, in-memory stores or `localStorage`. The prototype stack (Vite, Hono, Neon Postgres, Vercel) is also **not** the production stack in `CLAUDE.md` (Azure, Entra, Azure SQL ledger tables, Capacitor on iPad, Key Vault).
+So the table below describes **how deeply each idea has been explored in this sandbox**, not what is live. Production status belongs in the developer's backlog. The column is left for Bryan to fill in so this file can show both.
 
-That gap is the single biggest fact on this roadmap. The vision is a vision of **connection**, and connection only exists once real data flows between real systems. Every horizon below therefore pairs new capability with moving something from prototype to production.
-
-| Area | Prototype | Production | Notes |
+| Area | Sandbox depth | In production? | Notes from the sandbox |
 |---|---|---|---|
-| Document Center | Deep | — | Bulletins that amend a manual, absorption inbox, suggestions to owner, read-and-initial that re-arms per revision, review cycles, register. Group drives / SharePoint reconciliation is a draft design. ForeFlight Documents mirroring not built. |
-| Tech Log | Deep | — | 9 phases with engine tests. Blocked on CAMP utilization-push (OQ1), myairops OData (OQ2), DOM rulings. |
-| Scheduling + checklists | Deep | — | Rules engine with due rules, conditions, ack-escalation, versioned templates. Real Postgres adapter exists but boards run on mock. |
-| EA booking + messages | Medium | — | Request builder, approvals queue, watches, messages both ways. Write-back to myairops blocked (OQ5). |
-| Passenger records | Medium | — | PII residency undecided (OQ6). Default: read-through, mirror nothing. |
-| Flight Hub (crew) | Medium | — | Pilot readiness, trip brief, acceptance, preflight. FA side is separate screens. No persistence contract. |
-| Airport company pages | Medium | — | Pilot/maintenance lens, evaluator worklist, rules and flags. |
-| ForeFlight Files (trip sheets, pax docs) | Medium | — | Client + flight matcher + trip-sheet document. |
-| Notifications / accountability | Medium | — | Derived feed design implemented; escalation exists only inside scheduling. No manager escalation ladder app-wide. |
-| Manager views | Shallow | — | Screens exist; real data does not. |
-| Wall screens | Shallow | — | Ops, maintenance, scheduling walls on mock data. |
-| SIFL / tax | Shallow | — | Screen and context exist; not validated. |
-| FlightAware, Workday, FCM, FAA feeds | — | — | Not started. Satcom has a mock service only. |
-| AI agents | — | — | Not started. |
+| Document Center | Deep | _fill in_ | Bulletins that amend a manual, absorption inbox, suggestions to owner, read-and-initial that re-arms per revision, review cycles, register. Group drives / SharePoint reconciliation is a draft design. ForeFlight Documents mirroring not built. |
+| Tech Log | Deep | _fill in_ | 9 phases with engine tests. Blocked on CAMP utilization-push (OQ1) and DOM rulings. |
+| Scheduling + checklists | Deep | _fill in_ | Rules engine with due rules, conditions, ack-escalation, versioned templates. |
+| EA booking + messages | Medium | _fill in_ | Request builder, approvals queue, watches, messages both ways. Write-back to myairops blocked (OQ5). |
+| Passenger records | Medium | _fill in_ | PII residency undecided (OQ6). Default: read-through, mirror nothing. |
+| Flight Hub (crew) | Medium | _fill in_ | Pilot readiness, trip brief, acceptance, preflight. FA side is separate screens. |
+| Airport company pages | Medium | _fill in_ | Source labels, propose → review → publish, per-field confirmation, officer worklist, rules and flags. See [`airport-knowledge-loop.md`](./airport-knowledge-loop.md). |
+| ForeFlight Files (trip sheets, pax docs) | Medium | _fill in_ | Client, flight matcher, trip-sheet document. |
+| Notifications / accountability | Medium | _fill in_ | Derived feed implemented. Escalation exists only inside scheduling. |
+| Manager views | Shallow | _fill in_ | Screens exist on mock data. |
+| Wall screens | Shallow | _fill in_ | Ops, maintenance, scheduling walls on mock data. |
+| SIFL / tax | Shallow | _fill in_ | Screen and context exist; not validated. |
+| FlightAware, Workday, FCM, FAA NOTAMs | — | _fill in_ | Not explored. FAA NASR is bundled for airports. Satcom has a mock service only. |
+| Airflow / AI agents | — | — | Not started. Evaluation plan in Horizon 4. |
 
 ## 2. The shared platform — build once, used by everything
 
@@ -71,10 +71,10 @@ flowchart LR
 
 **Outcome:** Document Center and Tech Log are in production, used by real people, on the production stack.
 
-- Stand up the production platform minimum: Entra, Azure SQL with ledger tables, Key Vault, the signature service, the notification engine core.
-- **Document Center:** port the existing engine to production; build ForeFlight Documents mirroring of the pilot content pack; group-drive reconciliation (from the 2026-07-30 design, once its open questions close); read-and-sign escalation to the manager.
+- Confirm the production platform minimum is in place, since much is already built: Entra, Azure SQL with ledger tables, Key Vault, the signature service, the notification engine core. Anything missing here comes first.
+- **Document Center:** finish the living-document model in production; build ForeFlight Documents mirroring of the pilot content pack; group-drive reconciliation (from the 2026-07-30 design, once its open questions close); read-and-sign escalation to the manager.
 - **Tech Log:** production backend, offline iPad build with native SQLite, CAMP **sandbox** read path. Resolve the DOM rulings (check-flight gate, supersede authority, RII ATA list) before the ledger schema freezes, because ledger schema cannot be reverted.
-- **Stop adding prototype surface** except where it de-risks a decision. Every new prototype screen widens the gap in section 1.
+- **Mockups stay the spec, and each one names its gate.** A mockup for a feature behind an open question, such as myairops write-back, should say so on the screen. Otherwise it sets an expectation the developer cannot meet.
 
 **Gates to exit:** both modules used on real trips for a full month; immutability, idempotency and hash tests green in CI; CAMP sandbox round-trip proven.
 
@@ -86,7 +86,7 @@ flowchart LR
 - **Flight Hub** for pilots and flight attendants on real trips: readiness, brief, acceptance, the crew-relevant checklist items.
 - **Scheduling checklists** on the real engine, with **automatic re-fire** when a trip changes, notifying only the item owners.
 - **ForeFlight Files:** trip sheets and passenger documents pushed automatically.
-- **Airport company pages** in production, pushed to ForeFlight alongside the trip.
+- **The airport knowledge loop, without AI:** a per-airport briefing that labels every line as official, company, our history or crew-reported, and a post-trip debrief that confirms or corrects it. Required after international trips. Company pages go to ForeFlight alongside the trip. Design: [`airport-knowledge-loop.md`](./airport-knowledge-loop.md).
 - **Accountability ladder** generalized app-wide: documents, checklists, status updates.
 
 **Gates:** OQ2 answered; trip graph matches myairops on every leg for a month with no manual fix-ups.
@@ -98,7 +98,7 @@ flowchart LR
 - **EA ↔ scheduling space** per the booking-portal phase plan, stages 1–5. Stage 6 (write-back) stays gated on OQ5.
 - **Passenger records** with document currency, briefing currency, food preferences and allergies. Gated on OQ6.
 - **FlightAware integration**, starting with live position and status, then Foresight predictions for taxi-out and ETA.
-- **Passenger notifications** by email first: the 72-hour email (exists in prototype), the night-before brief, and day-of-travel updates such as block out, taxi estimate, airborne, and door-open estimate. Recipients are the EA and opted-in delegates by default.
+- **Passenger notifications by email** (decided 2026-10-22; an app only if passengers ask for one): the 72-hour email (exists in prototype), the night-before brief, and day-of-travel updates such as block out, taxi estimate, airborne, and door-open estimate. Recipients are the EA and opted-in delegates by default.
 - **Wall screens** on real data for each sub-department.
 
 **Gates:** OQ6 decided; security sign-off on any message that reveals a principal's real-time position.
@@ -120,10 +120,34 @@ flowchart LR
 
 **Outcome:** people ask questions in plain language and get answers grounded in our data and in certified aviation data, with the reasoning shown.
 
-- **Integrate Jeppesen ForeFlight Airflow first.** Its business-aviation agents, Trip Feasibility and Ops Briefing, were announced on 16 October 2026 inside ForeFlight Dispatch, with a broader rollout planned for early 2027. That is most of the "can we do this trip, and what do we need to know" use case, built on certified data we do not have.
+- **Integrate Jeppesen ForeFlight Airflow first, if the evaluation below says it fits.** GFO already uses ForeFlight Dispatch, and Airflow's business-aviation agents, Trip Feasibility and Ops Briefing, were announced on 16 October 2026 inside Dispatch, with a broader rollout planned for early 2027. That covers most of the "can we do this trip, and what do we need to know" use case, built on certified data we do not have.
 - **Build our own agents only for our own data.** An EA assistant that answers "who is on Tuesday's trip, are their documents current, have they been briefed" from the insight layer. It starts **read-only**. Drafting a request comes next, after a human-review step is in place. It never commits anything on its own.
 - **Performance questions** such as "can the G500 depart runway 21 at LUK on a hot day with this fuel" are answered by ForeFlight or AFM-approved performance data. The agent asks and explains. It never computes takeoff performance itself.
-- **Passenger app**, if the email channel proves the demand. It is a separate product with its own security review.
+- **Passenger app**, only if passengers ask for it after the email channel is running. It is a separate product with its own security review.
+
+#### Airflow evaluation — before anything is built
+
+Airflow is the bet that keeps crews in two apps instead of three or four, so the evaluation deserves its own plan. The steps are Bryan's: see the demos, talk to their teams, write use cases, then take a recommendation to the VP.
+
+**Candidate use cases**, in the order they would be piloted:
+
+1. **Ops briefing that includes our airport knowledge.** Official worldwide data from Airflow, plus our company pages and recent crew reports, in one ForeFlight briefing. This is the airport knowledge loop's step 2.
+2. **Trip feasibility for scheduling.** "Can a G500 do KLUK–EGGW on Thursday with five passengers?" Customs, fire category, parking, noise, fuel and runway checks, answered before scheduling commits.
+3. **Feasibility as an input to the EA's request.** The EA asks, the answer comes back with feasibility and cost, and the request is pre-filled. This needs use case 2 working first.
+4. **Disruption options.** When a tail goes down in the Tech Log, rank the recovery options. Today this agent is airline-only, so check whether a business-aviation version is planned.
+
+**Questions for the demos:**
+
+1. Can Ops Briefing or Trip Feasibility take **operator content** as input: company pages, airport notes, our own crew reports? Through which API?
+2. Can our system **call the agents** and get structured results back, or do they live only inside the Dispatch UI?
+3. What is the **automation tier** for each agent, from advisory only to autonomous? We want advisory only.
+4. How is the **reasoning shown**, and can we keep it as a record with the trip?
+5. Does takeoff performance come from **approved AFM data** for the G500, G650ER and, later, the G800?
+6. Where is our data **processed and stored**? Is it used to train models? What does P&G IT security need to see?
+7. What does the **ForeFlight AI Connector**, their MCP server, expose, and does it support Claude yet?
+8. What is the **pricing model**, and what is the timeline for business-aviation rollout?
+
+**What the VP pitch needs:** one use case shown end to end on a real past trip, the time it saves scheduling or crew, what it replaces, the risk controls (advisory only, reasoning shown, human decides), and the cost. Use case 1 is probably the strongest pitch because the international gap in section 7 of the airport loop doc is real and the loop is useful without AI anyway.
 
 **Gates:** the insight data layer exists; an AI usage policy agreed with P&G IT and legal.
 
@@ -132,6 +156,8 @@ flowchart LR
 ## 4. Where the project ends — today's scope line
 
 The current project is **done** when the golden thread in the manifesto runs end to end on a real trip, with every step on production data. That is the end of Horizon 4.
+
+**The app goal.** Crew live in two apps, myGFO and ForeFlight. Scheduling and EAs live in myGFO and myairops. Any feature that would add a third app for crew needs a strong reason.
 
 Explicitly outside the line, until decided otherwise:
 
@@ -147,7 +173,7 @@ New ideas go into a parking lot, not into a horizon, until one of the gates abov
 
 | Risk | Why it matters | Mitigation |
 |---|---|---|
-| Prototype breadth outruns production | Every mock screen sets an expectation the production team must meet. | Horizon 0 freezes new prototype surface. |
+| Mockups outrun the build | Every mockup sets an expectation the developer must meet, including ones behind unanswered vendor questions. | Each mockup names its gate. Production status is tracked in section 1. |
 | Notification fatigue | "Only if they need to" fails if every module adds alerts. | One engine, a per-person budget, quiet hours, and review of every new alert type. |
 | Escalation reads as surveillance | Crew trust drops and people game the signals. | Escalate on the work, not the person. Make the ladder visible to the person first. |
 | Vendor dependency | myairops write and CAMP utilization are undocumented or ungranted. | Gates stay hard. Pull-only until answered. |
@@ -159,9 +185,17 @@ New ideas go into a parking lot, not into a horizon, until one of the gates abov
 
 These are separate from the numbered Open Questions in `CLAUDE.md`, which still govern.
 
-- **A. Capacity.** Who builds production: you with assisted sessions, a P&G IT team, or a contractor? This sets every date.
-- **B. Scheduling system of record.** Is myairops the long-term scheduling system, or is myGFO's booking engine meant to replace it eventually? The recent "the booking is the only trip" work points one way and `CLAUDE.md` points the other.
-- **C. ForeFlight Dispatch.** Does GFO use or plan to use Dispatch? Airflow's business-aviation agents live there.
-- **D. Passenger channel.** Email first and an app later, or an app from the start? Who in exec protection signs off?
-- **E. What "40%" means for documents.** Measured against the prototype or against production? Section 1 suggests the prototype engine is further along than that, while production has not started.
-- **F. Workday ownership.** Who in HRIS grants access, and is the manager chain in Workday reliable enough to escalate against?
+**Answered 2026-10-22:**
+
+- **A. Capacity.** Bryan designs and mocks up. A developer builds the production platform, and a lot is built. → Section 1 now separates sandbox, mockups and production.
+- **B. Scheduling system of record.** myairops stays. GFO has its OData and REST APIs. Write-back is hard to get approved, so pull-only stands. → OQ5 unchanged.
+- **C. ForeFlight Dispatch.** In use. Airflow not started. Next steps are demos, use cases and a VP recommendation. → Airflow evaluation in Horizon 4.
+- **D. Passenger channel.** Email first, an app only if passengers want it. → Horizon 2 and 4 updated.
+
+**Still open:**
+
+- **E. Production status.** Which pieces in section 1 are live or in build? Filling in that column turns this into a roadmap the developer can use.
+- **F. What "40%" means for documents.** Is it production progress, or progress toward the full living-document vision?
+- **G. Workday ownership.** Who in HRIS grants access, and is the manager chain in Workday reliable enough to escalate against?
+- **H. Company pages as controlled documents.** Should airport company pages live in Document Center, so they reuse its review, bulletin and audit machinery? See the airport loop doc.
+- **I. Where this file lives.** If the real planning happens at work, this file may belong there. The sandbox copy can then point to it.

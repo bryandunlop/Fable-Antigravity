@@ -43,9 +43,15 @@ An MEL clock, an A&P certificate check, an RII inspector who is not the performe
 Automation and AI gather, check, draft and warn. A pilot decides whether the airplane can take off from that runway on that day. A scheduler decides whether the trip is feasible. An agent can answer "can we?" with evidence; it never answers "we will" on its own authority.
 
 ### 9. Privacy and security are default-deny
-The people we fly are high-profile. Who is on a trip, where they are, and what they need is shared with the smallest audience that needs it, for the shortest time. A feature that broadcasts a principal's position needs a security sign-off, not just a good UX.
+The people we fly are high-profile. Who is on a trip, where they are, and what they need is shared with the smallest audience that needs it, for the shortest time. A feature that broadcasts a principal's position needs a security sign-off, not just a good UX. Passengers hear from us by email first, and get an app only if they ask for one.
 
-### 10. Every screen answers one question at a glance
+### 10. Fewer apps, not more
+Crew should live in two apps: myGFO and ForeFlight. Scheduling and EAs live in myGFO and myairops. myGFO earns its place by pushing what crews need into ForeFlight, not by pulling crews into another screen.
+
+### 11. Knowledge compounds
+Every trip should leave the department knowing more than before it. A crew that learns something at an airport tells the next crew through a short debrief, reviewed before it becomes guidance. What we know stops leaving with the people who carry it.
+
+### 12. Every screen answers one question at a glance
 The hangar wall, the scheduling wall, the lead's dashboard, the EA's home — each one exists to answer the question that room asks most often, without a click.
 
 ## The golden thread — one trip, end to end
@@ -56,12 +62,13 @@ This is the vision as a story. Each step names the capability it depends on, so 
 2. **The request becomes a booking.** One click turns the answer into a scheduling request. Scheduling approves and assigns a tail and crew. *(EA ↔ scheduling space, booking engine)*
 3. **The EA manages passengers.** The system checks each name against the passenger record: is it current, is the passport valid, have they had a pre-flight briefing and how long ago. Gaps become tasks for the right person. *(Passenger records, document currency, accountability engine)*
 4. **The trip's checklist runs itself.** International permits, catering, FBO, hotels — each item has a due rule. When the trip changes, the affected items re-fire automatically and only the people who own them hear about it. *(Scheduling checklists, change re-fire, notification engine)*
-5. **Crew see their part.** Items the crew care about appear checked off in the Flight Hub. Pilots plan with the airport's company page and ask the questions that matter: can the G500 depart that runway on a hot day with this fuel? *(Flight Hub, company pages, Airflow Ops Briefing, ForeFlight performance)*
+5. **Crew see their part.** Items the crew care about appear checked off in the Flight Hub. Each airport on the trip has a briefing that says what is official, what is company guidance, what our history shows and what recent crews reported. Pilots ask the questions that matter: can the G500 depart that runway on a hot day with this fuel? *(Flight Hub, airport knowledge loop, Airflow Ops Briefing, ForeFlight performance)*
 6. **The night before, everyone gets their brief.** Crew get the ops brief. Passengers get the be-there time and the day as a timeline. *(Briefing engine, passenger email)*
 7. **In the cockpit, it is already there.** The trip sheet, passenger documents and company pages are in ForeFlight. The current manuals are already synced. *(ForeFlight Files + Documents sync)*
 8. **The airplane is broken? The Tech Log handles it.** Pilot squawks, maintenance defers or fixes, the release is signed, scheduling sees serviceability change, and the trip knows. *(Tech Log, CAMP sync)*
 9. **Block out, and the passengers know.** "Estimated taxi time 12 minutes. Airborne 12:14, 1:36 en route. Estimated door open 14:02." *(FlightAware Foresight, notification engine)*
 10. **After landing, the record closes itself.** Hours flow to CAMP, the journey log is signed, SIFL is computed from the manifest and purpose, and the trip's metrics feed the manager's view. *(Journey log, CAMP utilization, tax engine, analytics)*
+11. **The crew debriefs, and the next crew benefits.** One tap if everything was as briefed. A short note if not, especially after an international trip. The note is reviewed into the airport's company page. *(Airport knowledge loop)*
 
 When this thread runs end to end on a real trip, with no retyping and no phone call that exists only because a system did not tell someone, the vision is realized.
 
