@@ -421,6 +421,7 @@ code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5
       <div class="rev">
         <p class="rev-title">Record of revisions</p>
         <ol>
+          <li><b>R7</b><span>Data loops add myairops as read only. Gulfstream data becomes a hope, and trends start from our own Tech Log records. The story page ends with why it matters and how we know we have landed. The six leadership asks move here, to section 14.<span class="d">23 OCT 2026</span></span></li>
           <li><b>R6</b><span>Story page gains four drawings: the circles lit by horizon, a before and after of one handoff, one trip through the circles, and how alerts reach people.<span class="d">22 OCT 2026</span></span></li>
           <li><b>R5</b><span>Story page rebuilt around the department circles and the glidepath. Appendix sections 16 to 20 added here.<span class="d">22 OCT 2026</span></span></li>
           <li><b>R4</b><span>Split into a leadership story page and this reference. The trip story moved to the story page.<span class="d">22 OCT 2026</span></span></li>
@@ -473,7 +474,7 @@ code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5
 
   <main class="doc" id="main">
     <header class="hero prose" id="top">
-      <p class="eyebrow">Global Flight Operations · Working reference · Revision 6 · 22 OCT 2026</p>
+      <p class="eyebrow">Global Flight Operations · Working reference · Revision 7 · 23 OCT 2026</p>
       <h1>myGFO Vision Reference</h1>
       <p class="lead">The working detail behind the vision: what exists today, the plan and its gates, the designs, every idea and every decision.</p>
       <p class="byline">For the myGFO committee and the developer. The short version for leadership is the <a href="https://claude.ai/artifact/AoYwwwQJ5SHMu8RHXMRYAg" target="_blank" rel="noopener">myGFO Vision and Roadmap</a> story page. Written by Bryan Dunlop with Claude. It is not the developer's work plan.</p>
@@ -1065,7 +1066,7 @@ code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5
         <article class="idea" data-status="yes"><div><p class="area">Platform</p><h3>Two-way ForeFlight loop</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1 to H4</p></div><p class="note">myGFO sends trips, documents, airport pages and aircraft status. ForeFlight returns planned times, performance and Airflow briefings. See section 19.</p></article>
         <article class="idea" data-status="yes"><div><p class="area">Documents</p><h3>Document Center as the document-control system</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H0 onward</p></div><p class="note">Comply365-class control: submit a revision, compare old and new, approve inside, read and sign. See section 18.</p></article>
         <article class="idea" data-status="yes"><div><p class="area">Frontier</p><h3>Knowledge loop beyond airports</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H1</p></div><p class="note">FBOs, hotels, handlers, caterers and individual tails.</p></article>
-        <article class="idea" data-status="yes"><div><p class="area">Aircraft</p><h3>Gulfstream data into the Tech Log</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H3, more in H4</p></div><p class="note">Gulfstream Performance Analytics flags problems early, even in flight. Alerts land in the Tech Log so the part and the technician meet the aircraft. See section 19.</p></article>
+        <article class="idea" data-status="yes"><div><p class="area">Aircraft</p><h3>Aircraft trends in the Tech Log</h3></div><div class="st"><span class="pill s-yes">In the roadmap</span><p class="lands">H3, more in H4</p></div><p class="note">Start with repeats and trends in our own Tech Log records. Add Gulfstream Performance Analytics data if Gulfstream will share it. Alerts land in the Tech Log so the part and the technician meet the aircraft. See section 19.</p></article>
         <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Plan for in-flight connectivity</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">Unplaced</p></div><p class="note">The MEL data includes a Starlink item. Live sync and cabin updates in flight, still offline-safe.</p></article>
         <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Comprehension checks and drafted revisions</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H0 or H4</p></div><p class="note">Ask two or three questions when a bulletin publishes. An AI drafts the next revision from open bulletins for the owner.</p></article>
         <article class="idea" data-status="open"><div><p class="area">Frontier</p><h3>Emissions on the booking screen</h3></div><div class="st"><span class="pill s-open">Not discussed</span><p class="lands">H2</p></div><p class="note">Show CO2 next to cost. Check the EU emissions trading threshold for flights to Europe.</p></article>
@@ -1085,6 +1086,15 @@ code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5
     <section class="sec prose" id="questions">
       <div class="sec-head"><p class="eyebrow">Decisions · 14</p><h2>Questions and decisions</h2></div>
       <p>These sit beside the numbered Open Questions in CLAUDE.md, which still govern.</p>
+      <h3>Leadership asks</h3>
+      <ul class="qa">
+        <li class="chg"><span><b>Name an owner for each overlap.</b> Every handoff between two circles needs someone who sets its rules, such as the DOM and chief pilot for the Tech Log.</span><span class="who">Lead team</span></li>
+        <li class="chg"><span><b>Approve two vendor evaluations.</b> Jeppesen ForeFlight Airflow for feasibility and briefings, and what aircraft data Gulfstream can share with us.</span><span class="who">VP</span></li>
+        <li class="chg"><span><b>Decide who may see live flight times.</b> Live times for drivers, the protection team and passengers mean some tails are visible on FlightAware. Security should choose which, and for whom.</span><span class="who">Security</span></li>
+        <li class="chg"><span><b>Discuss capturing actual trip costs.</b> The SEC disclosure and the entertainment disallowance both need real costs per trip, not estimates.</span><span class="who">Scheduling, VP, CPSO</span></li>
+        <li class="chg"><span><b>Shape the emergency response app.</b> It must reach people outside the department without VPN and keep working when everything else is down.</span><span class="who">Security, Safety</span></li>
+        <li class="chg"><span><b>Sponsor Workday access.</b> Escalation to managers and joiner and leaver checklists depend on a reliable manager chain from Workday.</span><span class="who">HRIS</span></li>
+      </ul>
       <h3>Still open</h3>
       <ul class="qa">
         <li><span>Which areas in section 2 are live or in build?</span><span class="who">Bryan, developer</span></li>
@@ -1111,7 +1121,7 @@ code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5
         <li class="chg">The vision is drawn as five department circles: pilots, flight attendants, EAs, scheduling and maintenance. Software ties them together where they overlap.</li>
         <li class="chg">Safety, documents and leadership form a band around the circles, because they touch every one.</li>
         <li class="chg">The story page leads with the circles, then the glidepath.</li>
-        <li class="chg">Adopted: Gulfstream aircraft data into the Tech Log, a two-way loop with ForeFlight, and Document Center as the document-control system on the level of Comply365.</li>
+        <li class="chg">Adopted: aircraft trends in the Tech Log, from our own records first and Gulfstream data if it can be had, a two-way loop with ForeFlight, and Document Center as the document-control system on the level of Comply365.</li>
       </ul>
       <p class="eyebrow">R4 · 22 OCT 2026</p>
       <ul class="decisions">
@@ -1175,7 +1185,7 @@ code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5
         <li><a href="https://comply365.com/wheels-up-selects-comply365-for-operational-document-compliance-management/" target="_blank" rel="noopener">Comply365: Wheels Up document and compliance management</a></li>
         <li><a href="https://www.halldale.com/civil-aviation/20786-cat-comply365-platform-streamlines-operations-for-wheels-up" target="_blank" rel="noopener">Halldale: Comply365 platform for Wheels Up</a></li>
       </ul>
-      <footer class="end">myGFO Vision Reference · Revision 6 · 22 OCT 2026. Source: docs/vision/reference.html in the myGFO sandbox repository.</footer>
+      <footer class="end">myGFO Vision Reference · Revision 7 · 23 OCT 2026. Source: docs/vision/reference.html in the myGFO sandbox repository.</footer>
     </section>
 
     <!-- 16 -->
@@ -1378,7 +1388,13 @@ code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5
     <!-- 19 -->
     <section class="sec prose" id="loops">
       <div class="sec-head chg"><p class="eyebrow">Appendix · 19 · <span class="new">New in R5</span></p><h2>Data loops</h2></div>
-      <p>Bryan wants data to flow both ways with the outside systems, so each one informs myGFO and myGFO informs it back.</p>
+      <p>Bryan wants data to flow both ways with the outside systems where that is allowed, so each one informs myGFO and myGFO informs it back.</p>
+      <h3>myairops</h3>
+      <ul>
+        <li><b>Rule.</b> myGFO reads from myairops and never writes back. The integration refuses every write and ships with no write grants.</li>
+        <li><b>What myGFO reads.</b> Trips, crew, passengers and aircraft, through the OData and REST APIs Bryan already has.</li>
+        <li><b>Open.</b> Writing back, which the booking portal would need, is Open Question 5 in CLAUDE.md. It waits on scoped keys and a sandbox from the vendor.</li>
+      </ul>
       <h3>ForeFlight</h3>
       <ul>
         <li><b>Confirmed.</b> The Dispatch API lets a scheduling system push scheduled flights into Dispatch. Enroute times, performance and flight documents can flow back.</li>
@@ -1387,8 +1403,10 @@ code { font: 13px var(--font-mono); background: var(--surface-2); padding: 1px 5
         <li><b>Open.</b> Whether myairops already pushes flights to Dispatch. If it does, myGFO reads from both instead of pushing flights itself.</li>
         <li><b>What myGFO sends.</b> Trips, trip sheets, manuals, airport pages and aircraft status.</li>
       </ul>
-      <h3>Gulfstream</h3>
+      <h3>Our aircraft data, and Gulfstream as a hope</h3>
       <ul>
+        <li><b>Now.</b> Trends come from what the Tech Log already records. A defect on the same ATA chapter and tail three or more times in 30 days is flagged as a repeat. The sandbox already has this rule.</li>
+        <li><b>Hoped for.</b> Gulfstream data would add to these trends. Whether Gulfstream will share it with us is not known.</li>
         <li><b>Confirmed.</b> On 20 Oct 2026 Gulfstream expanded its Performance Analytics program. It combines aircraft health monitoring, operating data and maintenance history into one view of each aircraft.</li>
         <li><b>Confirmed.</b> Gulfstream says its teams addressed nearly 100 potential operational events before they happened this year, and expects to more than double its analytics capabilities in the first half of 2027.</li>
         <li><b>Earlier.</b> Gulfstream's health and trend monitoring has reported problems in flight, so a technician and parts could meet the aircraft.</li>
