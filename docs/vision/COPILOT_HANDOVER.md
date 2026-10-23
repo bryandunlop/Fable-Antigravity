@@ -44,7 +44,7 @@ Commit messages cite decision IDs such as D111, which live in Bryan's Obsidian v
 |---|---|
 | `CLAUDE.md` | The working agreement: NEVER and ALWAYS rules, invariants, the config and secrets contract, the CAMP error taxonomy, and Open Questions OQ1 to OQ6. |
 | `docs/vision/index.html` | The plan and glidepath at Revision 5: five department circles tied together where they overlap, the glidepath from H0 to the end goal, the two-way data loops with ForeFlight and Gulfstream, six example screens, and the decisions leadership must make. |
-| `docs/vision/reference.html` | The working reference at Revision 5: manifesto, where we are, platform, horizons and gates, designs, the ideas register and the decisions log. Section numbers below refer to it. |
+| `docs/vision/reference.html` | The working reference at Revision 5: principles, where we are, platform, horizons and gates, designs, the ideas register and the decisions log. Section numbers below refer to it. |
 | `docs/DEVELOPER_HANDOFF_V2.md` | Module hand-off from 6 Jul 2026: Tech Log, Scheduling, Pilot Workspace, Inventory v2, and what blocked each. |
 | `docs/tech-log/HANDOFF.md`, `docs/tech-log-api/` | Tech Log build notes, plus an API sketch in `README.md`, `routes.ts` and `schema.sql`. Compare the schema with production's. |
 | `docs/CANONICAL_MAINTENANCE_SURFACE.md` | Which of three overlapping maintenance surfaces is the real one. |
@@ -175,7 +175,7 @@ Open `docs/vision/reference.html` in a browser or read the HTML. Each section ha
 
 | No. | Anchor | Section |
 |---|---|---|
-| 1 | `#manifesto` | Manifesto and the twelve principles |
+| 1 | `#principles` | Why myGFO exists, and the twelve principles |
 | 2 | `#today` | Where we are, and what stays in other apps |
 | 3 | `#platform` | The eight shared platform pieces and the dependency matrix |
 | 4 | `#horizons` | Horizons H0 to H4 and their gates |
