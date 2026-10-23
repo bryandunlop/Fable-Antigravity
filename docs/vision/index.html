@@ -1,0 +1,1043 @@
+<title>myGFO Vision and Roadmap</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a manager's one-pager. The vision as five overlapping department circles, the plan as an
+   approach-chart glidepath, the outside loops, six screens, and the decisions needed. */
+:root {
+  --bg: #F4F6F9;
+  --surface: #FFFFFF;
+  --surface-2: #EBEFF5;
+  --ink: #13202F;
+  --ink-2: #38485B;
+  --muted: #5F6E82;
+  --rule: #D6DEE8;
+  --accent: #1C58B5;
+  --accent-soft: #E2EBF9;
+  --on-accent: #FFFFFF;
+  --ok: #1D7349; --ok-soft: #E1F1E8;
+  --warn: #8F5600; --warn-soft: #F8ECD6;
+  --bad: #A3322A; --bad-soft: #F8E4E1;
+  --t-off: #3E4C5E; --t-off-soft: #E4E9F0;
+  --t-co: #855700; --t-co-soft: #F7EBD2;
+  --t-hist: #1C58B5; --t-hist-soft: #E2EBF9;
+  --t-crew: #6B3FA0; --t-crew-soft: #EEE6F8;
+  --device: #1A222C;
+  --grid: #E3E8EF;
+  --lock-a: #22416B; --lock-b: #0E1A2B; --lock-fg: #F2F6FB; --lock-card: rgba(255, 255, 255, 0.16);
+  --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C1219; --surface: #131B25; --surface-2: #1A2431;
+    --ink: #E3E9F1; --ink-2: #BAC5D3; --muted: #8B98AA; --rule: #253141;
+    --accent: #7EA9F2; --accent-soft: #18263A; --on-accent: #0C1219;
+    --ok: #5DBE8A; --ok-soft: #12291E; --warn: #E3A64A; --warn-soft: #2C2210; --bad: #F08A80; --bad-soft: #33191A;
+    --t-off: #B6C2D1; --t-off-soft: #202A37; --t-co: #E8B65C; --t-co-soft: #2E2412;
+    --t-hist: #7EA9F2; --t-hist-soft: #18263A; --t-crew: #C3A2EE; --t-crew-soft: #251C35;
+    --device: #2C3846;
+    --grid: #1C2633;
+    --lock-a: #1D3657; --lock-b: #070D16; --lock-fg: #F2F6FB; --lock-card: rgba(255, 255, 255, 0.12);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C1219; --surface: #131B25; --surface-2: #1A2431;
+  --ink: #E3E9F1; --ink-2: #BAC5D3; --muted: #8B98AA; --rule: #253141;
+  --accent: #7EA9F2; --accent-soft: #18263A; --on-accent: #0C1219;
+  --ok: #5DBE8A; --ok-soft: #12291E; --warn: #E3A64A; --warn-soft: #2C2210; --bad: #F08A80; --bad-soft: #33191A;
+  --t-off: #B6C2D1; --t-off-soft: #202A37; --t-co: #E8B65C; --t-co-soft: #2E2412;
+  --t-hist: #7EA9F2; --t-hist-soft: #18263A; --t-crew: #C3A2EE; --t-crew-soft: #251C35;
+  --device: #2C3846;
+  --grid: #1C2633;
+  --lock-a: #1D3657; --lock-b: #070D16; --lock-fg: #F2F6FB; --lock-card: rgba(255, 255, 255, 0.12);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+a { color: var(--accent); text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+p { margin: 0 0 1em; }
+ul, ol { margin: 0 0 1em; padding-left: 1.3em; }
+h1, h2, h3 { text-wrap: balance; }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1120px; margin: 0 auto; }
+
+/* Top bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); border-bottom: 1px solid var(--rule); }
+.topbar .wrap { display: flex; align-items: center; gap: 18px; min-height: 52px; }
+.brand { font-family: var(--font-display); font-stretch: 75%; font-weight: 800; font-size: 1.35rem; color: var(--ink); text-decoration: none; flex: none; }
+.nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1 1 auto; }
+.nav::-webkit-scrollbar { display: none; }
+.nav a { flex: none; font-size: 13.5px; color: var(--ink-2); text-decoration: none; padding: 6px 10px; border-radius: 999px; white-space: nowrap; }
+.nav a:hover { background: var(--surface-2); color: var(--ink); }
+.nav a[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+.nav a.ext { color: var(--accent); }
+
+/* Hero and sections */
+.hero { padding-block: 56px 8px; }
+.eyebrow { font: 500 12px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.hero h1 { font-family: var(--font-display); font-stretch: 75%; font-weight: 780; font-size: clamp(2.5rem, 4.2vw + 1rem, 4.4rem); line-height: 1; letter-spacing: -0.012em; margin: 12px 0 18px; }
+.lead { font-size: 1.28rem; line-height: 1.5; max-width: 62ch; margin: 0; }
+section.sec { padding-block: 64px 8px; }
+.sec-head { max-width: 68ch; margin-bottom: 22px; }
+.sec-head h2 { font-family: var(--font-display); font-stretch: 80%; font-weight: 740; font-size: clamp(1.8rem, 1.8vw + 1.1rem, 2.6rem); line-height: 1.05; letter-spacing: -0.005em; margin: 8px 0 12px; }
+.sec-head p { font-size: 1.08rem; color: var(--ink-2); margin: 0; }
+
+/* Diagrams */
+figure { margin: 0; }
+.figscroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; }
+.diagram { display: block; width: 100%; height: auto; min-width: 700px; }
+.diagram.circles { max-width: 860px; min-width: 600px; margin: 0 auto; }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 84ch; }
+.scroll-hint { display: none; font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+.d-box { fill: var(--surface); stroke: var(--rule); stroke-width: 1.5; }
+.d-hub { fill: var(--accent); }
+.d-title { fill: var(--ink); font: 600 14px var(--font-body); }
+.d-sub { fill: var(--muted); font: 12px var(--font-body); }
+.d-hub-title { fill: var(--on-accent); font: 700 15px var(--font-body); }
+.d-hub-sub { fill: var(--on-accent); font: 12px var(--font-body); }
+.d-label { fill: var(--muted); font: 600 11.5px var(--font-mono); letter-spacing: 0.08em; }
+.d-line { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.d-head { fill: var(--ink-2); }
+.d-note { fill: var(--ink-2); font: 12px var(--font-body); }
+
+.v-circle { fill: var(--accent); fill-opacity: 0.1; stroke: var(--accent); stroke-opacity: 0.55; stroke-width: 1.5; }
+.v-band { fill: none; stroke: var(--accent-soft); stroke-width: 30; }
+.v-band-text { fill: var(--ink-2); font: 600 12px var(--font-mono); letter-spacing: 0.14em; }
+.v-dept { fill: var(--ink); font: 760 19px var(--font-display); font-stretch: 85%; }
+.v-keep { fill: var(--muted); font: 12.5px var(--font-body); }
+.v-lens { fill: var(--ink); font: 600 13px var(--font-body); }
+.v-h { fill: var(--accent); font: 600 11.5px var(--font-mono); }
+
+.g-ground { stroke: var(--rule); stroke-width: 2; }
+.g-path { stroke: var(--accent); stroke-width: 3; fill: none; }
+.g-drop { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; }
+.g-fix { fill: var(--surface); stroke: var(--accent); stroke-width: 2.5; }
+.g-fix.now { fill: var(--accent); }
+.g-plane { fill: var(--ink); }
+.g-runway { fill: var(--ink); }
+.g-code { fill: var(--accent); font: 600 12px var(--font-mono); }
+.g-name { fill: var(--ink); font: 700 14px var(--font-body); }
+.g-lit { fill: var(--ink-2); font: 12px var(--font-body); }
+.g-gate { fill: var(--ink-2); font: 11.5px var(--font-body); }
+.g-diamond { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.5; }
+.g-here { fill: var(--accent); font: 600 11px var(--font-mono); letter-spacing: 0.06em; }
+.g-goal { fill: var(--ink); font: 700 14px var(--font-body); }
+.g-goal-sub { fill: var(--ink-2); font: 12px var(--font-body); }
+
+/* Circles legend */
+.ideas3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 22px 0 0; padding: 0; list-style: none; }
+.ideas3 li { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; font-size: 14.5px; color: var(--ink-2); }
+.ideas3 b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 4px; }
+.tablewrap { overflow-x: auto; margin: 18px 0 0; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 560px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+th { font: 500 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td.k { font-weight: 600; white-space: nowrap; }
+.hz-tag { font: 600 12px var(--font-mono); color: var(--accent); white-space: nowrap; }
+
+/* Glidepath fix cards */
+.fixes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.fix { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 14px 12px; display: grid; gap: 6px; align-content: start; }
+.fix.now { border-color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+.fix .c { font: 600 12px var(--font-mono); color: var(--accent); }
+.fix h3 { margin: 0; font-size: 15px; line-height: 1.25; }
+.fix ul { margin: 0; padding-left: 1.1em; }
+.fix li { font-size: 13.5px; color: var(--ink-2); margin: 3px 0; }
+.fix .lit { font-size: 12.5px; color: var(--ink); background: var(--accent-soft); border-radius: 6px; padding: 5px 8px; }
+.fix .gate { font-size: 12.5px; color: var(--ink-2); display: flex; gap: 7px; align-items: flex-start; }
+.fix .gate::before { content: ""; flex: none; width: 9px; height: 9px; margin-top: 5px; transform: rotate(45deg); border: 1.5px solid var(--warn); background: var(--warn-soft); }
+.endgoal { margin-top: 10px; background: var(--ink); color: var(--bg); border-radius: 10px; padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+.endgoal b { font: 600 12px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.endgoal span { font-size: 15px; }
+
+/* Gallery */
+.gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.shot { background: var(--surface-2); border-radius: 12px; padding: 18px; display: grid; gap: 14px; align-content: start; }
+.shot .ov { justify-self: start; font: 600 11px var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent); background: var(--surface); border: 1px solid var(--rule); padding: 3px 8px; border-radius: 999px; }
+.shot h3 { margin: 4px 0 4px; font-size: 1.08rem; }
+.shot .cap { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+.shot-mock { display: flex; justify-content: center; min-width: 0; }
+
+/* Mockups */
+.mock { width: 100%; max-width: 460px; font-size: 13px; line-height: 1.4; color: var(--ink); }
+.mock p { margin: 0; }
+.win { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(15, 25, 40, 0.06), 0 8px 24px rgba(15, 25, 40, 0.08); }
+.win-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--surface-2); border-bottom: 1px solid var(--rule); font: 500 12px var(--font-body); color: var(--ink-2); }
+.dots { display: inline-flex; gap: 5px; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--rule); display: block; }
+.win-body { padding: 12px 14px 14px; display: grid; gap: 10px; }
+.mock .note { font-size: 12px; color: var(--muted); }
+.mock .src { font-size: 11px; color: var(--muted); }
+.badge { font: 600 11px var(--font-mono); padding: 2px 7px; border-radius: 4px; letter-spacing: 0.04em; }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.info { background: var(--accent-soft); color: var(--accent); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { font: 500 12px var(--font-body); padding: 4px 11px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 10px; align-items: baseline; }
+
+.cmp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.cmp > div { border: 1px solid var(--rule); border-radius: 8px; padding: 9px 10px; font-size: 12.5px; line-height: 1.45; }
+.cmp .h { display: block; font: 600 10.5px var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.cmp del { background: var(--bad-soft); color: var(--bad); text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
+.cmp ins { background: var(--ok-soft); color: var(--ok); text-decoration: none; border-radius: 3px; padding: 0 2px; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.checks li { margin: 0; display: flex; gap: 8px; font-size: 12.5px; }
+.checks li::before { content: "✓"; color: var(--ok); font-weight: 700; }
+
+.msg { border-radius: 10px; padding: 9px 12px; max-width: 92%; }
+.msg p { color: inherit; font-size: 13px; }
+.msg.me { justify-self: end; background: var(--accent); color: var(--on-accent); }
+.msg.bot { background: var(--surface-2); }
+.msg .from { font: 600 11px var(--font-mono); color: var(--muted); margin-bottom: 4px; letter-spacing: 0.03em; }
+.msg ul { margin: 6px 0 8px; padding-left: 1.1em; }
+.msg li { margin: 3px 0; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip { font: 500 12px var(--font-body); padding: 3px 10px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: var(--surface); }
+
+.ipad { width: 100%; max-width: 460px; background: var(--device); border-radius: 22px; padding: 12px; }
+.ipad .screen { background: var(--bg); border-radius: 12px; overflow: hidden; }
+.appbar { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 9px 12px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+.appbar b { font-family: var(--font-display); font-stretch: 80%; font-size: 15px; }
+.appbar span { font: 11.5px var(--font-mono); color: var(--muted); }
+.ipad .inner { padding: 10px; }
+.tier { font: 500 11px var(--font-mono); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+.t-off { background: var(--t-off-soft); color: var(--t-off); }
+.t-co { background: var(--t-co-soft); color: var(--t-co); }
+.t-hist { background: var(--t-hist-soft); color: var(--t-hist); }
+.t-crew { background: var(--t-crew-soft); color: var(--t-crew); }
+.brief { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.brief-head { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+.icao { font: 600 14px var(--font-mono); letter-spacing: 0.08em; }
+.brief-head .last { margin-left: auto; font: 11px var(--font-mono); color: var(--muted); }
+.since { padding: 9px 12px 11px; background: var(--surface-2); }
+.since-title { font: 600 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); margin: 0 0 8px; }
+.since ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.since li { display: flex; flex-wrap: wrap; gap: 3px 8px; align-items: baseline; margin: 0; font-size: 12.5px; }
+.since li .txt { flex: 1 1 200px; min-width: 0; }
+.since li.safety .txt { font-weight: 600; }
+.got { font: 500 11.5px var(--font-body); padding: 2px 10px; border-radius: 999px; cursor: pointer; border: 1px solid var(--warn); background: transparent; color: var(--warn); }
+li.acked .got { border-color: var(--ok); color: var(--ok); }
+
+.phone { width: 260px; max-width: 100%; background: var(--device); border-radius: 36px; padding: 10px; }
+.lock { border-radius: 28px; padding: 26px 12px 34px; min-height: 340px; color: var(--lock-fg); background: linear-gradient(170deg, var(--lock-a), var(--lock-b)); text-align: center; }
+.lock .date { font-size: 12px; opacity: 0.85; }
+.lock .clock { font-family: var(--font-display); font-stretch: 85%; font-weight: 600; font-size: 58px; line-height: 1; margin: 2px 0 22px; font-variant-numeric: tabular-nums; }
+.notif { text-align: left; background: var(--lock-card); border-radius: 14px; padding: 9px 11px; margin-bottom: 8px; }
+.notif .top { display: flex; justify-content: space-between; font-size: 10.5px; opacity: 0.85; margin-bottom: 2px; }
+.notif .top b { font-weight: 600; }
+.notif p { font-size: 12.5px; line-height: 1.35; color: var(--lock-fg); }
+
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tile { border: 1px solid var(--rule); border-radius: 8px; padding: 9px 11px; display: grid; gap: 1px; }
+.tile .k { font: 500 10.5px var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.tile .v { font-family: var(--font-display); font-stretch: 85%; font-weight: 700; font-size: 22px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.tile .v.small { font-size: 16px; }
+.tile .s { font-size: 11.5px; color: var(--ink-2); }
+.tile .s.warn { color: var(--warn); }
+.bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
+.bar i { display: block; height: 100%; width: 44%; background: var(--accent); }
+.decide { font-size: 12.5px; padding: 8px 11px; border-radius: 8px; background: var(--warn-soft); color: var(--ink); }
+.decide b { color: var(--warn); }
+
+/* Asks */
+.asks { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.asks li { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 4px 24px; padding: 16px 0; border-bottom: 1px solid var(--rule); margin: 0; }
+.asks h3 { margin: 0 0 4px; font-size: 1.05rem; }
+.asks p { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 70ch; }
+.asks .owner { font: 12.5px var(--font-mono); color: var(--muted); text-align: right; padding-top: 3px; }
+.roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.role { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; }
+.role h3 { margin: 0 0 4px; font-size: 1rem; color: var(--accent); }
+.role p { margin: 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.45; }
+.sub-h2 { margin: 48px 0 6px; }
+.sub-lead { margin: 0 0 14px; color: var(--ink-2); max-width: 70ch; }
+.endtests { list-style: none; margin: 0; padding: 0; counter-reset: et; border-top: 1px solid var(--rule); }
+.endtests li { counter-increment: et; display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--rule); margin: 0; }
+.endtests li::before { content: counter(et); grid-row: 1 / span 2; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font: 600 13px var(--font-mono); display: grid; place-items: center; }
+.endtests h3 { margin: 0 0 2px; font-size: 1.05rem; }
+.endtests p { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 70ch; }
+.closing { margin: 22px 0 0; font-size: 16px; max-width: 70ch; }
+.cta { display: inline-flex; align-items: center; gap: 8px; margin-top: 26px; padding: 10px 16px; border-radius: 8px; background: var(--accent); color: var(--on-accent); text-decoration: none; font-weight: 600; }
+footer.end { margin-top: 80px; padding-block: 18px 40px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+
+/* Revision 6: figures, glance strip, stepper, motion */
+.figscroll { background-color: var(--surface); background-image: radial-gradient(var(--grid) 1px, transparent 1.2px); background-size: 18px 18px; }
+figcaption .fig { font: 600 12px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-right: 6px; }
+.glance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 30px; }
+.gl { display: flex; gap: 14px; align-items: center; padding: 14px 16px; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; text-decoration: none; color: var(--ink); min-width: 0; transition: border-color 0.2s ease, transform 0.2s ease; }
+.gl:hover { border-color: var(--accent); transform: translateY(-1px); }
+.gl .t { display: grid; gap: 2px; min-width: 0; }
+.gl b { font: 600 11.5px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.gl .d { font-size: 14.5px; color: var(--ink-2); line-height: 1.35; }
+.gl svg { width: 64px; height: 64px; flex: none; }
+.mr-c { fill: var(--accent); fill-opacity: 0.08; stroke: var(--accent); stroke-opacity: 0.5; stroke-width: 1; }
+.mr-l { fill: none; }
+.mr-l.mr-old { fill: var(--accent); fill-opacity: 0.28; }
+.mr-l.mr-new { fill: var(--accent); fill-opacity: 0.9; }
+.mr-hub { fill: var(--accent); }
+.mr-ai { fill: none; stroke: var(--t-crew); stroke-width: 1.6; stroke-dasharray: 2.2 2.2; }
+.mg-ground { stroke: var(--rule); stroke-width: 2; }
+.mg-rwy { fill: var(--ink); }
+.mg-path { stroke: var(--accent); stroke-width: 2.5; }
+.mg-dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.mg-dot.on { fill: var(--accent); }
+.mc-box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+.mc-check { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mc-line { stroke: var(--rule); stroke-width: 4; stroke-linecap: round; }
+
+.stepper { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 12px; }
+.stepper .lbl { font: 600 11.5px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.sbtn { font: 600 13px var(--font-body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+.sbtn:hover { border-color: var(--accent); }
+.sbtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.step-cap { font-size: 15px; color: var(--ink); margin: 0 0 12px; min-height: 1.6em; }
+.lens { fill: var(--accent); fill-opacity: 0.34; transition: fill-opacity 0.3s ease; }
+.lens.off { fill-opacity: 0; }
+.v-lens, .v-h { transition: opacity 0.3s ease; }
+.v-lens.off, .v-h.off { opacity: 0.3; }
+.ai-ring { fill: none; stroke: var(--t-crew); stroke-width: 2.2; stroke-dasharray: 6 5; transition: opacity 0.3s ease; }
+.ai-label { fill: var(--t-crew); font: 600 12px var(--font-mono); letter-spacing: 0.04em; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; transition: opacity 0.3s ease; }
+.ai-ring.off, .ai-label.off { opacity: 0; }
+
+.fix { position: relative; }
+.fix .mini-ring { position: absolute; top: 10px; right: 10px; width: 46px; height: 46px; }
+.fix h3, .fix .c { padding-right: 50px; }
+
+.t-guide { stroke: var(--rule); stroke-width: 1; }
+.t-sep { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 4 4; }
+.t-thread { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; }
+.t-main { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.t-other { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.d-dash { stroke-dasharray: 5 5; }
+.own-pill { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1; }
+.own-text { fill: var(--ink); font: 600 12px var(--font-body); }
+.t-act { fill: var(--accent); font: 600 12px var(--font-body); }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.diagram.half { min-width: 0; }
+.d-dashed-box { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.d-lane { fill: var(--ink-2); font: 600 11.5px var(--font-mono); letter-spacing: 0.06em; }
+
+.g-trace { stroke: var(--surface); stroke-width: 3; fill: none; stroke-linecap: round; stroke-dasharray: 46 1000; stroke-dashoffset: 46; }
+.g-trace.go { animation: gtrace 1.9s ease-in-out 1 forwards; }
+@keyframes gtrace { from { stroke-dashoffset: 46; } to { stroke-dashoffset: -880; } }
+.g-pulse { fill: none; stroke: var(--accent); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: gpulse 2.6s ease-out infinite; }
+@keyframes gpulse { 0% { transform: scale(1); opacity: 0.75; } 100% { transform: scale(3.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .g-pulse { animation: none; opacity: 0; }
+  .g-trace.go { animation: none; }
+  .lens, .v-lens, .v-h, .ai-ring, .ai-label, .gl { transition: none; }
+}
+
+@media (max-width: 980px) {
+  .glance { grid-template-columns: minmax(0, 1fr); }
+  .fixes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .gallery { grid-template-columns: minmax(0, 1fr); }
+  .scroll-hint { display: block; }
+}
+@media (max-width: 640px) {
+  .fixes { grid-template-columns: minmax(0, 1fr); }
+  .asks li { grid-template-columns: minmax(0, 1fr); }
+  .asks .owner { text-align: left; }
+  .lead { font-size: 1.12rem; }
+  .cmp { grid-template-columns: minmax(0, 1fr); }
+  .pair { grid-template-columns: minmax(0, 1fr); }
+  .stepper .lbl { display: none; }
+  .shot { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+
+<div class="topbar gutter">
+  <div class="wrap">
+    <a class="brand" href="#top">myGFO</a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#circles">Circles</a>
+      <a href="#handoff">Handoffs</a>
+      <a href="#journey">One trip</a>
+      <a href="#glidepath">Glidepath</a>
+      <a href="#loops">Data flows</a>
+      <a href="#alerts">Alerts</a>
+      <a href="#looks">Screens</a>
+      <a href="#why">Why it matters</a>
+      <a class="ext" href="https://claude.ai/artifact/F3bTxregXxR3ovYRiAzk42" target="_blank" rel="noopener">Reference</a>
+    </nav>
+  </div>
+</div>
+
+<main class="gutter">
+  <div class="wrap">
+    <header class="hero" id="top">
+      <p class="eyebrow">Global Flight Operations · Plan and glidepath · Revision 7</p>
+      <h1>myGFO Vision and Roadmap</h1>
+      <p class="lead">Five departments share one airplane and one trip at a time. myGFO ties them together where their work overlaps, so every fact is entered once and reaches the right people at the right moment.</p>
+      <nav class="glance" aria-label="At a glance">
+        <a class="gl" href="#circles"><svg class="mini-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50.0" cy="32.5" r="16" class="mr-c"/><circle cx="66.6" cy="44.6" r="16" class="mr-c"/><circle cx="60.3" cy="64.2" r="16" class="mr-c"/><circle cx="39.7" cy="64.2" r="16" class="mr-c"/><circle cx="33.4" cy="44.6" r="16" class="mr-c"/><path d="M 48.9 48.5 A 16.0 16.0 0 0 0 34.5 28.6 A 16.0 16.0 0 0 0 48.9 48.5 Z" class="mr-l mr-new"/><path d="M 51.1 48.5 A 16.0 16.0 0 0 0 65.5 28.6 A 16.0 16.0 0 0 0 51.1 48.5 Z" class="mr-l mr-new"/><path d="M 51.8 50.6 A 16.0 16.0 0 0 0 75.1 58.2 A 16.0 16.0 0 0 0 51.8 50.6 Z" class="mr-l mr-new"/><path d="M 50.0 51.9 A 16.0 16.0 0 0 0 50.0 76.4 A 16.0 16.0 0 0 0 50.0 51.9 Z" class="mr-l mr-new"/><path d="M 48.2 50.6 A 16.0 16.0 0 0 0 24.9 58.2 A 16.0 16.0 0 0 0 48.2 50.6 Z" class="mr-l mr-new"/><circle cx="50" cy="50" r="7" class="mr-hub"/><circle cx="50" cy="50" r="10.5" class="mr-ai"/></svg><span class="t"><b>The vision</b><span class="d">Five circles, tied together where they overlap</span></span></a>
+        <a class="gl" href="#glidepath"><svg viewBox="0 0 120 64" aria-hidden="true"><line x1="4" y1="54" x2="116" y2="54" class="mg-ground"/><rect x="98" y="52.5" width="18" height="3" class="mg-rwy"/><line x1="6" y1="10" x2="100" y2="54" class="mg-path"/><circle cx="16" cy="14.7" r="3.6" class="mg-dot on"/><circle cx="34" cy="23.1" r="3.6" class="mg-dot"/><circle cx="52" cy="31.5" r="3.6" class="mg-dot"/><circle cx="70" cy="40.0" r="3.6" class="mg-dot"/><circle cx="88" cy="48.4" r="3.6" class="mg-dot"/></svg><span class="t"><b>The plan</b><span class="d">Five fixes on a glidepath to one end goal</span></span></a>
+        <a class="gl" href="#why"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="8" width="12" height="12" rx="3" class="mc-box"/><path d="M 9 14 L 11.5 17 L 16 11" class="mc-check"/><line x1="25" y1="14" x2="58" y2="14" class="mc-line"/><rect x="6" y="26" width="12" height="12" rx="3" class="mc-box"/><path d="M 9 32 L 11.5 35 L 16 29" class="mc-check"/><line x1="25" y1="32" x2="50" y2="32" class="mc-line"/><rect x="6" y="44" width="12" height="12" rx="3" class="mc-box"/><path d="M 9 50 L 11.5 53 L 16 47" class="mc-check"/><line x1="25" y1="50" x2="42" y2="50" class="mc-line"/></svg><span class="t"><b>Why it matters</b><span class="d">What changes for everyone, and how we know we have landed</span></span></a>
+      </nav>
+    </header>
+
+    <section class="sec" id="circles">
+      <div class="sec-head">
+        <p class="eyebrow">The vision</p>
+        <h2>Five circles. Software lives where they overlap.</h2>
+        <p>Each department is a circle and keeps its own tools. Where two circles meet, work changes hands, and that handoff is where myGFO ties them together.</p>
+      </div>
+      <div class="stepper" role="group" aria-label="Show the circles at a horizon">
+        <span class="lbl">Show</span>
+        <button class="sbtn" type="button" data-step="all" aria-pressed="true">End state</button>
+        <button class="sbtn" type="button" data-step="0" aria-pressed="false">H0</button>
+        <button class="sbtn" type="button" data-step="1" aria-pressed="false">H1</button>
+        <button class="sbtn" type="button" data-step="2" aria-pressed="false">H2</button>
+        <button class="sbtn" type="button" data-step="3" aria-pressed="false">H3</button>
+        <button class="sbtn" type="button" data-step="4" aria-pressed="false">H4</button>
+      </div>
+      <p class="step-cap" id="stepCap" aria-live="polite">The end state: every overlap is tied together, with AI answering from the shared record.</p>
+      <figure>
+        <div class="figscroll">
+          <svg class="diagram circles" viewBox="0 0 1000 790" role="img" aria-label="Five overlapping department circles: pilots, flight attendants, EAs, scheduling and maintenance. Pilots and maintenance meet at the Tech Log, pilots and flight attendants at the crew trip, flight attendants and EAs at the passenger, EAs and scheduling at the booking, scheduling and maintenance at availability. The shared record sits in the center. Safety, documents and leadership form a band around all five.">
+            <defs>
+              <path id="bandpath" d="M 500 26 A 364 364 0 1 1 500 754 A 364 364 0 1 1 500 26"/>
+            </defs>
+            <circle cx="500" cy="390" r="368" class="v-band"/>
+            <text class="v-band-text"><textPath href="#bandpath" startOffset="0">SAFETY · DOCUMENTS · LEADERSHIP · SAFETY · DOCUMENTS · LEADERSHIP · SAFETY · DOCUMENTS · LEADERSHIP · SAFETY · DOCUMENTS · LEADERSHIP · SAFETY · DOCUMENTS · LEADERSHIP · SAFETY · DOCUMENTS · LEADERSHIP · SAFETY · DOCUMENTS · LEADERSHIP ·</textPath></text>
+
+            <circle cx="500" cy="215" r="160" class="v-circle"/>
+            <circle cx="666.4" cy="335.9" r="160" class="v-circle"/>
+            <circle cx="602.9" cy="531.6" r="160" class="v-circle"/>
+            <circle cx="397.1" cy="531.6" r="160" class="v-circle"/>
+            <circle cx="333.6" cy="335.9" r="160" class="v-circle"/>
+            <path d="M 488.8 374.6 A 160.0 160.0 0 0 0 344.7 176.3 A 160.0 160.0 0 0 0 488.8 374.6 Z" class="lens" data-h="0"/>
+            <path d="M 511.2 374.6 A 160.0 160.0 0 0 0 655.3 176.3 A 160.0 160.0 0 0 0 511.2 374.6 Z" class="lens" data-h="1"/>
+            <path d="M 518.1 395.9 A 160.0 160.0 0 0 0 751.2 471.6 A 160.0 160.0 0 0 0 518.1 395.9 Z" class="lens" data-h="2"/>
+            <path d="M 500.0 409.0 A 160.0 160.0 0 0 0 500.0 654.1 A 160.0 160.0 0 0 0 500.0 409.0 Z" class="lens" data-h="2"/>
+            <path d="M 481.9 395.9 A 160.0 160.0 0 0 0 248.8 471.6 A 160.0 160.0 0 0 0 481.9 395.9 Z" class="lens" data-h="3"/>
+
+            <text x="500" y="140" text-anchor="middle" class="v-dept">Pilots</text>
+            <text x="500" y="158" text-anchor="middle" class="v-keep">keep ForeFlight</text>
+            <text x="737.8" y="312.8" text-anchor="middle" class="v-dept">Flight attendants</text>
+            <text x="737.8" y="330.8" text-anchor="middle" class="v-keep">cabin and service</text>
+            <text x="647" y="592.3" text-anchor="middle" class="v-dept">EAs</text>
+            <text x="647" y="610.3" text-anchor="middle" class="v-keep">for the principals</text>
+            <text x="353" y="592.3" text-anchor="middle" class="v-dept">Scheduling</text>
+            <text x="353" y="610.3" text-anchor="middle" class="v-keep">keeps myairops</text>
+            <text x="262.2" y="312.8" text-anchor="middle" class="v-dept">Maintenance</text>
+            <text x="262.2" y="330.8" text-anchor="middle" class="v-keep">keeps CAMP</text>
+
+            <text x="382.4" y="226" text-anchor="middle" class="v-lens" data-h="0">Tech Log</text>
+            <text x="382.4" y="242" text-anchor="middle" class="v-h" data-h="0">H0</text>
+            <text x="617.6" y="226" text-anchor="middle" class="v-lens" data-h="1">Crew trip</text>
+            <text x="617.6" y="242" text-anchor="middle" class="v-h" data-h="1">H1</text>
+            <text x="690.2" y="449.8" text-anchor="middle" class="v-lens" data-h="2">Passenger</text>
+            <text x="690.2" y="465.8" text-anchor="middle" class="v-h" data-h="2">H2</text>
+            <text x="500" y="588" text-anchor="middle" class="v-lens" data-h="2">Booking</text>
+            <text x="500" y="604" text-anchor="middle" class="v-h" data-h="2">H2</text>
+            <text x="309.8" y="449.8" text-anchor="middle" class="v-lens" data-h="3">Availability</text>
+            <text x="309.8" y="465.8" text-anchor="middle" class="v-h" data-h="3">H3</text>
+
+            <circle cx="500" cy="390" r="92" class="ai-ring" data-h="4"/>
+            <text x="500" y="290" text-anchor="middle" class="ai-label" data-h="4">AI ACROSS THE CENTER</text>
+            <circle cx="500" cy="390" r="76" class="d-hub"/>
+            <text x="500" y="382" text-anchor="middle" class="d-hub-title">Shared record</text>
+            <text x="500" y="401" text-anchor="middle" class="d-hub-sub">trips, people,</text>
+            <text x="500" y="416" text-anchor="middle" class="d-hub-sub">aircraft, alerts</text>
+          </svg>
+        </div>
+        <p class="scroll-hint">Scroll the diagram sideways to see all of it.</p>
+        <figcaption><span class="fig">Fig. 1</span>Each department keeps its own tools. Shaded overlaps are where myGFO ties two departments together. Safety, documents and leadership wrap the ring because they touch every circle.</figcaption>
+      </figure>
+
+
+    </section>
+
+
+    <section class="sec" id="handoff">
+      <div class="sec-head">
+        <p class="eyebrow">Why the overlaps matter</p>
+        <h2>Today a handoff is a phone call. With myGFO it is one record.</h2>
+        <p>Take the busiest overlap, pilots and maintenance. The same pattern repeats at every other overlap on the ring.</p>
+      </div>
+      <figure>
+        <div class="pair">
+          <div class="figscroll">
+          <svg class="diagram half" viewBox="8 0 456 372" role="img" aria-label="Today: the pilot phones the mechanic, the mechanic writes it up on paper or in a text, it is retyped into CAMP, and scheduling may be texted later, or never.">
+            <defs><marker id="ha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker></defs>
+            <text x="20" y="30" class="d-label">TODAY</text>
+            <rect x="20" y="60" width="120" height="44" rx="8" class="d-box"/><text x="80" y="87" text-anchor="middle" class="d-title">Pilot</text>
+            <rect x="330" y="60" width="120" height="44" rx="8" class="d-box"/><text x="390" y="87" text-anchor="middle" class="d-title">Mechanic</text>
+            <rect x="175" y="160" width="120" height="44" rx="8" class="d-box"/><text x="235" y="179" text-anchor="middle" class="d-title">Log entry</text><text x="235" y="196" text-anchor="middle" class="d-sub">paper or a text</text>
+            <rect x="330" y="280" width="120" height="44" rx="8" class="d-box"/><text x="390" y="307" text-anchor="middle" class="d-title">CAMP</text>
+            <rect x="20" y="280" width="120" height="44" rx="8" class="d-box"/><text x="80" y="307" text-anchor="middle" class="d-title">Scheduling</text>
+            <line x1="142" y1="82" x2="326" y2="82" class="d-line" marker-end="url(#ha)"/><text x="234" y="72" text-anchor="middle" class="d-note">phone call</text>
+            <line x1="372" y1="106" x2="285" y2="158" class="d-line" marker-end="url(#ha)"/><text x="350" y="140" class="d-note">writes it up</text>
+            <line x1="285" y1="206" x2="372" y2="278" class="d-line" marker-end="url(#ha)"/><text x="340" y="236" class="d-note">retyped into CAMP</text>
+            <line x1="80" y1="106" x2="80" y2="276" class="d-line d-dash" marker-end="url(#ha)"/><text x="88" y="186" class="d-note">texted later,</text><text x="88" y="200" class="d-note">maybe</text>
+            <text x="240" y="356" text-anchor="middle" class="d-note">Four hops, one retype, and scheduling may never hear.</text>
+          </svg>
+          </div>
+          <div class="figscroll">
+          <svg class="diagram half" viewBox="528 0 456 372" role="img" aria-label="With myGFO: the pilot and the mechanic work on one Tech Log record, each through their own view. It feeds CAMP through a gated, automatic path and tells scheduling at once. The DOM and chief pilot set the rules.">
+            <defs><marker id="hb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker></defs>
+            <text x="540" y="30" class="d-label">WITH myGFO</text>
+            <rect x="540" y="60" width="120" height="44" rx="8" class="d-box"/><text x="600" y="87" text-anchor="middle" class="d-title">Pilot</text>
+            <rect x="850" y="60" width="120" height="44" rx="8" class="d-box"/><text x="910" y="87" text-anchor="middle" class="d-title">Mechanic</text>
+            <rect x="680" y="150" width="150" height="64" rx="10" class="d-hub"/><text x="755" y="177" text-anchor="middle" class="d-hub-title">Tech Log record</text><text x="755" y="196" text-anchor="middle" class="d-hub-sub">one record, two views</text>
+            <rect x="850" y="280" width="120" height="44" rx="8" class="d-box"/><text x="910" y="298" text-anchor="middle" class="d-title">CAMP</text><text x="910" y="315" text-anchor="middle" class="d-sub">gated, automatic</text>
+            <rect x="540" y="280" width="120" height="44" rx="8" class="d-box"/><text x="600" y="298" text-anchor="middle" class="d-title">Scheduling</text><text x="600" y="315" text-anchor="middle" class="d-sub">told at once</text>
+            <line x1="640" y1="106" x2="702" y2="148" class="d-line" marker-end="url(#hb)"/><text x="650" y="134" text-anchor="end" class="d-note">pilot's view</text>
+            <line x1="870" y1="106" x2="808" y2="148" class="d-line" marker-end="url(#hb)"/><text x="860" y="134" class="d-note">mechanic's view</text>
+            <line x1="808" y1="216" x2="870" y2="278" class="d-line" marker-end="url(#hb)"/><text x="852" y="244" class="d-note">feeds</text>
+            <line x1="702" y1="216" x2="640" y2="278" class="d-line" marker-end="url(#hb)"/><text x="656" y="244" text-anchor="end" class="d-note">alerts at once</text>
+            <rect x="650" y="336" width="210" height="26" rx="13" class="own-pill"/><text x="755" y="353.5" text-anchor="middle" class="own-text">Rules: DOM and chief pilot</text>
+          </svg>
+          </div>
+        </div>
+        <figcaption><span class="fig">Fig. 2</span>Both sides work on the same record through their own screen. Nothing is retyped, scheduling hears at once, and one owner sets the rules of the handoff.</figcaption>
+      </figure>
+    </section>
+
+    <section class="sec" id="journey">
+      <div class="sec-head">
+        <p class="eyebrow">One trip</p>
+        <h2>A trip weaves through every circle.</h2>
+        <p>From the EA's first question to the crew's debrief, the trip passes from department to department. myGFO carries it across each handoff.</p>
+      </div>
+      <figure>
+        <div class="figscroll">
+          <svg class="diagram" viewBox="0 0 1000 348" role="img" aria-label="One trip as a thread across the departments. The EA asks; scheduling books; pilots and flight attendants prepare; passengers get the 72-hour email; the crew is briefed the night before; passengers and the EA get live times at block out; maintenance closes the record at block in; the crew debriefs the next day.">
+            <text x="190" y="34" text-anchor="middle" class="d-label">REQUEST</text>
+            <text x="298" y="34" text-anchor="middle" class="d-label">BOOKING</text>
+            <text x="406" y="34" text-anchor="middle" class="d-label">DAYS OUT</text>
+            <text x="514" y="34" text-anchor="middle" class="d-label">T-72 H</text>
+            <text x="622" y="34" text-anchor="middle" class="d-label">NIGHT BEFORE</text>
+            <text x="730" y="34" text-anchor="middle" class="d-label">BLOCK OUT</text>
+            <text x="838" y="34" text-anchor="middle" class="d-label">BLOCK IN</text>
+            <text x="946" y="34" text-anchor="middle" class="d-label">NEXT DAY</text>
+            <line x1="168" y1="70" x2="980" y2="70" class="t-guide"/>
+            <text x="16" y="75" class="d-title">Pilots</text>
+            <line x1="168" y1="116" x2="980" y2="116" class="t-guide"/>
+            <text x="16" y="121" class="d-title">Flight attendants</text>
+            <line x1="168" y1="162" x2="980" y2="162" class="t-guide"/>
+            <text x="16" y="167" class="d-title">EAs</text>
+            <line x1="168" y1="208" x2="980" y2="208" class="t-guide"/>
+            <text x="16" y="213" class="d-title">Scheduling</text>
+            <line x1="168" y1="254" x2="980" y2="254" class="t-guide"/>
+            <text x="16" y="259" class="d-title">Maintenance</text>
+            <line x1="168" y1="312" x2="980" y2="312" class="t-guide"/>
+            <text x="16" y="317" class="d-title">Passengers</text>
+            <line x1="16" y1="286" x2="980" y2="286" class="t-sep"/>
+            <path d="M 190 162 C 244 162, 244 208, 298 208 C 352 208, 352 70, 406 70 C 460 70, 460 312, 514 312 C 568 312, 568 70, 622 70 C 676 70, 676 312, 730 312 C 784 312, 784 254, 838 254 C 892 254, 892 70, 946 70" class="t-thread"/>
+            <circle cx="190" cy="162" r="7.5" class="t-main"/>
+            <circle cx="298" cy="208" r="7.5" class="t-main"/>
+            <circle cx="298" cy="162" r="6" class="t-other"/>
+            <circle cx="298" cy="70" r="6" class="t-other"/>
+            <circle cx="298" cy="116" r="6" class="t-other"/>
+            <circle cx="406" cy="162" r="6" class="t-other"/>
+            <circle cx="406" cy="208" r="6" class="t-other"/>
+            <circle cx="406" cy="70" r="7.5" class="t-main"/>
+            <circle cx="406" cy="116" r="6" class="t-other"/>
+            <circle cx="514" cy="312" r="7.5" class="t-main"/>
+            <circle cx="514" cy="162" r="6" class="t-other"/>
+            <circle cx="514" cy="208" r="6" class="t-other"/>
+            <circle cx="622" cy="70" r="7.5" class="t-main"/>
+            <circle cx="622" cy="116" r="6" class="t-other"/>
+            <circle cx="622" cy="254" r="6" class="t-other"/>
+            <circle cx="730" cy="312" r="7.5" class="t-main"/>
+            <circle cx="730" cy="162" r="6" class="t-other"/>
+            <circle cx="730" cy="116" r="6" class="t-other"/>
+            <circle cx="730" cy="70" r="6" class="t-other"/>
+            <circle cx="838" cy="254" r="7.5" class="t-main"/>
+            <circle cx="838" cy="70" r="6" class="t-other"/>
+            <circle cx="838" cy="116" r="6" class="t-other"/>
+            <circle cx="946" cy="70" r="7.5" class="t-main"/>
+            <circle cx="946" cy="116" r="6" class="t-other"/>
+            <circle cx="946" cy="312" r="6" class="t-other"/>
+            <text x="190" y="186" text-anchor="middle" class="t-act">asks</text>
+            <text x="298" y="232" text-anchor="middle" class="t-act">books</text>
+            <text x="406" y="54" text-anchor="middle" class="t-act">plan</text>
+            <text x="514" y="336" text-anchor="middle" class="t-act">72-hour email</text>
+            <text x="622" y="54" text-anchor="middle" class="t-act">briefing</text>
+            <text x="730" y="336" text-anchor="middle" class="t-act">live times</text>
+            <text x="838" y="278" text-anchor="middle" class="t-act">write-ups</text>
+            <text x="946" y="54" text-anchor="middle" class="t-act">debrief</text>
+          </svg>
+        </div>
+        <p class="scroll-hint">Scroll the diagram sideways to see all of it.</p>
+        <figcaption><span class="fig">Fig. 3</span>Filled dots carry the trip at each moment, labeled with what happens. Hollow dots are others who act at the same moment. Every moment, with screens, is in the <a href="https://claude.ai/artifact/F3bTxregXxR3ovYRiAzk42#trip" target="_blank" rel="noopener">reference</a>.</figcaption>
+      </figure>
+    </section>
+
+    <section class="sec" id="glidepath">
+      <div class="sec-head">
+        <p class="eyebrow">The plan</p>
+        <h2>The glidepath: five fixes to the end goal.</h2>
+        <p>Each fix lights up more of the circles. We cross a fix only when its gate is met, not on a date. Today we are at the first fix, landing Document Center and the Tech Log.</p>
+      </div>
+      <figure>
+        <div class="figscroll">
+          <svg class="diagram" viewBox="0 0 1000 330" role="img" aria-label="An approach profile from today to the end goal. Fix H0, land what we are building, lights up the Tech Log and documents. H1, the crew's day, lights up the crew trip. H2, the EA and the passenger, lights up booking and the passenger. H3, the 30,000-foot view, lights up availability and leadership. H4, intelligence, brings AI across the center. Touchdown is one real trip end to end on production data.">
+            <line x1="20" y1="280" x2="990" y2="280" class="g-ground"/>
+            <rect x="850" y="277" width="130" height="7" rx="1" class="g-runway"/>
+            <line x1="40" y1="60" x2="860" y2="280" class="g-path"/>
+            <line id="gTrace" x1="40" y1="60" x2="860" y2="280" class="g-trace"/>
+
+            <line x1="110" y1="78.8" x2="110" y2="280" class="g-drop"/>
+            <line x1="270" y1="121.7" x2="270" y2="280" class="g-drop"/>
+            <line x1="430" y1="164.6" x2="430" y2="280" class="g-drop"/>
+            <line x1="590" y1="207.6" x2="590" y2="280" class="g-drop"/>
+            <line x1="750" y1="250.5" x2="750" y2="280" class="g-drop"/>
+
+            <polygon points="12,0 -8,-7 -4,0 -8,7" transform="translate(84 71.8) rotate(15)" class="g-plane"/>
+            <text x="98" y="104" text-anchor="end" class="g-here">WE ARE HERE</text>
+
+            <circle cx="110" cy="78.8" r="6.5" class="g-pulse"/>
+            <circle cx="110" cy="78.8" r="6.5" class="g-fix now"/>
+            <circle cx="270" cy="121.7" r="6.5" class="g-fix"/>
+            <circle cx="430" cy="164.6" r="6.5" class="g-fix"/>
+            <circle cx="590" cy="207.6" r="6.5" class="g-fix"/>
+            <circle cx="750" cy="250.5" r="6.5" class="g-fix"/>
+
+            <text x="102" y="34.8" class="g-code">H0</text>
+            <text x="102" y="50.8" class="g-name">Land what we are building</text>
+            <text x="102" y="66.8" class="g-lit">Tech Log, documents</text>
+            <text x="262" y="77.7" class="g-code">H1</text>
+            <text x="262" y="93.7" class="g-name">The crew's day</text>
+            <text x="262" y="109.7" class="g-lit">Crew trip</text>
+            <text x="422" y="120.6" class="g-code">H2</text>
+            <text x="422" y="136.6" class="g-name">The EA and the passenger</text>
+            <text x="422" y="152.6" class="g-lit">Booking, passenger</text>
+            <text x="582" y="163.6" class="g-code">H3</text>
+            <text x="582" y="179.6" class="g-name">The 30,000-foot view</text>
+            <text x="582" y="195.6" class="g-lit">Availability, leadership</text>
+            <text x="742" y="206.5" class="g-code">H4</text>
+            <text x="742" y="222.5" class="g-name">Intelligence</text>
+            <text x="742" y="238.5" class="g-lit">AI across the center</text>
+
+            <text x="885" y="226" class="g-goal">End goal</text>
+            <text x="885" y="243" class="g-goal-sub">one real trip,</text>
+            <text x="885" y="258" class="g-goal-sub">end to end</text>
+
+            <rect x="105" y="275" width="10" height="10" transform="rotate(45 110 280)" class="g-diamond"/>
+            <rect x="265" y="275" width="10" height="10" transform="rotate(45 270 280)" class="g-diamond"/>
+            <rect x="425" y="275" width="10" height="10" transform="rotate(45 430 280)" class="g-diamond"/>
+            <rect x="585" y="275" width="10" height="10" transform="rotate(45 590 280)" class="g-diamond"/>
+            <rect x="745" y="275" width="10" height="10" transform="rotate(45 750 280)" class="g-diamond"/>
+            <text x="102" y="304" class="g-gate">Gate: both modules</text>
+            <text x="102" y="319" class="g-gate">in real use a month</text>
+            <text x="262" y="304" class="g-gate">Gate: myairops</text>
+            <text x="262" y="319" class="g-gate">data mapping done</text>
+            <text x="422" y="304" class="g-gate">Gate: passenger data</text>
+            <text x="422" y="319" class="g-gate">and live-times calls</text>
+            <text x="582" y="304" class="g-gate">Gate: Tax and</text>
+            <text x="582" y="319" class="g-gate">Workday agreed</text>
+            <text x="742" y="304" class="g-gate">Gate: AI use</text>
+            <text x="742" y="319" class="g-gate">approved</text>
+          </svg>
+        </div>
+        <p class="scroll-hint">Scroll the diagram sideways to see all of it.</p>
+        <figcaption><span class="fig">Fig. 4</span>Diamonds are gates. We cross a fix only when its gate is met, and each fix lights up more of the circles.</figcaption>
+      </figure>
+
+      <div class="fixes">
+        <article class="fix now">
+          <span class="c">H0 · We are here</span>
+          <svg class="mini-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50.0" cy="32.5" r="16" class="mr-c"/><circle cx="66.6" cy="44.6" r="16" class="mr-c"/><circle cx="60.3" cy="64.2" r="16" class="mr-c"/><circle cx="39.7" cy="64.2" r="16" class="mr-c"/><circle cx="33.4" cy="44.6" r="16" class="mr-c"/><path d="M 48.9 48.5 A 16.0 16.0 0 0 0 34.5 28.6 A 16.0 16.0 0 0 0 48.9 48.5 Z" class="mr-l mr-new"/><path d="M 51.1 48.5 A 16.0 16.0 0 0 0 65.5 28.6 A 16.0 16.0 0 0 0 51.1 48.5 Z" class="mr-l "/><path d="M 51.8 50.6 A 16.0 16.0 0 0 0 75.1 58.2 A 16.0 16.0 0 0 0 51.8 50.6 Z" class="mr-l "/><path d="M 50.0 51.9 A 16.0 16.0 0 0 0 50.0 76.4 A 16.0 16.0 0 0 0 50.0 51.9 Z" class="mr-l "/><path d="M 48.2 50.6 A 16.0 16.0 0 0 0 24.9 58.2 A 16.0 16.0 0 0 0 48.2 50.6 Z" class="mr-l "/><circle cx="50" cy="50" r="7" class="mr-hub"/></svg>
+          <h3>Land what we are building</h3>
+          <ul><li>Document Center live, with revisions approved inside myGFO</li><li>Tech Log live on iPad, offline</li><li>Shared record and alerts with two escalation paths</li></ul>
+          <span class="lit">Lights up: Tech Log and documents</span>
+          <span class="gate">Both modules in real use for a month</span>
+        </article>
+        <article class="fix">
+          <span class="c">H1</span>
+          <svg class="mini-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50.0" cy="32.5" r="16" class="mr-c"/><circle cx="66.6" cy="44.6" r="16" class="mr-c"/><circle cx="60.3" cy="64.2" r="16" class="mr-c"/><circle cx="39.7" cy="64.2" r="16" class="mr-c"/><circle cx="33.4" cy="44.6" r="16" class="mr-c"/><path d="M 48.9 48.5 A 16.0 16.0 0 0 0 34.5 28.6 A 16.0 16.0 0 0 0 48.9 48.5 Z" class="mr-l mr-old"/><path d="M 51.1 48.5 A 16.0 16.0 0 0 0 65.5 28.6 A 16.0 16.0 0 0 0 51.1 48.5 Z" class="mr-l mr-new"/><path d="M 51.8 50.6 A 16.0 16.0 0 0 0 75.1 58.2 A 16.0 16.0 0 0 0 51.8 50.6 Z" class="mr-l "/><path d="M 50.0 51.9 A 16.0 16.0 0 0 0 50.0 76.4 A 16.0 16.0 0 0 0 50.0 51.9 Z" class="mr-l "/><path d="M 48.2 50.6 A 16.0 16.0 0 0 0 24.9 58.2 A 16.0 16.0 0 0 0 48.2 50.6 Z" class="mr-l "/><circle cx="50" cy="50" r="7" class="mr-hub"/></svg>
+          <h3>The crew's day</h3>
+          <ul><li>Flight Hub for pilots and flight attendants</li><li>Airport knowledge loop</li><li>Trip sheets, manuals and airport pages in ForeFlight</li></ul>
+          <span class="lit">Lights up: the crew trip</span>
+          <span class="gate">myairops data mapping confirmed</span>
+        </article>
+        <article class="fix">
+          <span class="c">H2</span>
+          <svg class="mini-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50.0" cy="32.5" r="16" class="mr-c"/><circle cx="66.6" cy="44.6" r="16" class="mr-c"/><circle cx="60.3" cy="64.2" r="16" class="mr-c"/><circle cx="39.7" cy="64.2" r="16" class="mr-c"/><circle cx="33.4" cy="44.6" r="16" class="mr-c"/><path d="M 48.9 48.5 A 16.0 16.0 0 0 0 34.5 28.6 A 16.0 16.0 0 0 0 48.9 48.5 Z" class="mr-l mr-old"/><path d="M 51.1 48.5 A 16.0 16.0 0 0 0 65.5 28.6 A 16.0 16.0 0 0 0 51.1 48.5 Z" class="mr-l mr-old"/><path d="M 51.8 50.6 A 16.0 16.0 0 0 0 75.1 58.2 A 16.0 16.0 0 0 0 51.8 50.6 Z" class="mr-l mr-new"/><path d="M 50.0 51.9 A 16.0 16.0 0 0 0 50.0 76.4 A 16.0 16.0 0 0 0 50.0 51.9 Z" class="mr-l mr-new"/><path d="M 48.2 50.6 A 16.0 16.0 0 0 0 24.9 58.2 A 16.0 16.0 0 0 0 48.2 50.6 Z" class="mr-l "/><circle cx="50" cy="50" r="7" class="mr-hub"/></svg>
+          <h3>The EA and the passenger</h3>
+          <ul><li>EA booking space and messages</li><li>Passenger records and preferences</li><li>Live times to passengers, drivers and protection</li></ul>
+          <span class="lit">Lights up: booking and the passenger</span>
+          <span class="gate">Passenger data and live-times decisions</span>
+        </article>
+        <article class="fix">
+          <span class="c">H3</span>
+          <svg class="mini-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50.0" cy="32.5" r="16" class="mr-c"/><circle cx="66.6" cy="44.6" r="16" class="mr-c"/><circle cx="60.3" cy="64.2" r="16" class="mr-c"/><circle cx="39.7" cy="64.2" r="16" class="mr-c"/><circle cx="33.4" cy="44.6" r="16" class="mr-c"/><path d="M 48.9 48.5 A 16.0 16.0 0 0 0 34.5 28.6 A 16.0 16.0 0 0 0 48.9 48.5 Z" class="mr-l mr-old"/><path d="M 51.1 48.5 A 16.0 16.0 0 0 0 65.5 28.6 A 16.0 16.0 0 0 0 51.1 48.5 Z" class="mr-l mr-old"/><path d="M 51.8 50.6 A 16.0 16.0 0 0 0 75.1 58.2 A 16.0 16.0 0 0 0 51.8 50.6 Z" class="mr-l mr-old"/><path d="M 50.0 51.9 A 16.0 16.0 0 0 0 50.0 76.4 A 16.0 16.0 0 0 0 50.0 51.9 Z" class="mr-l mr-old"/><path d="M 48.2 50.6 A 16.0 16.0 0 0 0 24.9 58.2 A 16.0 16.0 0 0 0 48.2 50.6 Z" class="mr-l mr-new"/><circle cx="50" cy="50" r="7" class="mr-hub"/></svg>
+          <h3>The 30,000-foot view</h3>
+          <ul><li>Leadership view and change management</li><li>Availability and disruption options</li><li>Trends from Tech Log data, and the SIFL and SEC engine</li></ul>
+          <span class="lit">Lights up: availability and leadership</span>
+          <span class="gate">Tax and Workday agreements</span>
+        </article>
+        <article class="fix">
+          <span class="c">H4</span>
+          <svg class="mini-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50.0" cy="32.5" r="16" class="mr-c"/><circle cx="66.6" cy="44.6" r="16" class="mr-c"/><circle cx="60.3" cy="64.2" r="16" class="mr-c"/><circle cx="39.7" cy="64.2" r="16" class="mr-c"/><circle cx="33.4" cy="44.6" r="16" class="mr-c"/><path d="M 48.9 48.5 A 16.0 16.0 0 0 0 34.5 28.6 A 16.0 16.0 0 0 0 48.9 48.5 Z" class="mr-l mr-old"/><path d="M 51.1 48.5 A 16.0 16.0 0 0 0 65.5 28.6 A 16.0 16.0 0 0 0 51.1 48.5 Z" class="mr-l mr-old"/><path d="M 51.8 50.6 A 16.0 16.0 0 0 0 75.1 58.2 A 16.0 16.0 0 0 0 51.8 50.6 Z" class="mr-l mr-old"/><path d="M 50.0 51.9 A 16.0 16.0 0 0 0 50.0 76.4 A 16.0 16.0 0 0 0 50.0 51.9 Z" class="mr-l mr-old"/><path d="M 48.2 50.6 A 16.0 16.0 0 0 0 24.9 58.2 A 16.0 16.0 0 0 0 48.2 50.6 Z" class="mr-l mr-old"/><circle cx="50" cy="50" r="7" class="mr-hub"/><circle cx="50" cy="50" r="10.5" class="mr-ai"/></svg>
+          <h3>Intelligence</h3>
+          <ul><li>Airflow agents for feasibility and briefings</li><li>Copilot answers from myGFO</li><li>The ForeFlight loop complete in both directions</li></ul>
+          <span class="lit">Lights up: AI across the center</span>
+          <span class="gate">AI use approved by IT and Legal</span>
+        </article>
+      </div>
+      <div class="endgoal"><b>End goal</b><span>One real trip runs end to end on production data, with no retyping and no phone call that exists only because a system did not tell someone.</span></div>
+    </section>
+
+    <section class="sec" id="loops">
+      <div class="sec-head">
+        <p class="eyebrow">Outside the circles</p>
+        <h2>How data moves with the systems around us.</h2>
+        <p>Some systems only feed us, like myairops. Others should hear back from us, like ForeFlight. Each loop is drawn only as far as we know it works today.</p>
+      </div>
+      <figure>
+        <div class="pair">
+          <div class="figscroll">
+          <svg class="diagram half" viewBox="0 0 460 290" role="img" aria-label="myairops feeds myGFO trips, crew, passengers and aircraft. myGFO only reads from it. Whether myGFO may ever write back is not decided.">
+            <defs><marker id="lp1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker></defs>
+            <text x="20" y="26" class="d-label">MYAIROPS · READ ONLY</text>
+            <rect x="20" y="112" width="140" height="50" rx="8" class="d-hub"/><text x="90" y="142" text-anchor="middle" class="d-hub-title">myGFO</text>
+            <rect x="300" y="112" width="140" height="50" rx="8" class="d-box"/><text x="370" y="134" text-anchor="middle" class="d-title">myairops</text><text x="370" y="151" text-anchor="middle" class="d-sub">scheduling's system</text>
+            <path d="M 370 110 C 350 68, 110 68, 90 110" class="d-line" marker-end="url(#lp1)"/>
+            <text x="230" y="52" text-anchor="middle" class="d-note">trips, crew, passengers, aircraft</text>
+            <path d="M 90 164 C 110 228, 350 228, 370 164" class="d-line d-dash" marker-end="url(#lp1)"/>
+            <text x="230" y="248" text-anchor="middle" class="d-note">writing back: not decided</text>
+            <text x="230" y="264" text-anchor="middle" class="d-sub">myGFO reads only, for now</text>
+          </svg>
+          </div>
+          <div class="figscroll">
+          <svg class="diagram half" viewBox="0 0 460 290" role="img" aria-label="With ForeFlight, myGFO sends trips, trip sheets, manuals, airport pages and aircraft status, and ForeFlight returns planned times, performance and Airflow briefings.">
+            <defs><marker id="lp2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker></defs>
+            <text x="20" y="26" class="d-label">FOREFLIGHT · BOTH WAYS</text>
+            <rect x="20" y="112" width="140" height="50" rx="8" class="d-hub"/><text x="90" y="142" text-anchor="middle" class="d-hub-title">myGFO</text>
+            <rect x="300" y="112" width="140" height="50" rx="8" class="d-box"/><text x="370" y="134" text-anchor="middle" class="d-title">ForeFlight</text><text x="370" y="151" text-anchor="middle" class="d-sub">Dispatch and app</text>
+            <path d="M 90 110 C 110 68, 350 68, 370 110" class="d-line" marker-end="url(#lp2)"/>
+            <text x="230" y="46" text-anchor="middle" class="d-note">trips, trip sheets, manuals,</text>
+            <text x="230" y="60" text-anchor="middle" class="d-note">airport pages, aircraft status</text>
+            <path d="M 370 164 C 350 228, 110 228, 90 164" class="d-line" marker-end="url(#lp2)"/>
+            <text x="230" y="248" text-anchor="middle" class="d-note">planned times, performance,</text>
+            <text x="230" y="262" text-anchor="middle" class="d-note">Airflow briefings</text>
+          </svg>
+          </div>
+          <div class="figscroll">
+          <svg class="diagram half" viewBox="0 0 460 290" role="img" aria-label="Our own aircraft data: Tech Log entries reveal trends such as a repeat defect on one tail, which raises an alert before the next trip, then the fix and the CAMP record. Gulfstream analytics would add to the trends if Gulfstream shares the data, which is not confirmed.">
+            <defs><marker id="lp3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker></defs>
+            <text x="20" y="26" class="d-label">OUR AIRCRAFT DATA</text>
+            <rect x="20" y="60" width="140" height="48" rx="8" class="d-hub"/><text x="90" y="81" text-anchor="middle" class="d-hub-title">Tech Log</text><text x="90" y="98" text-anchor="middle" class="d-hub-sub">what crews record</text>
+            <rect x="196" y="60" width="140" height="48" rx="8" class="d-hub"/><text x="266" y="81" text-anchor="middle" class="d-hub-title">Trend found</text><text x="266" y="98" text-anchor="middle" class="d-hub-sub">repeats on one tail</text>
+            <rect x="196" y="182" width="140" height="48" rx="8" class="d-hub"/><text x="266" y="203" text-anchor="middle" class="d-hub-title">Alert</text><text x="266" y="220" text-anchor="middle" class="d-hub-sub">before the next trip</text>
+            <rect x="20" y="182" width="140" height="48" rx="8" class="d-box"/><text x="90" y="203" text-anchor="middle" class="d-title">Fix, then</text><text x="90" y="220" text-anchor="middle" class="d-sub">CAMP record</text>
+            <line x1="162" y1="84" x2="194" y2="84" class="d-line" marker-end="url(#lp3)"/>
+            <line x1="266" y1="110" x2="266" y2="180" class="d-line" marker-end="url(#lp3)"/>
+            <line x1="194" y1="206" x2="162" y2="206" class="d-line" marker-end="url(#lp3)"/>
+            <line x1="90" y1="180" x2="90" y2="110" class="d-line" marker-end="url(#lp3)"/>
+            <rect x="356" y="60" width="96" height="48" rx="8" class="d-dashed-box"/><text x="404" y="81" text-anchor="middle" class="d-title">Gulfstream</text><text x="404" y="98" text-anchor="middle" class="d-sub">hoped for</text>
+            <line x1="354" y1="84" x2="338" y2="84" class="d-line d-dash" marker-end="url(#lp3)"/>
+            <text x="236" y="256" text-anchor="middle" class="d-note">We start with what the Tech Log already records.</text>
+            <text x="236" y="272" text-anchor="middle" class="d-sub">Gulfstream data would add to it, if they share it.</text>
+          </svg>
+          </div>
+          <div class="figscroll">
+          <svg class="diagram half" viewBox="0 0 460 290" role="img" aria-label="The knowledge loop: a crew debrief updates the airport page, the page goes to ForeFlight, and the next crew is briefed from it.">
+            <defs><marker id="lp4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker></defs>
+            <text x="20" y="26" class="d-label">THE KNOWLEDGE LOOP</text>
+            <rect x="60" y="60" width="140" height="48" rx="8" class="d-box"/><text x="130" y="89" text-anchor="middle" class="d-title">Crew debrief</text>
+            <rect x="260" y="60" width="140" height="48" rx="8" class="d-hub"/><text x="330" y="89" text-anchor="middle" class="d-hub-title">Airport page</text>
+            <rect x="260" y="182" width="140" height="48" rx="8" class="d-box"/><text x="330" y="211" text-anchor="middle" class="d-title">ForeFlight</text>
+            <rect x="60" y="182" width="140" height="48" rx="8" class="d-box"/><text x="130" y="203" text-anchor="middle" class="d-title">Next crew's</text><text x="130" y="220" text-anchor="middle" class="d-sub">briefing</text>
+            <line x1="202" y1="84" x2="258" y2="84" class="d-line" marker-end="url(#lp4)"/>
+            <line x1="330" y1="110" x2="330" y2="180" class="d-line" marker-end="url(#lp4)"/>
+            <line x1="258" y1="206" x2="202" y2="206" class="d-line" marker-end="url(#lp4)"/>
+            <line x1="130" y1="180" x2="130" y2="110" class="d-line" marker-end="url(#lp4)"/>
+            <text x="230" y="256" text-anchor="middle" class="d-note">Each trip leaves the next one better briefed.</text>
+          </svg>
+          </div>
+        </div>
+        <figcaption><span class="fig">Fig. 5</span>Blue boxes are myGFO, and dashed lines are not confirmed. myairops stays read only until writing back is decided. ForeFlight Dispatch accepts scheduled flights and returns times, performance and documents. Aircraft trends start from what our own Tech Log records. Gulfstream analytics would add to them, but whether Gulfstream will share that data is not confirmed. Details and sources are in the reference.</figcaption>
+      </figure>
+    </section>
+
+
+    <section class="sec" id="alerts">
+      <div class="sec-head">
+        <p class="eyebrow">Who hears what</p>
+        <h2>People hear only what they need, and silence escalates.</h2>
+        <p>Urgent problems find whoever is on call. Overdue work climbs to the manager. Everyone else is left alone.</p>
+      </div>
+      <figure>
+        <div class="figscroll">
+          <svg class="diagram" viewBox="0 0 1000 262" role="img" aria-label="How alerts reach people. Urgent items such as an AOG or a safety item go to the on-call person at once, then the backup on-call, then the duty manager if nobody answers. Overdue items such as an unsigned document go to the person as a reminder, then a second reminder, then their manager or delegate. Everyone else hears nothing.">
+            <defs><marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker></defs>
+            <rect x="20" y="120" width="150" height="56" rx="8" class="d-hub"/><text x="95" y="143" text-anchor="middle" class="d-hub-title">Something</text><text x="95" y="162" text-anchor="middle" class="d-hub-title">happens</text>
+            <path d="M 172 136 C 215 136, 215 76, 256 76" class="d-line" marker-end="url(#aa)"/>
+            <path d="M 172 160 C 215 160, 215 216, 256 216" class="d-line" marker-end="url(#aa)"/>
+            <text x="260" y="40" class="d-lane">URGENT · AOG, SAFETY ITEMS</text>
+            <rect x="260" y="52" width="140" height="48" rx="8" class="d-box"/><text x="330" y="72" text-anchor="middle" class="d-title">On-call person</text><text x="330" y="90" text-anchor="middle" class="d-sub">told at once</text>
+            <rect x="480" y="52" width="140" height="48" rx="8" class="d-box"/><text x="550" y="72" text-anchor="middle" class="d-title">Backup on-call</text><text x="550" y="90" text-anchor="middle" class="d-sub">if no answer</text>
+            <rect x="700" y="52" width="140" height="48" rx="8" class="d-box"/><text x="770" y="72" text-anchor="middle" class="d-title">Duty manager</text><text x="770" y="90" text-anchor="middle" class="d-sub">if still no answer</text>
+            <line x1="402" y1="76" x2="478" y2="76" class="d-line" marker-end="url(#aa)"/>
+            <line x1="622" y1="76" x2="698" y2="76" class="d-line" marker-end="url(#aa)"/>
+            <text x="260" y="182" class="d-lane">OVERDUE · UNSIGNED DOCUMENTS, OPEN ITEMS</text>
+            <rect x="260" y="192" width="140" height="48" rx="8" class="d-box"/><text x="330" y="212" text-anchor="middle" class="d-title">Reminder</text><text x="330" y="230" text-anchor="middle" class="d-sub">to the person</text>
+            <rect x="480" y="192" width="140" height="48" rx="8" class="d-box"/><text x="550" y="212" text-anchor="middle" class="d-title">Second reminder</text><text x="550" y="230" text-anchor="middle" class="d-sub">still open</text>
+            <rect x="700" y="192" width="140" height="48" rx="8" class="d-box"/><text x="770" y="212" text-anchor="middle" class="d-title">Their manager</text><text x="770" y="230" text-anchor="middle" class="d-sub">or the delegate</text>
+            <line x1="402" y1="216" x2="478" y2="216" class="d-line" marker-end="url(#aa)"/>
+            <line x1="622" y1="216" x2="698" y2="216" class="d-line" marker-end="url(#aa)"/>
+            <rect x="868" y="122" width="120" height="52" rx="8" class="d-dashed-box"/><text x="928" y="144" text-anchor="middle" class="d-title">Everyone else</text><text x="928" y="162" text-anchor="middle" class="d-sub">hears nothing</text>
+          </svg>
+        </div>
+        <p class="scroll-hint">Scroll the diagram sideways to see all of it.</p>
+        <figcaption><span class="fig">Fig. 6</span>Quiet hours and crew rest are respected before anything is sent. The person always sees their own reminders before their manager does.</figcaption>
+      </figure>
+    </section>
+
+    <section class="sec" id="looks">
+      <div class="sec-head">
+        <p class="eyebrow">What it looks like</p>
+        <h2>Six screens, one from each place the circles meet.</h2>
+        <p>These are illustrative mockups with example data, not production screens.</p>
+      </div>
+      <div class="gallery">
+        <article class="shot">
+          <div><span class="ov">The documents band</span><h3>Approve a revision inside myGFO</h3><p class="cap">Old and new side by side, every change marked. The approver is never the author, and readers are asked to sign when it publishes.</p></div>
+          <div class="shot-mock">
+            <div class="mock win" aria-label="Mockup of a document revision being compared and approved">
+              <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span>myGFO · Documents</span></div>
+              <div class="win-body">
+                <div class="row"><b>GOM 3.4 · Crew report times</b><span class="badge info">Revision 12 proposed</span></div>
+                <p class="note">Drafted by a training captain. Review: chief pilot.</p>
+                <div class="cmp">
+                  <div><span class="h">Current · Rev 11</span>Crew report to the aircraft <del>60 minutes</del> before departure.</div>
+                  <div><span class="h">Proposed · Rev 12</span>Crew report to the aircraft <ins>75 minutes</ins> before an international departure, and 60 minutes otherwise.</div>
+                </div>
+                <p class="note">Absorbs one open bulletin. On publish, 18 pilots are asked to read and sign.</p>
+                <div class="btns"><span class="btn primary">Approve and publish</span><span class="btn">Request changes</span><span class="btn">Comment</span></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="shot">
+          <div><span class="ov">Pilots and maintenance</span><h3>Our own data flags a repeat</h3><p class="cap">The Tech Log spots the same defect coming back on one tail and raises it before landing, so the part and the technician meet the aircraft.</p></div>
+          <div class="shot-mock">
+            <div class="mock win" aria-label="Mockup of a repeat-defect alert in the Tech Log">
+              <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span>myGFO · Tech Log</span></div>
+              <div class="win-body">
+                <div class="row"><b>Tail 3 · inbound to Lunken</b><span class="badge warn">Trend alert</span></div>
+                <p>The left bleed air valve has been written up three times in 30 days on this tail, ATA 36. Landing in 2 h 10 min.</p>
+                <ul class="checks">
+                  <li>Part reserved at Lunken stores</li>
+                  <li>Technician assigned to meet the aircraft</li>
+                  <li>Tomorrow's trip 0415 is not affected if fixed tonight</li>
+                </ul>
+                <div class="btns"><span class="btn primary">Open the defect</span><span class="btn">View the trend</span></div>
+                <p class="src">Example built from Tech Log entries alone. Gulfstream data could add to it later.</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="shot">
+          <div><span class="ov">EAs and scheduling</span><h3>An EA asks, Copilot answers</h3><p class="cap">Availability, cost and Airflow feasibility in one reply, turned into a request with one tap.</p></div>
+          <div class="shot-mock">
+            <div class="mock win" aria-label="Mockup of a Copilot chat in Teams">
+              <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span>Teams · Copilot</span></div>
+              <div class="win-body">
+                <div class="msg me"><p>Can we take four people from Lunken to Teterboro Tuesday and back Thursday? What would it cost?</p></div>
+                <div class="msg bot">
+                  <p class="from">COPILOT · myGFO</p>
+                  <p>Yes. A G500 is free both days.</p>
+                  <ul><li><b>Feasibility:</b> Airflow found no runway, customs or fuel issues.</li><li><b>Crew:</b> two pilots and a flight attendant are available.</li><li><b>Estimate:</b> about $18,000 for the round trip.</li></ul>
+                  <div class="chips"><span class="chip">Start a request</span><span class="chip">Show the calendar</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="shot">
+          <div><span class="ov">Pilots and flight attendants</span><h3>The crew's airport briefing</h3><p class="cap">It opens with what is new since this pilot last looked, and labels where every line came from.</p></div>
+          <div class="shot-mock">
+            <div class="ipad" aria-label="Mockup of an airport briefing in Flight Hub on iPad">
+              <div class="screen">
+                <div class="appbar"><b>Flight Hub</b><span>Trip 0412 · Leg 2 of 3</span></div>
+                <div class="inner">
+                  <div class="brief">
+                    <div class="brief-head"><span class="icao">ZZZZ</span><b>Example International</b><span class="last">Your last look: 14 MAR</span></div>
+                    <div class="since">
+                      <p class="since-title">New since you last looked · 4 changes, 1 safety</p>
+                      <ul>
+                        <li class="safety"><span class="tier t-co">Company · safety</span><span class="txt">Ramp closed to aircraft over 90,000 lb until 31 MAR.</span><button class="got" type="button" aria-pressed="false">Got it</button></li>
+                        <li><span class="tier t-crew">Crew report · 9 days</span><span class="txt">Customs now meets the aircraft at the FBO.</span></li>
+                        <li><span class="tier t-off">Official · Jeppesen</span><span class="txt">Taxiway B closed at night.</span></li>
+                        <li><span class="tier t-hist">Our history</span><span class="txt">Typical taxi-out 14 min over 9 visits.</span></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="shot">
+          <div><span class="ov">Flight attendants, EAs and passengers</span><h3>Everyone waiting knows where the airplane is</h3><p class="cap">Live times reach the passengers, the EA, the drivers and the protection team. Nobody has to call to ask.</p></div>
+          <div class="shot-mock">
+            <div class="phone" aria-label="Mockup of live flight notifications on a phone lock screen">
+              <div class="lock">
+                <div class="date">Thursday</div>
+                <div class="clock">12:15</div>
+                <div class="notif"><div class="top"><b>myGFO</b><span>now</span></div><p>Airborne at 12:14. 1 h 36 min to Lunken. Door open about 14:02.</p></div>
+                <div class="notif"><div class="top"><b>myGFO</b><span>11:58</span></div><p>Your flight has left the gate. Estimated taxi 12 minutes.</p></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="shot">
+          <div><span class="ov">The leadership band</span><h3>The view from 30,000 feet</h3><p class="cap">Fleet, trips, overdue sign-offs and changes in progress, without asking anyone.</p></div>
+          <div class="shot-mock">
+            <div class="mock win" aria-label="Mockup of the leadership view">
+              <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span>myGFO · Leadership view</span></div>
+              <div class="win-body">
+                <div class="tiles">
+                  <div class="tile"><span class="k">Fleet</span><span class="v">5 of 6</span><span class="s">available today · 1 AOG</span></div>
+                  <div class="tile"><span class="k">Trips this week</span><span class="v">14</span><span class="s warn">2 need attention</span></div>
+                  <div class="tile"><span class="k">Overdue sign-offs</span><span class="v">3</span><span class="s">1 escalated to a manager</span></div>
+                  <div class="tile"><span class="k">Change in progress</span><span class="v small">G800 entry</span><span class="s">step 4 of 9</span><span class="bar"><i></i></span></div>
+                </div>
+                <div class="decide"><b>Decide today:</b> tail swap for trip 0412.</div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="sec" id="why">
+      <div class="sec-head">
+        <p class="eyebrow">Why it matters</p>
+        <h2>Everyone who touches GFO gets time back.</h2>
+        <p>Today much of the work at each overlap is chasing, calling and retyping. myGFO gives that time back to the people who fly, fix, plan and travel, and makes the operation safer because nothing depends on someone remembering to pass it on.</p>
+      </div>
+      <div class="roles">
+          <div class="role"><h3>Pilots</h3><p>A defect, a trip detail or an airport note is entered once and is there on the iPad, even offline. Fewer calls, no retyping.</p></div>
+          <div class="role"><h3>Flight attendants</h3><p>Trip changes and passenger needs reach you before the trip, not at the aircraft door.</p></div>
+          <div class="role"><h3>EAs</h3><p>One place to ask for a trip and see where it stands, without chasing anyone.</p></div>
+          <div class="role"><h3>Scheduling</h3><p>Aircraft status and crew readiness arrive as they change, not by text later.</p></div>
+          <div class="role"><h3>Maintenance</h3><p>Write-ups arrive complete, repeats are flagged, and nothing is retyped into CAMP.</p></div>
+          <div class="role"><h3>Passengers</h3><p>Accurate times and one point of contact, from booking to arrival.</p></div>
+          <div class="role"><h3>Leadership</h3><p>One honest view of the operation: what is open, what is late, and who owns it.</p></div>
+      </div>
+      <h2 class="sub-h2">How we know we have landed.</h2>
+      <p class="sub-lead">The end point is not a date or a feature list. We have arrived when all five of these are true.</p>
+      <ol class="endtests">
+          <li><h3>One real trip, end to end</h3><p>A trip runs from the EA's request to the crew's debrief on production data, and nobody retypes anything.</p></li>
+          <li><h3>Every handoff has a home</h3><p>Each overlap between two circles has a named owner, and its handoff happens in myGFO, not by phone or text.</p></li>
+          <li><h3>No phone call that a system should have made</h3><p>People still talk, but never just because a system failed to tell someone.</p></li>
+          <li><h3>One place for the record</h3><p>Defects, deferrals, releases and signed documents sit in one place and can be audited.</p></li>
+          <li><h3>Every gate crossed</h3><p>The five fixes are crossed in order, each when its gate is met. Passing the trip test after H4 is touchdown.</p></li>
+      </ol>
+      <p class="closing">After touchdown, the work changes from building toward myGFO to running it and making it better. The decisions and open questions that get us there are in the working reference.</p>
+      <a class="cta" href="https://claude.ai/artifact/F3bTxregXxR3ovYRiAzk42#questions" target="_blank" rel="noopener">Read the decisions in the reference</a>
+    </section>
+
+    <footer class="end">myGFO Vision and Roadmap · Revision 7 · 23 OCT 2026 · Bryan Dunlop with Claude. Screens are illustrative mockups with example data. Every idea, decision and source is in the working reference.</footer>
+  </div>
+</main>
+
+<script>
+(function () {
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  // Highlight the section being read, and keep its link in view on narrow screens
+  var nav = $('.nav');
+  var links = {};
+  $$('.nav a[href^="#"]').forEach(function (a) { links[a.getAttribute('href').slice(1)] = a; });
+  var sections = $$('main section[id]');
+  var visible = {};
+  function mark() {
+    var current = null;
+    for (var i = 0; i < sections.length; i++) { if (visible[sections[i].id]) { current = sections[i].id; break; } }
+    Object.keys(links).forEach(function (id) {
+      if (id === current) links[id].setAttribute('aria-current', 'true');
+      else links[id].removeAttribute('aria-current');
+    });
+    if (current && links[current]) {
+      var a = links[current];
+      var left = a.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
+      if (left < nav.scrollLeft || left + a.offsetWidth > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = Math.max(0, left - 16);
+    }
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+      mark();
+    }, { rootMargin: '-15% 0px -60% 0px' });
+    sections.forEach(function (s) { io.observe(s); });
+  }
+
+  // Fig. 1: light the circles up to a horizon
+  var stepEls = $$('#circles [data-h]');
+  var stepCap = $('#stepCap');
+  var caps = {
+    all: 'The end state: every overlap is tied together, with AI answering from the shared record.',
+    '0': 'H0 lights the Tech Log, where pilots and maintenance meet, on top of the shared record and controlled documents.',
+    '1': 'H1 adds the crew trip, where pilots and flight attendants meet.',
+    '2': 'H2 adds the booking, where EAs and scheduling meet, and the passenger, where flight attendants and EAs meet.',
+    '3': 'H3 adds availability, where scheduling and maintenance meet, and the leadership view across the band.',
+    '4': 'H4 adds AI across the center, answering from the shared record.'
+  };
+  $$('.sbtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var v = b.getAttribute('data-step');
+      var n = v === 'all' ? 4 : parseInt(v, 10);
+      stepEls.forEach(function (el) { el.classList.toggle('off', parseInt(el.getAttribute('data-h'), 10) > n); });
+      $$('.sbtn').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      stepCap.textContent = caps[v];
+    });
+  });
+
+  // On narrow screens, start the circles centered on the shared record
+  var cfs = $('#circles .figscroll');
+  if (cfs && cfs.scrollWidth > cfs.clientWidth) cfs.scrollLeft = (cfs.scrollWidth - cfs.clientWidth) / 2;
+
+  // Fig. 4: one tracer run along the glidepath the first time it is seen. The path itself is always drawn.
+  var trace = $('#gTrace');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (trace && !reduce && 'IntersectionObserver' in window) {
+    var io2 = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { trace.classList.add('go'); io2.disconnect(); }
+      });
+    }, { threshold: 0.45 });
+    io2.observe($('#glidepath figure'));
+  }
+
+  // The example briefing's acknowledgment
+  $$('.got').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var li = b.closest('li');
+      var done = li.classList.toggle('acked');
+      b.textContent = done ? 'Acknowledged' : 'Got it';
+      b.setAttribute('aria-pressed', done ? 'true' : 'false');
+    });
+  });
+})();
+</script>
